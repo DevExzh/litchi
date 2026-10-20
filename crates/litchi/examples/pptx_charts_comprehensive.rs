@@ -169,14 +169,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Finalize authoring, then edit the canonical OPC graph.
     let mut package = builder.build()?;
-    let relationship_ids = package.edit_opc(|opc| {
-        let mut ids = Vec::with_capacity(charts.len());
-        for (index, value) in charts.iter().enumerate() {
-            let slide_name = format!("/ppt/slides/slide{}.xml", index + 2);
-            ids.push(chart::add(opc, &slide_name, value)?);
-        }
-        Ok(ids)
-    })?;
+    let relationship_ids = {
+        let mut opc_edit = package.edit_opc()?;
+        let value = opc_edit.update(|opc| {
+            let mut ids = Vec::with_capacity(charts.len());
+            for (index, value) in charts.iter().enumerate() {
+                let slide_name = format!("/ppt/slides/slide{}.xml", index + 2);
+                ids.push(chart::add(opc, &slide_name, value)?);
+            }
+            Ok(ids)
+        })?;
+        package = opc_edit.commit()?.into_package();
+        value
+    };
 
     let bytes = package.to_bytes()?;
     let reopened = Package::from_bytes(&bytes)?;

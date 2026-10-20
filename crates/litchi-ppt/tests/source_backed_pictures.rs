@@ -285,7 +285,10 @@ fn every_declared_metadata_or_unrelated_stream_is_entry_bounded_at_admission() {
         let (bytes, range) = unrelated_stream_fixture(stream_name, 8 * 1024);
 
         let (reader, rejected) = RejectingReader::new(bytes.clone(), vec![range]);
-        let error = match Reader::from_reader_with_limits(reader, limits) {
+        let error = match Reader::from_reader_with_options(
+            reader,
+            OpenOptions::new().source_limits(limits),
+        ) {
             Ok(_) => panic!("oversized {stream_name} must fail eager admission"),
             Err(error) => error,
         };
@@ -297,10 +300,12 @@ fn every_declared_metadata_or_unrelated_stream_is_entry_bounded_at_admission() {
 
         let (reader, rejected) = RejectingReader::new(bytes.clone(), vec![range]);
         let ole = OleFile::open(reader).expect("directory indexing must not read the payload");
-        let error = match Reader::from_ole_file_with_limits(ole, limits) {
-            Ok(_) => panic!("oversized {stream_name} must fail pre-parsed admission"),
-            Err(error) => error,
-        };
+        let error =
+            match Reader::from_ole_file_with_options(ole, OpenOptions::new().source_limits(limits))
+            {
+                Ok(_) => panic!("oversized {stream_name} must fail pre-parsed admission"),
+                Err(error) => error,
+            };
         assert_entry_limit(error);
         assert!(
             !rejected.load(Ordering::Acquire),
@@ -308,7 +313,10 @@ fn every_declared_metadata_or_unrelated_stream_is_entry_bounded_at_admission() {
         );
 
         let (source, rejected) = RejectingSource::new(bytes, vec![range]);
-        let error = match SourceBackedPackage::from_read_at_with_limits(source, limits) {
+        let error = match SourceBackedPackage::from_read_at_with_options(
+            source,
+            OpenOptions::new().source_limits(limits),
+        ) {
             Ok(_) => panic!("oversized {stream_name} must fail positional admission"),
             Err(error) => error,
         };
@@ -332,24 +340,29 @@ fn all_declared_streams_contribute_to_aggregate_admission_before_payload_reads()
     let (bytes, ranges) = all_streams_fixture();
 
     let (reader, rejected) = RejectingReader::new(bytes.clone(), ranges.clone());
-    let error = match Reader::from_reader_with_limits(reader, limits) {
-        Ok(_) => panic!("aggregate stream overflow must fail eager admission"),
-        Err(error) => error,
-    };
+    let error =
+        match Reader::from_reader_with_options(reader, OpenOptions::new().source_limits(limits)) {
+            Ok(_) => panic!("aggregate stream overflow must fail eager admission"),
+            Err(error) => error,
+        };
     assert_aggregate_limit(error);
     assert!(!rejected.load(Ordering::Acquire));
 
     let (reader, rejected) = RejectingReader::new(bytes.clone(), ranges.clone());
     let ole = OleFile::open(reader).expect("directory indexing must not read payloads");
-    let error = match Reader::from_ole_file_with_limits(ole, limits) {
-        Ok(_) => panic!("aggregate stream overflow must fail pre-parsed admission"),
-        Err(error) => error,
-    };
+    let error =
+        match Reader::from_ole_file_with_options(ole, OpenOptions::new().source_limits(limits)) {
+            Ok(_) => panic!("aggregate stream overflow must fail pre-parsed admission"),
+            Err(error) => error,
+        };
     assert_aggregate_limit(error);
     assert!(!rejected.load(Ordering::Acquire));
 
     let (source, rejected) = RejectingSource::new(bytes, ranges);
-    let error = match SourceBackedPackage::from_read_at_with_limits(source, limits) {
+    let error = match SourceBackedPackage::from_read_at_with_options(
+        source,
+        OpenOptions::new().source_limits(limits),
+    ) {
         Ok(_) => panic!("aggregate stream overflow must fail positional admission"),
         Err(error) => error,
     };
@@ -429,7 +442,7 @@ fn positional_presentation_without_pictures_reports_absence_without_loading() {
 fn positional_path_open_keeps_the_file_source_positional() {
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/ppt/empty.ppt");
-    let package = SourceBackedPackage::from_path(&path).unwrap();
+    let package = SourceBackedPackage::open(&path).unwrap();
 
     assert_eq!(package.len(), std::fs::metadata(&path).unwrap().len());
     assert!(!package.presentation().unwrap().has_pictures());
@@ -444,7 +457,10 @@ fn positional_package_limit_is_typed_before_cfb_payload_reads() {
         .unwrap()
         .build()
         .unwrap();
-    let error = match SourceBackedPackage::from_read_at_with_limits(source.clone(), limits) {
+    let error = match SourceBackedPackage::from_read_at_with_options(
+        source.clone(),
+        OpenOptions::new().source_limits(limits),
+    ) {
         Ok(_) => panic!("package limit should reject the source"),
         Err(error) => error,
     };
@@ -470,7 +486,7 @@ fn positional_presentation_checks_stream_aggregate_before_materialization() {
         .unwrap()
         .build()
         .unwrap();
-    let error = match package.presentation_with_limits(limits) {
+    let error = match package.presentation_with_options(OpenOptions::new().source_limits(limits)) {
         Ok(_) => panic!("aggregate limit should reject the source"),
         Err(error) => error,
     };
@@ -498,12 +514,15 @@ fn positional_source_retains_tighter_parse_policy() {
         .unwrap()
         .build()
         .unwrap();
-    let package =
-        SourceBackedPackage::from_read_at_with_limits(source.clone(), package_limit).unwrap();
+    let package = SourceBackedPackage::from_read_at_with_options(
+        source.clone(),
+        OpenOptions::new().source_limits(package_limit),
+    )
+    .unwrap();
     assert_eq!(package.source_limits(), package_limit);
 
     let looser = SourceLimits::default();
-    let error = match package.presentation_with_limits(looser) {
+    let error = match package.presentation_with_options(OpenOptions::new().source_limits(looser)) {
         Ok(_) => panic!("the retained package policy must remain tighter"),
         Err(error) => error,
     };
@@ -527,7 +546,7 @@ fn positional_source_freshness_precedes_stricter_entry_projection() {
         .build()
         .unwrap();
 
-    let error = match package.presentation_with_limits(tighter) {
+    let error = match package.presentation_with_options(OpenOptions::new().source_limits(tighter)) {
         Ok(_) => panic!("the stricter entry projection must fail"),
         Err(error) => error,
     };
@@ -541,7 +560,7 @@ fn positional_source_freshness_precedes_stricter_entry_projection() {
     ));
 
     source.revision.fetch_add(1, Ordering::AcqRel);
-    let error = match package.presentation_with_limits(tighter) {
+    let error = match package.presentation_with_options(OpenOptions::new().source_limits(tighter)) {
         Ok(_) => panic!("source freshness must be checked before payload policy"),
         Err(error) => error,
     };
@@ -562,10 +581,10 @@ fn open_options_uses_the_checked_source_policy_and_getters() {
         .source_limits(limits)
         .password("secret")
         .leniency(Leniency::TolerateUserEditChainDefects);
-    assert_eq!(options.get_source_limits(), limits);
-    assert_eq!(options.get_password(), Some("secret"));
+    assert_eq!(options.source_limits_value(), limits);
+    assert_eq!(options.password_value(), Some("secret"));
     assert_eq!(
-        options.get_leniency(),
+        options.leniency_value(),
         Leniency::TolerateUserEditChainDefects
     );
 }
@@ -578,8 +597,11 @@ fn eager_ingress_enforces_input_and_entry_limits_with_exact_boundaries() {
         .unwrap()
         .build()
         .unwrap();
-    let mut package = Reader::from_reader_with_limits(Cursor::new(bytes.clone()), exact)
-        .expect("the complete input boundary is inclusive");
+    let mut package = Reader::from_reader_with_options(
+        Cursor::new(bytes.clone()),
+        OpenOptions::new().source_limits(exact),
+    )
+    .expect("the complete input boundary is inclusive");
     assert_eq!(package.source_limits().max_input_bytes(), bytes.len());
 
     let too_small = SourceLimits::builder()
@@ -587,7 +609,10 @@ fn eager_ingress_enforces_input_and_entry_limits_with_exact_boundaries() {
         .unwrap()
         .build()
         .unwrap();
-    let error = match Reader::from_reader_with_limits(Cursor::new(bytes.clone()), too_small) {
+    let error = match Reader::from_reader_with_options(
+        Cursor::new(bytes.clone()),
+        OpenOptions::new().source_limits(too_small),
+    ) {
         Ok(_) => panic!("complete input overflow must be typed"),
         Err(error) => error,
     };
@@ -600,7 +625,8 @@ fn eager_ingress_enforces_input_and_entry_limits_with_exact_boundaries() {
         } if observed == bytes.len() && maximum == bytes.len() - 1
     ));
 
-    let error = match package.presentation_with_limits(too_small) {
+    let error = match package.presentation_with_options(OpenOptions::new().source_limits(too_small))
+    {
         Ok(_) => panic!("stricter projection input overflow must be typed"),
         Err(error) => error,
     };
@@ -618,10 +644,11 @@ fn eager_ingress_enforces_input_and_entry_limits_with_exact_boundaries() {
         .unwrap()
         .build()
         .unwrap();
-    let error = match package.presentation_with_limits(entry_limit) {
-        Ok(_) => panic!("declared stream entry overflow must be typed"),
-        Err(error) => error,
-    };
+    let error =
+        match package.presentation_with_options(OpenOptions::new().source_limits(entry_limit)) {
+            Ok(_) => panic!("declared stream entry overflow must be typed"),
+            Err(error) => error,
+        };
     assert!(matches!(
         error,
         Error::Limit {

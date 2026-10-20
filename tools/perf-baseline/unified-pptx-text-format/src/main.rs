@@ -86,9 +86,9 @@ fn slide_props() -> Props<'static> {
         .with("color", "1F4E79")
 }
 
-fn native_edit() -> [litchi_pptx::opened::TextEdit<'static>; 1] {
-    use litchi_pptx::opened::{Rgb, TextEdit, TextProperties, TextTarget};
-    [TextEdit::new(
+fn native_edit() -> [litchi_pptx::opened::TextAssignment<'static>; 1] {
+    use litchi_pptx::opened::{Rgb, TextAssignment, TextProperties, TextTarget};
+    [TextAssignment::new(
         TextTarget::Run {
             shape: Position::new(0),
             paragraph: Position::new(0),

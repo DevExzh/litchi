@@ -57,30 +57,30 @@ impl Change {
 
 /// Reusable patch and revision pair produced by one successful commit.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChangeSet {
+pub(crate) struct RecordPatch {
     base: Revision,
     target: Revision,
     changes: Vec<Change>,
 }
 
-impl ChangeSet {
+impl RecordPatch {
     #[must_use]
-    pub const fn base(&self) -> Revision {
+    pub(crate) const fn base(&self) -> Revision {
         self.base
     }
 
     #[must_use]
-    pub const fn target(&self) -> Revision {
+    pub(crate) const fn target(&self) -> Revision {
         self.target
     }
 
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     #[must_use]
-    pub const fn is_empty(&self) -> bool {
+    pub(crate) const fn is_empty(&self) -> bool {
         self.changes.is_empty()
     }
 
@@ -89,11 +89,11 @@ impl ChangeSet {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() != self.target {
             return invalid("cannot undo against a different slide revision");
         }
-        let mut editor = Editor::open(current.clone());
+        let mut editor = RecordEdit::open(current.clone());
         for change in self.changes.iter().rev() {
             editor.apply_change(change, false)?;
         }
@@ -105,11 +105,11 @@ impl ChangeSet {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() != self.base {
             return invalid("cannot redo against a different slide revision");
         }
-        let mut editor = Editor::open(current.clone());
+        let mut editor = RecordEdit::open(current.clone());
         for change in &self.changes {
             editor.apply_change(change, true)?;
         }
@@ -119,13 +119,13 @@ impl ChangeSet {
 
 /// An isolated transaction over one slide's synchronization metadata.
 #[derive(Debug, Clone)]
-pub struct Editor {
+pub(crate) struct RecordEdit {
     source: Snapshot,
     root: Record,
     changes: Vec<Change>,
 }
 
-impl Editor {
+impl RecordEdit {
     pub(super) fn open(source: Snapshot) -> Self {
         Self {
             root: source.root.clone(),
@@ -136,7 +136,7 @@ impl Editor {
 
     /// Borrow the candidate slide record.
     #[must_use]
-    pub const fn record(&self) -> &Record {
+    pub(crate) const fn record(&self) -> &Record {
         &self.root
     }
 
@@ -145,25 +145,19 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn synchronization(&self) -> Result<Option<Synchronization>> {
+    pub(crate) fn synchronization(&self) -> Result<Option<Synchronization>> {
         codec::read(&self.root)
     }
 
     /// Return the source limits used by this transaction.
     #[must_use]
-    pub const fn limits(&self) -> Limits {
+    pub(crate) const fn limits(&self) -> Limits {
         self.source.limits
-    }
-
-    /// Whether a semantic change has been staged.
-    #[must_use]
-    pub const fn is_changed(&self) -> bool {
-        !self.changes.is_empty()
     }
 
     /// Borrow the semantic changes staged so far.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
 
@@ -176,7 +170,7 @@ impl Editor {
         clippy::needless_pass_by_value,
         reason = "taking the `Synchronization` by value is the established transaction API shape; changing it to a reference would churn callers in the sibling test module"
     )]
-    pub fn set(&mut self, value: Synchronization) -> Result<()> {
+    pub(crate) fn set(&mut self, value: Synchronization) -> Result<()> {
         let replacement = codec::encode_sync(&value)?;
         let existing = validation::sync_index(&self.root)?;
         let (index, before) = match existing {
@@ -214,7 +208,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn clear(&mut self) -> Result<bool> {
+    pub(crate) fn clear(&mut self) -> Result<bool> {
         let Some(index) = validation::sync_index(&self.root)? else {
             return Ok(false);
         };
@@ -228,43 +222,19 @@ impl Editor {
         Ok(true)
     }
 
-    /// Capture the candidate without publishing it.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        Snapshot::from_record_with_limits(self.root.clone(), self.source.limits)
-    }
-
     /// Validate and publish the candidate and its reversible patch.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<RecordCommit> {
         let snapshot = Snapshot::from_record_with_limits(self.root, self.source.limits)?;
-        let changes = ChangeSet {
+        let changes = RecordPatch {
             base: self.source.revision(),
             target: snapshot.revision(),
             changes: self.changes,
         };
-        Ok(Commit { snapshot, changes })
-    }
-
-    /// Alias for move-owned writer terminology.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn finish(self) -> Result<Commit> {
-        self.commit()
-    }
-
-    /// Discard the candidate and recover the source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
+        Ok(RecordCommit { snapshot, changes })
     }
 
     fn apply_change(&mut self, change: &Change, forward: bool) -> Result<()> {
@@ -306,19 +276,19 @@ impl Editor {
 
 /// A successful immutable target and reusable patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
+pub(crate) struct RecordCommit {
     snapshot: Snapshot,
-    changes: ChangeSet,
+    changes: RecordPatch,
 }
 
-impl Commit {
+impl RecordCommit {
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     #[must_use]
-    pub const fn changes(&self) -> &ChangeSet {
+    pub(crate) const fn changes(&self) -> &RecordPatch {
         &self.changes
     }
 
@@ -328,7 +298,7 @@ impl Commit {
     ///
     /// Returns an error if the synchronization record is malformed or exceeds
     /// the snapshot's validation limits.
-    pub fn synchronization(&self) -> Result<Option<Synchronization>> {
+    pub(crate) fn synchronization(&self) -> Result<Option<Synchronization>> {
         self.snapshot.synchronization()
     }
 
@@ -339,7 +309,7 @@ impl Commit {
     ///
     /// Returns an error if `current` does not match the committed revision or
     /// a staged change cannot be applied.
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.changes.undo(current)
     }
 
@@ -350,12 +320,12 @@ impl Commit {
     ///
     /// Returns an error if `current` does not match the source revision or a
     /// staged change cannot be applied.
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.changes.redo(current)
     }
 
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, ChangeSet) {
+    pub(crate) fn into_parts(self) -> (Snapshot, RecordPatch) {
         (self.snapshot, self.changes)
     }
 }

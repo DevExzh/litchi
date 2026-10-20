@@ -42,11 +42,7 @@ impl Pptx {
                     let PptxOwner::Eager(package) = &self.0.owner else {
                         unreachable!("encrypted PPTX owners are eager");
                     };
-                    package.write_reencrypted(
-                        &mut counted,
-                        password.as_str(),
-                        litchi_pptx::EncryptionLimits::default(),
-                    )?;
+                    package.write_reencrypted(&mut counted, password.as_str())?;
                 } else {
                     self.write_to(&mut counted)?;
                 }

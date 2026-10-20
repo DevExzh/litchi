@@ -13,7 +13,12 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use litchi_core::sheet::{Cell, CellValue, Result, WorkbookTrait, Worksheet};
+use litchi_core::edit::RefusalKind;
+use litchi_core::sheet::{Cell, CellValue, Error as SheetError, Result, WorkbookTrait, Worksheet};
+
+/// The refusal for a worksheet the workbook does not have.
+const NO_SUCH_SHEET: SheetError =
+    SheetError::refused(RefusalKind::NotFound, "worksheet", "no such worksheet");
 use litchi_eval::{FormulaEvaluator, TableConfig};
 
 // ---------------------------------------------------------------------------
@@ -106,6 +111,7 @@ impl<'a> Cell for MemCell<'a> {
 // types. This minimal sheet iterates nothing.
 
 impl Worksheet for MemSheet {
+    type Error = SheetError;
     type Cell<'a> = MemCell<'a>;
     type Cells<'a> = std::iter::Empty<Result<MemCell<'a>>>;
     type Rows<'a> = std::iter::Empty<Result<Cow<'a, [CellValue]>>>;
@@ -132,7 +138,11 @@ impl Worksheet for MemSheet {
     }
 
     fn cell_by_coordinate(&self, _coordinate: &str) -> Result<MemCell<'_>> {
-        Err("cell_by_coordinate is not implemented for MemSheet".into())
+        Err(SheetError::refused(
+            RefusalKind::UnsupportedOperation,
+            "cell_by_coordinate",
+            "MemSheet reads cells by row and column",
+        ))
     }
 
     fn cells(&self) -> Self::Cells<'_> {
@@ -162,6 +172,7 @@ impl Worksheet for MemSheet {
 // blanket implementation for references.
 
 impl WorkbookTrait for MemWorkbook {
+    type Error = SheetError;
     type Worksheet<'a> = &'a MemSheet;
     type Worksheets<'a> =
         std::iter::Map<std::slice::Iter<'a, MemSheet>, fn(&'a MemSheet) -> Result<&'a MemSheet>>;
@@ -175,18 +186,14 @@ impl WorkbookTrait for MemWorkbook {
     }
 
     fn worksheet_by_name(&self, name: &str) -> Result<&MemSheet> {
-        Ok(self
-            .sheets
+        self.sheets
             .iter()
             .find(|s| s.name == name)
-            .ok_or_else(|| format!("worksheet '{name}' not found"))?)
+            .ok_or(NO_SUCH_SHEET)
     }
 
     fn worksheet_by_index(&self, index: usize) -> Result<&MemSheet> {
-        Ok(self
-            .sheets
-            .get(index)
-            .ok_or_else(|| format!("worksheet index {index} out of range"))?)
+        self.sheets.get(index).ok_or(NO_SUCH_SHEET)
     }
 
     fn worksheets(&self) -> Self::Worksheets<'_> {

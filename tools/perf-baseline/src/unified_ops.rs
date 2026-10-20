@@ -2646,7 +2646,7 @@ fn leaf_doc_open(path: &Path) -> Result<litchi_doc::Document, Box<dyn Error>> {
 /// The leaf calls the unified PPT path open makes: the positional package,
 /// its OLE property-set metadata, and the reader.
 fn leaf_ppt_open(path: &Path) -> Result<litchi_ppt::Presentation, Box<dyn Error>> {
-    let package = litchi_ppt::SourceBackedPackage::from_path(path)?;
+    let package = litchi_ppt::SourceBackedPackage::open(path)?;
     std::hint::black_box(package.metadata().ok().map(Metadata::from));
     Ok(package.presentation()?)
 }
@@ -2991,7 +2991,7 @@ fn run_ole2(
             "fresh leaf DOC open (as for open) + Document::paragraphs() + nth(target).text()"
         },
         (Leg::Leaf, Ole2Query::PptOpen) => {
-            "litchi_ppt::SourceBackedPackage::from_path + OLE property-set metadata + presentation()"
+            "litchi_ppt::SourceBackedPackage::open + OLE property-set metadata + presentation()"
         },
         (Leg::Leaf, Ole2Query::PptFullText) => {
             "fresh leaf PPT open (as for open) + Presentation::text()"

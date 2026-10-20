@@ -358,11 +358,11 @@ fn removal_batches_are_atomic_or_best_effort_at_item_boundaries() {
 fn native_final_slide_refuses_and_notes_slides_leave_with_their_slide() {
     let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     builder.presentation().unwrap().add_slide().unwrap();
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     let before = package.to_bytes().unwrap();
     let mut edit = package.edit().unwrap();
     assert!(edit.remove_slide(litchi_core::Position::new(0)).is_err());
-    let (mut after, patch) = edit.commit().unwrap().into_parts();
+    let (after, patch) = edit.commit().unwrap().into_parts();
     assert!(patch.is_noop());
     assert_eq!(after.to_bytes().unwrap(), before);
 

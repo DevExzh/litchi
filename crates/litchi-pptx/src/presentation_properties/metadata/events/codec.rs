@@ -610,7 +610,7 @@ enum Frame {
 }
 
 #[derive(Clone, Debug)]
-struct Edit {
+struct ListDraft {
     range: Range<usize>,
     replacement: Vec<u8>,
 }
@@ -918,7 +918,7 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, working: &[Draft]) -> Re
         }
         return apply_edits(
             source,
-            vec![Edit {
+            vec![ListDraft {
                 range: located.list_content.clone(),
                 replacement: body,
             }],
@@ -939,22 +939,22 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, working: &[Draft]) -> Re
 pub(crate) fn remove_extension(source: &[u8], located: &Located) -> Result<Vec<u8>> {
     apply_edits(
         source,
-        vec![Edit {
+        vec![ListDraft {
             range: located.extension.clone(),
             replacement: Vec::new(),
         }],
     )
 }
 
-fn rewrite_event(source: &[u8], span: &EventSpan, desired: &Draft) -> Result<Vec<Edit>> {
+fn rewrite_event(source: &[u8], span: &EventSpan, desired: &Draft) -> Result<Vec<ListDraft>> {
     let mut edits = Vec::new();
     let new_local = desired.element_name().as_bytes();
-    edits.push(Edit {
+    edits.push(ListDraft {
         range: span.local_name.clone(),
         replacement: new_local.to_vec(),
     });
     if let Some(close_local_name) = &span.close_local_name {
-        edits.push(Edit {
+        edits.push(ListDraft {
             range: close_local_name.clone(),
             replacement: new_local.to_vec(),
         });
@@ -985,7 +985,7 @@ fn attribute_edit(
     span: &EventSpan,
     name: &[u8],
     value: Option<&str>,
-) -> Result<Edit> {
+) -> Result<ListDraft> {
     let matches: Vec<_> = span
         .attributes
         .iter()
@@ -998,7 +998,7 @@ fn attribute_edit(
         )));
     }
     match (matches.first().copied(), value) {
-        (Some(attribute), Some(value)) => Ok(Edit {
+        (Some(attribute), Some(value)) => Ok(ListDraft {
             range: attribute.value_start..attribute.value_end,
             replacement: crate::presentation_properties::metadata::escape_xml(value).into_bytes(),
         }),
@@ -1007,7 +1007,7 @@ fn attribute_edit(
             while start > span.qualified_name.end && is_xml_space(source[start - 1]) {
                 start -= 1;
             }
-            Ok(Edit {
+            Ok(ListDraft {
                 range: start..attribute.value_end + 1,
                 replacement: Vec::new(),
             })
@@ -1017,7 +1017,7 @@ fn attribute_edit(
             if at > span.qualified_name.end && source[at - 1] == b'/' {
                 at -= 1;
             }
-            Ok(Edit {
+            Ok(ListDraft {
                 range: at..at,
                 replacement: format!(
                     " {}=\"{}\"",
@@ -1027,7 +1027,7 @@ fn attribute_edit(
                 .into_bytes(),
             })
         },
-        (None, None) => Ok(Edit {
+        (None, None) => Ok(ListDraft {
             range: 0..0,
             replacement: Vec::new(),
         }),
@@ -1072,7 +1072,7 @@ fn serialize_event(event: &Draft, prefix: &[u8]) -> Vec<u8> {
     out
 }
 
-fn apply_edits(source: &[u8], mut edits: Vec<Edit>) -> Result<Vec<u8>> {
+fn apply_edits(source: &[u8], mut edits: Vec<ListDraft>) -> Result<Vec<u8>> {
     edits.retain(|edit| edit.range.start != edit.range.end || !edit.replacement.is_empty());
     edits.sort_by(|left, right| {
         right

@@ -10,7 +10,7 @@ fn ten_thousand_text_boxes_admit_an_eager_native_edit() {
         slide.add_text_box(&format!("shape-{index}"), 0, 0, 914_400, 914_400);
     }
     let bytes = builder.build().unwrap().to_bytes().unwrap();
-    let mut source = Package::from_bytes(&bytes).unwrap();
+    let source = Package::from_bytes(&bytes).unwrap();
     let mut edit = source.edit().unwrap();
     assert_eq!(edit.slides().len(), 1);
     assert_eq!(
@@ -24,7 +24,7 @@ fn ten_thousand_text_boxes_admit_an_eager_native_edit() {
         .unwrap(),
         2
     );
-    let mut after = edit.commit().unwrap().into_package();
+    let after = edit.commit().unwrap().into_package();
     assert_eq!(source.to_bytes().unwrap(), bytes);
     let reopened = Package::from_bytes(&after.to_bytes().unwrap()).unwrap();
     let presentation = reopened.presentation().unwrap();

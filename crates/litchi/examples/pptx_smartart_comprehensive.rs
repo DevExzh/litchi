@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     test_pyramid_diagrams()?;
     test_complex_hierarchies()?;
 
-    let mut pkg = Package::new()?;
+    let pkg = Package::new()?;
     pkg.save("smartart_comprehensive.pptx")?;
     let reopened = Package::open("smartart_comprehensive.pptx")?;
     let slide_count = reopened.presentation()?.slide_count()?;

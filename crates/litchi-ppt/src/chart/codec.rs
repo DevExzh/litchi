@@ -5,7 +5,7 @@ use std::io::{Cursor, Read, Write};
 use litchi_cfb::OleFile;
 use litchi_cfb::consts::STGTY_STREAM;
 use litchi_ograph::chart::Book;
-use litchi_ograph::{Limits, Package as GraphPackage};
+use litchi_ograph::{Limits, Package as OgraphPackage};
 
 use super::model::Kind;
 use crate::embedded::storage::{Compression, Kind as StorageKind, Storage};
@@ -18,7 +18,7 @@ const BOOK: &str = "Book";
 
 pub(super) enum Parsed {
     Graph {
-        package: Box<GraphPackage>,
+        package: Box<OgraphPackage>,
         book: Book,
         compression: Compression,
     },
@@ -101,7 +101,7 @@ pub(super) fn parse(
     let package_bytes = decode(storage, limits)?;
     match kind {
         Kind::Graph => {
-            let package = GraphPackage::with_limits(package_bytes, limits)?;
+            let package = OgraphPackage::with_limits(package_bytes, limits)?;
             let workbook = package.workbook()?.into_bytes();
             let book = Book::with_limits(workbook, limits)?;
             ensure_kind(&book, litchi_ograph::chart::Kind::Graph)?;

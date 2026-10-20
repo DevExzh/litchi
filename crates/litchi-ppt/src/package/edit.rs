@@ -89,7 +89,7 @@ impl EditOptions {
 
     /// Return the selected operation budget.
     #[must_use]
-    pub const fn get_max_operations(self) -> usize {
+    pub const fn max_operations_value(&self) -> usize {
         self.max_operations
     }
 }
@@ -136,6 +136,11 @@ impl From<slide_order::Error> for Error {
     fn from(error: slide_order::Error) -> Self {
         match error {
             slide_order::Error::Refused(slide_order::Refusal::Signed) => Self::Signed,
+            // A transfer plan made against another receiving artifact is a
+            // patch for another base (record 0351 §2.4).
+            slide_order::Error::Refused(slide_order::Refusal::TransferTargetMismatch) => {
+                Self::PatchConflict
+            },
             error => Self::Native(error),
         }
     }
@@ -640,9 +645,29 @@ impl Edit {
 
     /// Publish this edit as a new immutable package.
     pub fn commit(self) -> Result<Commit> {
+        self.commit_with(slide_order::Transaction::commit)
+    }
+
+    /// Publish this edit while reporting deterministic, content-free phase
+    /// boundaries of the native publication to `observer`.
+    ///
+    /// This is the opt-in diagnostic equivalent of [`Self::commit`]; it keeps
+    /// every validation and ownership rule of the ordinary commit.
+    #[cfg(feature = "performance-diagnostics")]
+    pub fn commit_profiled(
+        self,
+        observer: impl FnMut(slide_order::DiagnosticEvent),
+    ) -> Result<Commit> {
+        self.commit_with(|inner| inner.commit_profiled(observer))
+    }
+
+    fn commit_with(
+        self,
+        native: impl FnOnce(slide_order::Transaction) -> slide_order::Result<slide_order::Commit>,
+    ) -> Result<Commit> {
         ensure_source_version(&self.package, self.expected_source)?;
         let verified = self.inner.verified_shapes();
-        let native_commit = self.inner.commit();
+        let native_commit = native(self.inner);
         ensure_source_version(&self.package, self.expected_source)?;
         let native_commit = native_commit?;
         let operation_count = self.operation_count;
@@ -726,7 +751,19 @@ impl Package {
     }
 
     /// Apply a primary exact-source patch without mutating this package.
-    pub fn apply(&self, patch: &Patch) -> Result<Self> {
+    ///
+    /// The commit carries the published package, a copy of `patch` and its
+    /// diagnostics; an exact no-op patch publishes this package unchanged.
+    pub fn apply(&self, patch: &Patch) -> Result<Commit> {
+        let package = self.apply_package(patch)?;
+        Ok(Commit {
+            package,
+            patch: patch.clone(),
+            diagnostics: Diagnostics::new(!patch.is_noop(), patch.operation_count),
+        })
+    }
+
+    fn apply_package(&self, patch: &Patch) -> Result<Self> {
         if self.is_encrypted() {
             return Err(Error::Package(PackageError::EncryptionPolicy));
         }

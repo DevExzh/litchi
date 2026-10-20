@@ -253,10 +253,11 @@ fn managed_insertion_retains_patch_resources_and_cancellation_fences_commit() {
         token,
         ExecutionLimits::new(NonZeroUsize::MIN, NonZeroUsize::MIN, NonZeroU64::MAX, 0).unwrap(),
     );
-    let source = Package::from_read_at_with_execution_context(
+    let source = Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes(1, false))),
-        litchi_opc::SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(litchi_opc::SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = source.edit().unwrap();

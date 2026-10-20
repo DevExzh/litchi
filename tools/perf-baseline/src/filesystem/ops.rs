@@ -1036,7 +1036,7 @@ fn open_leaf_pptx(
         Ingress::Eager => litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(
             OwnedSource::new(fs::read(source)?),
         ))?,
-        Ingress::Source => litchi_pptx::SourceBackedPresentation::from_path(source)?,
+        Ingress::Source => litchi_pptx::SourceBackedPresentation::open(source)?,
     })
 }
 

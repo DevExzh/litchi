@@ -171,16 +171,6 @@ pub trait ShapeExt {
     /// Returns an error if the operation fails.
     fn interactions(&self) -> Result<Vec<crate::Interaction>>;
 
-    /// Parses click and mouse-over actions with explicit limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    fn interactions_with_limits(
-        &self,
-        limits: crate::InteractionLimits,
-    ) -> Result<Vec<crate::Interaction>>;
-
     /// Projects legacy placeholder metadata into checked semantic values.
     ///
     /// # Errors
@@ -198,17 +188,6 @@ pub trait ShapeExt {
         context: crate::PlaceholderContext,
     ) -> Result<Option<crate::PlaceholderAtom>>;
 
-    /// Parses a context-validated placeholder atom with explicit limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    fn placeholder_atom_with_limits(
-        &self,
-        context: crate::PlaceholderContext,
-        limits: crate::PlaceholderLimits,
-    ) -> Result<Option<crate::PlaceholderAtom>>;
-
     /// Parses `PowerPoint` 12 shape round-trip metadata.
     ///
     /// # Errors
@@ -223,32 +202,12 @@ pub trait ShapeExt {
     /// Returns an error if the operation fails.
     fn ppt_flags(&self) -> Result<Option<crate::ShapeFlagProjection>>;
 
-    /// Parses the PPT shape-flag projection with explicit limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    fn ppt_flags_with(
-        &self,
-        limits: crate::ShapeFlagLimits,
-    ) -> Result<Option<crate::ShapeFlagProjection>>;
-
     /// Parses inert shape programmable tags with default limits.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
     fn programmable_tags(&self) -> Result<Option<crate::ShapeProgrammableTags>>;
-
-    /// Parses inert shape programmable tags with explicit limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    fn programmable_tags_with_limits(
-        &self,
-        limits: crate::ShapeProgrammableTagLimits,
-    ) -> Result<Option<crate::ShapeProgrammableTags>>;
 
     /// Decodes the shape's PPT textbox payload.
     ///
@@ -263,12 +222,32 @@ pub trait ShapeExt {
     ///
     /// Returns an error if the operation fails.
     fn text_interactions(&self) -> Result<Vec<crate::TextInteraction>>;
+}
 
-    /// Parses range-anchored text actions with explicit limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
+/// The explicit-limit forms of [`ShapeExt`]'s parsers, for the crate's own
+/// bounded walks; the public trait applies the default limits.
+pub(crate) trait ShapeLimitsExt {
+    fn interactions_with_limits(
+        &self,
+        limits: crate::InteractionLimits,
+    ) -> Result<Vec<crate::Interaction>>;
+
+    fn placeholder_atom_with_limits(
+        &self,
+        context: crate::PlaceholderContext,
+        limits: crate::PlaceholderLimits,
+    ) -> Result<Option<crate::PlaceholderAtom>>;
+
+    fn ppt_flags_with(
+        &self,
+        limits: crate::ShapeFlagLimits,
+    ) -> Result<Option<crate::ShapeFlagProjection>>;
+
+    fn programmable_tags_with_limits(
+        &self,
+        limits: crate::ShapeProgrammableTagLimits,
+    ) -> Result<Option<crate::ShapeProgrammableTags>>;
+
     fn text_interactions_with_limits(
         &self,
         limits: crate::TextInteractionLimits,

@@ -3,7 +3,7 @@
     reason = "the sparkline wire model is retained for lossless round trips before public exposure"
 )]
 
-use litchi_core::sheet::Result as SheetResult;
+use crate::BoxedResult as SheetResult;
 use litchi_core::{id::generate_guid_braced, xml::escape_xml};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;

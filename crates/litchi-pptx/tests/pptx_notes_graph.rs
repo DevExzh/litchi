@@ -20,7 +20,7 @@ fn presentation_exposes_the_default_notes_graph() {
 #[test]
 fn default_notes_graph_survives_save_and_reopen() {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     package.save(output.path()).unwrap();
 
     let reopened = Package::open(output.path()).unwrap();

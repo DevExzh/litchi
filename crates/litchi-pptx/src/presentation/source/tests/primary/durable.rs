@@ -248,7 +248,7 @@ fn durable_noop_preserves_signed_source_and_changed_signed_replay_refuses() {
     // Rebind an unsigned fixture's real delta to the signed root. Its selected
     // slide closure still matches, so the refusal must be signature policy.
     let mut unsigned = crate::Package::from_bytes(&signed).unwrap();
-    unsigned.unsign().unwrap();
+    unsigned = unsigned.unsign().unwrap();
     let mut encoded = wire(&fresh(unsigned.to_bytes().unwrap()), "changed");
     encoded[8..40].copy_from_slice(&noop.to_bytes().unwrap()[8..40]);
     let decoded = Patch::from_bytes(&encoded).unwrap();
@@ -266,10 +266,11 @@ fn managed_destination_policy_and_retained_payloads_are_independent_of_encoding_
     let bytes = fixture();
     let patch = Patch::from_bytes(&wire(&fresh(bytes.clone()), "portable payload")).unwrap();
     let (budget, cancellation, context) = source_backed_context(16 * 1024 * 1024);
-    let destination = Package::from_read_at_with_execution_context(
+    let destination = Package::from_read_at_with_options(
         Arc::new(litchi_core::OwnedSource::new(bytes)),
-        SourceLimits::default(),
-        context,
+        crate::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let candidate = destination.apply(&patch).unwrap();
@@ -305,9 +306,9 @@ fn destination_xml_event_limit_refuses_expansion_before_publication() {
         .unwrap()
         .build()
         .unwrap();
-    let projection = SourceBackedPresentation::from_read_at_with_limits(
+    let projection = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(litchi_core::OwnedSource::new(bytes.clone())),
-        limits,
+        crate::OpenOptions::default().source_limits(limits),
     )
     .unwrap();
     let destination = Package::from_presentation(&projection).unwrap();
@@ -327,10 +328,11 @@ fn managed_replay_budget_failure_is_atomic_and_recovers() {
     let bytes = fixture();
     let patch = Patch::from_bytes(&wire(&fresh(bytes.clone()), "portable")).unwrap();
     let (budget, _cancel, context) = source_backed_context(MEMORY);
-    let destination = Package::from_read_at_with_execution_context(
+    let destination = Package::from_read_at_with_options(
         Arc::new(litchi_core::OwnedSource::new(bytes.clone())),
-        SourceLimits::default(),
-        context,
+        crate::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     drop(destination.presentation().unwrap().slide(0).unwrap());
@@ -388,9 +390,9 @@ fn decoding_does_not_replace_explicit_source_limits_with_defaults() {
         .unwrap()
         .build()
         .unwrap();
-    let projection = SourceBackedPresentation::from_read_at_with_limits(
+    let projection = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(litchi_core::OwnedSource::new(bytes.clone())),
-        limits,
+        crate::OpenOptions::default().source_limits(limits),
     )
     .unwrap();
     let source = Package::from_presentation(&projection).unwrap();

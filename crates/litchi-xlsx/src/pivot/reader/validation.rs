@@ -3,7 +3,7 @@
 use quick_xml::encoding::Decoder;
 use quick_xml::events::BytesStart;
 
-use litchi_core::sheet::Result as SheetResult;
+use crate::BoxedResult as SheetResult;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_sheet::Rect;
 

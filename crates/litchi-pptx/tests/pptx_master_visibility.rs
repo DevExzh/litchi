@@ -69,7 +69,7 @@ fn omitted_master_visibility_flags_default_to_true() {
 fn package_with_visibility(slide_xml: &[u8], layout_xml: &[u8]) -> Package {
     let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     builder.presentation().unwrap().add_slide().unwrap();
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     let package_bytes = package.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&package_bytes).unwrap();
     replace_part(&mut opc, "/ppt/slides/slide1.xml", slide_xml);

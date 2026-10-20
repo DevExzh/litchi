@@ -11,7 +11,7 @@
 //!
 //! - `run_format_batch/<owner>/<N>`: one atomic `File::batch` of N
 //!   `set /slide[1]/shape[i]/paragraph[1]/run[1] {bold, size, color}`
-//!   against one native edit staging the same N `TextEdit`s in 256-edit
+//!   against one native edit staging the same N `TextAssignment`s in 256-edit
 //!   chunks through one `set_text_property_chunks` call and one commit (the
 //!   1k-op batch budget: within 2×);
 //! - `shape_text_batch/<owner>/<N>`: N `set /slide[1]/shape[i] {text}`
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     use litchi_core::Position;
     use litchi_ops::{BatchItem, BatchMode, NewNode, OpenOptions, Props, SourceMode, props};
     use litchi_pptx::opened::{
-        CellFill, Rgb, ShapeTextReplacement, TextBody, TextEdit, TextProperties, TextTarget,
+        CellFill, Rgb, ShapeTextReplacement, TextAssignment, TextBody, TextProperties, TextTarget,
     };
 
     const WARMUP: usize = 2;
@@ -151,9 +151,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let name = format!("run_format_batch/{owner}/{n}");
             if wanted(&name) {
-                let edits: Vec<TextEdit<'_>> = (0..n)
+                let edits: Vec<TextAssignment<'_>> = (0..n)
                     .map(|index| {
-                        TextEdit::new(
+                        TextAssignment::new(
                             TextTarget::Run {
                                 shape: Position::new(index),
                                 paragraph: Position::new(0),
@@ -175,7 +175,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     })
                     .collect();
                 let leaf = || -> Vec<u8> {
-                    let chunks: Vec<&[TextEdit<'_>]> = edits.chunks(256).collect();
+                    let chunks: Vec<&[TextAssignment<'_>]> = edits.chunks(256).collect();
                     if eager {
                         let mut edit = eager_package.edit().expect("edit");
                         edit.set_text_property_chunks(0_usize, &chunks)
@@ -196,7 +196,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .expect("batch")
                         .file
                 };
-                let chunks: Vec<&[TextEdit<'_>]> = edits.chunks(256).collect();
+                let chunks: Vec<&[TextAssignment<'_>]> = edits.chunks(256).collect();
                 let leaf_bytes = if eager {
                     let mut edit = eager_package.edit()?;
                     edit.set_text_property_chunks(0_usize, &chunks)?;
@@ -429,7 +429,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut edit = package.edit().expect("edit");
             edit.set_text_properties(
                 0_usize,
-                &[TextEdit::new(
+                &[TextAssignment::new(
                     TextTarget::Cell {
                         shape: Position::new(table_shape),
                         row: Position::new(1),

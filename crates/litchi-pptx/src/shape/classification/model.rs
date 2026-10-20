@@ -116,13 +116,6 @@ impl Snapshot {
         &self.unknown_extensions
     }
 
-    /// Start a detached atomic edit of this snapshot.
-    #[inline]
-    #[must_use]
-    pub fn edit(&self) -> crate::shape::classification::transaction::Editor {
-        crate::shape::classification::transaction::Editor::new(self.clone())
-    }
-
     pub(crate) fn from_wire(
         outcome: Option<Outcome>,
         unknown_extensions: Vec<Opaque>,

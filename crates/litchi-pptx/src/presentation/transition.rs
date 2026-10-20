@@ -54,15 +54,17 @@ pub(crate) enum SlideMce {
 pub(crate) fn admit_source(xml: &[u8], operation: &'static str) -> Result<SlideMce> {
     match validate_source(xml, operation) {
         Ok(()) => return Ok(SlideMce::Plain),
-        Err(Error::UnsafeEdit { reason, .. })
-            if reason == MCE_OUTSIDE_TRANSITION || reason == MCE_BRANCH_SELECTION => {},
+        Err(Error::Refused(refusal))
+            if refusal.reason() == MCE_OUTSIDE_TRANSITION
+                || refusal.reason() == MCE_BRANCH_SELECTION => {},
         Err(error) => return Err(error),
     }
     if litchi_ooxml_common::mce::binds_namespace_by_reference(xml) {
-        return Err(Error::UnsafeEdit {
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
             operation,
-            reason: MCE_BRANCH_SELECTION,
-        });
+            MCE_BRANCH_SELECTION,
+        ));
     }
     let layout = locate_with(xml, operation, true)?;
     let _ = validate_owner_for_read(xml, &layout)?;
@@ -72,10 +74,11 @@ pub(crate) fn admit_source(xml: &[u8], operation: &'static str) -> Result<SlideM
 /// The refusal for an edit other than whole-child removal on an
 /// [`SlideMce::Enclosed`] slide.
 pub(crate) fn enclosed_edit_refusal(operation: &'static str) -> Error {
-    Error::UnsafeEdit {
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
         operation,
-        reason: MCE_BRANCH_SELECTION,
-    }
+        MCE_BRANCH_SELECTION,
+    )
 }
 
 /// Validate a source-backed slide while allowing its direct transition owner
@@ -91,10 +94,11 @@ pub(super) fn validate_source(xml: &[u8], operation: &'static str) -> Result<()>
         crate::shape::Scene::read(xml)?.is_rewritten() && has_mce_markup(xml)?
     };
     if scene_is_rewritten {
-        return Err(Error::UnsafeEdit {
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
             operation,
-            reason: MCE_BRANCH_SELECTION,
-        });
+            MCE_BRANCH_SELECTION,
+        ));
     }
     Ok(())
 }
@@ -178,10 +182,11 @@ pub(crate) fn stage(
         return Ok((None, false));
     }
     if presentation_is_protected(presentation_xml)? {
-        return Err(Error::UnsafeEdit {
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::Protected,
             operation,
-            reason: "source-backed transition edits refuse modification-protected presentations",
-        });
+            "source-backed transition edits refuse modification-protected presentations",
+        ));
     }
 
     let replaced_len = layout.transition.as_ref().map_or(0, Range::len);
@@ -316,10 +321,11 @@ fn validate_owner_for_edit(
         },
         Some(OwnerKind::AlternateContent) => {
             if matches!(current.kind(), Kind::Raw(_)) {
-                return Err(Error::UnsafeEdit {
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
                     operation,
-                    reason: "source-backed transition edits refuse an unknown active extension effect",
-                });
+                    "source-backed transition edits refuse an unknown active extension effect",
+                ));
             }
             validate_active_transition(xml, operation)
         },
@@ -428,10 +434,11 @@ fn alternate_fragment(
         .ok_or_else(|| invalid("alternate transition owner has no source range"))?;
     let active = active_transition_range(xml, owner, operation)?;
     let Some(active) = active else {
-        return Err(Error::UnsafeEdit {
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
             operation,
-            reason: "source-backed transition edit cannot insert into an AlternateContent owner without an active transition",
-        });
+            "source-backed transition edit cannot insert into an AlternateContent owner without an active transition",
+        ));
     };
     let canonical = crate::transition::write(target)?;
     let canonical_range = first_transition_range(&canonical)?;
@@ -462,10 +469,11 @@ fn alternate_fragment(
         "source-backed AlternateContent transition XML",
     )?;
     if let Some(requires) = transition_requirements(target) {
-        let choice = active_choice(xml, owner, &active, requires)?.ok_or(Error::UnsafeEdit {
+        let choice = active_choice(xml, owner, &active, requires)?.ok_or(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
             operation,
-            reason: "an extension transition requires an active Choice branch",
-        })?;
+            "an extension transition requires an active Choice branch",
+        ))?;
         let opening = &owner_bytes[choice.opening.clone()];
         let mut replacement = replace_range_bytes(
             opening,
@@ -497,10 +505,7 @@ fn alternate_fragment_len(
         .transition
         .as_ref()
         .ok_or_else(|| invalid("alternate transition owner has no source range"))?;
-    let active = active_transition_range(xml, owner, operation)?.ok_or(Error::UnsafeEdit {
-        operation,
-        reason: "source-backed transition edit cannot insert into an AlternateContent owner without an active transition",
-    })?;
+    let active = active_transition_range(xml, owner, operation)?.ok_or(Error::refused(litchi_core::edit::RefusalKind::UnsupportedContent, operation, "source-backed transition edit cannot insert into an AlternateContent owner without an active transition"))?;
     let canonical = crate::transition::write(target)?;
     let canonical_range = first_transition_range(&canonical)?;
     let fragment = canonical
@@ -529,10 +534,11 @@ fn alternate_fragment_len(
         .and_then(|length| length.checked_add(fragment_len))
         .ok_or_else(|| invalid("AlternateContent replacement size overflow"))?;
     if let Some(requires) = transition_requirements(target) {
-        let choice = active_choice(xml, owner, &active, requires)?.ok_or(Error::UnsafeEdit {
+        let choice = active_choice(xml, owner, &active, requires)?.ok_or(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
             operation,
-            reason: "an extension transition requires an active Choice branch",
-        })?;
+            "an extension transition requires an active Choice branch",
+        ))?;
         let opening = owner_bytes
             .get(choice.opening.clone())
             .ok_or_else(|| invalid("Choice opening range is outside its owner"))?;
@@ -880,10 +886,11 @@ fn active_choice(
 fn checked_active_choice(stack: &[Option<ActiveChoice>]) -> Result<Option<ActiveChoice>> {
     let choice = stack.iter().rev().find_map(|value| value.clone());
     if choice.as_ref().is_some_and(|choice| !choice.bindings_match) {
-        return Err(Error::UnsafeEdit {
-            operation: "set_transition",
-            reason: "transition extension prefix conflicts with the active Choice namespace binding",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "set_transition",
+            "transition extension prefix conflicts with the active Choice namespace binding",
+        ));
     }
     Ok(choice)
 }
@@ -901,10 +908,11 @@ fn validate_extension_bindings(reader: &NsReader<&[u8]>, requirements: &str) -> 
         if let ResolveResult::Bound(namespace) = namespace
             && namespace.as_ref() != expected.as_bytes()
         {
-            return Err(Error::UnsafeEdit {
-                operation: "set_transition",
-                reason: "transition extension prefix conflicts with an inherited namespace binding",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "set_transition",
+                "transition extension prefix conflicts with an inherited namespace binding",
+            ));
         }
     }
     Ok(())
@@ -1449,10 +1457,11 @@ fn write_rewritten_qname(name: &[u8], prefix: &str, output: &mut Vec<u8>) -> Res
 
 fn validate_target(value: &Transition, operation: &'static str) -> Result<()> {
     if matches!(value.kind(), Kind::Raw(_)) {
-        return Err(Error::UnsafeEdit {
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
             operation,
-            reason: "source-backed transition edits refuse untyped transition effects",
-        });
+            "source-backed transition edits refuse untyped transition effects",
+        ));
     }
     // The public model can only retain raw children produced by the bounded
     // reader. Ask the writer to validate portability before any output
@@ -1514,10 +1523,11 @@ fn locate_with(xml: &[u8], operation: &'static str, enclosed: bool) -> Result<La
                     root_prefix = Some(qname_prefix(element.name())?);
                     root_namespace = Some(pml_namespace(&namespace)?);
                 } else if depth == 2 {
-                    let rank = child_rank(&namespace, element.name()).ok_or(Error::UnsafeEdit {
+                    let rank = child_rank(&namespace, element.name()).ok_or(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
                         operation,
-                        reason: "source-backed transition edits refuse unknown direct slide children",
-                    })?;
+                        "source-backed transition edits refuse unknown direct slide children",
+                    ))?;
                     record_child(
                         rank,
                         start,
@@ -1540,17 +1550,19 @@ fn locate_with(xml: &[u8], operation: &'static str, enclosed: bool) -> Result<La
                     && !matches!(open_owner, Some(OwnerKind::AlternateContent))
                     && !(enclosed && tree_child && depth >= 5)
                 {
-                    return Err(Error::UnsafeEdit {
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
                         operation,
-                        reason: MCE_OUTSIDE_TRANSITION,
-                    });
+                        MCE_OUTSIDE_TRANSITION,
+                    ));
                 } else if is_pml(&namespace, element.name(), b"transition")
                     && !matches!(open_owner, Some(OwnerKind::AlternateContent))
                 {
-                    return Err(Error::UnsafeEdit {
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
                         operation,
-                        reason: "source-backed transition edits refuse nested or markup-compatibility transitions",
-                    });
+                        "source-backed transition edits refuse nested or markup-compatibility transitions",
+                    ));
                 }
             },
             Event::Empty(element) => {
@@ -1560,10 +1572,11 @@ fn locate_with(xml: &[u8], operation: &'static str, enclosed: bool) -> Result<La
                     return Err(invalid("slide root cannot be empty"));
                 }
                 if event_depth == 2 {
-                    let rank = child_rank(&namespace, element.name()).ok_or(Error::UnsafeEdit {
+                    let rank = child_rank(&namespace, element.name()).ok_or(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
                         operation,
-                        reason: "source-backed transition edits refuse unknown direct slide children",
-                    })?;
+                        "source-backed transition edits refuse unknown direct slide children",
+                    ))?;
                     record_child(
                         rank,
                         start,
@@ -1585,17 +1598,19 @@ fn locate_with(xml: &[u8], operation: &'static str, enclosed: bool) -> Result<La
                     && !matches!(open_owner, Some(OwnerKind::AlternateContent))
                     && !(enclosed && tree_child && event_depth >= 5)
                 {
-                    return Err(Error::UnsafeEdit {
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
                         operation,
-                        reason: MCE_OUTSIDE_TRANSITION,
-                    });
+                        MCE_OUTSIDE_TRANSITION,
+                    ));
                 } else if is_pml(&namespace, element.name(), b"transition")
                     && !matches!(open_owner, Some(OwnerKind::AlternateContent))
                 {
-                    return Err(Error::UnsafeEdit {
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
                         operation,
-                        reason: "source-backed transition edits refuse nested or markup-compatibility transitions",
-                    });
+                        "source-backed transition edits refuse nested or markup-compatibility transitions",
+                    ));
                 }
             },
             Event::End(element) => {
@@ -1976,10 +1991,11 @@ fn presentation_is_protected(xml: &[u8]) -> Result<bool> {
 }
 
 fn unsupported_transition() -> Error {
-    Error::UnsafeEdit {
-        operation: "edit_transition",
-        reason: "source-backed transition edits refuse extension, sound-action, or unknown transition markup",
-    }
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "edit_transition",
+        "source-backed transition edits refuse extension, sound-action, or unknown transition markup",
+    )
 }
 
 fn is_pml(namespace: &ResolveResult<'_>, name: QName<'_>, local: &[u8]) -> bool {

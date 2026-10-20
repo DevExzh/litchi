@@ -93,6 +93,7 @@ fn url_slide_and_jump_links_round_trip() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source_bytes

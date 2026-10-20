@@ -284,10 +284,11 @@ fn generate_ppt(output: &Path) -> Result<()> {
     if before != ppt_source_transition()? {
         return Err(format!("PPT source transition mismatch: {before:?}").into());
     }
-    let mut edit = snapshot.edit()?;
+    let package = litchi_ppt::Package::from_bytes(snapshot.bytes())?;
+    let mut edit = package.edit()?;
     edit.set_slide_transition_visual(position, ppt_changed_transition()?)?;
     let commit = edit.commit()?;
-    fs::write(output, commit.snapshot().bytes())?;
+    fs::write(output, commit.package().to_bytes()?)?;
     readback_ppt(output)
 }
 

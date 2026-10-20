@@ -415,7 +415,7 @@ impl Presentation {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn main_master_programmable_tags_with_limits(
+    pub(crate) fn main_master_programmable_tags_with_limits(
         &self,
         limits: crate::ProgTagLimits,
     ) -> Result<Vec<crate::ProgTags>> {
@@ -610,20 +610,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn powerpoint12_document_properties(&self) -> Result<DocumentProperties12> {
-        let mut documents = self
-            .inner
-            .parser
-            .find_records_ref()
-            .into_iter()
-            .filter(|record| record.record_type == RecordType::Document);
-        let document = documents.next().ok_or_else(|| {
-            Error::Corrupted("PowerPoint document has no Document container".to_string())
-        })?;
-        if documents.next().is_some() {
-            return Err(Error::Corrupted(
-                "PowerPoint document has multiple Document containers".to_string(),
-            ));
-        }
+        let document = self.live_document_ref()?;
         DocumentProperties12::parse(document)
     }
 
@@ -636,18 +623,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn routing_slip(&self) -> Result<Option<Slip>> {
-        let records = self.inner.parser.find_records_ref();
-        let mut documents = records
-            .into_iter()
-            .filter(|record| record.record_type == RecordType::Document);
-        let document = documents.next().ok_or_else(|| {
-            Error::Corrupted("PowerPoint document has no Document container".to_string())
-        })?;
-        if documents.next().is_some() {
-            return Err(Error::Corrupted(
-                "PowerPoint document has multiple Document containers".to_string(),
-            ));
-        }
+        let document = self.live_document_ref()?;
         let mut slip_records = document
             .children
             .iter()
@@ -672,18 +648,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn embedded_sounds(&self) -> Result<Option<Collection<'_>>> {
-        let records = self.inner.parser.find_records_ref();
-        let mut documents = records
-            .into_iter()
-            .filter(|record| record.record_type == RecordType::Document);
-        let document = documents.next().ok_or_else(|| {
-            Error::Corrupted("PowerPoint document has no Document container".to_string())
-        })?;
-        if documents.next().is_some() {
-            return Err(Error::Corrupted(
-                "PowerPoint document has multiple Document containers".to_string(),
-            ));
-        }
+        let document = self.live_document_ref()?;
         let mut collections = document
             .children
             .iter()
@@ -750,18 +715,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn external_media(&self) -> Result<Option<MediaCollection>> {
-        let records = self.inner.parser.find_records_ref();
-        let mut documents = records
-            .into_iter()
-            .filter(|record| record.record_type == RecordType::Document);
-        let document = documents.next().ok_or_else(|| {
-            Error::Corrupted("PowerPoint document has no Document container".to_string())
-        })?;
-        if documents.next().is_some() {
-            return Err(Error::Corrupted(
-                "PowerPoint document has multiple Document containers".to_string(),
-            ));
-        }
+        let document = self.live_document_ref()?;
         let Some(media) = MediaCollection::parse(document)? else {
             return Ok(None);
         };
@@ -848,18 +802,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn ole_objects(&self) -> Result<Option<OleCollection>> {
-        let records = self.inner.parser.find_records_ref();
-        let mut documents = records
-            .into_iter()
-            .filter(|record| record.record_type == RecordType::Document);
-        let document = documents.next().ok_or_else(|| {
-            Error::Corrupted("PowerPoint document has no Document container".to_string())
-        })?;
-        if documents.next().is_some() {
-            return Err(Error::Corrupted(
-                "PowerPoint document has multiple Document containers".to_string(),
-            ));
-        }
+        let document = self.live_document_ref()?;
         let Some(objects) = OleCollection::parse(document)? else {
             return Ok(None);
         };
@@ -951,7 +894,7 @@ impl Presentation {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn fonts_with_limits(
+    pub(crate) fn fonts_with_limits(
         &self,
         mut limits: crate::font::Limits,
     ) -> Result<crate::font::FontCollections> {
@@ -963,6 +906,21 @@ impl Presentation {
     ///
     /// Incrementally saved presentations can hold several `DocumentContainer`
     /// records; only the one referenced by the current `UserEditAtom` is live.
+    /// The parsed live `DocumentContainer`: the one the current persist
+    /// directory maps. An incrementally saved presentation keeps superseded
+    /// `DocumentContainer` records in the stream (record 0357).
+    fn live_document_ref(&self) -> Result<&Record> {
+        let live = self.live_document_record()?;
+        self.inner
+            .parser
+            .find_records_ref()
+            .into_iter()
+            .find(|record| record.record_type == RecordType::Document && **record == live)
+            .ok_or_else(|| {
+                Error::Corrupted("PowerPoint live Document container was not parsed".to_string())
+            })
+    }
+
     pub(crate) fn live_document_record(&self) -> Result<Record> {
         self.check_source()?;
         let persist_id = self.inner.slide_directory.document_persist_id();
@@ -1138,18 +1096,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn modify_password(&self) -> Result<Option<crate::ModifyPassword>> {
-        let records = self.inner.parser.find_records_ref();
-        let mut documents = records
-            .into_iter()
-            .filter(|record| record.record_type == RecordType::Document);
-        let document = documents.next().ok_or_else(|| {
-            Error::Corrupted("PowerPoint document has no Document container".to_string())
-        })?;
-        if documents.next().is_some() {
-            return Err(Error::Corrupted(
-                "PowerPoint document has multiple Document containers".to_string(),
-            ));
-        }
+        let document = self.live_document_ref()?;
         crate::ModifyPassword::parse_document(document)
     }
 
@@ -1161,18 +1108,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn privacy_settings(&self) -> Result<Option<crate::PrivacySettings>> {
-        let records = self.inner.parser.find_records_ref();
-        let mut documents = records
-            .into_iter()
-            .filter(|record| record.record_type == RecordType::Document);
-        let document = documents.next().ok_or_else(|| {
-            Error::Corrupted("PowerPoint document has no Document container".to_string())
-        })?;
-        if documents.next().is_some() {
-            return Err(Error::Corrupted(
-                "PowerPoint document has multiple Document containers".to_string(),
-            ));
-        }
+        let document = self.live_document_ref()?;
         crate::PrivacySettings::parse_document(document)
     }
 
@@ -1184,18 +1120,7 @@ impl Presentation {
     pub fn presentation_advisor_settings(
         &self,
     ) -> Result<Option<crate::PresentationAdvisorSettings>> {
-        let records = self.inner.parser.find_records_ref();
-        let mut documents = records
-            .into_iter()
-            .filter(|record| record.record_type == RecordType::Document);
-        let document = documents.next().ok_or_else(|| {
-            Error::Corrupted("PowerPoint document has no Document container".to_string())
-        })?;
-        if documents.next().is_some() {
-            return Err(Error::Corrupted(
-                "PowerPoint document has multiple Document containers".to_string(),
-            ));
-        }
+        let document = self.live_document_ref()?;
         crate::PresentationAdvisorSettings::parse_document(document)
     }
 
@@ -1207,18 +1132,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn html_document_settings(&self) -> Result<Option<crate::HtmlDocumentSettings>> {
-        let records = self.inner.parser.find_records_ref();
-        let mut documents = records
-            .into_iter()
-            .filter(|record| record.record_type == RecordType::Document);
-        let document = documents.next().ok_or_else(|| {
-            Error::Corrupted("PowerPoint document has no Document container".to_string())
-        })?;
-        if documents.next().is_some() {
-            return Err(Error::Corrupted(
-                "PowerPoint document has multiple Document containers".to_string(),
-            ));
-        }
+        let document = self.live_document_ref()?;
         crate::HtmlDocumentSettings::parse_document(document)
     }
 
@@ -1232,18 +1146,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn html_publish_settings(&self) -> Result<Option<crate::HtmlPublishSettings>> {
-        let records = self.inner.parser.find_records_ref();
-        let mut documents = records
-            .into_iter()
-            .filter(|record| record.record_type == RecordType::Document);
-        let document = documents.next().ok_or_else(|| {
-            Error::Corrupted("PowerPoint document has no Document container".to_string())
-        })?;
-        if documents.next().is_some() {
-            return Err(Error::Corrupted(
-                "PowerPoint document has multiple Document containers".to_string(),
-            ));
-        }
+        let document = self.live_document_ref()?;
         crate::HtmlPublishSettings::parse_document(document)
     }
 
@@ -1256,19 +1159,9 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn broadcasts(&self) -> Result<crate::Broadcasts> {
-        let records = self.inner.parser.find_records_ref();
-        let mut documents = records
-            .into_iter()
-            .filter(|record| record.record_type == RecordType::Document);
-        let document = documents.next().ok_or_else(|| {
-            Error::Corrupted("PowerPoint document has no Document container".to_string())
-        })?;
-        if documents.next().is_some() {
-            return Err(Error::Corrupted(
-                "PowerPoint document has multiple Document containers".to_string(),
-            ));
-        }
-        crate::Broadcasts::parse_document(document)
+        // The live document: an incrementally saved presentation keeps its
+        // superseded `DocumentContainer` records in the stream (record 0357).
+        crate::Broadcasts::parse_document(&self.live_document_record()?)
     }
 
     /// Return the structurally decoded, inert `PowerPoint` 9 mail envelope.
@@ -1280,18 +1173,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn envelope_data(&self) -> Result<Option<crate::EnvelopeData>> {
-        let records = self.inner.parser.find_records_ref();
-        let mut documents = records
-            .into_iter()
-            .filter(|record| record.record_type == RecordType::Document);
-        let document = documents.next().ok_or_else(|| {
-            Error::Corrupted("PowerPoint document has no Document container".to_string())
-        })?;
-        if documents.next().is_some() {
-            return Err(Error::Corrupted(
-                "PowerPoint document has multiple Document containers".to_string(),
-            ));
-        }
+        let document = self.live_document_ref()?;
         crate::EnvelopeData::parse_document(document)
     }
 
@@ -1301,18 +1183,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn document_structure(&self) -> Result<crate::DocumentStructure> {
-        let records = self.inner.parser.find_records_ref();
-        let mut documents = records
-            .into_iter()
-            .filter(|record| record.record_type == RecordType::Document);
-        let document = documents.next().ok_or_else(|| {
-            Error::Corrupted("PowerPoint document has no Document container".to_string())
-        })?;
-        if documents.next().is_some() {
-            return Err(Error::Corrupted(
-                "PowerPoint document has multiple Document containers".to_string(),
-            ));
-        }
+        let document = self.live_document_ref()?;
         crate::DocumentStructure::parse(document)
     }
 
@@ -1376,18 +1247,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn envelope_settings(&self) -> Result<Option<crate::EnvelopeSettings>> {
-        let records = self.inner.parser.find_records_ref();
-        let mut documents = records
-            .into_iter()
-            .filter(|record| record.record_type == RecordType::Document);
-        let document = documents.next().ok_or_else(|| {
-            Error::Corrupted("PowerPoint document has no Document container".to_string())
-        })?;
-        if documents.next().is_some() {
-            return Err(Error::Corrupted(
-                "PowerPoint document has multiple Document containers".to_string(),
-            ));
-        }
+        let document = self.live_document_ref()?;
         crate::EnvelopeSettings::parse_document(document)
     }
 
@@ -1790,7 +1650,7 @@ impl Presentation {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn programmable_tags_with_limits(
+    pub(crate) fn programmable_tags_with_limits(
         &self,
         limits: crate::ProgTagLimits,
     ) -> Result<Option<crate::ProgTags>> {
@@ -1802,7 +1662,7 @@ impl Presentation {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn shape_programmable_tags_with_limits(
+    pub(crate) fn shape_programmable_tags_with_limits(
         &self,
         limits: crate::ShapeProgrammableTagLimits,
     ) -> Result<Vec<crate::PresentationShapeProgrammableTagsEntry>> {
@@ -1833,7 +1693,7 @@ impl Presentation {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn shape_flags_with_limits(
+    pub(crate) fn shape_flags_with_limits(
         &self,
         limits: crate::ShapeFlagLimits,
     ) -> Result<Vec<crate::PresentationShapeFlagEntry>> {
@@ -1864,7 +1724,7 @@ impl Presentation {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn placeholder_atoms_with_limits(
+    pub(crate) fn placeholder_atoms_with_limits(
         &self,
         limits: crate::PlaceholderLimits,
     ) -> Result<Vec<crate::PresentationPlaceholderEntry>> {

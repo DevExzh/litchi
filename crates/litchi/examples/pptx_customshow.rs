@@ -119,12 +119,13 @@ fn main() -> Result<(), Box<dyn StdError>> {
     assert_eq!(manual.slide_count(), 5);
 
     // Publish the typed values atomically into ppt/presentation.xml.
-    package.edit_opc(|opc| {
+    {
+        let mut edit = package.edit_structure()?;
         for show in shows.shows.iter().cloned() {
-            structure::add_custom_show(opc, show)?;
+            edit.add_custom_show(show)?;
         }
-        Ok(())
-    })?;
+        package = edit.commit()?.into_package();
+    }
 
     let graph = package.with_opc(structure::load)?;
     assert_eq!(graph.custom_shows.shows, shows.shows);
@@ -135,10 +136,11 @@ fn main() -> Result<(), Box<dyn StdError>> {
 
     // Exercise a second transactional edit and verify it after reopening.
     let quick_demo_id = shows.get_by_name("Quick Demo").expect("quick demo").id;
-    package.edit_opc(|opc| {
-        assert!(structure::remove_custom_show(opc, quick_demo_id)?);
-        Ok(())
-    })?;
+    {
+        let mut edit = package.edit_structure()?;
+        assert!(edit.remove_custom_show(quick_demo_id)?);
+        package = edit.commit()?.into_package();
+    }
 
     let round_trip = Package::from_bytes(&package.to_bytes()?)?;
     let graph = round_trip.with_opc(structure::load)?;

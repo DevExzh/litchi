@@ -31,7 +31,7 @@ impl Revision {
 
 /// One typed replacement staged by a broadcast transaction.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Change {
+pub(crate) enum Change {
     /// Replace the complete typed broadcast projection while retaining opaque
     /// source children owned by the snapshot.
     Replace { before: Broadcast, after: Broadcast },
@@ -49,7 +49,7 @@ impl Change {
 
     /// Typed projection before this operation.
     #[must_use]
-    pub fn before(&self) -> &Broadcast {
+    pub(crate) fn before(&self) -> &Broadcast {
         match self {
             Self::Replace { before, .. } => before,
         }
@@ -57,7 +57,7 @@ impl Change {
 
     /// Typed projection after this operation.
     #[must_use]
-    pub fn after(&self) -> &Broadcast {
+    pub(crate) fn after(&self) -> &Broadcast {
         match self {
             Self::Replace { after, .. } => after,
         }
@@ -153,7 +153,7 @@ impl Snapshot {
 
     /// Start an isolated semantic edit.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> Transaction {
         Transaction {
             source: self.clone(),
             candidate: self.broadcast.clone(),
@@ -164,7 +164,7 @@ impl Snapshot {
 
 /// Isolated, failure-atomic editor over one source snapshot.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Transaction {
     source: Snapshot,
     candidate: Broadcast,
     changes: Vec<Change>,
@@ -173,31 +173,31 @@ pub struct Transaction {
 impl Transaction {
     /// Immutable source snapshot used for stale-source checks.
     #[must_use]
-    pub const fn source(&self) -> &Snapshot {
+    pub(crate) const fn source(&self) -> &Snapshot {
         &self.source
     }
 
     /// Current typed broadcast projection.
     #[must_use]
-    pub const fn broadcast(&self) -> &Broadcast {
+    pub(crate) const fn broadcast(&self) -> &Broadcast {
         &self.candidate
     }
 
     /// Opaque source records retained by every candidate publication.
     #[must_use]
-    pub fn unknown_records(&self) -> &[UnknownRecord] {
+    pub(crate) fn unknown_records(&self) -> &[UnknownRecord] {
         self.source.unknown_records()
     }
 
     /// Whether staged semantics differ from the source projection.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn has_net_change(&self) -> bool {
         self.candidate != self.source.broadcast
     }
 
     /// Typed operations staged in transaction order.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
 
@@ -206,18 +206,9 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace(&mut self, replacement: Broadcast) -> Result<()> {
+    pub(crate) fn replace(&mut self, replacement: Broadcast) -> Result<()> {
         replacement.validate()?;
         self.replace_candidate(replacement)
-    }
-
-    /// Alias for callers that prefer setter terminology.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn set_broadcast(&mut self, replacement: Broadcast) -> Result<()> {
-        self.replace(replacement)
     }
 
     /// Set one optional inert title.
@@ -225,7 +216,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_title(&mut self, value: Option<String>) -> Result<()> {
+    pub(crate) fn set_title(&mut self, value: Option<String>) -> Result<()> {
         self.set_optional_string(|broadcast| &mut broadcast.title, value)
     }
 
@@ -234,7 +225,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_description(&mut self, value: Option<String>) -> Result<()> {
+    pub(crate) fn set_description(&mut self, value: Option<String>) -> Result<()> {
         self.set_optional_string(|broadcast| &mut broadcast.description, value)
     }
 
@@ -243,7 +234,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_speaker(&mut self, value: Option<String>) -> Result<()> {
+    pub(crate) fn set_speaker(&mut self, value: Option<String>) -> Result<()> {
         self.set_optional_string(|broadcast| &mut broadcast.speaker, value)
     }
 
@@ -252,7 +243,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_contact(&mut self, value: Option<String>) -> Result<()> {
+    pub(crate) fn set_contact(&mut self, value: Option<String>) -> Result<()> {
         self.set_optional_string(|broadcast| &mut broadcast.contact, value)
     }
 
@@ -261,7 +252,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_remote_server_name(&mut self, value: Option<String>) -> Result<()> {
+    pub(crate) fn set_remote_server_name(&mut self, value: Option<String>) -> Result<()> {
         self.set_optional_string(|broadcast| &mut broadcast.remote_server_name, value)
     }
 
@@ -270,7 +261,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_email_address(&mut self, value: Option<String>) -> Result<()> {
+    pub(crate) fn set_email_address(&mut self, value: Option<String>) -> Result<()> {
         self.set_optional_string(|broadcast| &mut broadcast.email_address, value)
     }
 
@@ -279,7 +270,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_email_name(&mut self, value: Option<String>) -> Result<()> {
+    pub(crate) fn set_email_name(&mut self, value: Option<String>) -> Result<()> {
         self.set_optional_string(|broadcast| &mut broadcast.email_name, value)
     }
 
@@ -288,7 +279,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_chat_url(&mut self, value: Option<String>) -> Result<()> {
+    pub(crate) fn set_chat_url(&mut self, value: Option<String>) -> Result<()> {
         self.set_optional_string(|broadcast| &mut broadcast.chat_url, value)
     }
 
@@ -297,7 +288,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_archive_directory(&mut self, value: Option<String>) -> Result<()> {
+    pub(crate) fn set_archive_directory(&mut self, value: Option<String>) -> Result<()> {
         self.set_optional_string(|broadcast| &mut broadcast.archive_directory, value)
     }
 
@@ -306,7 +297,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_netshow_files_base_directory(&mut self, value: Option<String>) -> Result<()> {
+    pub(crate) fn set_netshow_files_base_directory(&mut self, value: Option<String>) -> Result<()> {
         self.set_optional_string(
             |broadcast| &mut broadcast.netshow_files_base_directory,
             value,
@@ -318,7 +309,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_netshow_files_directory(&mut self, value: Option<String>) -> Result<()> {
+    pub(crate) fn set_netshow_files_directory(&mut self, value: Option<String>) -> Result<()> {
         self.set_optional_string(|broadcast| &mut broadcast.netshow_files_directory, value)
     }
 
@@ -327,7 +318,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_netshow_server_name(&mut self, value: Option<String>) -> Result<()> {
+    pub(crate) fn set_netshow_server_name(&mut self, value: Option<String>) -> Result<()> {
         self.set_optional_string(|broadcast| &mut broadcast.netshow_server_name, value)
     }
 
@@ -336,7 +327,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_entry_id(&mut self, value: Option<String>) -> Result<()> {
+    pub(crate) fn set_entry_id(&mut self, value: Option<String>) -> Result<()> {
         self.set_optional_string(|broadcast| &mut broadcast.entry_id, value)
     }
 
@@ -345,7 +336,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_ppt_files_base_directory(&mut self, value: impl Into<String>) -> Result<()> {
+    pub(crate) fn set_ppt_files_base_directory(&mut self, value: impl Into<String>) -> Result<()> {
         self.set_required_string(
             |broadcast| &mut broadcast.ppt_files_base_directory,
             value.into(),
@@ -357,7 +348,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_ppt_files_directory(&mut self, value: impl Into<String>) -> Result<()> {
+    pub(crate) fn set_ppt_files_directory(&mut self, value: impl Into<String>) -> Result<()> {
         self.set_required_string(|broadcast| &mut broadcast.ppt_files_directory, value.into())
     }
 
@@ -366,7 +357,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_ppt_files_base_url(&mut self, value: impl Into<String>) -> Result<()> {
+    pub(crate) fn set_ppt_files_base_url(&mut self, value: impl Into<String>) -> Result<()> {
         self.set_required_string(|broadcast| &mut broadcast.ppt_files_base_url, value.into())
     }
 
@@ -375,7 +366,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_user_name(&mut self, value: impl Into<String>) -> Result<()> {
+    pub(crate) fn set_user_name(&mut self, value: impl Into<String>) -> Result<()> {
         self.set_required_string(|broadcast| &mut broadcast.user_name, value.into())
     }
 
@@ -384,7 +375,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_broadcast_date_time(&mut self, value: impl Into<String>) -> Result<()> {
+    pub(crate) fn set_broadcast_date_time(&mut self, value: impl Into<String>) -> Result<()> {
         self.set_required_string(|broadcast| &mut broadcast.broadcast_date_time, value.into())
     }
 
@@ -393,7 +384,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_presentation_name(&mut self, value: impl Into<String>) -> Result<()> {
+    pub(crate) fn set_presentation_name(&mut self, value: impl Into<String>) -> Result<()> {
         self.set_required_string(|broadcast| &mut broadcast.presentation_name, value.into())
     }
 
@@ -402,7 +393,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_asd_file_name(&mut self, value: impl Into<String>) -> Result<()> {
+    pub(crate) fn set_asd_file_name(&mut self, value: impl Into<String>) -> Result<()> {
         self.set_required_string(|broadcast| &mut broadcast.asd_file_name, value.into())
     }
 
@@ -411,19 +402,10 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_properties(&mut self, value: BroadcastProperties) -> Result<()> {
+    pub(crate) fn set_properties(&mut self, value: BroadcastProperties) -> Result<()> {
         let mut candidate = self.candidate.clone();
         candidate.properties = value;
         self.replace_candidate(candidate)
-    }
-
-    /// Capture the current candidate without publishing it.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        self.build_snapshot()
     }
 
     /// Publish the candidate atomically with a reversible source-checked patch.
@@ -431,7 +413,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         let snapshot = self.build_snapshot()?;
         let changes = if snapshot.bytes == self.source.bytes {
             Vec::new()
@@ -446,21 +428,6 @@ impl Transaction {
             changes,
         };
         Ok(Commit { snapshot, patch })
-    }
-
-    /// Alias for move-owned writer terminology.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn finish(self) -> Result<Commit> {
-        self.commit()
-    }
-
-    /// Discard all staged edits and recover the exact source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 
     fn set_optional_string(
@@ -497,7 +464,7 @@ impl Transaction {
     }
 
     fn build_snapshot(&self) -> Result<Snapshot> {
-        if !self.is_changed() {
+        if !self.has_net_change() {
             return Ok(self.source.clone());
         }
         let record = self
@@ -515,7 +482,7 @@ impl Transaction {
 
 /// A successful immutable target and its source-checked patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
 }
@@ -523,19 +490,19 @@ pub struct Commit {
 impl Commit {
     /// Published target snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Reversible patch from source to target.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Published target typed broadcast projection.
     #[must_use]
-    pub const fn broadcast(&self) -> &Broadcast {
+    pub(crate) const fn broadcast(&self) -> &Broadcast {
         self.snapshot.broadcast()
     }
 
@@ -544,7 +511,7 @@ impl Commit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.undo(current)
     }
 
@@ -553,20 +520,20 @@ impl Commit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.redo(current)
     }
 
     /// Split the commit into its target and patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 }
 
 /// A source-checked reversible patch for one complete broadcast container.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct Patch {
     base: Revision,
     target: Revision,
     before: Arc<[u8]>,
@@ -577,49 +544,49 @@ pub struct Patch {
 impl Patch {
     /// Source revision required for forward application.
     #[must_use]
-    pub const fn base(&self) -> Revision {
+    pub(crate) const fn base(&self) -> Revision {
         self.base
     }
 
     /// Target revision produced by forward application.
     #[must_use]
-    pub const fn target(&self) -> Revision {
+    pub(crate) const fn target(&self) -> Revision {
         self.target
     }
 
     /// Typed operations represented by this patch.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Exact source bytes bound to this patch.
     #[must_use]
-    pub fn before(&self) -> &[u8] {
+    pub(crate) fn before(&self) -> &[u8] {
         &self.before
     }
 
     /// Alias for callers that name the source bytes explicitly.
     #[must_use]
-    pub fn before_bytes(&self) -> &[u8] {
+    pub(crate) fn before_bytes(&self) -> &[u8] {
         self.before()
     }
 
     /// Exact target bytes produced by this patch.
     #[must_use]
-    pub fn after(&self) -> &[u8] {
+    pub(crate) fn after(&self) -> &[u8] {
         &self.after
     }
 
     /// Alias for callers that name the target bytes explicitly.
     #[must_use]
-    pub fn after_bytes(&self) -> &[u8] {
+    pub(crate) fn after_bytes(&self) -> &[u8] {
         self.after()
     }
 
     /// Whether this patch is an exact byte-for-byte no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.before.as_ref() == self.after.as_ref()
     }
 
@@ -628,7 +595,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision != self.base || current.bytes.as_ref() != self.before.as_ref() {
             return Err(Error::InvalidFormat(
                 "broadcast patch source does not match its base snapshot".into(),
@@ -645,7 +612,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.inverse().apply(current)
     }
 
@@ -654,13 +621,13 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.apply(current)
     }
 
     /// Build a source-checked inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             base: self.target,
             target: self.base,

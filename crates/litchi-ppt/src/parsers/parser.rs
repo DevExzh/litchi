@@ -50,7 +50,11 @@ impl RecordParser {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_document_with_limits(&mut self, data: &[u8], limits: SourceLimits) -> Result<()> {
+    pub(crate) fn parse_document_with_limits(
+        &mut self,
+        data: &[u8],
+        limits: SourceLimits,
+    ) -> Result<()> {
         if data.is_empty() {
             return Ok(());
         }

@@ -432,10 +432,11 @@ fn managed_shape_property_revision_retains_resources_and_checks_cancellation() {
         token,
         ExecutionLimits::new(NonZeroUsize::MIN, NonZeroUsize::MIN, NonZeroU64::MAX, 0).unwrap(),
     );
-    let source = Package::from_read_at_with_execution_context(
+    let source = Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes(&[2], false))),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = source.edit().unwrap();

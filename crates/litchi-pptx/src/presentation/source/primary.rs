@@ -16,9 +16,9 @@ use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
-use litchi_core::{ExecutionContext, Position, ReadAt, Reservation};
+use litchi_core::{Position, ReadAt, Reservation};
 use litchi_opc::constants::relationship_type as rt;
-use litchi_opc::{PackURI, PartData, SourceLimits, TargetMode};
+use litchi_opc::{PackURI, PartData, TargetMode};
 
 use super::{
     MAX_SOURCE_BACKED_SLIDE_BATCH, SourceBackedPresentation, SourceBackedPresentationEditor,
@@ -95,33 +95,51 @@ pub struct Package {
 
 impl Package {
     /// Open an ordinary PPTX without materializing unselected parts.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     #[cfg(any(unix, windows))]
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_presentation(&SourceBackedPresentation::from_path(path)?)
+        Self::from_presentation(&SourceBackedPresentation::open(path)?)
+    }
+
+    /// Open an ordinary PPTX under explicit ingress options (source limits,
+    /// payload-cache policy, execution context).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input exceeds the policies, cannot be read or
+    /// is malformed.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_options(path: impl AsRef<Path>, options: crate::OpenOptions) -> Result<Self> {
+        Self::from_presentation(&SourceBackedPresentation::open_with_options(path, options)?)
     }
 
     /// Admit an immutable positional source with finite default read limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
         Self::from_presentation(&SourceBackedPresentation::from_read_at(source)?)
     }
 
-    /// Admit a source under caller-owned execution and resource policy.
-    pub fn from_read_at_with_execution_context(
+    /// Admit a positional source under explicit ingress options.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input exceeds the policies, cannot be read or
+    /// is malformed.
+    pub fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        context: ExecutionContext,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::from_presentation(
-            &SourceBackedPresentation::from_read_at_with_execution_context(
-                source, limits, context,
-            )?,
-        )
+        Self::from_presentation(&SourceBackedPresentation::from_read_at_with_options(
+            source, options,
+        )?)
     }
 
-    /// Share an existing read projection, retaining its exact source and policy.
-    ///
-    /// Live projection clones and slide handles remain valid. Strict edit
-    /// admission is repeated if the projection repaired its slide catalog.
     pub fn from_presentation(presentation: &SourceBackedPresentation) -> Result<Self> {
         let seed = presentation.editor_seed()?;
         let inner = &presentation.inner;
@@ -1566,7 +1584,7 @@ impl Edit {
     pub fn set_text_properties(
         &mut self,
         slide: impl Into<Position>,
-        edits: &[crate::opened::TextEdit<'_>],
+        edits: &[crate::opened::TextAssignment<'_>],
     ) -> Result<usize> {
         self.stage_slide_edit(
             slide.into(),
@@ -1582,7 +1600,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// As the eager verb, and [`Error::UnsafeEdit`] for a notes-page body.
+    /// As the eager verb, and [`Error::Refused`] for a notes-page body.
     pub fn insert_paragraph(
         &mut self,
         slide: impl Into<Position>,
@@ -1605,7 +1623,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// As the eager verb, and [`Error::UnsafeEdit`] for a notes-page body.
+    /// As the eager verb, and [`Error::Refused`] for a notes-page body.
     pub fn remove_paragraph(
         &mut self,
         slide: impl Into<Position>,
@@ -1626,7 +1644,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// As the eager verb, and [`Error::UnsafeEdit`] for a notes-page body.
+    /// As the eager verb, and [`Error::Refused`] for a notes-page body.
     pub fn insert_run(
         &mut self,
         slide: impl Into<Position>,
@@ -1651,7 +1669,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// As the eager verb, and [`Error::UnsafeEdit`] for a notes-page body.
+    /// As the eager verb, and [`Error::Refused`] for a notes-page body.
     pub fn remove_run(
         &mut self,
         slide: impl Into<Position>,
@@ -1689,7 +1707,7 @@ impl Edit {
     pub fn set_text_property_chunks(
         &mut self,
         slide: impl Into<Position>,
-        chunks: &[&[crate::opened::TextEdit<'_>]],
+        chunks: &[&[crate::opened::TextAssignment<'_>]],
     ) -> Result<usize> {
         self.stage_slide_edit(
             slide.into(),
@@ -1704,7 +1722,7 @@ impl Edit {
     pub fn set_text_property_chunks_per_edit(
         &mut self,
         slide: impl Into<Position>,
-        chunks: &[&[crate::opened::TextEdit<'_>]],
+        chunks: &[&[crate::opened::TextAssignment<'_>]],
     ) -> Result<Vec<bool>> {
         let mut changes = Vec::new();
         self.stage_slide_edit(

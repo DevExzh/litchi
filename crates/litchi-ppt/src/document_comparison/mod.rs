@@ -5,8 +5,12 @@
 //! `validation`, and focused regression coverage in `tests`. Parsing
 //! never compares presentations, opens external data, or executes embedded
 //! content.
+//!
+//! [`crate::Package::edit_document_comparison`] stages edits of the inert
+//! review metadata of the live document; see [`Edit`].
 
 mod codec;
+mod edit;
 mod model;
 pub(crate) mod package;
 mod transaction;
@@ -19,10 +23,11 @@ pub use model::{
     TableDiffFlags, TextDiffFlags, Unknown,
 };
 
-pub use package::{
-    Commit as PackageCommit, MAX_PACKAGE_BYTES, Patch as PackagePatch, Snapshot as PackageSnapshot,
-};
-pub use transaction::{Change, ChangeKind, Commit, Editor, Patch, Revision, Snapshot};
+pub use edit::Edit;
+pub use package::{MAX_PACKAGE_BYTES, Snapshot as PackageSnapshot};
+pub use transaction::{Change, ChangeKind, Revision, Snapshot};
+
+crate::scoped::family!("document-comparison");
 
 #[cfg(test)]
 mod tests;

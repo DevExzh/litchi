@@ -45,7 +45,7 @@ fn fixture() -> Vec<u8> {
                 .add_text_box(text, 0, 0, 914_400, 914_400);
         }
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     package.to_bytes().unwrap()
 }
 
@@ -510,7 +510,7 @@ fn final_slide_shared_owner_dependency_unknown_macro_and_signed_sources_refuse_a
             .add_slide()
             .unwrap()
             .add_text_box("only", 0, 0, 914_400, 914_400);
-        let mut package = builder.build().unwrap();
+        let package = builder.build().unwrap();
         package.to_bytes().unwrap()
     };
     let final_error = open(&one_slide)
@@ -575,10 +575,11 @@ fn stale_source_and_cancellation_are_rejected_before_output() {
     assert!(output.is_empty());
 
     let (cancellation_source, context) = managed_context();
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(fixture())),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let plan = editor.plan_slide_removal(Position::new(1)).unwrap();

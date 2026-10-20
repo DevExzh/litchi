@@ -6,7 +6,7 @@ use litchi_drawingml::text::Alignment;
 
 use litchi_drawingml::geom::Preset;
 
-use super::{CellFill, Rgb, ShapeFill, TextEdit, TextProperties, TextTarget};
+use super::{CellFill, Rgb, ShapeFill, TextAssignment, TextProperties, TextTarget};
 use crate::{Error, Package, Result};
 
 fn deck() -> Result<Package> {
@@ -45,7 +45,7 @@ fn run(paragraph: usize, run: usize) -> TextTarget {
     }
 }
 
-fn apply(package: &Package, edits: &[TextEdit<'_>]) -> Result<(Package, usize)> {
+fn apply(package: &Package, edits: &[TextAssignment<'_>]) -> Result<(Package, usize)> {
     let mut edit = package.edit()?;
     let changed = edit.set_text_properties(0usize, edits)?;
     Ok((edit.commit()?.into_package(), changed))
@@ -66,7 +66,7 @@ fn run_formatting_round_trips() -> Result<()> {
         .with_size(Some(2_400))
         .with_color(Some(Rgb([0x1F, 0x4E, 0x79])))
         .with_font(Some("Georgia"));
-    let (after, changed) = apply(&package, &[TextEdit::new(run(0, 0), properties)])?;
+    let (after, changed) = apply(&package, &[TextAssignment::new(run(0, 0), properties)])?;
     assert_eq!(changed, 1);
     let xml = slide_xml(&after)?;
     for needle in [
@@ -86,7 +86,7 @@ fn run_formatting_round_trips() -> Result<()> {
         .with_size(None)
         .with_color(None)
         .with_font(None);
-    let (cleared, _) = apply(&after, &[TextEdit::new(run(0, 0), clear)])?;
+    let (cleared, _) = apply(&after, &[TextAssignment::new(run(0, 0), clear)])?;
     let xml = slide_xml(&cleared)?;
     assert!(!contains(&xml, "b=\"1\""));
     assert!(!contains(&xml, "srgbClr val=\"1F4E79\""));
@@ -105,14 +105,14 @@ fn paragraph_text_and_alignment() -> Result<()> {
     let properties = TextProperties::default()
         .with_text("one\ntwo")
         .with_align(Some(Alignment::Center));
-    let (after, changed) = apply(&package, &[TextEdit::new(target, properties)])?;
+    let (after, changed) = apply(&package, &[TextAssignment::new(target, properties)])?;
     assert_eq!(changed, 1);
     let scene_xml = slide_xml(&after)?;
     let scene = crate::shape::Scene::read(&scene_xml)?;
     assert_eq!(scene.at(0)?.text(), Some("one\ntwo"));
     assert!(contains(&scene_xml, "algn=\"ctr\""));
     // An exact repeat changes nothing.
-    let (_, unchanged) = apply(&after, &[TextEdit::new(target, properties)])?;
+    let (_, unchanged) = apply(&after, &[TextAssignment::new(target, properties)])?;
     assert_eq!(unchanged, 0);
     Ok(())
 }
@@ -121,9 +121,9 @@ fn paragraph_text_and_alignment() -> Result<()> {
 fn run_text_keeps_properties() -> Result<()> {
     let package = deck()?;
     let bold = TextProperties::default().with_bold(Some(true));
-    let (bolded, _) = apply(&package, &[TextEdit::new(run(0, 0), bold)])?;
+    let (bolded, _) = apply(&package, &[TextAssignment::new(run(0, 0), bold)])?;
     let text = TextProperties::default().with_text("x < y & z");
-    let (after, _) = apply(&bolded, &[TextEdit::new(run(0, 0), text)])?;
+    let (after, _) = apply(&bolded, &[TextAssignment::new(run(0, 0), text)])?;
     let xml = slide_xml(&after)?;
     assert!(contains(&xml, "x &lt; y &amp; z"));
     assert!(contains(&xml, "b=\"1\""));
@@ -144,7 +144,7 @@ fn cell_text_and_fill() -> Result<()> {
         .with_text("changed")
         .with_fill(Some(CellFill::Rgb(Rgb([0xFF, 0xEE, 0x00]))))
         .with_bold(Some(true));
-    let (after, changed) = apply(&package, &[TextEdit::new(target, properties)])?;
+    let (after, changed) = apply(&package, &[TextAssignment::new(target, properties)])?;
     assert_eq!(changed, 1);
     let xml = slide_xml(&after)?;
     let scene = crate::shape::Scene::read(&xml)?;
@@ -155,7 +155,7 @@ fn cell_text_and_fill() -> Result<()> {
     assert_eq!(cell.fill()?, Some([0xFF, 0xEE, 0x00]));
     assert_eq!(table.cell(0, 0)?.expect("cell").fill()?, None);
     let clear = TextProperties::default().with_fill(None);
-    let (cleared, _) = apply(&after, &[TextEdit::new(target, clear)])?;
+    let (cleared, _) = apply(&after, &[TextAssignment::new(target, clear)])?;
     let xml = slide_xml(&cleared)?;
     let scene = crate::shape::Scene::read(&xml)?;
     let frame = scene.at(1)?.xml()?.to_vec();
@@ -169,15 +169,15 @@ fn refusals_leave_the_edit_unchanged() -> Result<()> {
     let package = deck()?;
     let mut edit = package.edit()?;
     let bad = [
-        TextEdit::new(run(0, 9), TextProperties::default().with_bold(Some(true))),
-        TextEdit::new(run(0, 0), TextProperties::default().with_size(Some(5))),
-        TextEdit::new(run(0, 0), TextProperties::default().with_text("a\nb")),
-        TextEdit::new(run(0, 0), TextProperties::default()),
-        TextEdit::new(
+        TextAssignment::new(run(0, 9), TextProperties::default().with_bold(Some(true))),
+        TextAssignment::new(run(0, 0), TextProperties::default().with_size(Some(5))),
+        TextAssignment::new(run(0, 0), TextProperties::default().with_text("a\nb")),
+        TextAssignment::new(run(0, 0), TextProperties::default()),
+        TextAssignment::new(
             TextTarget::Shape { shape: at(0) },
             TextProperties::default().with_fill(Some(CellFill::Rgb(Rgb([0, 0, 0])))),
         ),
-        TextEdit::new(
+        TextAssignment::new(
             TextTarget::Cell {
                 shape: at(0),
                 row: at(0),
@@ -197,7 +197,7 @@ fn refusals_leave_the_edit_unchanged() -> Result<()> {
     assert!(matches!(
         package.edit()?.set_text_properties(
             0usize,
-            &[TextEdit::new(
+            &[TextAssignment::new(
                 run(3, 0),
                 TextProperties::default().with_bold(Some(true))
             )]
@@ -215,8 +215,8 @@ fn source_owner_matches_eager_owner() -> Result<()> {
         .with_bold(Some(true))
         .with_align(Some(Alignment::Right));
     let edits = [
-        TextEdit::new(run(0, 0), properties),
-        TextEdit::new(
+        TextAssignment::new(run(0, 0), properties),
+        TextAssignment::new(
             TextTarget::Paragraph {
                 shape: at(0),
                 paragraph: at(0),
@@ -254,7 +254,7 @@ fn shape_fill_and_geometry_round_trip() -> Result<()> {
         .with_shape_fill(Some(ShapeFill::Solid(Rgb([0x1E, 0x3A, 0x5F]))))
         .with_geometry(Preset::Ellipse)
         .with_bold(Some(true));
-    let (after, changed) = apply(&package, &[TextEdit::new(shape_target(), properties)])?;
+    let (after, changed) = apply(&package, &[TextAssignment::new(shape_target(), properties)])?;
     assert_eq!(changed, 1);
     let xml = slide_xml(&after)?;
     assert!(contains(
@@ -278,15 +278,15 @@ fn shape_fill_and_geometry_round_trip() -> Result<()> {
     assert!(xfrm < geometry && geometry < fill);
 
     // The same assignments again change nothing.
-    let (_, unchanged) = apply(&after, &[TextEdit::new(shape_target(), properties)])?;
+    let (_, unchanged) = apply(&after, &[TextAssignment::new(shape_target(), properties)])?;
     assert_eq!(unchanged, 0);
 
     // `None` writes `a:noFill`; removal deletes the local fill choice.
     let none = TextProperties::default().with_shape_fill(Some(ShapeFill::None));
-    let (hidden, _) = apply(&after, &[TextEdit::new(shape_target(), none)])?;
+    let (hidden, _) = apply(&after, &[TextAssignment::new(shape_target(), none)])?;
     assert!(contains(&slide_xml(&hidden)?, "<a:noFill/></p:spPr>"));
     let cleared = TextProperties::default().with_shape_fill(None);
-    let (cleared, _) = apply(&hidden, &[TextEdit::new(shape_target(), cleared)])?;
+    let (cleared, _) = apply(&hidden, &[TextAssignment::new(shape_target(), cleared)])?;
     let xml = slide_xml(&cleared)?;
     assert!(!contains(&xml, "<a:noFill/></p:spPr>"));
     assert!(contains(&xml, "</a:prstGeom></p:spPr>"));
@@ -300,8 +300,8 @@ fn shape_properties_refuse_other_targets() -> Result<()> {
     let fill = TextProperties::default().with_shape_fill(Some(ShapeFill::None));
     let geometry = TextProperties::default().with_geometry(Preset::Star5);
     for item in [
-        TextEdit::new(run(0, 0), fill),
-        TextEdit::new(
+        TextAssignment::new(run(0, 0), fill),
+        TextAssignment::new(
             TextTarget::Paragraph {
                 shape: at(0),
                 paragraph: at(0),
@@ -309,7 +309,7 @@ fn shape_properties_refuse_other_targets() -> Result<()> {
             geometry,
         ),
         // The table frame has no shape properties of its own.
-        TextEdit::new(TextTarget::Shape { shape: at(1) }, geometry),
+        TextAssignment::new(TextTarget::Shape { shape: at(1) }, geometry),
     ] {
         assert!(
             edit.set_text_properties(0usize, &[item]).is_err(),
@@ -324,7 +324,7 @@ fn shape_properties_refuse_other_targets() -> Result<()> {
 fn source_owner_writes_shape_properties_like_the_eager_owner() -> Result<()> {
     use std::sync::Arc;
     let bytes = deck()?.to_bytes()?;
-    let edits = [TextEdit::new(
+    let edits = [TextAssignment::new(
         shape_target(),
         TextProperties::default()
             .with_shape_fill(Some(ShapeFill::Solid(Rgb([0xFF, 0x00, 0x00]))))
@@ -358,7 +358,7 @@ fn run_spans_split_runs_and_format_only_the_span() -> Result<()> {
     };
     // "alpha" → "al" + bold "pha"; the parts keep the run's markup.
     let bold = TextProperties::default().with_bold(Some(true));
-    let (after, changed) = apply(&package, &[TextEdit::new(span(2, 5), bold)])?;
+    let (after, changed) = apply(&package, &[TextAssignment::new(span(2, 5), bold)])?;
     assert_eq!(changed, 1);
     let xml = slide_xml(&after)?;
     let scene = crate::shape::Scene::read(&xml)?;
@@ -373,7 +373,7 @@ fn run_spans_split_runs_and_format_only_the_span() -> Result<()> {
     let text = TextProperties::default()
         .with_text("L & P")
         .with_italic(Some(true));
-    let (after, _) = apply(&package, &[TextEdit::new(span(1, 4), text)])?;
+    let (after, _) = apply(&package, &[TextAssignment::new(span(1, 4), text)])?;
     let xml = slide_xml(&after)?;
     let scene = crate::shape::Scene::read(&xml)?;
     assert_eq!(scene.at(0)?.text(), Some("aL & Pa"));
@@ -382,8 +382,8 @@ fn run_spans_split_runs_and_format_only_the_span() -> Result<()> {
     let (after, changed) = apply(
         &package,
         &[
-            TextEdit::new(span(3, 4), bold),
-            TextEdit::new(
+            TextAssignment::new(span(3, 4), bold),
+            TextAssignment::new(
                 span(0, 1),
                 TextProperties::default().with_italic(Some(true)),
             ),
@@ -395,7 +395,7 @@ fn run_spans_split_runs_and_format_only_the_span() -> Result<()> {
     assert_eq!(scene.at(0)?.text(), Some("alpha"));
     // Empty, out-of-range and off-boundary spans are refused.
     for (start, end) in [(2, 2), (4, 9)] {
-        assert!(apply(&package, &[TextEdit::new(span(start, end), bold)]).is_err());
+        assert!(apply(&package, &[TextAssignment::new(span(start, end), bold)]).is_err());
     }
     Ok(())
 }
@@ -435,7 +435,7 @@ fn cell_runs_and_spans_edit_one_run() -> Result<()> {
         run: at(run),
     };
     let text = TextProperties::default().with_text("B2");
-    let (after, changed) = apply(&package, &[TextEdit::new(cell(0), text)])?;
+    let (after, changed) = apply(&package, &[TextAssignment::new(cell(0), text)])?;
     assert_eq!(changed, 1);
     let xml = slide_xml(&after)?;
     let scene = crate::shape::Scene::read(&xml)?;
@@ -458,7 +458,7 @@ fn cell_runs_and_spans_edit_one_run() -> Result<()> {
     let bold = TextProperties::default()
         .with_text("ONE")
         .with_bold(Some(true));
-    let (after, _) = apply(&package, &[TextEdit::new(span, bold)])?;
+    let (after, _) = apply(&package, &[TextAssignment::new(span, bold)])?;
     let xml = slide_xml(&after)?;
     let scene = crate::shape::Scene::read(&xml)?;
     let frame = scene.at(1)?.xml()?.to_vec();
@@ -471,9 +471,9 @@ fn cell_runs_and_spans_edit_one_run() -> Result<()> {
         .collect();
     assert_eq!(runs, ["a", "ONE"]);
     // Out-of-range runs, line breaks and a non-table shape are refused.
-    assert!(apply(&package, &[TextEdit::new(cell(4), text)]).is_err());
+    assert!(apply(&package, &[TextAssignment::new(cell(4), text)]).is_err());
     let broken = TextProperties::default().with_text("a\nb");
-    assert!(apply(&package, &[TextEdit::new(cell(0), broken)]).is_err());
+    assert!(apply(&package, &[TextAssignment::new(cell(0), broken)]).is_err());
     let not_a_table = TextTarget::CellRun {
         shape: at(0),
         row: at(0),
@@ -481,7 +481,7 @@ fn cell_runs_and_spans_edit_one_run() -> Result<()> {
         paragraph: at(0),
         run: at(0),
     };
-    assert!(apply(&package, &[TextEdit::new(not_a_table, text)]).is_err());
+    assert!(apply(&package, &[TextAssignment::new(not_a_table, text)]).is_err());
     Ok(())
 }
 
@@ -513,7 +513,7 @@ fn notes_pages_take_run_edits() -> Result<()> {
     let mut edit = package.edit()?;
     let changed = edit.set_notes_text_properties(
         0usize,
-        &[TextEdit::new(
+        &[TextAssignment::new(
             span,
             TextProperties::default()
                 .with_text("final")
@@ -538,7 +538,7 @@ fn notes_pages_take_run_edits() -> Result<()> {
     assert!(
         edit.set_notes_text_properties(
             0usize,
-            &[TextEdit::new(
+            &[TextAssignment::new(
                 span,
                 TextProperties::default().with_bold(Some(true))
             )]
@@ -564,7 +564,7 @@ fn cell_theme_fill_anchor_and_insets_round_trip() -> Result<()> {
         .with_cell_anchor(Some(Anchor::Center))
         .with_cell_margin(CellMargin::Left, Some(91_440))
         .with_cell_margin(CellMargin::Bottom, Some(45_720));
-    let (after, changed) = apply(&package, &[TextEdit::new(target, properties)])?;
+    let (after, changed) = apply(&package, &[TextAssignment::new(target, properties)])?;
     assert_eq!(changed, 1);
     let read = |package: &Package| -> Result<crate::table::CellProperties> {
         let xml = slide_xml(package)?;
@@ -582,13 +582,13 @@ fn cell_theme_fill_anchor_and_insets_round_trip() -> Result<()> {
         "<a:schemeClr val=\"accent1\"/>"
     ));
     // An exact repeat changes nothing; `none` writes an explicit no-fill.
-    let (_, unchanged) = apply(&after, &[TextEdit::new(target, properties)])?;
+    let (_, unchanged) = apply(&after, &[TextAssignment::new(target, properties)])?;
     assert_eq!(unchanged, 0);
     let none = TextProperties::default()
         .with_fill(Some(CellFill::None))
         .with_cell_anchor(None)
         .with_cell_margin(CellMargin::Left, None);
-    let (cleared, _) = apply(&after, &[TextEdit::new(target, none)])?;
+    let (cleared, _) = apply(&after, &[TextAssignment::new(target, none)])?;
     let cell = read(&cleared)?;
     assert_eq!(cell.fill, Some(CellFill::None));
     assert_eq!(cell.anchor, None);
@@ -598,7 +598,7 @@ fn cell_theme_fill_anchor_and_insets_round_trip() -> Result<()> {
     assert!(
         edit.set_text_properties(
             0usize,
-            &[TextEdit::new(
+            &[TextAssignment::new(
                 run(0, 0),
                 TextProperties::default().with_cell_anchor(Some(Anchor::Top))
             )]
@@ -615,14 +615,14 @@ fn underline_and_strike_round_trip() -> Result<()> {
     let properties = TextProperties::default()
         .with_underline(Some(Underline::Double))
         .with_strike(Some(Strike::Single));
-    let (after, _) = apply(&package, &[TextEdit::new(run(0, 0), properties)])?;
+    let (after, _) = apply(&package, &[TextAssignment::new(run(0, 0), properties)])?;
     let xml = slide_xml(&after)?;
     assert!(contains(&xml, "u=\"dbl\""));
     assert!(contains(&xml, "strike=\"sngStrike\""));
     let clear = TextProperties::default()
         .with_underline(None)
         .with_strike(None);
-    let (cleared, _) = apply(&after, &[TextEdit::new(run(0, 0), clear)])?;
+    let (cleared, _) = apply(&after, &[TextAssignment::new(run(0, 0), clear)])?;
     assert_eq!(slide_xml(&cleared)?, slide_xml(&package)?);
     Ok(())
 }
@@ -676,10 +676,10 @@ fn chunked_text_edits_equal_one_call_per_chunk() -> Result<()> {
     let package = deck()?;
     let bold = TextProperties::default().with_bold(Some(true));
     let italic = TextProperties::default().with_italic(Some(true));
-    let first = [TextEdit::new(run(0, 0), bold)];
+    let first = [TextAssignment::new(run(0, 0), bold)];
     let second = [
-        TextEdit::new(run(0, 0), italic),
-        TextEdit::new(
+        TextAssignment::new(run(0, 0), italic),
+        TextAssignment::new(
             TextTarget::Cell {
                 shape: at(1),
                 row: at(0),
@@ -700,7 +700,7 @@ fn chunked_text_edits_equal_one_call_per_chunk() -> Result<()> {
     assert_eq!(slide_xml(&chunked.commit()?.into_package())?, expected);
     let mut empty = package.edit()?;
     assert_eq!(empty.set_text_property_chunks(0usize, &[])?, 0);
-    let too_many = vec![TextEdit::new(run(0, 0), bold); 257];
+    let too_many = vec![TextAssignment::new(run(0, 0), bold); 257];
     assert!(
         empty
             .set_text_property_chunks(0usize, &[&too_many])
@@ -725,20 +725,20 @@ fn batched_paragraph_and_cell_edits_equal_one_edit_at_a_time() -> Result<()> {
         paragraph: at(0),
     };
     let edits = [
-        TextEdit::new(run(0, 0), TextProperties::default().with_bold(Some(true))),
-        TextEdit::new(
+        TextAssignment::new(run(0, 0), TextProperties::default().with_bold(Some(true))),
+        TextAssignment::new(
             paragraph(0),
             TextProperties::default().with_align(Some(Alignment::Center)),
         ),
         // A whole-shape edit after the paragraph edits sees them.
-        TextEdit::new(
+        TextAssignment::new(
             TextTarget::Shape { shape: at(0) },
             TextProperties::default().with_italic(Some(true)),
         ),
-        TextEdit::new(run(0, 0), TextProperties::default().with_size(Some(2_000))),
-        TextEdit::new(cell(0, 0), TextProperties::default().with_bold(Some(true))),
-        TextEdit::new(cell(1, 1), TextProperties::default().with_text("changed")),
-        TextEdit::new(
+        TextAssignment::new(run(0, 0), TextProperties::default().with_size(Some(2_000))),
+        TextAssignment::new(cell(0, 0), TextProperties::default().with_bold(Some(true))),
+        TextAssignment::new(cell(1, 1), TextProperties::default().with_text("changed")),
+        TextAssignment::new(
             cell(0, 0),
             TextProperties::default().with_italic(Some(true)),
         ),
@@ -772,19 +772,19 @@ fn per_edit_changes_equal_one_edit_at_a_time() -> Result<()> {
     let bold = TextProperties::default().with_bold(Some(true));
     let fill = TextProperties::default().with_fill(Some(CellFill::Rgb(Rgb([0xFF, 0xEE, 0xCC]))));
     let edits = [
-        TextEdit::new(cell(0, 0), bold),
+        TextAssignment::new(cell(0, 0), bold),
         // The same change again: no bytes change.
-        TextEdit::new(cell(0, 0), bold),
-        TextEdit::new(cell(0, 1), fill),
-        TextEdit::new(
+        TextAssignment::new(cell(0, 0), bold),
+        TextAssignment::new(cell(0, 1), fill),
+        TextAssignment::new(
             cell_paragraph(1, 0),
             TextProperties::default().with_align(Some(Alignment::Center)),
         ),
-        TextEdit::new(
+        TextAssignment::new(
             cell_paragraph(1, 1),
             TextProperties::default().with_text("b2"),
         ),
-        TextEdit::new(run(0, 0), TextProperties::default().with_italic(Some(true))),
+        TextAssignment::new(run(0, 0), TextProperties::default().with_italic(Some(true))),
     ];
     let mut expected = Vec::new();
     let mut sequential = deck()?;
@@ -794,7 +794,7 @@ fn per_edit_changes_equal_one_edit_at_a_time() -> Result<()> {
         sequential = after;
     }
     assert_eq!(expected, [true, false, true, true, false, true]);
-    let chunks: Vec<&[TextEdit<'_>]> = edits.chunks(2).collect();
+    let chunks: Vec<&[TextAssignment<'_>]> = edits.chunks(2).collect();
     let mut batched = package.edit()?;
     assert_eq!(
         batched.set_text_property_chunks_per_edit(0usize, &chunks)?,
@@ -851,21 +851,21 @@ fn notes_chunks_equal_one_call_per_chunk() -> Result<()> {
         run: at(0),
     };
     let edits = [
-        TextEdit::new(
+        TextAssignment::new(
             paragraph(0),
             TextProperties::default().with_align(Some(Alignment::Right)),
         ),
-        TextEdit::new(notes_run, TextProperties::default().with_bold(Some(true))),
-        TextEdit::new(
+        TextAssignment::new(notes_run, TextProperties::default().with_bold(Some(true))),
+        TextAssignment::new(
             paragraph(0),
             TextProperties::default().with_italic(Some(true)),
         ),
-        TextEdit::new(notes_run, TextProperties::default().with_bold(Some(true))),
-        TextEdit::new(paragraph(0), TextProperties::default().with_text("one two")),
+        TextAssignment::new(notes_run, TextProperties::default().with_bold(Some(true))),
+        TextAssignment::new(paragraph(0), TextProperties::default().with_text("one two")),
         // Unchanged after the edit before it.
-        TextEdit::new(paragraph(0), TextProperties::default().with_text("one two")),
+        TextAssignment::new(paragraph(0), TextProperties::default().with_text("one two")),
     ];
-    let chunks: Vec<&[TextEdit<'_>]> = edits.chunks(2).collect();
+    let chunks: Vec<&[TextAssignment<'_>]> = edits.chunks(2).collect();
     let notes_xml = |package: &Package| -> Result<Vec<u8>> {
         let notes = package.notes()?.expect("notes");
         Ok(notes.slides().first().expect("note").xml().to_vec())

@@ -8,10 +8,7 @@ use std::sync::Arc;
 
 use litchi_core::{CheckStatus, EvidenceValue, OwnedSource, ReadAt, ValidationLimits};
 use litchi_opc::SourceBackedPackage;
-use litchi_pptx::{
-    PptxValidationLimits, validate_source_backed, validate_source_backed_with_limits,
-    validate_source_with_limits,
-};
+use litchi_pptx::{PptxValidationLimits, validate_source, validate_source_backed};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
@@ -113,7 +110,12 @@ fn valid_source_report_reuses_catalog_and_reports_external_presence_only() {
     let bytes = valid_package();
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes.clone()));
     let package = SourceBackedPackage::from_read_at(source).unwrap();
-    let report = validate_source_backed(&package).unwrap();
+    let report = validate_source_backed(
+        &package,
+        PptxValidationLimits::default(),
+        ValidationLimits::default(),
+    )
+    .unwrap();
 
     assert!(matches!(
         status(&report, "pptx.package.loaded_relationships_content_types"),
@@ -164,7 +166,7 @@ fn mce_is_reported_without_selecting_a_branch() {
         ),
         &[],
     );
-    let report = validate_source_with_limits(
+    let report = validate_source(
         Arc::new(OwnedSource::new(bytes)),
         PptxValidationLimits::default(),
         ValidationLimits::default(),
@@ -206,7 +208,7 @@ fn malformed_slide_is_a_bounded_issue_and_xml_limit_stops_dependents() {
         ),
         &[],
     );
-    let report = validate_source_with_limits(
+    let report = validate_source(
         Arc::new(OwnedSource::new(bytes.clone())),
         PptxValidationLimits::default(),
         ValidationLimits::default(),
@@ -223,7 +225,7 @@ fn malformed_slide_is_a_bounded_issue_and_xml_limit_stops_dependents() {
             .any(|issue| issue.code() == "pptx.presentation.slide_closure.incomplete")
     );
 
-    let limited = validate_source_with_limits(
+    let limited = validate_source(
         Arc::new(OwnedSource::new(bytes)),
         PptxValidationLimits::default().with_max_xml_bytes(16),
         ValidationLimits::default(),
@@ -257,7 +259,7 @@ fn signature_and_macro_presence_are_inert_facts() {
             ("ppt/vbaProject.bin", b"opaque-vba".as_slice()),
         ],
     );
-    let report = validate_source_with_limits(
+    let report = validate_source(
         Arc::new(OwnedSource::new(bytes)),
         PptxValidationLimits::default(),
         ValidationLimits::default(),
@@ -289,7 +291,7 @@ fn signature_and_macro_presence_are_inert_facts() {
 fn source_backed_limits_are_finite_and_report_owned_xml_ceiling() {
     let bytes = valid_package();
     let package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
-    let report = validate_source_backed_with_limits(
+    let report = validate_source_backed(
         &package,
         PptxValidationLimits::default().with_max_owner_bytes(1),
         ValidationLimits::default(),
@@ -314,7 +316,7 @@ fn strict_namespaces_and_direct_numeric_slide_owners_are_required() {
         ),
         &[],
     );
-    let report = validate_source_with_limits(
+    let report = validate_source(
         Arc::new(OwnedSource::new(undeclared_relationship_prefix)),
         PptxValidationLimits::default(),
         ValidationLimits::default(),
@@ -340,7 +342,7 @@ fn strict_namespaces_and_direct_numeric_slide_owners_are_required() {
         ),
         &[],
     );
-    let report = validate_source_with_limits(
+    let report = validate_source(
         Arc::new(OwnedSource::new(duplicate_owners)),
         PptxValidationLimits::default(),
         ValidationLimits::default(),
@@ -370,7 +372,7 @@ fn strict_namespaces_and_direct_numeric_slide_owners_are_required() {
         ),
         &[],
     );
-    let report = validate_source_with_limits(
+    let report = validate_source(
         Arc::new(OwnedSource::new(non_numeric)),
         PptxValidationLimits::default(),
         ValidationLimits::default(),
@@ -399,7 +401,7 @@ fn malformed_references_comments_and_depth_block_mce_truthfully() {
         ),
         &[],
     );
-    let report = validate_source_with_limits(
+    let report = validate_source(
         Arc::new(OwnedSource::new(unknown_reference)),
         PptxValidationLimits::default(),
         ValidationLimits::default(),
@@ -429,7 +431,7 @@ fn malformed_references_comments_and_depth_block_mce_truthfully() {
         ),
         &[],
     );
-    let report = validate_source_with_limits(
+    let report = validate_source(
         Arc::new(OwnedSource::new(invalid_comment)),
         PptxValidationLimits::default(),
         ValidationLimits::default(),
@@ -442,7 +444,7 @@ fn malformed_references_comments_and_depth_block_mce_truthfully() {
             .any(|issue| issue.code() == "pptx.presentation.root.malformed")
     );
 
-    let limited = validate_source_with_limits(
+    let limited = validate_source(
         Arc::new(OwnedSource::new(valid_package())),
         PptxValidationLimits::default().with_max_xml_depth(1),
         ValidationLimits::default(),
@@ -480,7 +482,7 @@ fn graph_checks_orphan_manifests_and_agile_vba_signature_presence() {
             ),
         ],
     );
-    let report = validate_source_with_limits(
+    let report = validate_source(
         Arc::new(OwnedSource::new(bytes)),
         PptxValidationLimits::default(),
         ValidationLimits::default(),
@@ -520,7 +522,7 @@ fn graph_limit_stops_graph_only_and_keeps_later_catalog_facts() {
             ("ppt/vbaProject.bin", b"opaque-vba".as_slice()),
         ],
     );
-    let report = validate_source_with_limits(
+    let report = validate_source(
         Arc::new(OwnedSource::new(bytes)),
         PptxValidationLimits::default().with_max_graph_nodes(0),
         ValidationLimits::default(),
@@ -586,7 +588,7 @@ fn mce_conclusion_is_order_independent_when_a_slide_cannot_be_inspected() {
             ),
             &[],
         );
-        let report = validate_source_with_limits(
+        let report = validate_source(
             Arc::new(OwnedSource::new(bytes)),
             PptxValidationLimits::default(),
             ValidationLimits::default(),
@@ -615,7 +617,7 @@ fn slide_id_schema_bounds_and_direct_list_cardinality_are_enforced() {
             ),
             &[],
         );
-        let report = validate_source_with_limits(
+        let report = validate_source(
             Arc::new(OwnedSource::new(bytes)),
             PptxValidationLimits::default(),
             ValidationLimits::default(),
@@ -642,7 +644,7 @@ fn slide_id_schema_bounds_and_direct_list_cardinality_are_enforced() {
         ),
         &[],
     );
-    let report = validate_source_with_limits(
+    let report = validate_source(
         Arc::new(OwnedSource::new(multiple_lists)),
         PptxValidationLimits::default(),
         ValidationLimits::default(),
@@ -666,7 +668,7 @@ fn slide_id_schema_bounds_and_direct_list_cardinality_are_enforced() {
         ),
         &[],
     );
-    let report = validate_source_with_limits(
+    let report = validate_source(
         Arc::new(OwnedSource::new(no_list)),
         PptxValidationLimits::default(),
         ValidationLimits::default(),
@@ -691,7 +693,7 @@ fn namespace_attribute_values_and_reader_depth_are_bounded() {
         ),
         &[],
     );
-    let report = validate_source_with_limits(
+    let report = validate_source(
         Arc::new(OwnedSource::new(invalid_namespace_value)),
         PptxValidationLimits::default(),
         ValidationLimits::default(),

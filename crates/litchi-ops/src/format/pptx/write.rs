@@ -504,10 +504,10 @@ fn body_edits<'t>(
     targets: &[Target],
     text: Option<&'t str>,
     format: &'t text::TextValues,
-) -> Result<Vec<(usize, Vec<litchi_pptx::opened::TextEdit<'t>>)>> {
+) -> Result<Vec<(usize, Vec<litchi_pptx::opened::TextAssignment<'t>>)>> {
     let formatting = format.properties();
     let filled = text.map(|text| formatting.with_text(text));
-    let mut groups: Vec<(usize, Vec<litchi_pptx::opened::TextEdit<'t>>)> = Vec::new();
+    let mut groups: Vec<(usize, Vec<litchi_pptx::opened::TextAssignment<'t>>)> = Vec::new();
     for target in targets {
         let properties = match filled {
             Some(filled) if !target.slot => filled,
@@ -525,7 +525,7 @@ fn body_edits<'t>(
             unreachable!("a group was just pushed")
         };
         edits.try_reserve(1).map_err(allocation)?;
-        edits.push(litchi_pptx::opened::TextEdit::new(
+        edits.push(litchi_pptx::opened::TextAssignment::new(
             litchi_pptx::opened::TextTarget::Shape {
                 shape: litchi_core::Position::new(target.position),
             },

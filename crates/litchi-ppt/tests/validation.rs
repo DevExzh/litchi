@@ -8,7 +8,7 @@ use litchi_cfb::OleWriter;
 use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 use litchi_ppt::{
     DocumentAtom, DocumentDimensions, PptValidationError, PptValidationLimits, Ratio,
-    SlideSizeType, validate_source, validate_source_with_limits,
+    SlideSizeType, validate_source,
 };
 use std::{
     io::{self, Cursor},
@@ -194,7 +194,11 @@ fn fat_stream_range_and_size(bytes: &[u8], name: &str) -> ((u64, u64), u64) {
 fn valid_root_and_dual_storage_hierarchies_are_complete() {
     for dual in [false, true] {
         let bytes = package(dual, false, &[], &[]);
-        let report = validate_source(Arc::new(OwnedSource::new(bytes))).unwrap();
+        let report = validate_source(
+            Arc::new(OwnedSource::new(bytes)),
+            PptValidationLimits::default(),
+        )
+        .unwrap();
         assert!(report.is_complete(), "{report:?}");
         assert!(!report.has_errors(), "{report:?}");
         assert!(check(&report, "ppt.record.parse").status().is_complete());
@@ -209,7 +213,11 @@ fn pictures_must_remain_root_level_with_dual_storage() {
         &[],
         &[(&["PP97_DUALSTORAGE", "Pictures"][..], b"picture")],
     );
-    let report = validate_source(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let report = validate_source(
+        Arc::new(OwnedSource::new(bytes)),
+        PptValidationLimits::default(),
+    )
+    .unwrap();
     assert!(!check(&report, "ppt.pictures.stream").status().is_complete());
     assert!(
         report
@@ -227,7 +235,11 @@ fn pictures_under_another_storage_are_noncanonical() {
         &[],
         &[(&["OtherStorage", "Pictures"][..], b"picture")],
     );
-    let report = validate_source(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let report = validate_source(
+        Arc::new(OwnedSource::new(bytes)),
+        PptValidationLimits::default(),
+    )
+    .unwrap();
     assert!(!check(&report, "ppt.pictures.stream").status().is_complete());
     assert!(
         report
@@ -255,7 +267,7 @@ fn cross_storage_native_streams_are_rejected_before_payload_reads() {
     let bytes = output.into_inner();
     let (document_range, _) = fat_stream_range_and_size(&bytes, "PowerPoint Document");
     let source = Arc::new(RejectRangesSource::new(bytes, [document_range]));
-    let report = validate_source(source).unwrap();
+    let report = validate_source(source, PptValidationLimits::default()).unwrap();
     assert!(
         !check(&report, "ppt.storage.hierarchy")
             .status()
@@ -298,7 +310,7 @@ fn directory_depth_limit_stops_native_stream_checks() {
         defaults.record(),
         defaults.report(),
     );
-    let report = validate_source_with_limits(Arc::new(OwnedSource::new(bytes)), limits).unwrap();
+    let report = validate_source(Arc::new(OwnedSource::new(bytes)), limits).unwrap();
     assert!(
         !check(&report, "ppt.storage.hierarchy")
             .status()
@@ -318,7 +330,7 @@ fn validation_is_non_mutating_and_uses_positional_reads() {
     let bytes = package(false, false, &[], &[]);
     let original = bytes.clone();
     let source = Arc::new(CountingSource::new(bytes));
-    let report = validate_source(source.clone()).unwrap();
+    let report = validate_source(source.clone(), PptValidationLimits::default()).unwrap();
     assert!(!report.has_errors(), "{report:?}");
     assert!(source.reads.load(Ordering::Relaxed) > 0);
     assert_eq!(source.bytes.as_slice(), original.as_slice());
@@ -334,7 +346,11 @@ fn hostile_topology_and_short_source_are_reported_without_panic() {
     writer.create_stream(&["Current User"], &current).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let report = validate_source(Arc::new(OwnedSource::new(output.into_inner()))).unwrap();
+    let report = validate_source(
+        Arc::new(OwnedSource::new(output.into_inner())),
+        PptValidationLimits::default(),
+    )
+    .unwrap();
     assert!(report.has_errors());
     assert!(
         report
@@ -343,7 +359,11 @@ fn hostile_topology_and_short_source_are_reported_without_panic() {
             .any(|issue| issue.code() == "ppt.document.stream_ambiguous")
     );
 
-    let short = validate_source(Arc::new(OwnedSource::new(vec![0u8; 64]))).unwrap();
+    let short = validate_source(
+        Arc::new(OwnedSource::new(vec![0u8; 64])),
+        PptValidationLimits::default(),
+    )
+    .unwrap();
     assert!(short.has_errors());
     assert!(
         short
@@ -371,7 +391,11 @@ fn security_macro_protection_and_external_markers_are_presence_only() {
             (&["VBA"][..], b"macro"),
         ],
     );
-    let report = validate_source(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let report = validate_source(
+        Arc::new(OwnedSource::new(bytes)),
+        PptValidationLimits::default(),
+    )
+    .unwrap();
     assert!(
         report
             .issues()
@@ -424,7 +448,7 @@ fn encrypted_validation_does_not_read_powerpoint_document_payload() {
     let sectors = document.size.div_ceil(sector_size as u64);
     let end = start + sectors * sector_size as u64;
     let source = Arc::new(RejectRangesSource::new(bytes, [(start, end)]));
-    let report = validate_source(source).unwrap();
+    let report = validate_source(source, PptValidationLimits::default()).unwrap();
     assert!(!report.has_errors(), "{report:?}");
     assert!(!check(&report, "ppt.record.parse").status().is_complete());
     assert!(
@@ -441,7 +465,7 @@ fn malformed_current_user_never_reads_powerpoint_document_payload() {
     let bytes = package_with_streams(false, &document, &[0u8; 28], &[]);
     let (document_range, _) = fat_stream_range_and_size(&bytes, "PowerPoint Document");
     let source = Arc::new(RejectRangesSource::new(bytes, [document_range]));
-    let report = validate_source(source).unwrap();
+    let report = validate_source(source, PptValidationLimits::default()).unwrap();
     assert!(
         !check(&report, "ppt.current_user.stream")
             .status()
@@ -461,7 +485,7 @@ fn assert_current_user_rejected_without_document_read(current: &[u8]) {
     let bytes = package_with_streams(false, &document, current, &[]);
     let (document_range, _) = fat_stream_range_and_size(&bytes, "PowerPoint Document");
     let source = Arc::new(RejectRangesSource::new(bytes, [document_range]));
-    let report = validate_source(source).unwrap();
+    let report = validate_source(source, PptValidationLimits::default()).unwrap();
     assert!(
         !check(&report, "ppt.current_user.stream")
             .status()
@@ -531,7 +555,11 @@ fn current_user_must_have_supported_versions_and_printable_names() {
     let mut nonzero_unused = base.clone();
     nonzero_unused[26..28].copy_from_slice(&0xBEEF_u16.to_le_bytes());
     let bytes = package_with_streams(false, &document, &nonzero_unused, &[]);
-    let report = validate_source(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let report = validate_source(
+        Arc::new(OwnedSource::new(bytes)),
+        PptValidationLimits::default(),
+    )
+    .unwrap();
     assert!(
         check(&report, "ppt.current_user.stream")
             .status()
@@ -560,7 +588,7 @@ fn oversized_current_user_never_reads_powerpoint_document_payload() {
         defaults.report(),
     );
     let source = Arc::new(RejectRangesSource::new(bytes, [document_range]));
-    let report = validate_source_with_limits(source, limits).unwrap();
+    let report = validate_source(source, limits).unwrap();
     assert!(
         !check(&report, "ppt.current_user.stream")
             .status()
@@ -577,7 +605,7 @@ fn out_of_bounds_current_edit_never_reads_powerpoint_document_payload() {
     let (document_range, _) = fat_stream_range_and_size(&bytes, "PowerPoint Document");
     let source = Arc::new(RejectRangesSource::new(bytes, [document_range]));
 
-    let report = validate_source(source).unwrap();
+    let report = validate_source(source, PptValidationLimits::default()).unwrap();
     assert!(
         !check(&report, "ppt.current_user.stream")
             .status()
@@ -621,7 +649,7 @@ fn current_user_parser_resource_limit_blocks_without_document_read() {
         defaults.report(),
     );
     let source = Arc::new(RejectRangesSource::new(bytes, [document_range]));
-    let report = validate_source_with_limits(source, limits).unwrap();
+    let report = validate_source(source, limits).unwrap();
     assert!(
         !check(&report, "ppt.current_user.stream")
             .status()
@@ -662,7 +690,7 @@ fn aggregate_stream_limit_refuses_native_payload_reads() {
         bytes,
         [document_range, current_range],
     ));
-    let report = validate_source_with_limits(source, limits).unwrap();
+    let report = validate_source(source, limits).unwrap();
     assert!(!check(&report, "ppt.stream.budget").status().is_complete());
     assert!(!check(&report, "ppt.document.stream").status().is_complete());
     assert!(
@@ -691,7 +719,11 @@ fn user_edit_bootstrap_rejects_empty_wrong_version_and_null_persist_records() {
         document.extend(edit);
         let current = current_user(edit_offset, false);
         let bytes = package_with_streams(false, &document, &current, &[]);
-        let report = validate_source(Arc::new(OwnedSource::new(bytes))).unwrap();
+        let report = validate_source(
+            Arc::new(OwnedSource::new(bytes)),
+            PptValidationLimits::default(),
+        )
+        .unwrap();
         assert!(
             report
                 .issues()
@@ -728,7 +760,11 @@ fn user_edit_bootstrap_rejects_invalid_versions_ids_and_offsets() {
         document.extend(record(0, 0, 4085, &payload));
         let current = current_user(edit_offset, false);
         let bytes = package_with_streams(false, &document, &current, &[]);
-        let report = validate_source(Arc::new(OwnedSource::new(bytes))).unwrap();
+        let report = validate_source(
+            Arc::new(OwnedSource::new(bytes)),
+            PptValidationLimits::default(),
+        )
+        .unwrap();
         assert!(
             report
                 .issues()
@@ -749,7 +785,11 @@ fn nested_document_container_does_not_satisfy_top_level_owner() {
     document.extend(user_edit_atom(persist_offset));
     let current = current_user(edit_offset, false);
     let bytes = package_with_streams(false, &document, &current, &[]);
-    let report = validate_source(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let report = validate_source(
+        Arc::new(OwnedSource::new(bytes)),
+        PptValidationLimits::default(),
+    )
+    .unwrap();
     assert!(
         report
             .issues()
@@ -768,7 +808,11 @@ fn top_level_document_container_header_is_checked() {
     document.extend(user_edit_atom(persist_offset));
     let current = current_user(edit_offset, false);
     let bytes = package_with_streams(false, &document, &current, &[]);
-    let report = validate_source(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let report = validate_source(
+        Arc::new(OwnedSource::new(bytes)),
+        PptValidationLimits::default(),
+    )
+    .unwrap();
     assert!(
         report
             .issues()
@@ -798,8 +842,7 @@ fn stream_and_source_limits_stop_work_before_unbounded_materialization() {
         defaults.record(),
         defaults.report(),
     );
-    let report =
-        validate_source_with_limits(Arc::new(OwnedSource::new(bytes.clone())), too_small).unwrap();
+    let report = validate_source(Arc::new(OwnedSource::new(bytes.clone())), too_small).unwrap();
     assert!(!check(&report, "ppt.document.stream").status().is_complete());
 
     let limited_source = defaults
@@ -820,7 +863,7 @@ fn stream_and_source_limits_stop_work_before_unbounded_materialization() {
         limited_source,
         defaults.report(),
     );
-    let report = validate_source_with_limits(Arc::new(OwnedSource::new(bytes)), limits).unwrap();
+    let report = validate_source(Arc::new(OwnedSource::new(bytes)), limits).unwrap();
     assert!(!check(&report, "ppt.record.parse").status().is_complete());
 }
 
@@ -828,7 +871,7 @@ fn stream_and_source_limits_stop_work_before_unbounded_materialization() {
 fn source_version_changes_are_errors() {
     let bytes = package(false, false, &[], &[]);
     let source = Arc::new(ChangingSource::new(bytes));
-    let error = validate_source(source).unwrap_err();
+    let error = validate_source(source, PptValidationLimits::default()).unwrap_err();
     assert!(matches!(
         error,
         PptValidationError::Ingress(litchi_cfb::OleError::SourceChanged { .. })

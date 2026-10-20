@@ -4,7 +4,7 @@ use super::Slide;
 use super::model::{ParsedComment, ParsedSlideTiming};
 use crate::animation::{ShapeAnimation, SlideAnimationExtension};
 use crate::consts::RecordType;
-use crate::odraw::ShapeExt as _;
+use crate::odraw::ShapeLimitsExt as _;
 use crate::package::{Error, Result};
 use crate::records::Record;
 use crate::shapes::ShapeEnum;
@@ -189,7 +189,7 @@ impl Slide<'_> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn shape_interactions_with_limits(
+    pub(crate) fn shape_interactions_with_limits(
         &self,
         limits: crate::InteractionLimits,
     ) -> Result<Vec<crate::ShapeInteractionEntry>> {
@@ -226,7 +226,7 @@ impl Slide<'_> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn shape_text_interactions_with_limits(
+    pub(crate) fn shape_text_interactions_with_limits(
         &self,
         limits: crate::TextInteractionLimits,
     ) -> Result<Vec<crate::ShapeTextInteractionEntry>> {
@@ -292,7 +292,7 @@ impl Slide<'_> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn shape_programmable_tags_with_limits(
+    pub(crate) fn shape_programmable_tags_with_limits(
         &self,
         limits: crate::ShapeProgrammableTagLimits,
     ) -> Result<Vec<crate::ShapeProgrammableTagsEntry>> {
@@ -332,7 +332,7 @@ impl Slide<'_> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn programmable_tags_with_limits(
+    pub(crate) fn programmable_tags_with_limits(
         &self,
         limits: crate::ProgTagLimits,
     ) -> Result<Option<crate::ProgTags>> {
@@ -353,7 +353,7 @@ impl Slide<'_> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn shape_flags_with_limits(
+    pub(crate) fn shape_flags_with_limits(
         &self,
         limits: crate::ShapeFlagLimits,
     ) -> Result<Vec<crate::ShapeFlagEntry>> {
@@ -387,7 +387,7 @@ impl Slide<'_> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn placeholder_atoms_with_limits(
+    pub(crate) fn placeholder_atoms_with_limits(
         &self,
         limits: crate::PlaceholderLimits,
     ) -> Result<Vec<crate::PlaceholderEntry>> {

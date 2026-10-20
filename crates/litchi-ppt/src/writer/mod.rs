@@ -74,7 +74,8 @@ pub mod slide_timing;
 pub mod table;
 
 /// Bounded standalone Graph chart authoring and inert PPT object emission.
-pub mod chart;
+/// The chart draft is public as [`crate::builder::Chart`].
+pub(crate) mod chart;
 
 /// PowerPoint 11 smart-tag authoring.
 pub mod smart_tags;
@@ -98,7 +99,6 @@ pub(crate) fn core_encode<W: std::io::Write + std::io::Seek>(
 // Re-export commonly used types from submodules
 pub use crate::shapes::geometry::{GeometryRect, ShapePathType};
 pub use blip::{Id as PictureId, Kind as PictureKind, PictureData, Pictures};
-pub use chart::{Chart, ChartKind, ChartSeries};
 pub use comments::{CommentDateTime, SlideComment};
 pub use custom_shows::CustomShow;
 pub use escher::FreeformGeometry;

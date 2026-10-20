@@ -174,12 +174,8 @@ impl<'a> Presentation<'a> {
     }
 
     /// Load presentation InkAction snapshots under an explicit bounded policy.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if one slide exceeds the supplied policy or has an
-    /// unsupported or malformed typed action closure.
-    pub fn ink_actions_with_limits(
+    #[cfg(test)]
+    pub(crate) fn ink_actions_with_limits(
         &self,
         limits: embedded::ink_actions::Limits,
     ) -> Result<Vec<embedded::ink_actions::Snapshot>> {

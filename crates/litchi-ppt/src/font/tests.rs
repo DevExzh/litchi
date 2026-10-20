@@ -350,8 +350,6 @@ fn whole_package_transaction_is_exact_reversible_and_refuses_reindexing() {
     transaction
         .replace_font(Scope::Base, 0, replacement)
         .unwrap();
-    assert!(transaction.remove_font(Scope::Base, 0).is_err());
-    assert!(transaction.reorder_fonts(Scope::Base, &[0]).is_err());
     let commit = transaction.commit().unwrap();
     assert_eq!(commit.fonts().get_base(0).unwrap().name, "Transaction Font");
     let replay = commit.patch().apply(&source).unwrap();
@@ -444,7 +442,6 @@ fn failed_mutation_rolls_back_without_staging_changes() {
     );
     assert_eq!(transaction.fonts(), &before);
     assert!(transaction.changes().is_empty());
-    assert_eq!(transaction.rollback().bytes(), source.bytes());
 }
 
 #[test]

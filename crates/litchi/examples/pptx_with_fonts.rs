@@ -92,7 +92,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Save the presentation
     let output_path = "output_pptx_with_fonts.pptx";
-    let mut pkg = builder.build()?;
+    let pkg = builder.build()?;
     pkg.save(output_path)?;
 
     println!("✓ Successfully created: {}", output_path);

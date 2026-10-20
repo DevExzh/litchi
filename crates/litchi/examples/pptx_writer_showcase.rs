@@ -25,7 +25,7 @@
 use litchi_pptx::transition::{
     Axis, InOut, Kind, Ms, Shape as TransitionShape, Side, Speed, Spokes, Transition,
 };
-use litchi_pptx::{GradientStop, MutablePresentation, PatternType, SlideBackground};
+use litchi_pptx::{GradientStop, PatternType, SlideBackground};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Save the presentation
     let output_path = "pptx_writer_showcase.pptx";
     println!("\n✓ Saving presentation to: {}", output_path);
-    let mut pkg = builder.build()?;
+    let pkg = builder.build()?;
     pkg.save(output_path)?;
 
     println!("\n======================================================");
@@ -97,7 +97,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// Slide 1: Title slide with fade transition
-fn create_title_slide(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error>> {
+fn create_title_slide(pres: &mut litchi_pptx::builder::Presentation) -> Result<(), Box<dyn Error>> {
     println!("✓ Creating slide 1: Title slide");
 
     let slide = pres.add_slide()?;
@@ -128,7 +128,9 @@ fn create_title_slide(pres: &mut MutablePresentation) -> Result<(), Box<dyn Erro
 }
 
 /// Slides 2-5: Solid backgrounds in different colors
-fn create_solid_background_slides(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error>> {
+fn create_solid_background_slides(
+    pres: &mut litchi_pptx::builder::Presentation,
+) -> Result<(), Box<dyn Error>> {
     println!("✓ Creating slides 2-5: Solid backgrounds");
 
     let colors = vec![
@@ -160,7 +162,9 @@ fn create_solid_background_slides(pres: &mut MutablePresentation) -> Result<(), 
 }
 
 /// Slides 6-7: Gradient backgrounds
-fn create_gradient_slides(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error>> {
+fn create_gradient_slides(
+    pres: &mut litchi_pptx::builder::Presentation,
+) -> Result<(), Box<dyn Error>> {
     println!("✓ Creating slides 6-7: Gradient backgrounds");
 
     // Linear gradient (3 colors)
@@ -236,7 +240,9 @@ fn create_gradient_slides(pres: &mut MutablePresentation) -> Result<(), Box<dyn 
 }
 
 /// Slides 8-13: Pattern backgrounds
-fn create_pattern_slides(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error>> {
+fn create_pattern_slides(
+    pres: &mut litchi_pptx::builder::Presentation,
+) -> Result<(), Box<dyn Error>> {
     println!("✓ Creating slides 8-13: Pattern backgrounds");
 
     let patterns = vec![
@@ -314,7 +320,7 @@ fn create_pattern_slides(pres: &mut MutablePresentation) -> Result<(), Box<dyn E
 }
 
 /// Slides 14-15: Shape demonstrations
-fn create_shape_demos(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error>> {
+fn create_shape_demos(pres: &mut litchi_pptx::builder::Presentation) -> Result<(), Box<dyn Error>> {
     println!("✓ Creating slides 14-15: Shape demonstrations");
 
     // Slide with rectangles and ellipses
@@ -381,7 +387,9 @@ fn create_shape_demos(pres: &mut MutablePresentation) -> Result<(), Box<dyn Erro
 }
 
 /// Slides 16-18: Transition showcase
-fn create_transition_showcase(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error>> {
+fn create_transition_showcase(
+    pres: &mut litchi_pptx::builder::Presentation,
+) -> Result<(), Box<dyn Error>> {
     println!("✓ Creating slides 16-18: Transition showcase");
 
     // Zoom transition
@@ -415,7 +423,7 @@ fn create_transition_showcase(pres: &mut MutablePresentation) -> Result<(), Box<
 }
 
 /// Slide 19: Speaker notes demonstration
-fn create_notes_demo(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error>> {
+fn create_notes_demo(pres: &mut litchi_pptx::builder::Presentation) -> Result<(), Box<dyn Error>> {
     println!("✓ Creating slide 19: Speaker notes");
 
     let slide = pres.add_slide()?;
@@ -454,7 +462,9 @@ fn create_notes_demo(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error
 }
 
 /// Slide 20: Summary
-fn create_summary_slide(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error>> {
+fn create_summary_slide(
+    pres: &mut litchi_pptx::builder::Presentation,
+) -> Result<(), Box<dyn Error>> {
     println!("✓ Creating slide 20: Summary");
 
     let slide = pres.add_slide()?;

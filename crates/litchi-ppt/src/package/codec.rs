@@ -30,17 +30,21 @@ impl Reader<File> {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::open_with_limits(path, SourceLimits::default())
+        Self::open_with_options(path, OpenOptions::default())
     }
 
-    /// Open a `.ppt` package with explicit finite presentation-record limits.
+    /// Open a `.ppt` package under explicit open options.
+    ///
+    /// The reader keeps the options' source limits and leniency; every
+    /// projection it returns ([`Self::presentation`], the font and
+    /// picture-bullet readers) inherits them.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: SourceLimits) -> Result<Self> {
+    pub fn open_with_options<P: AsRef<Path>>(path: P, options: OpenOptions<'_>) -> Result<Self> {
         let file = File::open(path)?;
-        Reader::from_reader_with_limits(file, limits)
+        Reader::from_reader_with_options(file, options)
     }
 }
 
@@ -66,15 +70,19 @@ impl<R: Read + Seek> Reader<R> {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_reader(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(reader, SourceLimits::default())
+        Self::from_reader_with_options(reader, OpenOptions::default())
     }
 
-    /// Create a package whose presentation reads inherit explicit record limits.
+    /// Create a reader under explicit open options.
+    ///
+    /// The reader keeps the options' source limits and leniency; every
+    /// projection it returns inherits them.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_reader_with_limits(mut reader: R, source_limits: SourceLimits) -> Result<Self> {
+    pub fn from_reader_with_options(mut reader: R, options: OpenOptions<'_>) -> Result<Self> {
+        let source_limits = options.source_limits_value();
         let original_position = reader.stream_position()?;
         let input_len = reader.seek(SeekFrom::End(0))?;
         reader.seek(SeekFrom::Start(original_position))?;
@@ -96,7 +104,11 @@ impl<R: Read + Seek> Reader<R> {
 
         validate_powerpoint_document_stream(&ole)?;
 
-        Ok(Self { ole, source_limits })
+        Ok(Self {
+            ole,
+            source_limits,
+            leniency: options.leniency_value(),
+        })
     }
 
     /// Create a Reader from an already-parsed OLE file.
@@ -125,15 +137,16 @@ impl<R: Read + Seek> Reader<R> {
     ///
     /// Returns an error if the operation fails.
     pub fn from_ole_file(ole: OleFile<R>) -> Result<Self> {
-        Self::from_ole_file_with_limits(ole, SourceLimits::default())
+        Self::from_ole_file_with_options(ole, OpenOptions::default())
     }
 
-    /// Wrap an already-parsed OLE file with explicit presentation-record limits.
+    /// Wrap an already-parsed OLE file under explicit open options.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn from_ole_file_with_limits(ole: OleFile<R>, source_limits: SourceLimits) -> Result<Self> {
+    pub fn from_ole_file_with_options(ole: OleFile<R>, options: OpenOptions<'_>) -> Result<Self> {
+        let source_limits = options.source_limits_value();
         let input_bytes = usize::try_from(ole.file_size()).map_err(|_error| Error::Limit {
             kind: super::SourceLimitKind::InputBytes,
             observed: usize::MAX,
@@ -149,7 +162,11 @@ impl<R: Read + Seek> Reader<R> {
         preflight_declared_streams(&ole, source_limits)?;
         validate_powerpoint_document_stream(&ole)?;
 
-        Ok(Self { ole, source_limits })
+        Ok(Self {
+            ole,
+            source_limits,
+            leniency: options.leniency_value(),
+        })
     }
 
     /// Get the main presentation.
@@ -173,12 +190,16 @@ impl<R: Read + Seek> Reader<R> {
     pub fn presentation(&mut self) -> Result<Presentation> {
         Presentation::from_ole_with_options(
             &mut self.ole,
-            OpenOptions::default(),
+            OpenOptions::default().leniency(self.leniency),
             self.source_limits,
         )
     }
 
-    /// Get the main presentation using explicit password-to-open options.
+    /// Get the main presentation with per-call open options, such as the
+    /// password of an encrypted presentation.
+    ///
+    /// Explicit source limits in `options` can only tighten the reader's
+    /// own; the options' leniency replaces the reader's for this call.
     ///
     /// # Errors
     ///
@@ -186,41 +207,9 @@ impl<R: Read + Seek> Reader<R> {
     pub fn presentation_with_options(&mut self, options: OpenOptions<'_>) -> Result<Presentation> {
         let source_limits = if options.has_explicit_source_limits() {
             self.source_limits
-                .constrained_by(options.get_source_limits())
+                .constrained_by(options.source_limits_value())
         } else {
             self.source_limits
-        };
-        Presentation::from_ole_with_options(&mut self.ole, options, source_limits)
-    }
-
-    /// Open the presentation with explicit record limits and no password.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn presentation_with_limits(&mut self, limits: SourceLimits) -> Result<Presentation> {
-        Presentation::from_ole_with_options(
-            &mut self.ole,
-            OpenOptions::default(),
-            limits.constrained_by(self.source_limits),
-        )
-    }
-
-    /// Open the presentation with password options and explicit record limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn presentation_with_options_and_limits(
-        &mut self,
-        options: OpenOptions<'_>,
-        limits: SourceLimits,
-    ) -> Result<Presentation> {
-        let source_limits = limits.constrained_by(self.source_limits);
-        let source_limits = if options.has_explicit_source_limits() {
-            source_limits.constrained_by(options.get_source_limits())
-        } else {
-            source_limits
         };
         Presentation::from_ole_with_options(&mut self.ole, options, source_limits)
     }
@@ -228,6 +217,11 @@ impl<R: Read + Seek> Reader<R> {
     /// Limits inherited by [`Self::presentation`].
     pub fn source_limits(&self) -> SourceLimits {
         self.source_limits
+    }
+
+    /// Leniency inherited by [`Self::presentation`].
+    pub fn leniency(&self) -> crate::leniency::Leniency {
+        self.leniency
     }
 
     /// Whether the already-parsed CFB directory contains a digital-signature

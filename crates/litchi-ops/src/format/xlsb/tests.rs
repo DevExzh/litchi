@@ -203,15 +203,9 @@ fn names_match_exactly_on_both_owner_states() {
     let missing = WorkbookTrait::worksheet_by_name(&source, "sheet1")
         .err()
         .unwrap();
-    assert_eq!(
-        missing.downcast_ref::<Error>().map(Error::code),
-        Some(Code::NotFound)
-    );
+    assert_eq!(missing.code(), Code::NotFound);
     let out_of_range = WorkbookTrait::worksheet_by_index(&source, 3).err().unwrap();
-    assert_eq!(
-        out_of_range.downcast_ref::<Error>().map(Error::code),
-        Some(Code::OutOfRange)
-    );
+    assert_eq!(out_of_range.code(), Code::OutOfRange);
 }
 
 #[test]
@@ -357,7 +351,6 @@ fn chart_tabs_are_skipped_and_an_active_chart_is_a_typed_refusal() {
     let active_chart = rewrite_active_book_view(&bytes, 1);
     let source = open_bytes(active_chart.clone(), &OpenOptions::new());
     let error = source.active_worksheet().err().unwrap();
-    let error = error.downcast::<Error>().expect("typed trait error");
     assert_eq!(error.code(), Code::UnsupportedCapability);
     assert!(matches!(
         error.leaf(),
@@ -386,10 +379,7 @@ fn source_owner_defers_a_malformed_unselected_worksheet() {
     assert!(first.cell_value(1, 1).is_ok());
     let second = WorkbookTrait::worksheet_by_index(&handle, 1).unwrap();
     let error = second.cell_value(1, 1).unwrap_err();
-    assert_eq!(
-        error.downcast_ref::<Error>().map(Error::code),
-        Some(Code::CorruptFile)
-    );
+    assert_eq!(error.code(), Code::CorruptFile);
     assert!(handle.text().is_err());
 }
 
@@ -409,17 +399,11 @@ fn one_based_trait_cell_reads_reject_zero_and_out_of_grid_before_materialization
         let error = worksheet
             .cell(row, column)
             .expect_err("invalid cell must fail");
-        let error = error
-            .downcast::<Error>()
-            .expect("invalid cell keeps the typed ops error");
         assert_eq!(error.code(), Code::OutOfRange);
 
         let error = worksheet
             .cell_value(row, column)
             .expect_err("invalid cell value must fail");
-        let error = error
-            .downcast::<Error>()
-            .expect("invalid cell value keeps the typed ops error");
         assert_eq!(error.code(), Code::OutOfRange);
     }
 
@@ -427,8 +411,6 @@ fn one_based_trait_cell_reads_reject_zero_and_out_of_grid_before_materialization
     let error = worksheet
         .cell_by_coordinate(private_reference)
         .err()
-        .unwrap()
-        .downcast::<Error>()
         .unwrap();
     assert_eq!(error.code(), Code::InvalidArgument);
     assert!(!error.to_string().contains(private_reference));
@@ -471,47 +453,29 @@ fn a_changed_source_is_a_typed_io_error_on_every_read() {
         WorkbookTrait::worksheet_by_name(&handle, "missing"),
         WorkbookTrait::active_worksheet(&handle),
     ] {
-        changed(
-            *result
-                .expect_err("stale selector refuses before catalog lookup")
-                .downcast::<Error>()
-                .expect("typed trait error"),
-        );
+        changed(result.expect_err("stale selector refuses before catalog lookup"));
     }
-    changed(
-        *first
-            .cell_value(1, 1)
-            .unwrap_err()
-            .downcast::<Error>()
-            .unwrap(),
-    );
+    changed(first.cell_value(1, 1).unwrap_err());
     let mut cells = first.cells();
     changed(
-        *cells
+        cells
             .next()
             .unwrap()
-            .expect_err("stale cell iterator reports one error")
-            .downcast::<Error>()
-            .unwrap(),
+            .expect_err("stale cell iterator reports one error"),
     );
     assert!(cells.next().is_none());
     let mut rows = first.rows();
     changed(
-        *rows
-            .next()
+        rows.next()
             .unwrap()
-            .expect_err("stale row iterator reports one error")
-            .downcast::<Error>()
-            .unwrap(),
+            .expect_err("stale row iterator reports one error"),
     );
     assert!(rows.next().is_none());
     changed(
-        *worksheets
+        worksheets
             .next()
             .unwrap()
-            .expect_err("stale worksheet iterator reports one error")
-            .downcast::<Error>()
-            .unwrap(),
+            .expect_err("stale worksheet iterator reports one error"),
     );
     assert!(worksheets.next().is_none());
     changed(handle.editor().err().expect("materialization refuses"));

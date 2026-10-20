@@ -7,6 +7,7 @@
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 
+use super::package::*;
 use super::*;
 use crate::time::Offset;
 

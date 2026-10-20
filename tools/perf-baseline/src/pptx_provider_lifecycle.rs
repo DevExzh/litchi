@@ -777,25 +777,25 @@ fn run_lifecycle_iteration(
 
     let source_allocation_region = crate::allocation_metrics::begin();
     let source_started = Instant::now();
-    let source_view =
-        litchi_pptx::SourceBackedPresentation::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source_read,
-            SourceLimits::default(),
-            cache_limits,
-            source_context.context.clone(),
-        )?;
+    let source_view = litchi_pptx::SourceBackedPresentation::from_read_at_with_options(
+        source_read,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache_limits)
+            .execution_context(source_context.context.clone()),
+    )?;
     let open_source_ns = crate::elapsed_ns(source_started.elapsed())?;
     let open_source_allocation_metrics = source_allocation_region.finish();
 
     let destination_allocation_region = crate::allocation_metrics::begin();
     let destination_started = Instant::now();
-    let editor =
-        litchi_pptx::SourceBackedPresentationEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            destination_read,
-            SourceLimits::default(),
-            cache_limits,
-            destination_context.context.clone(),
-        )?;
+    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at_with_options(
+        destination_read,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache_limits)
+            .execution_context(destination_context.context.clone()),
+    )?;
     let open_destination_ns = crate::elapsed_ns(destination_started.elapsed())?;
     let open_destination_allocation_metrics = destination_allocation_region.finish();
     if source_view.slide_count() != crate::PPTX_CROSS_COPY_SOURCE_SLIDE_COUNT

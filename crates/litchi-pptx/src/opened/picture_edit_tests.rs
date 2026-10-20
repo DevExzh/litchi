@@ -65,7 +65,7 @@ fn picture_images_are_replaced_and_the_old_part_dropped() -> Result<()> {
     let mut edit = package.edit()?;
     assert!(!edit.set_picture_image(0usize, 0usize, &resource(PNG_A))?);
     assert!(edit.set_picture_image(0usize, 0usize, &resource(PNG_B))?);
-    let mut after = edit.commit()?.into_package();
+    let after = edit.commit()?.into_package();
     let parts = media(&after)?;
     assert_eq!(parts.len(), 1, "{parts:?}");
     assert_eq!(parts[0].1, PNG_B);

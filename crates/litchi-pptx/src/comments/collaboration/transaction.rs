@@ -110,8 +110,8 @@ impl AuthorPresenceSnapshot {
     }
 
     #[must_use]
-    pub fn edit(&self) -> AuthorPresenceEdit {
-        AuthorPresenceEdit {
+    pub(crate) fn edit(&self) -> PresenceDraft {
+        PresenceDraft {
             original: self.clone(),
             working: self.value().cloned(),
         }
@@ -132,15 +132,15 @@ impl AuthorPresenceSnapshot {
 
 /// Detached edit of one author presence extension.
 #[derive(Debug, Clone)]
-pub struct AuthorPresenceEdit {
+pub(crate) struct PresenceDraft {
     original: AuthorPresenceSnapshot,
     working: Option<PresenceInfo>,
 }
 
-impl AuthorPresenceEdit {
+impl PresenceDraft {
     #[inline]
     #[must_use]
-    pub fn value(&self) -> Option<&PresenceInfo> {
+    pub(crate) fn value(&self) -> Option<&PresenceInfo> {
         self.working.as_ref()
     }
 
@@ -150,12 +150,13 @@ impl AuthorPresenceEdit {
 
     /// The outcome of this edit or commit.
     #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
         crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Set or remove the optional presence extension.
-    pub fn set(&mut self, value: Option<PresenceInfo>) -> Result<bool> {
+    pub(crate) fn set(&mut self, value: Option<PresenceInfo>) -> Result<bool> {
         if let Some(value) = &value {
             codec::validate_value(Kind::Presence, &Value::Presence(value.clone()))?;
         }
@@ -165,20 +166,20 @@ impl AuthorPresenceEdit {
     }
 
     /// Set a concrete inert presence value.
-    pub fn set_presence(&mut self, value: PresenceInfo) -> Result<bool> {
+    pub(crate) fn set_presence(&mut self, value: PresenceInfo) -> Result<bool> {
         self.set(Some(value))
     }
 
     /// Remove the recognized presence extension.
-    pub fn remove(&mut self) -> Result<bool> {
+    pub(crate) fn remove(&mut self) -> Result<bool> {
         self.set(None)
     }
 
     /// Validate and consume into a source-checked reversible patch.
-    pub fn commit(self) -> Result<AuthorPresenceCommit> {
+    pub(crate) fn commit(self) -> Result<PresencePrepared> {
         if !self.is_changed() {
-            let patch = AuthorPresencePatch::new(self.original.clone(), self.original.clone());
-            return Ok(AuthorPresenceCommit {
+            let patch = PresenceChange::new(self.original.clone(), self.original.clone());
+            return Ok(PresencePrepared {
                 snapshot: self.original,
                 patch,
                 changed: false,
@@ -207,8 +208,8 @@ impl AuthorPresenceEdit {
         if snapshot.value() != self.value() {
             return Err(invalid("presenceInfo source did not round-trip"));
         }
-        let patch = AuthorPresencePatch::new(self.original, snapshot.clone());
-        Ok(AuthorPresenceCommit {
+        let patch = PresenceChange::new(self.original, snapshot.clone());
+        Ok(PresencePrepared {
             snapshot,
             patch,
             changed: true,
@@ -218,79 +219,80 @@ impl AuthorPresenceEdit {
 
 /// A committed source-preserving author presence edit.
 #[derive(Debug, Clone)]
-pub struct AuthorPresenceCommit {
+pub(crate) struct PresencePrepared {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: AuthorPresenceSnapshot,
-    patch: AuthorPresencePatch,
+    patch: PresenceChange,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     changed: bool,
 }
 
-impl AuthorPresenceCommit {
+impl PresencePrepared {
+    #[cfg(test)]
     fn is_changed(&self) -> bool {
         self.changed
     }
 
     /// The outcome of this edit or commit.
     #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
         crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     #[inline]
     #[must_use]
-    pub fn snapshot(&self) -> &AuthorPresenceSnapshot {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &AuthorPresenceSnapshot {
         &self.snapshot
     }
 
     #[inline]
     #[must_use]
-    pub fn patch(&self) -> &AuthorPresencePatch {
+    pub(crate) fn patch(&self) -> &PresenceChange {
         &self.patch
-    }
-
-    #[must_use]
-    pub fn into_patch(self) -> AuthorPresencePatch {
-        self.patch
     }
 }
 
 /// A reversible source-checked author presence replacement.
 #[derive(Debug, Clone)]
-pub struct AuthorPresencePatch {
+pub(crate) struct PresenceChange {
     before: AuthorPresenceSnapshot,
     after: AuthorPresenceSnapshot,
 }
 
-impl AuthorPresencePatch {
+impl PresenceChange {
     fn new(before: AuthorPresenceSnapshot, after: AuthorPresenceSnapshot) -> Self {
         Self { before, after }
     }
 
     #[inline]
     #[must_use]
-    pub fn before(&self) -> &AuthorPresenceSnapshot {
+    pub(crate) fn before(&self) -> &AuthorPresenceSnapshot {
         &self.before
     }
 
     #[inline]
     #[must_use]
-    pub fn after(&self) -> &AuthorPresenceSnapshot {
+    pub(crate) fn after(&self) -> &AuthorPresenceSnapshot {
         &self.after
     }
 
     #[inline]
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
-    #[inline]
     #[must_use]
-    pub const fn expected_revision(&self) -> Revision {
-        self.before.revision
-    }
-
-    #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -298,7 +300,8 @@ impl AuthorPresencePatch {
     }
 
     /// Apply to an exact source buffer.
-    pub fn apply(&self, target: &mut Vec<u8>) -> Result<AuthorPresenceSnapshot> {
+    #[cfg(test)]
+    pub(crate) fn apply(&self, target: &mut Vec<u8>) -> Result<AuthorPresenceSnapshot> {
         if target.as_slice() != self.before.source_xml.as_slice() {
             return Err(invalid("author presence source is stale"));
         }
@@ -324,11 +327,6 @@ impl AuthorPresencePatch {
         }
         *target = self.after.source_xml.as_ref().clone();
         Ok(result)
-    }
-
-    /// Apply atomically to the exact OPC author part.
-    pub fn apply_package(&self, target: &mut OpcPackage) -> Result<AuthorPresenceSnapshot> {
-        super::package::apply_presence_patch(target, self)
     }
 }
 
@@ -461,8 +459,8 @@ impl CommentThreadingSnapshot {
     }
 
     #[must_use]
-    pub fn edit(&self) -> CommentThreadingEdit {
-        CommentThreadingEdit {
+    pub(crate) fn edit(&self) -> ThreadingDraft {
+        ThreadingDraft {
             original: self.clone(),
             working: self.value().cloned(),
         }
@@ -485,15 +483,15 @@ impl CommentThreadingSnapshot {
 
 /// Detached edit of one comment threading extension.
 #[derive(Debug, Clone)]
-pub struct CommentThreadingEdit {
+pub(crate) struct ThreadingDraft {
     original: CommentThreadingSnapshot,
     working: Option<ThreadingInfo>,
 }
 
-impl CommentThreadingEdit {
+impl ThreadingDraft {
     #[inline]
     #[must_use]
-    pub fn value(&self) -> Option<&ThreadingInfo> {
+    pub(crate) fn value(&self) -> Option<&ThreadingInfo> {
         self.working.as_ref()
     }
 
@@ -501,14 +499,8 @@ impl CommentThreadingEdit {
         self.original.value() != self.value()
     }
 
-    /// The outcome of this edit or commit.
-    #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
-        crate::diagnostics::Diagnostics::new(self.is_changed())
-    }
-
     /// Set or remove the optional threading extension.
-    pub fn set(&mut self, value: Option<ThreadingInfo>) -> Result<bool> {
+    pub(crate) fn set(&mut self, value: Option<ThreadingInfo>) -> Result<bool> {
         if let Some(value) = &value {
             codec::validate_value(Kind::Threading, &Value::Threading(value.clone()))?;
         }
@@ -518,23 +510,22 @@ impl CommentThreadingEdit {
     }
 
     /// Set concrete inert threading metadata.
-    pub fn set_threading(&mut self, value: ThreadingInfo) -> Result<bool> {
+    pub(crate) fn set_threading(&mut self, value: ThreadingInfo) -> Result<bool> {
         self.set(Some(value))
     }
 
     /// Remove the recognized threading extension.
-    pub fn remove(&mut self) -> Result<bool> {
+    pub(crate) fn remove(&mut self) -> Result<bool> {
         self.set(None)
     }
 
     /// Validate and consume into a source-checked reversible patch.
-    pub fn commit(self) -> Result<CommentThreadingCommit> {
+    pub(crate) fn commit(self) -> Result<ThreadingPrepared> {
         if !self.is_changed() {
-            let patch = CommentThreadingPatch::new(self.original.clone(), self.original.clone());
-            return Ok(CommentThreadingCommit {
+            let patch = ThreadingChange::new(self.original.clone(), self.original.clone());
+            return Ok(ThreadingPrepared {
                 snapshot: self.original,
                 patch,
-                changed: false,
             });
         }
         let value = self.working.clone().map(Value::Threading);
@@ -565,90 +556,70 @@ impl CommentThreadingEdit {
         if snapshot.value() != self.value() {
             return Err(invalid("threadingInfo source did not round-trip"));
         }
-        let patch = CommentThreadingPatch::new(self.original, snapshot.clone());
-        Ok(CommentThreadingCommit {
-            snapshot,
-            patch,
-            changed: true,
-        })
+        let patch = ThreadingChange::new(self.original, snapshot.clone());
+        Ok(ThreadingPrepared { snapshot, patch })
     }
 }
 
 /// A committed source-preserving comment-threading edit.
 #[derive(Debug, Clone)]
-pub struct CommentThreadingCommit {
+pub(crate) struct ThreadingPrepared {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: CommentThreadingSnapshot,
-    patch: CommentThreadingPatch,
-    changed: bool,
+    patch: ThreadingChange,
 }
 
-impl CommentThreadingCommit {
-    fn is_changed(&self) -> bool {
-        self.changed
-    }
-
-    /// The outcome of this edit or commit.
-    #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
-        crate::diagnostics::Diagnostics::new(self.is_changed())
-    }
-
+impl ThreadingPrepared {
     #[inline]
     #[must_use]
-    pub fn snapshot(&self) -> &CommentThreadingSnapshot {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &CommentThreadingSnapshot {
         &self.snapshot
     }
 
     #[inline]
     #[must_use]
-    pub fn patch(&self) -> &CommentThreadingPatch {
+    pub(crate) fn patch(&self) -> &ThreadingChange {
         &self.patch
-    }
-
-    #[must_use]
-    pub fn into_patch(self) -> CommentThreadingPatch {
-        self.patch
     }
 }
 
 /// A reversible source-checked comment-threading replacement.
 #[derive(Debug, Clone)]
-pub struct CommentThreadingPatch {
+pub(crate) struct ThreadingChange {
     before: CommentThreadingSnapshot,
     after: CommentThreadingSnapshot,
 }
 
-impl CommentThreadingPatch {
+impl ThreadingChange {
     fn new(before: CommentThreadingSnapshot, after: CommentThreadingSnapshot) -> Self {
         Self { before, after }
     }
 
     #[inline]
     #[must_use]
-    pub fn before(&self) -> &CommentThreadingSnapshot {
+    pub(crate) fn before(&self) -> &CommentThreadingSnapshot {
         &self.before
     }
 
     #[inline]
     #[must_use]
-    pub fn after(&self) -> &CommentThreadingSnapshot {
+    pub(crate) fn after(&self) -> &CommentThreadingSnapshot {
         &self.after
     }
 
     #[inline]
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
-    #[inline]
     #[must_use]
-    pub const fn expected_revision(&self) -> Revision {
-        self.before.revision
-    }
-
-    #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -656,7 +627,8 @@ impl CommentThreadingPatch {
     }
 
     /// Apply to an exact source buffer.
-    pub fn apply(&self, target: &mut Vec<u8>) -> Result<CommentThreadingSnapshot> {
+    #[cfg(test)]
+    pub(crate) fn apply(&self, target: &mut Vec<u8>) -> Result<CommentThreadingSnapshot> {
         if target.as_slice() != self.before.source_xml.as_slice() {
             return Err(invalid("comment threading source is stale"));
         }
@@ -687,11 +659,6 @@ impl CommentThreadingPatch {
         }
         *target = self.after.source_xml.as_ref().clone();
         Ok(result)
-    }
-
-    /// Apply atomically to the exact OPC comment part.
-    pub fn apply_package(&self, target: &mut OpcPackage) -> Result<CommentThreadingSnapshot> {
-        super::package::apply_threading_patch(target, self)
     }
 }
 

@@ -71,8 +71,8 @@ impl Snapshot {
     /// Start an atomic detached edit.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Edit {
-        Edit {
+    pub(crate) fn edit(&self) -> Draft {
+        Draft {
             original: self.clone(),
             working: self.metadata.clone(),
         }
@@ -81,12 +81,12 @@ impl Snapshot {
 
 /// A bounded edit staged against one media shape.
 #[derive(Debug, Clone)]
-pub struct Edit {
+pub struct Draft {
     original: Snapshot,
     working: MediaMetadata,
 }
 
-impl Edit {
+impl Draft {
     /// Borrow the projected typed metadata.
     #[inline]
     #[must_use]
@@ -175,7 +175,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Prepared> {
         validate_metadata(&self.working)?;
         let updated = encode_edit(&self.original, &self.working)?;
         let updated = Arc::new(updated);
@@ -193,14 +193,14 @@ impl Edit {
             metadata: self.working,
             revision: fingerprint(&updated),
         };
-        let patch = Patch {
+        let patch = Change {
             source_part_name: self.original.source_part_name,
             key: snapshot.metadata.key.clone(),
             expected_revision: self.original.revision,
             expected_xml: Arc::clone(&self.original.source_xml),
             updated_xml: Arc::clone(&updated),
         };
-        Ok(Commit { snapshot, patch })
+        Ok(Prepared { snapshot, patch })
     }
 
     fn caption_mut(&mut self, index: usize) -> Result<&mut Caption> {
@@ -214,47 +214,47 @@ impl Edit {
 
 /// A committed metadata snapshot and its source-checked package patch.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Prepared {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: Snapshot,
-    patch: Patch,
+    patch: Change,
 }
 
-impl Commit {
+impl Prepared {
     /// Borrow the projected post-edit snapshot.
     #[inline]
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
-    /// Borrow the source-checked patch for package publication.
-    #[inline]
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
+    #[cfg(test)]
     fn is_changed(&self) -> bool {
         self.patch.is_changed()
     }
 
     /// The outcome of this edit or commit.
     #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
         crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Consume the commit and return its patch.
     #[inline]
     #[must_use]
-    pub fn into_patch(self) -> Patch {
+    pub(crate) fn into_patch(self) -> Change {
         self.patch
     }
 }
 
 /// A source-checked, atomic replacement of one owning slide XML part.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub(crate) struct Change {
     pub(crate) source_part_name: String,
     pub(crate) key: super::model::MediaKey,
     pub(crate) expected_revision: Revision,
@@ -262,22 +262,15 @@ pub struct Patch {
     pub(crate) updated_xml: Arc<Vec<u8>>,
 }
 
-impl Patch {
+impl Change {
     fn is_changed(&self) -> bool {
         self.expected_xml.as_slice() != self.updated_xml.as_slice()
     }
 
     /// Whether this patch leaves its source unchanged.
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         !self.is_changed()
-    }
-
-    /// Return the source revision required for publication.
-    #[inline]
-    #[must_use]
-    pub const fn expected_revision(&self) -> Revision {
-        self.expected_revision
     }
 }
 

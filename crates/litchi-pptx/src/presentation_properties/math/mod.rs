@@ -12,5 +12,7 @@ mod model;
 mod tests;
 
 pub use model::{BinaryBreak, BinarySubtractionBreak, Properties};
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
 pub(crate) use codec::{parse, write};

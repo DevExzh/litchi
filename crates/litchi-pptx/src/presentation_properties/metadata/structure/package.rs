@@ -4,15 +4,15 @@ use std::sync::Arc;
 
 use litchi_opc::OpcPackage;
 
-pub use super::codec::{
-    add_custom_show, add_custom_show_slide, add_section, add_section_slide, find_custom_show,
-    find_section, load, remove_custom_show, remove_custom_show_slide, remove_section,
-    remove_section_slide, reorder_custom_show_slides, reorder_custom_shows, reorder_section_slides,
-    reorder_sections, replace_custom_show, replace_section, store,
-    synchronize_after_slide_mutation, update_custom_show, update_section,
+pub(crate) use super::codec::{
+    add_custom_show, add_custom_show_slide, add_section, add_section_slide, remove_custom_show,
+    remove_custom_show_slide, remove_section, remove_section_slide, reorder_custom_show_slides,
+    reorder_custom_shows, reorder_section_slides, reorder_sections, store, update_custom_show,
+    update_section,
 };
+pub use super::codec::{find_custom_show, find_section, load};
 
-use super::transaction::{Commit, Patch, Snapshot};
+use super::transaction::{Change, Prepared, Snapshot};
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
@@ -45,7 +45,7 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Snapshot> {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     let current = load_snapshot(package)?;
     if !current.same_source(patch.before()) {
         return Err(invalid("presentation structure source is stale"));
@@ -92,7 +92,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
     clippy::needless_pass_by_value,
     reason = "public API consumes the commit to signal it has been applied"
 )]
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }
 

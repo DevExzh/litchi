@@ -44,7 +44,7 @@ fn main() -> Result<()> {
     let _ = definition.reset_parts(expected);
     styles.add(definition)?;
     let _ = style::put(&mut graph, styles)?;
-    let mut package = Package::from_opc_package(graph)?;
+    let package = Package::from_opc_package(graph)?;
     package.save(&destination)?;
 
     let reopened = Package::open(&destination)?;

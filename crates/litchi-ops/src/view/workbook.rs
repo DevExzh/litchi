@@ -3,7 +3,7 @@
 //! provided.
 
 use litchi_core::FileFormat;
-use litchi_core::sheet::{Result as SheetResult, WorkbookTrait};
+use litchi_core::sheet::WorkbookTrait;
 
 use super::sheet::{Worksheet, Worksheets};
 
@@ -141,17 +141,13 @@ impl<'a> WorkbookView<'a> {
 
 /// The refusal of access to `what` on an ODS view through the trait.
 #[cfg(feature = "ods")]
-fn ods_unsupported(what: &str) -> Box<dyn std::error::Error + Send + Sync> {
-    Box::new(
-        crate::Error::new(
-            crate::Code::UnsupportedCapability,
-            format!("ODS {what} is not available through the generic sheet traits"),
-        )
-        .with_format(FileFormat::Ods)
-        .with_suggestion(
-            "read ODS worksheets through `WorkbookView::worksheet_names` and `File::text`",
-        ),
+fn ods_unsupported() -> crate::Error {
+    crate::Error::new(
+        crate::Code::UnsupportedCapability,
+        "ODS worksheets are not available through the generic sheet traits",
     )
+    .with_format(FileFormat::Ods)
+    .with_suggestion("read ODS worksheets through `WorkbookView::worksheet_names` and `File::text`")
 }
 
 /// Static dispatch to the format handle's [`WorkbookTrait`]: XLSX and XLSB
@@ -159,6 +155,7 @@ fn ods_unsupported(what: &str) -> Box<dyn std::error::Error + Send + Sync> {
 /// from the file on first use when the workbook was opened from a path), and
 /// ODS refused as described on [`WorkbookView`].
 impl WorkbookTrait for WorkbookView<'_> {
+    type Error = crate::Error;
     type Worksheet<'b>
         = Worksheet<'b>
     where
@@ -181,7 +178,7 @@ impl WorkbookTrait for WorkbookView<'_> {
         }
     }
 
-    fn active_worksheet(&self) -> SheetResult<Worksheet<'_>> {
+    fn active_worksheet(&self) -> Result<Worksheet<'_>> {
         match self.0 {
             #[cfg(feature = "xlsx")]
             Inner::Xlsx(handle) => WorkbookTrait::active_worksheet(handle),
@@ -190,7 +187,7 @@ impl WorkbookTrait for WorkbookView<'_> {
             #[cfg(feature = "xls")]
             Inner::Xls(handle) => WorkbookTrait::active_worksheet(handle),
             #[cfg(feature = "ods")]
-            Inner::Ods(_) => Err(ods_unsupported("the active worksheet")),
+            Inner::Ods(_) => Err(ods_unsupported()),
         }
     }
 
@@ -207,7 +204,7 @@ impl WorkbookTrait for WorkbookView<'_> {
         }
     }
 
-    fn worksheet_by_index(&self, index: usize) -> SheetResult<Worksheet<'_>> {
+    fn worksheet_by_index(&self, index: usize) -> Result<Worksheet<'_>> {
         match self.0 {
             #[cfg(feature = "xlsx")]
             Inner::Xlsx(handle) => WorkbookTrait::worksheet_by_index(handle, index),
@@ -216,11 +213,14 @@ impl WorkbookTrait for WorkbookView<'_> {
             #[cfg(feature = "xls")]
             Inner::Xls(handle) => WorkbookTrait::worksheet_by_index(handle, index),
             #[cfg(feature = "ods")]
-            Inner::Ods(_) => Err(ods_unsupported(&format!("worksheet {index}"))),
+            Inner::Ods(_) => {
+                let _ = index;
+                Err(ods_unsupported())
+            },
         }
     }
 
-    fn worksheet_by_name(&self, name: &str) -> SheetResult<Worksheet<'_>> {
+    fn worksheet_by_name(&self, name: &str) -> Result<Worksheet<'_>> {
         match self.0 {
             #[cfg(feature = "xlsx")]
             Inner::Xlsx(handle) => WorkbookTrait::worksheet_by_name(handle, name),
@@ -229,7 +229,10 @@ impl WorkbookTrait for WorkbookView<'_> {
             #[cfg(feature = "xls")]
             Inner::Xls(handle) => WorkbookTrait::worksheet_by_name(handle, name),
             #[cfg(feature = "ods")]
-            Inner::Ods(_) => Err(ods_unsupported(&format!("worksheet {name:?}"))),
+            Inner::Ods(_) => {
+                let _ = name;
+                Err(ods_unsupported())
+            },
         }
     }
 
@@ -269,7 +272,7 @@ impl WorkbookTrait for WorkbookView<'_> {
             Inner::Xls(handle) => WorkbookTrait::worksheets(handle),
             #[cfg(feature = "ods")]
             Inner::Ods(_) => Worksheets::new(super::sheet::WorksheetsInner::Refused(Some(
-                ods_unsupported("worksheet iteration"),
+                ods_unsupported(),
             ))),
         }
     }

@@ -10,7 +10,7 @@ use super::super::{
     BINARY_CONTENT_TYPE, BINARY_RELATIONSHIP, CONTROL_RELATIONSHIP, DESCRIPTOR_CONTENT_TYPE,
     Limits, STRICT_CONTROL_RELATIONSHIP,
 };
-use super::transaction::{BinarySource, Commit, Patch, RelationshipState, Snapshot};
+use super::transaction::{BinarySource, Change, Prepared, RelationshipState, Snapshot};
 use super::validation::invalid_revision;
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::presentation::embedded::invalid;
@@ -89,7 +89,7 @@ pub fn load(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     let before = patch.before();
     let slide = package.get_part(&before.slide_part_name)?;
     let current = load(
@@ -139,12 +139,12 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     let patch = commit.into_patch();
     apply_patch(package, &patch)
 }
 
-fn install_patch(package: &mut OpcPackage, patch: &Patch) -> Result<()> {
+fn install_patch(package: &mut OpcPackage, patch: &Change) -> Result<()> {
     let before = patch.before();
     let after = patch.after();
     let slide = package.get_part_mut(&before.slide_part_name)?;

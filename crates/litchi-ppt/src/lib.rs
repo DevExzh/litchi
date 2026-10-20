@@ -64,6 +64,7 @@ mod binary_tag_edit;
 mod consts;
 mod officeart_wire;
 mod record_wire;
+mod scoped;
 
 pub use consts::RecordType;
 // Core modules
@@ -203,9 +204,7 @@ pub use slide::{
     SlideFactory, SpeakerNotes,
 };
 pub use sound_collection::{BuiltinId, Sound};
-pub use validation::{
-    PptValidationError, PptValidationLimits, validate_source, validate_source_with_limits,
-};
+pub use validation::{PptValidationError, PptValidationLimits, validate_source};
 pub use view_info::{
     Guide, GuideOrientation, Ratio, SlideViewInfo, SlideViewInformation, SlideViewPreferences,
     ViewKind, ViewOrigin, ZoomViewInfo,
@@ -238,7 +237,6 @@ pub use document_properties::{
     PhotoAlbumFrameShape, PhotoAlbumLayout, PhotoAlbumSettings,
 };
 pub use document_structure::{CustomTableStylesPlacement, DocumentStructure};
-pub use embedded::object::Editor;
 pub use embedded::object::{
     Collection, ColorFollow, ContainerKind, Control, Definition, DimensionPolicy, DrawAspect,
     EmbedPreferences, ExternalObject, LinkInfo, Metadata, ObjectSubtype, ObjectType, UnknownRecord,
@@ -257,10 +255,10 @@ pub use external_media::{
     Video,
 };
 pub use font::{
-    Commit as FontCommit, EmbeddedFont, EotMetadata, Facet as FontFacet, Font, FontCollection,
-    FontCollections, FontEmbeddingFlags, Limits as FontLimits, PackageLimits as FontPackageLimits,
-    PackageOptions as FontPackageOptions, Patch as FontPatch, Revision as FontRevision,
-    Scope as FontScope, Snapshot as FontSnapshot, Transaction as FontTransaction,
+    EmbeddedFont, EotMetadata, Facet as FontFacet, Font, FontCollection, FontCollections,
+    FontEmbeddingFlags, Limits as FontLimits, PackageLimits as FontPackageLimits,
+    PackageOptions as FontPackageOptions, Revision as FontRevision, Scope as FontScope,
+    Snapshot as FontSnapshot,
 };
 pub use header_footer::{
     DateTimeFormatId, HeaderFooter, HeaderFooterDisplayText, HeaderFooterOptions,
@@ -289,9 +287,8 @@ pub use named_shows::{NamedShow, NamedShows};
 pub use outline_text::OutlineTextBody;
 pub use picture_bullets::{
     MAX_PICTURE_BULLET_INDEX, PictureBullet, PictureBulletChange, PictureBulletChangeKind,
-    PictureBulletCollection, PictureBulletCommit, PictureBulletLimits, PictureBulletPackageLimits,
-    PictureBulletPatch, PictureBulletRevision, PictureBulletSnapshot, PictureBulletTransaction,
-    PictureBulletType,
+    PictureBulletCollection, PictureBulletLimits, PictureBulletPackageLimits,
+    PictureBulletRevision, PictureBulletSnapshot, PictureBulletType,
 };
 pub use placeholder_atom::{
     AtomPlaceholderSize, PlaceholderAtom, PlaceholderContext, PlaceholderEntry, PlaceholderKind,
@@ -333,10 +330,8 @@ pub use slide_round_trip::{
 };
 pub use slide_show_settings::{ColorIndex, ColorIndexKind, SlideShowFlags, SlideShowSettings};
 pub use slide_sync::{
-    Change as SlideSyncChange, ChangeSet as SlideSyncChangeSet, Commit as SlideSyncCommit,
-    Editor as SlideSyncEditor, LibraryUrl, Limits as SlideSyncLimits, MAX_TEXT_BYTES,
-    Revision as SlideSyncRevision, ServerId, Snapshot as SlideSyncSnapshot, Synchronization,
-    SystemTime,
+    LibraryUrl, Limits as SlideSyncLimits, MAX_TEXT_BYTES, Revision as SlideSyncRevision, ServerId,
+    Snapshot as SlideSyncSnapshot, Synchronization, SystemTime,
 };
 pub use smart_tags::{SmartTag, SmartTagProperty, SmartTagStore, SmartTagType};
 pub use style_text_prop::{StyleTextPropAtom, TextCFRun, TextPFRun};
@@ -387,7 +382,7 @@ pub mod animation;
 pub mod transition;
 
 // Re-export transition types for ergonomic read access
-pub use animation::{EditorLimits, LegacyShapeAnimation, Scope, Timeline};
+pub use animation::{LegacyShapeAnimation, Scope, Timeline};
 pub use transition::{
     AdvanceMode, SoundAction, TransitionDirection, TransitionInfo, TransitionSpeed, TransitionType,
 };

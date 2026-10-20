@@ -29,7 +29,6 @@ use std::fmt::Write as _;
 use sha2::{Digest, Sha256};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
-use super::{CrossSlideCopyPatch, CrossSlideCopyPlan};
 use crate::media_parts::Resource;
 use crate::opened::Limits;
 use crate::{Package, Result};
@@ -83,7 +82,7 @@ fn authored(prefix: &str, slides: usize) -> Result<Vec<u8>> {
             .add_slide()?
             .set_title(&format!("change-0751-{prefix}-{index}"));
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     package.to_bytes()
 }
 
@@ -143,7 +142,7 @@ fn plain_pair() -> Result<(Vec<u8>, Vec<u8>)> {
     ))
 }
 
-fn plan_copy(source: &Package, destination: &Package) -> Result<CrossSlideCopyPlan> {
+fn plan_copy(source: &Package, destination: &Package) -> Result<crate::cross_slide_copy::Plan> {
     destination.opened_presentation()?.plan_cross_slide_copy(
         &source.opened_presentation()?,
         SOURCE_SLIDE,
@@ -152,7 +151,11 @@ fn plan_copy(source: &Package, destination: &Package) -> Result<CrossSlideCopyPl
     )
 }
 
-fn record_patch(transcript: &mut String, label: &str, patch: &CrossSlideCopyPatch) -> Result<()> {
+fn record_patch(
+    transcript: &mut String,
+    label: &str,
+    patch: &crate::cross_slide_copy::Patch,
+) -> Result<()> {
     writeln!(transcript, "{label}.bytes={}", hex(&patch.to_bytes()?)).unwrap();
     writeln!(
         transcript,
@@ -229,7 +232,8 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
     )
     .unwrap();
     record_patch(&mut transcript, &format!("{label}.plan"), plan.patch())?;
-    let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    let durable =
+        crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?, Limits::default())?;
 
     // The plan, retained and released, into the destination it was planned
     // against and into a fresh open of the same bytes.
@@ -366,7 +370,7 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
     // A destination whose exact-source authorization an edit revoked while
     // keeping its bytes accepts the copy and publishes the same output.
     let mut revoked = Package::from_reader(std::io::Cursor::new(destination_bytes.to_vec()))?;
-    revoked.edit_opc(|opc| {
+    revoked.edit_opc_in_place(|opc| {
         opc.set_save_options(litchi_opc::SaveOptions::default());
         Ok(())
     })?;
@@ -380,7 +384,7 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
 
     // A source edited back to its own bytes plans and publishes the same copy.
     let mut resaved_source = Package::from_reader(std::io::Cursor::new(source_bytes.to_vec()))?;
-    resaved_source.edit_opc(|opc| {
+    resaved_source.edit_opc_in_place(|opc| {
         opc.set_save_options(litchi_opc::SaveOptions::default());
         Ok(())
     })?;
@@ -473,7 +477,8 @@ fn caller_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8])
         &format!("{label}.caller.plan"),
         plan.patch(),
     )?;
-    let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    let durable =
+        crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?, Limits::default())?;
     let outcome = custom.apply_cross_slide_copy_plan(&source, &plan);
     record_outcome(
         &mut transcript,
@@ -512,7 +517,10 @@ fn caller_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8])
         &mut target,
         outcome,
     )?;
-    let ordinary_durable = CrossSlideCopyPatch::from_bytes(&ordinary_plan.patch().to_bytes()?)?;
+    let ordinary_durable = crate::cross_slide_copy::Patch::from_bytes(
+        &ordinary_plan.patch().to_bytes()?,
+        Limits::default(),
+    )?;
     let mut target = with_caller_part(destination_bytes)?;
     let outcome = target.apply_cross_slide_copy_patch(&source, &ordinary_durable);
     record_outcome(
@@ -543,7 +551,7 @@ fn limits_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8])
             .expect("finite nonzero limits");
         let stage = format!("{label}.limits.{name}");
         writeln!(transcript, "{stage}.bound={bound}").unwrap();
-        match CrossSlideCopyPatch::from_bytes_with_limits(&bytes, limits) {
+        match crate::cross_slide_copy::Patch::from_bytes(&bytes, limits) {
             Ok(patch) => {
                 let mut target =
                     Package::from_reader(std::io::Cursor::new(destination_bytes.to_vec()))?;
@@ -642,15 +650,15 @@ media.patch.undo2.published=c1b8ae334472a75240e2590b9925f5fe50387d45e1c623b3d99d
 media.patch.undo2.revision=3b5d7eeaa2760d75a1f54329cca73475b9b14b67b4afe0c4ce6e836f63fd46a2
 media.plan.redo.published=6545174ab647b7e9bc2ed1cd9d032e5196f108b05f73d8b9a7e3e21d964c1771
 media.plan.redo.revision=eb7c1a3e673d5fe956bd8ece62baad39cd6c162a97d90c26f6f0feb77e803bb8
-media.patch.stale.refused=UnsafeEdit { operation: "apply_cross_slide_copy_patch", reason: "the complete destination package graph differs from the cross-slide patch source" }
+media.patch.stale.refused=PatchConflict
 media.patch.stale.untouched=6545174ab647b7e9bc2ed1cd9d032e5196f108b05f73d8b9a7e3e21d964c1771
-media.stale.destination.refused=UnsafeEdit { operation: "apply_cross_slide_copy_plan", reason: "the complete destination package graph changed after cross-slide planning" }
+media.stale.destination.refused=PatchConflict
 media.stale.destination.untouched=632b53ac43e445b7bbe04e91b572c73e8279692549fc847bd5e2d81f4e6649ba
-media.stale.source.refused=UnsafeEdit { operation: "apply_cross_slide_copy_plan", reason: "the complete source package graph changed after cross-slide planning" }
+media.stale.source.refused=PatchConflict
 media.stale.source.untouched=c1b8ae334472a75240e2590b9925f5fe50387d45e1c623b3d99d16baae91d58d
-media.foreign.source.refused=UnsafeEdit { operation: "apply_cross_slide_copy_plan", reason: "the complete source package graph changed after cross-slide planning" }
+media.foreign.source.refused=PatchConflict
 media.foreign.source.untouched=c1b8ae334472a75240e2590b9925f5fe50387d45e1c623b3d99d16baae91d58d
-media.stale.physical.refused=UnsafeEdit { operation: "apply_cross_slide_copy_plan", reason: "the serialized destination package changed after cross-slide planning" }
+media.stale.physical.refused=PatchConflict
 media.stale.physical.untouched=a02526ca7578418779cbb042e51a60e2c4c34927e36e894e42bdb4dbf879fdb2
 media.revoked.destination.published=6545174ab647b7e9bc2ed1cd9d032e5196f108b05f73d8b9a7e3e21d964c1771
 media.revoked.destination.revision=eb7c1a3e673d5fe956bd8ece62baad39cd6c162a97d90c26f6f0feb77e803bb8
@@ -691,15 +699,15 @@ plain.patch.undo2.published=6cdd00f339051b5f0a35d4809233fd3f64e7cbee86d9524bd8fe
 plain.patch.undo2.revision=a2d91ca61d9019c584e33862ae72549b48929004232ac67d61dae3dcf75a633b
 plain.plan.redo.published=15aa2b596658ca2baa30e0b9b2274ed69ee508a2a6da97a82982eb30bc4a530d
 plain.plan.redo.revision=0efbb26e7c5f17d10013ff269f43d1912a05037d809ab6c7eeab74e0b7e64632
-plain.patch.stale.refused=UnsafeEdit { operation: "apply_cross_slide_copy_patch", reason: "the complete destination package graph differs from the cross-slide patch source" }
+plain.patch.stale.refused=PatchConflict
 plain.patch.stale.untouched=15aa2b596658ca2baa30e0b9b2274ed69ee508a2a6da97a82982eb30bc4a530d
-plain.stale.destination.refused=UnsafeEdit { operation: "apply_cross_slide_copy_plan", reason: "the complete destination package graph changed after cross-slide planning" }
+plain.stale.destination.refused=PatchConflict
 plain.stale.destination.untouched=216a1dd43508078d378f461986537efed6c1ed31f874d67bdd1bc469715b3d9b
-plain.stale.source.refused=UnsafeEdit { operation: "apply_cross_slide_copy_plan", reason: "the complete source package graph changed after cross-slide planning" }
+plain.stale.source.refused=PatchConflict
 plain.stale.source.untouched=6cdd00f339051b5f0a35d4809233fd3f64e7cbee86d9524bd8fe748c44722db4
-plain.foreign.source.refused=UnsafeEdit { operation: "apply_cross_slide_copy_plan", reason: "the complete source package graph changed after cross-slide planning" }
+plain.foreign.source.refused=PatchConflict
 plain.foreign.source.untouched=6cdd00f339051b5f0a35d4809233fd3f64e7cbee86d9524bd8fe748c44722db4
-plain.stale.physical.refused=UnsafeEdit { operation: "apply_cross_slide_copy_plan", reason: "the serialized destination package changed after cross-slide planning" }
+plain.stale.physical.refused=PatchConflict
 plain.stale.physical.untouched=c7e61fcbbd418b98d29d47aed30a6e8202e697b4443440bf648e2f8501c83a7d
 plain.revoked.destination.published=15aa2b596658ca2baa30e0b9b2274ed69ee508a2a6da97a82982eb30bc4a530d
 plain.revoked.destination.revision=0efbb26e7c5f17d10013ff269f43d1912a05037d809ab6c7eeab74e0b7e64632
@@ -789,7 +797,7 @@ media.limits.destination-under.patch.refused=Limit { resource: "cross-slide seri
 media.limits.destination-under.patch.untouched=c1b8ae334472a75240e2590b9925f5fe50387d45e1c623b3d99d16baae91d58d
 media.limits.destination-under.plan.refused=Limit { resource: "cross-slide candidate patch bytes", limit: 72047 }
 media.limits.destination-exact.bound=72048
-media.limits.destination-exact.patch.refused=UnsafeEdit { operation: "apply_cross_slide_copy_patch", reason: "the durable cross-slide patch does not match a freshly proven candidate" }
+media.limits.destination-exact.patch.refused=PatchConflict
 media.limits.destination-exact.patch.untouched=c1b8ae334472a75240e2590b9925f5fe50387d45e1c623b3d99d16baae91d58d
 media.limits.destination-exact.plan.refused=Limit { resource: "cross-slide candidate patch bytes", limit: 72048 }
 plain.limits.patch.bound=4895
@@ -801,7 +809,7 @@ plain.limits.source-under.patch.refused=Limit { resource: "cross-slide serialize
 plain.limits.source-under.patch.untouched=6cdd00f339051b5f0a35d4809233fd3f64e7cbee86d9524bd8fe748c44722db4
 plain.limits.source-under.plan.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 31374 }
 plain.limits.source-exact.bound=31375
-plain.limits.source-exact.patch.refused=UnsafeEdit { operation: "apply_cross_slide_copy_patch", reason: "the durable cross-slide patch does not match a freshly proven candidate" }
+plain.limits.source-exact.patch.refused=PatchConflict
 plain.limits.source-exact.patch.untouched=6cdd00f339051b5f0a35d4809233fd3f64e7cbee86d9524bd8fe748c44722db4
 plain.limits.source-exact.plan.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 31375 }
 plain.limits.destination-under.bound=30460

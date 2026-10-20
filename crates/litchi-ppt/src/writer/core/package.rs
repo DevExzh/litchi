@@ -262,8 +262,8 @@ impl Builder {
         #[cfg(feature = "encryption")]
         let options = if let Some(password) = self.encryption_password() {
             crate::OpenOptions::new()
-                .source_limits(options.get_source_limits())
-                .leniency(options.get_leniency())
+                .source_limits(options.source_limits_value())
+                .leniency(options.leniency_value())
                 .password(Some(password))
         } else {
             options

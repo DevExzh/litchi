@@ -1,6 +1,7 @@
 //! Semantic, bounded and inert `PowerPoint` font ownership.
 
 mod codec;
+mod edit;
 mod model;
 mod package;
 mod patch;
@@ -13,6 +14,7 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
+pub use edit::Edit;
 #[allow(
     clippy::module_name_repetitions,
     reason = "`EmbeddedFont`, `FontCollection`, `FontCollections`, and `FontEmbeddingFlags` are established public API names re-exported through the `font` module; renaming them would break downstream crates"
@@ -23,9 +25,11 @@ pub use model::{
 };
 pub use package::{PackageLimits, PackageOptions};
 pub(crate) use package::{require_stream_only_cfb, validate_unrelated_streams};
-pub use patch::{Patch, Revision};
+pub use patch::Revision;
 pub use snapshot::Snapshot;
-pub use transaction::{Change, ChangeKind, Commit, Transaction};
+pub use transaction::{Change, ChangeKind};
+
+crate::scoped::family!("font");
 
 #[cfg(feature = "fonts")]
 #[allow(

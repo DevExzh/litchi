@@ -1,3 +1,6 @@
+mod in_place;
+use in_place::InPlace as _;
+
 use std::io::{self, Write};
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
@@ -31,11 +34,11 @@ fn package_bytes(slides: &[Vec<u8>]) -> Vec<u8> {
             presentation.add_slide().expect("add slide");
         }
     }
-    let mut authored = builder.build().expect("new PPTX package");
+    let authored = builder.build().expect("new PPTX package");
     let authored_bytes = authored.to_bytes().expect("serialize authored package");
     let mut package = Package::from_bytes(&authored_bytes).expect("open authored package");
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             for (index, slide) in slides.iter().enumerate() {
                 let uri = PackURI::new(format!("/ppt/slides/slide{}.xml", index + 1))
                     .expect("generated PPTX slide URI is valid");
@@ -788,12 +791,13 @@ fn source_stale_after_accepted_output_overrides_sink_result() {
 #[test]
 fn source_cancellation_before_output_is_document_progress() {
     let (cancellation_source, context) = execution_context();
-    let presentation = SourceBackedPresentation::from_read_at_with_execution_context(
+    let presentation = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(package_bytes(&[slide_xml(
             r#"<a:t>before</a:t>"#,
         )]))),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .expect("managed source-backed package");
     cancellation_source.cancel();
@@ -811,12 +815,13 @@ fn source_cancellation_before_output_is_document_progress() {
 #[test]
 fn source_cancellation_after_sink_acceptance_overrides_sink_result() {
     let (cancellation_source, context) = execution_context();
-    let presentation = SourceBackedPresentation::from_read_at_with_execution_context(
+    let presentation = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(package_bytes(&[slide_xml(
             r#"<a:t>cancel</a:t>"#,
         )]))),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .expect("managed source-backed package");
     let mut sink = CancelOnWrite {

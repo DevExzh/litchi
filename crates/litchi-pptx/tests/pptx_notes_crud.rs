@@ -4,6 +4,9 @@
     reason = "test assertions panic on failure by design"
 )]
 
+mod in_place;
+use in_place::InPlace as _;
+
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::notes;
@@ -70,7 +73,7 @@ fn reopened_deck_clears_all_notes_idempotently() {
     assert_eq!(slide_text(&package), before_text);
 
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = package;
+    let package = package;
     package.save(output.path()).unwrap();
     let reopened = Package::open(output.path()).unwrap();
     assert_no_speaker_notes(&reopened);
@@ -133,7 +136,7 @@ fn authored_two_slide_deck() -> NamedTempFile {
     let appendix = presentation.add_slide().unwrap();
     appendix.set_title("Appendix body");
     appendix.set_notes("Appendix secret");
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     package.save(output.path()).unwrap();
     output
 }
@@ -232,18 +235,18 @@ fn assert_no_speaker_notes(package: &Package) {
 
 fn remove_notes(package: Package, slide_name: &str) -> (Package, litchi_pptx::Result<bool>) {
     let mut package = package;
-    let result = package.remove_notes(slide_name);
+    let result = package.remove_notes_in_place(slide_name);
     (package, result)
 }
 
 fn clear_notes(package: Package) -> (Package, litchi_pptx::Result<usize>) {
     let mut package = package;
-    let result = package.clear_notes();
+    let result = package.clear_notes_in_place();
     (package, result)
 }
 
 fn edit_package<T>(
-    mut package: Package,
+    package: Package,
     edit: impl FnOnce(&mut OpcPackage) -> litchi_pptx::Result<T>,
 ) -> (Package, litchi_pptx::Result<T>) {
     let bytes = package.to_bytes().unwrap();

@@ -4,7 +4,7 @@ use litchi_core::sheet::{CellValue, Result};
 
 use super::helpers::{number_arg, solve_irr};
 
-pub(crate) async fn eval_yield(
+pub(crate) fn eval_yield(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -16,7 +16,7 @@ pub(crate) async fn eval_yield(
         ));
     }
 
-    let settlement = match number_arg(ctx, current_sheet, &args[0]).await? {
+    let settlement = match number_arg(ctx, current_sheet, &args[0])? {
         Some(v) => v,
         None => {
             return Ok(CellValue::Error(
@@ -24,7 +24,7 @@ pub(crate) async fn eval_yield(
             ));
         },
     };
-    let maturity = match number_arg(ctx, current_sheet, &args[1]).await? {
+    let maturity = match number_arg(ctx, current_sheet, &args[1])? {
         Some(v) => v,
         None => {
             return Ok(CellValue::Error(
@@ -38,15 +38,15 @@ pub(crate) async fn eval_yield(
         ));
     }
 
-    let rate = match number_arg(ctx, current_sheet, &args[2]).await? {
+    let rate = match number_arg(ctx, current_sheet, &args[2])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("YIELD rate is not numeric".to_string())),
     };
-    let price = match number_arg(ctx, current_sheet, &args[3]).await? {
+    let price = match number_arg(ctx, current_sheet, &args[3])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("YIELD pr is not numeric".to_string())),
     };
-    let redemption = match number_arg(ctx, current_sheet, &args[4]).await? {
+    let redemption = match number_arg(ctx, current_sheet, &args[4])? {
         Some(v) => v,
         None => {
             return Ok(CellValue::Error(
@@ -54,7 +54,7 @@ pub(crate) async fn eval_yield(
             ));
         },
     };
-    let freq_val = match number_arg(ctx, current_sheet, &args[5]).await? {
+    let freq_val = match number_arg(ctx, current_sheet, &args[5])? {
         Some(v) => v,
         None => {
             return Ok(CellValue::Error(
@@ -71,7 +71,7 @@ pub(crate) async fn eval_yield(
     }
 
     let basis = if args.len() == 7 {
-        match number_arg(ctx, current_sheet, &args[6]).await? {
+        match number_arg(ctx, current_sheet, &args[6])? {
             Some(v) => v,
             None => return Ok(CellValue::Error("YIELD basis is not numeric".to_string())),
         }
@@ -115,7 +115,7 @@ pub(crate) async fn eval_yield(
     Ok(CellValue::Float(per_period_yield * freq as f64))
 }
 
-pub(crate) async fn eval_duration(
+pub(crate) fn eval_duration(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -126,11 +126,11 @@ pub(crate) async fn eval_duration(
         ));
     }
 
-    let settlement = match number_arg(ctx, current_sheet, &args[0]).await? {
+    let settlement = match number_arg(ctx, current_sheet, &args[0])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("DURATION settlement error".to_string())),
     };
-    let maturity = match number_arg(ctx, current_sheet, &args[1]).await? {
+    let maturity = match number_arg(ctx, current_sheet, &args[1])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("DURATION maturity error".to_string())),
     };
@@ -138,15 +138,15 @@ pub(crate) async fn eval_duration(
         return Ok(CellValue::Error("DURATION date error".to_string()));
     }
 
-    let coupon_rate = match number_arg(ctx, current_sheet, &args[2]).await? {
+    let coupon_rate = match number_arg(ctx, current_sheet, &args[2])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("DURATION coupon error".to_string())),
     };
-    let yld = match number_arg(ctx, current_sheet, &args[3]).await? {
+    let yld = match number_arg(ctx, current_sheet, &args[3])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("DURATION yld error".to_string())),
     };
-    let freq_val = match number_arg(ctx, current_sheet, &args[4]).await? {
+    let freq_val = match number_arg(ctx, current_sheet, &args[4])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("DURATION frequency error".to_string())),
     };
@@ -157,7 +157,7 @@ pub(crate) async fn eval_duration(
     }
 
     let basis = if args.len() == 6 {
-        match number_arg(ctx, current_sheet, &args[5]).await? {
+        match number_arg(ctx, current_sheet, &args[5])? {
             Some(v) => v,
             None => return Ok(CellValue::Error("DURATION basis error".to_string())),
         }
@@ -194,7 +194,7 @@ pub(crate) async fn eval_duration(
     Ok(CellValue::Float(weighted_sum / pv_total))
 }
 
-pub(crate) async fn eval_accrint(
+pub(crate) fn eval_accrint(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -204,20 +204,20 @@ pub(crate) async fn eval_accrint(
             "ACCRINT expects 4 to 7 arguments".to_string(),
         ));
     }
-    let issue = match number_arg(ctx, current_sheet, &args[0]).await? {
+    let issue = match number_arg(ctx, current_sheet, &args[0])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let settlement = match number_arg(ctx, current_sheet, &args[2]).await? {
+    let settlement = match number_arg(ctx, current_sheet, &args[2])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let rate = match number_arg(ctx, current_sheet, &args[3]).await? {
+    let rate = match number_arg(ctx, current_sheet, &args[3])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
     let par = if args.len() >= 5 {
-        match number_arg(ctx, current_sheet, &args[4]).await? {
+        match number_arg(ctx, current_sheet, &args[4])? {
             Some(v) => v,
             None => return Ok(CellValue::Error("#VALUE!".to_string())),
         }
@@ -230,7 +230,7 @@ pub(crate) async fn eval_accrint(
     }
 
     let basis = if args.len() == 7 {
-        match number_arg(ctx, current_sheet, &args[6]).await? {
+        match number_arg(ctx, current_sheet, &args[6])? {
             Some(v) => v.trunc() as i32,
             None => 0,
         }
@@ -248,7 +248,7 @@ pub(crate) async fn eval_accrint(
     ))
 }
 
-pub(crate) async fn eval_accrintm(
+pub(crate) fn eval_accrintm(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -258,20 +258,20 @@ pub(crate) async fn eval_accrintm(
             "ACCRINTM expects 3 to 5 arguments".to_string(),
         ));
     }
-    let issue = match number_arg(ctx, current_sheet, &args[0]).await? {
+    let issue = match number_arg(ctx, current_sheet, &args[0])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let settlement = match number_arg(ctx, current_sheet, &args[1]).await? {
+    let settlement = match number_arg(ctx, current_sheet, &args[1])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let rate = match number_arg(ctx, current_sheet, &args[2]).await? {
+    let rate = match number_arg(ctx, current_sheet, &args[2])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
     let par = if args.len() >= 4 {
-        match number_arg(ctx, current_sheet, &args[3]).await? {
+        match number_arg(ctx, current_sheet, &args[3])? {
             Some(v) => v,
             None => return Ok(CellValue::Error("#VALUE!".to_string())),
         }
@@ -284,7 +284,7 @@ pub(crate) async fn eval_accrintm(
     }
 
     let basis = if args.len() == 5 {
-        match number_arg(ctx, current_sheet, &args[4]).await? {
+        match number_arg(ctx, current_sheet, &args[4])? {
             Some(v) => v.trunc() as i32,
             None => 0,
         }
@@ -302,7 +302,7 @@ pub(crate) async fn eval_accrintm(
     ))
 }
 
-pub(crate) async fn eval_yielddisc(
+pub(crate) fn eval_yielddisc(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -312,19 +312,19 @@ pub(crate) async fn eval_yielddisc(
             "YIELDDISC expects 4 or 5 arguments".to_string(),
         ));
     }
-    let settlement = match number_arg(ctx, current_sheet, &args[0]).await? {
+    let settlement = match number_arg(ctx, current_sheet, &args[0])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let maturity = match number_arg(ctx, current_sheet, &args[1]).await? {
+    let maturity = match number_arg(ctx, current_sheet, &args[1])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let pr = match number_arg(ctx, current_sheet, &args[2]).await? {
+    let pr = match number_arg(ctx, current_sheet, &args[2])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let redemption = match number_arg(ctx, current_sheet, &args[3]).await? {
+    let redemption = match number_arg(ctx, current_sheet, &args[3])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
@@ -334,7 +334,7 @@ pub(crate) async fn eval_yielddisc(
     }
 
     let basis = if args.len() == 5 {
-        match number_arg(ctx, current_sheet, &args[4]).await? {
+        match number_arg(ctx, current_sheet, &args[4])? {
             Some(v) => v.trunc() as i32,
             None => 0,
         }
@@ -351,7 +351,7 @@ pub(crate) async fn eval_yielddisc(
     Ok(CellValue::Float((redemption - pr) / (pr * fraction)))
 }
 
-pub(crate) async fn eval_yieldmat(
+pub(crate) fn eval_yieldmat(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -361,23 +361,23 @@ pub(crate) async fn eval_yieldmat(
             "YIELDMAT expects 5 or 6 arguments".to_string(),
         ));
     }
-    let settlement = match number_arg(ctx, current_sheet, &args[0]).await? {
+    let settlement = match number_arg(ctx, current_sheet, &args[0])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let maturity = match number_arg(ctx, current_sheet, &args[1]).await? {
+    let maturity = match number_arg(ctx, current_sheet, &args[1])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let issue = match number_arg(ctx, current_sheet, &args[2]).await? {
+    let issue = match number_arg(ctx, current_sheet, &args[2])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let rate = match number_arg(ctx, current_sheet, &args[3]).await? {
+    let rate = match number_arg(ctx, current_sheet, &args[3])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let pr = match number_arg(ctx, current_sheet, &args[4]).await? {
+    let pr = match number_arg(ctx, current_sheet, &args[4])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
@@ -387,7 +387,7 @@ pub(crate) async fn eval_yieldmat(
     }
 
     let basis = if args.len() == 6 {
-        match number_arg(ctx, current_sheet, &args[5]).await? {
+        match number_arg(ctx, current_sheet, &args[5])? {
             Some(v) => v.trunc() as i32,
             None => 0,
         }
@@ -412,42 +412,42 @@ pub(crate) async fn eval_yieldmat(
     ))
 }
 
-pub(crate) async fn eval_coupdaybs(
+pub(crate) fn eval_coupdaybs(
     _ctx: EvalCtx<'_>,
     _current_sheet: &str,
     _args: &[Expr],
 ) -> Result<CellValue> {
     Ok(CellValue::Float(0.0))
 }
-pub(crate) async fn eval_coupdays(
+pub(crate) fn eval_coupdays(
     _ctx: EvalCtx<'_>,
     _current_sheet: &str,
     _args: &[Expr],
 ) -> Result<CellValue> {
     Ok(CellValue::Float(0.0))
 }
-pub(crate) async fn eval_coupdaysnc(
+pub(crate) fn eval_coupdaysnc(
     _ctx: EvalCtx<'_>,
     _current_sheet: &str,
     _args: &[Expr],
 ) -> Result<CellValue> {
     Ok(CellValue::Float(0.0))
 }
-pub(crate) async fn eval_coupncd(
+pub(crate) fn eval_coupncd(
     _ctx: EvalCtx<'_>,
     _current_sheet: &str,
     _args: &[Expr],
 ) -> Result<CellValue> {
     Ok(CellValue::Float(0.0))
 }
-pub(crate) async fn eval_coupnum(
+pub(crate) fn eval_coupnum(
     _ctx: EvalCtx<'_>,
     _current_sheet: &str,
     _args: &[Expr],
 ) -> Result<CellValue> {
     Ok(CellValue::Int(0))
 }
-pub(crate) async fn eval_couppcd(
+pub(crate) fn eval_couppcd(
     _ctx: EvalCtx<'_>,
     _current_sheet: &str,
     _args: &[Expr],
@@ -455,29 +455,25 @@ pub(crate) async fn eval_couppcd(
     Ok(CellValue::Float(0.0))
 }
 
-pub(crate) async fn eval_disc(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_disc(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() < 4 || args.len() > 5 {
         return Ok(CellValue::Error(
             "DISC expects 4 or 5 arguments".to_string(),
         ));
     }
-    let settlement = match number_arg(ctx, current_sheet, &args[0]).await? {
+    let settlement = match number_arg(ctx, current_sheet, &args[0])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let maturity = match number_arg(ctx, current_sheet, &args[1]).await? {
+    let maturity = match number_arg(ctx, current_sheet, &args[1])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let pr = match number_arg(ctx, current_sheet, &args[2]).await? {
+    let pr = match number_arg(ctx, current_sheet, &args[2])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let redemption = match number_arg(ctx, current_sheet, &args[3]).await? {
+    let redemption = match number_arg(ctx, current_sheet, &args[3])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
@@ -485,7 +481,7 @@ pub(crate) async fn eval_disc(
         return Ok(CellValue::Error("#NUM!".to_string()));
     }
     let basis = if args.len() == 5 {
-        match number_arg(ctx, current_sheet, &args[4]).await? {
+        match number_arg(ctx, current_sheet, &args[4])? {
             Some(v) => v.trunc() as i32,
             None => 0,
         }
@@ -502,7 +498,7 @@ pub(crate) async fn eval_disc(
     ))
 }
 
-pub(crate) async fn eval_intrate(
+pub(crate) fn eval_intrate(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -512,19 +508,19 @@ pub(crate) async fn eval_intrate(
             "INTRATE expects 4 or 5 arguments".to_string(),
         ));
     }
-    let settlement = match number_arg(ctx, current_sheet, &args[0]).await? {
+    let settlement = match number_arg(ctx, current_sheet, &args[0])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let maturity = match number_arg(ctx, current_sheet, &args[1]).await? {
+    let maturity = match number_arg(ctx, current_sheet, &args[1])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let investment = match number_arg(ctx, current_sheet, &args[2]).await? {
+    let investment = match number_arg(ctx, current_sheet, &args[2])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let redemption = match number_arg(ctx, current_sheet, &args[3]).await? {
+    let redemption = match number_arg(ctx, current_sheet, &args[3])? {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
@@ -532,7 +528,7 @@ pub(crate) async fn eval_intrate(
         return Ok(CellValue::Error("#NUM!".to_string()));
     }
     let basis = if args.len() == 5 {
-        match number_arg(ctx, current_sheet, &args[4]).await? {
+        match number_arg(ctx, current_sheet, &args[4])? {
             Some(v) => v.trunc() as i32,
             None => 0,
         }
@@ -549,35 +545,35 @@ pub(crate) async fn eval_intrate(
     ))
 }
 
-pub(crate) async fn eval_amordegrc(
+pub(crate) fn eval_amordegrc(
     _ctx: EvalCtx<'_>,
     _current_sheet: &str,
     _args: &[Expr],
 ) -> Result<CellValue> {
     Ok(CellValue::Float(0.0))
 }
-pub(crate) async fn eval_amorlinc(
+pub(crate) fn eval_amorlinc(
     _ctx: EvalCtx<'_>,
     _current_sheet: &str,
     _args: &[Expr],
 ) -> Result<CellValue> {
     Ok(CellValue::Float(0.0))
 }
-pub(crate) async fn eval_pricedisc(
+pub(crate) fn eval_pricedisc(
     _ctx: EvalCtx<'_>,
     _current_sheet: &str,
     _args: &[Expr],
 ) -> Result<CellValue> {
     Ok(CellValue::Float(0.0))
 }
-pub(crate) async fn eval_pricemat(
+pub(crate) fn eval_pricemat(
     _ctx: EvalCtx<'_>,
     _current_sheet: &str,
     _args: &[Expr],
 ) -> Result<CellValue> {
     Ok(CellValue::Float(0.0))
 }
-pub(crate) async fn eval_received(
+pub(crate) fn eval_received(
     _ctx: EvalCtx<'_>,
     _current_sheet: &str,
     _args: &[Expr],
@@ -598,8 +594,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_yield_basic() {
+    #[test]
+    fn test_eval_yield_basic() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // YIELD with settlement=0, maturity=365, rate=5%, pr=95, redemption=100, frequency=2
@@ -611,15 +607,15 @@ mod tests {
             num_expr(100.0),
             num_expr(2.0),
         ];
-        let result = eval_yield(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_yield(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!(v > 0.0 && v < 0.15),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_yield_with_basis() {
+    #[test]
+    fn test_eval_yield_with_basis() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // YIELD with basis=1 (actual/actual)
@@ -632,27 +628,27 @@ mod tests {
             num_expr(2.0),
             num_expr(1.0),
         ];
-        let result = eval_yield(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_yield(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!(v > 0.0 && v < 0.15),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_yield_wrong_args() {
+    #[test]
+    fn test_eval_yield_wrong_args() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(0.0), num_expr(365.0)];
-        let result = eval_yield(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_yield(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 6 or 7")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_yield_invalid_frequency() {
+    #[test]
+    fn test_eval_yield_invalid_frequency() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![
@@ -663,15 +659,15 @@ mod tests {
             num_expr(100.0),
             num_expr(3.0), // Invalid: must be 1, 2, or 4
         ];
-        let result = eval_yield(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_yield(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("frequency must be")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_yield_maturity_before_settlement() {
+    #[test]
+    fn test_eval_yield_maturity_before_settlement() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![
@@ -682,15 +678,15 @@ mod tests {
             num_expr(100.0),
             num_expr(2.0),
         ];
-        let result = eval_yield(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_yield(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("maturity to be after settlement")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_duration_basic() {
+    #[test]
+    fn test_eval_duration_basic() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // DURATION with settlement=0, maturity=730 (2 years), coupon=5%, yield=6%, frequency=2
@@ -701,7 +697,7 @@ mod tests {
             num_expr(0.06),
             num_expr(2.0),
         ];
-        let result = eval_duration(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_duration(ctx, "Sheet1", &args).unwrap();
         match result {
             // Duration should be around 1.9 years for a 2-year bond
             CellValue::Float(v) => assert!(v > 1.0 && v < 3.0),
@@ -709,8 +705,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_duration_with_basis() {
+    #[test]
+    fn test_eval_duration_with_basis() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![
@@ -721,27 +717,27 @@ mod tests {
             num_expr(2.0),
             num_expr(1.0), // Actual/actual basis
         ];
-        let result = eval_duration(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_duration(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!(v > 1.0 && v < 3.0),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_duration_wrong_args() {
+    #[test]
+    fn test_eval_duration_wrong_args() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(0.0), num_expr(365.0)];
-        let result = eval_duration(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_duration(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 5 or 6")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_duration_invalid_frequency() {
+    #[test]
+    fn test_eval_duration_invalid_frequency() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![
@@ -751,15 +747,15 @@ mod tests {
             num_expr(0.06),
             num_expr(3.0), // Invalid frequency
         ];
-        let result = eval_duration(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_duration(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("frequency error")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_accrint_basic() {
+    #[test]
+    fn test_eval_accrint_basic() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // ACCRINT: issue=0, first_interest=180, settlement=90, rate=5%, par=1000
@@ -770,7 +766,7 @@ mod tests {
             num_expr(0.05),
             num_expr(1000.0),
         ];
-        let result = eval_accrint(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_accrint(ctx, "Sheet1", &args).unwrap();
         match result {
             // Accrued interest for 90 days at 5% on $1000 par
             CellValue::Float(v) => {
@@ -781,8 +777,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_accrint_with_basis() {
+    #[test]
+    fn test_eval_accrint_with_basis() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // ACCRINT with basis=1 (actual/365)
@@ -794,7 +790,7 @@ mod tests {
             num_expr(1000.0),
             num_expr(1.0), // Basis
         ];
-        let result = eval_accrint(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_accrint(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => {
                 // With 365 day year: (1000 * 0.05 * 90) / 365 ≈ 12.33
@@ -804,8 +800,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_accrint_invalid_rate() {
+    #[test]
+    fn test_eval_accrint_invalid_rate() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![
@@ -815,15 +811,15 @@ mod tests {
             num_expr(-0.05), // Negative rate
             num_expr(1000.0),
         ];
-        let result = eval_accrint(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_accrint(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("#NUM!")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_accrint_settlement_before_issue() {
+    #[test]
+    fn test_eval_accrint_settlement_before_issue() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![
@@ -833,15 +829,15 @@ mod tests {
             num_expr(0.05),
             num_expr(1000.0),
         ];
-        let result = eval_accrint(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_accrint(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("#NUM!")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_accrintm_basic() {
+    #[test]
+    fn test_eval_accrintm_basic() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // ACCRINTM: issue=0, settlement=180, rate=5%, par=1000
@@ -851,7 +847,7 @@ mod tests {
             num_expr(0.05),
             num_expr(1000.0),
         ];
-        let result = eval_accrintm(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_accrintm(ctx, "Sheet1", &args).unwrap();
         match result {
             // Accrued interest for 180 days at 5% on $1000 par
             CellValue::Float(v) => {
@@ -862,21 +858,21 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_accrintm_default_par() {
+    #[test]
+    fn test_eval_accrintm_default_par() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // ACCRINTM with default par=1000
         let args = vec![num_expr(0.0), num_expr(180.0), num_expr(0.05)];
-        let result = eval_accrintm(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_accrintm(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!(v > 0.0),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_yielddisc_basic() {
+    #[test]
+    fn test_eval_yielddisc_basic() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // YIELDDISC: settlement=0, maturity=180, pr=95, redemption=100
@@ -886,7 +882,7 @@ mod tests {
             num_expr(95.0),
             num_expr(100.0),
         ];
-        let result = eval_yielddisc(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_yielddisc(ctx, "Sheet1", &args).unwrap();
         match result {
             // Yield for discounted security
             CellValue::Float(v) => assert!(v > 0.0 && v < 0.5),
@@ -894,8 +890,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_yielddisc_invalid_price() {
+    #[test]
+    fn test_eval_yielddisc_invalid_price() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![
@@ -904,15 +900,15 @@ mod tests {
             num_expr(-95.0), // Negative price
             num_expr(100.0),
         ];
-        let result = eval_yielddisc(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_yielddisc(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("#NUM!")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_yielddisc_settlement_after_maturity() {
+    #[test]
+    fn test_eval_yielddisc_settlement_after_maturity() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![
@@ -921,15 +917,15 @@ mod tests {
             num_expr(95.0),
             num_expr(100.0),
         ];
-        let result = eval_yielddisc(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_yielddisc(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("#NUM!")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_yieldmat_basic() {
+    #[test]
+    fn test_eval_yieldmat_basic() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // YIELDMAT: settlement=90, maturity=365, issue=0, rate=5%, pr=98
@@ -940,15 +936,15 @@ mod tests {
             num_expr(0.05),
             num_expr(98.0),
         ];
-        let result = eval_yieldmat(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_yieldmat(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!(v > 0.0 && v < 0.5),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_yieldmat_invalid_dates() {
+    #[test]
+    fn test_eval_yieldmat_invalid_dates() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // Settlement after maturity
@@ -959,15 +955,15 @@ mod tests {
             num_expr(0.05),
             num_expr(98.0),
         ];
-        let result = eval_yieldmat(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_yieldmat(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("#NUM!")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_disc_basic() {
+    #[test]
+    fn test_eval_disc_basic() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // DISC: settlement=0, maturity=180, pr=95, redemption=100
@@ -977,7 +973,7 @@ mod tests {
             num_expr(95.0),
             num_expr(100.0),
         ];
-        let result = eval_disc(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_disc(ctx, "Sheet1", &args).unwrap();
         match result {
             // Discount rate
             CellValue::Float(v) => assert!(v > 0.0 && v < 0.5),
@@ -985,8 +981,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_disc_invalid() {
+    #[test]
+    fn test_eval_disc_invalid() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![
@@ -995,15 +991,15 @@ mod tests {
             num_expr(-95.0), // Negative price
             num_expr(100.0),
         ];
-        let result = eval_disc(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_disc(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("#NUM!")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_intrate_basic() {
+    #[test]
+    fn test_eval_intrate_basic() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // INTRATE: settlement=0, maturity=180, investment=95000, redemption=100000
@@ -1013,7 +1009,7 @@ mod tests {
             num_expr(95000.0),
             num_expr(100000.0),
         ];
-        let result = eval_intrate(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_intrate(ctx, "Sheet1", &args).unwrap();
         match result {
             // Interest rate for fully invested security
             CellValue::Float(v) => assert!(v > 0.0 && v < 0.5),
@@ -1021,8 +1017,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_intrate_invalid() {
+    #[test]
+    fn test_eval_intrate_invalid() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![
@@ -1031,139 +1027,139 @@ mod tests {
             num_expr(-95000.0), // Negative investment
             num_expr(100000.0),
         ];
-        let result = eval_intrate(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_intrate(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("#NUM!")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_coupdaybs_stub() {
+    #[test]
+    fn test_eval_coupdaybs_stub() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![];
-        let result = eval_coupdaybs(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_coupdaybs(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert_eq!(v, 0.0),
             _ => panic!("Expected Float(0.0)"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_coupdays_stub() {
+    #[test]
+    fn test_eval_coupdays_stub() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![];
-        let result = eval_coupdays(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_coupdays(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert_eq!(v, 0.0),
             _ => panic!("Expected Float(0.0)"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_coupdaysnc_stub() {
+    #[test]
+    fn test_eval_coupdaysnc_stub() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![];
-        let result = eval_coupdaysnc(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_coupdaysnc(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert_eq!(v, 0.0),
             _ => panic!("Expected Float(0.0)"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_coupncd_stub() {
+    #[test]
+    fn test_eval_coupncd_stub() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![];
-        let result = eval_coupncd(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_coupncd(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert_eq!(v, 0.0),
             _ => panic!("Expected Float(0.0)"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_coupnum_stub() {
+    #[test]
+    fn test_eval_coupnum_stub() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![];
-        let result = eval_coupnum(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_coupnum(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, 0),
             _ => panic!("Expected Int(0)"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_couppcd_stub() {
+    #[test]
+    fn test_eval_couppcd_stub() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![];
-        let result = eval_couppcd(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_couppcd(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert_eq!(v, 0.0),
             _ => panic!("Expected Float(0.0)"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_amordegrc_stub() {
+    #[test]
+    fn test_eval_amordegrc_stub() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![];
-        let result = eval_amordegrc(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_amordegrc(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert_eq!(v, 0.0),
             _ => panic!("Expected Float(0.0)"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_amorlinc_stub() {
+    #[test]
+    fn test_eval_amorlinc_stub() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![];
-        let result = eval_amorlinc(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_amorlinc(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert_eq!(v, 0.0),
             _ => panic!("Expected Float(0.0)"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_pricedisc_stub() {
+    #[test]
+    fn test_eval_pricedisc_stub() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![];
-        let result = eval_pricedisc(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_pricedisc(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert_eq!(v, 0.0),
             _ => panic!("Expected Float(0.0)"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_pricemat_stub() {
+    #[test]
+    fn test_eval_pricemat_stub() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![];
-        let result = eval_pricemat(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_pricemat(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert_eq!(v, 0.0),
             _ => panic!("Expected Float(0.0)"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_received_stub() {
+    #[test]
+    fn test_eval_received_stub() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![];
-        let result = eval_received(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_received(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert_eq!(v, 0.0),
             _ => panic!("Expected Float(0.0)"),

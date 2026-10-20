@@ -46,7 +46,7 @@ fn presentation_photo_album_metadata_is_preserved_as_an_opaque_extension() {
 }
 
 fn package_with_presentation_xml() -> Package {
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     let bytes = package.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
     opc.get_part_mut(&PackURI::new("/ppt/presentation.xml").unwrap())

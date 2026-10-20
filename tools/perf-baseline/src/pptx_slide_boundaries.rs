@@ -12,7 +12,8 @@ use super::{
 };
 use litchi_opc::OpcPackage;
 use litchi_pptx::opened::{Limits, Patch};
-use litchi_pptx::{Error, Package, SlideRemovalPatch, SlideRemovalRefusal};
+use litchi_pptx::slide_removal::Patch as SlideRemovalPatch;
+use litchi_pptx::{Error, Package, SlideRemovalRefusal};
 use serde::Serialize;
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 use std::error::Error as StdError;
@@ -140,7 +141,9 @@ fn remove_bytes(bytes: &[u8], position: usize) -> Result<Vec<u8>, Box<dyn StdErr
     let mut package = Package::from_reader(std::io::Cursor::new(bytes.to_vec()))?;
     let snapshot = package.opened_presentation()?;
     let plan = snapshot.plan_slide_removal(position)?;
-    package.apply_slide_removal_plan(&plan)?;
+    let mut edit = package.edit()?;
+    edit.stage_slide_removal(&plan)?;
+    package = edit.commit()?.into_package();
     Ok(package.to_bytes()?)
 }
 
@@ -414,7 +417,9 @@ fn apply_boundary_to_package(
         Operation::Remove => {
             let snapshot = package.opened_presentation()?;
             let plan = snapshot.plan_slide_removal(position)?;
-            package.apply_slide_removal_plan(&plan)?;
+            let mut edit = package.edit()?;
+            edit.stage_slide_removal(&plan)?;
+            *package = edit.commit()?.into_package();
         },
         Operation::Move => {
             let (from, to) = MOVE_PAIRS
@@ -471,23 +476,29 @@ fn verify_remove_durable(corpus: &Corpus) -> Result<(bool, bool, bool, bool), Bo
     let plan = source_package
         .opened_presentation()?
         .plan_slide_removal(REPRESENTATIVE_REMOVE_POSITION)?;
-    let forward = SlideRemovalPatch::from_bytes(&plan.patch().to_bytes()?)?;
-    let inverse = SlideRemovalPatch::from_bytes(&plan.patch().inverse().to_bytes()?)?;
+    let forward = SlideRemovalPatch::from_bytes(
+        &plan.patch().to_bytes()?,
+        litchi_pptx::opened::Limits::default(),
+    )?;
+    let inverse = SlideRemovalPatch::from_bytes(
+        &plan.patch().inverse().to_bytes()?,
+        litchi_pptx::opened::Limits::default(),
+    )?;
     let mut applied = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
-    applied.apply_slide_removal_patch(&forward)?;
+    applied = applied.apply_slide_removal(&forward)?.into_package();
     let applied_bytes = applied.to_bytes()?;
     let forward_verified = output_names(&applied_bytes)?.len() == SLIDE_COUNT - 1;
     let mut restored = Package::from_reader(std::io::Cursor::new(applied_bytes))?;
-    restored.apply_slide_removal_patch(&inverse)?;
+    restored = restored.apply_slide_removal(&inverse)?.into_package();
     let restored_bytes = restored.to_bytes()?;
     let inverse_verified = package_slide_names(&restored_bytes)? == corpus.slide_names
         && super::raw_zip_members(&restored_bytes)? == super::raw_zip_members(&corpus.archive)?;
 
     let mut stale = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
     mutate_order(&mut stale)?;
-    let stale_verified = stale.apply_slide_removal_patch(&forward).is_err();
-    let mut foreign = Package::from_reader(std::io::Cursor::new(corpus.foreign_archive.clone()))?;
-    let foreign_verified = foreign.apply_slide_removal_patch(&forward).is_err();
+    let stale_verified = stale.apply_slide_removal(&forward).is_err();
+    let foreign = Package::from_reader(std::io::Cursor::new(corpus.foreign_archive.clone()))?;
+    let foreign_verified = foreign.apply_slide_removal(&forward).is_err();
     Ok((
         forward_verified,
         inverse_verified,
@@ -505,8 +516,14 @@ fn verify_move_durable(corpus: &Corpus) -> Result<(bool, bool, bool, bool), Box<
         litchi_core::Position::new(REPRESENTATIVE_MOVE.1),
     )?;
     let commit = transaction.commit()?;
-    let forward = Patch::from_bytes(&commit.patch().to_bytes()?)?;
-    let inverse = Patch::from_bytes(&forward.inverse().to_bytes()?)?;
+    let forward = Patch::from_bytes(
+        &commit.patch().to_bytes()?,
+        litchi_pptx::opened::Limits::default(),
+    )?;
+    let inverse = Patch::from_bytes(
+        &forward.inverse().to_bytes()?,
+        litchi_pptx::opened::Limits::default(),
+    )?;
     let mut applied = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
     applied = applied.apply(&forward)?;
     let applied_bytes = applied.to_bytes()?;
@@ -533,7 +550,7 @@ fn verify_move_durable(corpus: &Corpus) -> Result<(bool, bool, bool, bool), Box<
 fn verify_dependency_refusal(corpus: &Corpus) -> Result<bool, Box<dyn StdError>> {
     let source = corpus.dependency_archive.as_slice();
     let source_before = source.to_vec();
-    let mut package = Package::from_reader(std::io::Cursor::new(source_before.clone()))?;
+    let package = Package::from_reader(std::io::Cursor::new(source_before.clone()))?;
     let snapshot = package.opened_presentation()?;
     let source_revision = snapshot.revision();
     let before_names = snapshot
@@ -618,12 +635,16 @@ fn verify_refusal_gates(
     let limits =
         Limits::new(64, 1, 1_024, 1, 1, 1).ok_or("PPTX boundary test limits must be nonzero")?;
     let remove_limited = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?
-        .opened_presentation_with_limits(limits)?
+        .opened_presentation_with_options(
+            litchi_pptx::opened::EditOptions::default().limits(limits),
+        )?
         .plan_slide_removal(REPRESENTATIVE_REMOVE_POSITION)
         .is_err();
     let move_limited = {
         let package = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
-        let snapshot = package.opened_presentation_with_limits(limits)?;
+        let snapshot = package.opened_presentation_with_options(
+            litchi_pptx::opened::EditOptions::default().limits(limits),
+        )?;
         let mut transaction = snapshot.edit();
         transaction.move_slide(
             REPRESENTATIVE_MOVE.0,
@@ -842,11 +863,13 @@ pub(super) fn run(
         let started = Instant::now();
         match operation {
             Operation::Remove => {
-                package.apply_slide_removal_plan(
+                let mut edit = package.edit()?;
+                edit.stage_slide_removal(
                     removal_plan
                         .as_ref()
                         .ok_or("PPTX removal plan disappeared before commit")?,
                 )?;
+                package = edit.commit()?.into_package();
             },
             Operation::Move => {
                 let commit = transaction

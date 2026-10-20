@@ -537,3 +537,71 @@ impl From<litchi_ooxml_common::xml::sheet_name::Error> for Error {
         Self::SheetNameDependency(error)
     }
 }
+
+/// Classify an XLSB package error for the format-neutral sheet error the
+/// formula engine reports. The message is static: no sheet name, reference
+/// or record content crosses.
+impl From<Error> for litchi_core::sheet::Error {
+    #[cold]
+    #[inline(never)]
+    fn from(error: Error) -> Self {
+        use litchi_core::edit::RefusalKind;
+        let refused = |kind, reason| Self::refused(kind, "read", reason);
+        match error {
+            Error::Io(_) => Self::Io,
+            Error::WorksheetNotFound(_) | Error::FileNotFound(_) => refused(
+                RefusalKind::NotFound,
+                "the XLSB workbook has no such worksheet",
+            ),
+            Error::InvalidCellReference(_) | Error::Coordinate(_) | Error::Range(_) => {
+                refused(RefusalKind::InvalidValue, "the cell reference is not valid")
+            },
+            Error::UnsupportedFeature(_) => refused(
+                RefusalKind::UnsupportedContent,
+                "the XLSB workbook uses an unsupported feature",
+            ),
+            Error::LimitExceeded { .. }
+            | Error::Limit { .. }
+            | Error::ExternalLinkLimitExceeded { .. }
+            | Error::Allocation { .. }
+            | Error::CapacityOverflow { .. } => refused(
+                RefusalKind::UnsupportedContent,
+                "the XLSB workbook exceeds a configured limit",
+            ),
+            Error::PasswordProtected | Error::Signed => {
+                refused(RefusalKind::Protected, "the XLSB workbook is protected")
+            },
+            Error::UnsupportedOpenPolicy { .. } => refused(
+                RefusalKind::UnsupportedOperation,
+                "the XLSB workbook was opened without this capability",
+            ),
+            Error::Opc(_) | Error::Execution(_) => Self::Io,
+            Error::PatchConflict { .. } => Self::Internal("an XLSB patch conflicts with its base"),
+            Error::SheetNameDependency(_)
+            | Error::Xml(_)
+            | Error::Wire(_)
+            | Error::Calc(_)
+            | Error::MergedCell(_)
+            | Error::Hyperlink(_)
+            | Error::InvalidRecordType(_)
+            | Error::UnexpectedRecord { .. }
+            | Error::InvalidLength { .. }
+            | Error::UnexpectedEndOfStream(_)
+            | Error::InvalidFormula(_)
+            | Error::UnresolvedDependency(_)
+            | Error::DrawingTransfer(_)
+            | Error::Encoding(_)
+            | Error::InvalidFormat(_)
+            | Error::InvalidUri(_)
+            | Error::InvalidRelationship(_)
+            | Error::InvalidContentType { .. }
+            | Error::Drawing(_)
+            | Error::Common(_)
+            | Error::CustomDataReferenced { .. }
+            | Error::WideStringLength { .. }
+            | Error::Unrecognized { .. } => Self::Malformed("the XLSB data is malformed"),
+            #[cfg(feature = "vba-inspection")]
+            Error::Vba(_) => Self::Malformed("the XLSB data is malformed"),
+        }
+    }
+}

@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
-use litchi_core::sheet::{CellValue, Result};
+use crate::BoxedResult as Result;
+use litchi_core::sheet::CellValue;
 
 const MAX_ROW: u32 = 1_048_576;
 const MAX_COLUMN: u32 = 16_384;

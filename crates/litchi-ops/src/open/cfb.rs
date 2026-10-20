@@ -431,10 +431,12 @@ fn ppt_source(
     #[cfg(feature = "ppt")]
     {
         let is_signed = signed(&&shared);
-        let Some(package) = litchi_ppt::SourceBackedPackage::from_shared_if_powerpoint_with_limits(
-            shared,
-            options.ppt_source_limits.unwrap_or_default(),
-        )?
+        let Some(package) =
+            litchi_ppt::SourceBackedPackage::from_shared_if_powerpoint_with_options(
+                shared,
+                litchi_ppt::OpenOptions::new()
+                    .source_limits(options.ppt_source_limits.unwrap_or_default()),
+            )?
         else {
             // A `Current User` stream without a PowerPoint document: the
             // byte route reports what the reader makes of it.

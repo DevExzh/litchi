@@ -152,7 +152,7 @@ fn rejects_malformed_build_list_and_limit_overflow() {
     let valid = build_list(&[build(1, 42, BuildType::AsOneObject)]);
     assert!(parse_bytes(&valid[..valid.len() - 1], &bytes).is_err());
     assert!(
-        parse_bytes_with_limits(
+        codec::parse_bytes_with_limits(
             &valid,
             &bytes,
             Limits {
@@ -225,9 +225,9 @@ fn transaction_shape_edit_checks_the_officeart_graph_and_identity() {
     let mut edit = snapshot.edit();
 
     assert!(edit.set_shape_id(Id::new(9, 42), 999).is_err());
-    assert!(!edit.is_changed());
+    assert!(edit.changes().is_empty());
     assert!(edit.set_shape_id(Id::new(9, 42), 77).is_err());
-    assert!(!edit.is_changed());
+    assert!(edit.changes().is_empty());
 }
 
 #[test]
@@ -308,4 +308,151 @@ fn transaction_rejects_stale_sources_and_supports_inverse_replay() {
         commit.patch().redo(&restored).unwrap().bytes(),
         target.bytes()
     );
+}
+
+/// A built two-textbox package whose first slide carries a `___PPT10`
+/// `BuildList` with one diagram build on its first shape, and the ids of
+/// the slide's `OfficeArt` shapes.
+fn package_with_diagram() -> (crate::Package, Vec<u8>, Vec<u32>) {
+    use litchi_core::Position;
+
+    use crate::record_wire as wire;
+    use crate::slide_order::records::{Owner, Rewrite, publish};
+
+    let mut builder = crate::Builder::new();
+    let slide = builder.add_slide().unwrap();
+    builder.add_textbox(slide, 10, 10, 200, 40, "One").unwrap();
+    builder.add_textbox(slide, 10, 80, 200, 40, "Two").unwrap();
+    let package = builder.build().unwrap();
+    let base = crate::scoped::Base::capture(&package).unwrap();
+    let native = base.native().unwrap();
+    let owner = Owner::Slide(Position::new(0));
+    let before = base.owner_record(&native, owner).unwrap();
+    let children = wire::child_list(&before).unwrap();
+    let drawing = children
+        .iter()
+        .find(|child| wire::record_type(child).unwrap() == RecordType::PPDrawing.as_u16())
+        .expect("the built slide has a drawing");
+    let parsed = crate::odraw::parse_drawing(&drawing[8..]).unwrap();
+    let mut shape_ids = validation::shape_ids(&parsed, usize::MAX).unwrap();
+    shape_ids.sort_unstable();
+    let target = *shape_ids.last().unwrap();
+    let list = record(
+        0x0F,
+        0,
+        RecordType::BuildList.as_u16(),
+        &build(7, target, BuildType::AllAtOnce).to_bytes(),
+    );
+    let blob =
+        crate::binary_tag_edit::locate(&before, RecordType::Slide.as_u16(), "___PPT10", "diagram")
+            .unwrap();
+    let mut records = blob
+        .records()
+        .iter()
+        .map(|record| record.to_vec())
+        .collect::<Vec<_>>();
+    records.push(list);
+    let after = blob.rebuild(&before, &records, &[]).unwrap();
+    let published = publish(
+        &native,
+        &[Rewrite {
+            owner,
+            before: before.into(),
+            after: after.into(),
+        }],
+    )
+    .unwrap();
+    let bytes = published.bytes().to_vec();
+    (
+        crate::Package::from_bytes(&bytes).unwrap(),
+        bytes,
+        shape_ids,
+    )
+}
+
+#[test]
+fn package_diagram_edits_publish_replay_and_invert_exactly() {
+    use litchi_core::Position;
+    use litchi_core::edit::RefusalKind;
+
+    let (source, source_bytes, shape_ids) = package_with_diagram();
+    let slide = Position::new(0);
+    let id = source
+        .edit_diagrams(slide)
+        .unwrap()
+        .builds()
+        .next()
+        .unwrap()
+        .id();
+    assert_eq!(id.build_id(), 7);
+
+    let no_op = source.edit_diagrams(slide).unwrap().commit().unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), source_bytes);
+
+    let mut edit = source.edit_diagrams(slide).unwrap();
+    edit.set_mode(id, BuildType::Down).unwrap();
+    drop(edit);
+    assert_eq!(source.to_bytes().unwrap(), source_bytes);
+
+    let mut edit = source.edit_diagrams(slide).unwrap();
+    let Err(Error::Refused(refusal)) = edit.set_mode(Id::new(99, 1), BuildType::Down) else {
+        panic!("a missing build must be refused");
+    };
+    assert_eq!(refusal.kind(), RefusalKind::NotFound);
+    let Err(Error::Refused(refusal)) = edit.set_shape_id(id, 0xFFFF_FFF0) else {
+        panic!("a missing shape must be refused");
+    };
+    assert_eq!(refusal.kind(), RefusalKind::InvalidValue);
+    assert!(edit.changes().is_empty());
+    edit.set_mode(id, BuildType::Down).unwrap();
+    let other = shape_ids[shape_ids.len() - 2];
+    let moved = edit.set_shape_id(id, other).unwrap();
+    assert_eq!(moved, Id::new(7, other));
+    assert_eq!(edit.changes().len(), 2);
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.patch().before_bytes(), source_bytes.as_slice());
+    let published = commit.package().edit_diagrams(slide).unwrap();
+    let build = published.builds().next().unwrap();
+    assert_eq!(build.id(), moved);
+    assert_eq!(build.mode(), BuildType::Down);
+    assert_eq!(
+        source
+            .edit_diagrams(slide)
+            .unwrap()
+            .builds()
+            .next()
+            .unwrap()
+            .mode(),
+        BuildType::AllAtOnce
+    );
+
+    let replayed = source.apply_diagrams(commit.patch()).unwrap();
+    assert_eq!(
+        replayed.package().to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
+    let restored = commit
+        .package()
+        .apply_diagrams(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(restored.package().to_bytes().unwrap(), source_bytes);
+    assert!(matches!(
+        commit.package().apply_diagrams(commit.patch()),
+        Err(Error::PatchConflict)
+    ));
+
+    let Err(Error::Refused(refusal)) = source.edit_diagrams(Position::new(1)) else {
+        panic!("a missing slide must be refused");
+    };
+    assert_eq!(refusal.kind(), RefusalKind::NotFound);
+    let mut builder = crate::Builder::new();
+    builder.add_slide().unwrap();
+    let plain = builder.build().unwrap();
+    let Err(Error::Refused(refusal)) = plain.edit_diagrams(slide) else {
+        panic!("a slide without a build list must be refused");
+    };
+    assert_eq!(refusal.kind(), RefusalKind::UnsupportedTarget);
 }

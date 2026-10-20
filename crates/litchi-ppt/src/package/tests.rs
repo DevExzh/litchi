@@ -4,7 +4,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
-use super::{Error, Reader, SourceLimits};
+use super::{Error, OpenOptions, Reader, SourceLimits};
 use litchi_cfb::{OleFile, OleWriter};
 use std::io::Cursor;
 use std::path::Path;
@@ -69,10 +69,10 @@ fn rejects_oversized_clear_or_encrypted_pictures_before_presentation_parsing() {
         let bytes = serialize_ole(&mut writer);
         let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
         let error = package
-            .presentation_with_limits(SourceLimits {
+            .presentation_with_options(OpenOptions::new().source_limits(SourceLimits {
                 max_input_bytes: 64,
                 ..SourceLimits::default()
-            })
+            }))
             .err()
             .unwrap();
         assert!(matches!(
@@ -96,11 +96,11 @@ fn rejects_aggregate_stream_bytes_at_the_exact_boundary_plus_one() {
     let bytes = serialize_ole(&mut writer);
     let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let error = package
-        .presentation_with_limits(SourceLimits {
+        .presentation_with_options(OpenOptions::new().source_limits(SourceLimits {
             max_input_bytes: 8,
             max_aggregate_input_bytes: 23,
             ..SourceLimits::default()
-        })
+        }))
         .err()
         .unwrap();
     assert!(matches!(
@@ -123,13 +123,19 @@ fn package_byte_limit_accepts_exact_size_and_rejects_one_less() {
         max_package_bytes: bytes.len(),
         ..SourceLimits::default()
     };
-    assert!(Reader::from_reader_with_limits(Cursor::new(bytes.clone()), exact).is_ok());
-    let error = Reader::from_reader_with_limits(
+    assert!(
+        Reader::from_reader_with_options(
+            Cursor::new(bytes.clone()),
+            OpenOptions::new().source_limits(exact)
+        )
+        .is_ok()
+    );
+    let error = Reader::from_reader_with_options(
         Cursor::new(bytes.clone()),
-        SourceLimits {
+        OpenOptions::new().source_limits(SourceLimits {
             max_package_bytes: bytes.len() - 1,
             ..SourceLimits::default()
-        },
+        }),
     )
     .err()
     .unwrap();
@@ -166,7 +172,11 @@ fn unspecified_open_options_preserve_profiles_above_defaults() {
         .unwrap()
         .build()
         .unwrap();
-    let mut eager = Reader::from_reader_with_limits(Cursor::new(bytes.clone()), selected).unwrap();
+    let mut eager = Reader::from_reader_with_options(
+        Cursor::new(bytes.clone()),
+        OpenOptions::new().source_limits(selected),
+    )
+    .unwrap();
     assert_eq!(eager.presentation().unwrap().source_limits(), selected);
     assert_eq!(
         eager
@@ -183,9 +193,11 @@ fn unspecified_open_options_preserve_profiles_above_defaults() {
         SourceLimits::default()
     );
 
-    let source =
-        SourceBackedPackage::from_read_at_with_limits(Arc::new(OwnedSource::new(bytes)), selected)
-            .unwrap();
+    let source = SourceBackedPackage::from_read_at_with_options(
+        Arc::new(OwnedSource::new(bytes)),
+        OpenOptions::new().source_limits(selected),
+    )
+    .unwrap();
     assert_eq!(source.presentation().unwrap().source_limits(), selected);
     assert_eq!(
         source

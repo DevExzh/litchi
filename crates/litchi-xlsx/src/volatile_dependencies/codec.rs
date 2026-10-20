@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use litchi_core::sheet::Result;
+use crate::BoxedResult as Result;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesEnd, BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};

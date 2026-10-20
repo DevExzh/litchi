@@ -6,19 +6,15 @@ use chrono::{Datelike, NaiveDate};
 
 use super::helpers::{add_months, coerce_date_value, last_day_of_month};
 
-pub(crate) async fn eval_days(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_days(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 2 {
         return Ok(CellValue::Error(
             "DAYS expects 2 arguments (end_date, start_date)".to_string(),
         ));
     }
 
-    let end_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let start_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let end_val = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let start_val = evaluate_expression(ctx, current_sheet, &args[1])?;
 
     let end_date = match coerce_date_value(&end_val) {
         Some(d) => d,
@@ -41,7 +37,7 @@ pub(crate) async fn eval_days(
     Ok(CellValue::Float(diff as f64))
 }
 
-pub(crate) async fn eval_days360(
+pub(crate) fn eval_days360(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -52,8 +48,8 @@ pub(crate) async fn eval_days360(
         ));
     }
 
-    let start_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let end_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let start_val = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let end_val = evaluate_expression(ctx, current_sheet, &args[1])?;
 
     let start_date = match coerce_date_value(&start_val) {
         Some(d) => d,
@@ -73,7 +69,7 @@ pub(crate) async fn eval_days360(
     };
 
     let european_method = if args.len() == 3 {
-        let method_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+        let method_val = evaluate_expression(ctx, current_sheet, &args[2])?;
         match method_val {
             CellValue::Bool(b) => b,
             _ => match to_number(&method_val) {
@@ -98,7 +94,7 @@ pub(crate) async fn eval_days360(
     Ok(CellValue::Float(days as f64))
 }
 
-pub(crate) async fn eval_datedif(
+pub(crate) fn eval_datedif(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -109,9 +105,9 @@ pub(crate) async fn eval_datedif(
         ));
     }
 
-    let start_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let end_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
-    let unit_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+    let start_val = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let end_val = evaluate_expression(ctx, current_sheet, &args[1])?;
+    let unit_val = evaluate_expression(ctx, current_sheet, &args[2])?;
 
     let mut start_date = match coerce_date_value(&start_val) {
         Some(d) => d,
@@ -344,7 +340,7 @@ fn adjust_year(date: NaiveDate, year: i32) -> Option<NaiveDate> {
     })
 }
 
-pub(crate) async fn eval_yearfrac(
+pub(crate) fn eval_yearfrac(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -355,8 +351,8 @@ pub(crate) async fn eval_yearfrac(
         ));
     }
 
-    let start_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let end_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let start_val = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let end_val = evaluate_expression(ctx, current_sheet, &args[1])?;
 
     let start_date = match coerce_date_value(&start_val) {
         Some(d) => d,
@@ -376,7 +372,7 @@ pub(crate) async fn eval_yearfrac(
     };
 
     let basis = if args.len() == 3 {
-        let basis_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+        let basis_val = evaluate_expression(ctx, current_sheet, &args[2])?;
         match to_number(&basis_val) {
             Some(n) => n.trunc() as i32,
             None => {
@@ -461,51 +457,51 @@ mod tests {
         Expr::Literal(CellValue::String(s.to_string()))
     }
 
-    #[tokio::test]
-    async fn test_eval_days() {
+    #[test]
+    fn test_eval_days() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Days between 2024-03-15 and 2024-03-10
         let args = vec![num_expr(45366.0), num_expr(45361.0)];
-        let result = eval_days(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_days(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert_eq!(v, 5.0),
             _ => panic!("Expected Float, got {:?}", result),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_days_negative() {
+    #[test]
+    fn test_eval_days_negative() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Days between 2024-03-10 and 2024-03-15 (negative)
         let args = vec![num_expr(45361.0), num_expr(45366.0)];
-        let result = eval_days(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_days(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert_eq!(v, -5.0),
             _ => panic!("Expected Float, got {:?}", result),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_days_wrong_args() {
+    #[test]
+    fn test_eval_days_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(45366.0)];
-        let result = eval_days(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_days(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 2 arguments")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_days360_us() {
+    #[test]
+    fn test_eval_days360_us() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // 2024-03-15 to 2024-06-15 using US method
         let args = vec![num_expr(45366.0), num_expr(45458.0)];
-        let result = eval_days360(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_days360(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => {
                 // Should be approximately 90 days (3 months * 30)
@@ -515,13 +511,13 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_days360_european() {
+    #[test]
+    fn test_eval_days360_european() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // 2024-03-15 to 2024-06-15 using European method
         let args = vec![num_expr(45366.0), num_expr(45458.0), num_expr(1.0)];
-        let result = eval_days360(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_days360(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => {
                 // Should be approximately 90 days (3 months * 30)
@@ -531,38 +527,38 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_days360_wrong_args() {
+    #[test]
+    fn test_eval_days360_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(45366.0)];
-        let result = eval_days360(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_days360(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 2 or 3 arguments")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_datedif_days() {
+    #[test]
+    fn test_eval_datedif_days() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Days between dates
         let args = vec![num_expr(45361.0), num_expr(45366.0), str_expr("D")];
-        let result = eval_datedif(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_datedif(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert_eq!(v, 5.0),
             _ => panic!("Expected Float, got {:?}", result),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_datedif_months() {
+    #[test]
+    fn test_eval_datedif_months() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Complete months between dates
         let args = vec![num_expr(45366.0), num_expr(45458.0), str_expr("M")];
-        let result = eval_datedif(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_datedif(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => {
                 // Should be 3 complete months (March 15 to June 15)
@@ -572,13 +568,13 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_datedif_years() {
+    #[test]
+    fn test_eval_datedif_years() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Complete years between dates
         let args = vec![num_expr(45366.0), num_expr(45732.0), str_expr("Y")];
-        let result = eval_datedif(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_datedif(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => {
                 // March 2024 to March 2025 = 1 year
@@ -588,37 +584,37 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_datedif_invalid_unit() {
+    #[test]
+    fn test_eval_datedif_invalid_unit() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(45366.0), num_expr(45458.0), str_expr("X")];
-        let result = eval_datedif(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_datedif(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("unit must be one of")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_datedif_wrong_args() {
+    #[test]
+    fn test_eval_datedif_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(45366.0), num_expr(45458.0)];
-        let result = eval_datedif(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_datedif(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 3 arguments")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_yearfrac_basis0() {
+    #[test]
+    fn test_eval_yearfrac_basis0() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // US (NASD) 30/360 basis
         let args = vec![num_expr(45366.0), num_expr(45458.0), num_expr(0.0)];
-        let result = eval_yearfrac(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_yearfrac(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => {
                 // Approximately 3 months = 0.25 years
@@ -628,13 +624,13 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_yearfrac_basis1() {
+    #[test]
+    fn test_eval_yearfrac_basis1() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Actual/actual basis
         let args = vec![num_expr(45366.0), num_expr(45458.0), num_expr(1.0)];
-        let result = eval_yearfrac(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_yearfrac(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => {
                 // Approximately 3 months = 0.25 years
@@ -644,13 +640,13 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_yearfrac_default_basis() {
+    #[test]
+    fn test_eval_yearfrac_default_basis() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Default basis (0)
         let args = vec![num_expr(45366.0), num_expr(45458.0)];
-        let result = eval_yearfrac(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_yearfrac(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => {
                 assert!(v > 0.0);
@@ -659,12 +655,12 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_yearfrac_invalid_basis() {
+    #[test]
+    fn test_eval_yearfrac_invalid_basis() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(45366.0), num_expr(45458.0), num_expr(10.0)];
-        let result = eval_yearfrac(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_yearfrac(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("#NUM!")),
             _ => panic!("Expected Error"),

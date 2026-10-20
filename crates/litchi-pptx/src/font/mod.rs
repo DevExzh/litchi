@@ -13,8 +13,8 @@ pub use model::{
     Permission, Pitch, PitchFamily, Restrictions, Style,
 };
 pub use package::{conformance, load, put, remove};
-
-use crate::error::Error;
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PML: &str = "http://purl.oclc.org/ooxml/presentationml/main";

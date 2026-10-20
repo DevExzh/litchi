@@ -2,7 +2,7 @@
 
 use super::codec::{root_conformance, scan_xml, validate_resource_xml};
 use super::model::{Conformance, Graph, Link, Master, Slide, Theme};
-use super::transaction::{PartState, Patch, Snapshot};
+use super::transaction::{Change, PartState, Snapshot};
 use super::{
     MAX_MASTER_XML, MAX_NOTES_SLIDES, MAX_NOTES_XML, MAX_OWNED_PARTS, MAX_PRESENTATION_XML,
     MAX_SLIDE_XML, MAX_THEME_XML, MAX_TOTAL_BYTES, SLIDE_CT, THEME_CT, allocation, checked_add,
@@ -365,7 +365,7 @@ fn snapshot_from_index(
 }
 
 /// Apply a source-checked notes patch atomically.
-pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     let current = load_snapshot(package, patch.before().presentation_part_name())?
         .ok_or_else(|| invalid("notes patch source graph is absent"))?;
     if !current.same_source(patch.before()) {
@@ -410,7 +410,7 @@ pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Sna
 /// Apply a committed notes edit atomically.
 pub(crate) fn apply_commit(
     package: &mut OpcPackage,
-    commit: super::transaction::Commit,
+    commit: super::transaction::Prepared,
 ) -> Result<Snapshot> {
     let patch = commit.into_patch();
     apply_patch(package, &patch)
@@ -1385,7 +1385,7 @@ pub(crate) fn put_changed(
         return Err(invalid("notes graph contains an unknown slide owner"));
     }
 
-    // Commit is infallible after all URI, graph, allocation, relationship and
+    // Prepared is infallible after all URI, graph, allocation, relationship and
     // signature checks succeed. Owned payload buffers move into their
     // canonical parts.
     refuse_signed_change(package)?;

@@ -12,7 +12,7 @@ fn built_and_opened_presentations_support_immutable_edits() {
     let source = NamedTempFile::with_suffix(".pptx").unwrap();
     let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     builder.presentation().unwrap().add_slide().unwrap();
-    let mut created = builder.build().unwrap();
+    let created = builder.build().unwrap();
     created.save(source.path()).unwrap();
 
     let opened = Package::open(source.path()).unwrap();

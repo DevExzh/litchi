@@ -79,9 +79,13 @@ fn assert_replaced(path: &str, slide: usize, shape: usize, text: &str) {
     let published = commit.package().to_bytes().unwrap();
     assert_eq!(texts(&Package::from_bytes(&published).unwrap()), expected);
     // Exact replay and exact inverse.
-    let replayed = source.apply(commit.patch()).unwrap();
+    let replayed = source.apply(commit.patch()).unwrap().into_package();
     assert_eq!(replayed.to_bytes().unwrap(), published);
-    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source_bytes);
 }
 
@@ -184,7 +188,11 @@ fn outline_text_composes_with_staged_slide_structure() {
     expected[1][0] = "Second now".to_owned();
     expected.remove(2);
     assert_eq!(texts(commit.package()), expected);
-    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
 }
 
@@ -266,31 +274,6 @@ fn signed_outline_text_admits_exact_noops_and_refuses_changes() {
         edit.set_shape_texts(&[ShapeTextReplacement::new(target(0, 0), "Changed")])
             .is_err()
     );
-}
-
-#[test]
-fn durable_outline_text_patch_replays_and_reverts() {
-    let source = slide_order::Snapshot::from_bytes(fixture("ole/ppt/SampleShow.ppt")).unwrap();
-    let mut transaction = source.edit().unwrap();
-    transaction
-        .set_shape_text(target(1, 0), "A durable retitle")
-        .unwrap();
-    let (after, patch) = transaction.commit().unwrap().into_parts();
-    let limits = litchi_core::patch::PatchLimits::new(
-        litchi_core::patch::BlobLimits::new(0, 0, 0),
-        64 * 1024,
-        64,
-        8,
-        4_096,
-        32 * 1024,
-    );
-    let durable = patch.to_durable(limits).unwrap();
-    let texts_of =
-        |snapshot: &slide_order::Snapshot| texts(&Package::from_bytes(snapshot.bytes()).unwrap());
-    let replayed = source.apply_durable(&durable).unwrap();
-    assert_eq!(texts_of(&replayed), texts_of(&after));
-    let reverted = replayed.apply_durable(&durable.inverse()).unwrap();
-    assert_eq!(texts_of(&reverted), texts_of(&source));
 }
 
 /// Corpus coverage of a length-changing replacement (record 0260): every

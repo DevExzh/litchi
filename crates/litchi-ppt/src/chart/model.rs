@@ -4,12 +4,12 @@ use std::iter::FusedIterator;
 use std::num::{NonZeroU32, NonZeroUsize};
 
 use litchi_ograph::chart::{Book, Context, Refs};
-use litchi_ograph::{Package as GraphPackage, PackageRef};
+use litchi_ograph::{Package as OgraphPackage, PackageRef};
 
 use super::codec::encode_storage;
+use super::draft::GraphPackage;
 use super::package::classify;
-use super::transaction::PackageEditor;
-use crate::embedded::object::{ContainerKind, Editor as ObjectEditor, ExternalObject};
+use crate::embedded::object::{self, Collection, ContainerKind, ExternalObject};
 use crate::embedded::storage::Compression;
 use crate::package::{Error, Result as PackageResult};
 
@@ -145,7 +145,7 @@ impl Info {
 #[derive(Debug)]
 pub struct Graph {
     info: Info,
-    package: Box<GraphPackage>,
+    package: Box<OgraphPackage>,
     book: Book,
     compression: Compression,
 }
@@ -199,66 +199,67 @@ impl Graph {
         Ok(chart)
     }
 
-    /// Open a copy-on-write transaction over this chart's standalone OLE2
-    /// package.
+    /// A copy-on-write draft of this chart's standalone OLE2 package.
     ///
-    /// The read model remains unchanged. The returned editor can replace the
-    /// validated Graph chart stream and commit a new package, while preserving
-    /// the original package when no edit is staged.
+    /// The read model remains unchanged. The draft can replace the validated
+    /// Graph chart stream; it keeps the original package bytes when no
+    /// replacement is staged.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn edit_package(&self) -> PackageResult<PackageEditor> {
+    pub fn draft_package(&self) -> PackageResult<GraphPackage> {
         let package = self.package.as_ref().as_ref();
-        PackageEditor::with_limits(package.as_bytes().to_vec(), package.limits())
+        GraphPackage::with_limits(package.as_bytes().to_vec(), package.limits())
     }
 
-    /// Move this Graph object into a package transaction without cloning its
+    /// Move this Graph object into a package draft without cloning its
     /// validated OLE2 allocation.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn into_package_editor(self) -> PackageResult<PackageEditor> {
+    pub fn into_draft_package(self) -> PackageResult<GraphPackage> {
         let Self { package, .. } = self;
         let graph_package = *package;
         let limits = graph_package.as_ref().limits();
-        PackageEditor::with_limits(graph_package.finish().into_bytes(), limits)
+        GraphPackage::with_limits(graph_package.finish().into_bytes(), limits)
     }
 
-    /// Stage a committed Graph package back into its owning PPT object.
+    /// Stage a Graph package draft back into its owning PPT object on a
+    /// package-level embedded-object edit.
     ///
-    /// The host editor is checked against this chart's `[MS-PPT]`
-    /// `ExOleObjAtom`: the external-object ID, persist ID, embedded-object
-    /// container, and Graph subtype/ProgID must all still agree. The supplied
-    /// [`PackageEditor`] is then committed and stored as one inert
+    /// The staged objects of `edit` are checked against this chart's
+    /// `[MS-PPT]` `ExOleObjAtom`: the external-object ID, persist ID,
+    /// embedded-object container, and Graph subtype/ProgID must all still
+    /// agree. The draft's package bytes are then stored as one inert
     /// `ExOleObjStg` payload. No slide record, `OfficeArt` frame, or
     /// `ExObjRefAtom` is rewritten, so the existing `[MS-ODRAW]` anchor remains
-    /// attached to the same external object.
-    ///
-    /// This is the host-side half of the typed replacement path. The package
-    /// transaction still owns `[MS-OGRAPH]` chart-stream validation and
-    /// replacement; this method only bridges its resulting OLE2 bytes into the
-    /// PPT editor's failure-atomic storage transaction.
+    /// attached to the same external object. [`object::Edit::commit`]
+    /// publishes the new presentation.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation fails.
+    /// Returns [`object::Error::Refused`] with
+    /// [`litchi_core::edit::RefusalKind::NotFound`] when `edit` holds no
+    /// object with this chart's id, with
+    /// [`litchi_core::edit::RefusalKind::UnsupportedTarget`] when that object
+    /// is no longer this embedded Graph object, and [`object::Error::Package`]
+    /// when the draft cannot be encoded as a storage.
     pub fn replace_package(
         &self,
-        editor: &mut ObjectEditor,
-        package: PackageEditor,
-    ) -> PackageResult<()> {
-        validate_replacement_target(editor, &self.info)?;
-        let bytes = package.finish()?;
+        edit: &mut object::Edit,
+        package: GraphPackage,
+    ) -> object::Result<()> {
+        validate_replacement_target(edit.objects(), &self.info)?;
+        let bytes = package.into_bytes()?;
         let storage = encode_storage(bytes, self.compression)?;
-        editor.replace_storage(self.info.persist_id(), storage)
+        edit.replace_storage(self.info.persist_id(), storage)
     }
 
     pub(super) fn new(
         info: Info,
-        package: Box<GraphPackage>,
+        package: Box<OgraphPackage>,
         book: Book,
         compression: Compression,
     ) -> Self {
@@ -390,7 +391,7 @@ impl Chart {
         }
     }
 
-    /// Open a package transaction for a standalone Graph chart.
+    /// A package draft of a standalone Graph chart.
     ///
     /// Excel-hosted charts expose their validated Workbook inventory through
     /// [`Excel::book`], but their surrounding workbook package belongs to the
@@ -399,11 +400,11 @@ impl Chart {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn edit_package(&self) -> PackageResult<PackageEditor> {
+    pub fn draft_package(&self) -> PackageResult<GraphPackage> {
         match self {
-            Self::Graph(chart) => chart.edit_package(),
+            Self::Graph(chart) => chart.draft_package(),
             Self::Excel(_) => Err(Error::InvalidFormat(
-                "only standalone Graph chart packages support this transaction".to_string(),
+                "only standalone Graph chart packages support a package draft".to_string(),
             )),
         }
     }
@@ -542,39 +543,30 @@ fn semantic_charts(book: &Book, kind: Kind) -> SemanticCharts<'_> {
     }
 }
 
-fn validate_replacement_target(editor: &ObjectEditor, info: &Info) -> PackageResult<()> {
-    let object = editor
-        .objects()
-        .objects
-        .iter()
-        .find(|object| object.id() == info.object_id())
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "chart external-object ID {} is not present in the host editor",
-                info.object_id()
-            ))
-        })?;
-    let ExternalObject::Object(definition) = object else {
-        return Err(Error::InvalidFormat(
-            "chart replacement target is not an OLE object definition".to_string(),
-        ));
+fn validate_replacement_target(objects: &Collection, info: &Info) -> object::Result<()> {
+    const OPERATION: &str = "chart.replace_package";
+    let target = || -> object::Error {
+        crate::scoped::unsupported_target(
+            OPERATION,
+            "the chart's external object is no longer an embedded Graph object",
+        )
+        .into()
     };
-    if !matches!(definition.kind, ContainerKind::Embedded(_)) {
-        return Err(Error::InvalidFormat(
-            "chart replacement target is not an embedded OLE object".to_string(),
-        ));
-    }
-    if definition.object.persist_id != info.persist_id() {
-        return Err(Error::InvalidFormat(format!(
-            "chart persist ID {} does not match host object persist ID {}",
-            info.persist_id(),
-            definition.object.persist_id
-        )));
-    }
-    if classify(definition.object.subtype, definition.program_id.as_deref()) != Some(Kind::Graph) {
-        return Err(Error::InvalidFormat(
-            "chart replacement target is not a Graph OLE object".to_string(),
-        ));
+    let found = objects
+        .get(info.object_id())
+        .ok_or_else(|| -> object::Error {
+            crate::scoped::not_found(OPERATION, "the edit holds no object with the chart's id")
+                .into()
+        })?;
+    let ExternalObject::Object(definition) = found else {
+        return Err(target());
+    };
+    if !matches!(definition.kind, ContainerKind::Embedded(_))
+        || definition.object.persist_id != info.persist_id()
+        || classify(definition.object.subtype, definition.program_id.as_deref())
+            != Some(Kind::Graph)
+    {
+        return Err(target());
     }
     Ok(())
 }

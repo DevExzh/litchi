@@ -1,68 +1,8 @@
 //! Detached and range-based Designer design-element edits.
 
 use super::codec::{self, Source};
-use super::model::Snapshot;
-use super::validation::{validate_snapshot, validate_value};
+use super::validation::validate_value;
 use crate::Result;
-
-/// A detached atomic edit of one design-element snapshot.
-#[derive(Debug, Clone)]
-pub struct Editor {
-    original: Snapshot,
-    working: Snapshot,
-}
-
-impl Editor {
-    pub(super) fn new(snapshot: Snapshot) -> Self {
-        Self {
-            original: snapshot.clone(),
-            working: snapshot,
-        }
-    }
-
-    /// Set the typed boolean while retaining every opaque extension.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn set(&mut self, value: bool) -> Result<()> {
-        validate_value(value)?;
-        self.working.value = Some(value);
-        Ok(())
-    }
-
-    /// Clear only the typed value; opaque extension entries remain retained.
-    pub fn clear(&mut self) {
-        self.working.value = None;
-    }
-
-    /// Borrow the projected snapshot without mutating the original.
-    #[inline]
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.working
-    }
-
-    fn is_changed(&self) -> bool {
-        self.original != self.working
-    }
-
-    /// The outcome of this edit or commit.
-    #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
-        crate::diagnostics::Diagnostics::new(self.is_changed())
-    }
-
-    /// Validate and consume the edit into a new snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Snapshot> {
-        validate_snapshot(&self.working)?;
-        Ok(self.working)
-    }
-}
 
 /// Stage a value into one selected raw shape while preserving unrelated XML.
 pub(super) fn set(xml: &[u8], source: &Source, value: bool) -> Result<Vec<u8>> {

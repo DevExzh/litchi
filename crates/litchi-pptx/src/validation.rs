@@ -221,23 +221,14 @@ impl From<ValidationReportError> for PptxValidationError {
     }
 }
 
-/// Validate a positional PPTX source under default finite input and report
-/// limits without changing it, fetching external targets, or executing code.
-pub fn validate_source(source: Arc<dyn ReadAt>) -> Result<ValidateReport, PptxValidationError> {
-    validate_source_with_limits(
-        source,
-        PptxValidationLimits::default(),
-        ValidationLimits::default(),
-    )
-}
-
-/// Validate a positional PPTX source under explicit finite policies.
+/// Validate a positional PPTX source under finite input and report limits,
+/// without changing it, fetching external targets, or executing code.
 ///
 /// Structural OPC rejection and semantic PresentationML rejection are
 /// represented as bounded report issues. Source I/O, source mutation,
 /// cancellation, and allocation failures remain errors because no honest
 /// report can be made for those conditions.
-pub fn validate_source_with_limits(
+pub fn validate_source(
     source: Arc<dyn ReadAt>,
     input_limits: PptxValidationLimits,
     report_limits: ValidationLimits,
@@ -249,7 +240,7 @@ pub fn validate_source_with_limits(
         Arc::clone(&source),
         input_limits.read_limits,
     ) {
-        Ok(package) => validate_source_backed_with_limits(&package, input_limits, report_limits),
+        Ok(package) => validate_source_backed(&package, input_limits, report_limits),
         Err(OpcError::Limit { .. }) => blocked_report(
             "PPTX OPC ingress reached a configured resource ceiling",
             report_limits,
@@ -271,24 +262,10 @@ pub fn validate_source_with_limits(
     result
 }
 
-/// Validate an already indexed source-backed OPC package.
-///
-/// This entry point reuses the package's validated part index, relationship
-/// manifests, and content-type catalog. It materializes only the mandatory
-/// presentation root and ordered slides needed by this report.
+/// Validate an already indexed source-backed OPC package under format and
+/// report limits. This reuses the package's validated part index,
+/// relationship manifests and content-type catalog.
 pub fn validate_source_backed(
-    package: &SourceBackedPackage,
-) -> Result<ValidateReport, PptxValidationError> {
-    validate_source_backed_with_limits(
-        package,
-        PptxValidationLimits::default(),
-        ValidationLimits::default(),
-    )
-}
-
-/// Validate an already indexed source-backed OPC package with explicit format
-/// and report limits.
-pub fn validate_source_backed_with_limits(
     package: &SourceBackedPackage,
     input_limits: PptxValidationLimits,
     report_limits: ValidationLimits,

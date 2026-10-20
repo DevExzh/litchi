@@ -160,7 +160,12 @@ fn metadata_transaction_fills_the_fixed_blank_streams() {
         package.presentation().unwrap().text().unwrap()
     );
     assert_eq!(
-        package.apply_metadata(&patch).unwrap().to_bytes().unwrap(),
+        package
+            .apply_metadata(&patch)
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         bytes
     );
     assert!(matches!(
@@ -171,6 +176,7 @@ fn metadata_transaction_fills_the_fixed_blank_streams() {
         edited
             .apply_metadata(&patch.inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source

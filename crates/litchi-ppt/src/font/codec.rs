@@ -16,7 +16,7 @@ impl FontCollections {
     ///
     /// Returns an error if the limits are invalid or any collection violates
     /// them.
-    pub fn validate_with_limits(&self, limits: Limits) -> Result<()> {
+    pub(crate) fn validate_with_limits(&self, limits: Limits) -> Result<()> {
         validation::validate_collections(self, limits)
     }
 
@@ -36,7 +36,7 @@ impl FontCollections {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(root: &Record, limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(root: &Record, limits: Limits) -> Result<Self> {
         validation::validate_limits(limits)?;
         let mut session = RecordParseSession::new(limits.records, root.data.len())?;
         session.account_existing(0)?;
@@ -467,7 +467,7 @@ impl FontCollection {
     ///
     /// Returns an error if the limits are invalid, the record is malformed, or
     /// it violates `limits`.
-    pub fn parse_with_limits(record: &Record, limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(record: &Record, limits: Limits) -> Result<Self> {
         validation::validate_limits(limits)?;
         let mut session = RecordParseSession::new(limits.records, record.data.len())?;
         Self::parse_with_session(record, limits, &mut session, 0, false, false)
@@ -638,7 +638,7 @@ impl FontCollection {
     ///
     /// Returns an error if the record is malformed, violates `limits`, or the
     /// drained payloads lose alignment with the parsed facets.
-    pub fn take_with_limits(record: &mut Record, limits: Limits) -> Result<Self> {
+    pub(crate) fn take_with_limits(record: &mut Record, limits: Limits) -> Result<Self> {
         let mut session = RecordParseSession::new(limits.records, record.data.len())?;
         session.account_existing(0)?;
         if record.children.is_empty() {
@@ -715,7 +715,7 @@ impl FontCollection {
     ///
     /// Returns an error if the collection fails validation or serialization
     /// exceeds `limits`.
-    pub fn to_record_bytes_with_limits(&self, limits: Limits) -> Result<Vec<u8>> {
+    pub(crate) fn to_record_bytes_with_limits(&self, limits: Limits) -> Result<Vec<u8>> {
         encode_record(&self.to_record_with_limits(limits, true)?, limits.records)
     }
 

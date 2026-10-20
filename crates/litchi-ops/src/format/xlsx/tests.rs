@@ -214,7 +214,7 @@ fn two_sheets() -> Vec<u8> {
     ])
 }
 
-fn assert_workbook_trait_surface(workbook: &impl WorkbookTrait) {
+fn assert_workbook_trait_surface(workbook: &impl WorkbookTrait<Error = Error>) {
     assert_eq!(workbook.worksheet_names(), ["First", "Second"]);
     assert_eq!(workbook.worksheet_count(), 2);
     assert_eq!(workbook.active_sheet_index(), 1);
@@ -229,18 +229,12 @@ fn assert_workbook_trait_surface(workbook: &impl WorkbookTrait) {
         .worksheet_by_index(2)
         .err()
         .expect("index 2 is out of range");
-    assert_eq!(
-        missing.downcast_ref::<Error>().map(Error::code),
-        Some(Code::OutOfRange)
-    );
+    assert_eq!(missing.code(), Code::OutOfRange);
     let missing = workbook
         .worksheet_by_name("Third")
         .err()
         .expect("no such sheet");
-    assert_eq!(
-        missing.downcast_ref::<Error>().map(Error::code),
-        Some(Code::NotFound)
-    );
+    assert_eq!(missing.code(), Code::NotFound);
 
     let mut worksheets = workbook.worksheets();
     assert_eq!(worksheets.next().unwrap().unwrap().name(), "First");
@@ -255,40 +249,20 @@ fn assert_workbook_trait_surface(workbook: &impl WorkbookTrait) {
         &CellValue::Int(7)
     );
     assert_eq!(
-        by_name
-            .cell(0, 1)
-            .map(drop)
-            .unwrap_err()
-            .downcast_ref::<Error>()
-            .map(Error::code),
-        Some(Code::OutOfRange)
+        by_name.cell(0, 1).map(drop).unwrap_err().code(),
+        Code::OutOfRange
     );
     assert_eq!(
-        by_name
-            .cell(1, 0)
-            .map(drop)
-            .unwrap_err()
-            .downcast_ref::<Error>()
-            .map(Error::code),
-        Some(Code::OutOfRange)
+        by_name.cell(1, 0).map(drop).unwrap_err().code(),
+        Code::OutOfRange
     );
     assert_eq!(
-        by_name
-            .cell_value(0, 1)
-            .map(drop)
-            .unwrap_err()
-            .downcast_ref::<Error>()
-            .map(Error::code),
-        Some(Code::OutOfRange)
+        by_name.cell_value(0, 1).map(drop).unwrap_err().code(),
+        Code::OutOfRange
     );
     assert_eq!(
-        by_name
-            .cell_value(1, 0)
-            .map(drop)
-            .unwrap_err()
-            .downcast_ref::<Error>()
-            .map(Error::code),
-        Some(Code::OutOfRange)
+        by_name.cell_value(1, 0).map(drop).unwrap_err().code(),
+        Code::OutOfRange
     );
     assert_eq!(
         by_name.cell_by_coordinate("B2").unwrap().value(),
@@ -478,12 +452,7 @@ fn selector_matches_names_case_insensitively_on_both_owner_states() {
 fn sheet_trait_coordinates_are_argument_errors_and_payload_coordinates_corruption() {
     let handle = open_bytes(selector_workbook("7", VALID_SECOND), &OpenOptions::new());
     let sheet = WorkbookTrait::worksheet_by_index(&handle, 0).unwrap();
-    let code = |error: Box<dyn std::error::Error + Send + Sync>| {
-        error
-            .downcast_ref::<Error>()
-            .expect("a unified error")
-            .code()
-    };
+    let code = |error: Error| error.code();
     assert_eq!(
         code(sheet.cell_by_coordinate("A0").map(drop).unwrap_err()),
         Code::InvalidArgument
@@ -524,13 +493,7 @@ fn generic_sheet_validates_rows_on_an_empty_worksheet() {
         assert_eq!(sheet.dimensions(), None);
         assert!(sheet.row(0).unwrap().is_empty());
         let error = sheet.row(1_048_576).map(drop).unwrap_err();
-        assert_eq!(
-            error
-                .downcast_ref::<Error>()
-                .expect("a unified error")
-                .code(),
-            Code::OutOfRange
-        );
+        assert_eq!(error.code(), Code::OutOfRange);
     }
 }
 
@@ -603,7 +566,7 @@ fn a_changed_source_is_a_typed_io_error_on_every_read() {
     changed(handle.worksheet_names().unwrap_err());
     changed(handle.worksheet_count().unwrap_err());
     let error = generic.cell_value(1, 1).unwrap_err();
-    changed(*error.downcast::<Error>().expect("typed trait error"));
+    changed(error);
     for result in [
         WorkbookTrait::worksheet_by_index(&handle, 0),
         WorkbookTrait::worksheet_by_index(&handle, usize::MAX),
@@ -611,20 +574,13 @@ fn a_changed_source_is_a_typed_io_error_on_every_read() {
         WorkbookTrait::worksheet_by_name(&handle, "missing"),
         WorkbookTrait::active_worksheet(&handle),
     ] {
-        changed(
-            *result
-                .expect_err("selection refuses stale source")
-                .downcast::<Error>()
-                .expect("typed trait error"),
-        );
+        changed(result.expect_err("selection refuses stale source"));
     }
     changed(
-        *sheets
+        sheets
             .next()
             .unwrap()
-            .expect_err("iterator refuses stale source")
-            .downcast::<Error>()
-            .expect("typed trait error"),
+            .expect_err("iterator refuses stale source"),
     );
     assert!(sheets.next().is_none());
     assert!(sheets.next().is_none());

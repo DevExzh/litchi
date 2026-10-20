@@ -269,7 +269,7 @@ impl ClientData {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(bytes: &[u8], limits: ClientDataLimits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(bytes: &[u8], limits: ClientDataLimits) -> Result<Self> {
         if bytes.len() < HEADER_LEN {
             return corrupted("OfficeArtClientData header is truncated");
         }
@@ -367,7 +367,7 @@ impl ClientData {
     /// # Errors
     ///
     /// Returns an error if serialization fails or the underlying writer reports an error.
-    pub fn to_bytes_with_limits(&self, limits: ClientDataLimits) -> Result<Vec<u8>> {
+    pub(crate) fn to_bytes_with_limits(&self, limits: ClientDataLimits) -> Result<Vec<u8>> {
         validate_sequence(&self.children, limits)?;
         let payload_capacity = self
             .children

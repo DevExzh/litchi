@@ -19,9 +19,9 @@ impl Transaction {
         if let Some(opened) = self.opened_source() {
             return Ok(opened.clone());
         }
-        let mut reader = crate::raw::Reader::from_reader_with_limits(
+        let mut reader = crate::raw::Reader::from_reader_with_options(
             Cursor::new(self.working.bytes()),
-            self.working.limits,
+            self.working.open_options(),
         )?;
         Ok(reader.presentation_with_options(self.working.open_options())?)
     }
@@ -66,7 +66,11 @@ impl Transaction {
     /// Returns a typed refusal for an absent or inserted slide, a value the
     /// records cannot hold, a slide whose tags are ambiguous, or a changed
     /// signed source.
-    pub fn add_comment(&mut self, position: Position, comment: &NewComment) -> Result<usize> {
+    pub(crate) fn add_comment(
+        &mut self,
+        position: Position,
+        comment: &NewComment,
+    ) -> Result<usize> {
         let index = self.next_comment_index(&comment.author)?;
         let mut added = 0;
         self.stage_records(Some(position), true, |view| {
@@ -94,7 +98,7 @@ impl Transaction {
     ///
     /// Returns a typed refusal for an absent slide or comment, a value the
     /// records cannot hold, or a changed signed source.
-    pub fn set_comment(
+    pub(crate) fn set_comment(
         &mut self,
         position: Position,
         comment: Position,
@@ -117,7 +121,7 @@ impl Transaction {
     ///
     /// Returns a typed refusal for an absent slide or comment, or a changed
     /// signed source.
-    pub fn remove_comment(&mut self, position: Position, comment: Position) -> Result<()> {
+    pub(crate) fn remove_comment(&mut self, position: Position, comment: Position) -> Result<()> {
         self.stage_records(Some(position), false, |view| {
             let slide = view.slide.ok_or_else(missing_record)?;
             Ok(Replacement {
@@ -187,7 +191,7 @@ impl Transaction {
     /// Returns a typed refusal for an absent slide, table, row or column, a
     /// merged-away cell, a cell without editable text, an unrepresentable
     /// text, or a changed signed source.
-    pub fn set_table_cell_text(
+    pub(crate) fn set_table_cell_text(
         &mut self,
         target: crate::text_edit::Target,
         row: Position,
@@ -268,7 +272,7 @@ impl Transaction {
     /// Returns a typed refusal for an absent slide or shape, a slide target
     /// outside the presentation, an empty URL, ambiguous client data, or a
     /// changed signed source.
-    pub fn set_shape_hyperlink(
+    pub(crate) fn set_shape_hyperlink(
         &mut self,
         target: crate::text_edit::Target,
         click: Option<&crate::hyperlink::Click>,
@@ -425,7 +429,7 @@ impl Transaction {
     /// editable text, a range outside its text, an unrepresentable size, a
     /// style atom the run model does not reproduce byte for byte, or a
     /// changed signed source.
-    pub fn set_run_format(
+    pub(crate) fn set_run_format(
         &mut self,
         target: crate::text_edit::Target,
         start: usize,
@@ -474,7 +478,7 @@ impl Transaction {
     /// Returns a typed refusal for an absent slide or shape, a range outside
     /// the text or overlapping another link, an invalid target, or a changed
     /// signed source.
-    pub fn set_text_hyperlink(
+    pub(crate) fn set_text_hyperlink(
         &mut self,
         target: crate::text_edit::Target,
         start: usize,
