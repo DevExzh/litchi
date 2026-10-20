@@ -5,11 +5,10 @@
 use super::*;
 
 pub use super::{
-    ClipboardFormat, Limits, OLEPresentationStream, OlePresentationStream, PresentationStream,
-    StreamRevision, TargetDevice, TocEntry,
+    ClipboardFormat, Limits, OlePresentationStream, StreamRevision, TargetDevice, TocEntry,
 };
 
-/// A cheap immutable snapshot of an OLEPresentationStream.
+/// A cheap immutable snapshot of an OlePresentationStream.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Snapshot {
     stream: OlePresentationStream,
@@ -23,7 +22,7 @@ impl Snapshot {
         let limits = limits.validate()?;
         if bytes.len() > limits.max_bytes {
             return Err(invalid(
-                "OLEPresentationStream exceeds the configured limit",
+                "OlePresentationStream exceeds the configured limit",
             ));
         }
         Self::parse_shared(Arc::<[u8]>::from(bytes), limits)
@@ -47,7 +46,7 @@ impl Snapshot {
         stream.validate(limits)?;
         if stream.bytes().len() > limits.max_bytes {
             return Err(invalid(
-                "OLEPresentationStream exceeds the configured limit",
+                "OlePresentationStream exceeds the configured limit",
             ));
         }
         if stream.dirty {
@@ -243,7 +242,7 @@ impl Edit {
             removed = Some(stream.remove_toc_entry(index, limits)?);
             Ok(())
         })?;
-        removed.ok_or_else(|| invalid("OLEPresentationStream TOC removal produced no entry"))
+        removed.ok_or_else(|| invalid("OlePresentationStream TOC removal produced no entry"))
     }
 
     /// Validates and publishes this transaction.

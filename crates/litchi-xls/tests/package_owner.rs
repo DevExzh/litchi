@@ -310,7 +310,7 @@ fn retained_narrow_profile_allows_noop_but_refuses_entry_and_input_growth() {
         )
         .unwrap();
     let noop = snapshot.edit().commit().unwrap();
-    assert_eq!(noop.snapshot().bytes(), bytes.as_slice());
+    assert_eq!(noop.package().bytes(), bytes.as_slice());
 
     let mut growing = snapshot.edit();
     growing.rename_sheet(0_usize.into(), "Renamed").unwrap();

@@ -720,8 +720,8 @@ enum Publication {
 impl Publication {
     fn snapshot(&self) -> &litchi_xls::cell_values::Snapshot {
         match self {
-            Self::Eager(commit) => commit.snapshot(),
-            Self::SourceBacked(commit) => commit.snapshot(),
+            Self::Eager(commit) => commit.package(),
+            Self::SourceBacked(commit) => commit.package(),
             Self::PlanOnly(commit) => commit.source(),
         }
     }
@@ -748,9 +748,9 @@ impl Publication {
 
     fn complete_target_materialized_bytes(&self) -> u64 {
         match self {
-            Self::Eager(commit) => u64::try_from(commit.snapshot().bytes().len()).unwrap_or(0),
+            Self::Eager(commit) => u64::try_from(commit.package().bytes().len()).unwrap_or(0),
             Self::SourceBacked(commit) => {
-                u64::try_from(commit.snapshot().bytes().len()).unwrap_or(0)
+                u64::try_from(commit.package().bytes().len()).unwrap_or(0)
             },
             Self::PlanOnly(_) => 0,
         }
@@ -759,10 +759,10 @@ impl Publication {
     fn target_workbook_bytes(&self) -> u64 {
         match self {
             Self::Eager(commit) => {
-                u64::try_from(commit.snapshot().workbook_stream().len()).unwrap_or(0)
+                u64::try_from(commit.package().workbook_stream().len()).unwrap_or(0)
             },
             Self::SourceBacked(commit) => {
-                u64::try_from(commit.snapshot().workbook_stream().len()).unwrap_or(0)
+                u64::try_from(commit.package().workbook_stream().len()).unwrap_or(0)
             },
             Self::PlanOnly(commit) => commit.diagnostics().target_workbook_bytes(),
         }
@@ -773,12 +773,12 @@ impl Publication {
             Self::Eager(commit) => NumericDiagnostics {
                 source_bytes: u64::try_from(commit.patch().before().len()).unwrap_or(0),
                 source_workbook_bytes,
-                target_workbook_bytes: u64::try_from(commit.snapshot().workbook_stream().len())
+                target_workbook_bytes: u64::try_from(commit.package().workbook_stream().len())
                     .unwrap_or(0),
                 operation_shape: None,
                 candidate_reopen_logical_artifact_bytes: 0,
                 selected_stream_logical_bytes: u64::try_from(
-                    commit.snapshot().workbook_stream().len(),
+                    commit.package().workbook_stream().len(),
                 )
                 .unwrap_or(0),
                 target_materialization_vec_bytes: 0,
@@ -791,7 +791,7 @@ impl Publication {
             },
             Self::SourceBacked(commit) => {
                 let diagnostics = commit.diagnostics();
-                let target_bytes = u64::try_from(commit.snapshot().bytes().len()).unwrap_or(0);
+                let target_bytes = u64::try_from(commit.package().bytes().len()).unwrap_or(0);
                 let target_materialized = !commit.is_noop();
                 NumericDiagnostics {
                     source_bytes: diagnostics.source_bytes(),
@@ -852,7 +852,7 @@ impl Publication {
     ) -> Result<Option<PublishReport>, Box<dyn std::error::Error>> {
         match self {
             Self::Eager(commit) => {
-                for chunk in commit.snapshot().bytes().chunks(64 * 1024) {
+                for chunk in commit.package().bytes().chunks(64 * 1024) {
                     writer.write_all(chunk)?;
                 }
                 writer.flush()?;

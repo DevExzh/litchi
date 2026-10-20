@@ -84,7 +84,7 @@ impl Limits {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClipboardFormat {
     /// No format marker.  This form is accepted for a TOCENTRY, but not for
-    /// the primary OLEPresentationStream.
+    /// the primary OlePresentationStream.
     None,
     /// A standard numeric clipboard format identifier.
     Standard(u32),
@@ -863,7 +863,7 @@ impl TocEntry {
     }
 }
 
-/// A typed OLEDS `OLEPresentationStream` (`\x02OlePres###`).
+/// A typed OLEDS `OlePresentationStream` (`\x02OlePres###`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OlePresentationStream {
     wire: Arc<[u8]>,
@@ -910,62 +910,62 @@ impl OlePresentationStream {
                 .all(|(left, right)| left.content_eq(right))
     }
 
-    /// Parses one complete OLEPresentationStream under explicit limits.
+    /// Parses one complete OlePresentationStream under explicit limits.
     pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self, OleError> {
         let limits = limits.validate()?;
         if bytes.len() > limits.max_bytes {
             return Err(invalid(
-                "OLEPresentationStream exceeds the configured limit",
+                "OlePresentationStream exceeds the configured limit",
             ));
         }
         Self::parse_shared(Arc::<[u8]>::from(bytes), limits)
     }
 
-    /// Parses one complete OLEPresentationStream without copying an existing
+    /// Parses one complete OlePresentationStream without copying an existing
     /// source allocation.
     pub fn parse_shared(bytes: Arc<[u8]>, limits: Limits) -> Result<Self, OleError> {
         let limits = limits.validate()?;
         if bytes.len() > limits.max_bytes {
             return Err(invalid(
-                "OLEPresentationStream exceeds the configured limit",
+                "OlePresentationStream exceeds the configured limit",
             ));
         }
         let mut reader = Reader::new(&bytes);
         let (format, format_marker) =
             parse_clipboard_format(&mut reader, true, MAX_PRIMARY_REGISTERED_FORMAT_CHARS)?;
         if matches!(format, ClipboardFormat::Standard(CF_BITMAP)) {
-            return Err(invalid("OLEPresentationStream cannot use CF_BITMAP"));
+            return Err(invalid("OlePresentationStream cannot use CF_BITMAP"));
         }
-        let target_size = reader.u32("OLEPresentationStream target-device size")?;
+        let target_size = reader.u32("OlePresentationStream target-device size")?;
         let target = reader.sized_range(
             target_size,
-            "OLEPresentationStream target device",
+            "OlePresentationStream target device",
             true,
             true,
         )?;
         if let Some(range) = target.as_ref() {
-            validate_target_device(&bytes[range.clone()], "OLEPresentationStream target device")?;
+            validate_target_device(&bytes[range.clone()], "OlePresentationStream target device")?;
         }
-        let aspect = reader.u32("OLEPresentationStream aspect")?;
-        let lindex = reader.u32("OLEPresentationStream lindex")?;
-        let advf = reader.u32("OLEPresentationStream advf")?;
-        let reserved1 = reader.u32("OLEPresentationStream reserved1")?;
-        let width = reader.i32("OLEPresentationStream width")?;
-        let height = reader.i32("OLEPresentationStream height")?;
-        let data_size = reader.u32("OLEPresentationStream data size")?;
+        let aspect = reader.u32("OlePresentationStream aspect")?;
+        let lindex = reader.u32("OlePresentationStream lindex")?;
+        let advf = reader.u32("OlePresentationStream advf")?;
+        let reserved1 = reader.u32("OlePresentationStream reserved1")?;
+        let width = reader.i32("OlePresentationStream width")?;
+        let height = reader.i32("OlePresentationStream height")?;
+        let data_size = reader.u32("OlePresentationStream data size")?;
         let data_len = usize::try_from(data_size)
-            .map_err(|_| invalid("OLEPresentationStream data size exceeds this platform"))?;
+            .map_err(|_| invalid("OlePresentationStream data size exceeds this platform"))?;
         if data_len > limits.max_data_bytes {
             return Err(invalid(
-                "OLEPresentationStream data exceeds the configured limit",
+                "OlePresentationStream data exceeds the configured limit",
             ));
         }
         let data_start = reader.position();
-        reader.take(data_len, "OLEPresentationStream data")?;
+        reader.take(data_len, "OlePresentationStream data")?;
         let data = BytesField::from_source(Arc::clone(&bytes), data_start..reader.position());
 
         let reserved2 = if format.is_metafile_pict() {
-            Some(reader.array::<18>("OLEPresentationStream metafile reserved bytes")?)
+            Some(reader.array::<18>("OlePresentationStream metafile reserved bytes")?)
         } else {
             None
         };
@@ -976,20 +976,20 @@ impl OlePresentationStream {
         let unknown_tail_start = if reader.remaining() == 0 {
             bytes.len()
         } else {
-            toc_signature = Some(reader.u32("OLEPresentationStream TOC signature")?);
-            let count = reader.u32("OLEPresentationStream TOC count")?;
+            toc_signature = Some(reader.u32("OlePresentationStream TOC signature")?);
+            let count = reader.u32("OlePresentationStream TOC count")?;
             toc_count = Some(count);
             if toc_signature == Some(TOC_SIGNATURE) {
                 let count_usize = usize::try_from(count).map_err(|_| {
-                    invalid("OLEPresentationStream TOC count exceeds this platform")
+                    invalid("OlePresentationStream TOC count exceeds this platform")
                 })?;
                 if count_usize > limits.max_toc_entries {
                     return Err(invalid(
-                        "OLEPresentationStream TOC count exceeds the configured limit",
+                        "OlePresentationStream TOC count exceeds the configured limit",
                     ));
                 }
                 if count_usize > reader.remaining() / MIN_TOC_ENTRY_BYTES {
-                    return Err(invalid("OLEPresentationStream TOC entries are truncated"));
+                    return Err(invalid("OlePresentationStream TOC entries are truncated"));
                 }
                 toc_count = Some(count);
                 toc_entries
@@ -1008,7 +1008,7 @@ impl OlePresentationStream {
                     }
                     toc_entries.push(entry);
                     if reader.position() <= start {
-                        return Err(invalid("OLEPresentationStream TOC entry has zero width"));
+                        return Err(invalid("OlePresentationStream TOC entry has zero width"));
                     }
                 }
             } else if count != 0 {
@@ -1054,7 +1054,7 @@ impl OlePresentationStream {
             format,
             ClipboardFormat::None | ClipboardFormat::Standard(CF_BITMAP)
         ) {
-            return Err(invalid("primary OLEPresentationStream format is not valid"));
+            return Err(invalid("primary OlePresentationStream format is not valid"));
         }
         if data.len() > Limits::default().max_data_bytes {
             return Err(invalid("presentation data exceeds the default limit"));
@@ -1111,7 +1111,7 @@ impl OlePresentationStream {
             value,
             ClipboardFormat::None | ClipboardFormat::Standard(CF_BITMAP)
         ) {
-            return Err(invalid("primary OLEPresentationStream format is not valid"));
+            return Err(invalid("primary OlePresentationStream format is not valid"));
         }
         value.encoded_len()?;
         if self.format != value {
@@ -1150,7 +1150,7 @@ impl OlePresentationStream {
                 "presentation target device exceeds the configured limit",
             ));
         }
-        validate_target_device(&value, "OLEPresentationStream target device")?;
+        validate_target_device(&value, "OlePresentationStream target device")?;
         if self.target_device.replace(value) {
             self.dirty = true;
         }
@@ -1303,7 +1303,7 @@ impl OlePresentationStream {
         let limits = limits.validate()?;
         let mut candidate =
             self.toc_entries.get(index).cloned().ok_or_else(|| {
-                invalid("OLEPresentationStream TOC entry index is outside the table")
+                invalid("OlePresentationStream TOC entry index is outside the table")
             })?;
         let before = candidate.clone();
         edit(&mut candidate)?;
@@ -1334,7 +1334,7 @@ impl OlePresentationStream {
         let limits = limits.validate()?;
         if index > self.toc_entries.len() {
             return Err(invalid(
-                "OLEPresentationStream TOC insertion index is outside the table",
+                "OlePresentationStream TOC insertion index is outside the table",
             ));
         }
         entry.validate(limits)?;
@@ -1359,7 +1359,7 @@ impl OlePresentationStream {
         let limits = limits.validate()?;
         if index >= self.toc_entries.len() {
             return Err(invalid(
-                "OLEPresentationStream TOC removal index is outside the table",
+                "OlePresentationStream TOC removal index is outside the table",
             ));
         }
         let mut candidate = self.clone();
@@ -1431,7 +1431,7 @@ impl OlePresentationStream {
         }
         if length > limits.max_bytes {
             return Err(invalid(
-                "OLEPresentationStream exceeds the configured limit",
+                "OlePresentationStream exceeds the configured limit",
             ));
         }
         Ok(length)
@@ -1490,7 +1490,7 @@ impl OlePresentationStream {
         if !self.dirty {
             if self.wire.len() > limits.max_bytes {
                 return Err(invalid(
-                    "OLEPresentationStream exceeds the configured limit",
+                    "OlePresentationStream exceeds the configured limit",
                 ));
             }
             return Ok(self.wire.to_vec());
@@ -1579,7 +1579,7 @@ fn parse_toc_entry_from_reader(
     })
 }
 
-/// A typed OLEDS `OLENativeStream` (`\x01Ole10Native`).
+/// A typed OLEDS `OleNativeStream` (`\x01Ole10Native`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OleNativeStream {
     wire: Arc<[u8]>,
@@ -1596,7 +1596,7 @@ impl OleNativeStream {
     pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self, OleError> {
         let limits = limits.validate()?;
         if bytes.len() > limits.max_bytes {
-            return Err(invalid("OLENativeStream exceeds the configured limit"));
+            return Err(invalid("OleNativeStream exceeds the configured limit"));
         }
         Self::parse_shared(Arc::<[u8]>::from(bytes), limits)
     }
@@ -1606,20 +1606,20 @@ impl OleNativeStream {
         let limits = limits.validate()?;
         if bytes.len() > limits.max_bytes || bytes.len() < 4 {
             return Err(invalid(
-                "OLENativeStream is truncated or exceeds the configured limit",
+                "OleNativeStream is truncated or exceeds the configured limit",
             ));
         }
         let mut reader = Reader::new(&bytes);
-        let size = usize::try_from(reader.u32("OLENativeStream native-data size")?)
-            .map_err(|_| invalid("OLENativeStream native-data size exceeds this platform"))?;
+        let size = usize::try_from(reader.u32("OleNativeStream native-data size")?)
+            .map_err(|_| invalid("OleNativeStream native-data size exceeds this platform"))?;
         if size > limits.max_data_bytes {
-            return Err(invalid("OLENativeStream data exceeds the configured limit"));
+            return Err(invalid("OleNativeStream data exceeds the configured limit"));
         }
         let data_start = reader.position();
-        reader.take(size, "OLENativeStream native data")?;
+        reader.take(size, "OleNativeStream native data")?;
         if reader.remaining() != 0 {
             return Err(invalid(
-                "OLENativeStream has trailing bytes after NativeData",
+                "OleNativeStream has trailing bytes after NativeData",
             ));
         }
         let data_end = reader.position();
@@ -1682,7 +1682,7 @@ impl OleNativeStream {
             .checked_add(self.data.len())
             .ok_or_else(|| invalid("native stream serialized size overflows"))?;
         if length > limits.max_bytes {
-            return Err(invalid("OLENativeStream exceeds the configured limit"));
+            return Err(invalid("OleNativeStream exceeds the configured limit"));
         }
         Ok(length)
     }
@@ -1693,7 +1693,7 @@ impl OleNativeStream {
         self.encoded_len(limits)?;
         if !self.dirty {
             if self.wire.len() > limits.max_bytes {
-                return Err(invalid("OLENativeStream exceeds the configured limit"));
+                return Err(invalid("OleNativeStream exceeds the configured limit"));
             }
             return Ok(self.wire.to_vec());
         }
@@ -1705,15 +1705,6 @@ impl OleNativeStream {
         Ok(output)
     }
 }
-
-/// Alias following the stream's specification name.
-pub type OLEPresentationStream = OlePresentationStream;
-/// Concise alias for [`OlePresentationStream`].
-pub type PresentationStream = OlePresentationStream;
-/// Alias following the stream's specification name.
-pub type OLENativeStream = OleNativeStream;
-/// Concise alias for [`OleNativeStream`].
-pub type NativeStream = OleNativeStream;
 
 pub mod presentation;
 

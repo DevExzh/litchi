@@ -296,10 +296,10 @@ fn inert_macro_security() -> Result<(), Box<dyn Error>> {
         security_ole_limits()?,
     )?;
     let no_op = source.edit().commit()?;
-    assert_eq!(no_op.snapshot().bytes(), bytes.as_slice());
+    assert_eq!(no_op.package().bytes(), bytes.as_slice());
     assert_eq!(
         before_macro_digest,
-        macro_stream_digest(no_op.snapshot().bytes())?
+        macro_stream_digest(no_op.package().bytes())?
     );
     let mut edit = source.edit();
     edit.insert_rows("Sheet1".into(), 1, 1)?;

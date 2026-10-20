@@ -31044,7 +31044,7 @@ fn run_semantic_xls(
         )?;
         let mut edit = source.edit();
         edit.set_number(selected.0.into(), reference, replacement)?;
-        edit.commit()?.snapshot().bytes().to_vec()
+        edit.commit()?.package().bytes().to_vec()
     } else {
         corpus.archive.clone()
     };
@@ -31157,7 +31157,7 @@ fn run_semantic_xls(
                     edit.set_number(selected.0.into(), reference, replacement)?;
                 }
                 let commit = edit.commit()?;
-                let bytes = commit.snapshot().bytes().to_vec();
+                let bytes = commit.package().bytes().to_vec();
                 let duration = started.elapsed();
                 let diagnostics = commit.diagnostics();
                 if commit.patch().is_noop() == updated
@@ -31170,7 +31170,7 @@ fn run_semantic_xls(
                     return Err("semantic XLS edit/save has unexpected publication state".into());
                 }
                 let applied = commit.patch().apply(&source)?;
-                if applied.bytes() != commit.snapshot().bytes() {
+                if applied.bytes() != commit.package().bytes() {
                     return Err("semantic XLS exact patch replay differs from commit".into());
                 }
                 let restored = commit.patch().inverse().apply(&applied)?;

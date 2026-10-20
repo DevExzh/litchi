@@ -37,7 +37,7 @@ fn workbook_bytes(numbers: &[(u32, u16, f64)], blanks: &[(u32, u16)]) -> Vec<u8>
             )
             .unwrap();
         }
-        snapshot = edit.commit().unwrap().snapshot().clone();
+        snapshot = edit.commit().unwrap().package().clone();
     }
     snapshot.bytes().to_vec()
 }
@@ -259,7 +259,7 @@ fn copies_numbers_and_blanks_in_source_order_and_preserves_foreign_streams() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    let copied = commit.snapshot();
+    let copied = commit.package();
     let sheet = copied
         .worksheet(Selector::Position(Position::new(0)))
         .unwrap()
@@ -322,7 +322,7 @@ fn same_width_existing_targets_are_supported_but_occupied_mismatches_are_atomic(
     let commit = edit.commit().unwrap();
     assert_eq!(
         commit
-            .snapshot()
+            .package()
             .worksheet(Selector::Position(Position::new(0)))
             .unwrap()
             .unwrap()
@@ -350,7 +350,7 @@ fn same_width_existing_targets_are_supported_but_occupied_mismatches_are_atomic(
         .unwrap_err();
     assert!(error.to_string().contains("record width or family"));
     assert_eq!(
-        refused.commit().unwrap().snapshot().bytes(),
+        refused.commit().unwrap().package().bytes(),
         occupied.bytes()
     );
 }
@@ -393,7 +393,7 @@ fn strings_formulas_and_unrelated_owners_are_refused_before_staging() {
         )
         .is_err()
     );
-    assert_eq!(edit.commit().unwrap().snapshot().bytes(), target.bytes());
+    assert_eq!(edit.commit().unwrap().package().bytes(), target.bytes());
 
     let mut formula_writer = Builder::new();
     let formula_sheet = formula_writer.add_worksheet("Sheet1").unwrap();
@@ -438,7 +438,7 @@ fn assert_scalar_transfer_refused(target: &Snapshot, donor: &Snapshot) {
         )
         .is_err()
     );
-    assert_eq!(edit.commit().unwrap().snapshot().bytes(), before.as_slice());
+    assert_eq!(edit.commit().unwrap().package().bytes(), before.as_slice());
 }
 
 #[test]
@@ -548,7 +548,7 @@ fn hostile_duplicate_unknown_and_dependency_records_are_refused_atomically() {
             .is_err()
     );
     assert_eq!(
-        duplicate_target_edit.commit().unwrap().snapshot().bytes(),
+        duplicate_target_edit.commit().unwrap().package().bytes(),
         duplicate_target_before.as_slice()
     );
 
@@ -584,7 +584,7 @@ fn bounds_noop_and_stale_or_foreign_artifacts_are_checked() {
         )
         .is_err()
     );
-    assert_eq!(over.commit().unwrap().snapshot().bytes(), target.bytes());
+    assert_eq!(over.commit().unwrap().package().bytes(), target.bytes());
 
     let empty_range = CellRange::new(
         Reference::new(20, 20).unwrap(),
@@ -614,10 +614,10 @@ fn bounds_noop_and_stale_or_foreign_artifacts_are_checked() {
     .unwrap();
     let commit = copy.commit().unwrap();
     assert!(commit.patch().apply(&donor).is_err());
-    assert!(commit.patch().apply(commit.snapshot()).is_err());
+    assert!(commit.patch().apply(commit.package()).is_err());
     assert_eq!(
         commit.patch().apply(&target).unwrap().bytes(),
-        commit.snapshot().bytes()
+        commit.package().bytes()
     );
 }
 

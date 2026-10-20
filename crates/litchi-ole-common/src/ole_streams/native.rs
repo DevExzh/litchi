@@ -4,9 +4,9 @@
 
 use super::*;
 
-pub use super::{Limits, NativeStream, OLENativeStream, OleNativeStream, StreamRevision};
+pub use super::{Limits, OleNativeStream, StreamRevision};
 
-/// A cheap immutable snapshot of an OLENativeStream.
+/// A cheap immutable snapshot of an OleNativeStream.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Snapshot {
     stream: OleNativeStream,
@@ -19,7 +19,7 @@ impl Snapshot {
     pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self, OleError> {
         let limits = limits.validate()?;
         if bytes.len() > limits.max_bytes {
-            return Err(invalid("OLENativeStream exceeds the configured limit"));
+            return Err(invalid("OleNativeStream exceeds the configured limit"));
         }
         Self::parse_shared(Arc::<[u8]>::from(bytes), limits)
     }
@@ -86,7 +86,7 @@ impl Snapshot {
         let limits = limits.validate()?;
         stream.encoded_len(limits)?;
         if stream.bytes().len() > limits.max_bytes {
-            return Err(invalid("OLENativeStream exceeds the configured limit"));
+            return Err(invalid("OleNativeStream exceeds the configured limit"));
         }
         if stream.dirty {
             let bytes = stream.to_bytes(limits)?;

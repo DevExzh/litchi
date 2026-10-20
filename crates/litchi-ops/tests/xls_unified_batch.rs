@@ -117,7 +117,7 @@ fn fixture_with_blank() -> Vec<u8> {
     .expect("insert formatting-only blank");
     edit.commit()
         .expect("commit blank fixture")
-        .snapshot()
+        .package()
         .bytes()
         .to_vec()
 }
@@ -148,7 +148,7 @@ fn rich_fixture() -> Vec<u8> {
     .expect("insert rich cell");
     edit.commit()
         .expect("commit rich fixture")
-        .snapshot()
+        .package()
         .bytes()
         .to_vec()
 }

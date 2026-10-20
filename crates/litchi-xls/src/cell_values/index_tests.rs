@@ -182,7 +182,7 @@ fn joining_a_noop_then_staging_reuses_the_coordinate_slot() {
     )
     .unwrap();
     let commit = left.commit().unwrap();
-    let snapshot = commit.snapshot();
+    let snapshot = commit.package();
     let cell = snapshot
         .worksheet(Selector::Position(Position::new(0)))
         .unwrap()
@@ -258,7 +258,7 @@ fn joined_cloned_edits_rebuild_indexes_across_sheets_and_invert_exactly() {
         .set_numeric(Selector::Position(Position::new(1)), reference(1, 1), 23.0)
         .unwrap();
     let fixed_commit = fixed_clone.commit().unwrap();
-    let fixed_snapshot = fixed_commit.snapshot();
+    let fixed_snapshot = fixed_commit.package();
     for (sheet, row, column, value) in [
         (0, 0, 0, 12.0),
         (0, 1, 1, 22.0),
@@ -310,7 +310,7 @@ fn joined_cloned_edits_rebuild_indexes_across_sheets_and_invert_exactly() {
         .remove_cell(Selector::Position(Position::new(1)), reference(1, 1))
         .unwrap();
     let structural_commit = structural_clone.commit().unwrap();
-    for (position, worksheet) in structural_commit.snapshot().worksheets().enumerate() {
+    for (position, worksheet) in structural_commit.package().worksheets().enumerate() {
         if position == 0 {
             assert_eq!(worksheet.cells().count(), 1);
             assert_eq!(
@@ -325,7 +325,7 @@ fn joined_cloned_edits_rebuild_indexes_across_sheets_and_invert_exactly() {
         structural_commit
             .patch()
             .inverse()
-            .apply(structural_commit.snapshot())
+            .apply(structural_commit.package())
             .unwrap()
             .bytes(),
         source.bytes()

@@ -191,7 +191,7 @@ fn replacing_the_last_sst_reference_prunes_the_old_unique_entry() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    let target = commit.snapshot();
+    let target = commit.package();
     assert_eq!(sst_counts(target.workbook_stream()), (1, 1));
     assert_eq!(sst_table(target).strings, ["new"]);
     assert_eq!(label_indexes(target.workbook_stream()), [0]);
@@ -219,7 +219,7 @@ fn clearing_the_last_sst_reference_writes_zero_counts() {
     edit.remove_cell(Selector::Name("Sheet1"), Reference::new(0, 0).unwrap())
         .unwrap();
     let commit = edit.commit().unwrap();
-    let target = commit.snapshot();
+    let target = commit.package();
     assert_eq!(sst_counts(target.workbook_stream()), (0, 0));
     assert!(sst_table(target).strings.is_empty());
     assert!(label_indexes(target.workbook_stream()).is_empty());
@@ -248,7 +248,7 @@ fn shared_references_keep_the_old_unique_entry_and_remap_labels() {
         Value::Text("new".into()),
     )
     .unwrap();
-    let target = edit.commit().unwrap().snapshot().clone();
+    let target = edit.commit().unwrap().package().clone();
     assert_eq!(sst_counts(target.workbook_stream()), (2, 2));
     assert_eq!(sst_table(&target).strings, ["old", "new"]);
     assert_eq!(label_indexes(target.workbook_stream()), [1, 0]);
@@ -269,7 +269,7 @@ fn rich_phonetic_properties_and_opaque_ext_rst_survive_compaction() {
         Value::Text("new".into()),
     )
     .unwrap();
-    let target = edit.commit().unwrap().snapshot().clone();
+    let target = edit.commit().unwrap().package().clone();
     let table = sst_table(&target);
     assert_eq!(table.strings, ["rich", "new"]);
     assert_eq!(table.properties[0], sst_table(&source).properties[0]);
@@ -424,7 +424,7 @@ fn wide_continuation_after_a_changed_preceding_cell_remains_lossless() {
         Value::Text("new".into()),
     )
     .unwrap();
-    let target = edit.commit().unwrap().snapshot().clone();
+    let target = edit.commit().unwrap().package().clone();
     assert_eq!(sst_counts(target.workbook_stream()), (2, 2));
     assert_eq!(
         sst_table(&target).strings,
@@ -448,14 +448,14 @@ fn exact_and_semantic_inverse_restore_a_pruned_sst_tail() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    let exact = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    let exact = commit.patch().inverse().apply(commit.package()).unwrap();
     assert_eq!(exact.bytes(), source.bytes());
     let semantic = commit.patch().semantic();
-    let restored = semantic.inverse().apply(commit.snapshot()).unwrap();
-    assert_eq!(sst_table(restored.snapshot()).strings, ["old"]);
+    let restored = semantic.inverse().apply(commit.package()).unwrap();
+    assert_eq!(sst_table(restored.package()).strings, ["old"]);
     assert_eq!(
         restored
-            .snapshot()
+            .package()
             .worksheet(Selector::Name("Sheet1"))
             .unwrap()
             .unwrap()

@@ -224,9 +224,6 @@ impl CellRange {
     }
 }
 
-/// Backward-compatible short name for [`CellRange`].
-pub type Range = CellRange;
-
 /// A semantic worksheet selector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -5067,8 +5064,14 @@ impl Commit {
 
     /// Returns the reopened target snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub const fn package(&self) -> &Snapshot {
         &self.snapshot
+    }
+
+    /// Consumes the commit into its reopened target snapshot.
+    #[must_use]
+    pub fn into_package(self) -> Snapshot {
+        self.snapshot
     }
 
     /// Returns the exact-source reversible patch.
@@ -5222,7 +5225,7 @@ impl SourceBackedCommit {
 
     /// Fully reopened target snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub const fn package(&self) -> &Snapshot {
         &self.snapshot
     }
 
@@ -5325,9 +5328,6 @@ pub struct SourceBackedPlanCommit {
     plan: ValidatedOverlayPlan,
     diagnostics: SourceBackedDiagnostics,
 }
-
-/// Explicit alias for callers that prefer the numeric-plan terminology.
-pub type SourceBackedNumericPlanCommit = SourceBackedPlanCommit;
 
 impl SourceBackedPlanCommit {
     /// Exact immutable source snapshot used by this plan.

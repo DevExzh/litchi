@@ -23,9 +23,9 @@ impl Edit {
         })
     }
 
-    /// Returns the current transaction snapshot.
+    /// The staged snapshot, not yet committed.
     #[must_use]
-    pub const fn snapshot(&self) -> Snapshot {
+    pub const fn staged(&self) -> Snapshot {
         self.working
     }
 

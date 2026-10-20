@@ -454,7 +454,7 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
             )
             .unwrap();
             let commit = edit.commit().unwrap();
-            (commit.snapshot().bytes().to_vec(), "4242".to_owned())
+            (commit.package().bytes().to_vec(), "4242".to_owned())
         },
         #[cfg(feature = "ppt")]
         File::Ppt(handle) => {
