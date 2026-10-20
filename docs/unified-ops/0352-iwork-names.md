@@ -114,9 +114,52 @@ receipt (`test-data/iwork/numbers/chart-data-edited-native-receipt.json`)
 and the dated provenance line of the Keynote assets keep the historical
 name; the assets line now adds the new one.
 
-The other `litchi-iwa` names (`PagesEditor`, `NumbersSheetImageOptions`, …)
-keep their format prefixes. They are outside this item, and the crate
-remains the migration host that ADR 0028 retires piece by piece.
+### 2.3 Redundant format prefixes and deprecated native fields (coordinator follow-up)
+
+At the coordinator's request, a second commit extends item 24 to every
+type inside the per-format modules.
+
+**Prefixes.** Every public `Pages*`/`Keynote*`/`Numbers*` type or alias
+under `litchi_iwa::{pages, keynote, numbers}` loses the prefix that its
+module already states. That is 168 names: 102 type definitions and 66
+`pub use … as Keynote*` aliases. Examples:
+
+- `pages::PagesEditor` → `pages::Editor`;
+- `keynote::KeynoteSlideInfo` → `keynote::SlideInfo`;
+- `keynote::KeynoteTableCellTextFont` → `keynote::TableCellTextFont`;
+- `numbers::NumbersSheetImageOptions` → `numbers::SheetImageOptions`.
+
+Code inside a format's module uses the bare name. Code elsewhere (other
+host modules, tests, examples, README) uses the module-qualified path
+(`pages::Editor`), with `use litchi_iwa::pages;` or `{self, …}` in a use
+list. This touches about 4,600 occurrences in 460 files.
+
+One shadowing case needed explicit paths. Three Keynote build-conversion
+functions import `litchi_keynote::build::{FlipDirection, …}` locally, so
+there the host enums are written `self::FlipDirection` (in `editor.rs`) or
+`super::FlipDirection` (in `editor/builds.rs`).
+
+A rustdoc walk with the gate's `Surface` class now finds no public type or
+alias in those modules that starts with a format prefix, and the `iwa`
+glossary profile bans all 168 old names (173 bans in total).
+
+**Deprecated native fields.** These fields were `#[deprecated]`:
+
+- `keynote::SlideInfo::{node_id, slide_id, title_storage_id, body_storage_id, notes_storage_id}`;
+- `keynote::SlideTextInfo::drawable_object_id`.
+
+They are now plain, documented public API. The migration host addresses
+native objects by these identities, so removing them would leave its
+raw-ID editor methods without addresses. Each doc comment names the native
+archive or storage it identifies and points semantic callers to
+`litchi_keynote::Package`. The 65 `#[expect(deprecated)]` sites that
+existed only for these fields are removed. No deprecation warning remains
+(`clippy -D warnings` passes).
+
+The two boundary audits that required the fields to stay deprecated now
+require the opposite: each field must not be deprecated and must carry a
+`///` doc comment that names it a native identity. Their unit tests are
+rewritten to match.
 
 ## 3. Gate coverage
 
@@ -195,7 +238,43 @@ re-applying this record's profile edits. The post-merge re-run covered:
 - the boundary, non-iWork, tool-unittest, OfficeCLI, bench-matrix and
   feature-matrix gates.
 
-The results are in the final report.
+Every gate exited 0.
+
+## 6a. Final gate run (after §2.3, commit `69ec5d60a3`)
+
+The final run was on the tree after the prefix and deprecation commit.
+Every command exited 0:
+
+- `cargo fmt --all --check`.
+- Clippy, `-D warnings`:
+  - `--all-targets --all-features` on litchi-core, iwa-common, numbers,
+    numbers-wire, pages, keynote, iwa-structured, litchi-iwa, litchi-ops,
+    litchi, litchi-py and litchi-cli;
+  - litchi-ops with no features, and with each of `pages`, `keynote`,
+    `numbers`.
+- Glossary profiles `core-minimal`, `iwa-common`, `iwa` (173 bans),
+  `numbers-*`, `pages`, `keynote-*`, `facade-iwork` and `ops-iwork`.
+- Tests:
+
+  | Suite | Passed | Failed |
+  |---|---:|---:|
+  | `cargo test -p litchi-iwa --all-features` | 1,783 | 0 |
+  | iWork leaf crates | 3,353 | 0 |
+  | litchi-ops `--lib` | 949 | 0 |
+  | litchi-ops iWork/corpus/capabilities/registry targets | 89 | 0 |
+  | litchi | 235 | 0 |
+  | litchi-cli | 34 | 0 |
+
+- pyo3 `run_tests.sh`.
+- `RUSTDOCFLAGS=-Dwarnings cargo doc`.
+- perf-baseline `cargo check --locked`.
+- `check_crate_boundaries.py`, `non_iwork_gate.py verify`, the required
+  tool unittests (1,269), the OfficeCLI delta and corpus `--check`,
+  `unified_bench_matrix.py --check`, and `check_feature_matrix.py`
+  (31 ok).
+
+The full chunked litchi-ops suite (2,627 passed) ran before §2.3. That
+commit does not touch litchi-ops, which does not depend on litchi-iwa.
 
 ## 7. Gaps and follow-ups
 
@@ -203,10 +282,25 @@ The results are in the final report.
   (`check_iwork_leaf_public_api.semantic_module` no longer exists). It is
   not in the coordinator's unittest set and this change does not touch the
   failure. Follow-up: restore or retire that test module.
-- `litchi-iwa` keeps prefixed names outside D11 (`PagesEditor`,
-  `KeynoteEditor`, `NumbersEditor`, `*Options`, …). They live in the
-  migration host and leave it with each ADR 0028 migration. The 0351
-  inventory already lists the host's `*_with_limits` and
-  `UnverifiedTopologyEdit` rows.
+- `litchi-iwa` still has 18 `#[deprecated]` items besides the fields:
+  - the raw-ID compatibility methods `numbers::Editor::{set_cell_comment,
+    cell_comment_replies, add/set/remove_cell_comment_reply}` and
+    `sheet_drawable_comment*` (7);
+  - `pages::Editor::{drawable_comment, set_drawable_comment,
+    clear_drawable_comment}`;
+  - `IWorkDrawableCommentEditor` and its root re-export;
+  - the `numbers::editor::table::cell::Borders` re-export.
+
+  `tools/check_crate_boundaries.py` currently *requires* them to stay
+  deprecated, and each one keeps a compatibility fallback for graphs the
+  focused owners refuse. Resolving them means one of two things: delete
+  each method once its focused owner reaches parity, or keep it as plain
+  native-ID API and invert its audit, as §2.3 does for the fields. That is
+  per-method work for a follow-up wave. The 0351 inventory already lists
+  the host's `*_with_limits` and `UnverifiedTopologyEdit` rows.
+- Root-level host types keep their `IWork*` prefixes
+  (`IWorkDrawableCommentEditor`, `IWorkMediaEditor`, `IWorkPackage`).
+  They are not inside a per-format module, so they need a separate naming
+  decision.
 - `Area::area()` (cell count) keeps its 0300-era name. Renaming it is a
   separate API change.
