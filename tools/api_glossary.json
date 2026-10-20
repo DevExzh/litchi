@@ -9525,6 +9525,266 @@
       ]
     },
     {
+      "id": "facade-sheet-text",
+      "package": "litchi",
+      "default_features": false,
+      "features": [
+        "sheet-text"
+      ],
+      "banned_names": [
+        {
+          "name": "TextWorkbook",
+          "scope": "litchi::sheet",
+          "replacement": "`Workbook` (record 0354)"
+        },
+        {
+          "name": "TextWorksheet",
+          "scope": "litchi::sheet",
+          "replacement": "`Worksheet` (record 0354)"
+        },
+        {
+          "name": "TextCell",
+          "scope": "litchi::sheet",
+          "replacement": "`Cell` (record 0354)"
+        },
+        {
+          "name": "TextConfig",
+          "scope": "litchi::sheet",
+          "replacement": "`delimited::Options` (record 0354)"
+        },
+        {
+          "name": "TextParser",
+          "scope": "litchi::sheet",
+          "replacement": "`delimited::Tokenizer` (record 0354)"
+        },
+        {
+          "name": "TextWorksheetIterator",
+          "scope": "litchi::sheet",
+          "replacement": "`WorkbookTrait::worksheets` (record 0354)"
+        },
+        {
+          "name": "TextRowIterator",
+          "scope": "litchi::sheet",
+          "replacement": "`Worksheet::rows` (record 0354)"
+        },
+        {
+          "name": "TextCellIterator",
+          "scope": "litchi::sheet",
+          "replacement": "`Worksheet::cells` (record 0354)"
+        },
+        {
+          "name": "DelimitedConfig",
+          "scope": "litchi::sheet",
+          "replacement": "`delimited::Options`, merged with the workbook options (record 0354)"
+        },
+        {
+          "name": "SylkConfig",
+          "scope": "litchi::sheet",
+          "replacement": "`sylk::Options` (record 0354)"
+        },
+        {
+          "name": "DifConfig",
+          "scope": "litchi::sheet",
+          "replacement": "`dif::Options` (record 0354)"
+        },
+        {
+          "name": "FixedWidthConfig",
+          "scope": "litchi::sheet",
+          "replacement": "`fixed_width::Options` (record 0354)"
+        },
+        {
+          "name": "SylkParser",
+          "scope": "litchi::sheet",
+          "replacement": "`sylk::read` (record 0354)"
+        },
+        {
+          "name": "DifParser",
+          "scope": "litchi::sheet",
+          "replacement": "`dif::read` (record 0354)"
+        },
+        {
+          "name": "FixedWidthParser",
+          "scope": "litchi::sheet",
+          "replacement": "`fixed_width::read` (record 0354)"
+        },
+        {
+          "name": "formats",
+          "scope": "litchi::sheet",
+          "replacement": "the format modules `delimited`, `sylk`, `dif`, `fixed_width` (record 0354)"
+        }
+      ],
+      "families": [],
+      "delegated_globs": [
+        "litchi_core",
+        "litchi_sheet",
+        "litchi_sheet_text"
+      ]
+    },
+    {
+      "id": "sheet-text",
+      "package": "litchi-sheet-text",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "TextWorkbook",
+          "scope": "litchi_sheet_text",
+          "replacement": "`Workbook` (record 0354)"
+        },
+        {
+          "name": "TextWorksheet",
+          "scope": "litchi_sheet_text",
+          "replacement": "`Worksheet` (record 0354)"
+        },
+        {
+          "name": "TextCell",
+          "scope": "litchi_sheet_text",
+          "replacement": "`Cell` (record 0354)"
+        },
+        {
+          "name": "TextConfig",
+          "scope": "litchi_sheet_text",
+          "replacement": "`delimited::Options` (record 0354)"
+        },
+        {
+          "name": "TextParser",
+          "scope": "litchi_sheet_text",
+          "replacement": "`delimited::Tokenizer` (record 0354)"
+        },
+        {
+          "name": "TextWorksheetIterator",
+          "scope": "litchi_sheet_text",
+          "replacement": "`WorkbookTrait::worksheets` (record 0354)"
+        },
+        {
+          "name": "TextRowIterator",
+          "scope": "litchi_sheet_text",
+          "replacement": "`Worksheet::rows` (record 0354)"
+        },
+        {
+          "name": "TextCellIterator",
+          "scope": "litchi_sheet_text",
+          "replacement": "`Worksheet::cells` (record 0354)"
+        },
+        {
+          "name": "DelimitedConfig",
+          "scope": "litchi_sheet_text",
+          "replacement": "`delimited::Options`, merged with the workbook options (record 0354)"
+        },
+        {
+          "name": "SylkConfig",
+          "scope": "litchi_sheet_text",
+          "replacement": "`sylk::Options` (record 0354)"
+        },
+        {
+          "name": "DifConfig",
+          "scope": "litchi_sheet_text",
+          "replacement": "`dif::Options` (record 0354)"
+        },
+        {
+          "name": "FixedWidthConfig",
+          "scope": "litchi_sheet_text",
+          "replacement": "`fixed_width::Options` (record 0354)"
+        },
+        {
+          "name": "SylkParser",
+          "scope": "litchi_sheet_text",
+          "replacement": "`sylk::read` (record 0354)"
+        },
+        {
+          "name": "DifParser",
+          "scope": "litchi_sheet_text",
+          "replacement": "`dif::read` (record 0354)"
+        },
+        {
+          "name": "FixedWidthParser",
+          "scope": "litchi_sheet_text",
+          "replacement": "`fixed_width::read` (record 0354)"
+        },
+        {
+          "name": "read_delimited",
+          "scope": "litchi_sheet_text",
+          "replacement": "`delimited::read` (record 0354)"
+        },
+        {
+          "name": "write_delimited",
+          "scope": "litchi_sheet_text",
+          "replacement": "`delimited::write` (record 0354)"
+        },
+        {
+          "name": "read_sylk",
+          "scope": "litchi_sheet_text",
+          "replacement": "`sylk::read` (record 0354)"
+        },
+        {
+          "name": "write_sylk",
+          "scope": "litchi_sheet_text",
+          "replacement": "`sylk::write` (record 0354)"
+        },
+        {
+          "name": "read_dif",
+          "scope": "litchi_sheet_text",
+          "replacement": "`dif::read` (record 0354)"
+        },
+        {
+          "name": "write_dif",
+          "scope": "litchi_sheet_text",
+          "replacement": "`dif::write` (record 0354)"
+        },
+        {
+          "name": "read_fixed_width",
+          "scope": "litchi_sheet_text",
+          "replacement": "`fixed_width::read` (record 0354)"
+        },
+        {
+          "name": "write_fixed_width",
+          "scope": "litchi_sheet_text",
+          "replacement": "`fixed_width::write` (record 0354)"
+        },
+        {
+          "name": "from_path_with_config",
+          "scope": "litchi_sheet_text",
+          "replacement": "`Workbook::open_with_options` (record 0354)"
+        },
+        {
+          "name": "from_path",
+          "scope": "litchi_sheet_text",
+          "replacement": "`Workbook::open` (record 0354)"
+        },
+        {
+          "name": "set_data",
+          "scope": "litchi_sheet_text",
+          "replacement": "`Workbook::set_rows` (record 0354)"
+        },
+        {
+          "name": "formats",
+          "scope": "litchi_sheet_text",
+          "replacement": "the format modules `delimited`, `sylk`, `dif`, `fixed_width` (record 0354)"
+        },
+        {
+          "name": "worksheet_name",
+          "scope": "litchi_sheet_text",
+          "replacement": "`Workbook::name` (record 0354)"
+        },
+        {
+          "name": "set_worksheet_name",
+          "scope": "litchi_sheet_text",
+          "replacement": "`Workbook::set_name` (record 0354)"
+        },
+        {
+          "name": "detected_bom",
+          "scope": "litchi_sheet_text",
+          "replacement": "`Workbook::bom` (record 0354)"
+        },
+        {
+          "name": "config",
+          "scope": "litchi_sheet_text",
+          "replacement": "`Workbook::options` (record 0354)"
+        }
+      ],
+      "families": []
+    },
+    {
       "id": "pages",
       "package": "litchi-pages",
       "default_features": true,

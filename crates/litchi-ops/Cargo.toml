@@ -135,6 +135,7 @@ litchi-opc          = { workspace = true, optional = true }
 litchi-ppt          = { workspace = true, optional = true }
 litchi-pptx         = { workspace = true, optional = true }
 litchi-rtf          = { workspace = true, optional = true }
+litchi-sheet-text   = { workspace = true } # Delimited tokenizer and decoding for `File::import` (record 0354)
 litchi-sign         = { workspace = true, optional = true }
 litchi-xls          = { workspace = true, optional = true }
 litchi-xlsb         = { workspace = true, optional = true }

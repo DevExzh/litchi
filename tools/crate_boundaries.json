@@ -30,6 +30,7 @@
       "litchi-pptx",
       "litchi-rtf",
       "litchi-sheet",
+      "litchi-sheet-text",
       "litchi-sign",
       "litchi-xls",
       "litchi-xlsb",
@@ -274,6 +275,7 @@
       "litchi-ppt",
       "litchi-pptx",
       "litchi-rtf",
+      "litchi-sheet-text",
       "litchi-sign",
       "litchi-xls",
       "litchi-xlsb",
@@ -328,6 +330,10 @@
     ],
     "litchi-sheet": [
       "litchi-core"
+    ],
+    "litchi-sheet-text": [
+      "litchi-core",
+      "litchi-sheet"
     ],
     "litchi-sign": [
       "litchi-cfb",
@@ -566,6 +572,7 @@
     "litchi-pages",
     "litchi-pptx",
     "litchi-sheet",
+    "litchi-sheet-text",
     "litchi-sign",
     "litchi-slide",
     "litchi-spreadsheet-drawing",

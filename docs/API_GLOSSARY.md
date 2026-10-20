@@ -2882,3 +2882,21 @@ raw query surface only).
 | `litchi_ops` PPTX `placeholder` add (`phType`, alias `type`; `text`), returning the canonical `/slide[N]/shape[K]`; `notes` add (`text`); slide `title`/`text` on add and `layout` set | adopted (0346) |
 
 See [0346](unified-ops/0346-pptx-p0-final.md).
+
+## Text workbooks in their own leaf (record 0354)
+
+Owner decision 0350 (memo item 26): the facade's `litchi::sheet::text`
+module moves into the leaf crate `litchi-sheet-text`; the facade re-exports
+it as `litchi::sheet::text` behind the `sheet-text` feature. Every reader
+and writer stays; the names follow the focused-module rule. The
+`sheet-text` and `facade-sheet-text` gate profiles ban every old name.
+
+| Name | Status |
+|---|---|
+| `litchi_sheet_text::Workbook` (one sheet; `new`, `open`, `open_with_options`, `from_bytes`, `from_bytes_with_options`, `from_reader`, `from_reader_with_options`, `options`, `name`, `set_name`, `rows`, `set_rows`, `bom`, `worksheet`, `write_to`, `to_bytes`) | adopted (0354); replaces `TextWorkbook` and its `from_path_with_config`, `worksheet_name`, `set_worksheet_name`, `set_data`, `detected_bom`, `config` |
+| `litchi_sheet_text::{Worksheet, Cell}` | adopted (0354); `Worksheet<'a>` borrows the workbook's rows; replace `TextWorksheet`, `TextCell` and the three public iterator types |
+| `litchi_sheet_text::delimited::{Options, Dialect, Tokenizer, declared_delimiter, read, write}` | adopted (0354); `Options` merges `TextConfig` and `DelimitedConfig`; `Tokenizer` replaces `TextParser` and import's private parser; `read`/`write` replace `read_delimited`/`write_delimited` |
+| `litchi_sheet_text::{sylk, dif, fixed_width}::{Options, read, write}` | adopted (0354); replace `SylkConfig`/`DifConfig`/`FixedWidthConfig`, the `*Parser` types and `read_*`/`write_*` |
+| `litchi_sheet_text::{Encoding, SourceLimits, SemanticLimits, LimitKind, SourceLimitKind, SemanticLimitKind, Error, Format, OptionKind}` | adopted (0354); every reader takes caller limits (`max_input_bytes`, `max_cells`); `litchi_ops::import::Encoding` is this `Encoding` |
+
+See [0354](unified-ops/0354-sheet-text-and-structured-keywords.md).

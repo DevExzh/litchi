@@ -3,8 +3,8 @@
 //! - The generic sheet traits: [`WorkbookTrait`](crate::sheet::WorkbookTrait),
 //!   [`Worksheet`](crate::sheet::Worksheet), [`Cell`](crate::sheet::Cell)
 //!   and their iterators, over [`CellValue`](crate::sheet::CellValue).
-//! - [`text`](crate::sheet::text): CSV, TSV, PRN, SYLK, DIF and fixed-width
-//!   text workbooks.
+//! - `text` (the `sheet-text` feature): the `litchi-sheet-text` crate's CSV,
+//!   TSV, PRN, SYLK, DIF and fixed-width text workbooks.
 //! - [`view`](crate::sheet::view): worksheet-view semantics shared by XLSX
 //!   and XLSB.
 //! - `FormulaEvaluator` (the `eval` feature): formula evaluation over any
@@ -38,8 +38,8 @@
 //! ```
 //!
 //! The text workbooks are concrete types: open one with
-//! [`TextWorkbook`](crate::sheet::text::TextWorkbook) or read rows with the
-//! `formats::read_*` functions of [`text`](crate::sheet::text).
+//! `text::Workbook`, or read rows with `text::{delimited, sylk, dif,
+//! fixed_width}::read` (the `sheet-text` feature).
 
 /// Canonical worksheet-view semantics shared by XLSX and XLSB.
 pub mod view {
@@ -54,7 +54,11 @@ pub use litchi_core::sheet::{traits, types};
 pub mod eval {
     pub use litchi_eval::*;
 }
-pub mod text;
+/// Delimited, SYLK, DIF and fixed-width text workbooks (`litchi-sheet-text`).
+#[cfg(feature = "sheet-text")]
+pub mod text {
+    pub use litchi_sheet_text::*;
+}
 
 #[cfg(feature = "eval")]
 pub use eval::FormulaEvaluator;
