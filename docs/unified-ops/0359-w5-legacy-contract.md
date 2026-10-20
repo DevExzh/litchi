@@ -1,7 +1,8 @@
 # 0359 — W5: DOC, XLS, RTF and the shared legacy crates on the record 0351 contract
 
 - Status: implemented on `uo2/w5-legacy`, cut from `feat/unified-ops-api` at
-  `184dd4d908`, merged with trunk `94ccc434c8` (`515facc3c0`).
+  `184dd4d908`, merged with trunk twice (`515facc3c0` at `94ccc434c8`, `99eb713051` at
+  `f8899dd2cb`, which carries record 0358a).
 - Date: 2026-10-20.
 - Input: owner decision [0350](0350-owner-api-debt-decision.md); contract
   [0351](0351-api-contract.md) §2, §3.4, §4.3, §5 (wave W5); worked
@@ -70,7 +71,7 @@ byte-identical outputs; consumers were migrated in the same commits.
 | `789100cfa3` | RTF: `raw::Tree`, limits through options, redact commit triad |
 | `2eca78b99d`, `032eea8f42` | XLS/ole-common: commit accessors, alias removal, `property_set::Edit` |
 | `720041f8bb` | gate registrations |
-| `515facc3c0` | trunk merge |
+| `515facc3c0`, `99eb713051` | trunk merges |
 | `137461188f`, `c1cbb72cbc`, `94ab9057e7` | XLS-only build fix, probe, glossary line; fidelity re-bless; `cell_values::Limits`, native-resave |
 | this record | record, ABBA evidence, bench-matrix parser, typed property-set `into_parts` |
 
@@ -177,7 +178,8 @@ agents on other CPUs). `tools/unified_bench_matrix.py` gains `p0359`.
 
 ## 8. Gates
 
-On the head after the trunk merge, one cargo command at a time.
+Re-run in full on the head after the final trunk merge (`99eb713051`), one
+cargo command at a time; the working tree was clean afterwards.
 
 | Command | Exit |
 |---|---|
@@ -189,7 +191,7 @@ On the head after the trunk merge, one cargo command at a time.
 | `cargo test -p litchi --all-features` (209); `cargo test -p litchi-cli --all-features --test officecli_corpus` | 0; 0 |
 | `LITCHI_BLESS=1 cargo test -p litchi-ops --all-features --test capabilities --test registry`, and with every feature but `encryption` | 0, 0 (no change) |
 | `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p` the six crates, `litchi-ops`, `litchi` | 0 |
-| `RUSTC_BOOTSTRAP=1 tools/check_api_glossary.py` (47 profiles, 3,172 bans, 479 families, 69 owners) | 0 |
+| `RUSTC_BOOTSTRAP=1 tools/check_api_glossary.py` (47 profiles, 3,195 bans, 483 families, 71 owners) | 0 |
 | `check_crate_boundaries.py`; `non_iwork_gate.py verify` | 0; 0 |
 | `crates/pyo3-litchi/tests/run_tests.sh` | 0 |
 | `tools/perf-baseline`: `cargo check --locked --all-targets`; `tools/native-resave`: `cargo check --locked --all-features` | 0; 0 (after `94ab9057e7`) |
