@@ -30,13 +30,13 @@ fn exercise_generated_invalid(data: &[u8]) {
 
 fn exercise_generated_valid(data: &[u8]) {
     let xml = Oracle::new(data).valid_document();
-    let root = codec::parse(&xml)
+    let root = codec::parse(&xml, codec::Limits::default())
         .unwrap_or_else(|error| panic!("generated valid XML failed to parse: {error}: {xml}"));
     codec::validate(&root)
         .unwrap_or_else(|error| panic!("generated valid tree failed validation: {error}: {xml}"));
     let compact = codec::serialize(&root);
     assert!(!compact.contains('\n'));
-    let reparsed = codec::parse(&compact).expect("serialized generated tree must parse");
+    let reparsed = codec::parse(&compact, codec::Limits::default()).expect("serialized generated tree must parse");
     assert_eq!(reparsed, root);
     let package = Builder::from_mathml(xml.as_str())
         .build()
@@ -59,7 +59,7 @@ fn exercise_package(data: &[u8]) {
         let content = formula
             .content_xml()
             .expect("accepted package content must read");
-        let parsed = codec::parse(&content).expect("accepted package content must parse");
+        let parsed = codec::parse(&content, codec::Limits::default()).expect("accepted package content must parse");
         codec::validate(&parsed).expect("accepted package content must validate");
         assert_eq!(formula.root(), &parsed);
         let reopened =
@@ -73,12 +73,12 @@ fn exercise_xml(data: &[u8]) {
     let Ok(xml) = std::str::from_utf8(data) else {
         return;
     };
-    let Ok(root) = codec::parse(xml) else {
+    let Ok(root) = codec::parse(xml, codec::Limits::default()) else {
         return;
     };
     let valid = codec::validate(&root).is_ok();
     let compact = codec::serialize(&root);
-    let reparsed = codec::parse(&compact).expect("serialized parsed tree must parse");
+    let reparsed = codec::parse(&compact, codec::Limits::default()).expect("serialized parsed tree must parse");
     assert_eq!(reparsed, root);
     assert_eq!(codec::validate(&reparsed).is_ok(), valid);
     if valid {

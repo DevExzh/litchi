@@ -1,7 +1,8 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
+use litchi_odi::flat::Image as FlatImage;
 use litchi_odi::{
-    Builder, FlatImage, FrameEditor, History,
+    Builder, FrameEditor, History,
     frame::Frame,
     map::{Area, AreaKind, ImageMap},
     source::Source,
@@ -32,7 +33,7 @@ fn edit_frame(editor: &mut impl FrameEditor) {
 
 #[test]
 fn image_maps_and_broader_frame_semantics_are_inert_and_bounded() {
-    let image = FlatImage::from_bytes(FLAT.as_bytes().to_vec()).unwrap();
+    let image = FlatImage::from_bytes(FLAT.as_bytes()).unwrap();
     let frame = image.frame().unwrap();
     assert_eq!(frame.style_name(), Some("gr1"));
     assert_eq!(frame.text_style_name(), Some("P1"));
@@ -60,10 +61,10 @@ fn image_maps_and_broader_frame_semantics_are_inert_and_bounded() {
 #[test]
 fn malformed_image_maps_are_rejected() {
     let missing_geometry = FLAT.replace(r#" svg:width="1cm""#, "");
-    assert!(FlatImage::from_bytes(missing_geometry.into_bytes()).is_err());
+    assert!(FlatImage::from_bytes(missing_geometry.as_bytes()).is_err());
 
     let duplicate = FLAT.replace("</draw:image-map>", "</draw:image-map><draw:image-map/>");
-    assert!(FlatImage::from_bytes(duplicate.into_bytes()).is_err());
+    assert!(FlatImage::from_bytes(duplicate.as_bytes()).is_err());
 
     let spoofed = FLAT
         .replace("draw:area-circle", "fake:area-circle")
@@ -71,7 +72,7 @@ fn malformed_image_maps_are_rejected() {
             "xmlns:xlink=",
             r#"xmlns:fake="urn:not-drawing" xmlns:xlink="#,
         );
-    assert!(FlatImage::from_bytes(spoofed.into_bytes()).is_err());
+    assert!(FlatImage::from_bytes(spoofed.as_bytes()).is_err());
 }
 
 #[test]
@@ -156,6 +157,7 @@ fn authored_maps_styles_metadata_and_graph_round_trip() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
@@ -163,10 +165,10 @@ fn authored_maps_styles_metadata_and_graph_round_trip() {
 
 #[test]
 fn shared_edit_contract_and_history_work_for_flat_and_package_snapshots() {
-    let source = FlatImage::from_bytes(FLAT.as_bytes().to_vec()).unwrap();
-    let mut edit = source.transaction();
+    let source = FlatImage::from_bytes(FLAT.as_bytes()).unwrap();
+    let mut edit = source.edit();
     edit_frame(&mut edit);
-    let target = edit.commit().unwrap().into_snapshot();
+    let target = edit.commit().unwrap().into_package();
     let mut history = History::new(source.clone(), 3).unwrap();
     assert!(history.record(&source, target.clone()).unwrap());
     assert_eq!(history.undo().unwrap().as_bytes(), source.as_bytes());

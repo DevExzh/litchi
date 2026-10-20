@@ -102,6 +102,15 @@ pub struct Commit {
 }
 
 impl Commit {
+    pub(crate) fn replayed(package: crate::Package, primary: crate::transaction::Patch) -> Self {
+        let changed = !primary.is_noop();
+        Self {
+            package,
+            patch: Patch(primary),
+            diagnostics: Diagnostics { changed, fields: 0 },
+        }
+    }
+
     /// The committed package.
     #[must_use]
     pub const fn package(&self) -> &crate::Package {

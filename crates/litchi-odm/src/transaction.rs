@@ -1048,6 +1048,10 @@ pub struct Commit {
 }
 
 impl Commit {
+    pub(crate) fn replayed(package: Package, patch: Patch) -> Self {
+        Self { package, patch }
+    }
+
     fn new(source: &Package, package: Package, changes: ChangeSet) -> Self {
         Self {
             patch: Patch {

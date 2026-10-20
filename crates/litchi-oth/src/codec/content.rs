@@ -154,7 +154,7 @@ struct ActiveLink {
 
 /// Validate compact XML supplied to the fresh-package authoring boundary.
 pub(crate) fn validate_authored(xml: &str) -> Result<()> {
-    compact_xml::validate(xml.as_bytes()).map_err(Error::from)?;
+    compact_xml::validate(xml.as_bytes(), compact_xml::Limits::default()).map_err(Error::from)?;
     validate_structure(xml)
 }
 

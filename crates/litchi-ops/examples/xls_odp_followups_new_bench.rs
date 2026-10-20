@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     use std::time::Instant;
 
     use litchi_core::Position;
-    use litchi_odp::scene::{Change, CommonStyles, ObjectRef, Scene, StoryRef, TextPropertyEdit};
+    use litchi_odp::scene::{Change, CommonStyles, ObjectRef, Scene, StoryRef, TextPropertyUpdate};
     use litchi_ops::{NewNode, OpenOptions, Placement, SourceMode, props};
     use litchi_xls::cell_values::Selector;
     use litchi_xls::formula_metadata::Range;
@@ -181,7 +181,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if wanted("odp_shape_format") {
             let native = litchi_odp::Package::from_bytes(&bytes)?;
             let unified = litchi_ops::open_bytes(bytes.clone())?;
-            let mut properties = TextPropertyEdit::new();
+            let mut properties = TextPropertyUpdate::new();
             properties.bold = Some(true);
             let changes: Vec<Change> = (0..2)
                 .map(|paragraph| Change::SetTextProperties {

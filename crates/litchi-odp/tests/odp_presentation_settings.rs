@@ -132,7 +132,7 @@ fn source_checked_insert_remove_preserves_page_identity_and_references() {
         .package()
         .apply(&inserted.patch().inverse())
         .unwrap();
-    assert_eq!(restored.as_bytes(), source.as_bytes());
+    assert_eq!(restored.into_package().as_bytes(), source.as_bytes());
 }
 
 #[test]

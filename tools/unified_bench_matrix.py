@@ -2718,6 +2718,36 @@ def pptx_contract_rows(record):
     return out
 
 
+W6_ODF_OPS = {"open_get": "open", "set": "set", "batch1k": "batch"}
+
+
+@needs("0358")
+def p0358():
+    """Record 0358 §8 (W6 ODF contract): odf_w6_probe, one source built on
+    the wave's base (trunk) and head, run A-B-B-A pinned in release; one
+    after/before row per unified route (median of the after runs over the
+    median of the before runs)."""
+    base = RES / "0358"
+    legs: dict = {"before": {}, "after": {}}
+    paths = sorted(base.glob("probe-*-*.json"))
+    for path in paths:
+        leg = path.name.split("-")[1]
+        for r in load_json(path):
+            legs[leg].setdefault(r["scenario"], []).append(r["median_us"])
+    out = []
+    for scen, after in legs["after"].items():
+        before = legs["before"].get(scen)
+        if not before:
+            continue
+        fmt, op = scen.split("/")
+        b, a = med(before), med(after)
+        size = "1k ops" if op == "batch1k" else ""
+        out.append(row("0358", fmt, W6_ODF_OPS.get(op, op), f"File {op.replace('_', ' ')} ({fmt}, W6 head vs base)",
+                       size, b, a, [a / b], regression("0358"), f"odf_w6_probe:{scen}:after-before",
+                       src(paths), comparison="after/before"))
+    return out
+
+
 @needs("0357a")
 def p0357a():
     """Record 0357a: record-sized scoped-family patches (1,000 retained
@@ -2765,7 +2795,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0306, p0307, p0308, p0309, p0310, p0311, p0312,
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
-           p0347, p0348, p0355, p0355a, p0356, p0356a, p0357, p0357a]
+           p0347, p0348, p0355, p0355a, p0356, p0356a, p0357, p0357a, p0358]
 
 
 

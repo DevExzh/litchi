@@ -263,7 +263,10 @@ mod ordinary_ods_detection {
     fn ordinary_ods_remains_detectable_without_an_opc_catalog() {
         let bytes = odf_package(MIME, CONTENT);
         assert_eq!(
-            litchi::odf_common::detect::packaged_has_ooxml_catalog(&bytes),
+            litchi::odf_common::detect::packaged_has_ooxml_catalog(
+                &bytes,
+                litchi::odf_common::detect::CatalogProbeLimits::default()
+            ),
             Some(false)
         );
         assert_eq!(detect_file_format_from_bytes(&bytes), Some(FileFormat::Ods));
@@ -297,7 +300,10 @@ mod ordinary_odp_detection {
     fn ordinary_odp_remains_detectable_without_an_opc_catalog() {
         let bytes = odf_package(MIME, CONTENT);
         assert_eq!(
-            litchi::odf_common::detect::packaged_has_ooxml_catalog(&bytes),
+            litchi::odf_common::detect::packaged_has_ooxml_catalog(
+                &bytes,
+                litchi::odf_common::detect::CatalogProbeLimits::default()
+            ),
             Some(false)
         );
         assert_eq!(detect_file_format_from_bytes(&bytes), Some(FileFormat::Odp));

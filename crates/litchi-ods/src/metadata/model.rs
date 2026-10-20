@@ -65,7 +65,7 @@ impl Snapshot {
 
     /// Start an isolated metadata transaction.
     #[must_use]
-    pub fn transaction(&self) -> Transaction<'_> {
+    pub(crate) fn transaction(&self) -> Transaction<'_> {
         Transaction::from_snapshot(self)
     }
 }

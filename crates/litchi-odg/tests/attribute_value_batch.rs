@@ -115,6 +115,7 @@ fn shape_values_are_normalized_and_noop_edit_and_inverse_preserve_source() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );

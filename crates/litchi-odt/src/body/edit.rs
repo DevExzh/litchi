@@ -19,7 +19,7 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 
 use super::kept::Kept;
-use super::properties::{ParagraphPropertyEdit, TextPropertyEdit, check_length};
+use super::properties::{ParagraphPropertyUpdate, TextPropertyUpdate, check_length};
 use super::xml::{self, Ns, Prefixes};
 use super::{Attribute, AutomaticInsert, Body, Kind, Node, NodeId, Style};
 use crate::Document;
@@ -88,7 +88,7 @@ pub enum NewNode {
         /// The text.
         text: String,
         /// Formatting for a new automatic text style.
-        properties: TextPropertyEdit,
+        properties: TextPropertyUpdate,
     },
     /// An inert hyperlink (`text:a`).
     Hyperlink {
@@ -211,8 +211,8 @@ struct NodeEdit {
     /// What a text set keeps (record 0304): elements of the old content
     /// that add no text, at their character offsets.
     kept: Vec<Kept>,
-    text_properties: Option<TextPropertyEdit>,
-    paragraph_properties: Option<ParagraphPropertyEdit>,
+    text_properties: Option<TextPropertyUpdate>,
+    paragraph_properties: Option<ParagraphPropertyUpdate>,
     /// Raw replacement of the whole element (move source, swap).
     replacement: Option<Replacement>,
 }
@@ -552,7 +552,7 @@ impl BodyEdits {
         &mut self,
         body: Body<'_>,
         id: NodeId,
-        properties: &TextPropertyEdit,
+        properties: &TextPropertyUpdate,
     ) -> Result<()> {
         let target = node(body, id)?;
         properties.validate()?;
@@ -573,7 +573,7 @@ impl BodyEdits {
         self.claim(body, id, range, claim)?;
         self.edit_mut(id)
             .text_properties
-            .get_or_insert_with(TextPropertyEdit::default)
+            .get_or_insert_with(TextPropertyUpdate::default)
             .merge(properties);
         Ok(())
     }
@@ -583,7 +583,7 @@ impl BodyEdits {
         &mut self,
         body: Body<'_>,
         id: NodeId,
-        properties: &ParagraphPropertyEdit,
+        properties: &ParagraphPropertyUpdate,
     ) -> Result<()> {
         let target = node(body, id)?;
         properties.validate()?;
@@ -596,7 +596,7 @@ impl BodyEdits {
         self.claim(body, id, start_tag_range(target), Claim::StartTag)?;
         self.edit_mut(id)
             .paragraph_properties
-            .get_or_insert_with(ParagraphPropertyEdit::default)
+            .get_or_insert_with(ParagraphPropertyUpdate::default)
             .merge(properties);
         Ok(())
     }
@@ -1556,8 +1556,8 @@ impl StyleAllocator {
         body: Body<'_>,
         family: StyleFamily,
         base: Option<&str>,
-        text: Option<&TextPropertyEdit>,
-        paragraph: Option<&ParagraphPropertyEdit>,
+        text: Option<&TextPropertyUpdate>,
+        paragraph: Option<&ParagraphPropertyUpdate>,
     ) -> Result<String> {
         let key = format!("{family:?}|{base:?}|{text:?}|{paragraph:?}");
         if let Some((_, name)) = self.keys.iter().find(|(held, _)| *held == key) {
@@ -1577,9 +1577,9 @@ impl StyleAllocator {
                 break candidate;
             }
         };
-        let text_changes = text.map(TextPropertyEdit::attributes).unwrap_or_default();
+        let text_changes = text.map(TextPropertyUpdate::attributes).unwrap_or_default();
         let paragraph_changes = paragraph
-            .map(ParagraphPropertyEdit::attributes)
+            .map(ParagraphPropertyUpdate::attributes)
             .unwrap_or_default();
         let tabs = paragraph.and_then(|paragraph| paragraph.tab_stops_xml(prefixes));
         let automatic = base.and_then(|base| body.automatic_style(base));

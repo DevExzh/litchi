@@ -1215,7 +1215,7 @@ impl Edit {
     }
 
     /// Validate and publish the edit under a retained execution context.
-    pub fn commit(&mut self, context: &ExecutionContext) -> CoreResult<Commit> {
+    pub(crate) fn commit(&mut self, context: &ExecutionContext) -> CoreResult<Commit> {
         self.before.context().check().map_err(map_execution_core)?;
         context.check().map_err(map_execution_core)?;
         if self.before.enforce_context_lineage()
@@ -1354,7 +1354,7 @@ impl Edit {
 
 /// A complete DDE transaction result.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     changed: bool,
@@ -1363,26 +1363,26 @@ pub struct Commit {
 impl Commit {
     /// Whether source bytes changed.
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
     }
 
     /// Borrow the typed post-commit snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the exact reversible patch.
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &Patch {
         &self.patch
     }
 }
 
 /// An exact-source, reversible `content.xml` DDE patch.
 #[derive(Clone, Debug)]
-pub struct Patch {
+pub(crate) struct Patch {
     source: Arc<Snapshot>,
     target: Arc<Snapshot>,
 }
@@ -1398,7 +1398,7 @@ impl Eq for Patch {}
 impl Patch {
     /// Whether the patch preserves source bytes exactly.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         // Commits that preserve bytes intentionally retain one Arc for both
         // endpoints.  Use that O(1) invariant instead of scanning the whole
         // content XML from a non-fallible query.
@@ -1407,25 +1407,25 @@ impl Patch {
 
     /// Whether the patch changes source bytes.
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         !self.is_empty()
     }
 
     /// Return the exact source XML this patch expects.
     #[must_use]
-    pub fn source_xml(&self) -> &str {
+    pub(crate) fn source_xml(&self) -> &str {
         self.source.source_xml()
     }
 
     /// Return the exact target XML this patch publishes.
     #[must_use]
-    pub fn target_xml(&self) -> &str {
+    pub(crate) fn target_xml(&self) -> &str {
         self.target.source_xml()
     }
 
     /// Return the exact inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             source: Arc::clone(&self.target),
             target: Arc::clone(&self.source),
@@ -1434,7 +1434,7 @@ impl Patch {
 
     /// Apply the patch to an exact source snapshot under its destination
     /// limits and retained context.
-    pub fn apply(&self, snapshot: &Snapshot) -> CoreResult<Commit> {
+    pub(crate) fn apply(&self, snapshot: &Snapshot) -> CoreResult<Commit> {
         self.source.context().check().map_err(map_execution_core)?;
         snapshot.context().check().map_err(map_execution_core)?;
         if !compare_xml_bytes(

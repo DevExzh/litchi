@@ -173,9 +173,12 @@ fn slide_and_rdf_edits_publish_as_one_reversible_package_commit() {
     assert!(!rdf.contains('\n'));
     assert!(!rdf.contains("> <"));
 
-    let applied = source.apply(commit.patch()).unwrap();
+    let applied = source.apply(commit.patch()).unwrap().into_package();
     assert_eq!(applied.as_bytes(), commit.package().as_bytes());
-    let restored = applied.apply(&commit.patch().inverse()).unwrap();
+    let restored = applied
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.as_bytes(), source.as_bytes());
 
     assert_eq!(
@@ -192,7 +195,11 @@ fn slide_and_rdf_edits_publish_as_one_reversible_package_commit() {
     let durable_patch = edit::Patch::from_durable_bytes(&durable).unwrap();
     assert_eq!(durable_patch.domains(), commit.patch().domains());
     assert_eq!(
-        source.apply(&durable_patch).unwrap().as_bytes(),
+        source
+            .apply(&durable_patch)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         commit.package().as_bytes()
     );
     let mut malformed = durable;

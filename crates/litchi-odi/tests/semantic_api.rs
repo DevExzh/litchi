@@ -116,7 +116,11 @@ fn package_resources_are_inert_typed_and_preserved_by_edits() {
         Some("image/webp")
     );
     assert_eq!(
-        target.apply(&commit.patch().inverse()).unwrap().as_bytes(),
+        target
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 
@@ -248,6 +252,7 @@ fn package_edit_is_source_checked_reversible_and_preserves_unknown_content() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );

@@ -308,13 +308,19 @@ mod dynamic_text;
 pub mod frame;
 pub mod header_footer;
 pub mod index;
+#[cfg(test)]
+mod internal_tests;
 #[allow(
     unused_imports,
     reason = "internal XML helper used by moved ODF modules"
 )]
 pub(crate) use index::expanded_attributes;
 pub mod index_mark;
-pub mod mutable;
+#[allow(
+    dead_code,
+    reason = "record 0358: `MutableDocument` is the crate-private model behind `Builder` and `Edit`; its read views serve the unit regressions"
+)]
+pub(crate) mod mutable;
 pub mod note;
 pub(crate) use note::parse_notes;
 pub mod page_layout;

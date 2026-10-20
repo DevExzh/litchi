@@ -65,5 +65,4 @@ pub use repair::{
 };
 pub use validation::{
     DEFAULT_ODF_VALIDATION_LIMITS, OdfValidationError, OdfValidationLimits, validate_package,
-    validate_package_with_limits,
 };

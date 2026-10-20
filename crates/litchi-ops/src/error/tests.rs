@@ -1634,6 +1634,35 @@ fn edit_refusals_classify_by_kind_alone() {
     }
 }
 
+// Record 0358 (W6): ODF refusals classify by kind alone, a patch made for
+// another base is the caller's input, and a changed write of a signed
+// package is protected.
+#[cfg(any(
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
+    feature = "odf-objects"
+))]
+#[test]
+fn odf_refusals_classify_by_kind_and_patch_conflicts_are_invalid_input() {
+    use litchi_core::edit::RefusalKind;
+    use litchi_odf_common::Error as OdfError;
+
+    use super::Classify as _;
+
+    for kind in RefusalKind::ALL.iter().copied() {
+        let error = OdfError::refused(kind, "operation", "reason");
+        assert_eq!(error.classify().code, kind.classify().code, "{kind}");
+    }
+    assert_eq!(
+        OdfError::patch_conflict("operation", "reason")
+            .classify()
+            .code,
+        Code::InvalidInput
+    );
+    assert_eq!(OdfError::Signed.classify().code, Code::DocumentProtected);
+}
+
 // Record 0351 (W1): DOCX refusals classify by kind alone, a patch made for
 // another base is the caller's input, and a broken invariant is internal.
 #[cfg(feature = "docx")]

@@ -1,0 +1,142 @@
+use super::support;
+use crate::bibliography_configuration::{Configuration, Field, SortKey};
+use crate::{Document, Package};
+
+const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
+const STYLES: &str =
+    include_str!("../../../../test-data/odf/odt/bibliography-configuration-styles.xml");
+
+fn package(styles: &str) -> Package {
+    let content = format!(
+        r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TEXT}" o:version="1.3"><o:body><o:text><t:p>Body</t:p></o:text></o:body></o:document-content>"#
+    );
+    Package::from_bytes(&support::package(
+        MIMETYPE,
+        &[
+            ("content.xml", content.as_bytes()),
+            ("styles.xml", styles.as_bytes()),
+        ],
+    ))
+    .unwrap()
+}
+
+fn document(styles: &str) -> Document {
+    package(styles).document().unwrap()
+}
+
+fn fixture_configuration() -> Configuration {
+    Configuration {
+        prefix: Some("[".to_string()),
+        suffix: Some("]".to_string()),
+        numbered_entries: Some(true),
+        sort_by_position: Some(false),
+        sort_algorithm: Some("unicode".to_string()),
+        language: Some("en".to_string()),
+        country: Some("US".to_string()),
+        script: Some("Latn".to_string()),
+        rfc_language_tag: Some("en-US".to_string()),
+        sort_keys: vec![
+            SortKey {
+                field: Field::Author,
+                ascending: Some(true),
+            },
+            SortKey {
+                field: Field::Year,
+                ascending: Some(false),
+            },
+            SortKey {
+                field: Field::Isbn,
+                ascending: None,
+            },
+        ],
+    }
+}
+
+fn replacement_configuration() -> Configuration {
+    Configuration {
+        prefix: Some("(".to_string()),
+        suffix: Some(")".to_string()),
+        numbered_entries: Some(false),
+        language: Some("de".to_string()),
+        country: Some("DE".to_string()),
+        rfc_language_tag: Some("de-DE".to_string()),
+        sort_keys: vec![SortKey {
+            field: Field::Title,
+            ascending: Some(false),
+        }],
+        ..Default::default()
+    }
+}
+
+#[test]
+fn document_reads_styles_bibliography_configuration() {
+    let expected = fixture_configuration();
+    let source_package = package(STYLES);
+    let source = source_package.document().unwrap();
+
+    assert_eq!(
+        source.bibliography_configuration().unwrap(),
+        Some(expected.clone())
+    );
+    assert_eq!(
+        source
+            .variable_declarations()
+            .unwrap()
+            .bibliography_configuration,
+        Some(expected.clone())
+    );
+    let generic = crate::generic::Package::from_bytes(&source_package.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        generic.bibliography_configuration().unwrap(),
+        Some(expected)
+    );
+}
+
+#[test]
+fn mutable_document_replaces_removes_and_inserts_bibliography_configuration() {
+    let original = fixture_configuration();
+    let replacement = replacement_configuration();
+    let compact_styles = support::compact_xml_fixture(STYLES);
+    let mut mutable =
+        crate::mutable::MutableDocument::from_document(document(&compact_styles)).unwrap();
+
+    assert_eq!(
+        mutable
+            .set_bibliography_configuration(&replacement)
+            .unwrap(),
+        Some(original)
+    );
+    assert_eq!(
+        mutable.bibliography_configuration().unwrap(),
+        Some(replacement.clone())
+    );
+
+    let reopened = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
+    assert_eq!(
+        reopened.bibliography_configuration().unwrap(),
+        Some(replacement.clone())
+    );
+    let styles = String::from_utf8(reopened.get_file("styles.xml").unwrap()).unwrap();
+    assert!(styles.contains(r#"<style:style style:name="Keep" style:family="paragraph"/>"#));
+
+    assert_eq!(
+        mutable.clear_bibliography_configuration().unwrap(),
+        Some(replacement.clone())
+    );
+    assert_eq!(mutable.bibliography_configuration().unwrap(), None);
+    assert_eq!(
+        mutable
+            .set_bibliography_configuration(&replacement)
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        mutable.bibliography_configuration().unwrap(),
+        Some(replacement)
+    );
+}

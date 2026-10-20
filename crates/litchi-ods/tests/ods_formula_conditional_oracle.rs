@@ -76,7 +76,8 @@ fn compare(function: &str) {
     );
     for row in rows.iter().filter(|row| row["function"] == function) {
         let formula = row["formula"].as_str().expect("formula");
-        let expression = Expression::parse(formula).expect("reference expression parses");
+        let expression =
+            Expression::parse(formula, &Default::default()).expect("reference expression parses");
         let cells = Cells(
             row["cells_bits"]
                 .as_array()

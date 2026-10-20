@@ -5,7 +5,7 @@ use std::path::Path;
 use litchi_core::detection::FileFormat;
 use litchi_odf_common::{Error, LimitKind, OpenOptions, SourceLimitKind, SourceLimits};
 
-use super::{Edit, Formula, Package, Patch};
+use super::{Commit, Edit, Formula, Package, Patch};
 use crate::codec;
 use crate::package::Archive;
 
@@ -87,8 +87,10 @@ impl Package {
     pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> Result<Self, Error> {
         let limits = options.source_limits_value();
         check_input_bytes(bytes.len(), limits)?;
-        let owned =
-            litchi_odf_common::OwnedPackage::from_bytes_with_limits(copy_input(bytes)?, limits)?;
+        let owned = litchi_odf_common::OwnedPackage::from_bytes_with_options(
+            copy_input(bytes)?,
+            OpenOptions::new().source_limits(limits),
+        )?;
         Self::from_owned_with_options(owned, options)
     }
 
@@ -111,10 +113,7 @@ impl Package {
         reader: impl std::io::Read,
         options: OpenOptions,
     ) -> Result<Self, Error> {
-        let owned = litchi_odf_common::OwnedPackage::from_reader_with_limits(
-            reader,
-            options.source_limits_value(),
-        )?;
+        let owned = litchi_odf_common::OwnedPackage::from_reader_with_options(reader, options)?;
         Self::from_owned_with_options(owned, options)
     }
 
@@ -176,14 +175,21 @@ impl Package {
         }
     }
 
-    /// Apply a patch to this exact package.
+    /// Replay a patch onto this exact package; the commit publishes the
+    /// patch's target package with the patch and its change flag.
     ///
     /// # Errors
     ///
-    /// Returns an error when this package is not byte-identical to the patch
-    /// source.
-    pub fn apply(&self, patch: &Patch) -> Result<Self, Error> {
-        Ok(patch.apply(self)?)
+    /// Returns [`Error::PatchConflict`] when this package is not
+    /// byte-identical to the patch source.
+    pub fn apply(&self, patch: &Patch) -> Result<Commit, Error> {
+        if !patch.is_applicable_to(self) {
+            return Err(Error::patch_conflict(
+                "formula.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(Commit::replayed(patch.apply(self)?, patch.clone()))
     }
 
     /// Atomically replace `path` with this package (full durability).

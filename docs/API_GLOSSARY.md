@@ -146,7 +146,7 @@ line. A line is ✅ when the wave's gate registrations pass.
 | W3 | PPT | ✅ | ✅ 12 scoped families publish a `Package` (0357) | ✅ banned crate-wide (0357) | ➖ (typed `slide_order`/`text_edit` refusals gain `kind()`) | ✅ `raw::Reader`/`SourceBackedPackage` `*_with_options`, `_with_limits` banned (0357) | ✅ 0357 |
 | W4 | XLSX, XLSB, `litchi-ooxml-common` | 🔴 | 🔴 | 🔴 | ➖ | 🔴 | 🔴 |
 | W5 | DOC, XLS, RTF, `litchi-ograph`, `litchi-ole-common`, `litchi-crypto` | 🔴 (DOC `raw::Package`, RTF `raw::Document`) | 🔴 | 🔴 | 🔴 (XLS, ograph) | 🔴 | 🔴 |
-| W6 | ODF (`litchi-odf-common`, ODT, ODS, ODP, ODG, ODC, ODI, ODM, OTH, ODB, ODF-formula) | 🔴 (ODT `generic::Package`, `odc::Document`, `MutableDocument`) | 🔴 | 🔴 | ➖ | 🔴 (flat owners, ODC `Limits`) | 🔴 |
+| W6 | ODF (`litchi-odf-common`, ODT, ODS, ODP, ODG, ODC, ODI, ODM, OTH, ODB, ODF-formula) | ✅ (0358; every `Package`, projection and flat owner, ODT `generic::{Package, flat::Document}` and `odc::Document`; `MutableDocument` crate-private behind `Package::edit`, ODS `builder::Workbook` draft) | ✅ (0358; primary, metadata, flat, generic, chart and ODM title/link families registered; part-level drafts are closure arguments of `Package::edit`) · 🔴 the four source-backed stream publishers (ODS `SourceCell*`, `dde::Source*`, `sheet_metadata::SourceMetadata*`, ODP `tail_append`; 0358 gap 1) | ✅ (0358; banned crate-wide in all eleven profiles) | ✅ (0358; `Refused`/`PatchConflict`/`Signed`, refusal `kind()`s) | ✅ (0358; flat owners and ODC chart limits on `OpenOptions`/`SemanticLimits`, `_with_limits` banned) | ✅ 0358 |
 | W7 | iWork (Pages, Keynote, Numbers) | ✅ | 🔴 (`into_parts`) | ✅ | ➖ | 🔴 (`MergeReader`, `Workbook`) | 🔴 |
 | W8 | unified `File` (`litchi-ops`, facade, CLI, Python) | ➖ | ➖ | ➖ | ➖ | 🔴 (`File::*_with_limits`, `detect::*_with_limits`) | 🔴 |
 
@@ -181,7 +181,7 @@ line. A line is ✅ when the wave's gate registrations pass.
 | Ingress limit exceeded | `Error::Limit { kind, observed, maximum }` | `OpcError::ReadLimit`, facade `ResourceLimit` mapping drift | ✅ OPC (0036), DOC (0192), XLS (0196), PPT (0210) kind/observed/maximum; ✅ XLSB cell-values transaction bounds (`PackageError::Limit`, 0261); broader taxonomy pending |
 | Limit kind enums | `SourceLimitKind` / `SemanticLimitKind` | `ReadResource`, per-crate one-off kinds | ✅ keynote (0298) `SourceLimitKind`/`SemanticLimitKind` with `as_str()` nouns and `LimitKind::{Source, Semantic}`; ✅ OPC/OOXML (0036), DOC (0192), XLS (0196), PPT (0210) `SourceLimitKind`; ✅ XLSB `cell_values::LimitKind` (0261); other semantic kinds pending |
 | Dimension naming | nouns (`input_bytes`, `members`, `entry_bytes`, `aggregate_bytes`, `depth`, `events`, …); setters `max_<noun>` | a second name for an existing dimension | ✅ OPC common nouns (0037); shared defaults remain 512 MiB input and XML depth 256; other families pending |
-| Coverage policy | caller-selected limits on **every** public ingress path | — | ✅ PPT package/record ingress (0210), XLS eager ingress (0196); ✅ ODT/ODS/ODP `Package`, source-backed and catalog ingress via `OpenOptions` with typed `Error::{Limit, InvalidLimit}` (0268); ✅ OTH/ODM/ODG/ODC/ODI/ODB/ODF-formula `Package` ingress, `from_prepared_package` included (0282); 🔴 ODF flat owners (`FlatDrawing` and `FlatPresentation` take no caller limits; the flat ODT/ODS/ODC owners take their crate `Limits`, not `OpenOptions`) and the ODC chart `Limits` (0343 D6 → 0351 §2a) |
+| Coverage policy | caller-selected limits on **every** public ingress path | — | ✅ PPT package/record ingress (0210), XLS eager ingress (0196); ✅ ODT/ODS/ODP `Package`, source-backed and catalog ingress via `OpenOptions` with typed `Error::{Limit, InvalidLimit}` (0268); ✅ OTH/ODM/ODG/ODC/ODI/ODB/ODF-formula `Package` ingress, `from_prepared_package` included (0282); ✅ ODF flat owners `flat::{Document, Workbook, Presentation, Drawing, Chart, Image}` and `generic::flat::Document` take `OpenOptions`; the ODC chart `Limits` fold into `SemanticLimits` (0358) |
 
 ### RTF source dimensions
 
@@ -280,6 +280,38 @@ by content-types, relationships and supported source-preserving XML operations;
 this ledger does not imply that every format-semantic reader uses this profile.
 Local validation/custom-data XML policies retain their own names pending their
 semantic-limit migrations.
+
+### ODF semantic dimensions
+
+`litchi_odf_common::SemanticLimits` (in `OpenOptions::semantic_limits`)
+bounds the projections every ODF crate parses; `SemanticLimitKind::as_str()`
+is the noun and `Error::Limit { kind: LimitKind::Semantic(..), .. }` the
+exceeded error (record 0358). A flat (single-file) owner is bounded by the
+smaller of the source `input_bytes` and `content_bytes`. Each default is the
+most permissive bound an ODF reader enforced before the dimension was shared;
+a caller tightens it.
+
+| Dimension | Default | Ceiling | Meaning |
+|---|---|---|---|
+| `content_bytes` | 256 MiB | 256 MiB | `content.xml` (and a flat document) bytes |
+| `styles_bytes` | 256 MiB | 256 MiB | `styles.xml` bytes |
+| `units` | 1,048,576 | 1,048,576 | semantic units (paragraphs, cells, shapes) of one projection |
+| `depth` | 4,096 | 4,096 | XML nesting depth |
+| `text_bytes` | 16 MiB | 16 MiB | one text run, paragraph or map text |
+| `edits` | 1,024 | 1,024 | staged edits of one flat transaction |
+| `shapes` | 1,000,000 | 1,000,000 | drawing shapes |
+| `frames` | 1,000,000 | 1,000,000 | image frames |
+| `map_areas` | 100,000 | 100,000 | image-map areas |
+| `output_bytes` | 256 MiB | 256 MiB | serialized output of one commit |
+| `axes` | 16,384 | 16,777,216 | chart axes |
+| `series` | 65,536 | 16,777,216 | chart series |
+| `data_points` | 16,777,216 | 16,777,216 | chart data points |
+| `cached_rows` | 16,777,216 | 16,777,216 | rows of a chart's cached table |
+| `cached_cells` | 16,777,216 | 16,777,216 | cells of a chart's cached table |
+| `range_items` | 65,536 | 16,777,216 | items of one cell-range list |
+| `resources` | 100,000 | 16,777,216 | package resources one projection references |
+| `history` | 4,096 | 16,777,216 | retained history steps |
+| `scalar_bytes` | 64 KiB | 16 MiB | one scalar value (attribute, cached cell text) |
 
 ## 5. Errors
 

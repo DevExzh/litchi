@@ -71,7 +71,7 @@ fn deterministic_xml_property_corpus_covers_every_constructor_and_raw_ingress() 
             let first = create(&candidate).is_ok();
             let second = create(&candidate).is_ok();
             let raw = open(raw_formula_package(&candidate, None)).is_ok();
-            let parsed = codec::parse(&candidate).is_ok();
+            let parsed = codec::parse(&candidate, codec::Limits::default()).is_ok();
             assert_eq!(
                 first, second,
                 "document {document_index}, mutation {mutation}"
@@ -184,7 +184,11 @@ fn annotations_and_resources_retain_exact_provenance_through_opaque_edit_history
         RESOURCE_BYTES
     );
     assert_eq!(
-        target.apply(&patch.inverse()).expect("inverse").as_bytes(),
+        target
+            .apply(&patch.inverse())
+            .expect("inverse")
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 
@@ -263,9 +267,10 @@ fn deterministic_merge_transfer_and_history_properties_reopen_and_reverse() {
             .apply(&second_patch.inverse())
             .expect("second inverse");
         let restored_base = restored_first
+            .into_package()
             .apply(&first_patch.inverse())
             .expect("first inverse");
-        assert_eq!(restored_base.as_bytes(), base.as_bytes());
+        assert_eq!(restored_base.into_package().as_bytes(), base.as_bytes());
 
         let mut corrupted = durable;
         let index = usize::try_from(deterministic_state(case, 91)).unwrap_or(0) % corrupted.len();

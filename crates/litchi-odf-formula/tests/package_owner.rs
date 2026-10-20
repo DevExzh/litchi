@@ -92,7 +92,7 @@ fn an_exact_no_op_commit_is_the_source_byte_for_byte() {
     assert_eq!(commit.package().as_bytes(), bytes.as_slice());
     let (published, patch) = commit.into_parts();
     assert_eq!(
-        package.apply(&patch).unwrap().as_bytes(),
+        package.apply(&patch).unwrap().into_package().as_bytes(),
         published.as_bytes()
     );
 }
@@ -116,9 +116,13 @@ fn a_real_edit_changes_bytes_and_its_patch_reproduces_them() {
     let (published, patch) = commit.into_parts();
     assert_eq!(published.formula().root().all_text(), "y+1");
     let replayed = package.apply(&patch).unwrap();
-    assert_eq!(replayed.as_bytes(), published.as_bytes());
+    assert_eq!(replayed.into_package().as_bytes(), published.as_bytes());
     assert_eq!(
-        published.apply(&patch.inverse()).unwrap().as_bytes(),
+        published
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_slice()
     );
     assert!(published.apply(&patch).is_err());
@@ -205,7 +209,8 @@ fn caller_selected_limits_are_typed_at_every_ingress() {
 #[test]
 fn a_prepared_package_is_adopted_and_another_family_is_refused() {
     let bytes = fixture();
-    let prepared = litchi_odf_common::detect::prepared(bytes.clone()).expect("prepared Formula");
+    let prepared = litchi_odf_common::detect::prepared(bytes.clone(), SourceLimits::default())
+        .expect("prepared Formula");
     let identity = prepared.prepared_index_identity();
     let package = Package::from_prepared_package(prepared).unwrap();
     assert_eq!(package.as_bytes(), bytes.as_slice());
@@ -216,7 +221,8 @@ fn a_prepared_package_is_adopted_and_another_family_is_refused() {
             .join("../../test-data/odf/corpus/writer-header-footer.odt"),
     )
     .unwrap();
-    let prepared = litchi_odf_common::detect::prepared(text).expect("prepared text");
+    let prepared =
+        litchi_odf_common::detect::prepared(text, SourceLimits::default()).expect("prepared text");
     assert!(matches!(
         Package::from_prepared_package(prepared).unwrap_err(),
         Error::Core(litchi_core::Error::UnexpectedFormat { .. })

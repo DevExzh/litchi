@@ -221,7 +221,7 @@ fn reference_metadata_independent_oracle_matches_all_retained_rows() {
                 .checked_sub(1)
                 .expect("one-based oracle column") as usize,
         );
-        let expression = Expression::parse(formula)
+        let expression = Expression::parse(formula, &Default::default())
             .unwrap_or_else(|error| panic!("{case}: {formula} should parse: {error}"));
         let resolver = MetadataOracleResolver::new();
         let context = Context::new(&execution, position).with_mode(mode);

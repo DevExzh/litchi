@@ -684,7 +684,7 @@ mod tests {
                 zip.finish().unwrap();
             }
 
-            let prepared = crate::detect::prepared(bytes.clone())
+            let prepared = crate::detect::prepared(bytes.clone(), crate::SourceLimits::default())
                 .expect("encrypted ODT framing should remain detectable");
             assert!(prepared.package().get_file("content.xml").is_err());
             let unlocked = OwnedPackage::from_bytes_with_password(bytes.clone(), password).unwrap();

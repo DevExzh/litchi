@@ -282,7 +282,7 @@ fn ods_and_odp_facades_roundtrip_blank_nodes_and_datatypes() {
             language: None,
         },
     };
-    let mut sheet = ods::MutableSpreadsheet::from_workbook(
+    let mut sheet = ods::builder::Workbook::from_workbook(
         ods::Package::from_bytes(&package(
             constants::ODF_SPREADSHEET,
             "spreadsheet",

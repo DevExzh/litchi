@@ -179,9 +179,9 @@ impl Builder {
     /// Stage source-checked inert database-range CRUD in the builder.
     pub fn edit_database_ranges<F>(&mut self, update: F) -> Result<&mut Self>
     where
-        F: FnOnce(&mut crate::database_range::ContentEdit) -> Result<()>,
+        F: FnOnce(&mut crate::database_range::Draft) -> Result<()>,
     {
-        let mut edit = crate::database_range::ContentEdit::from_source(&self.content_xml)?;
+        let mut edit = crate::database_range::Draft::from_source(&self.content_xml)?;
         update(&mut edit)?;
         let commit = edit.commit()?;
         if commit.changed() {

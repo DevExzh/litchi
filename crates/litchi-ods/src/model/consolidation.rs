@@ -389,7 +389,7 @@ fn xml_error(error: quick_xml::Error) -> Error {
 #[cfg(any())]
 mod tests {
     use super::*;
-    use crate::{Builder, MutableSpreadsheet, Workbook};
+    use crate::{Builder, Workbook, builder::Workbook as Draft};
 
     const PREFIX: &str = concat!(
         "<office:document-content ",
@@ -492,7 +492,7 @@ mod tests {
         );
         assert_eq!(spreadsheet.consolidation(), Some(&original));
 
-        let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
+        let mut mutable = Draft::from_spreadsheet(spreadsheet).unwrap();
         mutable
             .set_consolidation(Some(replacement.clone()))
             .unwrap();

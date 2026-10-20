@@ -14,9 +14,8 @@
 /// through a broad module re-export.
 pub mod detect {
     pub use litchi_odf_common::detect::{
-        DEFAULT_MAX_INPUT_BYTES, Format, Limits, bytes, bytes_with_limits, flat, flat_mime,
-        flat_mime_with_limits, flat_with_limits, mime, packaged_mime, packaged_mime_read_at,
-        packaged_mime_read_at_with_limits, packaged_mime_with_limits, reader, reader_with_limits,
+        DEFAULT_MAX_INPUT_BYTES, Format, Limits, bytes, flat, flat_mime, mime, packaged_mime,
+        packaged_mime_read_at, reader,
     };
 }
 

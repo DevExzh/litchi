@@ -146,7 +146,7 @@ impl Snapshot {
     }
 
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit {
             before: self.clone(),
             draft: self.sheets.to_vec(),
@@ -354,7 +354,8 @@ impl Edit {
         self.publish(sheets)
     }
 
-    pub fn rollback(&mut self) {
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
         self.draft = self.before.sheets.to_vec();
     }
 
@@ -363,7 +364,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when validation, compactness, rebuilding, or readback fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         super::package::validate_owned_link_delta(self.before.sheets(), &self.draft)?;
         validation::validate_sheets(&self.draft)?;
         if self.draft.as_slice() == self.before.sheets() {
@@ -388,8 +389,11 @@ impl Edit {
             ),
             None => {
                 let content = super::package::replace_tables(package.content_xml(), &self.draft)?;
-                litchi_odf_common::compact_xml::validate(content.as_bytes())
-                    .map_err(Error::from)?;
+                litchi_odf_common::compact_xml::validate(
+                    content.as_bytes(),
+                    litchi_odf_common::compact_xml::Limits::default(),
+                )
+                .map_err(Error::from)?;
                 (package.replace_content_xml(&content)?, false)
             },
         };
@@ -433,7 +437,7 @@ impl Edit {
 
 /// An exact-source, reversible worksheet patch.
 #[derive(Clone)]
-pub struct Patch {
+pub(crate) struct Patch {
     source: Arc<Vec<u8>>,
     target: Arc<Vec<u8>>,
 }
@@ -450,45 +454,14 @@ impl fmt::Debug for Patch {
 
 impl Patch {
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         self.source != self.target
-    }
-
-    #[must_use]
-    pub fn is_applicable_to(&self, snapshot: &Snapshot) -> bool {
-        self.source.as_slice() == snapshot.as_bytes()
-    }
-
-    /// Apply this patch to its exact source snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for a stale source or invalid target.
-    pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
-        if !self.is_applicable_to(snapshot) {
-            return Err(Error::InvalidFormat(
-                "ODS worksheet patch source snapshot does not match".to_string(),
-            ));
-        }
-        Ok(Commit {
-            snapshot: Snapshot::from_arc(self.target.clone())?,
-            patch: self.clone(),
-            provenance_spliced: false,
-        })
-    }
-
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            source: self.target.clone(),
-            target: self.source.clone(),
-        }
     }
 }
 
 /// A validated worksheet publication.
 #[derive(Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     provenance_spliced: bool,
@@ -508,18 +481,13 @@ impl Commit {
     }
 
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         self.patch.changed()
     }
 
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
     }
 
     pub(crate) const fn content_provenance_spliced(&self) -> bool {
@@ -527,7 +495,7 @@ impl Commit {
     }
 
     #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
+    pub(crate) fn into_snapshot(self) -> Snapshot {
         self.snapshot
     }
 }

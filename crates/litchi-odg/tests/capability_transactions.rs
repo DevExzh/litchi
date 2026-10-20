@@ -84,6 +84,7 @@ fn one_transaction_composes_structure_geometry_style_layers_and_resources() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );

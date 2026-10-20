@@ -26,8 +26,9 @@ mod source_backed;
 mod transaction;
 
 pub use source_backed::{SourceCommit, SourceEdit, SourcePatch, SourceSnapshot};
+pub(crate) use transaction::Patch;
 pub use transaction::{
-    CachedCell, CachedRow, CachedTable, CachedValue, Commit, Edit, LinkSpec, Patch, SheetSelector,
+    CachedCell, CachedRow, CachedTable, CachedValue, Edit, LinkSpec, SheetSelector,
 };
 
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -869,7 +870,7 @@ impl Snapshot {
     ///
     /// The context is checked before every parser step and its input, memory,
     /// and work dimensions are charged.  The same budget lineage is required
-    /// again by [`Edit::commit`], so a numerically equivalent unrelated budget
+    /// again when the edit commits, so a numerically equivalent unrelated budget
     /// cannot be substituted for the retained operation context.
     pub fn parse_with_context(
         content_xml: &str,
@@ -1060,7 +1061,7 @@ impl Snapshot {
 
     /// Begin an immutable, source-checked DDE edit.
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit::new(self.clone())
     }
 

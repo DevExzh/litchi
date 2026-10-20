@@ -21002,11 +21002,11 @@ fn odt_resource_batch_image(
 }
 
 fn odt_media_archive_for_shape(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut document = litchi_odt::mutable::MutableDocument::new();
+    let mut document = litchi_odt::Builder::new();
     for index in 0..shape.docx_paragraphs() {
         document.add_paragraph(&semantic_odt_text(index, false))?;
     }
-    let base = document.to_bytes()?;
+    let base = document.build()?.to_bytes()?;
     let source = ArchiveReader::new(&base)?;
     let mut writer = litchi_odt::core::PackageWriter::new();
     writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
@@ -21596,7 +21596,11 @@ fn build_semantic_odt_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
 fn build_odf_repair_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
     let canonical = build_semantic_odt_corpus(shape)?;
     let archive = inject_mimetype_local_timestamp_extra(canonical.archive.clone())?;
-    let report = litchi_odf_common::validate_package(&archive)?;
+    let report = litchi_odf_common::validate_package(
+        &archive,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )?;
     if !report.is_complete()
         || report.issues().len() != 1
         || report.issues()[0].code() != litchi_odf_common::MIMETYPE_LOCAL_EXTRA_ISSUE
@@ -34384,7 +34388,13 @@ fn run_odf_validation_report(
         corpus,
         warmup_iterations,
         samples,
-        |bytes| Ok(litchi_odf_common::validate_package(bytes)?),
+        |bytes| {
+            Ok(litchi_odf_common::validate_package(
+                bytes,
+                litchi_odf_common::OdfValidationLimits::default(),
+                litchi_core::ValidationLimits::default(),
+            )?)
+        },
         |report, bytes| generic_validation_summary(report, bytes, None, None),
     )
 }
@@ -34394,7 +34404,11 @@ fn verify_odf_mimetype_repair(
 ) -> Result<(OdfRepairSummary, Vec<u8>), Box<dyn Error>> {
     let shape = semantic_shape(corpus)?;
     let canonical = semantic_odt_bytes(shape)?;
-    let report = litchi_odf_common::validate_package(&corpus.archive)?;
+    let report = litchi_odf_common::validate_package(
+        &corpus.archive,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )?;
     let plan = litchi_odf_common::plan_odf_repair(
         &corpus.archive,
         &report,
@@ -34443,7 +34457,11 @@ fn verify_odf_mimetype_repair(
         return Err("ODF repair patch did not refuse a stale source before output".into());
     }
 
-    let canonical_report = litchi_odf_common::validate_package(&canonical)?;
+    let canonical_report = litchi_odf_common::validate_package(
+        &canonical,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )?;
     if !canonical_report.is_complete()
         || canonical_report.has_errors()
         || !matches!(
@@ -34527,7 +34545,11 @@ fn run_odf_mimetype_repair_plan(
         // publisher's 64 KiB write request ceiling as a total memory bound.
         let mut sink = HashingDiscardSink::without_authoring_window(u64::try_from(expected.len())?);
         let started = Instant::now();
-        let report = litchi_odf_common::validate_package(&corpus.archive)?;
+        let report = litchi_odf_common::validate_package(
+            &corpus.archive,
+            litchi_odf_common::OdfValidationLimits::default(),
+            litchi_core::ValidationLimits::default(),
+        )?;
         let plan = litchi_odf_common::plan_odf_repair(
             &corpus.archive,
             &report,
@@ -35629,7 +35651,7 @@ fn verify_odt_mixed_guardrails(
     verify_odt_mixed_raw_members(source.as_bytes(), scalar.as_bytes())?;
     verify_odt_mixed_raw_members(source.as_bytes(), batch.package().as_bytes())?;
 
-    let replayed = source.apply(batch.patch())?;
+    let replayed = source.apply(batch.patch())?.into_package();
     if replayed.as_bytes() != batch.package().as_bytes() {
         return Err("ODT mixed volatile patch replay differs from batch output".into());
     }
@@ -36506,11 +36528,11 @@ fn run_odt_media_paragraph_edit_save(
         }
 
         verify_odt_media_archive(&bytes, true)?;
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT paragraph patch replay differs from commit".into());
         }
-        let restored = replayed.apply(&commit.patch().inverse())?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODT paragraph inverse did not restore the source".into());
         }
@@ -36559,11 +36581,11 @@ fn run_odt_media_line_break_edit_save(
         }
 
         verify_odt_media_line_break_archive(&bytes)?;
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT line-break patch replay differs from commit".into());
         }
-        let restored = replayed.apply(&commit.patch().inverse())?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODT line-break inverse did not restore the source".into());
         }
@@ -36607,11 +36629,11 @@ fn run_odt_media_append_run_edit_save(
         }
 
         verify_odt_media_append_run_archive(&bytes)?;
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT append-run patch replay differs from commit".into());
         }
-        let restored = replayed.apply(&commit.patch().inverse())?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODT append-run inverse did not restore the source".into());
         }
@@ -36659,11 +36681,11 @@ fn run_odt_media_append_hyperlink_edit_save(
         }
 
         verify_odt_media_append_hyperlink_archive(&bytes)?;
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT append-hyperlink patch replay differs from commit".into());
         }
-        let restored = replayed.apply(&commit.patch().inverse())?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err(
                 "media-rich ODT append-hyperlink inverse did not restore the source".into(),
@@ -36724,14 +36746,14 @@ fn run_odt_media_structural_paragraph_edit_save(
         }
 
         verify_odt_media_structural_paragraph_archive(&bytes, inserted)?;
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err(format!(
                 "media-rich ODT paragraph {operation} patch replay differs from commit"
             )
             .into());
         }
-        let restored = replayed.apply(&commit.patch().inverse())?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err(format!(
                 "media-rich ODT paragraph {operation} inverse did not restore the source"
@@ -36815,11 +36837,16 @@ fn verify_odt_embedded_resource_commit(
     let projection = verify_odt_resource_batch_archive(expected, true)?;
     verify_odt_resource_batch_raw_members(source.as_bytes(), expected)?;
 
-    let replayed = source.apply(commit.patch())?;
+    let replayed = source.apply(commit.patch())?.into_package();
     if replayed.as_bytes() != expected {
         return Err("ODT embedded-resource volatile replay differs from publication".into());
     }
-    if replayed.apply(&commit.patch().inverse())?.as_bytes() != source.as_bytes() {
+    if replayed
+        .apply(&commit.patch().inverse())?
+        .into_package()
+        .as_bytes()
+        != source.as_bytes()
+    {
         return Err("ODT embedded-resource volatile inverse did not restore source".into());
     }
     if replayed.apply(commit.patch()).is_ok() {
@@ -36915,9 +36942,13 @@ fn run_odt_embedded_resource_publication(
         if sink.bytes != expected {
             return Err("measured ODT embedded-resource publication differs from oracle".into());
         }
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != expected
-            || replayed.apply(&commit.patch().inverse())?.as_bytes() != source.as_bytes()
+            || replayed
+                .apply(&commit.patch().inverse())?
+                .into_package()
+                .as_bytes()
+                != source.as_bytes()
             || replayed.apply(commit.patch()).is_ok()
         {
             return Err("measured ODT embedded-resource patch contract differs".into());
@@ -38460,11 +38491,11 @@ fn run_odp_media_textbox_edit_save(
         }
 
         verify_odp_media_archive(&bytes, true)?;
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODP text-box patch replay differs from commit".into());
         }
-        let restored = replayed.apply(&commit.patch().inverse())?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODP text-box inverse did not restore the source".into());
         }
@@ -42121,11 +42152,11 @@ fn verify_odp_text_box_model_commit(
         case == Case::OdpMediaTextBoxBatchReplaceSave,
     )?;
 
-    let replayed = source.apply(commit.patch())?;
+    let replayed = source.apply(commit.patch())?.into_package();
     if replayed.as_bytes() != expected {
         return Err("ODP text-box model patch replay differs from publication".into());
     }
-    let restored = replayed.apply(&commit.patch().inverse())?;
+    let restored = replayed.apply(&commit.patch().inverse())?.into_package();
     if restored.as_bytes() != source.as_bytes() {
         return Err("ODP text-box model inverse did not restore exact source bytes".into());
     }
@@ -42136,11 +42167,11 @@ fn verify_odp_text_box_model_commit(
     let durable = litchi_odp::authoring::edit::Patch::from_durable_bytes(
         &commit.patch().to_durable_bytes()?,
     )?;
-    let durable_replayed = source.apply(&durable)?;
+    let durable_replayed = source.apply(&durable)?.into_package();
     if durable_replayed.as_bytes() != expected {
         return Err("durable ODP text-box model replay differs from publication".into());
     }
-    let durable_restored = durable_replayed.apply(&durable.inverse())?;
+    let durable_restored = durable_replayed.apply(&durable.inverse())?.into_package();
     if durable_restored.as_bytes() != source.as_bytes() {
         return Err("durable ODP text-box model inverse did not restore source".into());
     }
@@ -42231,9 +42262,13 @@ fn run_odp_text_box_model_publication(
         {
             return Err("measured ODP text-box model publication differs from oracle".into());
         }
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != expected
-            || replayed.apply(&commit.patch().inverse())?.as_bytes() != source.as_bytes()
+            || replayed
+                .apply(&commit.patch().inverse())?
+                .into_package()
+                .as_bytes()
+                != source.as_bytes()
             || replayed.apply(commit.patch()).is_ok()
         {
             return Err("measured ODP text-box model patch contract differs".into());

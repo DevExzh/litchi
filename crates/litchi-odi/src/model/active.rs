@@ -14,7 +14,9 @@ const SCRIPT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:script:1.0";
 const TABLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const TEXT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const XLINK: &[u8] = b"http://www.w3.org/1999/xlink";
-const MAX_DEPTH: usize = 256;
+// The configurable maximum (`SemanticLimits::MAXIMUM` depth); a caller-tightened
+// depth is checked by `flat::Bounds`.
+const MAX_DEPTH: usize = 4_096;
 pub(crate) const MAX_ITEMS: usize = 100_000;
 
 /// Semantic kind of inert active content discovered in an ODI artifact.

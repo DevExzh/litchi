@@ -496,7 +496,8 @@ fn lookups_use_the_caller_execution_policy_after_independent_preparation() {
     let (_caller_budget, caller_cancellation, caller_execution) =
         make_execution("worksheet-formula-independent-cancelled-caller");
     caller_cancellation.cancel();
-    let expression = Expression::parse("=[.A1]").expect("reference should parse");
+    let expression =
+        Expression::parse("=[.A1]", &Default::default()).expect("reference should parse");
     let error = evaluate_worksheet(
         &expression,
         &resolver,
@@ -586,7 +587,7 @@ fn public_value_evaluate_reads_repeated_runs_arrays_and_finite_axes() {
     // text borrow.  Both references land in the same physical repeated cell
     // run.
     for source in ["=[.A1]", "=[.C2]"] {
-        let expression = Expression::parse(source)
+        let expression = Expression::parse(source, &Default::default())
             .unwrap_or_else(|error| panic!("{source:?} should parse: {error}"));
         let result = evaluate_worksheet(
             &expression,
@@ -607,7 +608,8 @@ fn public_value_evaluate_reads_repeated_runs_arrays_and_finite_axes() {
 
     // The same compact number run is expanded only into the requested result
     // array.  The resolver still reads the two logical rows separately.
-    let expression = Expression::parse("=0+[.D1:.D2]").expect("range should parse");
+    let expression =
+        Expression::parse("=0+[.D1:.D2]", &Default::default()).expect("range should parse");
     let result = evaluate_worksheet(
         &expression,
         &resolver,
@@ -625,7 +627,8 @@ fn public_value_evaluate_reads_repeated_runs_arrays_and_finite_axes() {
 
     // Whole-axis references use the caller's finite extent and retain the
     // reference in matrix mode without reading every logically empty cell.
-    let expression = Expression::parse("=[.$A:.$A]").expect("whole-column range should parse");
+    let expression = Expression::parse("=[.$A:.$A]", &Default::default())
+        .expect("whole-column range should parse");
     let result = evaluate_worksheet(
         &expression,
         &resolver,
@@ -672,7 +675,7 @@ fn public_value_evaluate_refuses_unsupported_cells_with_typed_errors() {
         .expect("worksheet index should build");
 
     for source in ["=+[.A1]", "=+[.B1]", "=+[.C1]", "=+[.D1]"] {
-        let expression = Expression::parse(source)
+        let expression = Expression::parse(source, &Default::default())
             .unwrap_or_else(|error| panic!("{source:?} should parse: {error}"));
         let error = evaluate_worksheet(
             &expression,

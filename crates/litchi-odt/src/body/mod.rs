@@ -51,8 +51,8 @@ pub use edit::{Location, NewNode, Placement, admits};
 pub use fields::{TextField, fields, text_fields};
 pub use parts::{Parts, PartsView};
 pub use properties::{
-    CellProperties, ParagraphProperties, ParagraphPropertyEdit, TabStopEdit, TextProperties,
-    TextPropertyEdit,
+    CellProperties, ParagraphProperties, ParagraphPropertyUpdate, TabStopSpec, TextProperties,
+    TextPropertyUpdate,
 };
 use xml::{Ns, Prefixes};
 

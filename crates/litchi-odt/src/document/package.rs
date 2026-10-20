@@ -38,7 +38,10 @@ impl Document {
         // different ODF family still follows the historical package owner so
         // its MIME error is reported at the same boundary; rejected probes
         // recover the original allocation for the ordinary parser.
-        match litchi_odf_common::detect::prepared_or_original(bytes) {
+        match litchi_odf_common::detect::prepared_or_original(
+            bytes,
+            litchi_odf_common::SourceLimits::default(),
+        ) {
             Ok(prepared) if prepared.format() == litchi_core::detection::FileFormat::Odt => {
                 Self::from_prepared_package(prepared)
             },

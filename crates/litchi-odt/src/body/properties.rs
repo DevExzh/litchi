@@ -310,7 +310,7 @@ impl<'a> CellProperties<'a> {
 /// left `None` keeps what the node's style had.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub struct TextPropertyEdit {
+pub struct TextPropertyUpdate {
     /// Bold (`fo:font-weight`, with its Asian and complex twins).
     pub bold: Option<bool>,
     /// Italic (`fo:font-style`, with its twins).
@@ -337,7 +337,7 @@ pub struct TextPropertyEdit {
     pub small_caps: Option<bool>,
 }
 
-impl TextPropertyEdit {
+impl TextPropertyUpdate {
     /// An edit that changes nothing.
     #[must_use]
     pub fn new() -> Self {
@@ -466,7 +466,7 @@ impl TextPropertyEdit {
 /// Paragraph properties to set on a paragraph or heading.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub struct ParagraphPropertyEdit {
+pub struct ParagraphPropertyUpdate {
     /// `left`, `right`, `center` or `justify`.
     pub align: Option<String>,
     /// Space above, an ODF length.
@@ -490,13 +490,13 @@ pub struct ParagraphPropertyEdit {
     /// The paragraph's tab stops (`style:tab-stops`), replacing the ones
     /// its automatic style declares; an empty list declares none (record
     /// 0328).
-    pub tab_stops: Option<Vec<TabStopEdit>>,
+    pub tab_stops: Option<Vec<TabStopSpec>>,
 }
 
-/// One tab stop a [`ParagraphPropertyEdit`] declares (`style:tab-stop`).
+/// One tab stop a [`ParagraphPropertyUpdate`] declares (`style:tab-stop`).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub struct TabStopEdit {
+pub struct TabStopSpec {
     /// `style:position`, an ODF length from the paragraph's start indent.
     pub position: String,
     /// `style:type`: `left` (the default), `center`, `right` or `char`.
@@ -510,7 +510,7 @@ pub struct TabStopEdit {
     pub character: Option<String>,
 }
 
-impl TabStopEdit {
+impl TabStopSpec {
     /// A left tab stop at `position` (an ODF length).
     #[must_use]
     pub fn new(position: impl Into<String>) -> Self {
@@ -589,7 +589,7 @@ impl TabStopEdit {
     }
 }
 
-impl ParagraphPropertyEdit {
+impl ParagraphPropertyUpdate {
     /// An edit that changes nothing.
     #[must_use]
     pub fn new() -> Self {

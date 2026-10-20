@@ -1881,6 +1881,9 @@ impl Classify for litchi_odf_common::Error {
         match self {
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
             Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
+            Self::Refused(refusal) => refusal.classify(),
+            Self::PatchConflict { .. } => Class::of(Code::InvalidInput),
+            Self::Signed => Class::of(Code::DocumentProtected),
             Self::Core(error) => error.classify(),
             _ => Class::of(Code::InternalError),
         }

@@ -26,7 +26,7 @@
 //! edit.set(Field::Title, Some("Quarterly report"))?;
 //! let commit = edit.commit()?;
 //! assert!(commit.diagnostics().changed());
-//! let restored = commit.package().apply_metadata(&commit.patch().inverse())?;
+//! let restored = commit.package().apply_metadata(&commit.patch().inverse())?.into_package();
 //! assert_eq!(restored.as_bytes(), package.as_bytes());
 //! # Ok(())
 //! # }
@@ -43,7 +43,7 @@ pub use litchi_odf_common::core::metadata::{
     UserDefinedMetadata, UserDefinedValueType,
 };
 pub use model::Snapshot;
-pub use transaction::{Editor, Transaction, XmlCommit};
+pub use transaction::Editor;
 
 /// The family error: typed limits plus the common-core payload.
 pub use litchi_odf_common::Error;
@@ -85,8 +85,9 @@ impl crate::Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Core`] when this package is not the patch's source.
-    pub fn apply_metadata(&self, patch: &Patch) -> Result<Self, Error> {
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// source.
+    pub fn apply_metadata(&self, patch: &Patch) -> Result<Commit, Error> {
         patch.apply(self)
     }
 }

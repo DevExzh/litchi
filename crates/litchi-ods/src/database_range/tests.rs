@@ -1,5 +1,5 @@
 use super::{Condition, ConditionSource, Expression, Key, Order, Range, Rule, Rules, Sort, Source};
-use crate::{Builder, MutableSpreadsheet, Workbook};
+use crate::{Builder, Workbook, builder::Workbook as Draft};
 use std::io::{Cursor, Read, Write};
 
 const XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:v="urn:example:vendor"><office:body><office:spreadsheet><t:table t:name="Input"/><t:database-ranges><t:database-range t:name="Sales" t:target-range-address="Input.A1:Input.B20"><t:database-source-query t:database-name="sales.odb" t:query-name="OpenOrders"/><t:filter t:condition-source="self"><t:filter-condition t:field-number="0" t:value="East" t:operator="="/></t:filter><t:sort><t:sort-by t:field-number="1" t:order="descending"/></t:sort><t:subtotal-rules><t:subtotal-rule t:group-by-field-number="0"><t:subtotal-field t:field-number="1" t:function="sum"/></t:subtotal-rule></t:subtotal-rules></t:database-range></t:database-ranges><t:shapes/></office:spreadsheet></office:body></office:document-content>"#;
@@ -125,7 +125,7 @@ fn assert_contextual_change_is_refused(xml: &str) {
     }
 
     let mut noop = Workbook::from_bytes(bytes.clone())
-        .map(MutableSpreadsheet::from_workbook)
+        .map(Draft::from_workbook)
         .expect("package should open");
     let before = noop.workbook().content_xml().to_owned();
     noop.edit_database_ranges(|_| Ok(()))
@@ -133,7 +133,7 @@ fn assert_contextual_change_is_refused(xml: &str) {
     assert_eq!(noop.workbook().content_xml(), before);
 
     let mut changed = Workbook::from_bytes(bytes)
-        .map(MutableSpreadsheet::from_workbook)
+        .map(Draft::from_workbook)
         .expect("package should open");
     let before = changed.workbook().content_xml().to_owned();
     let result = changed.edit_database_ranges(|editor| {
@@ -180,7 +180,7 @@ fn catalog_reads_owned_filter_sort_and_subtotal_metadata() {
 #[test]
 fn clone_staged_crud_inserts_and_removes_owner_atomically() {
     let mut mutable = Workbook::from_bytes(package(WITHOUT_OWNER))
-        .map(MutableSpreadsheet::from_workbook)
+        .map(Draft::from_workbook)
         .expect("open");
     mutable
         .edit_database_ranges(|editor| editor.add(range("Sales")))
@@ -202,7 +202,7 @@ fn clone_staged_crud_inserts_and_removes_owner_atomically() {
 fn insertion_keeps_database_ranges_after_tracked_changes() {
     let xml = WITHOUT_OWNER.replace("<t:shapes/>", "<t:tracked-changes/><t:shapes/>");
     let mut mutable = Workbook::from_bytes(package(&xml))
-        .map(MutableSpreadsheet::from_workbook)
+        .map(Draft::from_workbook)
         .expect("open");
     mutable
         .edit_database_ranges(|editor| editor.add(range("Sales")))
@@ -240,7 +240,7 @@ fn explicit_empty_owner_is_distinct_from_absence() {
     let catalog = spreadsheet.database_ranges().expect("catalog");
     assert!(catalog.has_owner());
     assert!(catalog.is_empty());
-    let mut mutable = MutableSpreadsheet::from_workbook(spreadsheet);
+    let mut mutable = Draft::from_workbook(spreadsheet);
     mutable
         .edit_database_ranges(|editor| editor.add(range("Sales")))
         .expect("replace empty owner");
@@ -309,7 +309,7 @@ fn unknown_owner_markup_blocks_changed_edit_but_noop_is_byte_exact() {
         "<v:future v:flag=\"keep\"/><!-- future --></t:database-range>",
     );
     let mut mutable = Workbook::from_bytes(package(&xml))
-        .map(MutableSpreadsheet::from_workbook)
+        .map(Draft::from_workbook)
         .expect("open");
     let before = mutable.workbook().content_xml().to_owned();
     mutable
@@ -333,7 +333,7 @@ fn opaque_source_leaf_comment_allows_exact_noop_but_not_changed_rewrite() {
         r#"<t:database-source-query t:database-name="sales.odb" t:query-name="OpenOrders"><!-- retained --></t:database-source-query>"#,
     );
     let mut mutable = Workbook::from_bytes(package(&xml))
-        .map(MutableSpreadsheet::from_workbook)
+        .map(Draft::from_workbook)
         .expect("open");
     let before = mutable.workbook().content_xml().to_owned();
     mutable
@@ -454,14 +454,17 @@ fn known_children_in_wrong_parents_never_silently_drop_on_public_edit() {
 fn signed_database_range_noop_is_exact_but_changed_publication_is_refused() {
     let bytes = signed_package(XML);
     let mut noop = Workbook::from_bytes(bytes.clone())
-        .map(MutableSpreadsheet::from_workbook)
+        .map(Draft::from_workbook)
         .expect("signed source opens");
     noop.edit_database_ranges(|_| Ok(()))
         .expect("signed no-op should be accepted");
-    assert_eq!(noop.to_bytes(), bytes);
+    assert_eq!(
+        noop.build().expect("the draft builds").as_bytes().to_vec(),
+        bytes
+    );
 
     let mut changed = Workbook::from_bytes(bytes)
-        .map(MutableSpreadsheet::from_workbook)
+        .map(Draft::from_workbook)
         .expect("signed source opens");
     let before = changed.workbook().content_xml().to_owned();
     let result = changed.edit_database_ranges(|editor| {
@@ -488,18 +491,14 @@ fn facade_rejects_overbudget_owner_before_materializing_snapshot_graph() {
 }
 
 #[test]
-fn owned_snapshot_patch_inverse_and_conflict_are_atomic() -> litchi_core::Result<()> {
+fn owned_snapshot_commit_adds_the_owner() -> litchi_core::Result<()> {
     let snapshot = crate::database_range::Snapshot::from_bytes(package(WITHOUT_OWNER))?;
     let mut edit = snapshot.edit();
     edit.editor().add(range("Sales"))?;
     let commit = edit.commit()?;
-    assert!(commit.changed());
+    assert_ne!(commit.snapshot().as_bytes(), snapshot.as_bytes());
     assert!(commit.snapshot().has_owner());
     assert_eq!(commit.snapshot().ranges()[0].name.as_deref(), Some("Sales"));
-    let restored = commit.patch().inverse().apply(commit.snapshot())?;
-    assert_eq!(restored.snapshot().as_bytes(), snapshot.as_bytes());
-    let other = crate::database_range::Snapshot::from_bytes(package(XML))?;
-    assert!(commit.patch().apply(&other).is_err());
     Ok(())
 }
 

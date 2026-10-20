@@ -6,7 +6,7 @@ use std::ops::Range;
 use litchi_core::{Error, Result};
 
 use super::markup::{Encoded, StartTag, encode, escape_attribute, open_tag, template};
-use super::styles::{StylesInsertion, TextPropertyEdit};
+use super::styles::{StylesInsertion, TextPropertyUpdate};
 use super::{Object, ObjectKind, Page, Paragraph, RunKind, Scene, Story};
 
 /// Which object list of a page an [`ObjectRef`] indexes.
@@ -181,7 +181,7 @@ pub enum Change {
         /// Zero-based run position, or `None` for the paragraph.
         run: Option<usize>,
         /// The properties to set.
-        properties: TextPropertyEdit,
+        properties: TextPropertyUpdate,
     },
     /// Insert a paragraph at a final position, styled like its neighbour.
     InsertParagraph {
@@ -509,7 +509,7 @@ struct Format {
     family: &'static str,
     /// The node's current style.
     base: Option<String>,
-    properties: TextPropertyEdit,
+    properties: TextPropertyUpdate,
 }
 
 /// Plan `changes` against `scene`, the index of `xml`.
@@ -1230,7 +1230,7 @@ impl<'a> Planner<'a> {
         story: &StoryRef,
         index: usize,
         run: Option<usize>,
-        properties: &TextPropertyEdit,
+        properties: &TextPropertyUpdate,
     ) -> Result<()> {
         properties.validate()?;
         let paragraph = self.paragraph(story, index)?;

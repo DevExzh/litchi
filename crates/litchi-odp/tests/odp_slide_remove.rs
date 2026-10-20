@@ -108,10 +108,14 @@ fn dependency_free_blank_removal_is_exact_durable_reopenable_and_stale_checked()
 
     let durable =
         edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
-    let replayed = source.apply(&durable).unwrap();
+    let replayed = source.apply(&durable).unwrap().into_package();
     assert_eq!(replayed.as_bytes(), commit.package().as_bytes());
     assert_eq!(
-        replayed.apply(&durable.inverse()).unwrap().as_bytes(),
+        replayed
+            .apply(&durable.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source_bytes
     );
     let stale = Package::from_bytes(&package(&content(concat!(

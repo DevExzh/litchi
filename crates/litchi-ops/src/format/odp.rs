@@ -4,7 +4,7 @@
 //! `litchi_odp::Package` with its parsed `Presentation` projection (byte
 //! and reader routes, and every edited snapshot), the filesystem-backed
 //! `litchi_odp::SourceBackedPresentation` (path route on `unix`/`windows`),
-//! or the read-only `litchi_odp::FlatPresentation` of a flat `.fodp`
+//! or the read-only `litchi_odp::flat::Presentation` of a flat `.fodp`
 //! document. Unified reads walk the leaf's byte-range scene index of
 //! `content.xml` (`litchi_odp::scene`), built once per handle on first use;
 //! unified writes stage checked scene splices on one `Package::edit()`.
@@ -82,7 +82,7 @@ pub(crate) enum OdpOwner {
     Source(litchi_odp::SourceBackedPresentation),
     /// A flat (single XML document) presentation; edits go through its
     /// packaged projection (record 0292).
-    Flat(litchi_odp::FlatPresentation),
+    Flat(litchi_odp::flat::Presentation),
 }
 
 const fn assert_handle<T: Send + Sync + Clone>() {}
@@ -126,7 +126,7 @@ impl Odp {
 
     /// Adopts a flat (single XML) presentation for reads.
     pub(crate) fn from_flat(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
-        let flat = litchi_odp::FlatPresentation::from_bytes(&bytes).map_err(core_error)?;
+        let flat = litchi_odp::flat::Presentation::from_bytes(&bytes).map_err(odf_error)?;
         Ok(Self::from_owner(
             OdpOwner::Flat(flat),
             None,
@@ -243,7 +243,7 @@ impl Odp {
             let bytes = parts
                 .merge_package(flat.as_bytes(), package.as_bytes())
                 .map_err(core_error)?;
-            let flat = litchi_odp::FlatPresentation::from_bytes(&bytes).map_err(core_error)?;
+            let flat = litchi_odp::flat::Presentation::from_bytes(&bytes).map_err(odf_error)?;
             let next = Self::from_owner(
                 OdpOwner::Flat(flat),
                 self.0.origin.clone(),

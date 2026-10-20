@@ -132,6 +132,19 @@ pub enum ProtectionRefusal {
     ReEncryptionUnavailable,
 }
 
+impl ProtectionRefusal {
+    /// The refusal class litchi-ops reports for this reason (record 0351
+    /// §2.4): the route does not implement the operation.
+    #[must_use]
+    pub const fn kind(self) -> litchi_core::edit::RefusalKind {
+        match self {
+            Self::ReSigningUnavailable | Self::ReEncryptionUnavailable => {
+                litchi_core::edit::RefusalKind::UnsupportedOperation
+            },
+        }
+    }
+}
+
 /// Typed decision for one protected-package operation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ProtectionDecision {

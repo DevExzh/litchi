@@ -49,7 +49,8 @@ fn checked_in_libreoffice_mathml_samples_validate() {
         include_str!("../../../test-data/libreoffice-core/starmath/qa/extras/data/tdf99556-1.mml"),
     ];
     for sample in samples {
-        let root = codec::parse(sample).expect("checked-in MathML fixture");
+        let root =
+            codec::parse(sample, codec::Limits::default()).expect("checked-in MathML fixture");
         codec::validate(&root).expect("schema projection");
     }
 }
@@ -84,12 +85,16 @@ fn granular_edits_record_paths_and_round_trip_durable_history() {
 
     let durable = commit.patch().to_bytes().expect("encode patch");
     let reopened = Patch::from_bytes(&durable).expect("decode patch");
-    let target = source.apply(&reopened).expect("apply durable patch");
+    let target = source
+        .apply(&reopened)
+        .expect("apply durable patch")
+        .into_package();
     assert_eq!(target.as_bytes(), commit.package().as_bytes());
     assert_eq!(
         target
             .apply(&reopened.inverse())
             .expect("inverse")
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
@@ -322,12 +327,12 @@ fn three_way_plan_is_non_mutating_and_publishes_reopenable_reversible_bytes() {
 
     let durable = Patch::from_bytes(&commit.patch().to_bytes().expect("durable bytes"))
         .expect("durable reopen");
-    let published = base.apply(&durable).expect("durable apply");
+    let published = base.apply(&durable).expect("durable apply").into_package();
     let reopened = Package::from_bytes(published.as_bytes()).expect("package reopen");
     assert_eq!(reopened.formula().root().all_text(), "xy");
     assert!(left_commit.package().apply(&durable).is_err());
     let restored = published.apply(&durable.inverse()).expect("inverse");
-    assert_eq!(restored.as_bytes(), base_bytes);
+    assert_eq!(restored.into_package().as_bytes(), base_bytes);
 }
 
 #[test]

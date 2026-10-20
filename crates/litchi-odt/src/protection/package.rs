@@ -25,7 +25,7 @@ impl Package {
     /// resulting XML have validated. Unmodeled settings nodes and auxiliary
     /// package entries remain untouched; policy values are inert metadata and
     /// are never enforced by this method.
-    pub fn set_protection(&mut self, policy: &Policy) -> Result<Option<Policy>> {
+    pub(crate) fn set_protection(&mut self, policy: &Policy) -> Result<Option<Policy>> {
         policy.validate()?;
         let before = self.protection()?;
         if before.as_ref().is_some_and(|value| value == policy)
@@ -46,7 +46,7 @@ impl FlatDocument {
     }
 
     /// Replace document interaction policy metadata atomically.
-    pub fn set_protection(&mut self, policy: &Policy) -> Result<Policy> {
+    pub(crate) fn set_protection(&mut self, policy: &Policy) -> Result<Policy> {
         policy.validate()?;
         let before = self.protection()?;
         if &before == policy {

@@ -89,7 +89,7 @@ fn an_exact_no_op_commit_is_the_source_byte_for_byte() {
     assert_eq!(commit.package().as_bytes(), bytes.as_slice());
     let (published, patch) = commit.into_parts();
     assert_eq!(
-        package.apply(&patch).unwrap().as_bytes(),
+        package.apply(&patch).unwrap().into_package().as_bytes(),
         published.as_bytes()
     );
 }
@@ -120,9 +120,13 @@ fn a_real_edit_changes_bytes_and_its_patch_reproduces_them() {
         Some("renamed")
     );
     let replayed = package.apply(&patch).unwrap();
-    assert_eq!(replayed.as_bytes(), published.as_bytes());
+    assert_eq!(replayed.into_package().as_bytes(), published.as_bytes());
     assert_eq!(
-        published.apply(&patch.inverse()).unwrap().as_bytes(),
+        published
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         bytes.as_slice()
     );
     assert!(
@@ -234,7 +238,8 @@ fn semantic_limits_bound_content_and_series() {
 #[test]
 fn a_prepared_detection_result_is_adopted_and_other_families_are_refused() {
     let bytes = built(1).to_bytes().unwrap();
-    let prepared = litchi_odf_common::detect::prepared(bytes.clone()).expect("ODC is detected");
+    let prepared = litchi_odf_common::detect::prepared(bytes.clone(), SourceLimits::default())
+        .expect("ODC is detected");
     assert_eq!(
         Package::from_prepared_package(prepared).unwrap().as_bytes(),
         bytes.as_slice()
@@ -249,7 +254,8 @@ fn a_prepared_detection_result_is_adopted_and_other_families_are_refused() {
     )
     .unwrap();
     let text = text.finish_to_bytes().unwrap();
-    let prepared = litchi_odf_common::detect::prepared(text).expect("ODT is detected");
+    let prepared = litchi_odf_common::detect::prepared(text, SourceLimits::default())
+        .expect("ODT is detected");
     assert!(matches!(
         Package::from_prepared_package(prepared).unwrap_err(),
         Error::Core(litchi_core::Error::UnexpectedFormat { .. })

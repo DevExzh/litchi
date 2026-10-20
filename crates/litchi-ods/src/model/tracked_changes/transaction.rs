@@ -26,7 +26,7 @@ impl Snapshot {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn parse_with_limits(source: impl Into<Arc<str>>, limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(source: impl Into<Arc<str>>, limits: Limits) -> Result<Self> {
         let source = source.into();
         if source.len() > limits.max_input_bytes() {
             return invalid("tracked-change XML input exceeds the configured limit");
@@ -118,8 +118,8 @@ impl Snapshot {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn transaction(&self) -> Result<Transaction> {
-        Transaction::new(self.clone())
+    pub(crate) fn transaction(&self) -> Result<Edit> {
+        Edit::new(self.clone())
     }
 
     fn acceptance_values(&self) -> &[Option<Acceptance>] {
@@ -181,7 +181,7 @@ struct MultiDeletionGroup {
 /// publishing the operation to the draft. Dependency-changing replacements,
 /// moves, and reorders check the complete graph immediately; commit rechecks
 /// the complete graph before materializing source bytes.
-pub struct Transaction {
+pub struct Edit {
     before: Snapshot,
     changes: Option<Changes>,
     tracking: Option<bool>,
@@ -196,12 +196,12 @@ pub struct Transaction {
     full_replace: bool,
 }
 
-impl Transaction {
+impl Edit {
     /// Create a transaction from a source-bound snapshot.
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn new(snapshot: Snapshot) -> Result<Self> {
+    pub(crate) fn new(snapshot: Snapshot) -> Result<Self> {
         let changes = match (snapshot.changes(), snapshot.map.validated.as_deref()) {
             (Some(value), Some(validated)) => {
                 Some(value.try_clone_validated_with_limits(validated, &snapshot.limits)?)
@@ -830,11 +830,11 @@ impl Transaction {
         Ok(())
     }
 
-    /// Restore the original semantic and presence state without reparsing.
+    /// Discard every staged change in place.
     ///
     /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn rollback(&mut self) -> Result<()> {
+    /// Returns an error when the source snapshot can no longer be indexed.
+    pub fn reset(&mut self) -> Result<()> {
         let reset = Self::new(self.before.clone())?;
         self.changes = reset.changes;
         self.tracking = reset.tracking;
@@ -852,7 +852,7 @@ impl Transaction {
 
     /// Whether the current semantic and authored-presence state differs.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    pub(crate) fn is_changed(&self) -> bool {
         self.changes != self.before.map.changes
             || self.tracking != self.before.tracking()
             || self.acceptance.as_slice() != self.before.acceptance_values()
@@ -862,7 +862,7 @@ impl Transaction {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         if let Some(changes) = &self.changes {
             changes.validate_with_limits(&self.before.limits)?;
         }
@@ -1488,7 +1488,7 @@ impl Transaction {
 
 /// A source-exact reversible tracked-change patch.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct Patch {
     source: Arc<str>,
     target: Arc<str>,
     limits: Limits,
@@ -1503,70 +1503,16 @@ impl Patch {
         }
     }
 
-    /// Whether source and target bytes are identical.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.source == self.target
-    }
-
     /// Exact source XML required by this patch.
     #[must_use]
-    pub fn source(&self) -> &str {
+    pub(crate) fn source(&self) -> &str {
         &self.source
-    }
-
-    /// Exact target XML produced by this patch.
-    #[must_use]
-    pub fn target(&self) -> &str {
-        &self.target
-    }
-
-    /// Return the exact inverse patch.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self::new(
-            Arc::clone(&self.target),
-            Arc::clone(&self.source),
-            self.limits,
-        )
-    }
-
-    /// Apply only to the exact source snapshot from which this patch was built.
-    ///
-    /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
-        if snapshot.source_xml() != self.source() {
-            return invalid("tracked-change patch source snapshot does not match");
-        }
-        if self.is_empty() {
-            return Ok(Commit {
-                snapshot: snapshot.clone(),
-                patch: self.clone(),
-                changed: false,
-            });
-        }
-        if self.target.len() > self.limits.max_output_bytes() {
-            return invalid("tracked-change patch target exceeds the configured output limit");
-        }
-        let candidate_limits = self
-            .limits
-            .with_max_input_bytes(self.limits.max_output_bytes());
-        let mut target = Snapshot::parse_with_limits(Arc::clone(&self.target), candidate_limits)?;
-        target.limits = self
-            .limits
-            .with_max_input_bytes(self.limits.max_input_bytes().max(target.source_xml().len()));
-        Ok(Commit {
-            snapshot: target,
-            patch: self.clone(),
-            changed: true,
-        })
     }
 }
 
 /// A validated tracked-change publication candidate.
 #[derive(Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     changed: bool,
@@ -1574,43 +1520,33 @@ pub struct Commit {
 
 impl Commit {
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
     }
 
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &Patch {
         &self.patch
     }
 
     #[must_use]
-    pub fn content_xml(&self) -> &str {
+    pub(crate) fn content_xml(&self) -> &str {
         self.snapshot.source_xml()
     }
 
-    #[must_use]
-    pub fn source_arc(&self) -> Arc<str> {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
+    }
+
+    #[cfg(test)]
+    pub(crate) fn source_arc(&self) -> Arc<str> {
         self.snapshot.source_arc()
     }
 
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    #[must_use]
-    pub fn into_source(self) -> Arc<str> {
+    #[cfg(test)]
+    pub(crate) fn into_source(self) -> Arc<str> {
         self.snapshot.source
-    }
-
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
     }
 }
 
@@ -1618,9 +1554,9 @@ impl Commit {
 ///
 /// # Errors
 /// Returns an error when the operation cannot be completed.
-pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit>
+pub(crate) fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit>
 where
-    F: FnOnce(&mut Transaction) -> Result<()>,
+    F: FnOnce(&mut Edit) -> Result<()>,
 {
     let mut transaction = snapshot.transaction()?;
     edit(&mut transaction)?;
@@ -1977,7 +1913,7 @@ mod cache_regressions {
         })
     }
 
-    fn empty_transaction() -> Transaction {
+    fn empty_transaction() -> Edit {
         Snapshot::parse(
             r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:tracked-changes/></office:spreadsheet></office:body></office:document-content>"#,
         )

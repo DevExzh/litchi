@@ -18,8 +18,11 @@ const FIXTURES: [&str; 3] = [
 /// The byte route's first arm: the ODF package an ordinary ODP prepares,
 /// which the byte opener adopts (`prepared_or_original`).
 fn open_prepared(bytes: Vec<u8>) -> Odp {
-    let prepared = litchi_odf_common::detect::prepared_or_original(bytes)
-        .unwrap_or_else(|_| panic!("expected a prepared ODP package"));
+    let prepared = litchi_odf_common::detect::prepared_or_original(
+        bytes,
+        litchi_odf_common::SourceLimits::default(),
+    )
+    .unwrap_or_else(|_| panic!("expected a prepared ODP package"));
     Odp::from_prepared(prepared, &OpenOptions::default()).expect("open prepared ODP")
 }
 
