@@ -1,7 +1,7 @@
 //! Persistent, bounded namespace environments for source and typed XML trees.
 
 use super::invalid;
-use litchi_core::sheet::Result;
+use crate::BoxedResult as Result;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,

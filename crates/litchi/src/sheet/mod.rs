@@ -61,5 +61,6 @@ pub mod text;
 
 #[cfg(feature = "eval")]
 pub use eval::FormulaEvaluator;
+pub use litchi_core::sheet::{Error, LimitKind, Result, error};
 pub use traits::{Cell, WorkbookTrait, Worksheet};
-pub use types::{CellValue, Result};
+pub use types::CellValue;

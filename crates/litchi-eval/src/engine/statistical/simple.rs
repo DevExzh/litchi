@@ -2,6 +2,8 @@ use crate::engine::{
     EvalCtx, evaluate_expression, flatten_range_expr, for_each_value_in_expr, to_number,
 };
 use crate::parser::Expr;
+use litchi_core::edit::RefusalKind;
+use litchi_core::sheet::Error as SheetError;
 use litchi_core::sheet::{CellValue, Result};
 use std::cmp::Ordering;
 
@@ -156,10 +158,11 @@ pub(crate) fn eval_geomean(
         let res = for_each_value_in_expr(ctx, current_sheet, arg, |val| {
             if let Some(n) = to_number(val) {
                 if n <= 0.0 {
-                    return Err(Box::new(std::io::Error::new(
-                        std::io::ErrorKind::InvalidInput,
-                        "positive numbers required",
-                    )));
+                    return Err(SheetError::refused(
+                        RefusalKind::InvalidValue,
+                        "evaluate",
+                        "the function requires positive numbers",
+                    ));
                 }
                 numbers.push(n);
             }
@@ -200,10 +203,11 @@ pub(crate) fn eval_harmean(
         let res = for_each_value_in_expr(ctx, current_sheet, arg, |val| {
             if let Some(n) = to_number(val) {
                 if n <= 0.0 {
-                    return Err(Box::new(std::io::Error::new(
-                        std::io::ErrorKind::InvalidInput,
-                        "positive numbers required",
-                    )));
+                    return Err(SheetError::refused(
+                        RefusalKind::InvalidValue,
+                        "evaluate",
+                        "the function requires positive numbers",
+                    ));
                 }
                 numbers.push(n);
             }
@@ -424,8 +428,12 @@ fn eval_variance_a(
                 CellValue::Empty => {}, // Skip empty cells
                 CellValue::Bool(b) => numbers.push(if *b { 1.0 } else { 0.0 }),
                 CellValue::String(_) => numbers.push(0.0),
-                CellValue::Error(e) => {
-                    return Err(Box::new(std::io::Error::other(e.clone())));
+                CellValue::Error(_) => {
+                    return Err(SheetError::refused(
+                        RefusalKind::InvalidValue,
+                        "evaluate",
+                        "an argument is an error value",
+                    ));
                 },
                 _ => {
                     if let Some(n) = to_number(val) {
@@ -816,10 +824,11 @@ fn collect_aligned_numeric_pairs(
     if range1.values.len() != range2.values.len() {
         // In Excel, this actually returns #N/A if they don't match, or sometimes #VALUE!
         // But usually they must be the same size.
-        return Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "Arrays must have the same size",
-        )));
+        return Err(SheetError::refused(
+            RefusalKind::InvalidValue,
+            "evaluate",
+            "the arrays must have the same size",
+        ));
     }
 
     let mut xs = Vec::new();

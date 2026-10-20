@@ -7,9 +7,9 @@ use super::model::{
     STRICT_CONNECTIONS_RELATIONSHIP, STRICT_NAMESPACE,
 };
 use super::{codec, invalid};
+use crate::BoxedResult as Result;
 use crate::error::{Error as XlsxError, Result as XlsxResult};
 use litchi_core::Resource;
-use litchi_core::sheet::Result;
 use quick_xml::{events::Event, name::ResolveResult, reader::NsReader};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

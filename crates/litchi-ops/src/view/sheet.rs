@@ -36,7 +36,9 @@ use std::borrow::Cow;
 #[cfg(feature = "xlsb")]
 use std::sync::Arc;
 
-use litchi_core::sheet::{Cell as CoreCell, CellValue, Result, Worksheet as CoreWorksheet};
+use litchi_core::sheet::{Cell as CoreCell, CellValue, Worksheet as CoreWorksheet};
+
+use crate::Result;
 
 #[cfg(feature = "xlsb")]
 use crate::format::xlsb::source;
@@ -308,9 +310,13 @@ impl<'a> Iterator for Cells<'a> {
             #[cfg(feature = "xlsb")]
             CellsInner::XlsbEager(cells) => cells
                 .next()?
-                .map(|cell| CellInner::XlsbEager(Stored::new(cell))),
+                .map(|cell| CellInner::XlsbEager(Stored::new(cell)))
+                .map_err(Into::into),
             #[cfg(feature = "xls")]
-            CellsInner::Xls(cells) => cells.next()?.map(|cell| CellInner::Xls(Stored::new(cell))),
+            CellsInner::Xls(cells) => cells
+                .next()?
+                .map(|cell| CellInner::Xls(Stored::new(cell)))
+                .map_err(Into::into),
             CellsInner::Never(never, _) => match *never {},
         };
         Some(cell.map(Cell))
@@ -340,12 +346,17 @@ enum RowsInner<'a> {
 impl<'a> Iterator for Rows<'a> {
     type Item = Result<Cow<'a, [CellValue]>>;
 
+    #[allow(
+        clippy::useless_conversion,
+        reason = "the XLSX arm's error is already the unified error"
+    )]
     fn next(&mut self) -> Option<Self::Item> {
-        each!(RowsInner, &mut self.0, rows => rows.next(), RowsInner::Never(never, _) => match *never {})
+        each!(RowsInner, &mut self.0, rows => rows.next().map(|row| row.map_err(Into::into)), RowsInner::Never(never, _) => match *never {})
     }
 }
 
 impl CoreWorksheet for Worksheet<'_> {
+    type Error = crate::Error;
     type Cell<'b>
         = Cell<'b>
     where
@@ -397,8 +408,12 @@ impl CoreWorksheet for Worksheet<'_> {
         Ok(Cell(cell))
     }
 
+    #[allow(
+        clippy::useless_conversion,
+        reason = "the XLSX arm's error is already the unified error"
+    )]
     fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>> {
-        each!(SheetInner, &self.0, sheet => sheet.cell_value(row, column), SheetInner::Never(never, _) => match *never {})
+        each!(SheetInner, &self.0, sheet => sheet.cell_value(row, column).map_err(Into::into), SheetInner::Never(never, _) => match *never {})
     }
 
     fn cells(&self) -> Cells<'_> {
@@ -427,8 +442,12 @@ impl CoreWorksheet for Worksheet<'_> {
         each!(SheetInner, &self.0, sheet => sheet.name(), SheetInner::Never(never, _) => match *never {})
     }
 
+    #[allow(
+        clippy::useless_conversion,
+        reason = "the XLSX arm's error is already the unified error"
+    )]
     fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>> {
-        each!(SheetInner, &self.0, sheet => sheet.row(row_idx), SheetInner::Never(never, _) => match *never {})
+        each!(SheetInner, &self.0, sheet => sheet.row(row_idx).map_err(Into::into), SheetInner::Never(never, _) => match *never {})
     }
 
     fn row_count(&self) -> usize {
@@ -466,7 +485,7 @@ pub(crate) enum WorksheetsInner<'a> {
     Xls(crate::format::xls::Worksheets<'a>),
     /// Yields one error, then ends.
     #[cfg(feature = "ods")]
-    Refused(Option<Box<dyn std::error::Error + Send + Sync>>),
+    Refused(Option<crate::Error>),
     #[allow(
         dead_code,
         reason = "uninhabited: carries the lifetime when no borrowing format is enabled"
@@ -490,7 +509,10 @@ impl<'a> Iterator for Worksheets<'a> {
             #[cfg(feature = "xlsb")]
             WorksheetsInner::XlsbSource(sheets) => sheets.next()?.map(SheetInner::XlsbSource),
             #[cfg(feature = "xlsb")]
-            WorksheetsInner::XlsbEager(sheets) => sheets.next()?.map(SheetInner::XlsbEager),
+            WorksheetsInner::XlsbEager(sheets) => sheets
+                .next()?
+                .map(SheetInner::XlsbEager)
+                .map_err(Into::into),
             #[cfg(feature = "xls")]
             WorksheetsInner::Xls(sheets) => sheets.next()?.map(SheetInner::Xls),
             #[cfg(feature = "ods")]

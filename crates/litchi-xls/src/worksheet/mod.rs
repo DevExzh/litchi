@@ -17,9 +17,7 @@ use crate::pivot_table::PivotTable;
 use crate::protection::SheetProtection;
 use crate::view::View;
 use crate::writer::sort::Config;
-use litchi_core::sheet::{
-    Cell as SheetCell, CellValue, Result as SheetResult, Worksheet as WorksheetTrait,
-};
+use litchi_core::sheet::{Cell as SheetCell, CellValue, Worksheet as WorksheetTrait};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -850,6 +848,7 @@ impl Worksheet {
 impl WorksheetTrait for Worksheet {
     /// Stored cells are borrowed; an absent position reads as an owned
     /// empty cell.
+    type Error = Error;
     type Cell<'a> = Cow<'a, Cell>;
     type Cells<'a> = Cells<'a>;
     type Rows<'a> = Rows<'a>;
@@ -874,7 +873,7 @@ impl WorksheetTrait for Worksheet {
         }
     }
 
-    fn cell(&self, row: u32, column: u32) -> SheetResult<Cow<'_, Cell>> {
+    fn cell(&self, row: u32, column: u32) -> Result<Cow<'_, Cell>> {
         match self.cells.get(&(row, column)) {
             // Return reference instead of clone - zero-copy!
             Some(cell) => Ok(Cow::Borrowed(cell)),
@@ -883,12 +882,9 @@ impl WorksheetTrait for Worksheet {
         }
     }
 
-    fn cell_by_coordinate(&self, coordinate: &str) -> SheetResult<Cow<'_, Cell>> {
-        let (row, col) = crate::utils::parse_cell_reference(coordinate).ok_or_else(|| {
-            let error: Box<dyn std::error::Error + Send + Sync> =
-                Box::new(Error::InvalidCellReference(coordinate.to_string()));
-            error
-        })?;
+    fn cell_by_coordinate(&self, coordinate: &str) -> Result<Cow<'_, Cell>> {
+        let (row, col) = crate::utils::parse_cell_reference(coordinate)
+            .ok_or_else(|| Error::InvalidCellReference(coordinate.to_string()))?;
         self.cell(row, col)
     }
 
@@ -905,7 +901,7 @@ impl WorksheetTrait for Worksheet {
         }
     }
 
-    fn row(&self, row_idx: usize) -> SheetResult<Cow<'_, [CellValue]>> {
+    fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>> {
         let row_idx = crate::utils::truncate_usize_to_u32(row_idx);
         let mut row_data = Vec::new();
 
@@ -920,7 +916,7 @@ impl WorksheetTrait for Worksheet {
         Ok(Cow::Owned(row_data))
     }
 
-    fn cell_value(&self, row: u32, column: u32) -> SheetResult<Cow<'_, CellValue>> {
+    fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>> {
         match self.cells.get(&(row, column)) {
             Some(cell) => Ok(Cow::Borrowed(cell.value())),
             None => Ok(Cow::Borrowed(CellValue::EMPTY)),
@@ -935,7 +931,7 @@ pub struct Cells<'a> {
 }
 
 impl<'a> Iterator for Cells<'a> {
-    type Item = SheetResult<Cow<'a, Cell>>;
+    type Item = Result<Cow<'a, Cell>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.cells.next().map(|cell| Ok(Cow::Borrowed(cell)))
@@ -950,7 +946,7 @@ pub struct Rows<'a> {
 }
 
 impl<'a> Iterator for Rows<'a> {
-    type Item = SheetResult<Cow<'a, [CellValue]>>;
+    type Item = Result<Cow<'a, [CellValue]>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.current_row >= self.worksheet.row_count() {

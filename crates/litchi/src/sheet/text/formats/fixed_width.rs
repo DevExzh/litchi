@@ -4,7 +4,11 @@
 //! - Delimited (space/semicolon separated) - handled by delimited module
 //! - Fixed-width columns - handled by this module
 
-use crate::sheet::{CellValue, Result as SheetResult};
+use crate::sheet::CellValue;
+
+/// The boxed-error result the text readers still return (record 0353a
+/// leaves them to the `sheet::text` move).
+type SheetResult<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 use litchi_core::{BomKind, strip_bom, write_bom};
 use std::io::{BufRead, BufReader, Read, Seek, Write};
 

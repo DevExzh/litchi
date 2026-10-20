@@ -9,8 +9,8 @@ use super::model::{
     TextImportProperties, TextQualifier, WebQueryProperties, WebTableSelector, validate,
 };
 use super::namespace::{NamespaceContext, NamespaceDecl, NamespaceLimits};
+use crate::BoxedResult as Result;
 use crate::error::{Error as XlsxError, Result as XlsxResult};
-use litchi_core::sheet::Result;
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::{

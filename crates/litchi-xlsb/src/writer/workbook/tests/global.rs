@@ -377,22 +377,13 @@ fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
     let chart_name_error = reader
         .worksheet_by_name("Sales Chart")
         .expect_err("chart sheet must not be exposed as a worksheet");
-    assert!(
-        chart_name_error
-            .downcast_ref::<crate::package::error::Error>()
-            .is_some(),
-        "chart-sheet lookup must retain the typed package error"
-    );
+    // The trait's error is the typed package error itself.
+    let _: &crate::package::error::Error = &chart_name_error;
 
     let index_error = reader
         .worksheet_by_index(2)
         .expect_err("worksheet index after Tail must be out of range");
-    assert!(
-        index_error
-            .downcast_ref::<crate::package::error::Error>()
-            .is_some(),
-        "worksheet index failure must retain the typed package error"
-    );
+    let _: &crate::package::error::Error = &index_error;
     let direct_error = match reader.worksheet(2) {
         Ok(_) => panic!("direct worksheet index after Tail must be out of range"),
         Err(error) => error,

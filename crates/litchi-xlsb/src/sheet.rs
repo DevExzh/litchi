@@ -9,12 +9,15 @@ use crate::comments::Record;
 use crate::conditional_formatting::Formatting;
 use crate::hyperlinks::Hyperlink;
 use crate::merged_cells::MergedCell;
+use crate::package::PackageError;
 use crate::package::cell::Cell;
 use crate::package::data_validation::{Settings, Validation};
 use crate::package::scenarios::Manager;
 use crate::package::web_extension_bindings::Binding;
 use crate::slicer;
-use litchi_core::sheet::{Cell as SheetCell, CellValue, Result, Worksheet as SheetWorksheet};
+use litchi_core::sheet::{Cell as SheetCell, CellValue, Worksheet as SheetWorksheet};
+
+type Result<T> = std::result::Result<T, PackageError>;
 use litchi_sheet::view::View;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -534,6 +537,7 @@ impl Worksheet {
 impl SheetWorksheet for Worksheet {
     /// Stored cells are borrowed; an absent position reads as an owned
     /// empty cell.
+    type Error = PackageError;
     type Cell<'a> = Cow<'a, Cell>;
     type Cells<'a> = StoredCells<'a>;
     type Rows<'a> = Rows<'a>;
@@ -567,8 +571,7 @@ impl SheetWorksheet for Worksheet {
     }
 
     fn cell_by_coordinate(&self, coordinate: &str) -> Result<Cow<'_, Cell>> {
-        let (row, col) = crate::package::utils::parse_cell_reference(coordinate)
-            .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
+        let (row, col) = crate::package::utils::parse_cell_reference(coordinate)?;
         self.cell(row, col)
     }
 

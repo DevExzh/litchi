@@ -361,6 +361,44 @@ impl From<litchi_biff::Error> for Error {
     }
 }
 
+/// Classify an XLS error for the format-neutral sheet error the formula
+/// engine reports. The message is static: no sheet name, reference or
+/// record content crosses.
+impl From<Error> for litchi_core::sheet::Error {
+    fn from(error: Error) -> Self {
+        use litchi_core::edit::RefusalKind;
+        let refused = |kind, reason| Self::refused(kind, "read", reason);
+        match error {
+            Error::Io(_) | Error::Cfb(_) => Self::Io,
+            Error::WorksheetNotFound(_) => refused(
+                RefusalKind::NotFound,
+                "the XLS workbook has no such worksheet",
+            ),
+            Error::InvalidCellReference(_) => {
+                refused(RefusalKind::InvalidValue, "the cell reference is not valid")
+            },
+            Error::PasswordProtected
+            | Error::PasswordRequired
+            | Error::InvalidPassword
+            | Error::UnsupportedEncryption(_) => {
+                refused(RefusalKind::Protected, "the XLS workbook is encrypted")
+            },
+            Error::UnsupportedBiffVersion(_) | Error::UnsupportedFeature(_) => refused(
+                RefusalKind::UnsupportedContent,
+                "the XLS workbook uses an unsupported feature",
+            ),
+            Error::Limit { .. }
+            | Error::StagedChangeLimit { .. }
+            | Error::InvalidLimit { .. }
+            | Error::Allocation(_) => refused(
+                RefusalKind::UnsupportedContent,
+                "the XLS workbook exceeds a configured limit",
+            ),
+            _ => Self::Malformed("the XLS data is malformed"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

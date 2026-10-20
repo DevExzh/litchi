@@ -3,7 +3,12 @@
 use super::cell::TextCell;
 use super::iterators::{TextCellIterator, TextRowIterator};
 use super::parser::TextParser;
-use crate::sheet::{CellValue, Result as SheetResult, Worksheet};
+use crate::sheet::{CellValue, Error as SheetError, Result as SheetResult, Worksheet};
+
+/// The boxed-error result the text readers still return (record 0353a
+/// leaves them to the `sheet::text` move).
+type ReadResult<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
+use litchi_core::edit::RefusalKind;
 use std::borrow::Cow;
 use std::io::{Read, Seek};
 
@@ -20,7 +25,7 @@ impl TextWorksheet {
         reader: &mut R,
         config: super::workbook::TextConfig,
         name: String,
-    ) -> SheetResult<Self> {
+    ) -> ReadResult<Self> {
         let mut parser = TextParser::new(reader, config);
         let mut data = Vec::new();
 
@@ -48,7 +53,15 @@ impl TextWorksheet {
     }
 }
 
+/// A coordinate that is not of the `A1` form.
+const INVALID_COORDINATE: SheetError = SheetError::refused(
+    RefusalKind::InvalidValue,
+    "cell_by_coordinate",
+    "the coordinate is not of the A1 form",
+);
+
 impl Worksheet for TextWorksheet {
+    type Error = SheetError;
     type Cell<'a> = TextCell;
     type Cells<'a> = TextCellIterator<'a>;
     type Rows<'a> = TextRowIterator<'a>;
@@ -100,21 +113,19 @@ impl Worksheet for TextWorksheet {
         );
 
         if col_str.is_empty() || row_str.is_empty() {
-            return Err(format!("Invalid coordinate: {}", coordinate).into());
+            return Err(INVALID_COORDINATE);
         }
 
         // Convert column letters to number (A=1, B=2, ..., Z=26, AA=27, etc.)
         let mut col_num = 0u32;
         for c in col_str.chars() {
             if !c.is_ascii_alphabetic() {
-                return Err(format!("Invalid coordinate: {}", coordinate).into());
+                return Err(INVALID_COORDINATE);
             }
             col_num = col_num * 26 + (c.to_ascii_uppercase() as u32 - 'A' as u32 + 1);
         }
 
-        let row_num = row_str
-            .parse::<u32>()
-            .map_err(|_| format!("Invalid row number in coordinate: {}", coordinate))?;
+        let row_num = row_str.parse::<u32>().map_err(|_| INVALID_COORDINATE)?;
 
         self.cell(row_num, col_num)
     }
@@ -129,7 +140,11 @@ impl Worksheet for TextWorksheet {
 
     fn row(&self, row_idx: usize) -> SheetResult<Cow<'_, [CellValue]>> {
         if row_idx >= self.data.len() {
-            return Err(format!("Row {} not found", row_idx + 1).into());
+            return Err(SheetError::refused(
+                RefusalKind::NotFound,
+                "row",
+                "the text worksheet has no such row",
+            ));
         }
         // Return borrowed data - zero-copy!
         Ok(Cow::Borrowed(&self.data[row_idx]))

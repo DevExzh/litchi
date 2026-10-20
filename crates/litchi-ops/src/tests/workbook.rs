@@ -317,10 +317,7 @@ mod xlsx {
         )
         .unwrap();
 
-        let typed = |error: Box<dyn std::error::Error + Send + Sync>| {
-            let error = error
-                .downcast::<crate::Error>()
-                .expect("the trait boxes the typed error");
+        let typed = |error: crate::Error| {
             assert_eq!(error.code(), Code::IoError, "{error:?}");
             assert!(super::super::source_change(&error).is_some(), "{error:?}");
         };
@@ -676,8 +673,7 @@ mod ods {
         let view = file.workbook().unwrap();
         assert_eq!(generic_names(&view), ["Sheet1", "Sheet2"]);
         assert_eq!(WorkbookTrait::worksheet_count(&view), 2);
-        let refused = |error: Box<dyn std::error::Error + Send + Sync>| {
-            let error = error.downcast::<crate::Error>().expect("a typed refusal");
+        let refused = |error: crate::Error| {
             assert_eq!(error.code(), Code::UnsupportedCapability);
             assert_eq!(error.format(), Some(litchi_core::FileFormat::Ods));
         };

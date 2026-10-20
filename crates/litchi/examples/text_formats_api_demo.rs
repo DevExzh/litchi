@@ -15,24 +15,24 @@ use litchi::sheet::{CellValue, WorkbookTrait};
 type ExampleResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 /// A workbook over the cells a SYLK, DIF or fixed-width reader parsed.
-fn workbook_from_cells(cells: Vec<Vec<CellValue>>) -> litchi::sheet::Result<TextWorkbook> {
+fn workbook_from_cells(cells: Vec<Vec<CellValue>>) -> ExampleResult<TextWorkbook> {
     let mut workbook = TextWorkbook::from_bytes(&[], TextConfig::default())?;
     workbook.set_data(cells);
     Ok(workbook)
 }
 
 /// Open a SYLK (Symbolic Link) workbook.
-fn open_sylk(path: &str) -> litchi::sheet::Result<TextWorkbook> {
+fn open_sylk(path: &str) -> ExampleResult<TextWorkbook> {
     workbook_from_cells(read_sylk(&mut File::open(path)?, Default::default())?)
 }
 
 /// Open a DIF (Data Interchange Format) workbook.
-fn open_dif(path: &str) -> litchi::sheet::Result<TextWorkbook> {
+fn open_dif(path: &str) -> ExampleResult<TextWorkbook> {
     workbook_from_cells(read_dif(&mut File::open(path)?, Default::default())?)
 }
 
 /// Open a fixed-width PRN workbook.
-fn open_fixed_width(path: &str) -> litchi::sheet::Result<TextWorkbook> {
+fn open_fixed_width(path: &str) -> ExampleResult<TextWorkbook> {
     workbook_from_cells(read_fixed_width(
         &mut File::open(path)?,
         Default::default(),

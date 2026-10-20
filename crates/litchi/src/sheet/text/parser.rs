@@ -1,6 +1,10 @@
 //! Streaming parser for text-based spreadsheet formats
 
-use crate::sheet::{CellValue, Result as SheetResult};
+use crate::sheet::CellValue;
+
+/// The boxed-error result the text readers still return (record 0353a
+/// leaves them to the `sheet::text` move).
+type SheetResult<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 use std::io::{Read, Seek, SeekFrom};
 
 /// Streaming parser for delimited text formats

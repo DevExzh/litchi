@@ -6,6 +6,10 @@ use std::path::Path;
 
 use super::iterators::TextWorksheetIterator;
 use crate::sheet::{CellValue, Result as SheetResult, WorkbookTrait};
+
+/// The boxed-error result the text readers still return (record 0353a
+/// leaves them to the `sheet::text` move).
+type ReadResult<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 use litchi_core::{BomKind, strip_bom, write_bom};
 
 /// Configuration for parsing text-based spreadsheet files
@@ -134,19 +138,19 @@ pub struct TextWorkbook {
 
 impl TextWorkbook {
     /// Open a text workbook from a file path with default configuration
-    pub fn open<P: AsRef<Path>>(path: P) -> SheetResult<Self> {
+    pub fn open<P: AsRef<Path>>(path: P) -> ReadResult<Self> {
         Self::from_path_with_config(path, TextConfig::default())
     }
 
     /// Open a text workbook from a file path with custom configuration
-    pub fn from_path_with_config<P: AsRef<Path>>(path: P, config: TextConfig) -> SheetResult<Self> {
+    pub fn from_path_with_config<P: AsRef<Path>>(path: P, config: TextConfig) -> ReadResult<Self> {
         let file = File::open(path)?;
         let mut reader = BufReader::with_capacity(config.buffer_size, file);
         Self::from_reader(&mut reader, config)
     }
 
     /// Create a text workbook from any reader with configuration
-    pub fn from_reader<R: Read + Seek>(reader: &mut R, config: TextConfig) -> SheetResult<Self> {
+    pub fn from_reader<R: Read + Seek>(reader: &mut R, config: TextConfig) -> ReadResult<Self> {
         let mut detected_bom = None;
         if config.strip_bom
             && let Some((kind, _len)) = strip_bom(reader)?
@@ -172,7 +176,7 @@ impl TextWorkbook {
     }
 
     /// Create a text workbook from bytes with configuration
-    pub fn from_bytes(bytes: &[u8], config: TextConfig) -> SheetResult<Self> {
+    pub fn from_bytes(bytes: &[u8], config: TextConfig) -> ReadResult<Self> {
         let mut cursor = std::io::Cursor::new(bytes);
         Self::from_reader(&mut cursor, config)
     }
@@ -203,7 +207,7 @@ impl TextWorkbook {
     }
 
     /// Write the workbook back out using the current configuration.
-    pub fn write_to<W: Write>(&self, writer: &mut W) -> SheetResult<()> {
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> ReadResult<()> {
         if let Some(bom) = self.config.write_bom {
             write_bom(writer, bom)?;
         }
@@ -273,7 +277,15 @@ impl TextWorkbook {
     }
 }
 
+/// A worksheet a text workbook does not have (it has exactly one).
+const NO_SUCH_SHEET: crate::sheet::Error = crate::sheet::Error::refused(
+    litchi_core::edit::RefusalKind::NotFound,
+    "worksheet",
+    "the text workbook has no such worksheet",
+);
+
 impl WorkbookTrait for TextWorkbook {
+    type Error = crate::sheet::Error;
     type Worksheet<'a> = super::worksheet::TextWorksheet;
     type Worksheets<'a> = TextWorksheetIterator<'a>;
 
@@ -293,14 +305,14 @@ impl WorkbookTrait for TextWorkbook {
         if name == self.worksheet_name {
             self.active_worksheet()
         } else {
-            Err(format!("Worksheet '{}' not found", name).into())
+            Err(NO_SUCH_SHEET)
         }
     }
 
     fn worksheet_by_index(&self, index: usize) -> SheetResult<super::worksheet::TextWorksheet> {
         match index {
             0 => self.active_worksheet(),
-            _ => Err(format!("Worksheet index {} out of range", index).into()),
+            _ => Err(NO_SUCH_SHEET),
         }
     }
 

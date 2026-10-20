@@ -64,8 +64,10 @@ use std::fmt;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use litchi_core::edit::RefusalKind;
 use litchi_core::sheet::{
-    Cell as CoreCell, CellValue, Result as SheetResult, WorkbookTrait, Worksheet as CoreWorksheet,
+    Cell as CoreCell, CellValue, Error as SheetError, LimitKind as SheetLimitKind,
+    Result as SheetResult, WorkbookTrait, Worksheet as CoreWorksheet,
 };
 use litchi_eval::FormulaEvaluator;
 
@@ -874,15 +876,20 @@ impl<'f> Grid<'f> {
                 Value::Empty => Value::Number(0.0),
                 other => other,
             })),
-            Err(error) => match error.downcast::<crate::Error>() {
-                Ok(error) => Err(*error),
-                Err(error) => match error.downcast::<litchi_eval::DepthLimit>() {
-                    Ok(depth) => Err(limit(LimitKind::Depth, depth.depth(), self.max_depth)),
-                    // An engine refusal such as a structured reference
-                    // without its table: unsupported, not a failure.
-                    Err(_) => Ok(None),
-                },
-            },
+            Err(SheetError::Limit {
+                kind: SheetLimitKind::Depth,
+                observed,
+                ..
+            }) => Err(limit(LimitKind::Depth, observed, self.max_depth)),
+            Err(error) if error == MISSING_SHEET => Err(crate::Error::new(
+                Code::NotFound,
+                MISSING_SHEET
+                    .refusal()
+                    .map_or("", |refusal| refusal.reason()),
+            )),
+            // An engine refusal such as a structured reference without its
+            // table: unsupported, not a failure.
+            Err(_) => Ok(None),
         }
     }
 
@@ -913,23 +920,28 @@ impl<'f> Grid<'f> {
         Ok(())
     }
 
-    fn trip(&self, error: crate::Error) -> Box<dyn std::error::Error + Send + Sync> {
+    /// Keep the typed error for [`Self::compute`] and hand the engine its
+    /// classification.
+    fn trip(&self, error: crate::Error) -> SheetError {
         let _ = self.tripped.set(error.clone());
-        Box::new(error)
+        SheetError::from(error)
     }
 }
 
-/// Recover the typed error of a worksheet trait read.
-#[cfg(feature = "xlsx")]
-pub(crate) fn sheet_error(error: Box<dyn std::error::Error + Send + Sync>) -> crate::Error {
-    match error.downcast::<crate::Error>() {
-        Ok(error) => *error,
-        Err(_) => crate::Error::new(
-            Code::InternalError,
-            "a worksheet read failed without a typed error",
-        ),
-    }
-}
+/// The grid's refusal of a worksheet name it does not have, which
+/// [`Grid::compute`] reports as [`Code::NotFound`].
+const MISSING_SHEET: SheetError = SheetError::refused(
+    RefusalKind::NotFound,
+    "worksheet_by_name",
+    "the formula names a worksheet the workbook does not have",
+);
+
+/// The grid's refusal of the reads the engine never makes.
+const BY_ROW_AND_COLUMN: SheetError = SheetError::refused(
+    RefusalKind::UnsupportedOperation,
+    "read",
+    "the evaluation grid reads cells by row and column",
+);
 
 fn limit(kind: LimitKind, observed: usize, maximum: usize) -> crate::Error {
     Error::Limit {
@@ -1030,6 +1042,7 @@ fn normalize(formula: &str) -> Cow<'_, str> {
 }
 
 impl<'f> WorkbookTrait for Grid<'f> {
+    type Error = SheetError;
     type Worksheet<'g>
         = SheetRef<'g, 'f>
     where
@@ -1053,10 +1066,11 @@ impl<'f> WorkbookTrait for Grid<'f> {
 
     fn worksheet_by_index(&self, index: usize) -> SheetResult<SheetRef<'_, 'f>> {
         if index >= self.sheets.len() {
-            return Err(Box::new(crate::Error::new(
-                Code::OutOfRange,
+            return Err(SheetError::refused(
+                RefusalKind::InvalidValue,
+                "worksheet_by_index",
                 "the worksheet position is out of range",
-            )));
+            ));
         }
         let sheet = self.sheet(index).map_err(|error| self.trip(error))?;
         Ok(SheetRef { grid: self, sheet })
@@ -1072,13 +1086,7 @@ impl<'f> WorkbookTrait for Grid<'f> {
                     .iter()
                     .position(|candidate| candidate.eq_ignore_ascii_case(name))
             })
-            .ok_or_else(|| {
-                let error: Box<dyn std::error::Error + Send + Sync> = Box::new(crate::Error::new(
-                    Code::NotFound,
-                    "the formula names a worksheet the workbook does not have",
-                ));
-                error
-            })?;
+            .ok_or(MISSING_SHEET)?;
         self.worksheet_by_index(index)
     }
 
@@ -1190,6 +1198,7 @@ impl SheetRef<'_, '_> {
 }
 
 impl CoreWorksheet for SheetRef<'_, '_> {
+    type Error = SheetError;
     type Cell<'a>
         = GridCell<'a>
     where
@@ -1212,10 +1221,7 @@ impl CoreWorksheet for SheetRef<'_, '_> {
     }
 
     fn cell_by_coordinate(&self, _coordinate: &str) -> SheetResult<GridCell<'_>> {
-        Err(Box::new(crate::Error::new(
-            Code::UnsupportedCapability,
-            "the evaluation grid reads cells by row and column",
-        )))
+        Err(BY_ROW_AND_COLUMN)
     }
 
     fn cell_value(&self, row: u32, column: u32) -> SheetResult<Cow<'_, CellValue>> {
@@ -1243,10 +1249,7 @@ impl CoreWorksheet for SheetRef<'_, '_> {
     }
 
     fn row(&self, _row_idx: usize) -> SheetResult<Cow<'_, [CellValue]>> {
-        Err(Box::new(crate::Error::new(
-            Code::UnsupportedCapability,
-            "the evaluation grid reads cells by row and column",
-        )))
+        Err(BY_ROW_AND_COLUMN)
     }
 
     fn row_count(&self) -> usize {

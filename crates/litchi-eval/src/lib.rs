@@ -11,10 +11,14 @@ pub mod parser;
 
 use self::engine::{ReferenceResolver, ResolvedName};
 use self::parser::{RangeRef, parse_range_reference, parse_single_cell_reference};
-use litchi_core::sheet::{CellValue, Result, WorkbookTrait, Worksheet as _};
+use litchi_core::edit::RefusalKind;
+use litchi_core::sheet::{
+    CellValue, Error as SheetError, LimitKind, Result, WorkbookTrait, Worksheet as _,
+};
 use parking_lot::{Mutex, RwLock};
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
+#[cfg(feature = "web_functions")]
 use std::error::Error;
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
@@ -47,35 +51,19 @@ pub(crate) enum Fetched {
     Pending,
 }
 
-/// The chain of formula cells one evaluation follows exceeded the bound set
-/// with [`FormulaEvaluator::with_max_depth`].
-///
-/// Evaluation recurses through referenced formula cells, so the bound keeps
-/// a long dependency chain from exhausting the stack.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DepthLimit {
-    depth: usize,
-}
+/// A `[@…]` structured reference outside a table row.
+const ROW_CONTEXT: SheetError = SheetError::refused(
+    RefusalKind::UnsupportedOperation,
+    "evaluate",
+    "a this-row structured reference requires row context",
+);
 
-impl DepthLimit {
-    /// The chain length that was refused.
-    #[must_use]
-    pub const fn depth(self) -> usize {
-        self.depth
-    }
-}
-
-impl std::fmt::Display for DepthLimit {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            formatter,
-            "formula evaluation depth {} exceeds its bound",
-            self.depth
-        )
-    }
-}
-
-impl Error for DepthLimit {}
+/// A structured reference naming a column the table does not have.
+const MISSING_COLUMN: SheetError = SheetError::refused(
+    RefusalKind::NotFound,
+    "evaluate",
+    "the table has no column of that name",
+);
 
 struct Visit<'a> {
     session: &'a Mutex<HashSet<CellRef>>,
@@ -254,7 +242,10 @@ struct NamedTable {
     headers: HashMap<String, u32>,
 }
 
-impl<'e, 'w, W: WorkbookTrait + Sync + Send + ?Sized> EngineCtx for At<'e, 'w, W> {
+impl<'e, 'w, W: WorkbookTrait + Sync + Send + ?Sized> EngineCtx for At<'e, 'w, W>
+where
+    SheetError: From<W::Error>,
+{
     fn get_cell_value(&self, sheet_name: &str, row: u32, col: u32) -> Result<CellValue> {
         self.evaluator
             .get_cell_value_in(self.session, sheet_name, row, col)
@@ -293,13 +284,19 @@ impl<'e, 'w, W: WorkbookTrait + Sync + Send + ?Sized> EngineCtx for At<'e, 'w, W
     }
 }
 
-impl<W: WorkbookTrait + ?Sized> ReferenceResolver for At<'_, '_, W> {
+impl<W: WorkbookTrait + Sync + Send + ?Sized> ReferenceResolver for At<'_, '_, W>
+where
+    SheetError: From<W::Error>,
+{
     fn resolve_name(&self, current_sheet: &str, name: &str) -> Result<Option<ResolvedName>> {
         self.evaluator.resolve_name(current_sheet, name)
     }
 }
 
-impl<'a, W: WorkbookTrait + ?Sized> ReferenceResolver for FormulaEvaluator<'a, W> {
+impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> ReferenceResolver for FormulaEvaluator<'a, W>
+where
+    SheetError: From<W::Error>,
+{
     fn resolve_name(&self, current_sheet: &str, name: &str) -> Result<Option<ResolvedName>> {
         let trimmed = name.trim();
         if trimmed.is_empty() {
@@ -336,7 +333,10 @@ pub struct TableConfig<'a> {
     pub headers: &'a [String],
 }
 
-impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
+impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W>
+where
+    SheetError: From<W::Error>,
+{
     /// Create a new evaluator for the given workbook.
     pub fn new(workbook: &'a W) -> Self {
         let mut sheet_index = HashMap::new();
@@ -361,7 +361,8 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
     }
 
     /// Bound the chain of formula cells one evaluation follows; a longer
-    /// chain fails with [`DepthLimit`]. Unbounded by default.
+    /// chain fails with [`litchi_core::sheet::Error::Limit`] of kind
+    /// [`LimitKind::Depth`]. Unbounded by default.
     #[must_use]
     pub fn with_max_depth(mut self, depth: usize) -> Self {
         self.max_depth = depth;
@@ -393,11 +394,11 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
         col: u32,
     ) -> Result<CellValue> {
         let Some(sheet_idx) = self.sheet_index.get(sheet_name).copied() else {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                format!("worksheet '{sheet_name}' is not indexed"),
-            )
-            .into());
+            return Err(SheetError::refused(
+                RefusalKind::NotFound,
+                "evaluate",
+                "the formula names a worksheet the workbook does not list",
+            ));
         };
         let key = CellRef {
             sheet_idx,
@@ -411,7 +412,11 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
 
         let depth = session.depth();
         if depth >= self.max_depth {
-            return Err(DepthLimit { depth: depth + 1 }.into());
+            return Err(SheetError::Limit {
+                kind: LimitKind::Depth,
+                observed: depth + 1,
+                maximum: self.max_depth,
+            });
         }
         let Some(_visit) = session.enter(key) else {
             return Ok(CellValue::Error("Circular reference detected".to_string()));
@@ -560,14 +565,14 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
                 end_col: table.end_col,
             },
             StructuredReference::ThisRow { .. } => {
-                return Err("[@] this row references require row context".into());
+                return Err(ROW_CONTEXT);
             },
             StructuredReference::Column { column_name, .. } => {
                 let col = table
                     .headers
                     .get(&column_name.to_uppercase())
                     .copied()
-                    .ok_or_else(|| format!("Column '{}' not found in table", column_name))?;
+                    .ok_or(MISSING_COLUMN)?;
                 let mut range = RangeRef {
                     sheet: table.sheet.clone(),
                     start_row: table.start_row,
@@ -585,10 +590,8 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
                     .headers
                     .get(&column_name.to_uppercase())
                     .copied()
-                    .ok_or_else(|| format!("Column '{}' not found in table", column_name))?;
-                return Err(
-                    format!("[@{}] this row references require row context", column_name).into(),
-                );
+                    .ok_or(MISSING_COLUMN)?;
+                return Err(ROW_CONTEXT);
             },
             StructuredReference::ColumnRange {
                 start_column,
@@ -599,12 +602,12 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
                     .headers
                     .get(&start_column.to_uppercase())
                     .copied()
-                    .ok_or_else(|| format!("Column '{}' not found in table", start_column))?;
+                    .ok_or(MISSING_COLUMN)?;
                 let end_col = table
                     .headers
                     .get(&end_column.to_uppercase())
                     .copied()
-                    .ok_or_else(|| format!("Column '{}' not found in table", end_column))?;
+                    .ok_or(MISSING_COLUMN)?;
                 let mut range = RangeRef {
                     sheet: table.sheet.clone(),
                     start_row: table.start_row,
@@ -622,7 +625,7 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
                     .headers
                     .get(&column_name.to_uppercase())
                     .copied()
-                    .ok_or_else(|| format!("Column '{}' not found in table", column_name))?;
+                    .ok_or(MISSING_COLUMN)?;
                 RangeRef {
                     sheet: table.sheet.clone(),
                     start_row: table.start_row,
@@ -636,7 +639,7 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
                     .headers
                     .get(&column_name.to_uppercase())
                     .copied()
-                    .ok_or_else(|| format!("Column '{}' not found in table", column_name))?;
+                    .ok_or(MISSING_COLUMN)?;
                 RangeRef {
                     sheet: table.sheet.clone(),
                     start_row: table.end_row,
@@ -808,6 +811,7 @@ mod transport_tests {
     }
 
     impl Worksheet for Book {
+        type Error = SheetError;
         type Cell<'a> = Fixed<'a>;
         type Cells<'a> = std::iter::Empty<Result<Fixed<'a>>>;
         type Rows<'a> = std::iter::Empty<Result<Cow<'a, [CellValue]>>>;
@@ -851,6 +855,7 @@ mod transport_tests {
     }
 
     impl WorkbookTrait for Book {
+        type Error = SheetError;
         type Worksheet<'a> = &'a Book;
         type Worksheets<'a> = std::iter::Once<Result<&'a Book>>;
 
