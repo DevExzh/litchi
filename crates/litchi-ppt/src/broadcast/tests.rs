@@ -346,3 +346,26 @@ fn package_broadcast_edits_publish_replay_and_invert_exactly() {
     };
     assert_eq!(refusal.kind(), litchi_core::edit::RefusalKind::NotFound);
 }
+
+#[test]
+fn package_broadcast_edits_admit_a_signed_package_and_refuse_a_changed_commit() {
+    use litchi_core::Position;
+
+    let (source, _) = package_with_broadcast();
+    let signed = crate::scoped::signed(&source);
+    let bytes = signed.to_bytes().unwrap();
+
+    let no_op = signed
+        .edit_broadcast(Position::new(0))
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), bytes);
+
+    let mut edit = signed.edit_broadcast(Position::new(0)).unwrap();
+    edit.set_title(Some("Scoped broadcast".into())).unwrap();
+    assert!(matches!(edit.commit(), Err(super::Error::Signed)));
+    assert_eq!(signed.to_bytes().unwrap(), bytes);
+}

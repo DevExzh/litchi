@@ -17,6 +17,11 @@ pub(crate) fn finish(mut editor: Editor) -> Result<Vec<u8>> {
         original.extend_from_slice(&editor.original);
         return Ok(original);
     }
+    if editor.signed {
+        return Err(Error::Corrupted(
+            "signed PPT is not eligible for a changed OLE publication".into(),
+        ));
+    }
 
     for id in &editor.removed_persist_ids {
         editor.mappings.remove(id);
@@ -112,11 +117,7 @@ fn rewritten_object_list(editor: &Editor) -> Result<Vec<u8>> {
         .ok_or_else(|| Error::Corrupted("Document persist mapping is missing".into()))?
         as usize;
     let old_document = rewrite::slice(&editor.document, document_offset)?;
-    rewrite::replace_nested_record(
-        old_document,
-        rewrite::external_object_list(),
-        &editor.collection.to_record_bytes()?,
-    )
+    rewrite::replace_or_insert_object_list(old_document, &editor.collection.to_record_bytes()?)
 }
 
 fn write_package(editor: &mut Editor, appended: Vec<u8>) -> Result<Vec<u8>> {

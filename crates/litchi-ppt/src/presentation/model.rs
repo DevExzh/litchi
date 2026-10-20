@@ -909,7 +909,7 @@ impl Presentation {
     /// The parsed live `DocumentContainer`: the one the current persist
     /// directory maps. An incrementally saved presentation keeps superseded
     /// `DocumentContainer` records in the stream (record 0357).
-    fn live_document_ref(&self) -> Result<&Record> {
+    pub(crate) fn live_document_ref(&self) -> Result<&Record> {
         let live = self.live_document_record()?;
         self.inner
             .parser

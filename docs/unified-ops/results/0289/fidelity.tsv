@@ -838,6 +838,7 @@ poi/test-data/slideshow/ole2-embedding-2003.ppt	ppt	exact		none		-
 poi/test-data/slideshow/placeholder-layout-color.pptx	pptx	exact		value-exact	/ title: 346876 -> 346626 bytes, first difference at 344186	none	
 poi/test-data/slideshow/ppt_with_embeded.ppt	ppt	exact		none		-	
 poi/test-data/slideshow/prProps.pptx	pptx	exact		value-exact	/ title: 30976 -> 30718 bytes, first difference at 27151	none	
+poi/test-data/slideshow/slide_master.ppt	ppt	exact		none		-	
 poi/test-data/slideshow/sound.ppt	ppt	exact		none		-	
 poi/test-data/slideshow/testPPT_oleWorkbook.ppt	ppt	exact		none		-	
 poi/test-data/slideshow/text-margins.ppt	ppt	exact		none		-	

@@ -50,7 +50,7 @@ fn classify(record: &Record) -> Result<Option<Context>> {
                 ));
             }
             let slide_id = u32::from_le_bytes(atom.data[..4].try_into().unwrap_or([0; 4]));
-            Ok((slide_id == 0).then_some(Context::Notes))
+            Ok(super::validation::is_notes_master_reference(slide_id).then_some(Context::Notes))
         },
         RecordType::Slide => {
             let Some(atom) = record
