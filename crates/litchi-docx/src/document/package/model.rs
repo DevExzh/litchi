@@ -888,14 +888,14 @@ impl Document {
     // ========================================
     // WRITE OPERATIONS
     // ========================================
-    // Note: Write operations are primarily handled by the MutableDocument API
+    // Note: Write operations are primarily handled by the DraftDocument API
     // in the writer module. See src/ooxml/docx/writer/doc.rs for full API.
     //
     // ✅ COMPLETED: Modification operations (ECMA-376 Section 17.2.2)
     // - Add/insert/remove paragraphs: add_paragraph(), insert_paragraph(),
-    //   remove_paragraph() on MutableDocument
+    //   remove_paragraph() on DraftDocument
     // - Add/insert/remove tables: add_table(), insert_table(), remove_table()
-    // - Modify runs: MutableRun::bold(), italic(), font_name(), color()
+    // - Modify runs: DraftRun::bold(), italic(), font_name(), color()
     //   reached through the paragraph()/table() accessors
     // ✅ COMPLETED: Note and comment removal
     // - remove_footnote()/remove_endnote() strip typed w:footnoteReference /
@@ -932,7 +932,7 @@ impl Document {
     // - Run::breaks() preserves text-wrapping, page, and column breaks plus clear behavior
     // - Rendered pagination hints remain distinguishable from authored breaks
     // ✅ COMPLETED: Section-break insertion and mutation
-    // - MutableDocument::insert_section_break() authors paragraph-level w:pPr/w:sectPr;
+    // - DraftDocument::insert_section_break() authors paragraph-level w:pPr/w:sectPr;
     //   section_mut() edits the body-final section
     // - section_break(), update_section_break(), remove_section_break(),
     //   move_section_break() cover per-section page setup mutation

@@ -227,7 +227,7 @@ fn main() {
     let package = litchi_docx::Package::from_bytes(&template).expect("leaf template");
     let leaf_leg = || {
         for values in &leaf_values {
-            let mut merged = leaf_merge(&package, values);
+            let merged = leaf_merge(&package, values);
             let bytes = merged.to_bytes().expect("leaf bytes");
             std::hint::black_box(bytes);
         }

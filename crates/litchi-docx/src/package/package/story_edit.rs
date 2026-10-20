@@ -44,7 +44,7 @@ impl Package {
     /// Returns a typed document transaction error when a selector is
     /// ambiguous, a story is not an editable main/header/footer story, a leaf
     /// cannot be represented safely, or candidate package validation fails.
-    pub fn replace_story_hyperlink_texts(
+    pub(crate) fn replace_story_hyperlink_texts(
         &mut self,
         replacements: &[StoryHyperlinkTextReplacement],
     ) -> TransactionResult<StoryInventory> {
@@ -416,7 +416,7 @@ mod tests {
                 "rBodyLink".to_owned(),
                 true,
             );
-        package.mutable_doc = None;
+
         package
     }
 

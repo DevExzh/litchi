@@ -62,7 +62,7 @@ impl Snapshot {
 
     /// Start an isolated edit based on this snapshot.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> Transaction {
         Transaction {
             base: self.clone(),
             next: self.value,
@@ -72,7 +72,7 @@ impl Snapshot {
 
 /// A section-property edit that has not yet been published.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Transaction {
     base: Snapshot,
     next: Option<Layout>,
 }
@@ -152,7 +152,7 @@ impl Transaction {
 
 /// A successful publication containing the new snapshot and reversible patch.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
 }
@@ -185,7 +185,7 @@ impl Commit {
 
 /// A lineage-independent, preconditioned reversible layout patch.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Patch {
+pub(crate) struct Patch {
     before: Option<Layout>,
     after: Option<Layout>,
     before_xml: Arc<[u8]>,

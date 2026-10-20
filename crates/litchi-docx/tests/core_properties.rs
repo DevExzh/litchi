@@ -15,7 +15,7 @@ fn package_owns_core_property_crud_through_the_metadata_family() {
     });
     let commit = edit.commit().expect("commit");
     assert!(commit.diagnostics().changed());
-    let mut moved = commit.into_package();
+    let moved = commit.into_package();
     assert_eq!(
         moved.metadata().and_then(|props| props.title.as_deref()),
         Some("Moved")
@@ -32,7 +32,7 @@ fn package_owns_core_property_crud_through_the_metadata_family() {
     );
     let mut edit = reopened.edit_metadata();
     edit.clear();
-    let mut cleared = edit.commit().expect("clear").into_package();
+    let cleared = edit.commit().expect("clear").into_package();
 
     let output = NamedTempFile::with_suffix(".docx").unwrap();
     cleared.save(output.path()).unwrap();
@@ -48,7 +48,7 @@ fn metadata_patch_replays_and_inverts_on_reopened_bytes() {
         props.subject = Some("Subject".to_owned());
         props.category = Some("Category".to_owned());
     });
-    let (mut changed, patch) = edit.commit().expect("commit").into_parts();
+    let (changed, patch) = edit.commit().expect("commit").into_parts();
     let reopened = Package::from_bytes(&changed.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.metadata(), patch.target());
 

@@ -21,7 +21,7 @@
 //! activated while an inventory is built.
 
 use super::Package;
-use crate::{Error, Result};
+use crate::Result;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI};
 use quick_xml::events::Event;
@@ -32,7 +32,10 @@ use std::sync::Arc;
 
 use crate::document::ParagraphHyperlinkAddress;
 
+mod edit;
 mod source;
+
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 #[allow(
     unused_imports,
     reason = "source-backed consumers use the inventory and part types as they land"

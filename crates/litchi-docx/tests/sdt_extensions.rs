@@ -1,3 +1,7 @@
+#![allow(
+    clippy::redundant_closure_call,
+    reason = "raw OPC test edits stage one closure over the edit's graph"
+)]
 use std::collections::HashSet;
 
 use litchi_docx::content_control::{
@@ -55,22 +59,27 @@ fn store_for(id: &str, xml: &[u8], conformance: Conformance) -> NewStore {
 }
 
 fn mark_signed(package: &mut Package) {
-    package
-        .edit_opc(|opc| {
-            opc.try_add_part(Box::new(BlobPart::new(
-                PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
-                ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
-                Vec::new(),
-            )))?;
-            opc.rels_mut().add_relationship(
-                rt::DIGITAL_SIGNATURE_ORIGIN.to_owned(),
-                "_xmlsignatures/origin.sigs".to_owned(),
-                "rSignature".to_owned(),
-                false,
-            );
-            Ok::<_, Error>(())
-        })
+    *package = {
+        let mut edit = package.edit_opc();
+        (|opc: &mut OpcPackage| -> litchi_docx::Result<_> {
+            {
+                opc.try_add_part(Box::new(BlobPart::new(
+                    PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
+                    ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+                    Vec::new(),
+                )))?;
+                opc.rels_mut().add_relationship(
+                    rt::DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+                    "_xmlsignatures/origin.sigs".to_owned(),
+                    "rSignature".to_owned(),
+                    false,
+                );
+                Ok::<_, Error>(())
+            }
+        })(edit.package_mut())
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -127,7 +136,11 @@ fn bound_package(payload: &[u8]) -> Package {
         .unwrap()
         .to_base64();
     let mut package = Package::new().unwrap();
-    package.add_custom_xml(store(payload)).unwrap();
+    package = {
+        let mut edit = package.edit_custom_xml();
+        edit.add(store(payload)).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let document_name = PackURI::new("/word/document.xml").unwrap();
     let header_name = PackURI::new("/word/header1.xml").unwrap();
     let document_xml = main_xml(&format!(
@@ -140,11 +153,13 @@ fn bound_package(payload: &[u8]) -> Package {
         binding(Some(3), Some(&checksum))
     )
     .into_bytes();
-    package
-        .edit_opc(|opc| {
-            let document = opc.get_part_mut(&document_name)?;
-            document.set_blob(document_xml);
-            document.rels_mut().add_relationship(
+    package = {
+        let mut edit = package.edit_opc();
+        (|opc: &mut OpcPackage| -> litchi_docx::Result<_> {
+            {
+                let document = opc.get_part_mut(&document_name)?;
+                document.set_blob(document_xml);
+                document.rels_mut().add_relationship(
                 format!("{}/header", STRICT_RELS.trim_end_matches('/')).replace(
                     "http://purl.oclc.org/ooxml/officeDocument/relationships/header",
                     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
@@ -153,14 +168,17 @@ fn bound_package(payload: &[u8]) -> Package {
                 "rIdHeader1".to_owned(),
                 false,
             );
-            opc.add_part(Box::new(BlobPart::new(
-                header_name,
-                ct::WML_HEADER.to_owned(),
-                header_xml,
-            )));
-            Ok::<_, Error>(())
-        })
+                opc.add_part(Box::new(BlobPart::new(
+                    header_name,
+                    ct::WML_HEADER.to_owned(),
+                    header_xml,
+                )));
+                Ok::<_, Error>(())
+            }
+        })(edit.package_mut())
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     package
 }
 
@@ -395,15 +413,28 @@ fn managed_custom_xml_refresh_updates_both_bindings_in_one_sdt() {
     .into_bytes();
 
     let mut package = Package::new().unwrap();
-    package.add_custom_xml(store(initial)).unwrap();
+    package = {
+        let mut edit = package.edit_custom_xml();
+        edit.add(store(initial)).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let main = PackURI::new("/word/document.xml").unwrap();
-    package
-        .edit_opc(|opc| {
-            opc.get_part_mut(&main)?.set_blob(document_xml);
-            Ok::<_, Error>(())
-        })
+    package = {
+        let mut edit = package.edit_opc();
+        (|opc: &mut OpcPackage| -> litchi_docx::Result<_> {
+            {
+                opc.get_part_mut(&main)?.set_blob(document_xml);
+                Ok::<_, Error>(())
+            }
+        })(edit.package_mut())
         .unwrap();
-    package.set_custom_xml(ITEM, changed.to_vec()).unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    package = {
+        let mut edit = package.edit_custom_xml();
+        edit.set(ITEM, changed.to_vec()).unwrap();
+        edit.commit().unwrap().into_package()
+    };
 
     let source =
         std::str::from_utf8(package.opc_package().get_part(&main).unwrap().blob()).unwrap();
@@ -460,9 +491,12 @@ fn changed_payload_refreshes_all_seven_strict_story_kinds() {
         .unwrap()
         .to_base64();
     let mut package = strict_story_package(ct::WML_DOCUMENT_MAIN);
-    package
-        .add_custom_xml(store_for(ITEM, initial, Conformance::Strict))
-        .unwrap();
+    package = {
+        let mut edit = package.edit_custom_xml();
+        edit.add(store_for(ITEM, initial, Conformance::Strict))
+            .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let replacements = package
         .story_inventory()
         .unwrap()
@@ -476,16 +510,25 @@ fn changed_payload_refreshes_all_seven_strict_story_kinds() {
             )
         })
         .collect::<Vec<_>>();
-    package
-        .edit_opc(|opc| {
-            for (part, source) in replacements {
-                opc.get_part_mut(&part)?.set_blob(source);
+    package = {
+        let mut edit = package.edit_opc();
+        (|opc: &mut OpcPackage| -> litchi_docx::Result<_> {
+            {
+                for (part, source) in replacements {
+                    opc.get_part_mut(&part)?.set_blob(source);
+                }
+                Ok::<_, Error>(())
             }
-            Ok::<_, Error>(())
-        })
+        })(edit.package_mut())
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
 
-    package.set_custom_xml(ITEM, changed.to_vec()).unwrap();
+    package = {
+        let mut edit = package.edit_custom_xml();
+        edit.set(ITEM, changed.to_vec()).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let reports = package.verify_content_control_checksums().unwrap();
     assert_eq!(reports.len(), 7);
     assert!(
@@ -533,8 +576,16 @@ fn transitional_docm_main_is_a_reachable_inert_checksum_owner() {
         false,
     );
     let mut package = Package::from_opc_package(opc).unwrap();
-    package.add_custom_xml(store(initial)).unwrap();
-    package.set_custom_xml(ITEM, changed.to_vec()).unwrap();
+    package = {
+        let mut edit = package.edit_custom_xml();
+        edit.add(store(initial)).unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    package = {
+        let mut edit = package.edit_custom_xml();
+        edit.set(ITEM, changed.to_vec()).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let reports = package.verify_content_control_checksums().unwrap();
     assert_eq!(reports.len(), 1);
     assert!(matches!(
@@ -681,59 +732,84 @@ fn strict_dotx_and_dotm_inventory_every_reachable_story_role() {
     }
 }
 
-#[test]
-fn detached_edits_are_reversible_stale_safe_and_output_bounded() {
-    let source = format!(
-        r#"<w:sdtPr xmlns:w="{W}" xmlns:mc="{MC}" xmlns:h="{HASH}" xmlns:f="{FORMAT}" mc:Ignorable="h f"><w:lock w:val="contentLocked"/><w:dataBinding w:xpath="/x" w:storeItemID="{ITEM}"/></w:sdtPr>"#
-    )
-    .into_bytes();
-    let snapshot = Snapshot::from_xml(source.clone()).unwrap();
-    let mut transaction = snapshot.edit();
-    transaction
-        .set_checksum(0, Some(Checksum::from_word_value(0xbd0b_e338)))
+fn package_with_main(document: Vec<u8>, payload: &[u8]) -> Package {
+    let main = PackURI::new("/word/document.xml").unwrap();
+    let package = Package::new().unwrap();
+    let package = {
+        let mut edit = package.edit_custom_xml();
+        edit.add(store(payload)).unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    let mut edit = package.edit_opc();
+    edit.package_mut()
+        .get_part_mut(&main)
         .unwrap()
-        .set_formatting_allowed(0, Some(FormattingAllowed::Allowed))
-        .unwrap();
-    let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
-
-    let patch = commit.patch().clone();
-    let stale = Snapshot::from_xml(
-        source
-            .iter()
-            .copied()
-            .chain(b" ".iter().copied())
-            .collect::<Vec<_>>(),
-    )
-    .unwrap();
-    assert!(patch.apply(&stale).is_err());
-    assert!(!patch.is_applied());
-    let applied = patch.apply(&snapshot).unwrap();
-    assert!(patch.is_applied());
-    assert!(patch.apply(&snapshot).is_err());
-    let restored = patch.inverse().apply(&applied).unwrap();
-    assert_eq!(restored.source(), source);
-
-    let limited_source = format!(
-        r#"<w:sdtPr xmlns:w="{W}"><w:dataBinding w:xpath="/x" w:storeItemID="{ITEM}"/></w:sdtPr>"#
-    )
-    .into_bytes();
-    let limited = Snapshot::from_xml_with_limits(
-        limited_source.clone(),
-        Limits {
-            max_output_bytes: limited_source.len(),
-            ..Limits::default()
-        },
-    )
-    .unwrap();
-    let mut transaction = limited.edit();
-    transaction
-        .set_checksum(0, Some(Checksum::from_word_value(0xbd0b_e338)))
-        .unwrap();
-    assert!(transaction.commit().is_err());
-    assert_eq!(limited.source(), limited_source);
+        .set_blob(document);
+    edit.commit().unwrap().into_package()
 }
 
+#[test]
+fn content_control_edits_are_reversible_and_stale_safe() {
+    let sdt_pr = format!(
+        r#"<w:sdtPr xmlns:w="{W}" xmlns:mc="{MC}" xmlns:h="{HASH}" xmlns:f="{FORMAT}" mc:Ignorable="h f"><w:lock w:val="contentLocked"/><w:dataBinding w:xpath="/x" w:storeItemID="{ITEM}"/></w:sdtPr>"#
+    );
+    let main = PackURI::new("/word/document.xml").unwrap();
+    let source = main_xml(&format!("<w:sdt>{sdt_pr}<w:sdtContent/></w:sdt>"));
+    let payload = b"<x>bound</x>";
+    let package = package_with_main(source.clone(), payload);
+    let checksum = Checksum::compute(payload, &Limits::default()).unwrap();
+    let mut edit = package.edit_content_controls();
+    edit.set_checksum(&main, 0, Some(checksum))
+        .unwrap()
+        .set_formatting_allowed(&main, 0, Some(FormattingAllowed::Allowed))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    let changed_main = commit
+        .package()
+        .opc_package()
+        .get_part(&main)
+        .unwrap()
+        .blob()
+        .to_vec();
+    assert_ne!(changed_main, source);
+    // The source package is never changed by an edit.
+    assert_eq!(
+        package.opc_package().get_part(&main).unwrap().blob(),
+        source
+    );
+
+    let patch = commit.patch().clone();
+    let mut stale_source = source.clone();
+    stale_source.extend_from_slice(b" ");
+    let stale = package_with_main(stale_source, payload);
+    assert!(stale.apply_content_controls(&patch).is_err());
+    let applied = package.apply_content_controls(&patch).unwrap();
+    assert_eq!(
+        applied
+            .package()
+            .opc_package()
+            .get_part(&main)
+            .unwrap()
+            .blob(),
+        changed_main
+    );
+    // Replaying onto the after state fails its preconditions.
+    assert!(commit.package().apply_content_controls(&patch).is_err());
+    let restored = commit
+        .package()
+        .apply_content_controls(&patch.inverse())
+        .unwrap();
+    assert_eq!(
+        restored
+            .package()
+            .opc_package()
+            .get_part(&main)
+            .unwrap()
+            .blob(),
+        source
+    );
+}
 #[test]
 fn custom_xml_updates_refresh_all_declared_bindings_and_preserve_signed_noops() {
     let initial = b"<root xmlns='urn:test'><value>old</value></root>";
@@ -757,25 +833,35 @@ fn custom_xml_updates_refresh_all_declared_bindings_and_preserve_signed_noops() 
 
     mark_signed(&mut package);
     let signed_state = opc_state(&package);
-    package
-        .set_custom_xml(&ITEM.to_ascii_lowercase(), initial.to_vec())
-        .unwrap();
+    package = {
+        let mut edit = package.edit_custom_xml();
+        edit.set(&ITEM.to_ascii_lowercase(), initial.to_vec())
+            .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     assert!(package.is_signed());
     assert_eq!(opc_state(&package), signed_state);
 
     assert!(
-        package
-            .set_custom_xml(&ITEM.to_ascii_lowercase(), changed.to_vec())
-            .is_err()
+        {
+            let mut edit = package.edit_custom_xml();
+            edit.set(&ITEM.to_ascii_lowercase(), changed.to_vec())
+                .map(|_| ())
+                .and_then(|()| edit.commit().map(|_| ()))
+        }
+        .is_err()
     );
     assert!(package.is_signed());
     assert_eq!(opc_state(&package), signed_state);
 
-    package.unsign();
+    package = package.unsign();
     assert!(!package.is_signed());
-    package
-        .set_custom_xml(&ITEM.to_ascii_lowercase(), changed.to_vec())
-        .unwrap();
+    package = {
+        let mut edit = package.edit_custom_xml();
+        edit.set(&ITEM.to_ascii_lowercase(), changed.to_vec())
+            .unwrap();
+        edit.commit().unwrap().into_package()
+    };
 
     let reports = package.verify_content_control_checksums().unwrap();
     assert_eq!(
@@ -807,13 +893,25 @@ fn changed_bound_replace_requires_explicit_unsign_and_revalidates_every_checksum
         replacement
     };
     let signed_state = opc_state(&package);
-    assert!(package.replace_custom_xml(ITEM, replacement()).is_err());
+    assert!(
+        {
+            let mut edit = package.edit_custom_xml();
+            edit.replace(ITEM, replacement())
+                .map(|_| ())
+                .and_then(|()| edit.commit().map(|_| ()))
+        }
+        .is_err()
+    );
     assert!(package.is_signed());
     assert_eq!(opc_state(&package), signed_state);
 
-    package.unsign();
+    package = package.unsign();
     assert!(!package.is_signed());
-    package.replace_custom_xml(ITEM, replacement()).unwrap();
+    package = {
+        let mut edit = package.edit_custom_xml();
+        edit.replace(ITEM, replacement()).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     assert!(
         package
             .verify_content_control_checksums()
@@ -834,40 +932,56 @@ fn signed_remove_preserves_noops_and_requires_explicit_unsign_for_real_publicati
     let mut bound = bound_package(payload);
     mark_signed(&mut bound);
     let bound_signed_state = opc_state(&bound);
-    assert!(!bound.remove_custom_xml(ITEM_B).unwrap());
+    assert!(!{
+        let mut edit = bound.edit_custom_xml();
+        let value = edit.remove(ITEM_B).unwrap();
+        bound = edit.commit().unwrap().into_package();
+        value
+    });
     assert!(bound.is_signed());
     assert_eq!(opc_state(&bound), bound_signed_state);
-    assert!(bound.remove_custom_xml(ITEM).is_err());
+    assert!(
+        {
+            let mut edit = bound.edit_custom_xml();
+            edit.remove(ITEM)
+                .map(|_| ())
+                .and_then(|()| edit.commit().map(|_| ()))
+        }
+        .is_err()
+    );
     assert!(bound.is_signed());
     assert!(bound.custom_xml_by_id(ITEM).unwrap().is_some());
     assert_eq!(opc_state(&bound), bound_signed_state);
 
     let mut unbound = Package::new().unwrap();
-    unbound.add_custom_xml(store(payload)).unwrap();
+    unbound = {
+        let mut edit = unbound.edit_custom_xml();
+        edit.add(store(payload)).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     mark_signed(&mut unbound);
     let unbound_signed_state = opc_state(&unbound);
-    assert!(unbound.remove_custom_xml(ITEM).is_err());
+    assert!(
+        {
+            let mut edit = unbound.edit_custom_xml();
+            edit.remove(ITEM)
+                .map(|_| ())
+                .and_then(|()| edit.commit().map(|_| ()))
+        }
+        .is_err()
+    );
     assert!(unbound.is_signed());
     assert_eq!(opc_state(&unbound), unbound_signed_state);
 
-    unbound.unsign();
+    unbound = unbound.unsign();
     assert!(!unbound.is_signed());
-    assert!(unbound.remove_custom_xml(ITEM).unwrap());
+    assert!({
+        let mut edit = unbound.edit_custom_xml();
+        let value = edit.remove(ITEM).unwrap();
+        unbound = edit.commit().unwrap().into_package();
+        value
+    });
     assert!(unbound.custom_xml_by_id(ITEM).unwrap().is_none());
-}
-
-#[test]
-fn pending_managed_document_state_refuses_custom_xml_removal() {
-    let payload = b"<root xmlns='urn:test'><value>pending</value></root>";
-    let mut builder = litchi_docx::Builder::new().unwrap();
-    builder.package().add_custom_xml(store(payload)).unwrap();
-    builder
-        .document()
-        .unwrap()
-        .add_paragraph_with_text("pending managed edit");
-    let package = builder.package();
-    assert!(package.remove_custom_xml(ITEM).is_err());
-    assert!(package.custom_xml_by_id(ITEM).unwrap().is_some());
 }
 
 fn two_store_package() -> (Package, usize, usize) {
@@ -885,17 +999,29 @@ fn two_store_package() -> (Package, usize, usize) {
     let source = main_xml(&controls);
     let source_len = source.len();
     let mut package = Package::new().unwrap();
-    package.add_custom_xml(store(first)).unwrap();
-    package
-        .add_custom_xml(store_for(ITEM_B, second, Conformance::Transitional))
-        .unwrap();
+    package = {
+        let mut edit = package.edit_custom_xml();
+        edit.add(store(first)).unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    package = {
+        let mut edit = package.edit_custom_xml();
+        edit.add(store_for(ITEM_B, second, Conformance::Transitional))
+            .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let main = PackURI::new("/word/document.xml").unwrap();
-    package
-        .edit_opc(|opc| {
-            opc.get_part_mut(&main)?.set_blob(source);
-            Ok::<_, Error>(())
-        })
+    package = {
+        let mut edit = package.edit_opc();
+        (|opc: &mut OpcPackage| -> litchi_docx::Result<_> {
+            {
+                opc.get_part_mut(&main)?.set_blob(source);
+                Ok::<_, Error>(())
+            }
+        })(edit.package_mut())
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     (package, source_len, first.len() + second.len())
 }
 
@@ -1029,65 +1155,23 @@ fn package_limits_accept_exact_boundaries_and_reject_one_over() {
 }
 
 #[test]
-fn package_authored_output_limit_is_exact() {
-    let payload = b"<root>output-limit</root>";
-    let mut package = Package::new().unwrap();
-    package.add_custom_xml(store(payload)).unwrap();
-    let main = PackURI::new("/word/document.xml").unwrap();
-    let source = main_xml(&binding(Some(1), None));
-    package
-        .edit_opc(|opc| {
-            opc.get_part_mut(&main)?.set_blob(source);
-            Ok::<_, Error>(())
-        })
-        .unwrap();
-    let checksum = Checksum::compute(payload, &Limits::default()).unwrap();
-    let base = package.content_control_snapshot().unwrap();
-    let mut transaction = base.edit().unwrap();
-    transaction
-        .set_checksum(&main, 0, Some(checksum.clone()))
-        .unwrap();
-    let expected = transaction.commit().unwrap().stories()[0]
-        .snapshot()
-        .source()
-        .len();
-
-    let exact = package
-        .content_control_snapshot_with_limits(PackageLimits {
-            max_output_bytes: expected,
-            ..PackageLimits::default()
-        })
-        .unwrap();
-    let mut transaction = exact.edit().unwrap();
-    transaction
-        .set_checksum(&main, 0, Some(checksum.clone()))
-        .unwrap();
-    assert!(transaction.commit().is_ok());
-
-    let over = package
-        .content_control_snapshot_with_limits(PackageLimits {
-            max_output_bytes: expected - 1,
-            ..PackageLimits::default()
-        })
-        .unwrap();
-    let mut transaction = over.edit().unwrap();
-    transaction.set_checksum(&main, 0, Some(checksum)).unwrap();
-    assert!(transaction.commit().is_err());
-}
-
-#[test]
 fn every_story_limit_has_an_exact_and_one_over_fixture() {
     let mut package = strict_story_package(ct::WML_DOCUMENT_MAIN);
     let main = PackURI::new("/word/document.xml").unwrap();
-    package
-        .edit_opc(|opc| {
-            let part = opc.get_part_mut(&main)?;
-            let mut source = b"<!--prolog-->".to_vec();
-            source.extend_from_slice(part.blob());
-            part.set_blob(source);
-            Ok::<_, Error>(())
-        })
+    package = {
+        let mut edit = package.edit_opc();
+        (|opc: &mut OpcPackage| -> litchi_docx::Result<_> {
+            {
+                let part = opc.get_part_mut(&main)?;
+                let mut source = b"<!--prolog-->".to_vec();
+                source.extend_from_slice(part.blob());
+                part.set_blob(source);
+                Ok::<_, Error>(())
+            }
+        })(edit.package_mut())
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let inventory = package.story_inventory().unwrap();
     let max_story_bytes = inventory
         .stories()
@@ -1149,9 +1233,8 @@ fn every_story_limit_has_an_exact_and_one_over_fixture() {
 fn package_patch_rejects_stale_story_bytes_without_partial_publication() {
     let payload = b"<root xmlns='urn:test'><value>stable</value></root>";
     let mut package = bound_package(payload);
-    let snapshot = package.content_control_snapshot().unwrap();
     let main = PackURI::new("/word/document.xml").unwrap();
-    let mut transaction = snapshot.edit().unwrap();
+    let mut transaction = package.edit_content_controls();
     transaction
         .set_checksum(
             &main,
@@ -1161,23 +1244,28 @@ fn package_patch_rejects_stale_story_bytes_without_partial_publication() {
         .unwrap();
     let commit = transaction.commit().unwrap();
 
-    package
-        .edit_opc(|opc| {
-            let part = opc.get_part_mut(&main)?;
-            let mut changed = part.blob().to_vec();
-            let insertion = changed.len() - "</w:document>".len();
-            changed.splice(insertion..insertion, b"<!--stale-->".iter().copied());
-            part.set_blob(changed);
-            Ok::<_, Error>(())
-        })
+    package = {
+        let mut edit = package.edit_opc();
+        (|opc: &mut OpcPackage| -> litchi_docx::Result<_> {
+            {
+                let part = opc.get_part_mut(&main)?;
+                let mut changed = part.blob().to_vec();
+                let insertion = changed.len() - "</w:document>".len();
+                changed.splice(insertion..insertion, b"<!--stale-->".iter().copied());
+                part.set_blob(changed);
+                Ok::<_, Error>(())
+            }
+        })(edit.package_mut())
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let stale_source = package
         .opc_package()
         .get_part(&main)
         .unwrap()
         .blob()
         .to_vec();
-    assert!(package.apply_content_controls(&commit).is_err());
+    assert!(package.apply_content_controls(commit.patch()).is_err());
     assert_eq!(
         package.opc_package().get_part(&main).unwrap().blob(),
         stale_source

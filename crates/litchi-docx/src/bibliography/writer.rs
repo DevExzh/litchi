@@ -168,8 +168,8 @@ impl BibliographyPerson {
 ///
 /// Built with [`BibliographySourceBuilder::new`], optional fields chained,
 /// then passed to
-/// [`crate::Package::add_bibliography_source`] or
-/// [`crate::Package::replace_bibliography_source`]. Fields not covered
+/// [`crate::bibliography::Edit::add_source`] or
+/// [`crate::bibliography::Edit::replace_source`]. Fields not covered
 /// by the typed API can be carried with [`Self::custom_field`] so nothing is
 /// silently dropped.
 ///
@@ -181,12 +181,15 @@ impl BibliographyPerson {
 /// };
 /// use litchi_docx::Package;
 ///
-/// let mut package = Package::new()?;
+/// let package = Package::new()?;
 /// let source = BibliographySourceBuilder::new(BibliographySourceKind::Book, "Doe2024")?
 ///     .title("Example & Practice")?
 ///     .year("2024")?
 ///     .person(BibliographyPerson::new("Doe")?.with_first("Jane")?)?;
-/// package.add_bibliography_source(source)?;
+/// let mut edit = package.edit_bibliography();
+/// edit.add_source(source)?;
+/// let package = edit.commit()?.into_package();
+/// # let _ = package;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone, Default)]

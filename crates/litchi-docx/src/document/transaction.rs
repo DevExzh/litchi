@@ -6645,6 +6645,13 @@ pub struct Diagnostics {
 }
 
 impl Diagnostics {
+    pub(crate) const fn new(operations: usize, changed: bool) -> Self {
+        Self {
+            operations,
+            changed,
+        }
+    }
+
     /// Number of semantic operations in the commit.
     #[must_use]
     pub const fn operations(self) -> usize {
@@ -6706,6 +6713,21 @@ pub struct Patch {
 }
 
 impl Patch {
+    /// The operation-free patch that moves `before` to `after`: a recorded
+    /// history transition replayed as one main-document replacement.
+    pub(crate) fn transition(before: Snapshot, after: Snapshot) -> Self {
+        Self {
+            before,
+            after,
+            operations: OperationList::Empty,
+            operation_admission: None,
+            operation_string_admission: None,
+            inverse_operations: OperationList::Empty,
+            inverse_admission: None,
+            inverse_string_admission: None,
+        }
+    }
+
     /// Exact immutable source required by this patch.
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
@@ -13360,9 +13382,9 @@ mod tests {
     }
 
     fn generated_corpus_snapshot(paragraphs: usize) -> Snapshot {
-        let mut package = crate::Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         {
-            let document = package.authoring_document().unwrap();
+            let document = builder.document().unwrap();
             for index in 0..paragraphs {
                 document.add_paragraph_with_text(&format!(
                     "litchi-perf-baseline-docx-semantic-v1-source-{index:05}"
@@ -13370,6 +13392,7 @@ mod tests {
             }
         }
         let mut output = std::io::Cursor::new(Vec::new());
+        let package = builder.build().unwrap();
         package.write_to(&mut output).unwrap();
         crate::Package::from_reader(std::io::Cursor::new(output.into_inner()))
             .unwrap()

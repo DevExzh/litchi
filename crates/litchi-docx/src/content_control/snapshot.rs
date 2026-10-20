@@ -369,8 +369,8 @@ impl Snapshot {
 
     /// Begin a failure-atomic exact-source edit.
     #[must_use]
-    pub fn edit(&self) -> super::Transaction {
-        super::Transaction::new(self.clone())
+    pub(crate) fn edit(&self) -> super::Draft {
+        super::Draft::new(self.clone())
     }
 }
 

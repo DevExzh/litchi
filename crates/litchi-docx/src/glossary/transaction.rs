@@ -129,23 +129,22 @@ impl Snapshot {
 }
 
 /// Clone-staged, failure-atomic edit over a package-bound glossary graph.
-pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+#[derive(Clone, Debug)]
+pub(crate) struct Transaction {
     before: Snapshot,
     draft: Option<raw::Graph>,
 }
 
-impl<'a> Transaction<'a> {
+impl Transaction {
     /// Capture the current package graph and begin an isolated transaction.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn new(target: &'a mut OpcPackage) -> Result<Self> {
+    pub fn new(target: &OpcPackage) -> Result<Self> {
         let before = Snapshot::load(target)?;
         Ok(Self {
             draft: before.graph.clone(),
-            target,
             before,
         })
     }
@@ -460,17 +459,17 @@ impl<'a> Transaction<'a> {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(self, target: &mut OpcPackage) -> Result<Commit> {
         if !self.is_changed() {
             let patch = Patch::new(self.before.clone(), self.before.clone());
             return Ok(Commit::new(self.before, patch, false));
         }
-        crate::signature_policy::ensure_unsigned(self.target)?;
-        let current = Snapshot::load(self.target)?;
+        crate::signature_policy::ensure_unsigned(target)?;
+        let current = Snapshot::load(target)?;
         if !current.same_source(&self.before) {
             return Err(invalid("glossary transaction source is stale"));
         }
-        let mut candidate = self.target.clone();
+        let mut candidate = target.clone();
         match self.draft.as_ref() {
             Some(graph) => {
                 put_graph(&mut candidate, graph)?;
@@ -491,7 +490,7 @@ impl<'a> Transaction<'a> {
             _ => return Err(invalid("glossary publication changed the staged graph")),
         }
         let patch = Patch::new(self.before, snapshot.clone());
-        *self.target = candidate;
+        *target = candidate;
         Ok(Commit::new(snapshot, patch, true))
     }
 
@@ -513,7 +512,7 @@ impl<'a> Transaction<'a> {
 
 /// Successful glossary publication and its reversible source patch.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     changed: bool,
@@ -551,7 +550,7 @@ impl Commit {
 
 /// Reversible, source-checked replacement of the complete glossary graph.
 #[derive(Clone, Debug)]
-pub struct Patch {
+pub(crate) struct Patch {
     before: Snapshot,
     after: Snapshot,
 }

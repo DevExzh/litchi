@@ -58,7 +58,7 @@ impl Destination {
 
 /// Finite limits for a source-bound annotation edit.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct EditLimits {
+pub struct EditOptions {
     /// Annotation, story, payload and graph metadata limits.
     pub inventory: Limits,
     /// Maximum aggregate uncompressed Part bytes retained by the edit source.
@@ -72,7 +72,7 @@ pub struct EditLimits {
     pub max_operations: usize,
 }
 
-impl Default for EditLimits {
+impl Default for EditOptions {
     fn default() -> Self {
         Self {
             inventory: Limits::default(),
@@ -83,7 +83,7 @@ impl Default for EditLimits {
     }
 }
 
-impl EditLimits {
+impl EditOptions {
     fn validate(self) -> Result<Self> {
         self.inventory.validate()?;
         for (resource, actual, maximum) in [
@@ -122,12 +122,13 @@ struct State {
 /// Insertions and replacements consume detached validated InkML values. Native
 /// resource identities are allocated only inside the source-bound commit.
 pub struct Edit {
+    source: Package,
     base: Arc<State>,
     removals: Vec<usize>,
     additions: Vec<Addition>,
     replacements: Vec<Replacement>,
     input_bytes: usize,
-    limits: EditLimits,
+    limits: EditOptions,
 }
 
 /// The source-bound semantic request retained beside a committed patch.
@@ -204,7 +205,7 @@ struct Replacement {
 impl Edit {
     /// Borrow the immutable annotation inventory used by every selector.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub fn inventory(&self) -> &Snapshot {
         &self.base.snapshot
     }
 
@@ -403,13 +404,21 @@ impl Edit {
     ///
     /// Returns an error for unsupported host/resource dependencies, invalid XML,
     /// resource limits, source inconsistency, or candidate readback failure.
-    pub fn commit(mut self) -> Result<Commit> {
+    pub fn commit(self) -> Result<Commit> {
+        let source = self.source.clone();
+        let planned = self.plan()?;
+        source.apply_ink(&planned.patch)
+    }
+
+    /// Resolve the staged operations into a source-checked patch without
+    /// publishing it.
+    pub(crate) fn plan(mut self) -> Result<Planned> {
         if !self.additions.is_empty() || !self.replacements.is_empty() {
             return authoring::commit(self);
         }
         if self.removals.is_empty() {
             let intent = self.take_semantic_intent()?;
-            return Ok(Commit {
+            return Ok(Planned {
                 patch: Patch {
                     before: Arc::clone(&self.base),
                     after: self.base,
@@ -555,7 +564,7 @@ impl Edit {
             binding,
             snapshot,
         });
-        Ok(Commit {
+        Ok(Planned {
             patch: Patch {
                 before: self.base,
                 after,
@@ -597,31 +606,27 @@ impl GraphChange {
     }
 }
 
-/// A prepared annotation result and its reversible source-checked patch.
+/// A planned, unpublished Ink patch.
 #[derive(Clone)]
-pub struct Commit {
-    patch: Patch,
+pub(crate) struct Planned {
+    pub(crate) patch: Patch,
 }
 
-impl Commit {
-    /// Whether the prepared commit changes any annotation host.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_empty()
+impl Planned {
+    pub(crate) fn changed(&self) -> bool {
+        !self.patch.is_noop()
     }
 
-    /// Read the prepared annotation inventory without publishing it.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.patch.after.snapshot
-    }
-
-    /// Borrow the reusable patch for explicit package publication.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 }
+
+/// A published Ink change: the new package, its patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
+
+/// What an Ink commit changed.
+pub use litchi_core::edit::Diagnostics;
 
 /// In-memory reversible annotation patch with private package/source guards.
 ///
@@ -634,14 +639,14 @@ pub struct Patch {
     after: Arc<State>,
     changes: Arc<Vec<StoryChange>>,
     reversed: bool,
-    limits: EditLimits,
+    limits: EditOptions,
     intent: Arc<Vec<SemanticIntent>>,
 }
 
 impl Patch {
     /// Whether the patch preserves its exact source.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.changes.is_empty()
     }
 
@@ -721,14 +726,14 @@ impl Package {
     /// # Errors
     /// Returns an error for dirty state, invalid ownership/XML, or resource limits.
     pub fn edit_ink(&self) -> Result<Edit> {
-        self.edit_ink_with_limits(EditLimits::default())
+        self.edit_ink_with_options(EditOptions::default())
     }
 
     /// Start an annotation edit with explicit source and operation bounds.
     ///
     /// # Errors
     /// Returns an error for invalid limits, dirty state, malformed data or limits.
-    pub fn edit_ink_with_limits(&self, limits: EditLimits) -> Result<Edit> {
+    pub fn edit_ink_with_options(&self, limits: EditOptions) -> Result<Edit> {
         let limits = limits.validate()?;
         self.ensure_story_opc_current("edit_ink")?;
         let package = self.opc_package();
@@ -745,6 +750,7 @@ impl Package {
         let snapshot = super::package::load(package, limits.inventory)?;
         let binding = Binding::capture(package, limits.inventory)?;
         Ok(Edit {
+            source: self.clone(),
             base: Arc::new(State {
                 package: package.clone(),
                 binding,
@@ -766,12 +772,25 @@ impl Package {
     ///
     /// # Errors
     /// Returns an error for stale state, signature policy, dependency or readback failure.
-    pub fn apply_ink_patch(&mut self, patch: &Patch) -> Result<Snapshot> {
+    pub fn apply_ink(&self, patch: &Patch) -> Result<Commit> {
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        let mut next = self.clone();
+        next.apply_ink_patch(patch)?;
+        if patch.is_noop() {
+            return Ok(Commit::new(self.clone(), patch.clone(), diagnostics));
+        }
+        Ok(Commit::new(next, patch.clone(), diagnostics))
+    }
+
+    pub(crate) fn apply_ink_patch(&mut self, patch: &Patch) -> Result<Snapshot> {
         self.ensure_story_opc_current("apply_ink_patch")?;
         if !patch.matches(self.opc_package())? {
-            return Err(Error::Invalid("DOCX Ink patch source is stale".into()));
+            return Err(Error::conflict(
+                "apply_ink",
+                "the package does not hold the Ink patch source",
+            ));
         }
-        if patch.is_empty() {
+        if patch.is_noop() {
             return Ok(patch.after.snapshot.clone());
         }
         self.edit_semantic_opc("apply_ink_patch", |candidate| {
@@ -784,16 +803,6 @@ impl Package {
             }
             Ok(snapshot)
         })
-    }
-
-    /// Commit and atomically publish an isolated annotation edit.
-    ///
-    /// # Errors
-    /// Returns an error for unsafe dependencies, stale state, or publication failure.
-    pub fn publish_ink_edit(&mut self, edit: Edit) -> Result<Commit> {
-        let commit = edit.commit()?;
-        self.apply_ink_patch(commit.patch())?;
-        Ok(commit)
     }
 }
 

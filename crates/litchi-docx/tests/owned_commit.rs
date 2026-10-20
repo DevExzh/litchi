@@ -70,7 +70,7 @@ fn commit_retains_complete_package_and_chains_without_reopening() {
         first.opc_package(),
         shared.package().opc_package()
     ));
-    let restored = first.apply(&patch.inverse()).unwrap();
+    let restored = first.apply(&patch.inverse()).unwrap().into_package();
     assert_eq!(
         restored.document_snapshot().unwrap().xml_bytes(),
         original.xml_bytes()
@@ -151,7 +151,7 @@ fn captured_edit_is_independent_of_later_source_writer_mutation() {
             "later writer change",
         )
         .unwrap();
-    let mut source = later.commit().unwrap().into_package();
+    let source = later.commit().unwrap().into_package();
     let commit = edit.commit().unwrap();
     assert_eq!(
         commit
@@ -197,7 +197,10 @@ fn captured_edit_is_independent_of_later_source_writer_mutation() {
         .as_slice(),
     )
     .unwrap();
-    let applied = original_package.apply(commit.patch()).unwrap();
+    let applied = original_package
+        .apply(commit.patch())
+        .unwrap()
+        .into_package();
     assert_eq!(
         applied.document_snapshot().unwrap().xml_bytes(),
         commit.package().document_snapshot().unwrap().xml_bytes()

@@ -122,7 +122,7 @@ impl Snapshot {
 
     /// Start an isolated typed edit.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> Transaction {
         Transaction {
             original: self.clone(),
             settings: self.settings.clone(),
@@ -141,7 +141,7 @@ impl Snapshot {
 
 /// A typed mail-merge edit that has not yet been published.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Transaction {
     original: Snapshot,
     settings: Settings,
     recipients: Option<Recipients>,
@@ -303,7 +303,7 @@ impl Transaction {
 
 /// A successful typed mail-merge publication.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     changed: bool,
@@ -341,7 +341,7 @@ impl Commit {
 
 /// A reversible source-checked typed patch.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub(crate) struct Patch {
     before: Snapshot,
     after: Snapshot,
 }

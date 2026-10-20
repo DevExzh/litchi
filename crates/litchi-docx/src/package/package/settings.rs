@@ -31,7 +31,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn put_web(
+    pub(crate) fn put_web(
         &mut self,
         settings: docx_web::Settings,
         conformance: docx_web::Conformance,
@@ -47,7 +47,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn remove_web(&mut self) -> Result<bool> {
+    pub(crate) fn remove_web(&mut self) -> Result<bool> {
         docx_web::remove(&mut self.opc)
     }
 
@@ -78,7 +78,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn set_attached_template_uri(
+    pub(crate) fn set_attached_template_uri(
         &mut self,
         target_uri: impl Into<String>,
     ) -> Result<&mut Self> {
@@ -120,7 +120,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn remove_attached_template(&mut self) -> Result<Option<AttachedTemplate>> {
+    pub(crate) fn remove_attached_template(&mut self) -> Result<Option<AttachedTemplate>> {
         let snapshot = self.settings_part_snapshot()?;
         if !snapshot.relationship_exists {
             return Ok(None);
@@ -159,7 +159,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn set_document_variable(
+    pub(crate) fn set_document_variable(
         &mut self,
         name: impl Into<String>,
         value: impl Into<String>,
@@ -182,7 +182,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn remove_document_variable(&mut self, name: &str) -> Result<Option<String>> {
+    pub(crate) fn remove_document_variable(&mut self, name: &str) -> Result<Option<String>> {
         let snapshot = self.settings_part_snapshot()?;
         if !snapshot.relationship_exists {
             return Ok(None);
@@ -206,7 +206,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn clear_document_variables(&mut self) -> Result<usize> {
+    pub(crate) fn clear_document_variables(&mut self) -> Result<usize> {
         let snapshot = self.settings_part_snapshot()?;
         if !snapshot.relationship_exists {
             return Ok(0);
@@ -245,7 +245,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn put_glossary(
+    pub(crate) fn put_glossary(
         &mut self,
         catalog: glossary::Catalog,
         conformance: glossary::Conformance,
@@ -273,7 +273,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn put_glossary_graph(&mut self, graph: &glossary::raw::Graph) -> Result<bool> {
+    pub(crate) fn put_glossary_graph(&mut self, graph: &glossary::raw::Graph) -> Result<bool> {
         glossary::raw::put(&mut self.opc, graph)
     }
 
@@ -284,7 +284,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn take_glossary_graph(&mut self) -> Result<Option<glossary::raw::Graph>> {
+    pub(crate) fn take_glossary_graph(&mut self) -> Result<Option<glossary::raw::Graph>> {
         glossary::raw::remove(&mut self.opc)
     }
 
@@ -298,7 +298,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn remove_glossary(&mut self) -> Result<bool> {
+    pub(crate) fn remove_glossary(&mut self) -> Result<bool> {
         glossary::remove(&mut self.opc)
     }
 }

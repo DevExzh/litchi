@@ -601,7 +601,7 @@ mod tests {
             .unwrap();
         assert!(chartex::is_chartex(&xml));
         assert!(workbook.unwrap().starts_with(b"PK"));
-        let mut next = edit.commit().unwrap().into_package();
+        let next = edit.commit().unwrap().into_package();
         // Deterministic.
         let mut again = package.edit().unwrap();
         again

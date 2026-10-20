@@ -26,7 +26,7 @@
     clippy::unnecessary_wraps,
     reason = "the Result signature preserves a uniform fallible codec API"
 )]
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::leniency::{ContentControlDefect, ToleranceReport};
 /// Content control support for Word documents.
 ///
@@ -46,25 +46,40 @@ use std::fmt;
 use std::str::FromStr;
 
 mod authoring;
+mod edit;
 mod model;
+#[allow(
+    dead_code,
+    unreachable_pub,
+    reason = "the drafts stage the family edit; their accessors serve unit tests"
+)]
 mod package;
+#[allow(
+    dead_code,
+    unreachable_pub,
+    reason = "the drafts stage the family edit; their accessors serve unit tests"
+)]
 mod patch;
 mod snapshot;
+#[allow(
+    dead_code,
+    unreachable_pub,
+    reason = "the drafts stage the family edit; their accessors serve unit tests"
+)]
 mod transaction;
 
 pub use authoring::{AuthoredProperties, AuthoringView, NamespaceRequirements, write_sdt_pr};
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub use model::{
     BindingFlavor, Checksum, ChecksumStatus, ChecksumValue, DataBinding,
     FORMATTING_ALLOWED_NAMESPACE, FormattingAllowed, Inventory, Limits, Lock, Occurrence,
     STORE_ITEM_CHECKSUM_NAMESPACE,
 };
-pub use package::{
-    ChecksumEntry, PackageChecksumStatus, PackageCommit, PackageLimits, PackagePatch,
-    PackageSnapshot, PackageTransaction, Story,
-};
-pub use patch::Patch;
+pub use package::{ChecksumEntry, PackageChecksumStatus, PackageLimits, PackageSnapshot, Story};
+pub(crate) use patch::DraftPatch;
 pub use snapshot::{AttributeSpan, BindingSpan, LockSpan, Snapshot, SourceOccurrence, Span};
-pub use transaction::{Commit, Edit, Transaction};
+pub use transaction::Operation;
+pub(crate) use transaction::{Draft, DraftCommit};
 
 const WORD_2010_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/word/2010/wordml";
 const WORD_2012_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/word/2012/wordml";

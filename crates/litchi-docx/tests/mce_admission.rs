@@ -265,7 +265,7 @@ fn source_backed_edits_publish_what_the_eager_owner_publishes() {
             continue;
         }
         source_result.unwrap_or_else(|error| panic!("{name}: {error}"));
-        let mut owner = eager_result
+        let owner = eager_result
             .unwrap_or_else(|error| panic!("{name}: {error}"))
             .into_package();
         let mut saved = Vec::new();

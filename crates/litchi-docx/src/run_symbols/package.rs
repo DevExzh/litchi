@@ -8,9 +8,9 @@
 )]
 //! Run and writer facades for the `symEx` semantic owner.
 
+use crate::builder::{Run as DraftRun, RunContent};
 use crate::error::{Error, Result};
 use crate::paragraph::Run;
-use crate::writer::{MutableRun, RunContent};
 
 use super::codec;
 use super::{Symbol, Symbols};
@@ -112,7 +112,7 @@ impl Run {
     }
 }
 
-impl MutableRun {
+impl DraftRun {
     /// Borrow the symbol authored on this new run, if any.
     #[inline]
     #[must_use]

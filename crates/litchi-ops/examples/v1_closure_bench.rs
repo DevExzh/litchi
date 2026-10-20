@@ -78,7 +78,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut app = edit.app_props()?.unwrap_or_default();
         app.company = Some("Acme".to_owned());
         edit.set_app_props(Some(app));
-        let mut native = edit.commit()?.into_package();
+        let native = edit.commit()?.into_package();
         assert_eq!(unified.to_bytes()?, native.to_bytes()?);
         pair(
             "docx set / extended.company",

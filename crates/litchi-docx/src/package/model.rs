@@ -23,6 +23,7 @@ pub(super) use crate::alt::{Chunk, Conformance, Import, MAX_CHUNKS, Rel, is_rela
 pub(super) use crate::bibliography::{
     BibliographySource, SourceStore, discover_bibliography_source_stores,
 };
+pub(super) use crate::builder::Document as DraftDocument;
 pub(super) use crate::custom_xml::{Binding, NewStore};
 pub(super) use crate::document::Document;
 #[cfg(feature = "encryption")]
@@ -47,7 +48,6 @@ pub(super) use crate::vba_project::{
 };
 #[cfg(test)]
 pub(super) use crate::web_extensions as web;
-pub(super) use crate::writer::MutableDocument;
 pub(super) use crate::{font, glossary, web as docx_web};
 pub(super) use litchi_core::Metadata as Props;
 pub(super) use litchi_drawingml::diagram::{
@@ -151,19 +151,10 @@ pub struct Package {
     /// place, so a live allocation that is still this one holds the same
     /// bytes; the weak reference keeps nothing alive.
     pub(super) main_admission: std::sync::Arc<std::sync::Mutex<std::sync::Weak<Vec<u8>>>>,
-    /// Mutable document for writing (cached)
-    pub(super) mutable_doc: Option<Shared<MutableDocument>>,
-    /// Whether a committed raw edit has disabled the legacy document writer.
-    pub(super) raw_edit_committed: bool,
     /// Authoritative, mutation-tracked core properties.
     pub(super) properties: Shared<Slot>,
     /// Custom document properties
     pub(super) custom_props: Shared<CustomProps>,
-    /// Whether the custom-property facade has unmaterialized changes.
-    pub(super) custom_props_dirty: bool,
-    /// Optional managed font-publication policy.
-    #[cfg(feature = "automatic-fonts")]
-    pub(super) font_embedding: Option<litchi_fonts::embedding::Mode>,
     /// Encryption profile of the opened outer package, retained to prevent an
     /// accidental plaintext downgrade on save.
     #[cfg(feature = "encryption")]
@@ -212,56 +203,13 @@ pub(super) struct StoredRelationship {
     pub(super) external: bool,
 }
 
-pub(super) struct SettingsPartSnapshot {
+pub(crate) struct SettingsPartSnapshot {
     pub(super) document_uri: PackURI,
     pub(super) target: PackURI,
     pub(super) relationship_exists: bool,
     pub(super) content_type: String,
-    pub(super) xml: Vec<u8>,
+    pub(crate) xml: Vec<u8>,
     pub(super) relationships: Vec<StoredRelationship>,
-}
-
-/// Owns the DOCX state that is unpublished until the sink accepts the package.
-///
-/// The OPC snapshot is structural: built-in part payloads remain shared through
-/// their `Arc` allocations. The mutable document stays owned by this guard while
-/// materialization runs, so an error or unwind cannot drop the retryable writer.
-pub(super) struct WriteRollbackGuard {
-    package_before: Shared<OpcPackage>,
-    mutable_doc: Option<Shared<MutableDocument>>,
-}
-
-impl WriteRollbackGuard {
-    pub(super) fn new(package: &mut Package) -> Self {
-        Self {
-            package_before: package.opc.clone(),
-            mutable_doc: package.mutable_doc.take(),
-        }
-    }
-
-    pub(super) fn mutable_doc(&self) -> Option<&MutableDocument> {
-        self.mutable_doc.as_deref()
-    }
-
-    pub(super) fn modified_doc_mut(&mut self) -> Option<&mut MutableDocument> {
-        if self
-            .mutable_doc()
-            .is_some_and(|document| document.is_modified())
-        {
-            self.mutable_doc.as_deref_mut()
-        } else {
-            None
-        }
-    }
-
-    pub(super) fn publish(self, package: &mut Package) {
-        package.mutable_doc = self.mutable_doc;
-    }
-
-    pub(super) fn rollback(self, package: &mut Package) {
-        package.opc = self.package_before;
-        package.mutable_doc = self.mutable_doc;
-    }
 }
 
 #[cfg(feature = "automatic-fonts")]
@@ -271,35 +219,11 @@ use litchi_fonts::CollectGlyphs;
 
 #[cfg(feature = "automatic-fonts")]
 impl Package {
-    pub(super) fn embed_fonts(&mut self) -> Result<()> {
-        let Some(mode) = self.font_embedding else {
-            return Ok(());
-        };
-        let glyphs = {
-            let document = self.mutable_doc.as_ref().ok_or(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedContent,
-                "embed_fonts",
-                "font discovery is unavailable until the document has a complete mutable model",
-            ))?;
-            if !document.glyphs_are_complete() {
-                return Err(Error::refused(
-                    litchi_core::edit::RefusalKind::UnsupportedContent,
-                    "embed_fonts",
-                    "the mutable document preserves unscanned source XML; embedding could omit fonts or subset away live glyphs",
-                ));
-            }
-            document.collect_glyphs()
-        };
-        self.embed_fonts_with_glyphs(glyphs, mode)
-    }
-}
-
-#[cfg(feature = "automatic-fonts")]
-impl Package {
-    pub(super) fn embed_fonts_for_document(&mut self, document: &MutableDocument) -> Result<()> {
-        let Some(mode) = self.font_embedding else {
-            return Ok(());
-        };
+    pub(super) fn embed_fonts_for_document(
+        &mut self,
+        document: &DraftDocument,
+        mode: litchi_fonts::embedding::Mode,
+    ) -> Result<()> {
         if !document.glyphs_are_complete() {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -716,7 +640,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<VbaProject> {
+    pub(crate) fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<VbaProject> {
         let payload = project.finish(&litchi_vba::Limits::default())?;
         self.put_vba_managed("set_vba", payload, &VbaSupplementalData::new())
     }
@@ -727,7 +651,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn set_vba_with(
+    pub(crate) fn set_vba_with(
         &mut self,
         project: litchi_vba::build::Project,
         supplemental_data: &VbaSupplementalData,
@@ -743,7 +667,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn put_vba(
+    pub(crate) fn put_vba(
         &mut self,
         payload: litchi_vba::Payload,
         supplemental_data: &VbaSupplementalData,
@@ -757,7 +681,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn clear_vba(&mut self) -> Result<bool> {
+    pub(crate) fn clear_vba(&mut self) -> Result<bool> {
         let source = self.opc.main_document_part()?.partname().clone();
         let source_part = self.opc.get_part(&source)?;
         if discover_vba_project(&self.opc, source_part)?.is_none() {
@@ -814,7 +738,11 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn put_ribbon(&mut self, version: ribbon::Version, xml: Vec<u8>) -> Result<&mut Self> {
+    pub(crate) fn put_ribbon(
+        &mut self,
+        version: ribbon::Version,
+        xml: Vec<u8>,
+    ) -> Result<&mut Self> {
         // The shared Ribbon owner removes signatures itself, so a change to a
         // signed package is refused here, before it is reached.
         if crate::signature_policy::is_signed(&self.opc) {
@@ -837,7 +765,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn remove_ribbon(&mut self, family: ribbon::Family) -> Result<bool> {
+    pub(crate) fn remove_ribbon(&mut self, family: ribbon::Family) -> Result<bool> {
         if crate::signature_policy::is_signed(&self.opc)
             && ribbon_slot(ribbon::load(&self.opc)?, family).is_some()
         {
@@ -863,7 +791,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn put_fonts(
+    pub(crate) fn put_fonts(
         &mut self,
         table: font::Table,
         conformance: font::Conformance,
@@ -879,50 +807,8 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn remove_fonts(&mut self) -> Result<bool> {
+    pub(crate) fn remove_fonts(&mut self) -> Result<bool> {
         font::remove(&mut self.opc)
-    }
-
-    /// Select the font publication policy used by managed save operations.
-    #[cfg(feature = "automatic-fonts")]
-    ///
-    /// A save that would add fonts or change the font settings of a signed
-    /// package is refused with
-    /// [`litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy`] and leaves
-    /// the package as it was (ADR 0006): remove the signature explicitly first
-    /// with [`Self::unsign`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn set_font_embedding(&mut self, mode: litchi_fonts::embedding::Mode) -> Result<&mut Self> {
-        if self.mutable_doc.is_none() {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedOperation,
-                "set_font_embedding",
-                "font discovery requires a complete mutable document model",
-            ));
-        }
-        self.font_embedding = Some(mode);
-        Ok(self)
-    }
-
-    /// Select the font publication policy and return this package by value.
-    #[cfg(feature = "automatic-fonts")]
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn with_font_embedding(mut self, mode: litchi_fonts::embedding::Mode) -> Result<Self> {
-        self.set_font_embedding(mode)?;
-        Ok(self)
-    }
-
-    /// Disable managed font publication for subsequent saves.
-    #[cfg(feature = "automatic-fonts")]
-    pub fn clear_font_embedding(&mut self) -> &mut Self {
-        self.font_embedding = None;
-        self
     }
 }
 
@@ -947,36 +833,6 @@ impl Package {
     #[must_use]
     pub fn custom_props(&self) -> &CustomProps {
         &self.custom_props
-    }
-
-    /// Get a mutable reference to the custom document properties.
-    ///
-    /// A managed save of a signed package whose custom properties were
-    /// changed is refused with
-    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-    /// (ADR 0006) and leaves the package and the edit as they were: call
-    /// [`Self::unsign`] first. Properties that serialize to the stored bytes
-    /// publish nothing.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use litchi_docx::Package;
-    /// use litchi_ooxml_common::custom::Value;
-    ///
-    /// let mut pkg = Package::new()?;
-    /// let custom = pkg.custom_props_mut();
-    ///
-    /// custom.insert("ProjectName", "MyProject")?;
-    /// custom.insert("Version", Value::I32(1))?;
-    /// custom.insert("Budget", Value::F64(50_000.0))?;
-    ///
-    /// pkg.save("document.docx")?;
-    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
-    /// ```
-    pub fn custom_props_mut(&mut self) -> &mut CustomProps {
-        self.custom_props_dirty = true;
-        &mut self.custom_props
     }
 }
 

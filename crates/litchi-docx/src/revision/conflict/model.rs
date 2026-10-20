@@ -451,8 +451,8 @@ impl Snapshot {
 
     /// Start a failure-atomic conflict-markup edit.
     #[must_use]
-    pub fn edit(&self) -> super::transaction::Transaction {
-        super::transaction::Transaction::new(self.clone())
+    pub(crate) fn edit(&self) -> super::transaction::Draft {
+        super::transaction::Draft::new(self.clone())
     }
 
     pub(crate) fn with_binding(mut self, binding: Binding) -> Self {

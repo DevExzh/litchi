@@ -122,7 +122,12 @@ fn base_source_with_unrelated_relationship() -> Vec<u8> {
 fn assert_source_guard_rejects(variant: Vec<u8>, patch: &litchi_docx::ink::Patch) {
     let mut package = Package::from_reader(Cursor::new(&variant)).unwrap();
     let before = members(&save(&mut package));
-    assert!(package.apply_ink_patch(patch).is_err());
+    assert!(
+        package
+            .apply_ink(patch)
+            .map(|commit| commit.into_package())
+            .is_err()
+    );
     assert_eq!(members(&save(&mut package)), before);
 }
 
@@ -213,9 +218,9 @@ fn relationship_lexical_tokens_count_against_public_ink_topology_limit() {
     let before = members(&save(&mut package));
 
     let error = package
-        .edit_ink_with_limits(litchi_docx::ink::EditLimits {
+        .edit_ink_with_options(litchi_docx::ink::EditOptions {
             inventory: limits,
-            ..litchi_docx::ink::EditLimits::default()
+            ..litchi_docx::ink::EditOptions::default()
         })
         .err()
         .expect("lexical relationship tokens should exceed the semantic-only budget");

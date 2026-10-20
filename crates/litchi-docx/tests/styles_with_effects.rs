@@ -10,10 +10,43 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::result::Result;
 
-use litchi_docx::styles::effects::{Owner, Resource, Snapshot};
+use litchi_docx::styles::effects::{Owner, Patch, Resource, Snapshot};
 use litchi_docx::{Package, SourceLimits};
 use sha2::{Digest, Sha256};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
+
+/// Stage `resource` as `owner`'s part and publish it into `package`;
+/// returns whether the package changed.
+fn put_effects(
+    package: &mut Package,
+    owner: Owner,
+    resource: Resource,
+) -> litchi_docx::Result<bool> {
+    let mut edit = package.edit_styles_with_effects(owner);
+    edit.put(resource);
+    let commit = edit.commit()?;
+    let changed = commit.diagnostics().changed();
+    *package = commit.into_package();
+    Ok(changed)
+}
+
+/// Stage the removal of `owner`'s part and publish it into `package`;
+/// returns whether the package changed.
+fn remove_effects(package: &mut Package, owner: Owner) -> litchi_docx::Result<bool> {
+    let mut edit = package.edit_styles_with_effects(owner);
+    edit.remove();
+    let commit = edit.commit()?;
+    let changed = commit.diagnostics().changed();
+    *package = commit.into_package();
+    Ok(changed)
+}
+
+/// Replay an owner-bound patch into `package` and return the owner's
+/// published snapshot.
+fn apply_effects(package: &mut Package, patch: &Patch) -> litchi_docx::Result<Snapshot> {
+    *package = package.apply_styles_with_effects(patch)?.into_package();
+    package.styles_with_effects(patch.owner())
+}
 
 const EFFECTS_CONTENT_TYPE: &[u8] = b"application/vnd.ms-word.stylesWithEffects+xml";
 const EFFECTS_RELATIONSHIP: &[u8] =
@@ -477,9 +510,7 @@ fn assert_effects_add_rejected_under_cap(
     );
 
     assert!(
-        package
-            .put_styles_with_effects(Owner::MainDocument, resource.clone())
-            .is_err(),
+        put_effects(&mut package, Owner::MainDocument, resource.clone()).is_err(),
         "put unexpectedly passed the {label} cap"
     );
     assert_eq!(
@@ -492,9 +523,8 @@ fn assert_effects_add_rejected_under_cap(
         .styles_with_effects(Owner::MainDocument)
         .map_err(|error| FixtureError(format!("reload baseline after {label} put: {error}")))?;
     assert!(snapshot.is_empty());
-    let mut edit = snapshot.edit();
-    edit.replace_resource(Some(resource.clone()))
-        .map_err(|error| FixtureError(format!("stage {label} patch: {error}")))?;
+    let mut edit = package.edit_styles_with_effects(Owner::MainDocument);
+    edit.replace_resource(Some(resource.clone()));
     assert!(
         matches!(
             edit.commit(),
@@ -513,17 +543,16 @@ fn assert_effects_add_rejected_under_cap(
     let generous_snapshot = generous
         .styles_with_effects(Owner::MainDocument)
         .map_err(|error| FixtureError(format!("read generous {label} source: {error}")))?;
-    let mut edit = generous_snapshot.edit();
-    edit.replace_resource(Some(resource.clone()))
-        .map_err(|error| FixtureError(format!("stage generous {label} patch: {error}")))?;
+    assert!(generous_snapshot.is_empty());
+    let mut edit = generous.edit_styles_with_effects(Owner::MainDocument);
+    edit.replace_resource(Some(resource.clone()));
     let patch = edit
         .commit()
         .map_err(|error| FixtureError(format!("commit generous {label} patch: {error}")))?
-        .into_patch();
+        .into_parts()
+        .1;
     assert!(
-        package
-            .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
-            .is_err(),
+        apply_effects(&mut package, &patch).is_err(),
         "patch unexpectedly passed the destination's {label} cap"
     );
     assert_eq!(
@@ -747,14 +776,17 @@ fn source_snapshots_retain_shared_payloads_and_exact_noop_commits() {
     assert_eq!(source, cloned_source);
     assert_eq!(source.as_ptr(), cloned_source.as_ptr());
 
-    let commit = snapshot
-        .edit()
+    let commit = package
+        .edit_styles_with_effects(Owner::MainDocument)
         .commit()
         .expect("commit no-op effects transaction");
+    assert!(!commit.diagnostics().changed());
     assert_eq!(commit.patch().before(), commit.patch().after());
     assert_eq!(
         commit
-            .snapshot()
+            .package()
+            .styles_with_effects(Owner::MainDocument)
+            .expect("no-op snapshot")
             .resource()
             .expect("no-op resource")
             .xml_bytes()
@@ -772,17 +804,14 @@ fn source_resource_replace_inverse_stale_and_save_reopen_are_owner_bound() {
         .expect("load main effects");
     let replacement = changed_resource(&base);
 
-    let mut edit = base.edit();
-    edit.replace_resource(Some(replacement))
-        .expect("stage effects replacement");
+    let mut edit = package.edit_styles_with_effects(Owner::MainDocument);
+    edit.replace_resource(Some(replacement));
     let commit = edit.commit().expect("commit effects replacement");
     assert_ne!(commit.patch().before(), commit.patch().after());
     let patch = commit.patch().clone();
     let changed_bytes = package_bytes(&mut package);
 
-    package
-        .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
-        .expect("publish effects replacement");
+    apply_effects(&mut package, &patch).expect("publish effects replacement");
     assert_ne!(package_bytes(&mut package), changed_bytes);
     let published = package
         .styles_with_effects(Owner::MainDocument)
@@ -797,17 +826,11 @@ fn source_resource_replace_inverse_stale_and_save_reopen_are_owner_bound() {
     );
 
     let after_failed_stale = package_bytes(&mut package);
-    assert!(
-        package
-            .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
-            .is_err()
-    );
+    assert!(apply_effects(&mut package, &patch).is_err());
     assert_eq!(package_bytes(&mut package), after_failed_stale);
 
     let inverse = patch.inverse();
-    package
-        .apply_styles_with_effects_patch(Owner::MainDocument, &inverse)
-        .expect("publish inverse effects patch");
+    apply_effects(&mut package, &inverse).expect("publish inverse effects patch");
     assert_eq!(
         package
             .styles_with_effects(Owner::MainDocument)
@@ -843,21 +866,18 @@ fn public_patch_rejects_cross_owner_and_cross_package_snapshots_atomically() -> 
         .map_err(|error| FixtureError(format!("load cross-owner main: {error}")))?;
     let glossary_before = archive_member(&source, "word/glossary/stylesWithEffects.xml")?;
     let replacement = changed_resource(&main);
-    let mut edit = main.edit();
-    edit.replace_resource(Some(replacement.clone()))
-        .map_err(|error| FixtureError(format!("stage cross-owner replacement: {error}")))?;
+    let mut edit = package.edit_styles_with_effects(Owner::MainDocument);
+    edit.replace_resource(Some(replacement.clone()));
     let patch = edit
         .commit()
         .map_err(|error| FixtureError(format!("commit cross-owner replacement: {error}")))?
-        .into_patch();
+        .into_parts()
+        .1;
 
+    // Cross-owner replay is unrepresentable: the patch carries its owner, so
+    // it can only ever be checked against the main owner's snapshot.
+    assert_eq!(patch.owner(), Owner::MainDocument);
     let before_cross_owner = package_bytes(&mut package);
-    assert!(
-        package
-            .apply_styles_with_effects_patch(Owner::Glossary, &patch)
-            .is_err(),
-        "a main-owner patch must reject a glossary snapshot"
-    );
     assert_eq!(
         package_bytes(&mut package),
         before_cross_owner,
@@ -878,9 +898,7 @@ fn public_patch_rejects_cross_owner_and_cross_package_snapshots_atomically() -> 
         .map_err(|error| FixtureError(format!("open cross-package source: {error}")))?;
     let other_before = package_bytes(&mut other);
     assert!(
-        other
-            .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
-            .is_err(),
+        apply_effects(&mut other, &patch).is_err(),
         "a patch from another package snapshot must be rejected"
     );
     assert_eq!(
@@ -899,20 +917,18 @@ fn public_replace_inverse_restores_exact_package_bytes() -> FixtureResult<()> {
     let snapshot = package
         .styles_with_effects(Owner::MainDocument)
         .map_err(|error| FixtureError(format!("load exact-inverse source: {error}")))?;
-    let mut edit = snapshot.edit();
-    edit.replace_resource(Some(changed_resource(&snapshot)))
-        .map_err(|error| FixtureError(format!("stage exact-inverse replacement: {error}")))?;
+    let mut edit = package.edit_styles_with_effects(Owner::MainDocument);
+    edit.replace_resource(Some(changed_resource(&snapshot)));
     let patch = edit
         .commit()
         .map_err(|error| FixtureError(format!("commit exact-inverse replacement: {error}")))?
-        .into_patch();
-    package
-        .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
+        .into_parts()
+        .1;
+    apply_effects(&mut package, &patch)
         .map_err(|error| FixtureError(format!("publish exact-inverse replacement: {error}")))?;
     assert_ne!(package_bytes(&mut package), original);
 
-    package
-        .apply_styles_with_effects_patch(Owner::MainDocument, &patch.inverse())
+    apply_effects(&mut package, &patch.inverse())
         .map_err(|error| FixtureError(format!("publish exact-inverse restoration: {error}")))?;
     assert_eq!(
         package_bytes(&mut package),
@@ -973,12 +989,18 @@ fn source_bound_clear_and_inverse_restore_custom_target_and_relationship() -> Fi
         original_effects
     );
 
-    let mut edit = base.edit();
-    assert!(!edit.is_changed());
-    edit.clear_resource();
-    assert!(edit.is_changed());
+    let mut edit = package.edit_styles_with_effects(Owner::MainDocument);
+    assert!(
+        !edit
+            .clone()
+            .commit()
+            .expect("commit unstaged edit")
+            .diagnostics()
+            .changed()
+    );
+    edit.remove();
     let commit = edit.commit().expect("commit effects removal");
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(commit.patch().owner(), Owner::MainDocument);
     assert_eq!(
         commit.patch().before().expect("removal source").xml_bytes(),
@@ -987,9 +1009,7 @@ fn source_bound_clear_and_inverse_restore_custom_target_and_relationship() -> Fi
     assert!(commit.patch().after().is_none());
     let patch = commit.patch().clone();
 
-    let removed = package
-        .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
-        .expect("publish effects removal");
+    let removed = apply_effects(&mut package, &patch).expect("publish effects removal");
     assert!(removed.is_empty());
     let removed_bytes = package_bytes(&mut package);
     assert!(archive_member(&removed_bytes, custom_member).is_err());
@@ -1000,9 +1020,7 @@ fn source_bound_clear_and_inverse_restore_custom_target_and_relationship() -> Fi
             .any(|window| window == EFFECTS_RELATIONSHIP)
     );
 
-    let restored = package
-        .apply_styles_with_effects_patch(Owner::MainDocument, &patch.inverse())
-        .expect("publish effects inverse");
+    let restored = apply_effects(&mut package, &patch.inverse()).expect("publish effects inverse");
     assert_eq!(
         restored
             .resource()
@@ -1068,10 +1086,10 @@ fn package_absent_owner_edit_keeps_source_owner_precondition() -> FixtureResult<
         .styles_with_effects(Owner::MainDocument)
         .expect("load absent main effects owner");
     assert!(snapshot.is_empty());
-    let mut edit = snapshot.edit();
-    edit.clear_resource();
+    let mut edit = package.edit_styles_with_effects(Owner::MainDocument);
+    edit.remove();
     let commit = edit.commit().expect("commit absent-owner no-op");
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(
         commit
             .patch()
@@ -1098,25 +1116,25 @@ fn explicit_resource_crud_does_not_create_missing_glossary_or_seed_a_fifth_part(
     );
     let before = package_bytes(&mut no_glossary);
     assert!(
-        !no_glossary
-            .remove_styles_with_effects(Owner::MainDocument)
+        !remove_effects(&mut no_glossary, Owner::MainDocument)
             .expect("missing main effects is a no-op")
     );
     assert_eq!(package_bytes(&mut no_glossary), before);
-    assert!(
-        no_glossary
-            .put_styles_with_effects(Owner::Glossary, resource.clone())
-            .is_err()
-    );
+    assert!(put_effects(&mut no_glossary, Owner::Glossary, resource.clone()).is_err());
     assert_eq!(package_bytes(&mut no_glossary), before);
 
     let mut with_glossary = Package::new().expect("new DOCX package");
-    with_glossary
-        .put_glossary(
+    with_glossary = {
+        let mut edit = with_glossary.edit_glossary();
+        edit.put(
             litchi_docx::glossary::Catalog::new(),
             litchi_docx::glossary::Conformance::Transitional,
         )
         .expect("create glossary without effects resource");
+        edit.commit()
+            .expect("create glossary without effects resource")
+            .into_package()
+    };
     assert!(
         with_glossary
             .styles_with_effects(Owner::Glossary)
@@ -1134,8 +1152,7 @@ fn explicit_resource_crud_does_not_create_missing_glossary_or_seed_a_fifth_part(
         "glossary seed must remain four resources"
     );
     assert!(
-        with_glossary
-            .put_styles_with_effects(Owner::Glossary, resource)
+        put_effects(&mut with_glossary, Owner::Glossary, resource)
             .expect("explicitly create glossary effects resource")
     );
     assert!(
@@ -1162,27 +1179,20 @@ fn signed_effects_noop_preserves_source_and_changed_publication_requires_unsign(
         .expect("signed effects resource")
         .clone();
     assert!(
-        !package
-            .put_styles_with_effects(Owner::MainDocument, same)
-            .expect("signed exact effects no-op")
+        !put_effects(&mut package, Owner::MainDocument, same).expect("signed exact effects no-op")
     );
     assert!(package.is_signed());
     assert_eq!(package_bytes(&mut package), original);
 
     let changed = changed_resource(&snapshot);
     let before = package_bytes(&mut package);
-    assert!(
-        package
-            .put_styles_with_effects(Owner::MainDocument, changed.clone())
-            .is_err()
-    );
+    assert!(put_effects(&mut package, Owner::MainDocument, changed.clone()).is_err());
     assert!(package.is_signed());
     assert_eq!(package_bytes(&mut package), before);
 
-    package.unsign();
+    package = package.unsign();
     assert!(
-        package
-            .put_styles_with_effects(Owner::MainDocument, changed)
+        put_effects(&mut package, Owner::MainDocument, changed)
             .expect("changed effects after explicit unsign")
     );
     assert!(!package.is_signed());
@@ -1303,9 +1313,7 @@ fn secondary_effects_projection_failures_refuse_public_main_read_and_edit() -> F
             .map_err(|error| FixtureError(format!("reopen secondary {label} fixture: {error}")))?;
         let before_edit = package_bytes(&mut edit_package);
         assert!(
-            edit_package
-                .remove_styles_with_effects(Owner::MainDocument)
-                .is_err(),
+            remove_effects(&mut edit_package, Owner::MainDocument).is_err(),
             "main edit bypassed secondary {label} projection failure"
         );
         assert_eq!(
@@ -1430,11 +1438,7 @@ fn effects_owner_rejects_leaf_outbound_and_shared_inbound_edges() -> FixtureResu
     let mut package =
         Package::from_reader(Cursor::new(shared_package)).expect("open shared inbound fixture");
     let before = package_bytes(&mut package);
-    assert!(
-        package
-            .remove_styles_with_effects(Owner::MainDocument)
-            .is_err()
-    );
+    assert!(remove_effects(&mut package, Owner::MainDocument).is_err());
     assert_eq!(package_bytes(&mut package), before);
     Ok(())
 }
@@ -1460,8 +1464,7 @@ fn effects_namespace_prefix_and_unknown_xml_are_source_preserving() -> FixtureRe
     let resource = Resource::from_xml(unknown.clone())
         .map_err(|error| FixtureError(format!("unknown-extension parse: {error}")))?;
     let mut package = Package::from_reader(Cursor::new(base)).expect("open source fixture");
-    package
-        .put_styles_with_effects(Owner::MainDocument, resource)
+    put_effects(&mut package, Owner::MainDocument, resource)
         .expect("publish source-preserving unknown extension");
     let reopened = Package::from_reader(Cursor::new(package_bytes(&mut package)))
         .expect("reopen source-preserving fixture");
@@ -1488,8 +1491,7 @@ fn effects_addition_honors_public_package_caps_atomically() -> FixtureResult<()>
     let mut generous = Package::from_reader(Cursor::new(source.clone()))
         .map_err(|error| FixtureError(format!("open generous baseline: {error}")))?;
     assert!(
-        generous
-            .put_styles_with_effects(Owner::MainDocument, resource.clone())
+        put_effects(&mut generous, Owner::MainDocument, resource.clone())
             .map_err(|error| FixtureError(format!("derive generous addition: {error}")))?
     );
     let projected = package_bytes(&mut generous);
@@ -1550,8 +1552,7 @@ fn effects_addition_honors_public_package_caps_atomically() -> FixtureResult<()>
     .map_err(|error| FixtureError(format!("open exact-fit baseline: {error}")))?;
     assert_eq!(package_bytes(&mut exact), source);
     assert!(
-        exact
-            .put_styles_with_effects(Owner::MainDocument, resource.clone())
+        put_effects(&mut exact, Owner::MainDocument, resource.clone())
             .map_err(|error| FixtureError(format!("exact-fit put: {error}")))?
     );
     assert_eq!(
@@ -1567,16 +1568,16 @@ fn effects_addition_honors_public_package_caps_atomically() -> FixtureResult<()>
     let snapshot = exact_patch
         .styles_with_effects(Owner::MainDocument)
         .map_err(|error| FixtureError(format!("read exact-fit patch baseline: {error}")))?;
-    let mut edit = snapshot.edit();
-    edit.replace_resource(Some(resource))
-        .map_err(|error| FixtureError(format!("stage exact-fit addition patch: {error}")))?;
+    assert!(snapshot.is_empty());
+    let mut edit = exact_patch.edit_styles_with_effects(Owner::MainDocument);
+    edit.replace_resource(Some(resource));
     let patch = edit
         .commit()
         .map_err(|error| FixtureError(format!("commit exact-fit addition patch: {error}")))?
-        .into_patch();
+        .into_parts()
+        .1;
     assert!(
-        exact_patch
-            .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
+        apply_effects(&mut exact_patch, &patch)
             .map_err(|error| FixtureError(format!("exact-fit addition patch: {error}")))?
             .resource()
             .is_some()
@@ -1604,8 +1605,7 @@ fn effects_addition_honors_relationship_part_and_graph_caps_with_source_less_own
     let mut generous = Package::from_reader(Cursor::new(source.clone()))
         .map_err(|error| FixtureError(format!("open source-less owner baseline: {error}")))?;
     assert!(
-        generous
-            .put_styles_with_effects(Owner::MainDocument, resource.clone())
+        put_effects(&mut generous, Owner::MainDocument, resource.clone())
             .map_err(|error| FixtureError(format!("create source-less owner rels: {error}")))?
     );
     let projected = package_bytes(&mut generous);
@@ -1657,8 +1657,7 @@ fn effects_addition_honors_relationship_part_and_graph_caps_with_source_less_own
     .map_err(|error| FixtureError(format!("open source-less exact-fit baseline: {error}")))?;
     assert_eq!(package_bytes(&mut exact), source);
     assert!(
-        exact
-            .put_styles_with_effects(Owner::MainDocument, resource.clone())
+        put_effects(&mut exact, Owner::MainDocument, resource.clone())
             .map_err(|error| FixtureError(format!("source-less exact-fit put: {error}")))?
     );
     assert_eq!(
@@ -1682,16 +1681,16 @@ fn effects_addition_honors_relationship_part_and_graph_caps_with_source_less_own
                 "read source-less exact-fit patch baseline: {error}"
             ))
         })?;
-    let mut edit = snapshot.edit();
-    edit.replace_resource(Some(resource))
-        .map_err(|error| FixtureError(format!("stage source-less exact-fit patch: {error}")))?;
+    assert!(snapshot.is_empty());
+    let mut edit = exact_patch.edit_styles_with_effects(Owner::MainDocument);
+    edit.replace_resource(Some(resource));
     let patch = edit
         .commit()
         .map_err(|error| FixtureError(format!("commit source-less exact-fit patch: {error}")))?
-        .into_patch();
+        .into_parts()
+        .1;
     assert!(
-        exact_patch
-            .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
+        apply_effects(&mut exact_patch, &patch)
             .map_err(|error| FixtureError(format!("apply source-less exact-fit patch: {error}")))?
             .resource()
             .is_some()
@@ -1726,17 +1725,15 @@ fn assert_replacement_honors_total_part_bytes_cap(
                 .len(),
         "replacement must grow the selected {owner:?} part"
     );
-    let mut edit = base.edit();
-    edit.replace_resource(Some(replacement.clone()))
-        .map_err(|error| FixtureError(format!("stage generous {owner:?} replacement: {error}")))?;
+    let mut edit = generous.edit_styles_with_effects(owner);
+    edit.replace_resource(Some(replacement.clone()));
     let commit = edit
         .commit()
         .map_err(|error| FixtureError(format!("commit generous {owner:?} replacement: {error}")))?;
-    let published = generous
-        .apply_styles_with_effects_commit(owner, commit)
-        .map_err(|error| {
-            FixtureError(format!("publish generous {owner:?} replacement: {error}"))
-        })?;
+    generous = commit.into_package();
+    let published = generous.styles_with_effects(owner).map_err(|error| {
+        FixtureError(format!("publish generous {owner:?} replacement: {error}"))
+    })?;
     assert_eq!(
         published
             .resource()
@@ -1772,15 +1769,15 @@ fn assert_replacement_honors_total_part_bytes_cap(
     let exact_base = exact.styles_with_effects(owner).map_err(|error| {
         FixtureError(format!("load exact {owner:?} replacement source: {error}"))
     })?;
-    let mut exact_edit = exact_base.edit();
-    exact_edit
-        .replace_resource(Some(replacement.clone()))
-        .map_err(|error| FixtureError(format!("stage exact {owner:?} replacement: {error}")))?;
+    assert!(exact_base.resource().is_some());
+    let mut exact_edit = exact.edit_styles_with_effects(owner);
+    exact_edit.replace_resource(Some(replacement.clone()));
     let exact_commit = exact_edit
         .commit()
         .map_err(|error| FixtureError(format!("commit exact {owner:?} replacement: {error}")))?;
+    exact = exact_commit.into_package();
     let exact_published = exact
-        .apply_styles_with_effects_commit(owner, exact_commit)
+        .styles_with_effects(owner)
         .map_err(|error| FixtureError(format!("publish exact {owner:?} replacement: {error}")))?;
     assert_eq!(
         exact_published
@@ -1837,13 +1834,13 @@ fn assert_replacement_honors_total_part_bytes_cap(
             "load one-under {owner:?} replacement source: {error}"
         ))
     })?;
-    let mut limited_edit = limited_base.edit();
-    limited_edit
-        .replace_resource(Some(replacement))
-        .map_err(|error| FixtureError(format!("stage one-under {owner:?} replacement: {error}")))?;
+    assert!(limited_base.resource().is_some());
+    let mut limited_edit = limited.edit_styles_with_effects(owner);
+    limited_edit.replace_resource(Some(replacement));
     let commit_error = limited_edit
         .commit()
-        .expect_err("one-under replacement must fail at transaction commit");
+        .err()
+        .expect("one-under replacement must fail at transaction commit");
     assert!(
         matches!(
             commit_error,
@@ -1905,15 +1902,14 @@ fn absent_owner_inverse_rejects_candidate_with_different_relationship_id() -> Fi
         .styles_with_effects(Owner::MainDocument)
         .map_err(|error| FixtureError(format!("read stale inverse absent owner: {error}")))?;
     assert!(absent.is_empty());
-    let mut edit = absent.edit();
-    edit.replace_resource(Some(resource.clone()))
-        .map_err(|error| FixtureError(format!("stage stale inverse addition: {error}")))?;
+    let mut edit = package.edit_styles_with_effects(Owner::MainDocument);
+    edit.replace_resource(Some(resource.clone()));
     let patch = edit
         .commit()
         .map_err(|error| FixtureError(format!("commit stale inverse addition: {error}")))?
-        .into_patch();
-    package
-        .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
+        .into_parts()
+        .1;
+    apply_effects(&mut package, &patch)
         .map_err(|error| FixtureError(format!("publish stale inverse addition: {error}")))?;
     let added = package_bytes(&mut package);
     let relationships_name = "word/_rels/document.xml.rels";
@@ -1938,9 +1934,7 @@ fn absent_owner_inverse_rejects_candidate_with_different_relationship_id() -> Fi
     );
     let before = package_bytes(&mut candidate);
     assert!(
-        candidate
-            .apply_styles_with_effects_patch(Owner::MainDocument, &patch.inverse())
-            .is_err(),
+        apply_effects(&mut candidate, &patch.inverse()).is_err(),
         "inverse must reject a candidate with a different relationship ID"
     );
     assert_eq!(package_bytes(&mut candidate), before);
@@ -1974,22 +1968,25 @@ fn removing_effects_removes_empty_target_relationship_member_and_inverse_restore
     let snapshot = package
         .styles_with_effects(Owner::MainDocument)
         .map_err(|error| FixtureError(format!("load empty-target-rels effects: {error}")))?;
-    let mut edit = snapshot.edit();
-    edit.clear_resource();
+    assert_eq!(
+        snapshot.resource().expect("effects resource").xml_bytes(),
+        original_effects
+    );
+    let mut edit = package.edit_styles_with_effects(Owner::MainDocument);
+    edit.remove();
     let patch = edit
         .commit()
         .map_err(|error| FixtureError(format!("commit empty-target-rels removal: {error}")))?
-        .into_patch();
-    let removed = package
-        .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
+        .into_parts()
+        .1;
+    let removed = apply_effects(&mut package, &patch)
         .map_err(|error| FixtureError(format!("remove empty-target-rels effects: {error}")))?;
     assert!(removed.is_empty());
     let removed_bytes = package_bytes(&mut package);
     assert!(archive_member(&removed_bytes, "word/stylesWithEffects.xml").is_err());
     assert!(archive_member(&removed_bytes, target_relationships).is_err());
 
-    let restored = package
-        .apply_styles_with_effects_patch(Owner::MainDocument, &patch.inverse())
+    let restored = apply_effects(&mut package, &patch.inverse())
         .map_err(|error| FixtureError(format!("restore empty-target-rels effects: {error}")))?;
     assert_eq!(
         restored.resource().expect("inverse resource").xml_bytes(),

@@ -114,7 +114,7 @@ fn producer_and_native_revision_corpus_queries_survive_save_and_reopen() {
             .collect();
         assert_eq!(actual_sha256, expected_sha256, "corpus changed: {relative}");
 
-        let mut package = Package::open(&path).expect("open owning package");
+        let package = Package::open(&path).expect("open owning package");
         let document = package.document().expect("read owning document");
         let records = document.revisions().expect("read owning revisions");
         assert_eq!(

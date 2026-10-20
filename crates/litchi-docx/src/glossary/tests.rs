@@ -2,6 +2,7 @@ use super::codec::*;
 use super::graph::*;
 use super::model::*;
 use super::package::*;
+use super::transaction::Transaction;
 use super::*;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use std::sync::Arc;
@@ -1842,7 +1843,7 @@ fn aggregate_auxiliary_payload_limit_rejects_before_mutation() {
 #[test]
 fn transaction_creates_catalog_and_auxiliary_graph_atomically() {
     let mut package = package();
-    let mut transaction = Transaction::new(&mut package).unwrap();
+    let mut transaction = Transaction::new(&package).unwrap();
     transaction.add_entry(entry("Authored")).unwrap();
     transaction
         .add_part(
@@ -1858,7 +1859,7 @@ fn transaction_creates_catalog_and_auxiliary_graph_atomically() {
         })
         .unwrap();
 
-    let commit = transaction.commit().unwrap();
+    let commit = transaction.commit(&mut package).unwrap();
     assert!(commit.changed());
     assert_eq!(commit.snapshot().entries()[0].name(), Some("Authored"));
     assert_eq!(commit.snapshot().auxiliary_parts()[0].data(), [1, 2, 3]);
@@ -1882,8 +1883,8 @@ fn transaction_noop_preserves_signature_and_patch_rejects_stale_source() {
     let source = Snapshot::load(&package).unwrap();
 
     mark_signed(&mut package);
-    let transaction = Transaction::new(&mut package).unwrap();
-    let commit = transaction.commit().unwrap();
+    let transaction = Transaction::new(&package).unwrap();
+    let commit = transaction.commit(&mut package).unwrap();
     assert!(!commit.changed());
     assert!(package.is_signed());
 
@@ -1895,18 +1896,18 @@ fn transaction_noop_preserves_signature_and_patch_rejects_stale_source() {
     // A changed commit over the signed package is refused (it used to remove
     // the signature); the patch below comes from an explicitly unsigned copy.
     let mut target = package.clone();
-    let mut refused = Transaction::new(&mut target).unwrap();
+    let mut refused = Transaction::new(&target).unwrap();
     refused.add_entry(entry("New")).unwrap();
     assert!(matches!(
-        refused.commit(),
+        refused.commit(&mut target),
         Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
     ));
     assert!(target.is_signed());
 
     target.unsign();
-    let mut editing = Transaction::new(&mut target).unwrap();
+    let mut editing = Transaction::new(&target).unwrap();
     editing.add_entry(entry("New")).unwrap();
-    let changed = editing.commit().unwrap();
+    let changed = editing.commit(&mut target).unwrap();
     assert!(changed.changed());
     assert!(changed.patch().apply(&mut changed_package).is_err());
     assert_eq!(source.entries()[0].name(), Some("Keep"));
@@ -1928,11 +1929,11 @@ fn transaction_rejects_orphaned_auxiliary_removal_without_mutating_package() {
     raw::put(&mut package, &graph).unwrap();
     let before = Snapshot::load(&package).unwrap();
 
-    let mut transaction = Transaction::new(&mut package).unwrap();
+    let mut transaction = Transaction::new(&package).unwrap();
     transaction
         .remove_part("/word/glossary/media/image.png")
         .unwrap();
-    assert!(transaction.commit().is_err());
+    assert!(transaction.commit(&mut package).is_err());
     assert_eq!(Snapshot::load(&package).unwrap(), before);
 }
 
@@ -1952,9 +1953,9 @@ fn transaction_catalog_crud_preserves_opaque_entry_xml() {
     )
     .unwrap();
 
-    let mut transaction = Transaction::new(&mut package).unwrap();
+    let mut transaction = Transaction::new(&package).unwrap();
     transaction.add_entry(entry("Added")).unwrap();
-    transaction.commit().unwrap();
+    transaction.commit(&mut package).unwrap();
     let root = std::str::from_utf8(
         package
             .get_part(&PackURI::new("/word/glossary/document.xml").unwrap())

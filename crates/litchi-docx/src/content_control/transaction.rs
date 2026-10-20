@@ -16,8 +16,8 @@ use crate::{Error, Result};
 
 use super::snapshot::{AttributeSpan, BindingSpan, Source, Span};
 use super::{
-    BindingFlavor, Checksum, DataBinding, FORMATTING_ALLOWED_NAMESPACE, FormattingAllowed, Lock,
-    Patch, STORE_ITEM_CHECKSUM_NAMESPACE, Snapshot,
+    BindingFlavor, Checksum, DataBinding, DraftPatch, FORMATTING_ALLOWED_NAMESPACE,
+    FormattingAllowed, Lock, STORE_ITEM_CHECKSUM_NAMESPACE, Snapshot,
 };
 
 const MCE_NAMESPACE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
@@ -25,7 +25,7 @@ const MCE_NAMESPACE: &str = "http://schemas.openxmlformats.org/markup-compatibil
 /// One typed, source-order edit.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum Edit {
+pub enum Operation {
     /// Set, repair, or remove the checksum on one exact binding occurrence.
     SetChecksum {
         /// Source-order `w:sdtPr` ordinal.
@@ -59,13 +59,13 @@ enum Key {
 
 /// Isolated edit queue over one exact XML snapshot.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Draft {
     base: Snapshot,
-    edits: Vec<Option<Edit>>,
+    edits: Vec<Option<Operation>>,
     index: HashMap<Key, usize>,
 }
 
-impl Transaction {
+impl Draft {
     pub(crate) fn new(base: Snapshot) -> Self {
         Self {
             base,
@@ -81,7 +81,7 @@ impl Transaction {
     }
 
     /// Coalesced edits in request order.
-    pub fn edits(&self) -> impl Iterator<Item = &Edit> {
+    pub fn edits(&self) -> impl Iterator<Item = &Operation> {
         self.edits.iter().filter_map(Option::as_ref)
     }
 
@@ -96,15 +96,15 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn apply(&mut self, edit: Edit) -> Result<&mut Self> {
+    pub fn apply(&mut self, edit: Operation) -> Result<&mut Self> {
         match edit {
-            Edit::SetChecksum { occurrence, value } => self.set_checksum(occurrence, value),
-            Edit::SetBindingChecksum {
+            Operation::SetChecksum { occurrence, value } => self.set_checksum(occurrence, value),
+            Operation::SetBindingChecksum {
                 occurrence,
                 binding,
                 value,
             } => self.set_binding_checksum(occurrence, binding, value),
-            Edit::SetFormattingAllowed { occurrence, value } => {
+            Operation::SetFormattingAllowed { occurrence, value } => {
                 self.set_formatting_allowed(occurrence, value)
             },
         }
@@ -155,7 +155,7 @@ impl Transaction {
             &mut self.edits,
             &mut self.index,
             Key::Checksum(occurrence, binding),
-            (!unchanged).then_some(Edit::SetBindingChecksum {
+            (!unchanged).then_some(Operation::SetBindingChecksum {
                 occurrence,
                 binding,
                 value,
@@ -223,7 +223,7 @@ impl Transaction {
             &mut self.index,
             Key::Formatting(occurrence),
             (value != semantic.control().formatting_allowed())
-                .then_some(Edit::SetFormattingAllowed { occurrence, value }),
+                .then_some(Operation::SetFormattingAllowed { occurrence, value }),
         )?;
         Ok(self)
     }
@@ -233,12 +233,12 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn commit(&self) -> Result<Commit> {
+    pub fn commit(&self) -> Result<DraftCommit> {
         let before = self.base.source_owner();
         if self.index.is_empty() {
-            return Ok(Commit::new(
+            return Ok(DraftCommit::new(
                 self.base.clone(),
-                Patch::new(before.clone(), before, self.base.limits().clone()),
+                DraftPatch::new(before.clone(), before, self.base.limits().clone()),
             ));
         }
         let mut splices = Vec::new();
@@ -256,22 +256,22 @@ impl Transaction {
         )?;
         let after = Source::Package(Arc::new(output));
         let snapshot = Snapshot::from_source(after.clone(), self.base.limits().clone())?;
-        Ok(Commit::new(
+        Ok(DraftCommit::new(
             snapshot,
-            Patch::new(before, after, self.base.limits().clone()),
+            DraftPatch::new(before, after, self.base.limits().clone()),
         ))
     }
 }
 
 /// A fully reparsed candidate and reversible patch.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct DraftCommit {
     snapshot: Snapshot,
-    patch: Patch,
+    patch: DraftPatch,
 }
 
-impl Commit {
-    pub(crate) fn new(snapshot: Snapshot, patch: Patch) -> Self {
+impl DraftCommit {
+    pub(crate) fn new(snapshot: Snapshot, patch: DraftPatch) -> Self {
         Self { snapshot, patch }
     }
 
@@ -289,13 +289,13 @@ impl Commit {
 
     /// Reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub const fn patch(&self) -> &DraftPatch {
         &self.patch
     }
 
     /// Split the publication values.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub fn into_parts(self) -> (Snapshot, DraftPatch) {
         (self.snapshot, self.patch)
     }
 }
@@ -308,12 +308,12 @@ struct Splice {
 
 fn plan(
     snapshot: &Snapshot,
-    edit: &Edit,
+    edit: &Operation,
     splices: &mut Vec<Splice>,
     prefixes: &mut PrefixAllocator,
 ) -> Result<()> {
     match edit {
-        Edit::SetChecksum { occurrence, value } => {
+        Operation::SetChecksum { occurrence, value } => {
             let semantic = semantic_at(snapshot, *occurrence)?;
             let bindings = semantic.control().data_bindings();
             let binding = bindings
@@ -330,7 +330,7 @@ fn plan(
                 prefixes,
             )
         },
-        Edit::SetBindingChecksum {
+        Operation::SetBindingChecksum {
             occurrence,
             binding,
             value,
@@ -342,7 +342,7 @@ fn plan(
             splices,
             prefixes,
         ),
-        Edit::SetFormattingAllowed { occurrence, value } => {
+        Operation::SetFormattingAllowed { occurrence, value } => {
             let source = occurrence_at(snapshot, *occurrence)?;
             let lock = source
                 .locks()
@@ -725,10 +725,10 @@ fn semantic_at(snapshot: &Snapshot, index: usize) -> Result<&super::Occurrence> 
 }
 
 fn replace_edit(
-    edits: &mut Vec<Option<Edit>>,
+    edits: &mut Vec<Option<Operation>>,
     index: &mut HashMap<Key, usize>,
     key: Key,
-    edit: Option<Edit>,
+    edit: Option<Operation>,
 ) -> Result<()> {
     match (index.get(&key).copied(), edit) {
         (Some(position), Some(edit)) => {

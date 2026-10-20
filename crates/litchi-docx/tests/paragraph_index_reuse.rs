@@ -1,3 +1,7 @@
+#![allow(
+    clippy::redundant_closure_call,
+    reason = "raw OPC test edits stage one closure over the edit's graph"
+)]
 use std::io::{self, Cursor, Write};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -235,7 +239,7 @@ fn eager_mutable_save_replaces_cached_ranges_and_survives_reopen() {
     let mut edit = package.edit().unwrap();
     edit.insert_paragraph(litchi_core::Position::new(1), "after")
         .unwrap();
-    let mut package = edit.commit().unwrap().into_package();
+    let package = edit.commit().unwrap().into_package();
     let output = tempfile::NamedTempFile::with_suffix(".docx").unwrap();
     package.save(output.path()).unwrap();
 
@@ -252,14 +256,19 @@ fn eager_raw_edit_replaces_cached_ranges_and_keeps_old_snapshot_stable() {
     let old_snapshot = package.document_snapshot().unwrap();
 
     let main = PackURI::new(MAIN).unwrap();
-    package
-        .edit_opc(|candidate| {
-            candidate
-                .get_part_mut(&main)?
-                .set_blob(document_xml(&["after", "new tail"]));
-            Ok::<_, Error>(())
-        })
+    package = {
+        let mut edit = package.edit_opc();
+        (|candidate: &mut OpcPackage| -> litchi_docx::Result<_> {
+            {
+                candidate
+                    .get_part_mut(&main)?
+                    .set_blob(document_xml(&["after", "new tail"]));
+                Ok::<_, Error>(())
+            }
+        })(edit.package_mut())
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
 
     assert_eq!(old_snapshot.paragraph_count(), 1);
     assert_eq!(
@@ -282,20 +291,25 @@ fn eager_root_relationship_retarget_replaces_cached_ranges_and_survives_save() {
     let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
     assert_eager_view(&package.document().unwrap(), &["primary"]);
 
-    package
-        .edit_opc(|candidate| {
-            let office_document_id = candidate
-                .rels()
-                .iter()
-                .find(|relationship| relationship.reltype() == rt::OFFICE_DOCUMENT)
-                .map(|relationship| relationship.r_id().to_owned())
-                .expect("fixture must have one officeDocument relationship");
-            candidate
-                .relationships_mut()
-                .retarget(&office_document_id, "word/alternate.xml".to_owned())?;
-            Ok::<_, Error>(())
-        })
+    package = {
+        let mut edit = package.edit_opc();
+        (|candidate: &mut OpcPackage| -> litchi_docx::Result<_> {
+            {
+                let office_document_id = candidate
+                    .rels()
+                    .iter()
+                    .find(|relationship| relationship.reltype() == rt::OFFICE_DOCUMENT)
+                    .map(|relationship| relationship.r_id().to_owned())
+                    .expect("fixture must have one officeDocument relationship");
+                candidate
+                    .relationships_mut()
+                    .retarget(&office_document_id, "word/alternate.xml".to_owned())?;
+                Ok::<_, Error>(())
+            }
+        })(edit.package_mut())
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
 
     assert_eager_view(
         &package.document().unwrap(),
@@ -318,7 +332,7 @@ fn eager_failed_save_keeps_warmed_generation_retryable() {
     let mut edit = package.edit().unwrap();
     edit.insert_paragraph(litchi_core::Position::new(1), "after")
         .unwrap();
-    let mut changed = edit.commit().unwrap().into_package();
+    let changed = edit.commit().unwrap().into_package();
     assert!(changed.write_to(FailingWriter).is_err());
 
     // The failed sink must leave both published OPC generations unchanged:
@@ -326,7 +340,7 @@ fn eager_failed_save_keeps_warmed_generation_retryable() {
     // package stays retryable.
     assert_eager_view(&package.document().unwrap(), &["before"]);
     assert_eager_view(&changed.document().unwrap(), &["before", "after"]);
-    let mut package = changed;
+    let package = changed;
 
     let output = tempfile::NamedTempFile::with_suffix(".docx").unwrap();
     package.save(output.path()).unwrap();
@@ -533,17 +547,22 @@ fn owned_eager_projection_retains_the_graph_after_publication_and_drop() {
     assert!(std::ptr::eq(document.opc_package(), second.opc_package()));
     assert_eager_view(&document, &["before"]);
     let core = PackURI::new("/docProps/core.xml").unwrap();
-    package
-        .edit_opc(|candidate| {
-            candidate
-                .get_part_mut(&PackURI::new(MAIN).unwrap())?
-                .set_blob(document_xml(&["after", "tail"]));
-            candidate
-                .get_part_mut(&core)?
-                .set_blob(core_properties_xml("after"));
-            Ok(())
-        })
+    package = {
+        let mut edit = package.edit_opc();
+        (|candidate: &mut OpcPackage| -> litchi_docx::Result<_> {
+            {
+                candidate
+                    .get_part_mut(&PackURI::new(MAIN).unwrap())?
+                    .set_blob(document_xml(&["after", "tail"]));
+                candidate
+                    .get_part_mut(&core)?
+                    .set_blob(core_properties_xml("after"));
+                Ok(())
+            }
+        })(edit.package_mut())
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     assert!(!std::ptr::eq(document.opc_package(), package.opc_package()));
     assert_eager_view(&package.document().unwrap(), &["after", "tail"]);
     assert_eq!(
@@ -561,21 +580,28 @@ fn owned_eager_projection_retains_the_graph_after_publication_and_drop() {
 
 #[test]
 fn owned_eager_projection_survives_failed_edit_and_failed_save() {
-    let mut package =
-        Package::from_reader(Cursor::new(docx_bytes(document_xml(&["before"])))).unwrap();
+    let package = Package::from_reader(Cursor::new(docx_bytes(document_xml(&["before"])))).unwrap();
     let document = package.document().unwrap();
-    let error = package.edit_opc(|candidate| {
-        candidate
-            .get_part_mut(&PackURI::new(MAIN).unwrap())?
-            .set_blob(document_xml(&["unpublished"]));
-        Err::<(), _>(Error::InvalidFormat("injected edit failure".into()))
-    });
+    let error = {
+        let mut edit = package.edit_opc();
+        let value = (|candidate: &mut OpcPackage| -> litchi_docx::Result<_> {
+            {
+                candidate
+                    .get_part_mut(&PackURI::new(MAIN).unwrap())?
+                    .set_blob(document_xml(&["unpublished"]));
+                Err::<(), _>(Error::InvalidFormat("injected edit failure".into()))
+            }
+        })(edit.package_mut());
+        // The failed staging is never committed; dropping the edit discards it.
+        drop(edit);
+        value
+    };
     assert!(error.is_err());
     assert!(std::ptr::eq(document.opc_package(), package.opc_package()));
     let mut edit = package.edit().unwrap();
     edit.insert_paragraph(litchi_core::Position::new(1), "after")
         .unwrap();
-    let mut package = edit.commit().unwrap().into_package();
+    let package = edit.commit().unwrap().into_package();
     assert!(package.write_to(FailingWriter).is_err());
     assert_eager_view(&document, &["before"]);
     let mut output = Cursor::new(Vec::new());
@@ -588,7 +614,7 @@ fn owned_eager_projection_survives_failed_edit_and_failed_save() {
 #[test]
 fn unchanged_eager_save_keeps_projection_graph_shared_and_bytes_exact() {
     let bytes = docx_bytes(document_xml(&["unchanged"]));
-    let mut package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
+    let package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
     let document = package.document().unwrap();
     let mut output = Vec::new();
     package.write_to(&mut output).unwrap();

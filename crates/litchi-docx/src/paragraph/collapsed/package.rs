@@ -8,9 +8,9 @@
 )]
 //! Paragraph and document facade integration for `w12:collapsed`.
 
+use crate::builder::{Document as DraftDocument, Paragraph as DraftParagraph};
 use crate::error::{Error, Result};
 use crate::paragraph::Paragraph;
-use crate::writer::{MutableDocument, MutableParagraph};
 
 use super::codec;
 use super::model::Collapsed;
@@ -56,7 +56,7 @@ impl Paragraph {
     }
 }
 
-impl MutableParagraph {
+impl DraftParagraph {
     /// Return the authored collapse state for this paragraph.
     #[must_use]
     pub fn collapsed(&self) -> Option<Collapsed> {
@@ -89,7 +89,7 @@ impl MutableParagraph {
     }
 }
 
-impl MutableDocument {
+impl DraftDocument {
     /// Read the collapse state of any body paragraph, including preserved
     /// paragraphs from an opened document.
     ///

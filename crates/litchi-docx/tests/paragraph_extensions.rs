@@ -29,7 +29,7 @@ fn package_round_trip_preserves_extension_state_and_hyperlink_relationships() {
             .set_text_id(Some(Id::new(0xdef0).unwrap()))
             .unwrap();
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
     let reopened = Package::open(file.path()).unwrap();

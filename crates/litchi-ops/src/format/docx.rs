@@ -763,7 +763,7 @@ impl Docx {
         if let Some(package) = self.0.unsigned.get() {
             return Ok(package.clone());
         }
-        let mut package = match &self.0.owner {
+        let package = match &self.0.owner {
             DocxOwner::Eager(package) => {
                 // A copy of the graph would drop the encryption profile the
                 // eager owner keeps, and the leaf refuses to edit a package
@@ -780,7 +780,7 @@ impl Docx {
             },
             DocxOwner::Source(package) => package.to_owned_package_preserving_source()?,
         };
-        package.unsign();
+        let package = package.unsign();
         self.owner().check_source()?;
         // Concurrent first users may each build a candidate; only a complete
         // successfully fenced result is retained. Each writer gets a clone.

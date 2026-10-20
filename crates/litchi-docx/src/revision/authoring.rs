@@ -38,7 +38,11 @@ use quick_xml::{
 };
 
 use crate::package::story::{StoryLimits, capture};
-use crate::{Error, Package, Result};
+use crate::{Package, Result};
+
+#[path = "authoring/edit.rs"]
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 use litchi_ooxml_common::properties::time::DateTime;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::PackURI;
@@ -451,8 +455,8 @@ impl Snapshot {
 
     /// Start a failure-atomic tracked-change disposition transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction::new(self.clone())
+    pub(crate) fn edit(&self) -> Draft {
+        Draft::new(self.clone())
     }
 
     fn source_owner(&self) -> Arc<Vec<u8>> {
@@ -470,12 +474,16 @@ impl Snapshot {
 
 /// One failure-atomic tracked-change transaction.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Draft {
     base: Snapshot,
     dispositions: Vec<Option<Disposition>>,
 }
 
-impl Transaction {
+#[allow(
+    dead_code,
+    reason = "the detached draft API is exercised by unit tests"
+)]
+impl Draft {
     fn new(base: Snapshot) -> Self {
         Self {
             dispositions: Vec::new(),
@@ -485,13 +493,13 @@ impl Transaction {
 
     /// Borrow the immutable source snapshot.
     #[must_use]
-    pub const fn source(&self) -> &Snapshot {
+    pub(crate) const fn source(&self) -> &Snapshot {
         &self.base
     }
 
     /// Whether at least one disposition is staged.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    pub(crate) fn is_changed(&self) -> bool {
         self.dispositions.iter().any(Option::is_some)
     }
 
@@ -500,7 +508,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an out-of-bounds error for an unknown source-order index.
-    pub fn accept(&mut self, index: usize) -> Result<&mut Self> {
+    pub(crate) fn accept(&mut self, index: usize) -> Result<&mut Self> {
         self.set(index, Disposition::Accept)
     }
 
@@ -509,7 +517,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an out-of-bounds error for an unknown source-order index.
-    pub fn reject(&mut self, index: usize) -> Result<&mut Self> {
+    pub(crate) fn reject(&mut self, index: usize) -> Result<&mut Self> {
         self.set(index, Disposition::Reject)
     }
 
@@ -518,7 +526,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an out-of-bounds error for an unknown source-order index.
-    pub fn set(&mut self, index: usize, disposition: Disposition) -> Result<&mut Self> {
+    pub(crate) fn set(&mut self, index: usize, disposition: Disposition) -> Result<&mut Self> {
         let len = self.base.changes().len();
         if index >= len {
             return Err(Error::OutOfBounds {
@@ -539,7 +547,7 @@ impl Transaction {
     ///
     /// Returns an allocation error only if the internal disposition table could
     /// not be retained; the table is pre-sized by the source snapshot.
-    pub fn accept_all(&mut self) -> Result<&mut Self> {
+    pub(crate) fn accept_all(&mut self) -> Result<&mut Self> {
         self.ensure_dispositions(self.base.changes().len())?;
         self.dispositions.fill(Some(Disposition::Accept));
         Ok(self)
@@ -551,7 +559,7 @@ impl Transaction {
     ///
     /// Returns an allocation error only if the internal disposition table could
     /// not be retained; the table is pre-sized by the source snapshot.
-    pub fn reject_all(&mut self) -> Result<&mut Self> {
+    pub(crate) fn reject_all(&mut self) -> Result<&mut Self> {
         self.ensure_dispositions(self.base.changes().len())?;
         self.dispositions.fill(Some(Disposition::Reject));
         Ok(self)
@@ -565,11 +573,11 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an XML, ownership, or resource-limit error.
-    pub fn commit(&self) -> Result<Commit> {
+    pub(crate) fn commit(&self) -> Result<DraftCommit> {
         let before = self.base.source_owner();
         let source_limits = self.base.limits();
         if !self.is_changed() {
-            return Ok(Commit::new(
+            return Ok(DraftCommit::new(
                 self.base.clone(),
                 Arc::clone(&before),
                 before,
@@ -609,7 +617,7 @@ impl Transaction {
             target_limits,
             self.base.binding().cloned(),
         )?;
-        Ok(Commit::new(
+        Ok(DraftCommit::new(
             snapshot,
             before,
             after,
@@ -634,12 +642,16 @@ impl Transaction {
 
 /// A successful tracked-change disposition commit.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct DraftCommit {
     snapshot: Snapshot,
-    patch: Patch,
+    patch: DraftPatch,
 }
 
-impl Commit {
+#[allow(
+    dead_code,
+    reason = "the detached draft API is exercised by unit tests"
+)]
+impl DraftCommit {
     fn new(
         snapshot: Snapshot,
         before: Arc<Vec<u8>>,
@@ -650,44 +662,44 @@ impl Commit {
         let binding = snapshot.binding().cloned();
         Self {
             snapshot,
-            patch: Patch::new(before, after, source_limits, target_limits, binding),
+            patch: DraftPatch::new(before, after, source_limits, target_limits, binding),
         }
     }
 
     /// Whether the disposition changes any source byte.
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         !self.patch.is_noop()
     }
 
     /// Borrow the fully reparsed candidate.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &DraftPatch {
         &self.patch
     }
 
     /// Move the candidate snapshot out of the commit.
     #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
+    pub(crate) fn into_snapshot(self) -> Snapshot {
         self.snapshot
     }
 
     /// Move the patch out of the commit.
     #[must_use]
-    pub fn into_patch(self) -> Patch {
+    pub(crate) fn into_patch(self) -> DraftPatch {
         self.patch
     }
 }
 
 /// An exact, reversible, source-bound XML replacement.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub(crate) struct DraftPatch {
     source_fingerprint: u64,
     target_fingerprint: u64,
     before: Arc<Vec<u8>>,
@@ -698,7 +710,11 @@ pub struct Patch {
     gate: Arc<AtomicU8>,
 }
 
-impl Patch {
+#[allow(
+    dead_code,
+    reason = "the detached draft API is exercised by unit tests"
+)]
+impl DraftPatch {
     fn new(
         before: Arc<Vec<u8>>,
         after: Arc<Vec<u8>>,
@@ -720,43 +736,43 @@ impl Patch {
 
     /// Return the compact source fingerprint.
     #[must_use]
-    pub const fn source_fingerprint(&self) -> u64 {
+    pub(crate) const fn source_fingerprint(&self) -> u64 {
         self.source_fingerprint
     }
 
     /// Return the compact target fingerprint.
     #[must_use]
-    pub const fn target_fingerprint(&self) -> u64 {
+    pub(crate) const fn target_fingerprint(&self) -> u64 {
         self.target_fingerprint
     }
 
     /// Borrow the exact source bytes required by this patch.
     #[must_use]
-    pub fn before_bytes(&self) -> &[u8] {
+    pub(crate) fn before_bytes(&self) -> &[u8] {
         self.before.as_slice()
     }
 
     /// Borrow the exact target bytes produced by this patch.
     #[must_use]
-    pub fn after_bytes(&self) -> &[u8] {
+    pub(crate) fn after_bytes(&self) -> &[u8] {
         self.after.as_slice()
     }
 
     /// Return the target parsing/publication policy.
     #[must_use]
-    pub const fn limits(&self) -> Limits {
+    pub(crate) const fn limits(&self) -> Limits {
         self.target_limits
     }
 
     /// Whether this patch preserves every source byte.
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.as_slice() == self.after.as_slice()
     }
 
     /// Whether this patch or one of its clones has been successfully applied.
     #[must_use]
-    pub fn is_applied(&self) -> bool {
+    pub(crate) fn is_applied(&self) -> bool {
         self.gate.load(Ordering::Acquire) == GATE_APPLIED
     }
 
@@ -765,7 +781,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an exact-source, policy, binding, or target-parse error.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         let claim = self.claim_publication()?;
         if source.inner.limits != self.source_limits
             || source.binding() != self.binding.as_ref()
@@ -787,7 +803,7 @@ impl Patch {
 
     /// Build a fresh inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self::new(
             Arc::clone(&self.after),
             Arc::clone(&self.before),
@@ -873,8 +889,11 @@ impl Package {
     ///
     /// Returns an exact-source, signature-policy, stale-package, or target
     /// validation error without publishing a partial package mutation.
-    pub fn apply_tracked_revisions(&mut self, commit: &Commit) -> Result<Snapshot> {
-        self.apply_tracked_revision_patch(commit.patch())
+    pub(crate) fn publish_tracked_revision_draft(
+        &mut self,
+        commit: &DraftCommit,
+    ) -> Result<Snapshot> {
+        self.publish_tracked_revision_draft_patch(commit.patch())
     }
 
     /// Publish a reversible tracked-revision patch against the resolved main
@@ -889,9 +908,12 @@ impl Package {
     ///
     /// Returns an exact-source, signature-policy, stale-package, or target
     /// validation error without publishing a partial package mutation.
-    pub fn apply_tracked_revision_patch(&mut self, patch: &Patch) -> Result<Snapshot> {
+    pub(crate) fn publish_tracked_revision_draft_patch(
+        &mut self,
+        patch: &DraftPatch,
+    ) -> Result<Snapshot> {
         let claim = patch.claim_publication()?;
-        self.ensure_conflict_opc_current("apply_tracked_revision_patch")?;
+        self.ensure_conflict_opc_current("publish_tracked_revision_draft_patch")?;
         let binding = patch
             .binding
             .as_ref()
@@ -935,7 +957,7 @@ impl Package {
         let replacement = Arc::clone(&patch.after);
         let expected_topology = Arc::clone(&binding.topology);
         let published =
-            self.edit_semantic_opc("apply_tracked_revision_patch", move |candidate| {
+            self.edit_semantic_opc("publish_tracked_revision_draft_patch", move |candidate| {
                 let staged = capture(candidate, story_limits)?;
                 if staged.topology().as_bytes() != expected_topology.as_ref() {
                     return Err(invalid("tracked revision package owner topology is stale"));
@@ -3691,15 +3713,16 @@ mod tests {
 
     #[test]
     fn package_owner_binds_story_topology_and_publishes_inverse() {
-        let mut package = Package::new().expect("new package");
+        let mut builder = crate::Builder::new().expect("new package");
         let metadata = RevisionMetadata::new("1", "Alice").expect("revision metadata");
-        package
-            .authoring_document()
+        builder
+            .document()
             .expect("document writer")
             .add_paragraph()
             .add_revision(RevisionKind::Insert, metadata)
             .add_run_with_text("new");
         let mut bytes = Cursor::new(Vec::new());
+        let package = builder.build().expect("new package");
         package
             .to_plain_stream(&mut bytes)
             .expect("materialize package");
@@ -3710,7 +3733,7 @@ mod tests {
         transaction.accept(0).expect("accept package revision");
         let commit = transaction.commit().expect("commit package revision");
         let published = package
-            .apply_tracked_revisions(&commit)
+            .publish_tracked_revision_draft(&commit)
             .expect("publish package revision");
         assert!(
             !std::str::from_utf8(published.source())
@@ -3720,7 +3743,7 @@ mod tests {
 
         let inverse = commit.patch().inverse();
         let restored = package
-            .apply_tracked_revision_patch(&inverse)
+            .publish_tracked_revision_draft_patch(&inverse)
             .expect("publish package inverse");
         assert_eq!(restored.source(), snapshot.source());
     }

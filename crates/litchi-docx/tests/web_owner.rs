@@ -43,7 +43,12 @@ fn opens_real_poi_div_metadata_and_round_trips_a_package() {
     let mut synthetic = Package::new().unwrap();
     let (mut settings, conformance) = synthetic.web().unwrap().unwrap();
     settings.set_encoding("utf-8").unwrap();
-    assert!(synthetic.put_web(settings, conformance).unwrap());
+    assert!({
+        let mut edit = synthetic.edit_web();
+        let value = edit.put(settings, conformance).unwrap();
+        synthetic = edit.commit().unwrap().into_package();
+        value
+    });
     let mut output = Cursor::new(Vec::new());
     synthetic.write_to(&mut output).unwrap();
     let reopened = Package::from_reader(Cursor::new(output.into_inner())).unwrap();

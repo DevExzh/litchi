@@ -413,7 +413,7 @@ mod tests {
         assert!(commit.diagnostics().changed());
         assert!(!commit.patch().is_noop());
         assert_eq!(package.metadata().cloned(), before);
-        let mut next = commit.package().clone();
+        let next = commit.package().clone();
         assert_eq!(
             next.metadata().and_then(|props| props.title.as_deref()),
             Some("T")
@@ -511,7 +511,7 @@ mod tests {
         );
         let replayed = package.apply_metadata(&patch)?;
         assert_eq!(replayed.app_props()?, next.app_props()?);
-        let mut restored = next.apply_metadata(&patch.inverse())?;
+        let restored = next.apply_metadata(&patch.inverse())?;
         assert_eq!(restored.to_bytes()?, original);
         Ok(())
     }

@@ -44,7 +44,10 @@ fn apply_durable(
     package: &mut Package,
     patch: &CorePatch<Reversible>,
 ) -> litchi_docx::Result<bool> {
-    package.apply_durable_task_panes_patch(patch)
+    let mut edit = package.edit_task_panes();
+    let changed = edit.apply_durable(patch)?;
+    *package = edit.commit()?.into_package();
+    Ok(changed)
 }
 
 fn apply_durable_with_limits(
@@ -52,7 +55,12 @@ fn apply_durable_with_limits(
     patch: &CorePatch<Reversible>,
     limits: &web::Limits,
 ) -> litchi_docx::Result<bool> {
-    package.apply_durable_task_panes_patch_with_limits(patch, limits)
+    let mut edit = package.edit_task_panes_with_options(
+        litchi_docx::task_panes::EditOptions::default().limits(*limits),
+    );
+    let changed = edit.apply_durable(patch)?;
+    *package = edit.commit()?.into_package();
+    Ok(changed)
 }
 
 fn apply_and_inverse(original: &[u8], durable: &CorePatch<Reversible>) {
@@ -232,9 +240,11 @@ fn decode_wire(wire: &[u8]) -> CorePatch<Reversible> {
 fn source_with_unrelated_add_in_markup() -> Vec<u8> {
     let (panes, _) = authored_panes();
     let mut authored = Package::new().unwrap();
-    authored
-        .put_task_panes(panes, web::Conformance::Transitional)
-        .unwrap();
+    authored = {
+        let mut edit = authored.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let source = package_bytes(&authored);
     rewrite_member(&source, "webextensions/webextension1.xml", |content| {
         insert_before(
@@ -260,9 +270,12 @@ fn durable_creation_roundtrips_and_inverse_restores_exact_members_after_reopen()
 #[test]
 fn durable_custom_only_two_pane_edit_roundtrips_and_inverse_is_exact() {
     let mut source = Package::new().unwrap();
-    source
-        .put_task_panes(two_authored_panes(), web::Conformance::Transitional)
-        .unwrap();
+    source = {
+        let mut edit = source.edit_task_panes();
+        edit.put(two_authored_panes(), web::Conformance::Transitional)
+            .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let original = package_bytes(&source);
     let source = Package::from_reader(Cursor::new(&original)).unwrap();
     let desired = panes_with_metadata(&source, changed_custom_functions());
@@ -277,9 +290,11 @@ fn durable_custom_only_two_pane_edit_roundtrips_and_inverse_is_exact() {
 fn durable_transitional_custom_edit_ignores_unrelated_strict_namespace_text() {
     let (panes, _) = authored_panes();
     let mut authored = Package::new().unwrap();
-    authored
-        .put_task_panes(panes, web::Conformance::Transitional)
-        .unwrap();
+    authored = {
+        let mut edit = authored.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let source = package_bytes(&authored);
     let original = rewrite_member(&source, "word/document.xml", |content| {
         insert_before(
@@ -311,9 +326,11 @@ fn durable_transitional_custom_edit_ignores_unrelated_strict_namespace_text() {
 fn durable_removal_roundtrips_and_inverse_restores_exact_members_after_reopen() {
     let (panes, _) = authored_panes();
     let mut source = Package::new().unwrap();
-    source
-        .put_task_panes(panes, web::Conformance::Strict)
-        .unwrap();
+    source = {
+        let mut edit = source.edit_task_panes();
+        edit.put(panes, web::Conformance::Strict).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let original = package_bytes(&source);
     let source = Package::from_reader(Cursor::new(&original)).unwrap();
     let patch = source.plan_remove_task_panes().unwrap();
@@ -325,15 +342,22 @@ fn durable_removal_roundtrips_and_inverse_restores_exact_members_after_reopen() 
 fn durable_noop_is_deterministic_and_preserves_signed_source() {
     let (panes, _) = authored_panes();
     let mut package = Package::new().unwrap();
-    package
-        .put_task_panes(panes, web::Conformance::Transitional)
+    package = {
+        let mut edit = package.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    package = {
+        let mut edit = package.edit_opc();
+        (|opc: &mut litchi_opc::OpcPackage| -> litchi_docx::Result<_> {
+            {
+                opc.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+                Ok(())
+            }
+        })(edit.package_mut())
         .unwrap();
-    package
-        .edit_opc(|opc| {
-            opc.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
-            Ok(())
-        })
-        .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let before = members(&package_bytes(&package));
     let loaded = package.task_panes().unwrap().unwrap();
     let patch = package
@@ -352,9 +376,11 @@ fn durable_noop_is_deterministic_and_preserves_signed_source() {
 fn durable_exact_noop_exports_with_zero_blob_allowance() {
     let (panes, _) = authored_panes();
     let mut package = Package::new().unwrap();
-    package
-        .put_task_panes(panes, web::Conformance::Transitional)
-        .unwrap();
+    package = {
+        let mut edit = package.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let loaded = package.task_panes().unwrap().unwrap();
     let ordinary = package
         .plan_task_panes(loaded, web::Conformance::Transitional)
@@ -394,9 +420,11 @@ fn durable_creation_and_removal_roundtrip_in_both_conformances() {
         apply_and_inverse(&original, &durable_patch(&creation));
 
         let mut populated = Package::new().unwrap();
-        populated
-            .put_task_panes(authored_panes().0, conformance)
-            .unwrap();
+        populated = {
+            let mut edit = populated.edit_task_panes();
+            edit.put(authored_panes().0, conformance).unwrap();
+            edit.commit().unwrap().into_package()
+        };
         let original = package_bytes(&populated);
         let source = Package::from_reader(Cursor::new(&original)).unwrap();
         let removal = source.plan_remove_task_panes().unwrap();
@@ -408,15 +436,22 @@ fn durable_creation_and_removal_roundtrip_in_both_conformances() {
 fn durable_changed_signed_patch_requires_unsign_and_replan() {
     let (panes, _) = authored_panes();
     let mut package = Package::new().unwrap();
-    package
-        .put_task_panes(panes, web::Conformance::Transitional)
+    package = {
+        let mut edit = package.edit_task_panes();
+        edit.put(panes, web::Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    package = {
+        let mut edit = package.edit_opc();
+        (|opc: &mut litchi_opc::OpcPackage| -> litchi_docx::Result<_> {
+            {
+                opc.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+                Ok(())
+            }
+        })(edit.package_mut())
         .unwrap();
-    package
-        .edit_opc(|opc| {
-            opc.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
-            Ok(())
-        })
-        .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let changed = changed_panes(&package);
     let ordinary = package
         .plan_task_panes(changed.clone(), web::Conformance::Transitional)
@@ -430,7 +465,7 @@ fn durable_changed_signed_patch_requires_unsign_and_replan() {
     ));
     assert_eq!(members(&package_bytes(&package)), before);
 
-    package.unsign();
+    package = package.unsign();
     let after_unsign = members(&package_bytes(&package));
     let error = apply_durable(&mut package, &durable).unwrap_err();
     assert!(error.to_string().to_ascii_lowercase().contains("source"));
@@ -572,16 +607,21 @@ fn durable_inverse_rejects_unrelated_binary_closure_record() {
     let forged_content_type = "application/octet-stream";
     let original_payload = b"original durable binary";
     let forged_payload = b"forged durable binary";
-    source
-        .edit_opc(|opc| {
-            opc.add_part(Box::new(BlobPart::new(
-                forged_name.clone(),
-                forged_content_type.to_owned(),
-                original_payload.to_vec(),
-            )));
-            Ok(())
-        })
+    source = {
+        let mut edit = source.edit_opc();
+        (|opc: &mut litchi_opc::OpcPackage| -> litchi_docx::Result<_> {
+            {
+                opc.add_part(Box::new(BlobPart::new(
+                    forged_name.clone(),
+                    forged_content_type.to_owned(),
+                    original_payload.to_vec(),
+                )));
+                Ok(())
+            }
+        })(edit.package_mut())
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let source_part = source.opc_package().get_part(&forged_name).unwrap();
     assert_eq!(source_part.content_type(), forged_content_type);
     assert_eq!(source_part.blob(), original_payload);

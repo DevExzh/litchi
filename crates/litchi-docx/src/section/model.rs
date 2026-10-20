@@ -751,22 +751,6 @@ impl Section {
         self.set_footnote_columns(None)
     }
 
-    /// Apply a preconditioned footnote-layout patch atomically.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn apply_footnote_columns_patch(
-        &mut self,
-        patch: &super::footnote_columns::Patch,
-    ) -> Result<()> {
-        let snapshot = self.footnote_columns_snapshot()?;
-        let next = patch.apply(&snapshot)?;
-        self.xml_bytes = next.xml_bytes().to_vec();
-        self.snapshot = None;
-        Ok(())
-    }
-
     fn snapshot_mut(&mut self) -> Result<&mut Snapshot> {
         if self.snapshot.is_none() {
             self.snapshot = Some(codec::decode(&self.xml_bytes)?);

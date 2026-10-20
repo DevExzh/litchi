@@ -1,3 +1,7 @@
+#![allow(
+    clippy::redundant_closure_call,
+    reason = "raw OPC test edits stage one closure over the edit's graph"
+)]
 use litchi_docx::Package;
 use litchi_docx::glossary::{
     self, Catalog, Category, Conformance, Entry, Gallery, Id, Insert, Kind, Name, Props, raw,
@@ -32,22 +36,27 @@ fn entry(name: &str, relationship_id: Option<&str>) -> Entry {
 }
 
 fn mark_signed(package: &mut Package) {
-    package
-        .edit_opc(|opc| {
-            opc.try_add_part(Box::new(BlobPart::new(
-                PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
-                ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
-                Vec::new(),
-            )))?;
-            opc.rels_mut().add_relationship(
-                rt::DIGITAL_SIGNATURE_ORIGIN.to_owned(),
-                "_xmlsignatures/origin.sigs".to_owned(),
-                "rSignature".to_owned(),
-                false,
-            );
-            Ok(())
-        })
+    *package = {
+        let mut edit = package.edit_opc();
+        (|opc: &mut litchi_opc::OpcPackage| -> litchi_docx::Result<_> {
+            {
+                opc.try_add_part(Box::new(BlobPart::new(
+                    PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
+                    ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+                    Vec::new(),
+                )))?;
+                opc.rels_mut().add_relationship(
+                    rt::DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+                    "_xmlsignatures/origin.sigs".to_owned(),
+                    "rSignature".to_owned(),
+                    false,
+                );
+                Ok(())
+            }
+        })(edit.package_mut())
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
 }
 
 #[test]
@@ -84,9 +93,11 @@ fn package_and_document_accessor_round_trip() {
     catalog.add(entry("Two", None)).unwrap();
 
     let mut package = Package::new().unwrap();
-    package
-        .put_glossary(catalog, Conformance::Transitional)
-        .unwrap();
+    package = {
+        let mut edit = package.edit_glossary();
+        edit.put(catalog, Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     package.save(&path).unwrap();
 
     let reopened = Package::open(&path).unwrap();
@@ -133,7 +144,7 @@ fn unrelated_document_mutation_preserves_producer_glossary() {
     let mut edit = package.edit().unwrap();
     edit.insert_paragraph(litchi_core::Position::new(count), "unrelated mutation")
         .unwrap();
-    let mut package = edit.commit().unwrap().into_package();
+    let package = edit.commit().unwrap().into_package();
     package.save(&output).unwrap();
     assert!(
         Package::open(&output)
@@ -181,7 +192,12 @@ fn complete_raw_graph_round_trips_and_can_be_moved_out() {
     ];
 
     let mut package = Package::new().unwrap();
-    assert!(package.put_glossary_graph(&graph).unwrap());
+    assert!({
+        let mut edit = package.edit_glossary();
+        let value = edit.put_graph(&graph).unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
     let loaded = package.glossary_graph().unwrap().unwrap();
     assert_eq!(loaded.parts.len(), 2);
     assert_eq!(
@@ -189,7 +205,13 @@ fn complete_raw_graph_round_trips_and_can_be_moved_out() {
         Some("Picture")
     );
 
-    let removed = package.take_glossary_graph().unwrap().unwrap();
+    let removed = {
+        let mut edit = package.edit_glossary();
+        let value = edit.take_graph().unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    }
+    .unwrap();
     assert_eq!(removed.parts.len(), 2);
     assert!(package.glossary().unwrap().is_none());
     assert!(package.document().unwrap().styles().is_ok());
@@ -200,9 +222,11 @@ fn invalid_graph_update_is_failure_atomic() {
     let mut package = Package::new().unwrap();
     let mut existing = Catalog::new();
     existing.add(entry("Keep", None)).unwrap();
-    package
-        .put_glossary(existing, Conformance::Transitional)
-        .unwrap();
+    package = {
+        let mut edit = package.edit_glossary();
+        edit.put(existing, Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
 
     for relationship in [
         raw::Rel {
@@ -228,7 +252,15 @@ fn invalid_graph_update_is_failure_atomic() {
         invalid_catalog.add(entry("Invalid", None)).unwrap();
         let mut invalid = raw::Graph::new(invalid_catalog, Conformance::Transitional);
         invalid.rels.push(relationship);
-        assert!(package.put_glossary_graph(&invalid).is_err());
+        assert!(
+            {
+                let mut edit = package.edit_glossary();
+                edit.put_graph(&invalid)
+                    .map(|_| ())
+                    .and_then(|()| edit.commit().map(|_| ()))
+            }
+            .is_err()
+        );
         assert!(
             package
                 .glossary()
@@ -241,8 +273,19 @@ fn invalid_graph_update_is_failure_atomic() {
         );
     }
 
-    assert!(package.edit_opc(glossary::remove).unwrap());
-    assert!(!package.edit_opc(glossary::remove).unwrap());
+    assert!({
+        let mut edit = package.edit_opc();
+        let removed = glossary::remove(edit.package_mut()).unwrap();
+        package = edit.commit().unwrap().into_package();
+        removed
+    });
+    assert!(package.glossary().unwrap().is_none());
+    assert!(!{
+        let mut edit = package.edit_opc();
+        let removed = glossary::remove(edit.package_mut()).unwrap();
+        assert!(!edit.commit().unwrap().diagnostics().changed());
+        removed
+    });
 }
 
 #[test]
@@ -250,18 +293,24 @@ fn graph_noop_preserves_signature_and_real_change_requires_explicit_unsign() {
     let mut package = Package::new().unwrap();
     let mut catalog = Catalog::new();
     catalog.add(entry("Keep", None)).unwrap();
-    assert!(
-        package
-            .put_glossary(catalog, Conformance::Transitional)
-            .unwrap()
-    );
+    assert!({
+        let mut edit = package.edit_glossary();
+        let value = edit.put(catalog, Conformance::Transitional).unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
     mark_signed(&mut package);
     assert!(package.is_signed());
     let signature_origin = PackURI::new("/_xmlsignatures/origin.sigs").unwrap();
     assert!(package.opc_package().contains_part(&signature_origin));
 
     let graph = package.glossary_graph().unwrap().unwrap();
-    assert!(!package.put_glossary_graph(&graph).unwrap());
+    assert!(!{
+        let mut edit = package.edit_glossary();
+        let value = edit.put_graph(&graph).unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
     assert!(package.is_signed());
     assert!(package.opc_package().contains_part(&signature_origin));
 
@@ -269,7 +318,13 @@ fn graph_noop_preserves_signature_and_real_change_requires_explicit_unsign() {
     // refused until the signature is removed explicitly (ADR 0006).
     let mut changed = package.glossary_graph().unwrap().unwrap();
     changed.catalog.add(entry("Changed", None)).unwrap();
-    let error = package.put_glossary_graph(&changed).unwrap_err();
+    let error = {
+        let mut edit = package.edit_glossary();
+        edit.put_graph(&changed)
+            .map(|_| ())
+            .and_then(|()| edit.commit().map(|_| ()))
+    }
+    .unwrap_err();
     assert!(
         matches!(
             error,
@@ -290,8 +345,13 @@ fn graph_noop_preserves_signature_and_real_change_requires_explicit_unsign() {
             .is_none()
     );
 
-    package.unsign();
-    assert!(package.put_glossary_graph(&changed).unwrap());
+    package = package.unsign();
+    assert!({
+        let mut edit = package.edit_glossary();
+        let value = edit.put_graph(&changed).unwrap();
+        package = edit.commit().unwrap().into_package();
+        value
+    });
     assert!(!package.is_signed());
     assert!(!package.opc_package().contains_part(&signature_origin));
     assert!(
@@ -311,9 +371,11 @@ fn graph_failure_preserves_existing_graph_and_signature() {
     let mut package = Package::new().unwrap();
     let mut catalog = Catalog::new();
     catalog.add(entry("Keep", None)).unwrap();
-    package
-        .put_glossary(catalog, Conformance::Transitional)
-        .unwrap();
+    package = {
+        let mut edit = package.edit_glossary();
+        edit.put(catalog, Conformance::Transitional).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     mark_signed(&mut package);
 
     let mut invalid = package.glossary_graph().unwrap().unwrap();
@@ -323,7 +385,15 @@ fn graph_failure_preserves_existing_graph_and_signature() {
         target: "media/missing.png".to_owned(),
         external: false,
     });
-    assert!(package.put_glossary_graph(&invalid).is_err());
+    assert!(
+        {
+            let mut edit = package.edit_glossary();
+            edit.put_graph(&invalid)
+                .map(|_| ())
+                .and_then(|()| edit.commit().map(|_| ()))
+        }
+        .is_err()
+    );
     assert!(package.is_signed());
     assert!(
         package
