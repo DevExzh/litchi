@@ -563,12 +563,14 @@ fn deck_with_transition(transition: &str) -> Vec<u8> {
 /// The first slide's transition, read through the source-backed snapshot
 /// that names its part.
 fn first_slide_transition(deck: Vec<u8>) -> litchi_pptx::transition::Transition {
-    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(std::sync::Arc::new(
+    let package = litchi_pptx::source::Package::from_read_at(std::sync::Arc::new(
         litchi_core::source::OwnedSource::new(deck),
     ))
     .unwrap();
-    editor
-        .slide_snapshot(0)
+    package
+        .presentation()
+        .unwrap()
+        .slide(0_usize)
         .unwrap()
         .transition()
         .unwrap()

@@ -9,14 +9,13 @@ use std::io;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::presentation::source::SvgAttachmentReplacement;
+use crate::{Error, SourceBackedPresentation, SourceBackedPresentationEditor};
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::phys_pkg::{PhysPkgReader, PhysPkgWriter};
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceLimits, TargetMode,
-};
-use litchi_pptx::{
-    Error, SourceBackedPresentation, SourceBackedPresentationEditor, SourceSvgAttachmentReplacement,
 };
 use sha2::{Digest, Sha256};
 
@@ -382,7 +381,7 @@ fn attach_and_publish(source: &[u8], svg: &[u8]) -> (Vec<u8>, String, String) {
     let editor = open_editor(source);
     let mut edit = editor.edit_svg_attachment(0, 0).unwrap();
     assert!(edit.source().svg().is_none());
-    let replacement = SourceSvgAttachmentReplacement::new(svg.to_vec());
+    let replacement = SvgAttachmentReplacement::new(svg.to_vec());
     assert!(edit.attach(&replacement).unwrap());
     let commit = edit.commit_checked().unwrap();
     let relationship_id = commit
@@ -1150,7 +1149,7 @@ fn attach_rejects_existing_svg_owner_shared_id_and_unsafe_targets_before_publica
     let editor = open_editor(&source);
     let mut edit = editor.edit_svg_attachment(0, 0).unwrap();
     let collision =
-        SourceSvgAttachmentReplacement::new(NEW_SVG.to_vec()).with_relationship_id("rIdRaster");
+        SvgAttachmentReplacement::new(NEW_SVG.to_vec()).with_relationship_id("rIdRaster");
     assert!(matches!(
         edit.attach(&collision),
         Err(Error::Relationship(_)) | Err(Error::Invalid(_))
@@ -1168,8 +1167,8 @@ fn attach_rejects_existing_svg_owner_shared_id_and_unsafe_targets_before_publica
     let occupied = source_package(raster_slide_xml(true, false), true, false);
     let editor = open_editor(&occupied);
     let mut edit = editor.edit_svg_attachment(0, 0).unwrap();
-    let collision = SourceSvgAttachmentReplacement::new(NEW_SVG.to_vec())
-        .with_part_uri(PackURI::new(SVG).unwrap());
+    let collision =
+        SvgAttachmentReplacement::new(NEW_SVG.to_vec()).with_part_uri(PackURI::new(SVG).unwrap());
     assert!(matches!(
         edit.attach(&collision),
         Err(Error::Relationship(_)) | Err(Error::Invalid(_))
@@ -1184,7 +1183,7 @@ fn attach_rejects_existing_svg_owner_shared_id_and_unsafe_targets_before_publica
     let mut edit = editor.edit_svg_attachment(0, 0).unwrap();
     assert!(matches!(
         edit.attach(
-            &SourceSvgAttachmentReplacement::new(NEW_SVG.to_vec())
+            &SvgAttachmentReplacement::new(NEW_SVG.to_vec())
                 .with_part_uri(PackURI::new("/ppt/other/vector.svg").unwrap(),)
         ),
         Err(Error::Relationship(_)) | Err(Error::Invalid(_))
@@ -1256,7 +1255,7 @@ fn attachment_limits_are_checked_before_lifecycle_publication() {
         .unwrap();
     let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(source.clone())),
-        litchi_pptx::OpenOptions::default().source_limits(limits),
+        crate::OpenOptions::default().source_limits(limits),
     )
     .unwrap();
     let mut edit = editor.edit_svg_attachment(0, 0).unwrap();
@@ -1307,7 +1306,7 @@ fn inherited_namespace_context_respects_source_part_limit_and_is_reusable() {
     let source_for_presentation = Arc::new(VersionedSource::new(source.clone()));
     let presentation = SourceBackedPresentation::from_read_at_with_options(
         source_for_presentation,
-        litchi_pptx::OpenOptions::default().source_limits(source_limit),
+        crate::OpenOptions::default().source_limits(source_limit),
     )
     .unwrap();
     let slide = presentation.slide(0).unwrap();
@@ -1316,7 +1315,7 @@ fn inherited_namespace_context_respects_source_part_limit_and_is_reusable() {
     let source_for_editor = Arc::new(VersionedSource::new(source.clone()));
     let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         source_for_editor,
-        litchi_pptx::OpenOptions::default().source_limits(source_limit),
+        crate::OpenOptions::default().source_limits(source_limit),
     )
     .unwrap();
     assert!(editor.edit_svg_attachment(0, 0).is_ok());
@@ -1329,14 +1328,14 @@ fn inherited_namespace_context_respects_source_part_limit_and_is_reusable() {
     assert!(matches!(
         SourceBackedPresentation::from_read_at_with_options(
             Arc::new(VersionedSource::new(source.clone())),
-            litchi_pptx::OpenOptions::default().source_limits(tight_limit)
+            crate::OpenOptions::default().source_limits(tight_limit)
         ),
         Err(Error::Opc(OpcError::Limit { .. }))
     ));
     assert!(matches!(
         SourceBackedPresentationEditor::from_read_at_with_options(
             Arc::new(VersionedSource::new(source.clone())),
-            litchi_pptx::OpenOptions::default().source_limits(tight_limit)
+            crate::OpenOptions::default().source_limits(tight_limit)
         ),
         Err(Error::Opc(OpcError::Limit { .. }))
     ));
@@ -1356,7 +1355,7 @@ fn selfclosing_blip_limit_rejects_the_real_expanded_slide_size() {
         .unwrap();
     let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(source.clone())),
-        litchi_pptx::OpenOptions::default().source_limits(limits),
+        crate::OpenOptions::default().source_limits(limits),
     )
     .unwrap();
     let mut edit = editor.edit_svg_attachment(0, 0).unwrap();
@@ -1683,4 +1682,45 @@ fn foreign_nested_picture_does_not_change_direct_picture_selection() {
                     == br#"<x:foreign xmlns:x="urn:litchi:foreign"><p:pic xmlns:p="urn:litchi:foreign"/></x:foreign>"#
             })
     );
+}
+
+/// The `source::svg` family attaches and detaches a native SVG as the
+/// stream route does (record 0356a).
+#[test]
+fn svg_family_attaches_and_detaches_through_the_package() {
+    use crate::source::{Package, svg};
+    let source = package_from_raster(true, false);
+    let svg_bytes =
+        br#"<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>"#;
+    let (streamed, _, _) = attach_and_publish(&source, svg_bytes);
+
+    let package =
+        Package::from_read_at(Arc::new(litchi_core::OwnedSource::new(source.clone()))).unwrap();
+    let mut edit = package.edit_svg_images().unwrap();
+    assert!(edit.attachment(0_usize, 0_usize).unwrap().svg().is_none());
+    assert!(
+        edit.attach(
+            0_usize,
+            0_usize,
+            &svg::AttachmentReplacement::new(svg_bytes.to_vec())
+        )
+        .unwrap()
+    );
+    assert!(edit.attachment(0_usize, 0_usize).unwrap().svg().is_some());
+    let attached = edit.commit().unwrap().into_package();
+    assert_eq!(attached.to_bytes().unwrap(), streamed);
+
+    let mut edit = attached.edit_svg_images().unwrap();
+    assert!(edit.detach(0_usize, 0_usize).unwrap());
+    let detached = edit.commit().unwrap().into_package();
+    assert!(
+        detached
+            .edit_svg_images()
+            .unwrap()
+            .attachment(0_usize, 0_usize)
+            .unwrap()
+            .svg()
+            .is_none()
+    );
+    assert_eq!(package.to_bytes().unwrap(), source);
 }

@@ -2,13 +2,12 @@ use std::io;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::presentation::source::SvgReplacement;
+use crate::{Error, SourceBackedPresentation, SourceBackedPresentationEditor};
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceLimits, TargetMode,
-};
-use litchi_pptx::{
-    Error, SourceBackedPresentation, SourceBackedPresentationEditor, SourceSvgReplacement,
 };
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
@@ -247,7 +246,7 @@ fn svg_transaction_retargets_media_and_preserves_opaque_slide_bytes() {
     let mut edit = editor.edit_svg_image(0, 0).unwrap();
     assert_eq!(edit.source().svg_relationship_id(), "rIdSvg");
     assert_eq!(edit.source().raster_relationship_id(), "rIdRaster");
-    let replacement = SourceSvgReplacement::new(
+    let replacement = SvgReplacement::new(
         br#"<svg xmlns="http://www.w3.org/2000/svg"><circle cx="2" cy="3" r="1"/></svg>"#.to_vec(),
         b"new-raster-payload".to_vec(),
     )
@@ -329,7 +328,7 @@ fn svg_transaction_noop_inverse_stale_and_signed_are_atomic() {
     let source = source_package(false);
     let editor = open_editor(&source);
     let original_svg = editor.edit_svg_image(0, 0).unwrap();
-    let replacement = SourceSvgReplacement::new(
+    let replacement = SvgReplacement::new(
         original_svg.source().svg_bytes().to_vec(),
         original_svg.source().raster_bytes().to_vec(),
     );
@@ -346,7 +345,7 @@ fn svg_transaction_noop_inverse_stale_and_signed_are_atomic() {
     let versioned = Arc::new(VersionedSource::new(source.clone()));
     let editor = SourceBackedPresentationEditor::from_read_at(versioned.clone()).unwrap();
     let mut edit = editor.edit_svg_image(0, 0).unwrap();
-    edit.replace(SourceSvgReplacement::new(
+    edit.replace(SvgReplacement::new(
         b"<svg xmlns=\"http://www.w3.org/2000/svg\"><rect/></svg>".to_vec(),
         b"changed-raster".to_vec(),
     ))
@@ -365,7 +364,7 @@ fn svg_transaction_noop_inverse_stale_and_signed_are_atomic() {
     let signed = source_package(true);
     let editor = open_editor(&signed);
     let mut edit = editor.edit_svg_image(0, 0).unwrap();
-    edit.replace(SourceSvgReplacement::new(
+    edit.replace(SvgReplacement::new(
         b"<svg xmlns=\"http://www.w3.org/2000/svg\"><rect/></svg>".to_vec(),
         b"signed-raster".to_vec(),
     ))
@@ -416,7 +415,7 @@ fn svg_transaction_refuses_shared_media_before_output() {
     let shared = PackageWriter::to_bytes(&package).unwrap();
     let editor = open_editor(&shared);
     let mut edit = editor.edit_svg_image(0, 0).unwrap();
-    edit.replace(SourceSvgReplacement::new(
+    edit.replace(SvgReplacement::new(
         b"<svg xmlns=\"http://www.w3.org/2000/svg\"><rect/></svg>".to_vec(),
         b"new-raster".to_vec(),
     ))
@@ -459,14 +458,14 @@ fn svg_transaction_checks_replacement_limits_before_publication() {
         .unwrap();
     let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(source.clone())),
-        litchi_pptx::OpenOptions::default().source_limits(limits),
+        crate::OpenOptions::default().source_limits(limits),
     )
     .unwrap();
     let mut edit = editor.edit_svg_image(0, 0).unwrap();
     let mut oversized = vec![b'X'; max_part_bytes + 1];
     oversized[..4].copy_from_slice(b"<svg");
     let error = edit
-        .replace(SourceSvgReplacement::new(oversized, b"new-raster".to_vec()))
+        .replace(SvgReplacement::new(oversized, b"new-raster".to_vec()))
         .unwrap_err();
     assert!(matches!(error, Error::Limit { .. }));
     let mut output = Vec::new();
@@ -483,7 +482,7 @@ fn svg_transaction_refuses_retained_orphan_relationship_members_before_output() 
     let editor = open_editor(&source);
     let mut edit = editor.edit_svg_image(0, 0).unwrap();
     edit.replace(
-        SourceSvgReplacement::new(
+        SvgReplacement::new(
             b"<svg xmlns=\"http://www.w3.org/2000/svg\"><rect/></svg>".to_vec(),
             b"changed-raster".to_vec(),
         )
@@ -511,4 +510,77 @@ fn svg_transaction_validates_every_picture_owner_before_edit_creation() {
         matches!(result, Err(Error::Relationship(_))),
         "an unselected picture with unresolved relationships must fail closed"
     );
+}
+
+/// The `source::svg` family (record 0356a): a commit publishes a new
+/// source-backed package whose output is the stream route's bytes, reads of
+/// it see the change, and the inverse patch restores the picture.
+#[test]
+fn svg_family_publishes_a_source_backed_package() {
+    use crate::source::{Package, svg};
+    let source = source_package(false);
+    let package =
+        Package::from_read_at(Arc::new(litchi_core::OwnedSource::new(source.clone()))).unwrap();
+    let replacement = || {
+        svg::Replacement::new(
+            br#"<svg xmlns="http://www.w3.org/2000/svg"><circle cx="2" cy="3" r="1"/></svg>"#
+                .to_vec(),
+            b"new-raster-payload".to_vec(),
+        )
+    };
+
+    let mut edit = package.edit_svg_images().unwrap();
+    assert!(edit.replace(0_usize, 0_usize, replacement()).unwrap());
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    let (committed, patch) = commit.into_parts();
+
+    // The deferred output is the stream route's output.
+    let editor = open_editor(&source);
+    let mut stream_edit = editor.edit_svg_image(0, 0).unwrap();
+    stream_edit.replace(replacement()).unwrap();
+    let stream_commit = stream_edit.commit_checked().unwrap();
+    let mut streamed = Vec::new();
+    editor
+        .publish_svg_commit_to_stream(&mut streamed, &stream_commit)
+        .unwrap();
+    assert_eq!(committed.to_bytes().unwrap(), streamed);
+
+    // The source is unchanged; the committed package reads its change.
+    assert_eq!(package.to_bytes().unwrap(), source);
+    let image = committed
+        .edit_svg_images()
+        .unwrap()
+        .image(0_usize, 0_usize)
+        .unwrap();
+    assert_eq!(image.raster_bytes(), b"new-raster-payload");
+
+    let restored = committed
+        .apply_svg_images(&patch.inverse())
+        .unwrap()
+        .into_package();
+    let image = restored
+        .edit_svg_images()
+        .unwrap()
+        .image(0_usize, 0_usize)
+        .unwrap();
+    assert_eq!(image.raster_bytes(), b"old-raster-payload");
+    assert!(matches!(
+        restored.apply_svg_images(&patch.inverse()),
+        Err(Error::PatchConflict)
+    ));
+
+    // An unchanged edit keeps the source bytes.
+    let unchanged = package.edit_svg_images().unwrap().commit().unwrap();
+    assert!(!unchanged.diagnostics().changed());
+    assert_eq!(unchanged.package().to_bytes().unwrap(), source);
+
+    // A changed edit of a signed source is refused before staging.
+    let signed = source_package(true);
+    let signed = Package::from_read_at(Arc::new(litchi_core::OwnedSource::new(signed))).unwrap();
+    let mut edit = signed.edit_svg_images().unwrap();
+    assert!(matches!(
+        edit.replace(0_usize, 0_usize, replacement()),
+        Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
+    ));
 }

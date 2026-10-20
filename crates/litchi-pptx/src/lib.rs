@@ -187,16 +187,8 @@ pub use presentation::embedded::ink_actions;
 pub use presentation::{
     MAX_SOURCE_BACKED_SLIDE_BATCH, Presentation, SourceBackedCrossSlideCopyPlan,
     SourceBackedCrossSlideCopySnapshot, SourceBackedIntoEditorError, SourceBackedPresentation,
-    SourceBackedPresentationEditor, SourceBackedSlideBatchCommit, SourceBackedSlideBatchEdit,
-    SourceBackedSlideBatchPatch, SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit,
-    SourceBackedSlideEdit, SourceBackedSlideOrderCommit, SourceBackedSlideOrderEdit,
-    SourceBackedSlideOrderPatch, SourceBackedSlideOrderSnapshot, SourceBackedSlidePatch,
-    SourceBackedSlideRemovalPlan, SourceBackedSlideSnapshot, SourceBackedSvgAttachmentCommit,
-    SourceBackedSvgAttachmentEdit, SourceBackedSvgAttachmentPatch,
-    SourceBackedSvgAttachmentSnapshot, SourceBackedSvgCommit, SourceBackedSvgEdit,
-    SourceBackedSvgPatch, SourceBackedSvgSnapshot, SourceImage, SourceImageDescriptor,
-    SourceImageTarget, SourceSlide, SourceSvgAttachment, SourceSvgAttachmentReplacement,
-    SourceSvgDescriptor, SourceSvgImage, SourceSvgReplacement,
+    SourceBackedPresentationEditor, SourceBackedSlideRemovalPlan, SourceImage,
+    SourceImageDescriptor, SourceImageTarget, SourceSlide, SourceSvgDescriptor, SourceSvgImage,
 };
 pub use presentation_properties::{
     BrowserSupport, Color, ColorKind, Extension, HtmlPublish, HtmlTarget, OpaqueExtension, Print,

@@ -33,13 +33,13 @@ const MAX_GENERATED_NAME_ATTEMPTS: usize = 100_000;
 
 /// A caller-owned SVG payload and optional advanced package identity.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SourceSvgAttachmentReplacement {
+pub struct SvgAttachmentReplacement {
     svg: Arc<Vec<u8>>,
     svg_part_uri: Option<PackURI>,
     relationship_id: Option<String>,
 }
 
-impl SourceSvgAttachmentReplacement {
+impl SvgAttachmentReplacement {
     /// Construct an ordinary attach request.  The package editor allocates a
     /// relationship ID and media URI that do not collide with the source.
     #[must_use]
@@ -88,14 +88,14 @@ impl SourceSvgAttachmentReplacement {
 
 /// The attached SVG resource in one source-backed lifecycle snapshot.
 #[derive(Clone)]
-pub struct SourceSvgAttachment {
+pub struct AttachedSvg {
     relationship_id: String,
     relationship_type: String,
     part_uri: PackURI,
     payload: SourcePayload,
 }
 
-impl SourceSvgAttachment {
+impl AttachedSvg {
     /// Relationship ID carried by the native `asvg:svgBlip` element.
     #[must_use]
     pub fn relationship_id(&self) -> &str {
@@ -124,13 +124,13 @@ impl SourceSvgAttachment {
 /// Immutable source/target state for an existing raster picture's optional
 /// SVG owner.
 #[derive(Clone)]
-pub struct SourceBackedSvgAttachmentSnapshot {
+pub struct SvgAttachment {
     pub(super) slide: SourceBackedSlideSnapshot,
     image_position: usize,
     raster_relationship_id: String,
     raster_relationship_type: String,
     raster_part_uri: PackURI,
-    svg: Option<SourceSvgAttachment>,
+    svg: Option<AttachedSvg>,
     default_relationship_id: String,
     default_part_uri: PackURI,
     existing_relationship_ids: Arc<[String]>,
@@ -139,11 +139,11 @@ pub struct SourceBackedSvgAttachmentSnapshot {
 }
 
 /// One-shot source-backed attach/detach edit.
-pub struct SourceBackedSvgAttachmentEdit<'a> {
+pub(crate) struct SourceBackedSvgAttachmentEdit<'a> {
     editor: &'a SourceBackedPresentationEditor,
-    source: SourceBackedSvgAttachmentSnapshot,
+    source: SvgAttachment,
     slide: SourceBackedSlideSnapshot,
-    svg: Option<SourceSvgAttachment>,
+    svg: Option<AttachedSvg>,
     operation_used: bool,
     default_relationship_id: String,
     default_part_uri: PackURI,
@@ -151,18 +151,22 @@ pub struct SourceBackedSvgAttachmentEdit<'a> {
 
 /// Exact-source reversible patch for an SVG attach/detach operation.
 #[derive(Clone)]
-pub struct SourceBackedSvgAttachmentPatch {
-    before: SourceBackedSvgAttachmentSnapshot,
-    after: SourceBackedSvgAttachmentSnapshot,
+pub(crate) struct SourceBackedSvgAttachmentPatch {
+    before: SvgAttachment,
+    after: SvgAttachment,
 }
 
 /// Checked attach/detach transaction ready for publication.
-pub struct SourceBackedSvgAttachmentCommit {
-    snapshot: SourceBackedSvgAttachmentSnapshot,
+pub(crate) struct SourceBackedSvgAttachmentCommit {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the source-level engine tests")
+    )]
+    snapshot: SvgAttachment,
     patch: SourceBackedSvgAttachmentPatch,
 }
 
-impl SourceBackedSvgAttachmentSnapshot {
+impl SvgAttachment {
     /// Zero-based presentation position of the selected slide.
     #[must_use]
     pub const fn slide_position(&self) -> usize {
@@ -195,7 +199,7 @@ impl SourceBackedSvgAttachmentSnapshot {
 
     /// Current optional SVG attachment.
     #[must_use]
-    pub fn svg(&self) -> Option<&SourceSvgAttachment> {
+    pub fn svg(&self) -> Option<&AttachedSvg> {
         self.svg.as_ref()
     }
 
@@ -233,12 +237,14 @@ impl SourceBackedSvgAttachmentSnapshot {
 impl<'a> SourceBackedSvgAttachmentEdit<'a> {
     /// Exact immutable source snapshot against which this edit was created.
     #[must_use]
-    pub const fn source(&self) -> &SourceBackedSvgAttachmentSnapshot {
+    #[cfg(test)]
+    pub(crate) const fn source(&self) -> &SvgAttachment {
         &self.source
     }
 
     /// Attach one SVG using collision-free generated package identities.
-    pub fn attach_svg(&mut self, svg: &[u8]) -> Result<bool> {
+    #[cfg(test)]
+    pub(crate) fn attach_svg(&mut self, svg: &[u8]) -> Result<bool> {
         let (relationship_id, part_uri) = self.prepare_attachment(svg.len(), None, None)?;
         let mut owned = Vec::new();
         owned
@@ -248,7 +254,7 @@ impl<'a> SourceBackedSvgAttachmentEdit<'a> {
                 source,
             })?;
         owned.extend_from_slice(svg);
-        let replacement = SourceSvgAttachmentReplacement {
+        let replacement = SvgAttachmentReplacement {
             svg: Arc::new(owned),
             svg_part_uri: None,
             relationship_id: None,
@@ -257,7 +263,7 @@ impl<'a> SourceBackedSvgAttachmentEdit<'a> {
     }
 
     /// Attach one SVG with optional advanced package identities.
-    pub fn attach(&mut self, replacement: &SourceSvgAttachmentReplacement) -> Result<bool> {
+    pub(crate) fn attach(&mut self, replacement: &SvgAttachmentReplacement) -> Result<bool> {
         let (relationship_id, part_uri) = self.prepare_attachment(
             replacement.svg.len(),
             replacement.relationship_id.as_deref(),
@@ -333,7 +339,7 @@ impl<'a> SourceBackedSvgAttachmentEdit<'a> {
         payload: Arc<Vec<u8>>,
     ) -> Result<bool> {
         let payload = SourcePayload::Edited(payload);
-        let svg = SourceSvgAttachment {
+        let svg = AttachedSvg {
             relationship_id: relationship_id.clone(),
             relationship_type: self.source.raster_relationship_type.clone(),
             part_uri: part_uri.clone(),
@@ -354,7 +360,7 @@ impl<'a> SourceBackedSvgAttachmentEdit<'a> {
     }
 
     /// Detach the selected SVG while retaining the raster fallback.
-    pub fn detach(&mut self) -> Result<bool> {
+    pub(crate) fn detach(&mut self) -> Result<bool> {
         if self.operation_used {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedOperation,
@@ -384,9 +390,9 @@ impl<'a> SourceBackedSvgAttachmentEdit<'a> {
     /// Validate the selected dependency closure and freeze the edit into an
     /// exact-source patch. The validation plan is discarded; publication
     /// recaptures the source and rebuilds the physical plan.
-    pub fn commit(self) -> Result<SourceBackedSvgAttachmentCommit> {
+    pub(crate) fn commit(self) -> Result<SourceBackedSvgAttachmentCommit> {
         self.editor.package.check_execution()?;
-        let snapshot = SourceBackedSvgAttachmentSnapshot {
+        let snapshot = SvgAttachment {
             slide: self.slide,
             image_position: self.source.image_position,
             raster_relationship_id: self.source.raster_relationship_id.clone(),
@@ -413,22 +419,23 @@ impl<'a> SourceBackedSvgAttachmentEdit<'a> {
 
     /// Alias for [`Self::commit`], retained for callers that make the
     /// execution check explicit.
-    pub fn commit_checked(self) -> Result<SourceBackedSvgAttachmentCommit> {
+    pub(crate) fn commit_checked(self) -> Result<SourceBackedSvgAttachmentCommit> {
         self.commit()
     }
 }
 
 impl SourceBackedSvgAttachmentPatch {
-    /// Exact source snapshot required by this patch.
-    #[must_use]
-    pub const fn source(&self) -> &SourceBackedSvgAttachmentSnapshot {
-        &self.before
+    /// The slide and picture positions this patch addresses.
+    pub(crate) fn location(&self) -> (usize, usize) {
+        (self.before.slide.position(), self.before.image_position)
     }
 
-    /// Exact target snapshot produced by this patch.
-    #[must_use]
-    pub const fn target(&self) -> &SourceBackedSvgAttachmentSnapshot {
-        &self.after
+    /// The commit that publishes this patch.
+    pub(crate) fn to_commit(&self) -> SourceBackedSvgAttachmentCommit {
+        SourceBackedSvgAttachmentCommit {
+            snapshot: self.after.clone(),
+            patch: self.clone(),
+        }
     }
 
     fn is_changed(&self) -> bool {
@@ -437,13 +444,13 @@ impl SourceBackedSvgAttachmentPatch {
 
     /// Whether this patch leaves its source unchanged.
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         !self.is_changed()
     }
 
     /// Return the exact inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -451,10 +458,7 @@ impl SourceBackedSvgAttachmentPatch {
     }
 
     /// Apply only to the exact source snapshot captured by this patch.
-    pub fn apply(
-        &self,
-        source: &SourceBackedSvgAttachmentSnapshot,
-    ) -> Result<SourceBackedSvgAttachmentSnapshot> {
+    pub(crate) fn apply(&self, source: &SvgAttachment) -> Result<SvgAttachment> {
         self.before.slide.check_execution()?;
         source.slide.check_execution()?;
         if !source.same_source(&self.before) {
@@ -471,32 +475,33 @@ impl SourceBackedSvgAttachmentPatch {
 impl SourceBackedSvgAttachmentCommit {
     /// Candidate target snapshot after this edit.
     #[must_use]
-    pub const fn snapshot(&self) -> &SourceBackedSvgAttachmentSnapshot {
+    #[cfg(test)]
+    pub(crate) const fn snapshot(&self) -> &SvgAttachment {
         &self.snapshot
     }
 
     /// Exact-source patch for this edit.
     #[must_use]
-    pub const fn patch(&self) -> &SourceBackedSvgAttachmentPatch {
+    pub(crate) const fn patch(&self) -> &SourceBackedSvgAttachmentPatch {
         &self.patch
-    }
-
-    fn is_changed(&self) -> bool {
-        self.patch.is_changed()
-    }
-
-    /// The outcome of this edit or commit.
-    #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
-        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 }
 
 impl SourceBackedPresentationEditor {
+    /// Capture the attach/detach state of one direct raster picture.
+    pub(crate) fn svg_attachment_snapshot(
+        &self,
+        slide_position: usize,
+        image_position: usize,
+    ) -> Result<SvgAttachment> {
+        self.package.check_execution()?;
+        capture_svg_attachment_snapshot(self, slide_position, image_position, "svg_attachment")
+    }
+
     /// Begin an exact-source SVG attach/detach transaction on one direct
     /// raster picture.  Existing linked SVGs and MCE-owned picture branches
     /// are refused before an edit handle is returned.
-    pub fn edit_svg_attachment(
+    pub(crate) fn edit_svg_attachment(
         &self,
         slide_position: usize,
         image_position: usize,
@@ -511,11 +516,11 @@ impl SourceBackedPresentationEditor {
 
     /// Publish one exact-source SVG attach/detach commit atomically through a
     /// bounded OPC topology plan.
-    pub fn publish_svg_attachment_commit_to_stream<W: std::io::Write>(
+    pub(crate) fn publish_svg_attachment_commit_to_stream<W: std::io::Write>(
         self,
         writer: W,
         commit: &SourceBackedSvgAttachmentCommit,
-    ) -> Result<SourceBackedSvgAttachmentSnapshot> {
+    ) -> Result<SvgAttachment> {
         self.package.check_execution()?;
         let current = capture_svg_attachment_snapshot(
             &self,
@@ -536,27 +541,15 @@ impl SourceBackedPresentationEditor {
         self.package.write_topology_to_stream(writer, plan)?;
         Ok(target)
     }
-
-    /// Compatibility alias with the operation noun used by replacement APIs.
-    pub fn publish_svg_lifecycle_commit_to_stream<W: std::io::Write>(
-        self,
-        writer: W,
-        commit: &SourceBackedSvgAttachmentCommit,
-    ) -> Result<SourceBackedSvgAttachmentSnapshot> {
-        self.publish_svg_attachment_commit_to_stream(writer, commit)
-    }
 }
 
-impl SourceBackedSvgAttachmentSnapshot {
+impl SvgAttachment {
     fn is_changed_from(&self, other: &Self) -> bool {
         !same_attachment_state(self, other)
     }
 }
 
-fn same_attachment_state(
-    left: &SourceBackedSvgAttachmentSnapshot,
-    right: &SourceBackedSvgAttachmentSnapshot,
-) -> bool {
+fn same_attachment_state(left: &SvgAttachment, right: &SvgAttachment) -> bool {
     left.slide.xml.as_bytes() == right.slide.xml.as_bytes()
         && left.image_position == right.image_position
         && left.raster_relationship_id == right.raster_relationship_id
@@ -565,10 +558,7 @@ fn same_attachment_state(
         && same_attachment(&left.svg, &right.svg)
 }
 
-fn same_attachment(
-    left: &Option<SourceSvgAttachment>,
-    right: &Option<SourceSvgAttachment>,
-) -> bool {
+fn same_attachment(left: &Option<AttachedSvg>, right: &Option<AttachedSvg>) -> bool {
     match (left, right) {
         (None, None) => true,
         (Some(left), Some(right)) => {
@@ -725,7 +715,7 @@ fn capture_svg_attachment_snapshot(
     slide_position: usize,
     image_position: usize,
     _operation: &'static str,
-) -> Result<SourceBackedSvgAttachmentSnapshot> {
+) -> Result<SvgAttachment> {
     // SVG ownership validates the complete slide with its own bounded raw
     // scanner.  Do not run the legacy transition grammar here: it rejects
     // processing instructions and markup-compatibility payloads nested in
@@ -808,7 +798,7 @@ fn capture_svg_attachment_snapshot(
                 svg_relationship.id
             ))
         })?;
-        Some(SourceSvgAttachment {
+        Some(AttachedSvg {
             relationship_id: svg_relationship.id.clone(),
             relationship_type: relation.reltype().to_owned(),
             part_uri,
@@ -821,7 +811,7 @@ fn capture_svg_attachment_snapshot(
         allocate_svg_identity(&editor.package, &view, &raster_part_uri)?;
     let (existing_relationship_ids, physical_member_names) =
         capture_identity_inventory(&editor.package, &view)?;
-    Ok(SourceBackedSvgAttachmentSnapshot {
+    Ok(SvgAttachment {
         slide,
         image_position,
         raster_relationship_id: relationship.id,
@@ -1396,8 +1386,8 @@ fn splice_checked(
 
 fn build_attachment_topology_plan(
     package: &litchi_opc::SourceBackedPackage,
-    current: &SourceBackedSvgAttachmentSnapshot,
-    target: &SourceBackedSvgAttachmentSnapshot,
+    current: &SvgAttachment,
+    target: &SvgAttachment,
 ) -> Result<SourceTopologyPlan> {
     if current.slide.position() != target.slide.position()
         || current.image_position != target.image_position
