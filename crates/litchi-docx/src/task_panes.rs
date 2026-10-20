@@ -39,18 +39,18 @@ pub struct EditOptions {
 }
 
 impl EditOptions {
-    /// Bound every planned graph by `limits` instead of the standard web
-    /// extension limits.
+    /// Bound every planned graph by `limits` instead of the package's
+    /// semantic task-pane limits.
     #[must_use]
     pub fn limits(mut self, limits: Limits) -> Self {
         self.limits = Some(limits);
         self
     }
 
-    /// The configured limits, or the standard ones.
+    /// The configured limits; `None` uses the package's semantic limits.
     #[must_use]
-    pub fn limits_value(&self) -> Limits {
-        self.limits.unwrap_or_else(Limits::standard)
+    pub const fn limits_value(&self) -> Option<Limits> {
+        self.limits
     }
 }
 
@@ -155,8 +155,8 @@ impl Edit {
 }
 
 impl crate::Package {
-    /// Stage a task-pane change over this package under the standard web
-    /// extension limits. O(1).
+    /// Stage a task-pane change over this package under its semantic
+    /// task-pane limits. O(1).
     #[must_use]
     pub fn edit_task_panes(&self) -> Edit {
         self.edit_task_panes_with_options(EditOptions::default())
@@ -167,7 +167,9 @@ impl crate::Package {
     pub fn edit_task_panes_with_options(&self, options: EditOptions) -> Edit {
         Edit {
             staged: Staged::new(self),
-            limits: options.limits_value(),
+            limits: options
+                .limits_value()
+                .unwrap_or_else(|| self.semantic_limits().task_panes_value()),
         }
     }
 

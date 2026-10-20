@@ -155,6 +155,8 @@ pub struct Package {
     pub(super) properties: Shared<Slot>,
     /// Custom document properties
     pub(super) custom_props: Shared<CustomProps>,
+    /// The semantic read budgets the package was opened or built with.
+    pub(super) semantic_limits: std::sync::Arc<crate::SemanticLimits>,
     /// Encryption profile of the opened outer package, retained to prevent an
     /// accidental plaintext downgrade on save.
     #[cfg(feature = "encryption")]
@@ -587,7 +589,12 @@ impl Package {
         let tolerance = self.tolerance_report();
 
         // Retain the same immutable graph used to select the main part.
-        Ok(Document::new(doc_part, self.opc.shared(), tolerance))
+        Ok(Document::new(
+            doc_part,
+            self.opc.shared(),
+            tolerance,
+            std::sync::Arc::clone(&self.semantic_limits),
+        ))
     }
 
     /// Release the package's clean document memos: the visible main-document

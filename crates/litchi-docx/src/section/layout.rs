@@ -38,13 +38,8 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Parse an owned main-document XML snapshot.
-    pub fn from_xml(xml: Vec<u8>) -> Result<Self> {
-        Self::from_xml_with_limits(xml, &Limits::default())
-    }
-
     /// Parse an owned main-document XML snapshot with bounded section limits.
-    pub fn from_xml_with_limits(xml: Vec<u8>, limits: &Limits) -> Result<Self> {
+    pub fn from_xml(xml: Vec<u8>, limits: &Limits) -> Result<Self> {
         Self::from_shared_xml(Arc::new(xml), None, None, None, limits.clone())
     }
 
@@ -74,7 +69,7 @@ impl Snapshot {
         limits: Limits,
     ) -> Result<Self> {
         crate::source_backed::ensure_source_section_inventory_xml(&xml, &limits)?;
-        let inventory = Inventory::parse_with_limits(xml.as_slice(), &limits)?;
+        let inventory = Inventory::parse(xml.as_slice(), &limits)?;
         Ok(Self {
             xml,
             inventory,
@@ -300,12 +295,6 @@ impl Edit {
         Ok(self.projected_state.columns.clone())
     }
 
-    /// Whether the projected semantic state differs from the source state.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.projected_state != self.base_state
-    }
-
     /// Replace or remove the locally authored page geometry.
     pub fn set_page_size(&mut self, value: Option<PageSize>) -> Result<&mut Self> {
         if self.projected_state.page_size == value {
@@ -472,12 +461,6 @@ impl Commit {
     #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
-    }
-
-    /// Move the projected snapshot out of the commit.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
     }
 
     /// The estimated bytes retained by the optional source base snapshot.
@@ -2363,7 +2346,7 @@ mod tests {
 
     #[test]
     fn commit_apply_to_current_reuses_target_and_noop_current_allocations() {
-        let base = Snapshot::from_xml(DOCUMENT.to_vec()).unwrap();
+        let base = Snapshot::from_xml(DOCUMENT.to_vec(), &Default::default()).unwrap();
         let mut edit = base.edit(0).unwrap();
         edit.set_page_size(Some(PageSize {
             width: Some(Emu::from_twips(11906)),
@@ -2372,7 +2355,7 @@ mod tests {
         }))
         .unwrap();
         let changed = edit.commit().unwrap();
-        let current = Snapshot::from_xml(DOCUMENT.to_vec()).unwrap();
+        let current = Snapshot::from_xml(DOCUMENT.to_vec(), &Default::default()).unwrap();
         let target = changed.apply_to_current(&current).unwrap();
         let target_xml = target.shared_xml();
         let commit_xml = changed.snapshot.shared_xml();
@@ -2384,7 +2367,7 @@ mod tests {
         );
 
         let noop = base.edit(0).unwrap().commit().unwrap();
-        let current = Snapshot::from_xml(DOCUMENT.to_vec()).unwrap();
+        let current = Snapshot::from_xml(DOCUMENT.to_vec(), &Default::default()).unwrap();
         let target = noop.apply_to_current(&current).unwrap();
         let target_xml = target.shared_xml();
         let current_xml = current.shared_xml();

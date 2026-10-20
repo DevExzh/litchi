@@ -53,7 +53,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn conflicts(&self) -> Result<Snapshot> {
-        self.conflicts_with_limits(Limits::default())
+        self.conflicts_bounded(self.semantic_limits().conflicts_value())
     }
 
     /// Read the main-story conflicts with explicit semantic resource limits.
@@ -61,9 +61,9 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn conflicts_with_limits(&self, limits: Limits) -> Result<Snapshot> {
+    pub(crate) fn conflicts_bounded(&self, limits: Limits) -> Result<Snapshot> {
         let limits = limits.validate()?;
-        self.ensure_conflict_opc_current("conflicts_with_limits")?;
+        self.ensure_conflict_opc_current("conflicts_bounded")?;
         let captured = capture(self.opc_package(), limits, false)?;
         let story = captured
             .stories
@@ -83,7 +83,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn conflict_stories(&self) -> Result<Vec<Story>> {
-        self.conflict_stories_with_limits(Limits::default())
+        self.conflict_stories_bounded(self.semantic_limits().conflicts_value())
     }
 
     /// Read every reachable story with explicit semantic resource limits.
@@ -91,9 +91,9 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn conflict_stories_with_limits(&self, limits: Limits) -> Result<Vec<Story>> {
+    pub(crate) fn conflict_stories_bounded(&self, limits: Limits) -> Result<Vec<Story>> {
         let limits = limits.validate()?;
-        self.ensure_conflict_opc_current("conflict_stories_with_limits")?;
+        self.ensure_conflict_opc_current("conflict_stories_bounded")?;
         let captured = capture(self.opc_package(), limits, true)?;
         let mut stories = Vec::new();
         stories

@@ -230,12 +230,12 @@ fn explicit_limits_are_exact_and_independent() {
         max_ranges: 2,
         ..Limits::default()
     };
-    let snapshot = Snapshot::from_xml_with_limits(source.clone(), exact).unwrap();
+    let snapshot = Snapshot::from_xml(source.clone(), exact).unwrap();
     assert_eq!(snapshot.inventory().conflicts.len(), 4);
     assert_eq!(snapshot.inventory().ranges.len(), 2);
 
     assert!(
-        Snapshot::from_xml_with_limits(
+        Snapshot::from_xml(
             source.clone(),
             Limits {
                 max_source_bytes: source.len() - 1,
@@ -245,7 +245,7 @@ fn explicit_limits_are_exact_and_independent() {
         .is_err()
     );
     assert!(
-        Snapshot::from_xml_with_limits(
+        Snapshot::from_xml(
             source.clone(),
             Limits {
                 max_conflicts: 3,
@@ -255,7 +255,7 @@ fn explicit_limits_are_exact_and_independent() {
         .is_err()
     );
     assert!(
-        Snapshot::from_xml_with_limits(
+        Snapshot::from_xml(
             source,
             Limits {
                 max_ranges: 1,
@@ -277,22 +277,22 @@ fn explicit_limits_are_exact_and_independent() {
 #[test]
 fn malformed_range_topologies_are_refused_but_inactive_orphans_are_ignored() {
     let orphan = minimal_document(r#"<w:p><q14:customXmlConflictInsRangeEnd w:id="7"/></w:p>"#);
-    assert!(Snapshot::from_xml(orphan).is_err());
+    assert!(Snapshot::from_xml(orphan, Default::default()).is_err());
 
     let duplicate = minimal_document(
         r#"<w:p><q14:customXmlConflictInsRangeStart w:id="7" w:author="a"/><q14:customXmlConflictInsRangeStart w:id="7" w:author="b"/><q14:customXmlConflictInsRangeEnd w:id="7"/></w:p>"#,
     );
-    assert!(Snapshot::from_xml(duplicate).is_err());
+    assert!(Snapshot::from_xml(duplicate, Default::default()).is_err());
 
     let wrong_kind = minimal_document(
         r#"<w:p><q14:customXmlConflictInsRangeStart w:id="7" w:author="a"/><q14:customXmlConflictDelRangeEnd w:id="7"/></w:p>"#,
     );
-    assert!(Snapshot::from_xml(wrong_kind).is_err());
+    assert!(Snapshot::from_xml(wrong_kind, Default::default()).is_err());
 
     let inactive = minimal_document(
         r#"<mc:AlternateContent><mc:Choice Requires="q14"><w:p><w:r><w:t>active</w:t></w:r></w:p></mc:Choice><mc:Fallback><q14:customXmlConflictDelRangeEnd w:id="99"/></mc:Fallback></mc:AlternateContent>"#,
     );
-    let snapshot = Snapshot::from_xml(inactive).unwrap();
+    let snapshot = Snapshot::from_xml(inactive, Default::default()).unwrap();
     assert!(snapshot.inventory().ranges.is_empty());
 }
 
@@ -505,7 +505,10 @@ fn package_target_limit_lineage_keeps_unrelated_story_ceiling() {
         ..Limits::default()
     };
 
-    let source = package.conflicts_with_limits(limits).unwrap();
+    let source = package
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().conflicts(limits))
+        .conflicts()
+        .unwrap();
     assert_eq!(source.limits(), limits);
     let mut edit = package.edit_conflicts();
     edit.set_conflict_author(0, "after with a longer author")
@@ -519,7 +522,8 @@ fn package_target_limit_lineage_keeps_unrelated_story_ceiling() {
         .into_package();
     assert_eq!(
         changed
-            .conflicts_with_limits(limits)
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().conflicts(limits))
+            .conflicts()
             .unwrap()
             .inventory()
             .conflicts[0]
@@ -531,7 +535,8 @@ fn package_target_limit_lineage_keeps_unrelated_story_ceiling() {
         .apply_conflicts(&inverse)
         .unwrap()
         .into_package()
-        .conflicts_with_limits(limits)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().conflicts(limits))
+        .conflicts()
         .unwrap();
     assert_eq!(restored.source(), main);
     assert_eq!(restored.inventory().conflicts[0].metadata.author, "before");
@@ -547,7 +552,12 @@ fn package_story_fanout_stops_at_the_configured_cap() {
         ..Limits::default()
     };
 
-    assert!(package.conflicts_with_limits(limits).is_err());
+    assert!(
+        package
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().conflicts(limits))
+            .conflicts()
+            .is_err()
+    );
 }
 
 #[test]
@@ -566,7 +576,12 @@ fn package_aggregate_conflict_budget_is_applied_before_next_story_parse() {
         ..Limits::default()
     };
 
-    assert!(package.conflict_stories_with_limits(limits).is_err());
+    assert!(
+        package
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().conflicts(limits))
+            .conflict_stories()
+            .is_err()
+    );
 }
 
 #[test]
@@ -587,7 +602,10 @@ fn package_exact_aggregate_quotas_allow_a_later_empty_story() {
         ..Limits::default()
     };
 
-    let stories = package.conflict_stories_with_limits(limits).unwrap();
+    let stories = package
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().conflicts(limits))
+        .conflict_stories()
+        .unwrap();
     assert_eq!(stories.len(), 2);
     assert_eq!(stories[0].snapshot().inventory().conflicts.len(), 1);
     assert_eq!(stories[0].snapshot().inventory().ranges.len(), 1);
@@ -615,7 +633,12 @@ fn package_aggregate_text_segment_budget_precedes_later_story_parse() {
         ..Limits::default()
     };
 
-    assert!(package.conflict_stories_with_limits(limits).is_err());
+    assert!(
+        package
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().conflicts(limits))
+            .conflict_stories()
+            .is_err()
+    );
 }
 
 #[test]
@@ -635,7 +658,10 @@ fn later_story_patch_retains_the_original_package_limits() {
         max_total_text_segments: 2,
         ..Limits::default()
     };
-    let stories = package.conflict_stories_with_limits(limits).unwrap();
+    let stories = package
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().conflicts(limits))
+        .conflict_stories()
+        .unwrap();
     let header = stories[1].snapshot();
     assert_eq!(header.limits(), limits);
 
@@ -645,7 +671,8 @@ fn later_story_patch_retains_the_original_package_limits() {
     // The published package still satisfies the original package limits.
     let republished = commit
         .package()
-        .conflict_stories_with_limits(limits)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().conflicts(limits))
+        .conflict_stories()
         .unwrap();
     assert_eq!(republished[1].part(), stories[1].part());
     let published = republished[1].snapshot();
@@ -661,7 +688,7 @@ fn strict_word_namespace_and_public_writer_round_trip() {
     let strict = format!(
         r#"<w:document xmlns:w="{W_STRICT}" xmlns:q14="{W14}" xmlns:mc="{MC}" mc:Ignorable="q14"><w:body><w:p><q14:conflictIns w:id="31" w:author="strict"><w:r><w:t>strict text</w:t></w:r></q14:conflictIns></w:p></w:body></w:document>"#
     );
-    let parsed = Snapshot::from_xml(strict.into_bytes()).unwrap();
+    let parsed = Snapshot::from_xml(strict.into_bytes(), Default::default()).unwrap();
     assert_eq!(parsed.inventory().conflicts.len(), 1);
     assert_eq!(parsed.inventory().conflicts[0].scope, Scope::Inline);
 
@@ -700,7 +727,7 @@ fn strict_word_namespace_and_public_writer_round_trip() {
     assert!(xml.contains(">writer range payload</w:t>"));
     assert!(!xml.contains("<w:delText>writer range payload</w:delText>"));
 
-    let reopened = Snapshot::from_xml(xml.into_bytes()).unwrap();
+    let reopened = Snapshot::from_xml(xml.into_bytes(), Default::default()).unwrap();
     assert_eq!(reopened.inventory().conflicts.len(), 2);
     assert_eq!(reopened.inventory().ranges.len(), 1);
     assert_eq!(reopened.inventory().ranges[0].kind, Kind::Delete);
@@ -882,7 +909,8 @@ fn main_conflicts_ignore_a_malformed_unrelated_header_and_aggregate_quota() {
 
     assert_eq!(
         package
-            .conflicts_with_limits(limits)
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().conflicts(limits))
+            .conflicts()
             .unwrap()
             .inventory()
             .conflicts
@@ -890,5 +918,10 @@ fn main_conflicts_ignore_a_malformed_unrelated_header_and_aggregate_quota() {
         1
     );
     assert!(package.conflict_stories().is_err());
-    assert!(package.conflict_stories_with_limits(limits).is_err());
+    assert!(
+        package
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().conflicts(limits))
+            .conflict_stories()
+            .is_err()
+    );
 }

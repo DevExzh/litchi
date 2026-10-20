@@ -726,7 +726,10 @@ impl Package {
     /// # Errors
     /// Returns an error for dirty state, invalid ownership/XML, or resource limits.
     pub fn edit_ink(&self) -> Result<Edit> {
-        self.edit_ink_with_options(EditOptions::default())
+        self.edit_ink_with_options(EditOptions {
+            inventory: self.semantic_limits().ink_value(),
+            ..EditOptions::default()
+        })
     }
 
     /// Start an annotation edit with explicit source and operation bounds.

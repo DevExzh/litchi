@@ -56,6 +56,7 @@ pub mod run_effects;
 pub mod run_symbols;
 pub mod sanitize;
 pub mod section;
+mod semantic_limits;
 pub mod settings;
 mod signature_policy;
 pub mod smart_tag;
@@ -190,7 +191,6 @@ pub use statistics::{
 };
 pub use validation::{
     DEFAULT_DOCX_VALIDATION_LIMITS, DocxValidationError, DocxValidationLimits, validate_read_at,
-    validate_read_at_with_limits,
 };
 pub use variables::{Variables, parse_variables};
 
@@ -211,6 +211,7 @@ pub use paragraph::{
 };
 pub use run_effects::{Effect, Effects, OpaqueExtension};
 pub use section::{Emu, Margins, PageSize, Section, Sections};
+pub use semantic_limits::SemanticLimits;
 pub use streaming::{
     StreamingDocumentError, StreamingDocumentErrorSource, StreamingDocumentLimits,
     StreamingDocumentWriter,

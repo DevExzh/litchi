@@ -1,6 +1,7 @@
 //! Paired timing of the DOCX routes record 0351 §5 lists for wave W1
-//! (record 0355): open, one paragraph set, a 1,000-paragraph batch, save,
-//! and a repeated save of one package. Each pair times the unified call
+//! (record 0355): open, one paragraph set, one paragraph add, a metadata
+//! title set, a 1,000-paragraph batch, save, and a repeated save of one
+//! package. Each pair times the unified call
 //! against the hand-written leaf call doing the same work, in ABBA order on
 //! the same bytes; outputs are compared outside timing.
 //!
@@ -122,6 +123,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }),
         Box::new(|| {
             black_box(unified.set("/body/p[501]", props! { "text" => "changed" })?);
+            Ok(())
+        }),
+    )?;
+
+    pair(
+        "add paragraph",
+        Box::new(|| {
+            let mut edit = package.edit()?;
+            edit.insert_paragraph(Position::new(PARAGRAPHS), "added")?;
+            black_box(edit.commit()?.into_package());
+            Ok(())
+        }),
+        Box::new(|| {
+            black_box(unified.add("/body", NewNode::new("paragraph").prop("text", "added"))?);
+            Ok(())
+        }),
+    )?;
+
+    pair(
+        "set / title",
+        Box::new(|| {
+            let mut edit = package.edit_metadata();
+            edit.update(|props| props.title = Some("Title".to_owned()));
+            black_box(edit.commit()?.into_package());
+            Ok(())
+        }),
+        Box::new(|| {
+            black_box(unified.set("/", props! { "title" => "Title" })?);
             Ok(())
         }),
     )?;

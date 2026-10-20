@@ -634,11 +634,11 @@ fn redaction_limits_cover_selected_relationships_and_changed_stories() {
         .with_max_selected_relationships(6)
         .unwrap();
     assert!(matches!(
-        package.plan_story_hyperlink_redaction_with_limits(
-            &["https://shared.invalid/"],
-            Mode::Strict,
-            selected_limit,
-        ),
+        package
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(selected_limit)
+            )
+            .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict),
         Err(Error::ExternalHyperlinkRedactionLimit {
             resource: "selected story hyperlink relationships",
             maximum: 6,
@@ -650,11 +650,11 @@ fn redaction_limits_cover_selected_relationships_and_changed_stories() {
         .with_max_changed_stories(6)
         .unwrap();
     assert!(matches!(
-        package.plan_story_hyperlink_redaction_with_limits(
-            &["https://shared.invalid/"],
-            Mode::Strict,
-            changed_story_limit,
-        ),
+        package
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(changed_story_limit)
+            )
+            .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict),
         Err(Error::ExternalHyperlinkRedactionLimit {
             resource: "changed story parts",
             maximum: 6,
@@ -720,7 +720,10 @@ fn closure_capture_enforces_package_part_and_prolog_bounds_at_the_boundary() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(story))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(story))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_ok()
     );
     let story = StoryLimits {
@@ -729,7 +732,10 @@ fn closure_capture_enforces_package_part_and_prolog_bounds_at_the_boundary() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(story))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(story))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_err()
     );
 
@@ -740,7 +746,10 @@ fn closure_capture_enforces_package_part_and_prolog_bounds_at_the_boundary() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(story))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(story))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_ok()
     );
     let story = StoryLimits {
@@ -749,7 +758,10 @@ fn closure_capture_enforces_package_part_and_prolog_bounds_at_the_boundary() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(story))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(story))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_err()
     );
 }
@@ -766,7 +778,10 @@ fn closure_capture_enforces_exact_and_one_under_topology_limit() {
             ..StoryLimits::default()
         };
         if package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(story))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(story)),
+            )
+            .story_hyperlinks_only_snapshot()
             .is_ok()
         {
             high = middle;
@@ -780,7 +795,10 @@ fn closure_capture_enforces_exact_and_one_under_topology_limit() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(exact))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(exact))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_ok()
     );
     let one_under = StoryLimits {
@@ -789,7 +807,11 @@ fn closure_capture_enforces_exact_and_one_under_topology_limit() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(one_under))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default()
+                    .story_hyperlinks(with_story_limits(one_under))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_err()
     );
 }
@@ -1016,7 +1038,10 @@ fn relationship_limits_are_checked_before_main_payload_reads() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(limits))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(limits))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_err()
     );
     let after = package.cache_diagnostics();
@@ -1030,7 +1055,10 @@ fn relationship_limits_are_checked_before_main_payload_reads() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(exact))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(exact))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_ok()
     );
 }
@@ -1045,7 +1073,11 @@ fn child_relationship_owner_limit_is_preflighted_before_payload_reads() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(one_under))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default()
+                    .story_hyperlinks(with_story_limits(one_under))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_err()
     );
     let after = package.cache_diagnostics();
@@ -1058,7 +1090,10 @@ fn child_relationship_owner_limit_is_preflighted_before_payload_reads() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(exact))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(exact))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_ok()
     );
 }
@@ -1074,7 +1109,11 @@ fn child_relationship_total_is_preflighted_before_the_offending_payload_read() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(one_under))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default()
+                    .story_hyperlinks(with_story_limits(one_under))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_err()
     );
     let after = package.cache_diagnostics();
@@ -1088,7 +1127,10 @@ fn child_relationship_total_is_preflighted_before_the_offending_payload_read() {
     };
     assert!(
         package
-            .story_hyperlinks_only_snapshot_with_limits(with_story_limits(exact))
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(exact))
+            )
+            .story_hyperlinks_only_snapshot()
             .is_ok()
     );
 }

@@ -227,6 +227,7 @@ impl Package {
             main_admission: Arc::new(std::sync::Mutex::new(std::sync::Weak::new())),
             properties: properties.into(),
             custom_props: custom_props.into(),
+            semantic_limits: Arc::default(),
             #[cfg(feature = "encryption")]
             source_encryption: Default::default(),
         })
@@ -279,7 +280,10 @@ impl Package {
     /// Returns an error if the operation cannot be completed.
     pub fn open_with_options<P: AsRef<Path>>(path: P, options: OpenOptions) -> Result<Self> {
         options.check_owning()?;
-        Self::from_opc_package(OpcPackage::open_with_limits(path, options.source_limits)?)
+        Ok(
+            Self::from_opc_package(OpcPackage::open_with_limits(path, options.source_limits)?)?
+                .with_semantic_limits(options.semantic_limits),
+        )
     }
 
     /// Open a password-bearing DOCX path with standard finite policies.
@@ -351,6 +355,7 @@ impl Package {
             main_admission: Arc::new(std::sync::Mutex::new(std::sync::Weak::new())),
             properties: properties.into(),
             custom_props: custom_props.into(),
+            semantic_limits: Arc::default(),
             #[cfg(feature = "encryption")]
             source_encryption: Default::default(),
         })
@@ -388,10 +393,11 @@ impl Package {
     /// Returns an error if the operation cannot be completed.
     pub fn from_reader_with_options<R: Read>(reader: R, options: OpenOptions) -> Result<Self> {
         options.check_owning()?;
-        Self::from_opc_package(OpcPackage::from_reader_with_limits(
+        Ok(Self::from_opc_package(OpcPackage::from_reader_with_limits(
             reader,
             options.source_limits,
-        )?)
+        )?)?
+        .with_semantic_limits(options.semantic_limits))
     }
 
     /// Open a password-bearing DOCX reader with standard finite policies.
@@ -482,7 +488,8 @@ impl Package {
         options.check_owning()?;
         let source_encryption = opened.mode();
         let opc = OpcPackage::from_vec_with_limits(opened.into_bytes(), options.source_limits)?;
-        let mut package = Self::from_opc_package(opc)?;
+        let mut package =
+            Self::from_opc_package(opc)?.with_semantic_limits(options.semantic_limits);
         package.source_encryption = source_encryption.map_or_else(
             litchi_ooxml_common::package_encryption::PackageEncryption::plain,
             litchi_ooxml_common::package_encryption::PackageEncryption::encrypted,

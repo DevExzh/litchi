@@ -1174,9 +1174,9 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
         let diagnostics = SvgAttachmentCommitDiagnostics::new(
             self.operations.len(),
             patch.before.len(),
-            patch.is_changed(),
+            !patch.is_noop(),
         );
-        if patch.is_changed() {
+        if !patch.is_noop() {
             let plan = build_batch_topology_plan(
                 self.package.physical_package()?,
                 &patch.before,
@@ -1640,10 +1640,10 @@ impl SourceBackedSvgAttachmentBatchPatch {
         &self.after
     }
 
-    /// Whether this patch changes story or graph state.
+    /// Whether this patch leaves story and graph state unchanged.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !same_batch_state(&self.before, &self.after)
+    pub fn is_noop(&self) -> bool {
+        same_batch_state(&self.before, &self.after)
     }
 
     /// Return the exact in-memory inverse.
@@ -1665,7 +1665,7 @@ impl SourceBackedSvgAttachmentBatchPatch {
                 "SVG lifecycle batch patch source is stale or foreign".into(),
             ));
         }
-        Ok(if self.is_changed() {
+        Ok(if !self.is_noop() {
             self.after.clone()
         } else {
             source.clone()
@@ -1690,12 +1690,6 @@ impl SourceBackedSvgAttachmentBatchCommit {
     #[must_use]
     pub const fn diagnostics(&self) -> SvgAttachmentCommitDiagnostics {
         self.diagnostics
-    }
-
-    /// Whether this commit changes the package.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.patch.is_changed()
     }
 }
 
@@ -1752,10 +1746,10 @@ impl SourceBackedSvgAttachmentPatch {
         &self.after
     }
 
-    /// Whether this patch changes story or graph state.
+    /// Whether this patch leaves story and graph state unchanged.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !same_state(&self.before.state, &self.after.state)
+    pub fn is_noop(&self) -> bool {
+        same_state(&self.before.state, &self.after.state)
     }
 
     /// Return the exact in-memory inverse.
@@ -1777,7 +1771,7 @@ impl SourceBackedSvgAttachmentPatch {
                 "SVG lifecycle patch source is stale or foreign".into(),
             ));
         }
-        Ok(if self.is_changed() {
+        Ok(if !self.is_noop() {
             self.after.clone()
         } else {
             source.clone()
@@ -1802,12 +1796,6 @@ impl SourceBackedSvgAttachmentCommit {
     #[must_use]
     pub const fn diagnostics(&self) -> SvgAttachmentCommitDiagnostics {
         self.diagnostics
-    }
-
-    /// Whether this commit changes the package.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.patch.is_changed()
     }
 }
 
@@ -3056,7 +3044,7 @@ fn scan_story<'a>(bytes: &'a [u8], limits: litchi_opc::SourceLimits) -> Result<S
     let mut scan = ScanLimits::default();
     scan.max_xml_bytes = scan.max_xml_bytes.min(max);
     scan.max_fragment_bytes = scan.max_fragment_bytes.min(max);
-    SourceDrawing::scan_with_limits(bytes, 0, scan)
+    SourceDrawing::scan(bytes, 0, scan)
 }
 
 fn identity_inventory(

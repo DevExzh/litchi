@@ -561,7 +561,7 @@ impl Package {
     /// Returns an error if the operation cannot be completed.
     pub fn custom_xml_bindings(&self) -> Result<Vec<Binding>> {
         let limits = PackageLimits::default();
-        let stories = self.story_inventory_with_limits(limits.stories)?;
+        let stories = self.story_inventory_bounded(limits.stories)?;
         let mut bindings = Vec::new();
         visit_bindings(
             &stories,
@@ -728,7 +728,7 @@ fn visit_bindings(
 ) -> Result<()> {
     let mut controls = 0usize;
     for story in stories.stories() {
-        let inventory = Inventory::parse_with_limits(story.source(), &limits.controls)?;
+        let inventory = Inventory::parse(story.source(), &limits.controls)?;
         controls = controls
             .checked_add(inventory.occurrences().len())
             .ok_or_else(|| Error::InvalidFormat("content-control count overflow".into()))?;

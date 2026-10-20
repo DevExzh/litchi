@@ -345,16 +345,10 @@ impl Document {
     /// # Errors
     /// Returns malformed metadata, XML, or revision resource-limit errors.
     pub fn revisions(&self) -> Result<smallvec::SmallVec<[crate::revision::Revision; 4]>> {
-        self.revisions_with_limits(crate::revision::Limits::default())
+        self.revisions_bounded(self.limits.revisions_value())
     }
 
-    /// Read document revisions with explicit parser and retention limits.
-    ///
-    /// Repairs are recorded as for [`Self::revisions`].
-    ///
-    /// # Errors
-    /// Returns malformed metadata, XML, or revision resource-limit errors.
-    pub fn revisions_with_limits(
+    pub(crate) fn revisions_bounded(
         &self,
         limits: crate::revision::Limits,
     ) -> Result<smallvec::SmallVec<[crate::revision::Revision; 4]>> {

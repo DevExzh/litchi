@@ -271,7 +271,11 @@ fn story_scan_enforces_paragraph_depth_and_output_limits() {
     let paragraph_limited =
         source_backed::StoryTextLimits::new(4096, 1, 10_000, 64, 4096, 4_096, 4096).unwrap();
     assert!(matches!(
-        open(&source).story_text_snapshot_with_limits(StorySelector::Main, paragraph_limited),
+        open(&source)
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_text(paragraph_limited)
+            )
+            .story_text_snapshot(StorySelector::Main),
         Err(source_backed::StoryTextError::Limit {
             resource: "paragraphs",
             ..
@@ -281,7 +285,9 @@ fn story_scan_enforces_paragraph_depth_and_output_limits() {
     let depth_limited =
         source_backed::StoryTextLimits::new(4096, 10, 10_000, 2, 4096, 4_096, 4096).unwrap();
     assert!(matches!(
-        open(&source).story_text_snapshot_with_limits(StorySelector::Main, depth_limited),
+        open(&source)
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(depth_limited))
+            .story_text_snapshot(StorySelector::Main),
         Err(source_backed::StoryTextError::Limit {
             resource: "XML depth",
             ..
@@ -294,7 +300,8 @@ fn story_scan_enforces_paragraph_depth_and_output_limits() {
         source_backed::StoryTextLimits::new(4096, 10, 10_000, 2, 4096, 4_096, 4096).unwrap();
     assert!(matches!(
         open(&main_only_fixture(&empty_depth_document))
-            .story_text_snapshot_with_limits(StorySelector::Main, empty_depth),
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(empty_depth))
+            .story_text_snapshot(StorySelector::Main),
         Err(source_backed::StoryTextError::Limit {
             resource: "XML depth",
             ..
@@ -306,7 +313,7 @@ fn story_scan_enforces_paragraph_depth_and_output_limits() {
     let snapshot = open(&main_only_fixture(&format!(
         r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>long</w:t></w:r></w:p></w:body></w:document>"#
     )))
-    .story_text_snapshot_with_limits(StorySelector::Main, output_limited)
+    .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(output_limited)).story_text_snapshot(StorySelector::Main)
     .unwrap();
     assert!(matches!(
         snapshot.extract_text(),
@@ -321,7 +328,7 @@ fn story_scan_enforces_paragraph_depth_and_output_limits() {
     let aggregate_snapshot = open(&main_only_fixture(&format!(
         r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>one</w:t></w:r></w:p><w:p><w:r><w:t>two</w:t></w:r></w:p></w:body></w:document>"#
     )))
-    .story_text_snapshot_with_limits(StorySelector::Main, aggregate_limits)
+    .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(aggregate_limits)).story_text_snapshot(StorySelector::Main)
     .unwrap();
     let mut aggregate_output = Vec::new();
     let aggregate_error = aggregate_snapshot

@@ -417,7 +417,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn story_inventory(&self) -> Result<StoryInventory> {
-        self.story_inventory_with_limits(StoryLimits::default())
+        self.story_inventory_bounded(self.semantic_limits().stories_value())
     }
 
     /// Inventory Word stories under an explicit semantic resource policy.
@@ -425,8 +425,8 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn story_inventory_with_limits(&self, limits: StoryLimits) -> Result<StoryInventory> {
-        self.ensure_story_opc_current("story_inventory_with_limits")?;
+    pub(crate) fn story_inventory_bounded(&self, limits: StoryLimits) -> Result<StoryInventory> {
+        self.ensure_story_opc_current("story_inventory_bounded")?;
         capture(self.opc_package(), limits)
     }
 }

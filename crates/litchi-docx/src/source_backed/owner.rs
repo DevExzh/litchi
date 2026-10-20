@@ -26,7 +26,8 @@ impl Package {
             }
             let main = topology.main_document_part()?;
             validate_document_main_content_type(main.content_type())?;
-            let mut owner = Self::with_execution(self.physical.clone(), self.execution.clone())?;
+            let mut owner = Self::with_execution(self.physical.clone(), self.execution.clone())?
+                .with_semantic_limits(self.semantic_limits().clone());
             owner.effective = Some(topology.clone());
             Ok(owner)
         })();
@@ -333,6 +334,7 @@ impl Package {
                 _index_admission: index_admission,
                 source_version,
                 execution: self.execution.clone(),
+                limits: Arc::new(self.semantic_limits().clone()),
                 paragraph_index_cache: Arc::clone(&self.paragraph_index_cache),
                 paragraph_route,
                 positions,

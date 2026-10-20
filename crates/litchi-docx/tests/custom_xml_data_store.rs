@@ -64,7 +64,7 @@ fn checksum_at(package: &Package, part: &str) -> Checksum {
         .opc_package()
         .get_part(&PackURI::new(part).unwrap())
         .unwrap();
-    let snapshot = Snapshot::from_xml(part.blob().to_vec()).unwrap();
+    let snapshot = Snapshot::from_xml(part.blob().to_vec(), Default::default()).unwrap();
     snapshot.inventory().occurrences()[0]
         .control()
         .data_binding()
@@ -888,7 +888,7 @@ fn dual_core_and_word_2012_bindings_refresh_each_exact_checksum() {
     };
 
     let main = package.opc_package().main_document_part().unwrap();
-    let snapshot = Snapshot::from_xml(main.blob().to_vec()).unwrap();
+    let snapshot = Snapshot::from_xml(main.blob().to_vec(), Default::default()).unwrap();
     let bindings = snapshot.inventory().occurrences()[0]
         .control()
         .data_bindings();

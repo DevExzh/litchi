@@ -17074,7 +17074,7 @@ fn semantic_docx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> 
     for index in 0..shape.docx_paragraphs() {
         document.add_paragraph_with_text(&semantic_docx_text(index, false));
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     let mut output = Cursor::new(Vec::new());
     package.write_to(&mut output)?;
     Ok(output.into_inner())
@@ -17141,7 +17141,7 @@ fn docx_source_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
             )?;
         }
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     let mut output = Cursor::new(Vec::new());
     package.write_to(&mut output)?;
     restore_docx_source_edit_v1(output.into_inner())
@@ -34267,7 +34267,14 @@ fn run_docx_validation_report(
         corpus,
         warmup_iterations,
         samples,
-        |source| Ok(litchi_docx::validate_read_at(source)?),
+        |source| {
+            Ok(litchi_docx::validate_read_at(
+                source,
+                Default::default(),
+                Default::default(),
+                Default::default(),
+            )?)
+        },
     )
 }
 
@@ -49853,10 +49860,14 @@ fn verify_docx_section_layout_controls(
         corpus.archive.clone(),
     )))?;
     if !matches!(
-        limited.section_layout_snapshot_with_limits(&litchi_docx::section::Limits {
-            max_section_bytes: 1,
-            ..litchi_docx::section::Limits::default()
-        }),
+        limited
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().sections(
+                litchi_docx::section::Limits {
+                    max_section_bytes: 1,
+                    ..litchi_docx::section::Limits::default()
+                }
+            ))
+            .section_layout_snapshot(),
         Err(litchi_docx::Error::SectionInventoryLimit { .. })
     ) {
         return Err("DOCX section-layout section limit refusal is not typed".into());

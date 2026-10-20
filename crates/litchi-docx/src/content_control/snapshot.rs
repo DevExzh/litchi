@@ -248,21 +248,12 @@ struct Inner {
 pub struct Snapshot(Arc<Inner>);
 
 impl Snapshot {
-    /// Parse owned XML with production resource limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn from_xml(source: impl Into<Vec<u8>>) -> Result<Self> {
-        Self::from_xml_with_limits(source, Limits::default())
-    }
-
     /// Parse owned XML with explicit resource limits.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn from_xml_with_limits(source: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
+    pub fn from_xml(source: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
         limits.validate()?;
         let source = source.into();
         if source.len() > limits.max_input_bytes {
@@ -278,7 +269,7 @@ impl Snapshot {
     }
 
     pub(crate) fn from_source(source: Source, limits: Limits) -> Result<Self> {
-        let inventory = Inventory::parse_with_limits(source.as_slice(), &limits)?;
+        let inventory = Inventory::parse(source.as_slice(), &limits)?;
         // Reads degrade a malformed sdtPr per control and record it
         // (`ContentControlDefect`). An editable snapshot must address exact
         // source properties, so it keeps refusing properties a read repaired.

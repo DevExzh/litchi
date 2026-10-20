@@ -541,27 +541,9 @@ impl Package {
         Edit {
             package: self,
             text: Some(text.into()),
-            limits: Limits::default(),
+            limits: self.semantic_limits().tail_append_value(),
             options: Options::default(),
         }
-    }
-
-    /// Start a bounded source-backed append under an explicit finite policy.
-    pub fn tail_append_plain_paragraph_with_limits<'package, 'text, T>(
-        &'package self,
-        text: T,
-        limits: Limits,
-    ) -> Result<Edit<'package, 'text>>
-    where
-        T: Into<Cow<'text, str>>,
-    {
-        limits.validate()?;
-        Ok(Edit {
-            package: self,
-            text: Some(text.into()),
-            limits,
-            options: Options::default(),
-        })
     }
 
     /// Start the explicit exact archive no-op route.

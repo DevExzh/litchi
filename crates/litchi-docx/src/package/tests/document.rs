@@ -1299,7 +1299,7 @@ fn document_revision_queries_cover_final_sections_grids_and_numbering_after_reop
         ..Limits::default()
     };
     assert!(matches!(
-        document.revisions_with_limits(limits),
+        document.revisions_bounded(limits),
         Err(Error::RevisionLimit {
             resource: "records",
             ..
@@ -1339,7 +1339,7 @@ fn document_revision_queries_cover_final_sections_grids_and_numbering_after_reop
             .collect::<Vec<_>>()
     );
     assert!(matches!(
-        pinned_document.revisions_with_limits(limits),
+        pinned_document.revisions_bounded(limits),
         Err(Error::RevisionLimit {
             resource: "records",
             ..

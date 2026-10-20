@@ -138,6 +138,8 @@ pub struct Package {
     // Never replace this while retaining the prior owner's paragraph/admission caches.
     effective: Option<litchi_opc::PreparedTopology>,
     execution: Option<ExecutionContext>,
+    /// The semantic read budgets the package was opened with.
+    semantic_limits: Arc<crate::SemanticLimits>,
     paragraph_index_cache: Arc<ParagraphIndexCache>,
     /// Everything repaired while the package was read, aggregated from the
     /// codecs that record. See `crate::leniency`. Interior mutability keeps
@@ -394,7 +396,8 @@ impl Package {
                 read_policy,
             )?
         };
-        Self::with_execution(package, options.execution_context)
+        let limits = options.semantic_limits.clone();
+        Ok(Self::with_execution(package, options.execution_context)?.with_semantic_limits(limits))
     }
 
     /// Open a sequential reader with the standard finite source policies.
@@ -420,10 +423,13 @@ impl Package {
         {
             // Preserve the existing move-owned OPC fast path and its memoized
             // immutable-source proofs when no lazy policy is selected.
-            return Self::from_source_backed(SourceBackedPackage::from_reader_with_limits(
-                reader,
-                options.source_limits,
-            )?);
+            return Ok(
+                Self::from_source_backed(SourceBackedPackage::from_reader_with_limits(
+                    reader,
+                    options.source_limits,
+                )?)?
+                .with_semantic_limits(options.semantic_limits),
+            );
         }
         let source = ingress::from_reader(reader, &options)?;
         Self::from_read_at_with_options(source, options)
@@ -438,6 +444,21 @@ impl Package {
     /// immutable source under the same accounting as sequential ingress.
     pub fn from_bytes_with_options(bytes: &[u8], options: crate::OpenOptions) -> Result<Self> {
         Self::from_reader_with_options(bytes, options)
+    }
+
+    /// The semantic read budgets this package keeps (record 0355).
+    #[must_use]
+    pub fn semantic_limits(&self) -> &crate::SemanticLimits {
+        &self.semantic_limits
+    }
+
+    /// The same package under other semantic read budgets. O(1): the source
+    /// and every cache are shared.
+    #[must_use]
+    pub fn with_semantic_limits(&self, limits: crate::SemanticLimits) -> Self {
+        let mut next = self.clone();
+        next.semantic_limits = Arc::new(limits);
+        next
     }
 
     fn from_source_backed(package: SourceBackedPackage) -> Result<Self> {
@@ -460,6 +481,7 @@ impl Package {
             physical: package,
             effective: None,
             execution,
+            semantic_limits: Arc::default(),
             paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
             tolerance: Arc::new(Mutex::new(tolerance)),
             properties_recorded: Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -636,6 +658,7 @@ impl Package {
                     _index_admission: index_admission,
                     source_version,
                     execution: self.execution.clone(),
+                    limits: Arc::clone(&self.semantic_limits),
                     paragraph_index_cache: Arc::clone(&self.paragraph_index_cache),
                     paragraph_route,
                     // A managed view reads its source bytes, which only a
@@ -709,6 +732,7 @@ impl Package {
                 _index_admission: None,
                 source_version,
                 execution: self.execution.clone(),
+                limits: Arc::clone(&self.semantic_limits),
                 paragraph_index_cache: Arc::clone(&self.paragraph_index_cache),
                 paragraph_route: ParagraphIndexRoute::Visible,
                 positions: payload.positions(),
@@ -897,11 +921,11 @@ impl Package {
     /// Header/footer relationship IDs are retained as inert values. Their
     /// target parts are neither resolved nor read.
     pub fn section_inventory_snapshot(&self) -> Result<crate::section::Snapshot> {
-        self.section_inventory_snapshot_with_limits(&crate::section::Limits::default())
+        self.section_inventory_snapshot_bounded(self.semantic_limits.sections_value())
     }
 
     /// Capture a source-bound section inventory with explicit semantic limits.
-    pub fn section_inventory_snapshot_with_limits(
+    pub(crate) fn section_inventory_snapshot_bounded(
         &self,
         limits: &crate::section::Limits,
     ) -> Result<crate::section::Snapshot> {
@@ -941,11 +965,11 @@ impl Package {
     /// Capture an exact-source snapshot for editing locally authored page
     /// layout on one existing main-story section.
     pub fn section_layout_snapshot(&self) -> Result<layout::Snapshot> {
-        self.section_layout_snapshot_with_limits(&crate::section::Limits::default())
+        self.section_layout_snapshot_bounded(self.semantic_limits.sections_value())
     }
 
     /// Capture a bounded exact-source page-layout snapshot.
-    pub fn section_layout_snapshot_with_limits(
+    pub(crate) fn section_layout_snapshot_bounded(
         &self,
         limits: &crate::section::Limits,
     ) -> Result<layout::Snapshot> {
@@ -960,17 +984,6 @@ impl Package {
         selector: impl Into<crate::section::Selector>,
     ) -> Result<layout::Edit> {
         self.section_layout_snapshot()?.edit(selector)
-    }
-
-    /// Start an isolated bounded edit of one existing locally authored
-    /// section.
-    pub fn edit_section_layout_with_limits(
-        &self,
-        selector: impl Into<crate::section::Selector>,
-        limits: &crate::section::Limits,
-    ) -> Result<layout::Edit> {
-        self.section_layout_snapshot_with_limits(limits)?
-            .edit(selector)
     }
 
     /// Return content-free cache activity for this source-backed DOCX.
@@ -1287,24 +1300,9 @@ impl Package {
     /// inventory call.
     pub fn embedded(&self) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
         self.trim_clean_paragraph_index_for_operation();
-        Ok(litchi_ooxml_common::embedded::scan_source(
-            self.physical_package()?,
-        )?)
-    }
-
-    /// Inventory embedded relationships with explicit resource limits.
-    ///
-    /// This is a catalog-only operation over the retained source-backed OPC
-    /// package. Payload bytes are not read or materialized; callers must use
-    /// the deferred fallible payload operation on each returned entry.
-    pub fn embedded_with_limits(
-        &self,
-        limits: &litchi_ooxml_common::embedded::Limits,
-    ) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
-        self.trim_clean_paragraph_index_for_operation();
         Ok(litchi_ooxml_common::embedded::scan_source_with(
             self.physical_package()?,
-            limits,
+            &self.semantic_limits.embedded_value(),
         )?)
     }
 
@@ -1384,7 +1382,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns the same failures as [`Self::document_variables_snapshot`].
-    pub fn edit_document_variables(&self) -> Result<variables::Transaction> {
+    pub fn edit_document_variables(&self) -> Result<variables::Edit> {
         self.document_variables_snapshot()?.try_edit()
     }
 
@@ -1595,7 +1593,9 @@ impl Package {
     /// Returns a typed package, protection, markup-compatibility, XML, or
     /// resource-limit error.
     pub fn external_hyperlink_sanitization_snapshot(&self) -> Result<sanitize::Snapshot> {
-        self.external_hyperlink_sanitization_snapshot_with_limits(sanitize::Limits::default())
+        self.external_hyperlink_sanitization_snapshot_bounded(
+            self.semantic_limits.hyperlinks_value(),
+        )
     }
 
     /// Capture the external-hyperlink sanitization closure with explicit
@@ -1605,7 +1605,7 @@ impl Package {
     ///
     /// Returns the same failures as
     /// [`Self::external_hyperlink_sanitization_snapshot`].
-    pub fn external_hyperlink_sanitization_snapshot_with_limits(
+    pub(crate) fn external_hyperlink_sanitization_snapshot_bounded(
         &self,
         limits: sanitize::Limits,
     ) -> Result<sanitize::Snapshot> {
@@ -1649,21 +1649,6 @@ impl Package {
         Ok(self.external_hyperlink_sanitization_snapshot()?.plan())
     }
 
-    /// Build the external-hyperlink detachment plan with explicit limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same failures as
-    /// [`Self::external_hyperlink_sanitization_snapshot_with_limits`].
-    pub fn plan_external_hyperlink_detachment_with_limits(
-        &self,
-        limits: sanitize::Limits,
-    ) -> Result<sanitize::SanitizePlan> {
-        Ok(self
-            .external_hyperlink_sanitization_snapshot_with_limits(limits)?
-            .plan())
-    }
-
     /// Capture the exact main-document closure for explicit irreversible
     /// external-hyperlink redaction.
     ///
@@ -1673,11 +1658,11 @@ impl Package {
     /// relationship forms outside `w:hyperlink`, protection, signatures, and
     /// unsupported owner syntax. No target is fetched or executed.
     pub fn external_hyperlink_redaction_snapshot(&self) -> Result<redact::Snapshot> {
-        self.external_hyperlink_redaction_snapshot_with_limits(sanitize::Limits::default())
+        self.external_hyperlink_redaction_snapshot_bounded(self.semantic_limits.hyperlinks_value())
     }
 
     /// Capture an irreversible redaction inventory with explicit XML limits.
-    pub fn external_hyperlink_redaction_snapshot_with_limits(
+    pub(crate) fn external_hyperlink_redaction_snapshot_bounded(
         &self,
         limits: sanitize::Limits,
     ) -> Result<redact::Snapshot> {
@@ -1951,7 +1936,7 @@ impl Package {
             .partname()
             .clone();
         let current =
-            self.external_hyperlink_sanitization_snapshot_with_limits(commit.patch().limits())?;
+            self.external_hyperlink_sanitization_snapshot_bounded(commit.patch().limits())?;
         let target = commit.patch().apply(&current)?;
         if commit.patch().is_noop() {
             self.physical_package()?
@@ -1983,7 +1968,7 @@ impl Package {
             .partname()
             .clone();
         let current =
-            self.external_hyperlink_redaction_snapshot_with_limits(commit.patch().limits())?;
+            self.external_hyperlink_redaction_snapshot_bounded(commit.patch().limits())?;
         commit.patch().validate_source(&current)?;
         let report = commit.effect_report();
         if report.is_noop() {
@@ -2010,11 +1995,11 @@ impl Package {
     /// comments, and glossary stories. It does not alter the established
     /// main-only sanitization or redaction APIs above.
     pub fn story_hyperlinks_only_snapshot(&self) -> Result<crate::story_hyperlinks::Snapshot> {
-        self.story_hyperlinks_only_snapshot_with_limits(crate::story_hyperlinks::Limits::default())
+        self.story_hyperlinks_only_snapshot_bounded(self.semantic_limits.story_hyperlinks_value())
     }
 
     /// Capture the story hyperlink closure under an explicit bounded policy.
-    pub fn story_hyperlinks_only_snapshot_with_limits(
+    pub(crate) fn story_hyperlinks_only_snapshot_bounded(
         &self,
         limits: crate::story_hyperlinks::Limits,
     ) -> Result<crate::story_hyperlinks::Snapshot> {
@@ -2033,21 +2018,21 @@ impl Package {
         target_urls: &[&str],
         mode: crate::story_hyperlinks::Mode,
     ) -> Result<crate::story_hyperlinks::Plan> {
-        self.plan_story_hyperlink_redaction_with_limits(
+        self.plan_story_hyperlink_redaction_bounded(
             target_urls,
             mode,
-            crate::story_hyperlinks::Limits::default(),
+            self.semantic_limits.story_hyperlinks_value(),
         )
     }
 
     /// Plan story hyperlink removal with explicit semantic bounds.
-    pub fn plan_story_hyperlink_redaction_with_limits(
+    pub(crate) fn plan_story_hyperlink_redaction_bounded(
         &self,
         target_urls: &[&str],
         mode: crate::story_hyperlinks::Mode,
         limits: crate::story_hyperlinks::Limits,
     ) -> Result<crate::story_hyperlinks::Plan> {
-        self.story_hyperlinks_only_snapshot_with_limits(limits)?
+        self.story_hyperlinks_only_snapshot_bounded(limits)?
             .plan_target_urls_with_mode(target_urls, mode)
     }
 
@@ -3627,6 +3612,8 @@ pub struct Document {
     /// Everything repaired while this pinned view was read, shared by its
     /// clones. See `crate::leniency`.
     tolerance: Arc<Mutex<crate::leniency::ToleranceReport>>,
+    /// The semantic read budgets of the package the view came from.
+    limits: Arc<crate::SemanticLimits>,
 }
 
 impl Document {
@@ -3762,14 +3749,14 @@ impl Document {
     /// # Errors
     /// Returns malformed metadata, XML, or revision resource-limit errors.
     pub fn revisions(&self) -> Result<SmallVec<[crate::revision::Revision; 4]>> {
-        self.revisions_with_limits(crate::revision::Limits::default())
+        self.revisions_bounded(self.limits.revisions_value())
     }
 
     /// Read tracked revision metadata with explicit parser and retention limits.
     ///
     /// # Errors
     /// Returns malformed metadata, XML, or revision resource-limit errors.
-    pub fn revisions_with_limits(
+    pub(crate) fn revisions_bounded(
         &self,
         limits: crate::revision::Limits,
     ) -> Result<SmallVec<[crate::revision::Revision; 4]>> {
@@ -4067,17 +4054,17 @@ impl Document {
 
     /// Capture the immutable section inventory from the pinned main document.
     pub fn section_inventory(&self) -> Result<crate::section::Inventory> {
-        self.section_inventory_with_limits(&crate::section::Limits::default())
+        self.section_inventory_bounded(self.limits.sections_value())
     }
 
     /// Capture the section inventory with caller-provided semantic limits.
-    pub fn section_inventory_with_limits(
+    pub(crate) fn section_inventory_bounded(
         &self,
         limits: &crate::section::Limits,
     ) -> Result<crate::section::Inventory> {
         self.check_execution()?;
         ensure_source_section_inventory_xml(self.xml.as_bytes(), limits)?;
-        let inventory = crate::section::Inventory::parse_with_limits(self.xml.as_bytes(), limits)?;
+        let inventory = crate::section::Inventory::parse(self.xml.as_bytes(), limits)?;
         self.merge_tolerance(inventory.tolerance_report());
         self.check_execution()?;
         Ok(inventory)
@@ -4085,11 +4072,11 @@ impl Document {
 
     /// Capture a cheaply cloneable inventory bound to the exact opened source.
     pub fn section_inventory_snapshot(&self) -> Result<crate::section::Snapshot> {
-        self.section_inventory_snapshot_with_limits(&crate::section::Limits::default())
+        self.section_inventory_snapshot_bounded(self.limits.sections_value())
     }
 
     /// Capture a source-bound inventory with caller-provided semantic limits.
-    pub fn section_inventory_snapshot_with_limits(
+    pub(crate) fn section_inventory_snapshot_bounded(
         &self,
         limits: &crate::section::Limits,
     ) -> Result<crate::section::Snapshot> {

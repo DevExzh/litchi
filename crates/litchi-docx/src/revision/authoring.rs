@@ -371,23 +371,13 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Parse one standalone WordprocessingML main-document XML source.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for malformed XML, unsupported property/paragraph
-    /// revisions, incomplete move ownership, or exhausted limits.
-    pub fn from_xml(source: impl Into<Vec<u8>>) -> Result<Self> {
-        Self::from_xml_with_limits(source, Limits::default())
-    }
-
     /// Parse one standalone source under explicit bounded limits.
     ///
     /// # Errors
     ///
     /// Returns an error when the source is outside the supported owner or the
     /// supplied policy.
-    pub fn from_xml_with_limits(source: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
+    pub fn from_xml(source: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
         let source = Arc::new(source.into());
         Self::from_source(source, limits, None)
     }
@@ -858,7 +848,7 @@ impl Package {
     /// Returns an error when the main document is stale, unsupported, malformed,
     /// or outside the requested policy.
     pub fn tracked_revisions(&self) -> Result<Snapshot> {
-        self.tracked_revisions_with_limits(Limits::default())
+        self.tracked_revisions_bounded(self.semantic_limits().tracked_revisions_value())
     }
 
     /// Read tracked revisions from the main document under explicit limits.
@@ -867,11 +857,11 @@ impl Package {
     ///
     /// Returns an error when the main document is stale, unsupported, malformed,
     /// or outside the requested policy.
-    pub fn tracked_revisions_with_limits(&self, limits: Limits) -> Result<Snapshot> {
+    pub(crate) fn tracked_revisions_bounded(&self, limits: Limits) -> Result<Snapshot> {
         let limits = limits.validate()?;
-        self.ensure_conflict_opc_current("tracked_revisions_with_limits")?;
+        self.ensure_conflict_opc_current("tracked_revisions_bounded")?;
         let story_limits = package_story_limits(limits);
-        let inventory = self.story_inventory_with_limits(story_limits)?;
+        let inventory = self.story_inventory_bounded(story_limits)?;
         let story = inventory
             .get(inventory.main())
             .ok_or_else(|| invalid("resolved main document is missing from the story inventory"))?;
@@ -922,7 +912,7 @@ impl Package {
         let source_limits = patch.source_limits;
         let target_limits = patch.target_limits;
         let story_limits = package_story_limits(source_limits);
-        let inventory = self.story_inventory_with_limits(story_limits)?;
+        let inventory = self.story_inventory_bounded(story_limits)?;
         if inventory.topology().as_bytes() != binding.topology.as_ref() {
             return Err(invalid("tracked revision package owner topology is stale"));
         }
@@ -3190,7 +3180,8 @@ mod tests {
         let source = document(
             r#"<w:p><w:r><w:t>base</w:t></w:r><w:ins w:id="1" w:author="Alice"><w:r><w:t xml:space="preserve"> add </w:t></w:r></w:ins><w:del w:id="2" w:author="Bob"><w:r><w:delText xml:space="preserve"> old </w:delText></w:r></w:del></w:p>"#,
         );
-        let snapshot = Snapshot::from_xml(source.clone()).expect("parse inline revisions");
+        let snapshot =
+            Snapshot::from_xml(source.clone(), Default::default()).expect("parse inline revisions");
         assert_eq!(snapshot.changes().len(), 2);
         assert_eq!(snapshot.changes()[0].kind(), ChangeKind::Insert);
         assert_eq!(snapshot.changes()[1].kind(), ChangeKind::Delete);
@@ -3252,7 +3243,8 @@ mod tests {
         let source = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice" xmlns:x="urn:opaque" xmlns:c="http://schemas.openxmlformats.org/markup-compatibility/2006" c:Ignorable="x" xml:space="preserve" xml:lang="en"><w:r x:vendor="a>b"><x:opaque>  <x:child/>  payload<![CDATA[ & ]]></x:opaque><w:t> x </w:t></w:r></w:ins></w:p>"#,
         );
-        let snapshot = Snapshot::from_xml(source.clone()).expect("parse scoped payload");
+        let snapshot =
+            Snapshot::from_xml(source.clone(), Default::default()).expect("parse scoped payload");
         let mut transaction = snapshot.edit();
         transaction.accept(0).expect("accept insertion");
         let commit = transaction.commit().expect("commit scoped payload");
@@ -3282,7 +3274,7 @@ mod tests {
         let source = document(
             r#"<w:p><w:del w:id="1" w:author="Alice"><w:r><w:delText>old</w:delText></w:r></w:del></w:p>"#,
         );
-        let snapshot = Snapshot::from_xml(source).expect("parse deleted text");
+        let snapshot = Snapshot::from_xml(source, Default::default()).expect("parse deleted text");
         let mut transaction = snapshot.edit();
         transaction.reject(0).expect("reject deletion");
         let commit = transaction.commit().expect("commit deletion rejection");
@@ -3295,7 +3287,7 @@ mod tests {
                 .windows(b"w:w:t".len())
                 .any(|window| { window == b"w:w:t" })
         );
-        Snapshot::from_xml(expected).expect("reopen exact accepted XML");
+        Snapshot::from_xml(expected, Default::default()).expect("reopen exact accepted XML");
     }
 
     #[test]
@@ -3303,13 +3295,14 @@ mod tests {
         let source = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice" xmlns:x="urn:opaque" xml:space="preserve"/></w:p>"#,
         );
-        let snapshot = Snapshot::from_xml(source).expect("parse empty scoped insertion");
+        let snapshot =
+            Snapshot::from_xml(source, Default::default()).expect("parse empty scoped insertion");
         let mut transaction = snapshot.edit();
         transaction.accept(0).expect("accept empty insertion");
         let commit = transaction.commit().expect("remove empty insertion");
         let expected = document(r#"<w:p></w:p>"#);
         assert_eq!(commit.snapshot().source(), expected.as_slice());
-        Snapshot::from_xml(expected).expect("reopen empty-wrapper result");
+        Snapshot::from_xml(expected, Default::default()).expect("reopen empty-wrapper result");
     }
 
     #[test]
@@ -3323,7 +3316,7 @@ mod tests {
                 r#"<w:p><w:ins w:id="1" w:author="Alice">{child}</w:ins></w:p>"#
             ));
             assert!(
-                Snapshot::from_xml(source).is_err(),
+                Snapshot::from_xml(source, Default::default()).is_err(),
                 "direct wrapper child unexpectedly accepted: {child}"
             );
         }
@@ -3331,49 +3324,49 @@ mod tests {
         let nested_wrapper = document(
             r#"<w:p><w:r><w:ins w:id="1" w:author="Alice"><w:r><w:t>x</w:t></w:r></w:ins></w:r></w:p>"#,
         );
-        assert!(Snapshot::from_xml(nested_wrapper).is_err());
+        assert!(Snapshot::from_xml(nested_wrapper, Default::default()).is_err());
 
         let range_in_run = document(
             r#"<w:p><w:r><w:moveFromRangeStart w:id="1" w:author="Alice" w:date="2026-01-01T00:00:00Z" w:name="m"/></w:r></w:p>"#,
         );
-        assert!(Snapshot::from_xml(range_in_run).is_err());
+        assert!(Snapshot::from_xml(range_in_run, Default::default()).is_err());
     }
 
     #[test]
     fn unqualified_and_nested_word_run_content_are_refused() {
         let unqualified_direct =
             document(r#"<w:p><w:ins w:id="1" w:author="Alice"><t>unqualified</t></w:ins></w:p>"#);
-        assert!(Snapshot::from_xml(unqualified_direct).is_err());
+        assert!(Snapshot::from_xml(unqualified_direct, Default::default()).is_err());
 
         let unknown_nested_word = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><w:unknownWord/></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(unknown_nested_word).is_err());
+        assert!(Snapshot::from_xml(unknown_nested_word, Default::default()).is_err());
 
         let unknown_run_properties = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><w:rPr><w:unknownWord/></w:rPr><w:t>x</w:t></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(unknown_run_properties).is_err());
+        assert!(Snapshot::from_xml(unknown_run_properties, Default::default()).is_err());
 
         let valid_run_properties = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><w:rPr><w:b w:val="1"/></w:rPr><w:t>x</w:t></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(valid_run_properties).is_ok());
+        assert!(Snapshot::from_xml(valid_run_properties, Default::default()).is_ok());
 
         let unqualified_nested = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><t>unqualified</t></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(unqualified_nested).is_err());
+        assert!(Snapshot::from_xml(unqualified_nested, Default::default()).is_err());
 
         let unknown_in_move_range = document(
             r#"<w:p><w:moveFromRangeStart w:id="1" w:author="Alice" w:date="2026-01-01T00:00:00Z" w:name="m"/><w:r><w:unknownWord/></w:r><w:moveFromRangeEnd w:id="1"/><w:moveToRangeStart w:id="2" w:author="Alice" w:date="2026-01-01T00:00:00Z" w:name="m"/><w:r><w:t>x</w:t></w:r><w:moveToRangeEnd w:id="2"/></w:p>"#,
         );
-        assert!(Snapshot::from_xml(unknown_in_move_range).is_err());
+        assert!(Snapshot::from_xml(unknown_in_move_range, Default::default()).is_err());
 
         let foreign_payload = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><x:opaque xmlns:x="urn:opaque"/></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(foreign_payload).is_ok());
+        assert!(Snapshot::from_xml(foreign_payload, Default::default()).is_ok());
     }
 
     #[test]
@@ -3381,17 +3374,17 @@ mod tests {
         let alternate_inside_wrapper = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Fallback><w:r><w:t>x</w:t></w:r></mc:Fallback></mc:AlternateContent></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(alternate_inside_wrapper).is_err());
+        assert!(Snapshot::from_xml(alternate_inside_wrapper, Default::default()).is_err());
 
         let alternate_inside_run = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Fallback><w:t>x</w:t></mc:Fallback></mc:AlternateContent></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(alternate_inside_run).is_err());
+        assert!(Snapshot::from_xml(alternate_inside_run, Default::default()).is_err());
 
         let revision_inside_alternate = document(
             r#"<w:p><mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice Requires="w"><w:ins w:id="1" w:author="Alice"><w:r><w:t>x</w:t></w:r></w:ins></mc:Choice><mc:Fallback><w:r><w:t>fallback</w:t></w:r></mc:Fallback></mc:AlternateContent></w:p>"#,
         );
-        assert!(Snapshot::from_xml(revision_inside_alternate).is_err());
+        assert!(Snapshot::from_xml(revision_inside_alternate, Default::default()).is_err());
     }
 
     #[test]
@@ -3406,7 +3399,7 @@ mod tests {
                 r#"<w:p><w:ins w:id="1" w:author="Alice">{content}</w:ins></w:p>"#
             ));
             assert!(
-                Snapshot::from_xml(source).is_err(),
+                Snapshot::from_xml(source, Default::default()).is_err(),
                 "invalid character data unexpectedly accepted: {content}"
             );
         }
@@ -3414,13 +3407,15 @@ mod tests {
         let source = document(
             "<w:p><w:ins w:id=\"1\" w:author=\"Alice\"><w:r> \n <w:rPr>\t </w:rPr> \n <w:t>x</w:t>\n</w:r></w:ins></w:p>",
         );
-        let snapshot = Snapshot::from_xml(source.clone()).expect("parse whitespace-only run");
+        let snapshot = Snapshot::from_xml(source.clone(), Default::default())
+            .expect("parse whitespace-only run");
         let mut transaction = snapshot.edit();
         transaction.accept(0).expect("accept insertion");
         let commit = transaction.commit().expect("remove insertion");
         let expected = document("<w:p><w:r> \n <w:rPr>\t </w:rPr> \n <w:t>x</w:t>\n</w:r></w:p>");
         assert_eq!(commit.snapshot().source(), expected.as_slice());
-        Snapshot::from_xml(expected).expect("reopen whitespace-preserving output");
+        Snapshot::from_xml(expected, Default::default())
+            .expect("reopen whitespace-preserving output");
     }
 
     #[test]
@@ -3428,22 +3423,22 @@ mod tests {
         let duplicate_rpr = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><w:rPr/><w:rPr/><w:t>x</w:t></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(duplicate_rpr).is_err());
+        assert!(Snapshot::from_xml(duplicate_rpr, Default::default()).is_err());
 
         let late_rpr = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><w:t>x</w:t><w:rPr/></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(late_rpr).is_err());
+        assert!(Snapshot::from_xml(late_rpr, Default::default()).is_err());
 
         let duplicate_base_property = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><w:rPr><w:b/><w:b/></w:rPr><w:t>x</w:t></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(duplicate_base_property).is_err());
+        assert!(Snapshot::from_xml(duplicate_base_property, Default::default()).is_err());
 
         let unordered_base_properties = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><w:rPr><w:i/><w:b/></w:rPr><w:t>x</w:t></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(unordered_base_properties).is_ok());
+        assert!(Snapshot::from_xml(unordered_base_properties, Default::default()).is_ok());
     }
 
     #[test]
@@ -3451,12 +3446,12 @@ mod tests {
         let content_part = document(
             r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r><w:contentPart xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rId1"/></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(content_part).is_err());
+        assert!(Snapshot::from_xml(content_part, Default::default()).is_err());
 
         let custom_xml_closure = document(
             r#"<w:p><w:customXmlInsRangeStart w:id="9" w:author="Alice" w:date="2026-01-01T00:00:00Z"/><w:ins w:id="1" w:author="Alice"><w:r><w:t>x</w:t></w:r></w:ins><w:customXmlInsRangeEnd w:id="9"/></w:p>"#,
         );
-        assert!(Snapshot::from_xml(custom_xml_closure).is_err());
+        assert!(Snapshot::from_xml(custom_xml_closure, Default::default()).is_err());
     }
 
     #[test]
@@ -3464,7 +3459,8 @@ mod tests {
         let source = document(
             r#"<w:p><w:moveFromRangeStart w:id="2" w:author="Alice" w:date="2026-01-01T00:00:00Z" w:name="move1"/><w:moveFrom w:id="3" w:author="Alice"><w:r><w:delText>old</w:delText></w:r></w:moveFrom><w:moveFromRangeEnd w:id="2"/><w:moveToRangeStart w:id="0" w:author="Alice" w:date="2026-01-01T00:00:00Z" w:name="move1"/><w:moveTo w:id="1" w:author="Alice"><w:r><w:t>new</w:t></w:r></w:moveTo><w:moveToRangeEnd w:id="0"/></w:p>"#,
         );
-        let snapshot = Snapshot::from_xml(source.clone()).expect("parse tracked move");
+        let snapshot =
+            Snapshot::from_xml(source.clone(), Default::default()).expect("parse tracked move");
         assert_eq!(snapshot.changes().len(), 1);
         assert_eq!(snapshot.changes()[0].kind(), ChangeKind::Move);
 
@@ -3501,7 +3497,8 @@ mod tests {
         let source = document(
             r#"<w:p><w:moveToRangeStart w:id="0" w:author="Alice" w:date="2026-01-01T00:00:00Z" w:name="move1"/><w:r><w:t>to-ordinary</w:t></w:r><w:moveTo w:id="1" w:author="Alice"><w:r><w:t>new</w:t></w:r></w:moveTo><w:moveToRangeEnd w:id="0"/><w:moveFromRangeStart w:id="2" w:author="Alice" w:date="2026-01-01T00:00:00Z" w:name="move1"/><w:r><w:t>from-ordinary</w:t></w:r><w:moveFrom w:id="3" w:author="Alice"><w:r><w:delText>old</w:delText></w:r></w:moveFrom><w:moveFromRangeEnd w:id="2"/></w:p>"#,
         );
-        let snapshot = Snapshot::from_xml(source.clone()).expect("parse named move");
+        let snapshot =
+            Snapshot::from_xml(source.clone(), Default::default()).expect("parse named move");
         assert_eq!(snapshot.changes().len(), 1);
         assert_eq!(snapshot.changes()[0].id(), "0");
         assert_eq!(snapshot.changes()[0].name(), Some("move1"));
@@ -3518,7 +3515,8 @@ mod tests {
             r#"<w:p><w:r><w:t>to-ordinary</w:t></w:r><w:r><w:t>new</w:t></w:r><w:r><w:t>from-ordinary</w:t></w:r></w:p>"#,
         );
         assert_eq!(accepted.snapshot().source(), accepted_expected.as_slice());
-        Snapshot::from_xml(accepted_expected).expect("reopen exact accepted move XML");
+        Snapshot::from_xml(accepted_expected, Default::default())
+            .expect("reopen exact accepted move XML");
         assert_eq!(
             accepted
                 .patch()
@@ -3541,7 +3539,8 @@ mod tests {
             r#"<w:p><w:r><w:t>to-ordinary</w:t></w:r><w:r><w:t>from-ordinary</w:t></w:r><w:r><w:t>old</w:t></w:r></w:p>"#,
         );
         assert_eq!(rejected.snapshot().source(), rejected_expected.as_slice());
-        Snapshot::from_xml(rejected_expected).expect("reopen exact rejected move XML");
+        Snapshot::from_xml(rejected_expected, Default::default())
+            .expect("reopen exact rejected move XML");
         assert_eq!(
             rejected
                 .patch()
@@ -3558,7 +3557,7 @@ mod tests {
         let source = document(
             r#"<w:p><w:moveFrom w:id="4" w:author="Alice"><w:r><w:delText>old</w:delText></w:r></w:moveFrom><w:moveTo w:id="4" w:author="Alice"><w:r><w:t>new</w:t></w:r></w:moveTo></w:p>"#,
         );
-        assert!(Snapshot::from_xml(source).is_err());
+        assert!(Snapshot::from_xml(source, Default::default()).is_err());
     }
 
     #[test]
@@ -3566,7 +3565,7 @@ mod tests {
         let source = document(
             r#"<w:p><w:moveFromRangeStart w:id="1" w:author="A" w:date="2026-01-01T00:00:00Z" w:name="m"/><w:moveFrom w:id="2" w:author="A"><w:r><w:delText>x</w:delText></w:r></w:moveFrom><w:moveFromRangeEnd w:id="1"/><w:moveToRangeStart w:id="1" w:author="A" w:date="2026-01-01T00:00:00Z" w:name="m"/><w:moveTo w:id="3" w:author="A"><w:r><w:t>x</w:t></w:r></w:moveTo><w:moveToRangeEnd w:id="1"/></w:p>"#,
         );
-        assert!(Snapshot::from_xml(source).is_err());
+        assert!(Snapshot::from_xml(source, Default::default()).is_err());
     }
 
     #[test]
@@ -3574,22 +3573,22 @@ mod tests {
         let invalid_name = document(
             r#"<w:p><w:ins w:id="1" w:author="A" w:name="not-a-move"><w:r><w:t>x</w:t></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(invalid_name).is_err());
+        assert!(Snapshot::from_xml(invalid_name, Default::default()).is_err());
 
         let unknown_word_attribute = document(
             r#"<w:p><w:ins w:id="1" w:author="A" w:unsupported="x"><w:r><w:t>x</w:t></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(unknown_word_attribute).is_err());
+        assert!(Snapshot::from_xml(unknown_word_attribute, Default::default()).is_err());
 
         let invalid_displacement = document(
             r#"<w:p><w:moveFromRangeStart w:id="1" w:author="A" w:date="2026-01-01T00:00:00Z" w:name="m" w:displacedByCustomXml="middle"/><w:moveFrom w:id="2" w:author="A"><w:r><w:delText>x</w:delText></w:r></w:moveFrom><w:moveFromRangeEnd w:id="1"/><w:moveToRangeStart w:id="2" w:author="A" w:date="2026-01-01T00:00:00Z" w:name="m"/><w:moveTo w:id="3" w:author="A"><w:r><w:t>x</w:t></w:r></w:moveTo><w:moveToRangeEnd w:id="2"/></w:p>"#,
         );
-        assert!(Snapshot::from_xml(invalid_displacement).is_err());
+        assert!(Snapshot::from_xml(invalid_displacement, Default::default()).is_err());
 
         let valid_displacement = document(
             r#"<w:p><w:moveFromRangeStart w:id="1" w:author="A" w:date="2026-01-01T00:00:00Z" w:name="m" w:displacedByCustomXml="next"/><w:moveFrom w:id="2" w:author="A"><w:r><w:delText>x</w:delText></w:r></w:moveFrom><w:moveFromRangeEnd w:id="1" w:displacedByCustomXml="prev"/><w:moveToRangeStart w:id="3" w:author="A" w:date="2026-01-01T00:00:00Z" w:name="m" w:displacedByCustomXml="next"/><w:moveTo w:id="4" w:author="A"><w:r><w:t>x</w:t></w:r></w:moveTo><w:moveToRangeEnd w:id="3" w:displacedByCustomXml="prev"/></w:p>"#,
         );
-        assert!(Snapshot::from_xml(valid_displacement).is_ok());
+        assert!(Snapshot::from_xml(valid_displacement, Default::default()).is_ok());
     }
 
     #[test]
@@ -3597,17 +3596,17 @@ mod tests {
         let simple_field = document(
             r#"<w:p><w:fldSimple w:instr="PAGE"><w:ins w:id="1" w:author="A"><w:r><w:t>x</w:t></w:r></w:ins></w:fldSimple></w:p>"#,
         );
-        assert!(Snapshot::from_xml(simple_field).is_err());
+        assert!(Snapshot::from_xml(simple_field, Default::default()).is_err());
 
         let control = document(
             r#"<w:p><w:sdt><w:sdtContent><w:ins w:id="1" w:author="A"><w:r><w:t>x</w:t></w:r></w:ins></w:sdtContent></w:sdt></w:p>"#,
         );
-        assert!(Snapshot::from_xml(control).is_err());
+        assert!(Snapshot::from_xml(control, Default::default()).is_err());
 
         let range_in_control = document(
             r#"<w:p><w:sdt><w:sdtContent><w:moveFromRangeStart w:id="1" w:author="A" w:date="2026-01-01T00:00:00Z" w:name="m"/></w:sdtContent></w:sdt></w:p>"#,
         );
-        assert!(Snapshot::from_xml(range_in_control).is_err());
+        assert!(Snapshot::from_xml(range_in_control, Default::default()).is_err());
     }
 
     #[test]
@@ -3615,35 +3614,36 @@ mod tests {
         let nested = document(
             r#"<w:p><w:ins w:id="1" w:author="A"><w:ins w:id="2" w:author="B"><w:r><w:t>x</w:t></w:r></w:ins></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(nested).is_err());
+        assert!(Snapshot::from_xml(nested, Default::default()).is_err());
 
         let foreign_parent = document(
             r#"<x:p xmlns:x="urn:foreign"><w:ins w:id="1" w:author="A"><w:r><w:t>x</w:t></w:r></w:ins></x:p>"#,
         );
-        assert!(Snapshot::from_xml(foreign_parent).is_err());
+        assert!(Snapshot::from_xml(foreign_parent, Default::default()).is_err());
 
         let incomplete_move = document(
             r#"<w:p><w:moveFrom w:id="1" w:author="A"><w:r><w:delText>x</w:delText></w:r></w:moveFrom></w:p>"#,
         );
-        assert!(Snapshot::from_xml(incomplete_move).is_err());
+        assert!(Snapshot::from_xml(incomplete_move, Default::default()).is_err());
 
         let missing_move_name = document(
             r#"<w:p><w:moveFromRangeStart w:id="1" w:author="A" w:date="2026-01-01T00:00:00Z"/><w:moveFromRangeEnd w:id="1"/><w:moveToRangeStart w:id="2" w:author="A" w:date="2026-01-01T00:00:00Z" w:name="m"/><w:moveToRangeEnd w:id="2"/></w:p>"#,
         );
-        assert!(Snapshot::from_xml(missing_move_name).is_err());
+        assert!(Snapshot::from_xml(missing_move_name, Default::default()).is_err());
 
         let property =
             document(r#"<w:p><w:pPrChange w:id="1" w:author="A"><w:pPr/></w:pPrChange></w:p>"#);
-        assert!(Snapshot::from_xml(property).is_err());
+        assert!(Snapshot::from_xml(property, Default::default()).is_err());
 
         let field = document(
             r#"<w:p><w:ins w:id="1" w:author="A"><w:r><w:fldChar w:fldCharType="begin"/></w:r></w:ins></w:p>"#,
         );
-        assert!(Snapshot::from_xml(field).is_err());
+        assert!(Snapshot::from_xml(field, Default::default()).is_err());
 
-        let source = Snapshot::from_xml(document(
-            r#"<w:p><w:ins w:id="1" w:author="A"><w:r><w:t>x</w:t></w:r></w:ins></w:p>"#,
-        ))
+        let source = Snapshot::from_xml(
+            document(r#"<w:p><w:ins w:id="1" w:author="A"><w:r><w:t>x</w:t></w:r></w:ins></w:p>"#),
+            Default::default(),
+        )
         .unwrap();
         let mut transaction = source.edit();
         assert!(transaction.accept(1).is_err());
@@ -3654,7 +3654,7 @@ mod tests {
     fn no_op_and_limits_are_bounded_and_retryable() {
         let source_bytes =
             document(r#"<w:p><w:ins w:id="1" w:author="A"><w:r><w:t>x</w:t></w:r></w:ins></w:p>"#);
-        let source = Snapshot::from_xml(source_bytes.clone()).unwrap();
+        let source = Snapshot::from_xml(source_bytes.clone(), Default::default()).unwrap();
         let commit = source.edit().commit().expect("empty commit");
         assert!(!commit.changed());
         assert!(commit.patch().is_noop());
@@ -3667,7 +3667,7 @@ mod tests {
             max_events: 1,
             ..Limits::default()
         };
-        let error = Snapshot::from_xml_with_limits(source_bytes, limits).unwrap_err();
+        let error = Snapshot::from_xml(source_bytes, limits).unwrap_err();
         assert!(matches!(
             error,
             Error::RevisionLimit {
@@ -3680,7 +3680,7 @@ mod tests {
             max_changes: 0,
             ..Limits::default()
         };
-        let error = Snapshot::from_xml_with_limits(
+        let error = Snapshot::from_xml(
             document(r#"<w:p><w:ins w:id="1" w:author="A"><w:r/></w:ins></w:p>"#),
             change_limits,
         )
@@ -3697,7 +3697,7 @@ mod tests {
             max_metadata_bytes: 2,
             ..Limits::default()
         };
-        let error = Snapshot::from_xml_with_limits(
+        let error = Snapshot::from_xml(
             document(r#"<w:p><w:ins w:id="1" w:author="Alice"><w:r/></w:ins></w:p>"#),
             metadata_limits,
         )

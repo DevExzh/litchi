@@ -253,7 +253,7 @@ fn malformed_base64_is_distinct_from_a_valid_checksum_mismatch() {
     let source = format!(
         r#"<w:document xmlns:w="{W}" xmlns:mc="{MC}" xmlns:h="{HASH}" mc:Ignorable="h"><w:body><w:sdtPr><w:dataBinding w:xpath="/x" w:storeItemID="{ITEM}" h:storeItemChecksum="bad"/></w:sdtPr><w:sdtPr><w:dataBinding w:xpath="/x" w:storeItemID="{ITEM}" h:storeItemChecksum="OOMLvQ=="/></w:sdtPr></w:body></w:document>"#
     );
-    let inventory = Inventory::parse(source.as_bytes()).unwrap();
+    let inventory = Inventory::parse(source.as_bytes(), &Default::default()).unwrap();
     let first = inventory.occurrences()[0].control().data_binding().unwrap();
     assert!(
         matches!(first.checksum_status(), ChecksumStatus::Malformed(value) if &*value == "bad")
@@ -272,12 +272,12 @@ fn expanded_names_ignorable_scope_and_mce_select_only_active_metadata() {
     let missing_ignorable = format!(
         r#"<w:sdtPr xmlns:w="{W}" xmlns:h="{HASH}"><w:dataBinding w:xpath="/x" w:storeItemID="{ITEM}" h:storeItemChecksum="OOMLvQ=="/></w:sdtPr>"#
     );
-    assert!(Inventory::parse(missing_ignorable.as_bytes()).is_err());
+    assert!(Inventory::parse(missing_ignorable.as_bytes(), &Default::default()).is_err());
 
     let spoofed = format!(
         r#"<w:sdtPr xmlns:w="{W}" xmlns:mc="{MC}" xmlns:h="urn:not-the-hash-namespace" mc:Ignorable="h"><w:dataBinding w:xpath="/x" w:storeItemID="{ITEM}" h:storeItemChecksum="OOMLvQ=="/></w:sdtPr>"#
     );
-    let spoofed = Inventory::parse(spoofed.as_bytes()).unwrap();
+    let spoofed = Inventory::parse(spoofed.as_bytes(), &Default::default()).unwrap();
     assert!(matches!(
         spoofed.occurrences()[0]
             .control()
@@ -292,7 +292,7 @@ fn expanded_names_ignorable_scope_and_mce_select_only_active_metadata() {
         binding(Some(11), Some("AAAAAA==")),
         binding(Some(22), Some("OOMLvQ=="))
     );
-    let selected = Inventory::parse(alternate.as_bytes()).unwrap();
+    let selected = Inventory::parse(alternate.as_bytes(), &Default::default()).unwrap();
     assert_eq!(selected.occurrences().len(), 1);
     assert_eq!(selected.occurrences()[0].id(), Some(22));
 }
@@ -302,7 +302,7 @@ fn occurrences_preserve_missing_and_duplicate_ids_and_all_st_on_off_forms() {
     let ids = format!(
         r#"<w:document xmlns:w="{W}"><w:body><w:sdtPr/><w:sdtPr><w:id w:val="7"/></w:sdtPr><w:sdtPr><w:id w:val="7"/></w:sdtPr></w:body></w:document>"#
     );
-    let ids = Inventory::parse(ids.as_bytes()).unwrap();
+    let ids = Inventory::parse(ids.as_bytes(), &Default::default()).unwrap();
     assert_eq!(
         ids.occurrences()
             .iter()
@@ -329,7 +329,7 @@ fn occurrences_preserve_missing_and_duplicate_ids_and_all_st_on_off_forms() {
         let source = format!(
             r#"<w:sdtPr xmlns:w="{W}" xmlns:mc="{MC}" xmlns:f="{FORMAT}" mc:Ignorable="f"><w:lock w:val="contentLocked" f:formattingAllowed="{lexical}"/></w:sdtPr>"#
         );
-        let inventory = Inventory::parse(source.as_bytes()).unwrap();
+        let inventory = Inventory::parse(source.as_bytes(), &Default::default()).unwrap();
         assert_eq!(
             inventory.occurrences()[0]
                 .control()
@@ -345,7 +345,7 @@ fn occurrences_preserve_missing_and_duplicate_ids_and_all_st_on_off_forms() {
     );
     // formattingAllowed on a non-content lock is dropped and recorded; the
     // lock itself is kept (leniency F2.8).
-    let inventory = Inventory::parse(invalid.as_bytes()).unwrap();
+    let inventory = Inventory::parse(invalid.as_bytes(), &Default::default()).unwrap();
     assert!(
         inventory.occurrences()[0]
             .control()
@@ -364,7 +364,7 @@ fn core_and_word_2012_bindings_remain_distinct_exact_occurrences() {
         <w:sdtPr><w:id w:val="3"/><w:dataBinding w:xpath="/preferred" w:storeItemID="{ITEM}" h:storeItemChecksum="AAAAAA=="/><w15:dataBinding w:xpath="/compatibility" w:storeItemID="{ITEM}" h:storeItemChecksum="rwAAAA=="/></w:sdtPr>
         </w:body></w:document>"#
     );
-    let inventory = Inventory::parse(source.as_bytes()).unwrap();
+    let inventory = Inventory::parse(source.as_bytes(), &Default::default()).unwrap();
     assert_eq!(inventory.occurrences().len(), 3);
     assert_eq!(
         inventory.occurrences()[0]
@@ -391,7 +391,7 @@ fn core_and_word_2012_bindings_remain_distinct_exact_occurrences() {
         "/preferred"
     );
 
-    let snapshot = Snapshot::from_xml(source.into_bytes()).unwrap();
+    let snapshot = Snapshot::from_xml(source.into_bytes(), Default::default()).unwrap();
     assert_eq!(snapshot.occurrences()[0].bindings().len(), 1);
     assert_eq!(snapshot.occurrences()[1].bindings().len(), 1);
     assert_eq!(snapshot.occurrences()[2].bindings().len(), 2);
@@ -715,7 +715,8 @@ fn strict_dotx_and_dotm_inventory_every_reachable_story_role() {
         };
         assert_eq!(
             package
-                .story_inventory_with_limits(exact)
+                .with_semantic_limits(litchi_docx::SemanticLimits::default().stories(exact))
+                .story_inventory()
                 .unwrap()
                 .stories()
                 .len(),
@@ -723,10 +724,11 @@ fn strict_dotx_and_dotm_inventory_every_reachable_story_role() {
         );
         assert!(
             package
-                .story_inventory_with_limits(StoryLimits {
+                .with_semantic_limits(litchi_docx::SemanticLimits::default().stories(StoryLimits {
                     max_stories: 6,
                     ..StoryLimits::default()
-                })
+                }))
+                .story_inventory()
                 .is_err()
         );
     }
@@ -1050,13 +1052,17 @@ fn package_limits_accept_exact_boundaries_and_reject_one_over() {
     limits.max_content_controls = 2;
     assert!(
         package
-            .content_control_snapshot_with_limits(limits.clone())
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().content_controls(limits.clone())
+            )
+            .content_control_snapshot()
             .is_ok()
     );
     limits.controls.max_input_bytes = source_len - 1;
     assert!(
         package
-            .content_control_snapshot_with_limits(limits)
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().content_controls(limits))
+            .content_control_snapshot()
             .is_err()
     );
 
@@ -1066,11 +1072,19 @@ fn package_limits_accept_exact_boundaries_and_reject_one_over() {
     };
     assert!(
         package
-            .content_control_snapshot_with_limits(limits.clone())
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().content_controls(limits.clone())
+            )
+            .content_control_snapshot()
             .is_err()
     );
     limits.max_content_controls = 2;
-    assert!(package.content_control_snapshot_with_limits(limits).is_ok());
+    assert!(
+        package
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().content_controls(limits))
+            .content_control_snapshot()
+            .is_ok()
+    );
 
     let mut limits = PackageLimits {
         max_crc_parts: 2,
@@ -1079,7 +1093,10 @@ fn package_limits_accept_exact_boundaries_and_reject_one_over() {
     };
     assert!(
         package
-            .content_control_snapshot_with_limits(limits.clone())
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().content_controls(limits.clone())
+            )
+            .content_control_snapshot()
             .unwrap()
             .verify_checksums()
             .is_ok()
@@ -1087,7 +1104,10 @@ fn package_limits_accept_exact_boundaries_and_reject_one_over() {
     limits.max_crc_parts = 1;
     assert!(
         package
-            .content_control_snapshot_with_limits(limits.clone())
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().content_controls(limits.clone())
+            )
+            .content_control_snapshot()
             .and_then(|snapshot| snapshot.verify_checksums())
             .is_err()
     );
@@ -1095,7 +1115,8 @@ fn package_limits_accept_exact_boundaries_and_reject_one_over() {
     limits.max_crc_bytes = crc_bytes - 1;
     assert!(
         package
-            .content_control_snapshot_with_limits(limits)
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().content_controls(limits))
+            .content_control_snapshot()
             .and_then(|snapshot| snapshot.verify_checksums())
             .is_err()
     );
@@ -1103,53 +1124,71 @@ fn package_limits_accept_exact_boundaries_and_reject_one_over() {
     mark_signed(&mut package);
     let signature_minimum = minimum_accepted(|value| {
         package
-            .content_control_snapshot_with_limits(PackageLimits {
-                max_signature_bytes: value,
-                ..PackageLimits::default()
-            })
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().content_controls(
+                PackageLimits {
+                    max_signature_bytes: value,
+                    ..PackageLimits::default()
+                },
+            ))
+            .content_control_snapshot()
             .is_ok()
     });
     assert!(signature_minimum > 1);
     assert!(
         package
-            .content_control_snapshot_with_limits(PackageLimits {
-                max_signature_bytes: signature_minimum,
-                ..PackageLimits::default()
-            })
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().content_controls(
+                PackageLimits {
+                    max_signature_bytes: signature_minimum,
+                    ..PackageLimits::default()
+                }
+            ))
+            .content_control_snapshot()
             .is_ok()
     );
     assert!(
         package
-            .content_control_snapshot_with_limits(PackageLimits {
-                max_signature_bytes: signature_minimum - 1,
-                ..PackageLimits::default()
-            })
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().content_controls(
+                PackageLimits {
+                    max_signature_bytes: signature_minimum - 1,
+                    ..PackageLimits::default()
+                }
+            ))
+            .content_control_snapshot()
             .is_err()
     );
 
     let custom_graph_minimum = minimum_accepted(|value| {
         package
-            .content_control_snapshot_with_limits(PackageLimits {
-                max_custom_graph_bytes: value,
-                ..PackageLimits::default()
-            })
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().content_controls(
+                PackageLimits {
+                    max_custom_graph_bytes: value,
+                    ..PackageLimits::default()
+                },
+            ))
+            .content_control_snapshot()
             .is_ok()
     });
     assert!(custom_graph_minimum > 1);
     assert!(
         package
-            .content_control_snapshot_with_limits(PackageLimits {
-                max_custom_graph_bytes: custom_graph_minimum,
-                ..PackageLimits::default()
-            })
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().content_controls(
+                PackageLimits {
+                    max_custom_graph_bytes: custom_graph_minimum,
+                    ..PackageLimits::default()
+                }
+            ))
+            .content_control_snapshot()
             .is_ok()
     );
     assert!(
         package
-            .content_control_snapshot_with_limits(PackageLimits {
-                max_custom_graph_bytes: custom_graph_minimum - 1,
-                ..PackageLimits::default()
-            })
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().content_controls(
+                PackageLimits {
+                    max_custom_graph_bytes: custom_graph_minimum - 1,
+                    ..PackageLimits::default()
+                }
+            ))
+            .content_control_snapshot()
             .is_err()
     );
 }
@@ -1189,7 +1228,12 @@ fn every_story_limit_has_an_exact_and_one_over_fixture() {
         max_topology_bytes: inventory.topology().as_bytes().len(),
         max_xml_prolog_events: 2,
     };
-    assert!(package.story_inventory_with_limits(exact).is_ok());
+    assert!(
+        package
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().stories(exact))
+            .story_inventory()
+            .is_ok()
+    );
 
     for limited in [
         StoryLimits {
@@ -1225,7 +1269,12 @@ fn every_story_limit_has_an_exact_and_one_over_fixture() {
             ..exact
         },
     ] {
-        assert!(package.story_inventory_with_limits(limited).is_err());
+        assert!(
+            package
+                .with_semantic_limits(litchi_docx::SemanticLimits::default().stories(limited))
+                .story_inventory()
+                .is_err()
+        );
     }
 }
 

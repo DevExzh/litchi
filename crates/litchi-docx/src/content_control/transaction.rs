@@ -776,7 +776,7 @@ mod tests {
 
     #[test]
     fn checksum_insert_reparses_and_noop_preserves_exact_source() {
-        let source = Snapshot::from_xml(xml(BINDING)).unwrap();
+        let source = Snapshot::from_xml(xml(BINDING), Default::default()).unwrap();
         let mut noop = source.edit();
         noop.set_checksum(0, None).unwrap();
         let noop = noop.commit().unwrap();
@@ -807,7 +807,7 @@ mod tests {
     #[test]
     fn formatting_insert_reuses_local_ignorable_without_duplicate_attribute() {
         let lock = r#"<w:lock xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:future="urn:future" mc:Ignorable="future" w:val="contentLocked"/>"#;
-        let source = Snapshot::from_xml(xml(lock)).unwrap();
+        let source = Snapshot::from_xml(xml(lock), Default::default()).unwrap();
         let mut transaction = source.edit();
         transaction
             .set_formatting_allowed(0, Some(FormattingAllowed::Allowed))
@@ -824,7 +824,7 @@ mod tests {
         let source = format!(
             r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:h="{STORE_ITEM_CHECKSUM_NAMESPACE}" mc:Ignorable="h"><w:body><w:sdt><w:sdtPr><w:dataBinding w:xpath="/x" w:storeItemID="{{00000000-0000-0000-0000-000000000001}}" h:storeItemChecksum="bad"/></w:sdtPr><w:sdtContent/></w:sdt></w:body></w:document>"#
         );
-        let snapshot = Snapshot::from_xml(source.into_bytes()).unwrap();
+        let snapshot = Snapshot::from_xml(source.into_bytes(), Default::default()).unwrap();
         let expected = Checksum::from_word_value(1);
         let mut transaction = snapshot.edit();
         transaction.set_checksum(0, Some(expected.clone())).unwrap();
@@ -838,13 +838,15 @@ mod tests {
 
     #[test]
     fn stale_patch_failure_is_retryable_and_inverse_is_fresh() {
-        let source = Snapshot::from_xml(xml(BINDING)).unwrap();
+        let source = Snapshot::from_xml(xml(BINDING), Default::default()).unwrap();
         let mut transaction = source.edit();
         transaction
             .set_checksum(0, Some(Checksum::from_word_value(2)))
             .unwrap();
         let commit = transaction.commit().unwrap();
-        let stale = Snapshot::from_xml(xml("<w:lock w:val=\"contentLocked\"/>")).unwrap();
+        let stale =
+            Snapshot::from_xml(xml("<w:lock w:val=\"contentLocked\"/>"), Default::default())
+                .unwrap();
         assert!(commit.patch().apply(&stale).is_err());
         let applied = commit.patch().apply(&source).unwrap();
         assert!(commit.patch().is_applied());
@@ -856,7 +858,7 @@ mod tests {
     #[test]
     fn edits_only_the_mce_selected_binding() {
         let source = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:u="urn:unsupported"><w:body><mc:AlternateContent><mc:Choice Requires="u"><w:sdt><w:sdtPr><w:dataBinding w:xpath="/inactive" w:storeItemID="{00000000-0000-0000-0000-000000000001}"/></w:sdtPr><w:sdtContent/></w:sdt></mc:Choice><mc:Fallback><w:sdt><w:sdtPr><w:dataBinding w:xpath="/active" w:storeItemID="{00000000-0000-0000-0000-000000000001}"/></w:sdtPr><w:sdtContent/></w:sdt></mc:Fallback></mc:AlternateContent></w:body></w:document>"#.to_owned();
-        let snapshot = Snapshot::from_xml(source.into_bytes()).unwrap();
+        let snapshot = Snapshot::from_xml(source.into_bytes(), Default::default()).unwrap();
         assert_eq!(snapshot.occurrences().len(), 1);
         assert_eq!(
             snapshot.inventory().occurrences()[0]
@@ -878,7 +880,8 @@ mod tests {
 
     #[test]
     fn refuses_formatting_on_non_content_lock_without_consuming_transaction() {
-        let snapshot = Snapshot::from_xml(xml(r#"<w:lock w:val="sdtLocked"/>"#)).unwrap();
+        let snapshot =
+            Snapshot::from_xml(xml(r#"<w:lock w:val="sdtLocked"/>"#), Default::default()).unwrap();
         let mut transaction = snapshot.edit();
         assert!(
             transaction
@@ -895,7 +898,7 @@ mod tests {
             max_output_bytes: source.len(),
             ..Default::default()
         };
-        let snapshot = Snapshot::from_xml_with_limits(source, limits).unwrap();
+        let snapshot = Snapshot::from_xml(source, limits).unwrap();
         let mut transaction = snapshot.edit();
         transaction
             .set_checksum(0, Some(Checksum::from_word_value(4)))
@@ -912,7 +915,7 @@ mod tests {
         )
         .into_bytes();
         source.extend_from_slice(b" \r\n\t");
-        let snapshot = Snapshot::from_xml(source.clone()).unwrap();
+        let snapshot = Snapshot::from_xml(source.clone(), Default::default()).unwrap();
         assert_eq!(snapshot.occurrences().len(), 1);
         assert_eq!(snapshot.source(), source);
         let mut transaction = snapshot.edit();
@@ -928,7 +931,7 @@ mod tests {
         let source = format!(
             r#"<w:sdtPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="{MCE_NAMESPACE}" xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml"><mc:AlternateContent><mc:Choice Requires="w15"><w:dataBinding w:xpath="/active" w:storeItemID="{{00000000-0000-0000-0000-000000000001}}"/></mc:Choice><mc:Fallback><w:dataBinding w:xpath="/inactive" w:storeItemID="{{00000000-0000-0000-0000-000000000001}}"/></mc:Fallback></mc:AlternateContent></w:sdtPr>"#,
         );
-        let snapshot = Snapshot::from_xml(source.into_bytes()).unwrap();
+        let snapshot = Snapshot::from_xml(source.into_bytes(), Default::default()).unwrap();
         assert_eq!(snapshot.occurrences()[0].bindings().len(), 1);
         let span = snapshot.occurrences()[0].bindings()[0].start_tag();
         assert!(
@@ -953,7 +956,7 @@ mod tests {
         let source = format!(
             r#"<w:sdtPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="{MCE_NAMESPACE}" xmlns:u="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="u"><w:lock w:val="sdtLocked"/></mc:Choice><mc:Fallback><w:lock w:val="contentLocked"/></mc:Fallback></mc:AlternateContent></w:sdtPr>"#,
         );
-        let snapshot = Snapshot::from_xml(source.into_bytes()).unwrap();
+        let snapshot = Snapshot::from_xml(source.into_bytes(), Default::default()).unwrap();
         assert_eq!(snapshot.occurrences()[0].locks().len(), 1);
         assert_eq!(
             snapshot.occurrences()[0].locks()[0].lock(),
@@ -976,7 +979,7 @@ mod tests {
         let source = format!(
             r#"<w:sdtPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="{MCE_NAMESPACE}" xmlns:x="urn:unsupported" mc:Ignorable="x" mc:ProcessContent="x:wrap"><x:wrap>{BINDING}</x:wrap></w:sdtPr>"#,
         );
-        let snapshot = Snapshot::from_xml(source.into_bytes()).unwrap();
+        let snapshot = Snapshot::from_xml(source.into_bytes(), Default::default()).unwrap();
         assert_eq!(snapshot.occurrences()[0].bindings().len(), 1);
         let span = snapshot.occurrences()[0].bindings()[0].start_tag();
         assert_eq!(
@@ -990,7 +993,7 @@ mod tests {
         let source = format!(
             r#"<w:sdtPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="{MCE_NAMESPACE}" xmlns:x="urn:unsupported"><x:wrap mc:Ignorable="x" mc:ProcessContent="x:*"><x:inner><w:lock w:val="contentLocked"/></x:inner></x:wrap></w:sdtPr>"#,
         );
-        let snapshot = Snapshot::from_xml(source.into_bytes()).unwrap();
+        let snapshot = Snapshot::from_xml(source.into_bytes(), Default::default()).unwrap();
         assert_eq!(snapshot.occurrences()[0].locks().len(), 1);
         let lock = &snapshot.occurrences()[0].locks()[0];
         assert_eq!(lock.lock(), Lock::ContentLocked);
@@ -1009,7 +1012,7 @@ mod tests {
         let source = format!(
             r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:litchiDHash="urn:occupied"><w:body>{bindings}</w:body></w:document>"#,
         );
-        let snapshot = Snapshot::from_xml(source.into_bytes()).unwrap();
+        let snapshot = Snapshot::from_xml(source.into_bytes(), Default::default()).unwrap();
         let mut transaction = snapshot.edit();
         for occurrence in 0..2 {
             transaction
@@ -1040,7 +1043,7 @@ mod tests {
             max_output_bytes: source.len(),
             ..Default::default()
         };
-        let snapshot = Snapshot::from_xml_with_limits(source.clone(), authored).unwrap();
+        let snapshot = Snapshot::from_xml(source.clone(), authored).unwrap();
         let mut transaction = snapshot.edit();
         transaction
             .set_checksum(0, Some(Checksum::from_word_value(6)))
@@ -1051,13 +1054,13 @@ mod tests {
             max_mce_marked_bytes: source.len(),
             ..Default::default()
         };
-        assert!(Snapshot::from_xml_with_limits(source.clone(), marked).is_err());
+        assert!(Snapshot::from_xml(source.clone(), marked).is_err());
 
         let mce = super::super::Limits {
             max_mce_output_bytes: 1,
             ..Default::default()
         };
-        assert!(Snapshot::from_xml_with_limits(source, mce).is_err());
+        assert!(Snapshot::from_xml(source, mce).is_err());
     }
 
     #[test]
@@ -1067,13 +1070,13 @@ mod tests {
             max_input_bytes: source.len() - 1,
             ..Default::default()
         };
-        assert!(Snapshot::from_xml_with_limits(source.clone(), bytes).is_err());
+        assert!(Snapshot::from_xml(source.clone(), bytes).is_err());
 
         let depth = super::super::Limits {
             max_depth: usize::MAX,
             ..Default::default()
         };
-        let snapshot = Snapshot::from_xml_with_limits(source, depth).unwrap();
+        let snapshot = Snapshot::from_xml(source, depth).unwrap();
         assert_eq!(snapshot.occurrences().len(), 1);
     }
 }

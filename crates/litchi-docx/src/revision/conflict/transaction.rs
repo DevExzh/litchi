@@ -997,7 +997,8 @@ mod tests {
             <w14:conflictIns w:id="1" w:author="first"/>
             <w14:conflictDel w:id="2" w:author="second"/>
             </w:p></w:body></w:document>"#;
-        let snapshot = Snapshot::from_xml(source.as_slice()).expect("valid conflict source");
+        let snapshot = Snapshot::from_xml(source.as_slice(), Default::default())
+            .expect("valid conflict source");
         let mut transaction = snapshot.edit();
         transaction
             .set_conflict_author(0, "temporary")

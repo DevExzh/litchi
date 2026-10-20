@@ -17,6 +17,21 @@ impl Package {
         self.ensure_story_opc_current(operation)
     }
 
+    /// The semantic read budgets this package keeps (record 0355).
+    #[must_use]
+    pub fn semantic_limits(&self) -> &crate::SemanticLimits {
+        &self.semantic_limits
+    }
+
+    /// The same package under other semantic read budgets. O(1): every part
+    /// is shared.
+    #[must_use]
+    pub fn with_semantic_limits(&self, limits: crate::SemanticLimits) -> Self {
+        let mut next = self.clone();
+        next.semantic_limits = std::sync::Arc::new(limits);
+        next
+    }
+
     /// Get the underlying OPC package.
     ///
     /// This provides access to lower-level package operations.

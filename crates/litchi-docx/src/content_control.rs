@@ -750,7 +750,7 @@ impl ContentControl {
     pub(crate) fn extract_from_document_tolerant(
         doc_xml: &[u8],
     ) -> Result<(Vec<ContentControl>, ToleranceReport)> {
-        let mut inventory = Inventory::parse(doc_xml)?;
+        let mut inventory = Inventory::parse(doc_xml, &Default::default())?;
         let tolerance = std::mem::take(&mut inventory.tolerance);
         let controls = inventory
             .into_controls()
@@ -2311,14 +2311,14 @@ mod tests {
         // (leniency F2.8); the control and the inventory survive.
         for xml in invalid {
             let xml = xml.replace("xmlns:w=\"W\"", &format!("xmlns:w=\"{W}\""));
-            let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+            let inventory = Inventory::parse(xml.as_bytes(), &Default::default()).unwrap();
             assert_eq!(inventory.occurrences().len(), 1, "{xml}");
             assert_eq!(inventory.tolerance_report().total(), 1, "{xml}");
         }
         let repaired = format!(
             r#"<w:sdtPr xmlns:w="{W}"><w:id w:val="7"/><w:id w:val="8"/><w:lock w:val="invalid"/><w:text/><w:picture/></w:sdtPr>"#
         );
-        let inventory = Inventory::parse(repaired.as_bytes()).unwrap();
+        let inventory = Inventory::parse(repaired.as_bytes(), &Default::default()).unwrap();
         let control = inventory.occurrences()[0].control();
         assert_eq!(control.id_opt(), Some(7));
         assert!(!control.is_lock_delete() && !control.is_lock_content());
@@ -2389,7 +2389,7 @@ mod tests {
         let xml = format!(
             r#"<w:document xmlns:w="{W}"><w:sdtPr/><w:sdtPr><w:id w:val="7"/></w:sdtPr><w:sdtPr><w:id w:val="7"/></w:sdtPr></w:document>"#
         );
-        let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+        let inventory = Inventory::parse(xml.as_bytes(), &Default::default()).unwrap();
         assert_eq!(
             inventory
                 .occurrences()
@@ -2413,7 +2413,7 @@ mod tests {
             mce = std::str::from_utf8(MCE_NAMESPACE).unwrap(),
             hash = STORE_ITEM_CHECKSUM_NAMESPACE,
         );
-        let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+        let inventory = Inventory::parse(xml.as_bytes(), &Default::default()).unwrap();
         let binding = inventory.occurrences()[0].control().data_binding().unwrap();
         assert!(binding.checksum().is_none());
         assert!(
@@ -2421,11 +2421,11 @@ mod tests {
         );
 
         let missing_ignorable = xml.replace(" mc:Ignorable=\"h\"", "");
-        assert!(Inventory::parse(missing_ignorable.as_bytes()).is_err());
+        assert!(Inventory::parse(missing_ignorable.as_bytes(), &Default::default()).is_err());
         let fake_namespace = xml.replace(STORE_ITEM_CHECKSUM_NAMESPACE, "urn:fake");
-        assert!(Inventory::parse(fake_namespace.as_bytes()).is_ok());
+        assert!(Inventory::parse(fake_namespace.as_bytes(), &Default::default()).is_ok());
         assert!(
-            Inventory::parse(fake_namespace.as_bytes())
+            Inventory::parse(fake_namespace.as_bytes(), &Default::default())
                 .unwrap()
                 .occurrences()[0]
                 .control()
@@ -2451,7 +2451,7 @@ mod tests {
                 mce = std::str::from_utf8(MCE_NAMESPACE).unwrap(),
                 format = FORMATTING_ALLOWED_NAMESPACE,
             );
-            let control = Inventory::parse(xml.as_bytes())
+            let control = Inventory::parse(xml.as_bytes(), &Default::default())
                 .unwrap()
                 .into_controls()
                 .remove(0);
@@ -2463,7 +2463,7 @@ mod tests {
             format = FORMATTING_ALLOWED_NAMESPACE,
         );
         // The lock is kept and the misplaced qualifier dropped (F2.8).
-        let inventory = Inventory::parse(invalid.as_bytes()).unwrap();
+        let inventory = Inventory::parse(invalid.as_bytes(), &Default::default()).unwrap();
         let control = inventory.occurrences()[0].control();
         assert!(control.is_lock_delete());
         assert!(control.formatting_allowed().is_none());
@@ -2476,7 +2476,7 @@ mod tests {
             r#"<w:document xmlns:w="{W}" xmlns:mc="{mce}" xmlns:u="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="u"><w:sdtPr><w:id w:val="1"/></w:sdtPr></mc:Choice><mc:Fallback><w:sdtPr><w:id w:val="2"/></w:sdtPr></mc:Fallback></mc:AlternateContent></w:document>"#,
             mce = std::str::from_utf8(MCE_NAMESPACE).unwrap(),
         );
-        let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+        let inventory = Inventory::parse(xml.as_bytes(), &Default::default()).unwrap();
         assert_eq!(inventory.occurrences().len(), 1);
         assert_eq!(inventory.occurrences()[0].id(), Some(2));
     }
@@ -2488,16 +2488,16 @@ mod tests {
             max_content_controls: 1,
             ..Limits::default()
         };
-        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_ok());
+        assert!(Inventory::parse(xml.as_bytes(), &limits).is_ok());
         limits.max_events = 1;
-        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
+        assert!(Inventory::parse(xml.as_bytes(), &limits).is_err());
         limits = Limits::default();
         limits.max_depth = 1;
-        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
+        assert!(Inventory::parse(xml.as_bytes(), &limits).is_err());
         limits = Limits::default();
         limits.max_metadata_bytes = 1;
         let tagged = format!(r#"<w:sdtPr xmlns:w="{W}"><w:tag w:val="ab"/></w:sdtPr>"#);
-        assert!(Inventory::parse_with_limits(tagged.as_bytes(), &limits).is_err());
+        assert!(Inventory::parse(tagged.as_bytes(), &limits).is_err());
     }
 
     #[test]
@@ -2520,7 +2520,7 @@ mod tests {
         };
         limits.max_mce_output_bytes = exact_mce_output;
         assert_eq!(
-            Inventory::parse_with_limits(xml.as_bytes(), &limits)
+            Inventory::parse(xml.as_bytes(), &limits)
                 .unwrap()
                 .occurrences()[0]
                 .id(),
@@ -2528,9 +2528,9 @@ mod tests {
         );
 
         limits.max_mce_output_bytes = exact_mce_output - 1;
-        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
+        assert!(Inventory::parse(xml.as_bytes(), &limits).is_err());
         limits.max_mce_output_bytes = 1;
-        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
+        assert!(Inventory::parse(xml.as_bytes(), &limits).is_err());
     }
 
     #[test]
@@ -2584,9 +2584,9 @@ mod tests {
             ..Limits::default()
         };
         limits.max_bindings = PREFIXES * (SCOPES + 1);
-        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_ok());
+        assert!(Inventory::parse(xml.as_bytes(), &limits).is_ok());
         limits.max_bindings -= 1;
-        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
+        assert!(Inventory::parse(xml.as_bytes(), &limits).is_err());
     }
 
     #[test]
@@ -2602,7 +2602,7 @@ mod tests {
             ..Limits::default()
         };
         assert_eq!(
-            Inventory::parse_with_limits(single_control.as_bytes(), &limits)
+            Inventory::parse(single_control.as_bytes(), &limits)
                 .unwrap()
                 .occurrences()[0]
                 .control()
@@ -2611,16 +2611,16 @@ mod tests {
             2
         );
         limits.max_list_items_per_control = 1;
-        assert!(Inventory::parse_with_limits(single_control.as_bytes(), &limits).is_err());
+        assert!(Inventory::parse(single_control.as_bytes(), &limits).is_err());
 
         let two_controls = format!(
             r#"<w:document xmlns:w="{W}"><w:sdtPr><w:dropDownList>{one}</w:dropDownList></w:sdtPr><w:sdtPr><w:dropDownList>{two}</w:dropDownList></w:sdtPr></w:document>"#
         );
         limits.max_list_items_per_control = 1;
         limits.max_list_items = 2;
-        assert!(Inventory::parse_with_limits(two_controls.as_bytes(), &limits).is_ok());
+        assert!(Inventory::parse(two_controls.as_bytes(), &limits).is_ok());
         limits.max_list_items = 1;
-        assert!(Inventory::parse_with_limits(two_controls.as_bytes(), &limits).is_err());
+        assert!(Inventory::parse(two_controls.as_bytes(), &limits).is_err());
     }
 
     #[test]
@@ -2631,7 +2631,8 @@ mod tests {
             std::str::from_utf8(WORD_2010_NAMESPACE).unwrap(),
             std::str::from_utf8(WORD_2012_NAMESPACE).unwrap(),
         );
-        let inventory = Inventory::parse(aliased_inherited.as_bytes()).unwrap();
+        let inventory =
+            Inventory::parse(aliased_inherited.as_bytes(), &Default::default()).unwrap();
         assert_eq!(inventory.occurrences()[0].control().kind(), Kind::Checkbox);
         assert_eq!(
             inventory.occurrences()[1].control().kind(),
@@ -2642,12 +2643,12 @@ mod tests {
             r#"<w:sdtPr xmlns:w="{W}" xmlns:a="{}"><a:entityPicker/></w:sdtPr>"#,
             std::str::from_utf8(WORD_2010_NAMESPACE).unwrap(),
         );
-        assert!(Inventory::parse(missing.as_bytes()).is_err());
+        assert!(Inventory::parse(missing.as_bytes(), &Default::default()).is_err());
 
         let rebound = format!(
             r#"<w:sdtPr xmlns:w="{W}" xmlns:mc="{mce}" xmlns:a="urn:foreign" mc:Ignorable="a"><a:wrapper xmlns:a="{}"><a:repeatingSection/></a:wrapper></w:sdtPr>"#,
             std::str::from_utf8(WORD_2012_NAMESPACE).unwrap(),
         );
-        assert!(Inventory::parse(rebound.as_bytes()).is_err());
+        assert!(Inventory::parse(rebound.as_bytes(), &Default::default()).is_err());
     }
 }

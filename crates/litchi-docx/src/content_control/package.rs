@@ -871,8 +871,9 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn content_control_snapshot(&self) -> Result<PackageSnapshot> {
-        self.ensure_story_opc_current("content_control_snapshot")?;
-        PackageSnapshot::capture(self.opc_package(), PackageLimits::default())
+        self.content_control_snapshot_bounded(
+            self.semantic_limits().content_controls_value().clone(),
+        )
     }
 
     /// Capture with explicit aggregate resource limits.
@@ -880,11 +881,11 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn content_control_snapshot_with_limits(
+    pub(crate) fn content_control_snapshot_bounded(
         &self,
         limits: PackageLimits,
     ) -> Result<PackageSnapshot> {
-        self.ensure_story_opc_current("content_control_snapshot_with_limits")?;
+        self.ensure_story_opc_current("content_control_snapshot_bounded")?;
         PackageSnapshot::capture(self.opc_package(), limits)
     }
 
@@ -1901,7 +1902,7 @@ mod tests {
         };
         assert!(
             content_typed
-                .content_control_snapshot_with_limits(bounded)
+                .content_control_snapshot_bounded(bounded)
                 .is_err()
         );
     }
@@ -1974,7 +1975,7 @@ mod tests {
             .into_bytes(),
         );
         let snapshot = package
-            .content_control_snapshot_with_limits(PackageLimits {
+            .content_control_snapshot_bounded(PackageLimits {
                 max_mutations: 1,
                 ..PackageLimits::default()
             })
@@ -2044,9 +2045,7 @@ mod tests {
             max_mutations: 1,
             ..PackageLimits::default()
         };
-        let snapshot = package
-            .content_control_snapshot_with_limits(limits)
-            .unwrap();
+        let snapshot = package.content_control_snapshot_bounded(limits).unwrap();
         let mut transaction = snapshot.edit().unwrap();
 
         assert!(transaction.refresh_checksums().is_err());
@@ -2134,7 +2133,7 @@ mod tests {
         };
         assert!(
             package
-                .content_control_snapshot_with_limits(binding_limited)
+                .content_control_snapshot_bounded(binding_limited)
                 .is_err()
         );
 
@@ -2143,7 +2142,7 @@ mod tests {
             ..PackageLimits::default()
         };
         let snapshot = package
-            .content_control_snapshot_with_limits(report_limited)
+            .content_control_snapshot_bounded(report_limited)
             .unwrap();
         assert!(snapshot.verify_checksums().is_err());
     }
@@ -2167,7 +2166,7 @@ mod tests {
         };
         assert!(
             package
-                .content_control_snapshot_with_limits(relationship_limited)
+                .content_control_snapshot_bounded(relationship_limited)
                 .is_err()
         );
 
@@ -2177,7 +2176,7 @@ mod tests {
         };
         assert!(
             package
-                .content_control_snapshot_with_limits(props_limited)
+                .content_control_snapshot_bounded(props_limited)
                 .is_err()
         );
     }

@@ -269,7 +269,7 @@ pub enum Error {
     Document(#[from] crate::Error),
     /// The reusable main-document transaction refused the selected edit.
     #[error(transparent)]
-    Transaction(#[from] TransactionError),
+    DocumentEdit(#[from] TransactionError),
     /// A bounded story operation exceeded one finite resource ceiling.
     #[error("source-backed story text {resource} limit exceeded: {actual} > {maximum}")]
     Limit {
@@ -864,7 +864,7 @@ impl Snapshot {
 
     fn with_transaction_snapshot(&self, transaction: DocumentSnapshot) -> Result<Self> {
         let (raw, envelope) = if let Some(envelope) = self.envelope {
-            let wrapped = transaction.shared_xml().map_err(Error::Transaction)?;
+            let wrapped = transaction.shared_xml().map_err(Error::DocumentEdit)?;
             let wrapped_end = wrapped
                 .len()
                 .checked_sub(envelope.wrapped_suffix_len)
@@ -924,7 +924,7 @@ impl Snapshot {
                 checked_story_output_clone(
                     transaction
                         .shared_xml()
-                        .map_err(Error::Transaction)?
+                        .map_err(Error::DocumentEdit)?
                         .as_ref(),
                     &self.limits,
                     "story transaction XML",
@@ -1025,12 +1025,12 @@ impl Edit {
                 maximum: self.base.limits.max_replacement_text_bytes,
             });
         }
-        validate_paragraph_text(position, authored_text).map_err(Error::Transaction)?;
+        validate_paragraph_text(position, authored_text).map_err(Error::DocumentEdit)?;
         let text = checked_string_clone(authored_text, "story replacement text")?;
-        let mut candidate = self.projected.try_clone().map_err(Error::Transaction)?;
+        let mut candidate = self.projected.try_clone().map_err(Error::DocumentEdit)?;
         candidate
             .replace_paragraph_text(position, text)
-            .map_err(Error::Transaction)?;
+            .map_err(Error::DocumentEdit)?;
         self.base.check_execution()?;
         let _validated = self
             .base
@@ -1183,11 +1183,11 @@ impl Publication {
 impl Package {
     /// Capture one bounded source-backed Word text story.
     pub fn story_text_snapshot(&self, selector: Selector) -> Result<Snapshot> {
-        self.story_text_snapshot_with_limits(selector, Limits::default())
+        self.story_text_snapshot_bounded(selector, self.semantic_limits.story_text_value())
     }
 
     /// Capture one selected story under explicit finite bounds.
-    pub fn story_text_snapshot_with_limits(
+    pub(crate) fn story_text_snapshot_bounded(
         &self,
         selector: Selector,
         limits: Limits,
@@ -1198,12 +1198,6 @@ impl Package {
     /// Start one staged selected-story text edit.
     pub fn edit_story_text(&self, selector: Selector) -> Result<Edit> {
         self.story_text_snapshot(selector)?.edit()
-    }
-
-    /// Start one staged selected-story text edit under explicit bounds.
-    pub fn edit_story_text_with_limits(&self, selector: Selector, limits: Limits) -> Result<Edit> {
-        self.story_text_snapshot_with_limits(selector, limits)?
-            .edit()
     }
 
     /// Publish one selected-story commit through the existing one-Part shared
@@ -4902,7 +4896,7 @@ impl GlossaryBatchEdit {
                 maximum: self.base.limits.max_replacement_text_bytes,
             });
         }
-        validate_paragraph_text(position, authored_text).map_err(Error::Transaction)?;
+        validate_paragraph_text(position, authored_text).map_err(Error::DocumentEdit)?;
         self.intents
             .try_reserve(1)
             .map_err(|source| Error::Allocation {
@@ -5060,11 +5054,11 @@ impl Package {
         &self,
         selector: GlossaryBatchSelector,
     ) -> Result<GlossaryBatchSnapshot> {
-        self.glossary_text_batch_snapshot_with_limits(selector, Limits::default())
+        self.glossary_text_batch_snapshot_bounded(selector, self.semantic_limits.story_text_value())
     }
 
     /// Capture a glossary-entry batch under explicit finite bounds.
-    pub fn glossary_text_batch_snapshot_with_limits(
+    pub(crate) fn glossary_text_batch_snapshot_bounded(
         &self,
         selector: GlossaryBatchSelector,
         limits: Limits,
@@ -5078,16 +5072,6 @@ impl Package {
         selector: GlossaryBatchSelector,
     ) -> Result<GlossaryBatchEdit> {
         self.glossary_text_batch_snapshot(selector)?.edit()
-    }
-
-    /// Start one bounded atomic edit spanning selected glossary entries.
-    pub fn edit_glossary_text_batch_with_limits(
-        &self,
-        selector: GlossaryBatchSelector,
-        limits: Limits,
-    ) -> Result<GlossaryBatchEdit> {
-        self.glossary_text_batch_snapshot_with_limits(selector, limits)?
-            .edit()
     }
 
     /// Publish one glossary batch commit through a one-Part shared overlay.
@@ -5622,17 +5606,17 @@ fn project_batch_entry(
             return Err(Error::TopologyConflict);
         }
         base.check_execution()?;
-        validate_paragraph_text(intent.position, &intent.text).map_err(Error::Transaction)?;
+        validate_paragraph_text(intent.position, &intent.text).map_err(Error::DocumentEdit)?;
         let text = checked_string_clone(&intent.text, "glossary batch replacement text")?;
         projected
             .replace_paragraph_text(intent.position, text)
-            .map_err(Error::Transaction)?;
+            .map_err(Error::DocumentEdit)?;
     }
     base.check_execution()?;
     let wrapped = projected
         .projected()
         .shared_xml()
-        .map_err(Error::Transaction)?;
+        .map_err(Error::DocumentEdit)?;
     let wrapped_end = wrapped
         .len()
         .checked_sub(envelope.wrapped_suffix_len)

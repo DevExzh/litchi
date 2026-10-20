@@ -402,18 +402,23 @@ fn protected_malformed_active_and_over_limit_sources_fail_closed() {
     let package = open_source(fixture(three, external_options("https://one.invalid/")));
     assert_eq!(
         package
-            .plan_external_hyperlink_detachment_with_limits(
-                Limits::default().with_max_external_hyperlinks(3).unwrap(),
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default()
+                    .hyperlinks(Limits::default().with_max_external_hyperlinks(3).unwrap())
             )
+            .plan_external_hyperlink_detachment()
             .unwrap()
             .effect_report()
             .detached_hyperlinks(),
         3
     );
     assert!(matches!(
-        package.plan_external_hyperlink_detachment_with_limits(
-            Limits::default().with_max_external_hyperlinks(2).unwrap(),
-        ),
+        package
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default()
+                    .hyperlinks(Limits::default().with_max_external_hyperlinks(2).unwrap())
+            )
+            .plan_external_hyperlink_detachment(),
         Err(Error::ExternalHyperlinkDetachmentLimit {
             resource: "external hyperlinks",
             maximum: 2,

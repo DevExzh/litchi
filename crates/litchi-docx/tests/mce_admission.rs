@@ -811,8 +811,14 @@ fn raw_namespace_scanners_refuse_a_binding_spelled_with_references() {
     let literal = document(&format!(r#"xmlns:mc="{MCE}""#), PARAGRAPHS);
 
     // Tracked-revision authoring.
-    assert!(litchi_docx::revision::authoring::Snapshot::from_xml(escaped.clone()).is_err());
-    assert!(litchi_docx::revision::authoring::Snapshot::from_xml(literal.clone()).is_ok());
+    assert!(
+        litchi_docx::revision::authoring::Snapshot::from_xml(escaped.clone(), Default::default())
+            .is_err()
+    );
+    assert!(
+        litchi_docx::revision::authoring::Snapshot::from_xml(literal.clone(), Default::default())
+            .is_ok()
+    );
 
     // External-hyperlink redaction, past the transaction admission (a root
     // `Ignorable` of an understood namespace is admitted).

@@ -1028,7 +1028,8 @@ fn secondary_limits_bound_xml_paragraphs_and_output() {
             Dialect::Transitional,
             Mutation::TwoParagraphFootnote
         ))
-        .story_text_snapshot_with_limits(StorySelector::footnote(41), paragraph_limit),
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(paragraph_limit))
+        .story_text_snapshot(StorySelector::footnote(41)),
         Err(source_backed::StoryTextError::Limit {
             resource: "paragraphs",
             ..
@@ -1037,7 +1038,9 @@ fn secondary_limits_bound_xml_paragraphs_and_output() {
     let xml_limit =
         source_backed::StoryTextLimits::new(1, 10, 10_000, 64, 4096, 4096, 4096).unwrap();
     assert!(matches!(
-        open(&source).story_text_snapshot_with_limits(StorySelector::footnote(41), xml_limit),
+        open(&source)
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(xml_limit))
+            .story_text_snapshot(StorySelector::footnote(41)),
         Err(source_backed::StoryTextError::Limit {
             resource: "XML bytes",
             ..
@@ -1046,7 +1049,8 @@ fn secondary_limits_bound_xml_paragraphs_and_output() {
     let output_limit =
         source_backed::StoryTextLimits::new(4096, 10, 10_000, 64, 1, 4096, 4096).unwrap();
     let snapshot = open(&source)
-        .story_text_snapshot_with_limits(StorySelector::footnote(41), output_limit)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(output_limit))
+        .story_text_snapshot(StorySelector::footnote(41))
         .unwrap();
     assert!(matches!(
         snapshot.extract_text(),
@@ -1066,7 +1070,8 @@ fn deep_large_namespace_input_hits_a_finite_namespace_limit() {
             Dialect::Transitional,
             Mutation::DeepNamespaceFootnote
         ))
-        .story_text_snapshot_with_limits(StorySelector::footnote(41), limits)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(limits))
+        .story_text_snapshot(StorySelector::footnote(41))
         .is_err()
     );
 }
@@ -1085,7 +1090,8 @@ fn long_namespace_prefix_and_value_hit_namespace_byte_and_count_limits() {
             Dialect::Transitional,
             Mutation::LongNamespaceFootnote,
         ))
-        .story_text_snapshot_with_limits(StorySelector::footnote(41), namespace_limits),
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(namespace_limits))
+        .story_text_snapshot(StorySelector::footnote(41)),
         Err(source_backed::StoryTextError::Limit {
             resource: "namespace bytes",
             ..
@@ -1102,7 +1108,8 @@ fn long_namespace_prefix_and_value_hit_namespace_byte_and_count_limits() {
             Dialect::Transitional,
             Mutation::DeepNamespaceFootnote,
         ))
-        .story_text_snapshot_with_limits(StorySelector::footnote(41), count_limits)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(count_limits))
+        .story_text_snapshot(StorySelector::footnote(41))
         .is_err()
     );
 }
@@ -1115,7 +1122,8 @@ fn large_text_event_is_bounded_by_xml_and_decoded_output_limits() {
             .with_secondary_entry_limits(8, 64 * 1024, 256)
             .unwrap();
     let snapshot = open(&fixture(Dialect::Transitional, Mutation::LargeTextFootnote))
-        .story_text_snapshot_with_limits(StorySelector::footnote(41), output_limits)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(output_limits))
+        .story_text_snapshot(StorySelector::footnote(41))
         .unwrap();
     assert!(matches!(
         snapshot.extract_text(),
@@ -1129,7 +1137,8 @@ fn large_text_event_is_bounded_by_xml_and_decoded_output_limits() {
             .unwrap();
     assert!(
         open(&fixture(Dialect::Transitional, Mutation::LargeTextFootnote,))
-            .story_text_snapshot_with_limits(StorySelector::footnote(41), xml_limits)
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(xml_limits))
+            .story_text_snapshot(StorySelector::footnote(41))
             .is_err()
     );
 }
@@ -1144,7 +1153,8 @@ fn allowed_references_stream_under_caller_bounds_and_unknown_named_refs_refuse()
         Dialect::Transitional,
         Mutation::EscapedTextFootnote,
     ))
-    .story_text_snapshot_with_limits(StorySelector::footnote(41), limits)
+    .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(limits))
+    .story_text_snapshot(StorySelector::footnote(41))
     .unwrap();
 
     let expected = "A&<>\"'".repeat(64);
@@ -1198,7 +1208,8 @@ fn secondary_edit_refuses_when_synthetic_wrapper_exceeds_output_limit() {
         .with_secondary_entry_limits(8, 4096, 256)
         .unwrap();
     let snapshot = open(&fixture(Dialect::Transitional, Mutation::Valid))
-        .story_text_snapshot_with_limits(StorySelector::footnote(41), limits)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(limits))
+        .story_text_snapshot(StorySelector::footnote(41))
         .unwrap();
     assert!(snapshot.edit().is_err());
 }
@@ -1213,7 +1224,8 @@ fn markup_heavier_than_output_bound_can_decode_to_visible_text() {
         Dialect::Transitional,
         Mutation::MarkupHeavyFootnote,
     ))
-    .story_text_snapshot_with_limits(StorySelector::footnote(41), limits)
+    .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(limits))
+    .story_text_snapshot(StorySelector::footnote(41))
     .unwrap();
     assert_eq!(snapshot.paragraph_text(0).unwrap().as_deref(), Some("fit"));
 }
@@ -1229,7 +1241,8 @@ fn secondary_output_accumulation_and_borrowed_replacement_are_bounded() {
         Dialect::Transitional,
         Mutation::TwoParagraphFootnote,
     ))
-    .story_text_snapshot_with_limits(StorySelector::footnote(41), aggregate_limits)
+    .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(aggregate_limits))
+    .story_text_snapshot(StorySelector::footnote(41))
     .unwrap();
     assert!(matches!(
         aggregate.extract_text(),
@@ -1245,7 +1258,8 @@ fn secondary_output_accumulation_and_borrowed_replacement_are_bounded() {
         Dialect::Transitional,
         Mutation::TwoParagraphFootnote,
     ))
-    .story_text_snapshot_with_limits(StorySelector::footnote(41), stream_limits)
+    .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(stream_limits))
+    .story_text_snapshot(StorySelector::footnote(41))
     .unwrap();
     let mut streamed = Vec::new();
     let stream_error = stream_snapshot
@@ -1270,7 +1284,8 @@ fn secondary_output_accumulation_and_borrowed_replacement_are_bounded() {
             .with_secondary_entry_limits(8, 4096, 256)
             .unwrap();
     let replacement_snapshot = open(&fixture(Dialect::Transitional, Mutation::Valid))
-        .story_text_snapshot_with_limits(StorySelector::footnote(41), replacement_limits)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(replacement_limits))
+        .story_text_snapshot(StorySelector::footnote(41))
         .unwrap();
     let mut edit = replacement_snapshot.edit().unwrap();
     let borrowed = "borrowed-replacement-too-large";
@@ -1295,7 +1310,8 @@ fn xml_expanding_replacement_is_refused_without_changing_projection() {
         .with_secondary_entry_limits(8, 4096, 256)
         .unwrap();
     let snapshot = open(&fixture(Dialect::Transitional, Mutation::Valid))
-        .story_text_snapshot_with_limits(StorySelector::footnote(41), limits)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(limits))
+        .story_text_snapshot(StorySelector::footnote(41))
         .unwrap();
     let mut edit = snapshot.edit().unwrap();
     let before = edit.projected().unwrap().paragraph_text(0).unwrap();

@@ -961,11 +961,11 @@ impl RemovalPublication {
 impl Package {
     /// Capture the exact bounded closure for a plain main-story paragraph copy.
     pub fn plain_paragraph_copy_snapshot(&self) -> Result<Snapshot> {
-        self.plain_paragraph_copy_snapshot_with_limits(Limits::default())
+        self.plain_paragraph_copy_snapshot_bounded(self.semantic_limits.paragraph_copy_value())
     }
 
     /// Capture the exact closure under caller-selected finite limits.
-    pub fn plain_paragraph_copy_snapshot_with_limits(&self, limits: Limits) -> Result<Snapshot> {
+    pub(crate) fn plain_paragraph_copy_snapshot_bounded(&self, limits: Limits) -> Result<Snapshot> {
         self.trim_clean_paragraph_index_for_operation();
         let source_version = self
             .physical_package()?
@@ -1012,12 +1012,15 @@ impl Package {
 
     /// Capture the exact bounded closure for plain-paragraph removal.
     pub fn plain_paragraph_removal_snapshot(&self) -> Result<Snapshot> {
-        self.plain_paragraph_removal_snapshot_with_limits(Limits::default())
+        self.plain_paragraph_removal_snapshot_bounded(self.semantic_limits.paragraph_copy_value())
     }
 
     /// Capture the exact removal closure under caller-selected finite limits.
-    pub fn plain_paragraph_removal_snapshot_with_limits(&self, limits: Limits) -> Result<Snapshot> {
-        self.plain_paragraph_copy_snapshot_with_limits(limits)
+    pub(crate) fn plain_paragraph_removal_snapshot_bounded(
+        &self,
+        limits: Limits,
+    ) -> Result<Snapshot> {
+        self.plain_paragraph_copy_snapshot_bounded(limits)
     }
 
     /// Start one isolated source-backed exact paragraph-removal edit.
@@ -1045,7 +1048,7 @@ impl Package {
         patch: &Patch,
     ) -> Result<Publication> {
         self.trim_clean_paragraph_index_for_operation();
-        let current = self.plain_paragraph_copy_snapshot_with_limits(patch.limits)?;
+        let current = self.plain_paragraph_copy_snapshot_bounded(patch.limits)?;
         let target = patch.apply(&current)?;
         let original_artifact = self.physical_package()?.source_artifact();
         let main = self
@@ -1115,7 +1118,7 @@ impl Package {
         patch: &RemovalPatch,
     ) -> Result<RemovalPublication> {
         self.trim_clean_paragraph_index_for_operation();
-        let current = self.plain_paragraph_removal_snapshot_with_limits(patch.limits)?;
+        let current = self.plain_paragraph_removal_snapshot_bounded(patch.limits)?;
         let target = patch.apply(&current)?;
         let original_artifact = self.physical_package()?.source_artifact();
         let main = self

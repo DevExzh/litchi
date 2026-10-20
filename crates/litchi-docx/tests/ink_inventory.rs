@@ -185,7 +185,10 @@ fn all_story_owners_share_one_payload_and_keep_signed_source_exact() {
             max_total_payload_bytes: INK.len(),
             ..Limits::default()
         };
-        let snapshot = package.ink_with_limits(limits).unwrap();
+        let snapshot = package
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().ink(limits))
+            .ink()
+            .unwrap();
         assert_eq!(snapshot.annotations().len(), 8);
         assert_eq!(snapshot.distinct_payload_count(), 1);
         assert!(snapshot.get(Position::new(8)).is_none());
@@ -355,10 +358,12 @@ fn distinct_payload_budget_and_external_targets_are_checked() {
     let package = open(&opc);
     assert_eq!(package.ink().unwrap().distinct_payload_count(), 2);
     assert!(matches!(
-        package.ink_with_limits(Limits {
-            max_total_payload_bytes: INK.len(),
-            ..Limits::default()
-        }),
+        package
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().ink(Limits {
+                max_total_payload_bytes: INK.len(),
+                ..Limits::default()
+            }))
+            .ink(),
         Err(Error::InkLimit {
             resource: "total payload bytes",
             ..
@@ -396,10 +401,11 @@ fn inactive_unknown_choice_is_not_an_annotation_or_semantic_error() {
     let before = save(&mut package);
     assert_eq!(
         package
-            .ink_with_limits(Limits {
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().ink(Limits {
                 max_annotations: 1,
                 ..Limits::default()
-            })
+            }))
+            .ink()
             .unwrap()
             .annotations()
             .len(),
@@ -458,7 +464,12 @@ fn payload_annotation_relationship_and_dirty_state_limits_are_enforced() {
             ..Limits::default()
         },
     ] {
-        assert!(package.ink_with_limits(limits).is_err());
+        assert!(
+            package
+                .with_semantic_limits(litchi_docx::SemanticLimits::default().ink(limits))
+                .ink()
+                .is_err()
+        );
     }
     // The dirty-writer half of this test (`Builder::package()` with pending
     // edits) was removed with `Builder::package()`: an unbuilt draft is no
@@ -564,10 +575,12 @@ fn source_backed_payload_limit_refuses_before_decompression_and_releases_story_p
     let opc = source(false, true);
     let (budget, cancellation, package) = managed_source(PackageWriter::to_bytes(&opc).unwrap());
     assert!(matches!(
-        package.ink_with_limits(Limits {
-            max_payload_bytes: INK.len() - 1,
-            ..Limits::default()
-        }),
+        package
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().ink(Limits {
+                max_payload_bytes: INK.len() - 1,
+                ..Limits::default()
+            }))
+            .ink(),
         Err(Error::InkLimit {
             resource: "payload bytes",
             ..
@@ -696,7 +709,10 @@ fn source_backed_story_graph_and_aggregate_limits_fail_before_payload_reads() {
             _ => {},
         }
         assert!(
-            package.ink_with_limits(limits).is_err(),
+            package
+                .with_semantic_limits(litchi_docx::SemanticLimits::default().ink(limits))
+                .ink()
+                .is_err(),
             "scenario {scenario}"
         );
         assert_eq!(

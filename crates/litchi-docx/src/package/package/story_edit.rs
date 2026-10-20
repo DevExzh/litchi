@@ -51,7 +51,7 @@ impl Package {
         validate_replacements(replacements)?;
         let limits = StoryLimits::default();
         let inventory = self
-            .story_inventory_with_limits(limits)
+            .story_inventory_bounded(limits)
             .map_err(TransactionError::from)?;
         let mut grouped = BTreeMap::<&str, Vec<HyperlinkTextReplacement>>::new();
         for replacement in replacements {

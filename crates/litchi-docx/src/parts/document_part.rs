@@ -1371,14 +1371,14 @@ impl<'a> DocumentPart<'a> {
     /// # Errors
     /// Returns malformed metadata, XML, or revision resource-limit errors.
     pub fn revisions(&self) -> Result<SmallVec<[crate::revision::Revision; 4]>> {
-        self.revisions_with_limits(crate::revision::Limits::default())
+        self.revisions_bounded(crate::revision::Limits::default())
     }
 
     /// Read tracked revision metadata with explicit parser and retention limits.
     ///
     /// # Errors
     /// Returns malformed metadata, XML, or revision resource-limit errors.
-    pub fn revisions_with_limits(
+    pub(crate) fn revisions_bounded(
         &self,
         limits: crate::revision::Limits,
     ) -> Result<SmallVec<[crate::revision::Revision; 4]>> {
