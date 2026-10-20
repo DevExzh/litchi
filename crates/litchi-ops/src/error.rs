@@ -2085,6 +2085,10 @@ macro_rules! from_leaf {
     ($(#[$cfg:meta])* $leaf:ty => $variant:ident, $format:expr) => {
         $(#[$cfg])*
         impl From<$leaf> for Error {
+            // An error conversion is never the hot path: keep it out of the
+            // callers' bodies (record 0353a).
+            #[cold]
+            #[inline(never)]
             fn from(error: $leaf) -> Self {
                 Self::from_class(
                     error.classify(),
@@ -2135,6 +2139,8 @@ from_leaf!(#[cfg(feature = "xlsx")] litchi_xlsx::Error => Xlsx, Some(FileFormat:
 // typed cause, but expose only a content-free classification in diagnostics.
 #[cfg(feature = "xlsb")]
 impl From<litchi_xlsb::package::PackageError> for Error {
+    #[cold]
+    #[inline(never)]
     fn from(error: litchi_xlsb::package::PackageError) -> Self {
         let class = error.classify();
         let message = class.code.summary();
@@ -2144,6 +2150,8 @@ impl From<litchi_xlsb::package::PackageError> for Error {
 
 #[cfg(feature = "xlsb")]
 impl From<litchi_xlsb::Error> for Error {
+    #[cold]
+    #[inline(never)]
     fn from(error: litchi_xlsb::Error) -> Self {
         let class = error.classify();
         let message = class.code.summary();
@@ -2318,6 +2326,8 @@ from_leaf!(litchi_core::atomic::Error => Publication, None);
 /// code's static summary, so no authored content crosses.
 #[cfg(any(feature = "xlsx", feature = "xlsb", feature = "xls", feature = "ods"))]
 impl From<Error> for litchi_core::sheet::Error {
+    #[cold]
+    #[inline(never)]
     fn from(error: Error) -> Self {
         use litchi_core::edit::RefusalKind;
         let code = error.code();

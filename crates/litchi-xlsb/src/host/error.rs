@@ -542,6 +542,8 @@ impl From<litchi_ooxml_common::xml::sheet_name::Error> for Error {
 /// formula engine reports. The message is static: no sheet name, reference
 /// or record content crosses.
 impl From<Error> for litchi_core::sheet::Error {
+    #[cold]
+    #[inline(never)]
     fn from(error: Error) -> Self {
         use litchi_core::edit::RefusalKind;
         let refused = |kind, reason| Self::refused(kind, "read", reason);

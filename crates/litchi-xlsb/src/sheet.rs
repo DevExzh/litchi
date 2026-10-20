@@ -356,6 +356,7 @@ impl Worksheet {
     }
 
     /// Get cell at position
+    #[inline]
     pub fn get_cell(&self, row: u32, col: u32) -> Option<&Cell> {
         self.cells.get(&(row, col))
     }
@@ -619,6 +620,7 @@ pub struct StoredCells<'a> {
 impl<'a> Iterator for StoredCells<'a> {
     type Item = Result<Cow<'a, Cell>>;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.cells.next().map(|cell| Ok(Cow::Borrowed(cell)))
     }

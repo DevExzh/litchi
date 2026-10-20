@@ -273,8 +273,12 @@ impl<'a> SourceSheet<'a> {
 
     fn value_at(&self, row: u32, column: u32) -> Result<CellValue> {
         let (row, column) = zero_based_cell(row, column)?;
+        // The leaf's stored-cell lookup, which its trait `cell` wraps: an
+        // absent position reads as empty.
         self.workbook.materialize(self, |worksheet| {
-            Ok(worksheet.cell(row, column)?.value().clone())
+            Ok(worksheet
+                .get_cell(row, column)
+                .map_or(CellValue::Empty, |cell| cell.value().clone()))
         })
     }
 
@@ -369,10 +373,12 @@ impl<'w> CoreWorksheet for SourceSheet<'w> {
 
     fn cell(&self, row: u32, column: u32) -> Result<FacadeCell> {
         let (row, column) = zero_based_cell(row, column)?;
-        self.workbook.materialize(self, |worksheet| {
-            let cell = worksheet.cell(row, column)?;
-            Self::copy_cell(&cell)
-        })
+        self.workbook
+            .materialize(self, |worksheet| match worksheet.get_cell(row, column) {
+                Some(cell) => Self::copy_cell(cell),
+                // The leaf trait's empty cell for an absent position.
+                None => Self::copy_cell(&xlsb::Cell::new(row, column, CellValue::Empty)),
+            })
     }
 
     fn cell_by_coordinate(&self, coordinate: &str) -> Result<FacadeCell> {
