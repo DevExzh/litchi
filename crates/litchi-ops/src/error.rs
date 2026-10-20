@@ -2044,6 +2044,8 @@ impl Classify for litchi_ppt::text_edit::Error {
             // unsupported containers, is unsupported content: a signed
             // handle is refused before it reaches the leaf.
             Self::Refused(refusal) => refusal.kind().classify(),
+            Self::PatchConflict => Class::of(Code::InvalidInput),
+            Self::Signed => Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION),
         }
     }
 }

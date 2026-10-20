@@ -6199,6 +6199,11 @@
           "name": "snapshot",
           "scope": "litchi_ppt::chart::GraphPackage",
           "replacement": "GraphPackage::view"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::text_edit",
+          "replacement": "use commit.diagnostics().changed() (record 0357a)"
         }
       ],
       "families": [
@@ -6215,7 +6220,8 @@
         "litchi_ppt::client_data",
         "litchi_ppt::master::metadata",
         "litchi_ppt::master_layout",
-        "litchi_ppt::embedded::object"
+        "litchi_ppt::embedded::object",
+        "litchi_ppt::text_edit"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
@@ -7032,6 +7038,11 @@
           "name": "snapshot",
           "scope": "litchi_ppt::chart::GraphPackage",
           "replacement": "GraphPackage::view"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::text_edit",
+          "replacement": "use commit.diagnostics().changed() (record 0357a)"
         }
       ],
       "families": [
@@ -7048,7 +7059,8 @@
         "litchi_ppt::client_data",
         "litchi_ppt::master::metadata",
         "litchi_ppt::master_layout",
-        "litchi_ppt::embedded::object"
+        "litchi_ppt::embedded::object",
+        "litchi_ppt::text_edit"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",

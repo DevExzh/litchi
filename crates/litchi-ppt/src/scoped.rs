@@ -259,6 +259,8 @@ impl From<slide_order::Error> for Failure {
                 crate::text_edit::Error::Source(_) => Self::Package(PackageError::Corrupted(
                     "scoped PPT publication failed in the source overlay".into(),
                 )),
+                crate::text_edit::Error::PatchConflict => Self::PatchConflict,
+                crate::text_edit::Error::Signed => Self::Signed,
             },
             slide_order::Error::Composition(_) => Self::Package(PackageError::Corrupted(
                 "scoped PPT publication failed to compose".into(),

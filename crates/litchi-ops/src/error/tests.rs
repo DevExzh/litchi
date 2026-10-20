@@ -1147,6 +1147,8 @@ fn ppt_text_edit_errors_are_classified() {
         TextError::Package(litchi_ppt::Error::PasswordRequired),
         Code::DocumentProtected,
     );
+    assert_code(TextError::PatchConflict, Code::InvalidInput);
+    assert_code(TextError::Signed, Code::DocumentProtected);
     let error = assert_code(
         TextError::Source(OverlayError::Allocation {
             resource: "test",
