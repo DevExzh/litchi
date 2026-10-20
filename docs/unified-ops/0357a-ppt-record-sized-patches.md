@@ -159,3 +159,57 @@ package is already cached.
 | `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-ppt` | 0 |
 | `RUSTC_BOOTSTRAP=1 tools/check_api_glossary.py --profile ppt-minimal` / `ppt-full` | 0 / 0 |
 | `cargo check -p litchi-ops --all-features --all-targets` | 0 |
+
+## 6. Follow-up: closing the 0357 §9 family gaps
+
+Four commits on `uo2/w3-ppt` after `ac9e036031` close the animation, object
+and master gaps that [0357 §9](0357-ppt-api-contract.md) listed.
+
+- **Animation net change** (`6103aab069`). `animation::Edit::commit`
+  compares each staged slide or main-master record with its source. It no
+  longer tracks whether a verb rewrote a record. A record whose bytes equal
+  the source, or whose animation model equals the source model, is unstaged
+  and keeps its source bytes. The model is the timeline, the build list and
+  the legacy shape animations, the last compared by serialized
+  `AnimationInfo`. A change reverted before the commit is therefore an exact
+  no-op. A partial revert publishes only the records that still differ.
+- **Signed decks open** (`6103aab069`, `17a5751052`). The record publisher
+  `embedded::object::Editor` has an open that admits a digital-signature
+  component. It records the signature, and `finish` refuses any changed
+  publication. Encryption and rights-management components are still
+  refused. `edit_animations()` and `edit_objects()` now open a signed deck.
+  An exact no-op commit keeps the signed bytes, and a changed commit is
+  `Error::Signed`, as in every other family.
+- **Objects on a deck without a list** (`17a5751052`). `edit_objects()`
+  edits an empty list (seed 1) when the live document has no
+  `ExObjListContainer`. The first committed change inserts the container
+  directly after the `DocumentAtom`, which is where [MS-PPT] 2.4.1 places
+  `exObjList`. A list that already exists is replaced in place. A fix on
+  the way: removing an object whose storage the same edit had staged is now
+  a no-op.
+- **Notes masters and incremental saves** (`de984025c7`). [MS-PPT] 2.5.12
+  requires a null `NotesAtom.slideIdRef` in the notes master. PowerPoint
+  writes 0x80000000 there, and other producers write 0x80000001, often with
+  `fMasterScheme` set. Both values are in the `MasterId` domain (2.2.16),
+  never `SlideId` values. The two master validators and the master-layout
+  inventory now accept two forms: a null reference with null defined flags,
+  or a reference in the `MasterId` domain. A slide reference is still
+  refused. `Presentation::masters()` now reads the live `DocumentContainer`,
+  so it no longer refuses an incrementally saved deck. Before the fix,
+  `masters()` failed on 14 of the 30 corpus decks that open, and both master
+  families refused the notes master of 13 of them. Now every deck lists its
+  masters, and every listed master opens both families. Title-master
+  coverage uses Apache POI `slide_master.ppt`, copied into `test-data/poi`
+  (Apache-2.0; provenance in `test-data/poi/PROVENANCE.md`).
+- **Signed-package tests** (`348bfe5e65`). Every family now has a signed
+  test (admit, no-op, `Signed` on a changed commit), including
+  `master::metadata` and `master_layout` on main, handout, notes and title
+  masters.
+
+Gates on `348bfe5e65`: `cargo fmt --all --check` 0; clippy
+`--all-features` and `--no-default-features` (`-D warnings`) 0 / 0;
+`cargo test -p litchi-ppt --all-features` 0 (1,540 tests); `cargo doc` with
+`-Dwarnings` 0; `check_api_glossary.py` `ppt-minimal` / `ppt-full` 0 / 0;
+`cargo check -p litchi-ops --all-features --all-targets` 0; the litchi-ops
+PPT tests (`crud_matrix`, `ppt_unified_read`, `ppt_unified_write`,
+`ppt_elements`, `--lib`) 0 (988 tests, no re-bless).

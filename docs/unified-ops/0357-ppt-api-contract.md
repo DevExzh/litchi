@@ -248,13 +248,12 @@ into_package_editor, finish}` and `snapshot` on every family `Edit`.
 - `document_structure`'s master reordering and custom-table-style placement
   and `client_data`-independent anchor sub-fields have no public route
   beyond the primary edit's verbs.
-- Animation: an edit that stages a change and then reverts it publishes a
-  changed package (the editor tracks rewritten records, not net equality);
-  a signed package is refused at `edit_animations()`.
-- `edit_objects()` refuses a deck without an external-object list and a
-  signed deck at the start (the object publisher cannot open them).
-- Master editing: the existing master validator refuses the notes master of
-  13 of 25 corpus decks; no corpus deck has a title master.
+- Closed by [0357a §6](0357a-ppt-record-sized-patches.md#6-follow-up-closing-the-0357-9-family-gaps):
+  a reverted animation change publishing a changed package, the signed-deck
+  refusal of `edit_animations()` and `edit_objects()`, `edit_objects()`
+  refusing a deck without an external-object list, the master validator
+  refusing real notes masters (13 corpus decks), and the missing
+  title-master fixture.
 - The scoped family patches carried whole-artifact bytes; record
   [0357a](0357a-ppt-record-sized-patches.md) made them record-sized
   byte-range diffs. `package::metadata::Patch` and `package::edit::Patch`
