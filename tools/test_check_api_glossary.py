@@ -59,6 +59,53 @@ pub fn foreign() -> std::time::Duration { std::time::Duration::ZERO }
 /// old_comment is documentation, not a name.
 pub fn fine(old_argument: u8) { let _ = old_argument; }
 pub mod cycle { pub use crate::cycle as again; }
+pub struct Owner;
+impl Owner {
+    pub fn open() -> Self { Owner }
+    pub fn save(&self) {}
+    pub fn put_part(&mut self) {}
+    pub fn into_bytes(self) {}
+    fn private_mut(&mut self) {}
+}
+pub struct Frozen;
+impl Frozen { pub fn save(&self) {} pub fn into_bytes(self) {} }
+pub mod strict {
+    pub struct Package;
+    pub struct Edit;
+    impl Edit { pub fn commit(self) -> Commit { Commit } pub fn set(&mut self) {} }
+    pub struct Patch;
+    impl Patch { pub fn is_noop(&self) -> bool { true } pub fn inverse(&self) -> Self { Patch } }
+    pub struct Commit;
+    impl Commit {
+        pub fn package(&self) -> &Package { &Package }
+        pub fn into_package(self) -> Package { Package }
+        pub fn patch(&self) -> &Patch { &Patch }
+        pub fn diagnostics(&self) -> &Diagnostics { &Diagnostics }
+        pub fn into_parts(self) -> (Package, Patch) { (Package, Patch) }
+    }
+    pub struct Diagnostics;
+    impl Diagnostics { pub fn changed(&self) -> bool { false } }
+    pub enum Error { Bad }
+    pub enum LimitKind { Bytes }
+}
+pub mod loose {
+    pub struct Edit;
+    impl Edit { pub fn commit(self) {} pub fn rollback(self) {} }
+    pub struct Patch;
+    pub struct Commit;
+    impl Commit { pub fn snapshot(&self) {} }
+    pub struct Diagnostics;
+    pub enum Error { Bad }
+    pub enum LimitKind { Bytes }
+}
+pub mod shared {
+    pub use crate::strict::{Edit, Patch, Error, LimitKind};
+    pub type Commit = std::time::Duration;
+    pub use std::time::Instant as Diagnostics;
+}
+pub fn open_with_limits() {}
+pub fn open_with_options() {}
+pub struct MutableDraft;
 '''
 
 
@@ -94,6 +141,11 @@ class PolicyTests(unittest.TestCase):
             {"version": 1, "profiles": [profile(banned_names=[ban("Id", "other")])]},
             {"version": 1, "profiles": [profile(banned_names=[ban("Id"), ban("Id")])]},
             {"version": 1, "profiles": [profile(families=["fixture::tx", "fixture::tx"])]},
+            {"version": 1, "profiles": [profile(banned_names=[{**ban("Id"), "match": "infix"}])]},
+            {"version": 1, "profiles": [profile(family_methods="yes")]},
+            {"version": 1, "profiles": [profile(immutable_owners="fixture::Owner")]},
+            {"version": 1, "profiles": [profile(immutable_owners=["other::Owner"])]},
+            {"version": 1, "profiles": [profile(immutable_owners=["fixture::Owner", "fixture::Owner"])]},
         ]
         for value in cases:
             with self.subTest(value=value), self.assertRaises(ValueError):
@@ -260,6 +312,58 @@ class RustdocTests(unittest.TestCase):
                 target["inner"]["struct"] = None
             with self.subTest(mutation=mutation), self.assertRaises(ValueError):
                 gate.violations(doc, profile())
+
+    def test_suffix_and_prefix_bans_match_whole_name_ends(self):
+        suffix = {**ban("_with_limits"), "match": "suffix"}
+        failures = gate.violations(self.document, profile(banned_names=[suffix]))
+        self.assertEqual(len(failures), 1, failures)
+        self.assertIn("fixture::open_with_limits", failures[0])
+        prefix = {**ban("Mutable"), "match": "prefix"}
+        failures = gate.violations(self.document, profile(banned_names=[prefix]))
+        self.assertEqual(len(failures), 1, failures)
+        self.assertIn("fixture::MutableDraft", failures[0])
+        # A prefix or suffix ban never matches the bare affix itself.
+        exact_affix = {**ban("open"), "match": "prefix"}
+        self.assertEqual(len(gate.violations(self.document, profile(banned_names=[exact_affix]))), 2)
+        self.assertEqual(self.check("_with_limits"), [])
+        # The same name may be banned exactly and as an affix in one scope.
+        policy = {"version": 1, "profiles": [profile(banned_names=[ban("Mutable"), prefix])]}
+        self.assertTrue(gate.checked_policy(policy))
+
+    def test_immutable_owner_rejects_public_mut_self_methods_only(self):
+        failures = gate.violations(self.document, profile(immutable_owners=["fixture::Owner"]))
+        self.assertEqual(len(failures), 1, failures)
+        self.assertIn("fixture::Owner::put_part takes &mut self", failures[0])
+        self.assertEqual(gate.violations(self.document, profile(immutable_owners=["fixture::Frozen"])), [])
+        failures = gate.violations(self.document, profile(immutable_owners=["fixture::Missing"]))
+        self.assertEqual(failures, ["missing immutable owner type fixture::Missing"])
+
+    def test_family_methods_require_the_commit_triad_accessors(self):
+        families = ["fixture::strict", "fixture::loose"]
+        self.assertEqual(gate.violations(self.document, profile(families=families[:1], family_methods=True)), [])
+        # Without family_methods only the six type names are checked.
+        self.assertEqual(gate.violations(self.document, profile(families=families)), [])
+        failures = gate.violations(self.document, profile(families=families, family_methods=True))
+        expected = {
+            "fixture::loose::Commit exposes forbidden method snapshot (record 0351)",
+            "fixture::loose::Commit requires method diagnostics (record 0351)",
+            "fixture::loose::Commit requires method into_package (record 0351)",
+            "fixture::loose::Commit requires method into_parts (record 0351)",
+            "fixture::loose::Commit requires method package (record 0351)",
+            "fixture::loose::Commit requires method patch (record 0351)",
+            "fixture::loose::Diagnostics requires method changed (record 0351)",
+            "fixture::loose::Edit exposes forbidden method rollback (record 0351)",
+            "fixture::loose::Patch requires method inverse (record 0351)",
+            "fixture::loose::Patch requires method is_noop (record 0351)",
+        }
+        self.assertEqual(set(failures), expected)
+
+    def test_family_methods_leave_dependency_members_to_their_crate(self):
+        # `pub type Commit = litchi_core::edit::Commit<..>` and re-exported
+        # dependency types carry no rustdoc methods here; their own crate
+        # checks them. Local members of the same family are still checked.
+        self.assertEqual(
+            gate.violations(self.document, profile(families=["fixture::shared"], family_methods=True)), [])
 
     def test_cli_exit_codes_and_unknown_profile(self):
         policy_path = self.directory / "policy.json"

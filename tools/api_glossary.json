@@ -61,6 +61,49 @@
           "name": "LimitsError",
           "scope": "litchi_core",
           "replacement": "use Error::InvalidLimit"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_core",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_core",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_core",
+          "replacement": "use the focused module's Edit (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_core",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_core",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_core",
+          "replacement": "configure limits through OpenOptions (open_with_options/from_bytes_with_options) or the package's limits; raw/record APIs take limits as a required argument (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_core",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_core",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": []
@@ -335,7 +378,11 @@
       "families": [
         "litchi_docx::document",
         "litchi_docx::metadata"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_docx::Document"
+      ],
+      "family_methods": true
     },
     {
       "id": "docx-full",
@@ -612,7 +659,11 @@
       "families": [
         "litchi_docx::document",
         "litchi_docx::metadata"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_docx::Document"
+      ],
+      "family_methods": true
     },
     {
       "id": "opc-minimal",
@@ -1032,6 +1083,23 @@
           "scope": "litchi_ooxml_common::properties",
           "recursive": false,
           "replacement": "use litchi_core::Metadata (record 0253)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_ooxml_common",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_ooxml_common",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
@@ -1168,6 +1236,23 @@
           "scope": "litchi_ooxml_common::properties",
           "recursive": false,
           "replacement": "use litchi_core::Metadata (record 0253)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_ooxml_common",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_ooxml_common",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
@@ -1694,12 +1779,27 @@
           "name": "is_changed",
           "scope": "litchi_pptx",
           "replacement": "diagnostics().changed() on edits/commits, is_noop() on patches (record 0252)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_pptx",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_pptx",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
         "litchi_pptx::metadata",
         "litchi_pptx::opened"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_pptx::Presentation"
+      ],
+      "family_methods": true
     },
     {
       "id": "pptx-full",
@@ -2250,12 +2350,27 @@
           "name": "is_changed",
           "scope": "litchi_pptx",
           "replacement": "diagnostics().changed() on edits/commits, is_noop() on patches (record 0252)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_pptx",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_pptx",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
         "litchi_pptx::metadata",
         "litchi_pptx::opened"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_pptx::Presentation"
+      ],
+      "family_methods": true
     },
     {
       "id": "xlsx-minimal",
@@ -2778,6 +2893,27 @@
           "name": "CachedUniqueNamesWorkbookTransaction",
           "scope": "litchi_xlsx",
           "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_xlsx",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_xlsx",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_xlsx",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_xlsx",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
@@ -2789,7 +2925,11 @@
         "litchi_xlsx::auto_filter::edit",
         "litchi_xlsx::workbook::comments::edit",
         "litchi_xlsx::drawing::edit"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_xlsx::Workbook"
+      ],
+      "family_methods": true
     },
     {
       "id": "xlsx-full",
@@ -3315,6 +3455,27 @@
           "name": "CachedUniqueNamesWorkbookTransaction",
           "scope": "litchi_xlsx",
           "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_xlsx",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_xlsx",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_xlsx",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_xlsx",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
@@ -3326,7 +3487,11 @@
         "litchi_xlsx::auto_filter::edit",
         "litchi_xlsx::workbook::comments::edit",
         "litchi_xlsx::drawing::edit"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_xlsx::Workbook"
+      ],
+      "family_methods": true
     },
     {
       "id": "xlsb-minimal",
@@ -3760,6 +3925,16 @@
           "name": "CustomDataTransaction",
           "scope": "litchi_xlsb",
           "replacement": "use custom_data::Edit (record 0343)"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_xlsb",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_xlsb",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
@@ -3774,6 +3949,9 @@
         "litchi_xlsb::conditional_formatting::edit",
         "litchi_xlsb::comments::edit",
         "litchi_xlsb::drawing::edit"
+      ],
+      "immutable_owners": [
+        "litchi_xlsb::Package"
       ]
     },
     {
@@ -4211,6 +4389,16 @@
           "name": "CustomDataTransaction",
           "scope": "litchi_xlsb",
           "replacement": "use custom_data::Edit (record 0343)"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_xlsb",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_xlsb",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
@@ -4225,6 +4413,9 @@
         "litchi_xlsb::conditional_formatting::edit",
         "litchi_xlsb::comments::edit",
         "litchi_xlsb::drawing::edit"
+      ],
+      "immutable_owners": [
+        "litchi_xlsb::Package"
       ]
     },
     {
@@ -4464,12 +4655,28 @@
           "name": "rollback",
           "scope": "litchi_doc",
           "replacement": "drop the Edit or Transaction; the source snapshot is unchanged (record 0258)"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_doc",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_doc",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
         }
       ],
       "families": [
         "litchi_doc::package::edit",
         "litchi_doc::package::metadata"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_doc::Package",
+        "litchi_doc::Document"
+      ],
+      "family_methods": true
     },
     {
       "id": "doc-full",
@@ -4677,12 +4884,28 @@
           "name": "rollback",
           "scope": "litchi_doc",
           "replacement": "drop the Edit or Transaction; the source snapshot is unchanged (record 0258)"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_doc",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_doc",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
         }
       ],
       "families": [
         "litchi_doc::package::edit",
         "litchi_doc::package::metadata"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_doc::Package",
+        "litchi_doc::Document"
+      ],
+      "family_methods": true
     },
     {
       "id": "xls-minimal",
@@ -4988,13 +5211,40 @@
           "scope": "litchi_xls::writer::shape",
           "replacement": "use litchi_xls::AnchorBehavior, the one anchor-behaviour type (record 0316)",
           "recursive": false
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_xls",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_xls",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_xls",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_xls",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
         }
       ],
       "families": [
         "litchi_xls::package::edit",
         "litchi_xls::package::metadata",
         "litchi_xls::sheet_features::edit"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_xls::Package",
+        "litchi_xls::Workbook"
+      ],
+      "family_methods": true
     },
     {
       "id": "ppt-minimal",
@@ -5206,12 +5456,33 @@
           "name": "from_bytes_with_limits",
           "scope": "litchi_ppt::slide_order::Snapshot",
           "replacement": "use from_bytes_with_options(OpenOptions)"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_ppt",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_ppt",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_ppt",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
         "litchi_ppt::package::edit",
         "litchi_ppt::package::metadata"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_ppt::Package",
+        "litchi_ppt::Presentation"
+      ],
+      "family_methods": true
     },
     {
       "id": "ppt-full",
@@ -5430,12 +5701,33 @@
           "name": "set_property",
           "scope": "litchi_ppt::Builder",
           "replacement": "Builder::set_metadata(Metadata) plus summary_properties_mut() for custom properties (ADR 0034 §7, record 0254)"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_ppt",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_ppt",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_ppt",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
         "litchi_ppt::package::edit",
         "litchi_ppt::package::metadata"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_ppt::Package",
+        "litchi_ppt::Presentation"
+      ],
+      "family_methods": true
     },
     {
       "id": "rtf-minimal",
@@ -5942,11 +6234,53 @@
           "name": "split_paragraph_at",
           "scope": "litchi_rtf::edit::Edit",
           "replacement": "split_paragraph(Position, UTF-8 byte offset)"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_rtf",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_rtf",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_rtf",
+          "replacement": "use the focused module's Edit (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_rtf",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_rtf",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_rtf",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_rtf",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
         "litchi_rtf::tail_append"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_rtf::Package",
+        "litchi_rtf::Document"
+      ],
+      "family_methods": true
     },
     {
       "id": "ops-rtf",
@@ -5974,6 +6308,43 @@
           "name": "SourcePackageLimits",
           "scope": "litchi_odf_common",
           "replacement": "use checked SourceLimits and OpenOptions (ADR 0034 §5)"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_odf_common",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_odf_common",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_odf_common",
+          "replacement": "use the focused module's Edit (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_odf_common",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_odf_common",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_odf_common",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_odf_common",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": []
@@ -6263,12 +6634,34 @@
           "scope": "litchi_odt::generic::Package",
           "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
           "recursive": false
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_odt",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_odt",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_odt",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
         }
       ],
       "families": [
         "litchi_odt::metadata",
         "litchi_odt::transaction"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_odt::Package",
+        "litchi_odt::Document",
+        "litchi_odt::flat::Document"
+      ],
+      "family_methods": true
     },
     {
       "id": "ods",
@@ -6578,12 +6971,29 @@
           "scope": "litchi_ods::SourceBackedSpreadsheetCatalog",
           "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
           "recursive": false
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_ods",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ods",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
         }
       ],
       "families": [
         "litchi_ods::document",
         "litchi_ods::metadata"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_ods::Package",
+        "litchi_ods::Workbook",
+        "litchi_ods::FlatSpreadsheet"
+      ],
+      "family_methods": true
     },
     {
       "id": "odp",
@@ -6936,12 +7346,46 @@
           "scope": "litchi_odp::SourceBackedPresentationCatalog",
           "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
           "recursive": false
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_odp",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_odp",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_odp",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_odp",
+          "replacement": "configure limits through OpenOptions (open_with_options/from_bytes_with_options) or the package's limits; raw/record APIs take limits as a required argument (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_odp",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
         }
       ],
       "families": [
         "litchi_odp::edit",
         "litchi_odp::metadata"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_odp::Package",
+        "litchi_odp::Presentation",
+        "litchi_odp::FlatPresentation"
+      ],
+      "family_methods": true
     },
     {
       "id": "oth",
@@ -7103,12 +7547,55 @@
           "scope": "litchi_oth::Document",
           "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
           "recursive": false
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_oth",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_oth",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_oth",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_oth",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_oth",
+          "replacement": "configure limits through OpenOptions (open_with_options/from_bytes_with_options) or the package's limits; raw/record APIs take limits as a required argument (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_oth",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_oth",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
         "litchi_oth",
         "litchi_oth::metadata"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_oth::Package",
+        "litchi_oth::Document"
+      ],
+      "family_methods": true
     },
     {
       "id": "odm",
@@ -7306,12 +7793,60 @@
           "scope": "litchi_odm::Document",
           "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
           "recursive": false
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_odm",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_odm",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_odm",
+          "replacement": "use the focused module's Edit (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_odm",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_odm",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_odm",
+          "replacement": "configure limits through OpenOptions (open_with_options/from_bytes_with_options) or the package's limits; raw/record APIs take limits as a required argument (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_odm",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_odm",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
         "litchi_odm::metadata",
         "litchi_odm::transaction"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_odm::Package",
+        "litchi_odm::Document"
+      ],
+      "family_methods": true
     },
     {
       "id": "odi",
@@ -7432,12 +7967,45 @@
           "scope": "litchi_odi::Package",
           "replacement": "use Package::{as_bytes, to_bytes, write_to} (ADR 0034 §4)",
           "recursive": false
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_odi",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_odi",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_odi",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_odi",
+          "replacement": "configure limits through OpenOptions (open_with_options/from_bytes_with_options) or the package's limits; raw/record APIs take limits as a required argument (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_odi",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
         }
       ],
       "families": [
         "litchi_odi",
         "litchi_odi::metadata"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_odi::Package",
+        "litchi_odi::Image",
+        "litchi_odi::FlatImage"
+      ],
+      "family_methods": true
     },
     {
       "id": "odb",
@@ -7538,12 +8106,55 @@
           "name": "Transaction",
           "scope": "litchi_odb",
           "replacement": "use litchi_odb::Edit (ADR 0034 §3)"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_odb",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_odb",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_odb",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_odb",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_odb",
+          "replacement": "configure limits through OpenOptions (open_with_options/from_bytes_with_options) or the package's limits; raw/record APIs take limits as a required argument (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_odb",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_odb",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
         "litchi_odb",
         "litchi_odb::metadata"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_odb::Package",
+        "litchi_odb::Database"
+      ],
+      "family_methods": true
     },
     {
       "id": "odg",
@@ -7885,12 +8496,56 @@
           "scope": "litchi_odg::Builder",
           "replacement": "Builder::build returns Package; output lives on Package (ADR 0034 §4)",
           "recursive": false
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_odg",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_odg",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_odg",
+          "replacement": "use the focused module's Edit (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_odg",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_odg",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_odg",
+          "replacement": "configure limits through OpenOptions (open_with_options/from_bytes_with_options) or the package's limits; raw/record APIs take limits as a required argument (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_odg",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
         }
       ],
       "families": [
         "litchi_odg::edit",
         "litchi_odg::metadata"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_odg::Package",
+        "litchi_odg::Drawing",
+        "litchi_odg::FlatDrawing"
+      ],
+      "family_methods": true
     },
     {
       "id": "odc",
@@ -8057,12 +8712,45 @@
           "scope": "litchi_odc::Builder",
           "replacement": "Builder::build returns Package; output lives on Package (ADR 0034 §4)",
           "recursive": false
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_odc",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_odc",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_odc",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_odc",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_odc",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
         }
       ],
       "families": [
         "litchi_odc",
         "litchi_odc::metadata"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_odc::Package",
+        "litchi_odc::Chart",
+        "litchi_odc::FlatChart"
+      ],
+      "family_methods": true
     },
     {
       "id": "odf-formula",
@@ -8229,12 +8917,49 @@
           "scope": "litchi_odf_formula::Patch",
           "replacement": "use Package::apply(&patch) (ADR 0034 §3)",
           "recursive": false
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_odf_formula",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_odf_formula",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_odf_formula",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_odf_formula",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_odf_formula",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_odf_formula",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
         "litchi_odf_formula",
         "litchi_odf_formula::metadata"
-      ]
+      ],
+      "immutable_owners": [
+        "litchi_odf_formula::Package",
+        "litchi_odf_formula::Formula"
+      ],
+      "family_methods": true
     },
     {
       "id": "ops-odf",
@@ -8831,6 +9556,43 @@
           "scope": "litchi_numbers::table",
           "replacement": "use litchi_numbers::table::CellRange; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
           "recursive": false
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_numbers",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module's Edit (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_numbers",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_numbers",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_numbers",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
@@ -8866,6 +9628,10 @@
         "litchi_numbers::table::sort::transaction",
         "litchi_numbers::table::title",
         "litchi_numbers::table::topology"
+      ],
+      "immutable_owners": [
+        "litchi_numbers::Package",
+        "litchi_numbers::Workbook"
       ]
     },
     {
@@ -9439,6 +10205,43 @@
           "scope": "litchi_numbers::table",
           "replacement": "use litchi_numbers::table::CellRange; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
           "recursive": false
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_numbers",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module's Edit (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_numbers",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_numbers",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_numbers",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
@@ -9474,6 +10277,10 @@
         "litchi_numbers::table::sort::transaction",
         "litchi_numbers::table::title",
         "litchi_numbers::table::topology"
+      ],
+      "immutable_owners": [
+        "litchi_numbers::Package",
+        "litchi_numbers::Workbook"
       ]
     },
     {
@@ -10362,6 +11169,43 @@
           "scope": "litchi_pages::Document",
           "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2, record 0299)",
           "recursive": false
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_pages",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_pages",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_pages",
+          "replacement": "use the focused module's Edit (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_pages",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_pages",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_pages",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_pages",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
@@ -10392,6 +11236,10 @@
         "litchi_pages::table::sort::transaction",
         "litchi_pages::table::title",
         "litchi_pages::table::lock"
+      ],
+      "immutable_owners": [
+        "litchi_pages::Package",
+        "litchi_pages::Document"
       ]
     },
     {
@@ -11682,6 +12530,49 @@
           "scope": "litchi_keynote::slide::media::playback",
           "replacement": "the family lives in slide::audio::position / slide::movie::{geometry, playback} (record 0298)",
           "recursive": false
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_keynote",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_keynote",
+          "replacement": "use the focused module's Edit (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_keynote",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_keynote",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_keynote",
+          "replacement": "configure limits through OpenOptions (open_with_options/from_bytes_with_options) or the package's limits; raw/record APIs take limits as a required argument (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_keynote",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_keynote",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
@@ -11726,6 +12617,10 @@
         "litchi_keynote::soundtrack::order",
         "litchi_keynote::soundtrack::items",
         "litchi_keynote::slide::placeholder"
+      ],
+      "immutable_owners": [
+        "litchi_keynote::Package",
+        "litchi_keynote::Presentation"
       ]
     },
     {
@@ -13012,6 +13907,49 @@
           "scope": "litchi_keynote::slide::media::playback",
           "replacement": "the family lives in slide::audio::position / slide::movie::{geometry, playback} (record 0298)",
           "recursive": false
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_keynote",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_keynote",
+          "replacement": "use the focused module's Edit (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_keynote",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_keynote",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_keynote",
+          "replacement": "configure limits through OpenOptions (open_with_options/from_bytes_with_options) or the package's limits; raw/record APIs take limits as a required argument (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_keynote",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_keynote",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
         }
       ],
       "families": [
@@ -13056,6 +13994,10 @@
         "litchi_keynote::soundtrack::order",
         "litchi_keynote::soundtrack::items",
         "litchi_keynote::slide::placeholder"
+      ],
+      "immutable_owners": [
+        "litchi_keynote::Package",
+        "litchi_keynote::Presentation"
       ]
     }
   ]
