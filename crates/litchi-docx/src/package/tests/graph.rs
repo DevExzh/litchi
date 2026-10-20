@@ -1,10 +1,5 @@
 use super::*;
 
-const STRICT_FOOTNOTES_RELATIONSHIP: &str =
-    "http://purl.oclc.org/ooxml/officeDocument/relationships/footnotes";
-const STRICT_ENDNOTES_RELATIONSHIP: &str =
-    "http://purl.oclc.org/ooxml/officeDocument/relationships/endnotes";
-
 #[derive(Default)]
 struct ForwardOnlySink(Vec<u8>);
 
@@ -21,13 +16,14 @@ impl Write for ForwardOnlySink {
 
 #[test]
 fn plain_stream_accepts_a_forward_only_sink() {
-    let mut package = Package::new().unwrap();
-    package
-        .authoring_document()
+    let mut builder = crate::Builder::new().unwrap();
+    builder
+        .document()
         .unwrap()
         .add_paragraph_with_text("forward-only DOCX output");
 
     let mut sink = ForwardOnlySink::default();
+    let package = builder.build().unwrap();
     package.to_plain_stream(&mut sink).unwrap();
 
     let reopened = Package::from_reader(Cursor::new(sink.0)).unwrap();
@@ -48,13 +44,13 @@ fn with_eocd_comment(mut archive: Vec<u8>, comment: &[u8]) -> Vec<u8> {
 
 #[test]
 fn owned_document_noop_output_preserves_exact_archive() {
-    let mut authored = Package::new().expect("new document");
+    let authored = Package::new().expect("new document");
     let mut initial = Cursor::new(Vec::new());
     authored
         .to_plain_stream(&mut initial)
         .expect("serialize document");
     let source = with_eocd_comment(initial.into_inner(), b"docx exact source");
-    let mut package = Package::from_reader(Cursor::new(source.clone())).expect("open document");
+    let package = Package::from_reader(Cursor::new(source.clone())).expect("open document");
     let mut output = Cursor::new(Vec::new());
 
     package
@@ -67,14 +63,15 @@ fn owned_document_noop_output_preserves_exact_archive() {
 #[test]
 fn saves_and_reopens_package() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut package = Package::new().unwrap();
-    package
-        .authoring_document()
+    let mut builder = crate::Builder::new().unwrap();
+    builder
+        .document()
         .unwrap()
         .add_paragraph_with_text("round-trip text");
+    let package = builder.build().unwrap();
     package.save(file.path()).unwrap();
 
-    let mut reopened = Package::open(file.path()).unwrap();
+    let reopened = Package::open(file.path()).unwrap();
     assert!(
         reopened
             .document()
@@ -83,240 +80,6 @@ fn saves_and_reopens_package() {
             .unwrap()
             .contains("round-trip text")
     );
-
-    reopened
-        .authoring_document()
-        .unwrap()
-        .add_paragraph_with_text("appended after reopen");
-    reopened.save(file.path()).unwrap();
-    let reopened_again = Package::open(file.path()).unwrap();
-    let text = reopened_again.document().unwrap().text().unwrap();
-    assert!(text.contains("round-trip text"));
-    assert!(text.contains("appended after reopen"));
-}
-
-#[test]
-fn appending_a_paragraph_preserves_existing_note_edges_and_payloads() {
-    let document_uri = PackURI::new("/word/document.xml").unwrap();
-    let footnotes_uri = PackURI::new("/word/footnotes2.xml").unwrap();
-    let endnotes_uri = PackURI::new("/word/endnotes2.xml").unwrap();
-    let footnotes_xml = br#"<?xml version="1.0" encoding="UTF-8"?><w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnote w:id="41"><w:p><w:r><w:t>opaque footnote payload</w:t></w:r></w:p></w:footnote></w:footnotes>"#;
-    let endnotes_xml = br#"<?xml version="1.0" encoding="UTF-8"?><w:endnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:endnote w:id="51"><w:p><w:r><w:t>opaque endnote payload</w:t></w:r></w:p></w:endnote></w:endnotes>"#;
-
-    // Start from a valid base archive, then inject the source note graph at
-    // the OPC layer so the package under test is opened from real bytes.
-    let base = Package::new().unwrap();
-    let base_bytes = litchi_opc::PackageWriter::to_bytes(&base.opc).unwrap();
-    let mut source_opc = OpcPackage::from_bytes(&base_bytes).unwrap();
-    source_opc.add_part(Box::new(BlobPart::new(
-        footnotes_uri.clone(),
-        ct::WML_FOOTNOTES.to_owned(),
-        footnotes_xml.to_vec(),
-    )));
-    source_opc.add_part(Box::new(BlobPart::new(
-        endnotes_uri.clone(),
-        ct::WML_ENDNOTES.to_owned(),
-        endnotes_xml.to_vec(),
-    )));
-    source_opc
-        .get_part_mut(&document_uri)
-        .unwrap()
-        .rels_mut()
-        .try_add_relationship(
-            STRICT_FOOTNOTES_RELATIONSHIP.to_owned(),
-            "footnotes2.xml".to_owned(),
-            "rId7".to_owned(),
-            TargetMode::Internal,
-        )
-        .unwrap();
-    source_opc
-        .get_part_mut(&document_uri)
-        .unwrap()
-        .rels_mut()
-        .try_add_relationship(
-            STRICT_ENDNOTES_RELATIONSHIP.to_owned(),
-            "endnotes2.xml".to_owned(),
-            "rId8".to_owned(),
-            TargetMode::Internal,
-        )
-        .unwrap();
-
-    let mut source_note_edges = source_opc
-        .main_document_part()
-        .unwrap()
-        .rels()
-        .iter()
-        .filter(|relationship| {
-            matches!(
-                relationship.reltype(),
-                litchi_opc::constants::relationship_type::FOOTNOTES
-                    | litchi_opc::constants::relationship_type::ENDNOTES
-                    | STRICT_FOOTNOTES_RELATIONSHIP
-                    | STRICT_ENDNOTES_RELATIONSHIP
-            )
-        })
-        .map(|relationship| {
-            (
-                relationship.r_id().to_owned(),
-                relationship.reltype().to_owned(),
-                relationship.target_ref().to_owned(),
-                relationship.target_mode(),
-            )
-        })
-        .collect::<Vec<_>>();
-    source_note_edges.sort_by(|left, right| left.0.cmp(&right.0));
-    let source_note_payloads = [
-        (
-            footnotes_uri.clone(),
-            source_opc.get_part(&footnotes_uri).unwrap().blob().to_vec(),
-        ),
-        (
-            endnotes_uri.clone(),
-            source_opc.get_part(&endnotes_uri).unwrap().blob().to_vec(),
-        ),
-    ];
-    let source_bytes = litchi_opc::PackageWriter::to_bytes(&source_opc).unwrap();
-    let mut package = Package::from_reader(Cursor::new(source_bytes)).unwrap();
-    package
-        .authoring_document()
-        .unwrap()
-        .add_paragraph_with_text("appended beside opaque notes");
-    let mut output = Cursor::new(Vec::new());
-    package.to_plain_stream(&mut output).unwrap();
-
-    let reopened = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
-    let main = reopened.opc.main_document_part().unwrap();
-    let mut reopened_note_edges = main
-        .rels()
-        .iter()
-        .filter(|relationship| {
-            matches!(
-                relationship.reltype(),
-                litchi_opc::constants::relationship_type::FOOTNOTES
-                    | litchi_opc::constants::relationship_type::ENDNOTES
-                    | STRICT_FOOTNOTES_RELATIONSHIP
-                    | STRICT_ENDNOTES_RELATIONSHIP
-            )
-        })
-        .map(|relationship| {
-            (
-                relationship.r_id().to_owned(),
-                relationship.reltype().to_owned(),
-                relationship.target_ref().to_owned(),
-                relationship.target_mode(),
-            )
-        })
-        .collect::<Vec<_>>();
-    reopened_note_edges.sort_by(|left, right| left.0.cmp(&right.0));
-    assert_eq!(reopened_note_edges, source_note_edges);
-    for (uri, payload) in source_note_payloads {
-        assert_eq!(reopened.opc.get_part(&uri).unwrap().blob(), payload);
-    }
-    assert!(
-        reopened
-            .document()
-            .unwrap()
-            .text()
-            .unwrap()
-            .contains("appended beside opaque notes")
-    );
-}
-
-#[test]
-fn authored_notes_replace_existing_strict_note_edges() {
-    let document_uri = PackURI::new("/word/document.xml").unwrap();
-    let old_footnotes_uri = PackURI::new("/word/footnotes2.xml").unwrap();
-    let old_endnotes_uri = PackURI::new("/word/endnotes2.xml").unwrap();
-    let base = Package::new().unwrap();
-    let base_bytes = litchi_opc::PackageWriter::to_bytes(&base.opc).unwrap();
-    let mut source_opc = OpcPackage::from_bytes(&base_bytes).unwrap();
-    source_opc.add_part(Box::new(BlobPart::new(
-        old_footnotes_uri,
-        ct::WML_FOOTNOTES.to_owned(),
-        br#"<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#
-            .to_vec(),
-    )));
-    source_opc.add_part(Box::new(BlobPart::new(
-        old_endnotes_uri,
-        ct::WML_ENDNOTES.to_owned(),
-        br#"<w:endnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#
-            .to_vec(),
-    )));
-    source_opc
-        .get_part_mut(&document_uri)
-        .unwrap()
-        .rels_mut()
-        .try_add_relationship(
-            STRICT_FOOTNOTES_RELATIONSHIP.to_owned(),
-            "footnotes2.xml".to_owned(),
-            "rId7".to_owned(),
-            TargetMode::Internal,
-        )
-        .unwrap();
-    source_opc
-        .get_part_mut(&document_uri)
-        .unwrap()
-        .rels_mut()
-        .try_add_relationship(
-            STRICT_ENDNOTES_RELATIONSHIP.to_owned(),
-            "endnotes2.xml".to_owned(),
-            "rId8".to_owned(),
-            TargetMode::Internal,
-        )
-        .unwrap();
-    let source_bytes = litchi_opc::PackageWriter::to_bytes(&source_opc).unwrap();
-    let mut package = Package::from_reader(Cursor::new(source_bytes)).unwrap();
-    {
-        let document = package.authoring_document().unwrap();
-        let (footnote_id, footnote) = document.add_footnote();
-        footnote.add_paragraph_with_text("generated footnote payload");
-        let (endnote_id, endnote) = document.add_endnote();
-        endnote.add_paragraph_with_text("generated endnote payload");
-        let paragraph = document.add_paragraph();
-        paragraph.add_run().add_footnote_reference(footnote_id);
-        paragraph.add_run().add_endnote_reference(endnote_id);
-    }
-
-    let mut output = Cursor::new(Vec::new());
-    package.to_plain_stream(&mut output).unwrap();
-    let reopened = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
-    let main = reopened.opc.main_document_part().unwrap();
-    let footnote_relationships = main
-        .rels()
-        .iter()
-        .filter(|relationship| {
-            relationship.reltype() == litchi_opc::constants::relationship_type::FOOTNOTES
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(footnote_relationships.len(), 1);
-    assert_eq!(footnote_relationships[0].target_ref(), "footnotes.xml");
-    let endnote_relationships = main
-        .rels()
-        .iter()
-        .filter(|relationship| {
-            relationship.reltype() == litchi_opc::constants::relationship_type::ENDNOTES
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(endnote_relationships.len(), 1);
-    assert_eq!(endnote_relationships[0].target_ref(), "endnotes.xml");
-    assert_eq!(
-        main.rels()
-            .iter()
-            .filter(|relationship| {
-                relationship.reltype() == STRICT_FOOTNOTES_RELATIONSHIP
-                    || relationship.reltype() == STRICT_ENDNOTES_RELATIONSHIP
-            })
-            .count(),
-        0
-    );
-    let footnotes_uri = PackURI::new("/word/footnotes.xml").unwrap();
-    let footnotes =
-        std::str::from_utf8(reopened.opc.get_part(&footnotes_uri).unwrap().blob()).unwrap();
-    assert!(footnotes.contains("generated footnote payload"));
-    let endnotes_uri = PackURI::new("/word/endnotes.xml").unwrap();
-    let endnotes =
-        std::str::from_utf8(reopened.opc.get_part(&endnotes_uri).unwrap().blob()).unwrap();
-    assert!(endnotes.contains("generated endnote payload"));
 }
 
 #[test]
@@ -325,7 +88,7 @@ fn numbering_patch_publishes_through_the_package_graph() {
     let numbering_uri = PackURI::new("/word/numbering.xml").unwrap();
     let mut package = Package::new().unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.get_part_mut(&numbering_uri)
                 .map_err(Error::from)?
                 .set_blob(source_xml.to_vec());
@@ -366,7 +129,7 @@ fn document_patch_publishes_atomically_and_reopens() {
     let document_uri = PackURI::new("/word/document.xml").unwrap();
     let mut package = Package::new().unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.get_part_mut(&document_uri)?
                 .set_blob(source_xml.to_vec());
             Ok(())
@@ -403,7 +166,10 @@ fn document_patch_publishes_atomically_and_reopens() {
         "after and longer"
     );
 
-    package = package.apply(&commit.patch().inverse()).unwrap();
+    package = package
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(package.opc.main_document_part().unwrap().blob(), source_xml);
 }
 
@@ -413,7 +179,7 @@ fn durable_document_patch_preserves_hyperlink_graph_and_reopens_exactly() {
     let document_uri = PackURI::new("/word/document.xml").unwrap();
     let mut package = Package::new().unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let main = opc.get_part_mut(&document_uri)?;
             main.set_blob(source_xml.to_vec());
             main.rels_mut().try_add_relationship(
@@ -461,7 +227,11 @@ fn durable_document_patch_preserves_hyperlink_graph_and_reopens_exactly() {
         )
         .unwrap();
 
-    let published = package.apply_durable_document_patch(&decoded).unwrap();
+    package = package
+        .apply_durable_document(&decoded)
+        .unwrap()
+        .into_package();
+    let published = package.document_snapshot().unwrap();
     assert_eq!(published.xml_bytes(), commit.snapshot().xml_bytes());
     assert_eq!(
         document_relationship_inventory(&package),
@@ -480,9 +250,10 @@ fn durable_document_patch_preserves_hyperlink_graph_and_reopens_exactly() {
         relationships_before
     );
 
-    reopened
-        .apply_durable_document_patch(&decoded.inverse())
-        .unwrap();
+    reopened = reopened
+        .apply_durable_document(&decoded.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(
         reopened.opc.main_document_part().unwrap().blob(),
         source_xml
@@ -526,7 +297,10 @@ fn durable_hyperlink_edit_round_trips_real_open_xml_sdk_fixture() {
         4 * 1024 * 1024,
     );
     let durable = commit.patch().to_durable(limits).unwrap();
-    package.apply_durable_document_patch(&durable).unwrap();
+    package = package
+        .apply_durable_document(&durable)
+        .unwrap()
+        .into_package();
     assert_eq!(
         document_relationship_inventory(&package),
         relationships_before
@@ -544,9 +318,10 @@ fn durable_hyperlink_edit_round_trips_real_open_xml_sdk_fixture() {
         relationships_before
     );
 
-    package
-        .apply_durable_document_patch(&durable.inverse())
-        .unwrap();
+    package = package
+        .apply_durable_document(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(
         package.document_snapshot().unwrap().xml_bytes(),
         source.xml_bytes()
@@ -684,19 +459,28 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
     let relationships_before = document_relationship_inventory(&receiver);
     let history_budget = u64::try_from(commit.snapshot().xml_bytes().len()).unwrap() * 2;
     let mut history = source.history(litchi_core::patch::HistoryLimits::new(4, history_budget));
-    receiver
+    receiver = receiver
         .publish_document_commit_with_history(commit.clone(), &mut history)
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(
         document_relationship_inventory(&receiver),
         relationships_before
     );
-    assert!(receiver.undo_document(&mut history).unwrap());
+    receiver = {
+        let commit = receiver.undo_document(&mut history).unwrap();
+        assert!(commit.diagnostics().changed());
+        commit.into_package()
+    };
     assert_eq!(
         receiver.document_snapshot().unwrap().xml_bytes(),
         source.xml_bytes()
     );
-    assert!(receiver.redo_document(&mut history).unwrap());
+    receiver = {
+        let commit = receiver.redo_document(&mut history).unwrap();
+        assert!(commit.diagnostics().changed());
+        commit.into_package()
+    };
 
     let mut output = Cursor::new(Vec::new());
     receiver.to_plain_stream(&mut output).unwrap();
@@ -712,9 +496,10 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
 
     let mut durable_receiver =
         transfer_package(receiver_xml, "receiverLink", "receiverImage", b"same image");
-    durable_receiver
-        .apply_durable_document_patch(&decoded)
-        .unwrap();
+    durable_receiver = durable_receiver
+        .apply_durable_document(&decoded)
+        .unwrap()
+        .into_package();
     let mut durable_output = Cursor::new(Vec::new());
     durable_receiver
         .to_plain_stream(&mut durable_output)
@@ -737,7 +522,7 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
     let stale_commit = stale_edit.commit().unwrap();
     let stale_durable = stale_commit.patch().to_durable(patch_limits).unwrap();
     stale_receiver
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.get_part_mut(&PackURI::new("/word/document.xml").unwrap())?
                 .rels_mut()
                 .try_add_relationship(
@@ -763,7 +548,7 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
         stale_xml
     );
     assert!(matches!(
-        stale_receiver.apply_durable_document_patch(&stale_durable),
+        stale_receiver.apply_durable_document(&stale_durable),
         Err(crate::document::Error::PatchConflict)
     ));
     assert_eq!(
@@ -790,9 +575,10 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
     let copied_durable = copied_commit.patch().to_durable(patch_limits).unwrap();
     let mut copied_history =
         mismatched_source.history(litchi_core::patch::HistoryLimits::new(4, 4 * 1024 * 1024));
-    mismatched
+    mismatched = mismatched
         .publish_document_commit_with_history(copied_commit, &mut copied_history)
-        .unwrap();
+        .unwrap()
+        .into_package();
     let copied_image = PackURI::new("/word/media/shared-transfer1.png").unwrap();
     let copied_metadata = PackURI::new("/word/media/shared-meta-transfer1.xml").unwrap();
     assert_eq!(
@@ -819,7 +605,11 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
         document_relationship_inventory(&mismatched),
         mismatched_before
     );
-    assert!(mismatched.undo_document(&mut copied_history).unwrap());
+    mismatched = {
+        let commit = mismatched.undo_document(&mut copied_history).unwrap();
+        assert!(commit.diagnostics().changed());
+        commit.into_package()
+    };
     assert!(mismatched.opc.get_part(&copied_image).is_err());
     assert!(mismatched.opc.get_part(&copied_metadata).is_err());
     assert_eq!(
@@ -830,23 +620,33 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
         document_relationship_inventory(&mismatched),
         mismatched_before
     );
-    assert!(mismatched.redo_document(&mut copied_history).unwrap());
+    mismatched = {
+        let commit = mismatched.redo_document(&mut copied_history).unwrap();
+        assert!(commit.diagnostics().changed());
+        commit.into_package()
+    };
     assert_eq!(
         mismatched.opc.get_part(&copied_image).unwrap().blob(),
         b"same image"
     );
-    assert!(mismatched.undo_document(&mut copied_history).unwrap());
-    mismatched
-        .apply_durable_document_patch(&copied_durable)
-        .unwrap();
+    mismatched = {
+        let commit = mismatched.undo_document(&mut copied_history).unwrap();
+        assert!(commit.diagnostics().changed());
+        commit.into_package()
+    };
+    mismatched = mismatched
+        .apply_durable_document(&copied_durable)
+        .unwrap()
+        .into_package();
     assert_eq!(
         mismatched.opc.get_part(&copied_image).unwrap().blob(),
         b"same image"
     );
     assert!(mismatched.opc.get_part(&copied_metadata).is_ok());
-    mismatched
-        .apply_durable_document_patch(&copied_durable.inverse())
-        .unwrap();
+    mismatched = mismatched
+        .apply_durable_document(&copied_durable.inverse())
+        .unwrap()
+        .into_package();
     assert!(mismatched.opc.get_part(&copied_image).is_err());
     assert!(mismatched.opc.get_part(&copied_metadata).is_err());
     assert_eq!(
@@ -857,7 +657,7 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
     let mut ambiguous =
         transfer_package(receiver_xml, "receiverLink", "receiverImage", b"same image");
     ambiguous
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.get_part_mut(&PackURI::new("/word/document.xml").unwrap())?
                 .rels_mut()
                 .try_add_relationship(
@@ -888,7 +688,7 @@ fn transfer_package(
     let metadata_uri = PackURI::new("/word/media/shared-meta.xml").unwrap();
     let mut package = Package::new().unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             if opc.get_part(&image_uri).is_err() {
                 opc.try_add_part(Box::new(BlobPart::new(
                     image_uri.clone(),
@@ -952,144 +752,17 @@ fn document_relationship_inventory(package: &Package) -> Vec<(String, String, St
 }
 
 #[test]
-fn failed_stream_keeps_document_and_properties_retryable() {
-    let mut package = Package::new().unwrap();
-    package
-        .authoring_document()
-        .unwrap()
-        .add_paragraph_with_text("retryable document");
-    package.properties.put(Props {
-        title: Some("retryable properties".to_owned()),
-        ..Props::default()
-    });
-    let document_before = package.opc.main_document_part().unwrap().blob_arc();
-    let core_properties_uri = PackURI::new("/docProps/core.xml").unwrap();
-    let core_properties_before = package
-        .opc
-        .get_part(&core_properties_uri)
-        .unwrap()
-        .blob_arc();
-
-    assert!(package.to_plain_stream(FailingWriter).is_err());
-    assert_eq!(
-        package.opc.main_document_part().unwrap().blob(),
-        document_before.as_slice()
-    );
-    assert!(std::sync::Arc::ptr_eq(
-        &document_before,
-        &package.opc.main_document_part().unwrap().blob_arc()
-    ));
-    assert_eq!(
-        package.opc.get_part(&core_properties_uri).unwrap().blob(),
-        core_properties_before.as_slice()
-    );
-    assert!(std::sync::Arc::ptr_eq(
-        &core_properties_before,
-        &package
-            .opc
-            .get_part(&core_properties_uri)
-            .unwrap()
-            .blob_arc()
-    ));
-    assert!(
-        package
-            .mutable_doc
-            .as_ref()
-            .is_some_and(|document| document.is_modified())
-    );
-    assert!(package.properties.is_dirty());
-
-    package
-        .authoring_document()
-        .unwrap()
-        .add_paragraph_with_text("second attempt");
-    let mut output = Cursor::new(Vec::new());
-    package.to_plain_stream(&mut output).unwrap();
-    assert!(!output.into_inner().is_empty());
-    assert!(!package.properties.is_dirty());
-}
-
-#[test]
-fn panicking_stream_restores_package_and_retryable_state() {
-    let mut package = Package::new().unwrap();
-    {
-        let document = package.authoring_document().unwrap();
-        document.add_heading("panic-safe heading", 1).unwrap();
-        document.add_toc(crate::TableOfContents::new()).unwrap();
-    }
-    package.properties.put(Props {
-        title: Some("panic-safe properties".to_owned()),
-        ..Props::default()
-    });
-    package
-        .custom_props_mut()
-        .insert("RetryMarker", "panic-safe custom property")
-        .unwrap();
-
-    let package_before = litchi_opc::PackageWriter::to_bytes(&package.opc).unwrap();
-    let document_before = package.mutable_doc.as_ref().unwrap().to_xml().unwrap();
-
-    let unwind = catch_unwind(AssertUnwindSafe(|| {
-        package.to_plain_stream(PanickingWriter).unwrap();
-    }));
-    assert!(unwind.is_err());
-    assert_eq!(
-        litchi_opc::PackageWriter::to_bytes(&package.opc).unwrap(),
-        package_before
-    );
-    let document_after = package.mutable_doc.as_ref().unwrap().to_xml().unwrap();
-    // TOC materialization is a one-shot semantic mutation: it consumes the
-    // pending configuration and inserts the generated field before the sink
-    // runs. The rollback restores that same writer value and its edit
-    // intent, so retryability is checked through the retained heading/TOC
-    // semantics rather than an impossible byte-identical writer snapshot.
-    assert_ne!(document_after, document_before);
-    assert!(document_after.contains("panic-safe heading"));
-    assert!(document_after.contains("TOC"));
-    assert!(
-        package
-            .mutable_doc
-            .as_ref()
-            .is_some_and(|document| document.is_modified())
-    );
-    assert!(package.properties.is_dirty());
-
-    let mut output = Cursor::new(Vec::new());
-    package.to_plain_stream(&mut output).unwrap();
-    let output = output.into_inner();
-    assert!(!output.is_empty());
-    assert!(!package.properties.is_dirty());
-    let reopened = Package::from_opc_package(OpcPackage::from_bytes(&output).unwrap()).unwrap();
-    assert!(
-        reopened
-            .document()
-            .unwrap()
-            .text()
-            .unwrap()
-            .contains("panic-safe heading")
-    );
-    assert_eq!(
-        reopened
-            .document()
-            .unwrap()
-            .table_of_contents_count()
-            .unwrap(),
-        1
-    );
-    assert!(reopened.custom_props().contains("RetryMarker"));
-}
-
-#[test]
 fn unchanged_stream_preserves_exact_bytes_and_part_payload_sharing() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut source = Package::new().unwrap();
-    source
-        .authoring_document()
+    let mut builder = crate::Builder::new().unwrap();
+    builder
+        .document()
         .unwrap()
         .add_paragraph_with_text("unchanged package");
+    let source = builder.build().unwrap();
     source.save(file.path()).unwrap();
 
-    let mut package = Package::open(file.path()).unwrap();
+    let package = Package::open(file.path()).unwrap();
     let before = litchi_opc::PackageWriter::to_bytes(package.opc_package()).unwrap();
     let document_uri = PackURI::new("/word/document.xml").unwrap();
     let core_properties_uri = PackURI::new("/docProps/core.xml").unwrap();
@@ -1119,61 +792,41 @@ fn unchanged_stream_preserves_exact_bytes_and_part_payload_sharing() {
 
 #[cfg(feature = "automatic-fonts")]
 #[test]
-fn raw_opc_rejects_automatic_font_embedding_policy() {
-    let file = NamedTempFile::with_suffix(".docx").unwrap();
-    let mut source = Package::new().unwrap();
-    source
-        .authoring_document()
-        .unwrap()
-        .add_paragraph_with_text("preserved text");
-    source.save(file.path()).unwrap();
-
-    let mut opened = Package::open(file.path()).unwrap();
-    let _ = opened.authoring_document().unwrap();
-    opened
-        .set_font_embedding(litchi_fonts::embedding::Mode::Subset)
-        .unwrap();
-    assert!(matches!(
-        opened.edit_opc(|_| Ok(())),
-        Err(Error::UnsafeEdit {
-            operation: "edit_opc",
-            ..
-        })
-    ));
-}
-
-#[test]
-fn raw_opc_transaction_publishes_candidate_and_disables_writer() {
-    let mut package = Package::new().unwrap();
+fn raw_opc_edit_publishes_candidate_and_keeps_the_source() {
+    let package = Package::new().unwrap();
     let marker = PackURI::new("/custom/raw-edit-marker.bin").unwrap();
 
-    package
-        .edit_opc(|candidate| {
-            candidate.try_add_part(Box::new(BlobPart::new(
-                marker.clone(),
-                "application/octet-stream".to_string(),
-                b"raw edit".to_vec(),
-            )))?;
-            Ok::<_, Error>(())
-        })
+    let mut edit = package.edit_opc();
+    edit.package_mut()
+        .try_add_part(Box::new(BlobPart::new(
+            marker.clone(),
+            "application/octet-stream".to_string(),
+            b"raw edit".to_vec(),
+        )))
         .unwrap();
-
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
     assert_eq!(
-        package.opc_package().get_part(&marker).unwrap().blob(),
+        commit
+            .package()
+            .opc_package()
+            .get_part(&marker)
+            .unwrap()
+            .blob(),
         b"raw edit"
     );
-    assert!(matches!(
-        package.authoring_document(),
-        Err(Error::UnsafeEdit {
-            operation: "authoring_document",
-            ..
-        })
-    ));
+    assert!(!package.opc_package().contains_part(&marker));
+    let undone = commit
+        .package()
+        .apply_opc(&commit.patch().inverse())
+        .ok()
+        .unwrap();
+    assert!(!undone.package().opc_package().contains_part(&marker));
 }
 
 #[test]
-fn failed_raw_opc_transaction_preserves_graph_and_writer_state() {
-    let mut package = Package::new().unwrap();
+fn failed_raw_opc_edit_preserves_the_source_graph() {
+    let package = Package::new().unwrap();
     let document_uri = PackURI::new("/word/document.xml").unwrap();
     let original = package
         .opc_package()
@@ -1181,12 +834,9 @@ fn failed_raw_opc_transaction_preserves_graph_and_writer_state() {
         .unwrap()
         .blob_arc();
 
-    let error = package
-        .edit_opc(|candidate| {
-            candidate.remove_part(&document_uri);
-            Ok::<_, Error>(())
-        })
-        .unwrap_err();
+    let mut edit = package.edit_opc();
+    edit.package_mut().remove_part(&document_uri);
+    let error = edit.commit().err().unwrap();
     assert!(matches!(error, Error::PartNotFound(_)));
     assert!(std::sync::Arc::ptr_eq(
         &original,
@@ -1196,24 +846,6 @@ fn failed_raw_opc_transaction_preserves_graph_and_writer_state() {
             .unwrap()
             .blob_arc()
     ));
-    assert!(package.authoring_document().is_ok());
-}
-
-#[test]
-fn raw_opc_transaction_rejects_pending_managed_state() {
-    let mut package = Package::new().unwrap();
-    package
-        .authoring_document()
-        .unwrap()
-        .add_paragraph_with_text("managed edit");
-
-    assert!(matches!(
-        package.edit_opc(|_| Ok::<_, Error>(())),
-        Err(Error::UnsafeEdit {
-            operation: "edit_opc",
-            ..
-        })
-    ));
 }
 
 #[test]
@@ -1222,7 +854,7 @@ fn exact_source_patch_reuse_keeps_noop_arcs_stale_conflicts_and_scan_errors() {
     let document_uri = PackURI::new("/word/document.xml").unwrap();
     let mut package = Package::new().unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.get_part_mut(&document_uri)?
                 .set_blob(source_xml.to_vec());
             Ok(())
@@ -1234,7 +866,7 @@ fn exact_source_patch_reuse_keeps_noop_arcs_stale_conflicts_and_scan_errors() {
     let main_before = package.opc.main_document_part().unwrap().blob_arc();
     let noop = package.edit().unwrap().commit().unwrap();
     assert!(noop.patch().is_noop());
-    let next = package.apply(noop.patch()).unwrap();
+    let next = package.apply(noop.patch()).unwrap().into_package();
     let published = next.document_snapshot().unwrap();
     let main_after_noop = package.opc.main_document_part().unwrap().blob_arc();
     assert!(std::sync::Arc::ptr_eq(&main_before, &main_after_noop));
@@ -1267,14 +899,17 @@ fn exact_source_patch_reuse_keeps_noop_arcs_stale_conflicts_and_scan_errors() {
 
     // Reapplying the inverse still reaches the exact original bytes through the
     // reuse proof.
-    package = package.apply(&commit.patch().inverse()).unwrap();
+    package = package
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(package.opc.main_document_part().unwrap().blob(), source_xml);
 
     // When the main part no longer parses, the byte proof declines and the full
     // snapshot route decides, so the scan error keeps its identity instead of
     // becoming a stale-source refusal.
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.get_part_mut(&document_uri)?
                 .set_blob(b"<w:document>".to_vec());
             Ok(())
@@ -1292,7 +927,7 @@ fn the_document_snapshot_shares_the_main_part_payload_instead_of_copying_it() {
     let document_uri = PackURI::new("/word/document.xml").unwrap();
     let mut package = Package::new().unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.get_part_mut(&document_uri)?
                 .set_blob(source_xml.to_vec());
             Ok(())
@@ -1327,7 +962,7 @@ fn the_compaction_policy_reaches_publication_through_the_package_route() {
     let build = || {
         let mut package = Package::new().unwrap();
         package
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
                 opc.get_part_mut(&document_uri)?
                     .set_blob(source_xml.to_vec());
                 Ok(())
@@ -1380,30 +1015,22 @@ fn immutable_apply_shares_noops_and_keeps_each_package_revision_readable() {
     let package = Package::new().unwrap();
     let source_xml = package.document_snapshot().unwrap();
     let noop = package.edit().unwrap().commit().unwrap();
-    let mut unchanged = package.apply(noop.patch()).unwrap();
+    let unchanged = package.apply(noop.patch()).unwrap().into_package();
     assert!(std::ptr::eq(&*package.opc, &*unchanged.opc));
     assert!(std::ptr::eq(&*package.properties, &*unchanged.properties));
     assert!(std::ptr::eq(
         &*package.custom_props,
         &*unchanged.custom_props
     ));
-    assert!(std::ptr::eq(
-        package.mutable_doc.as_deref().unwrap(),
-        unchanged.mutable_doc.as_deref().unwrap()
-    ));
 
     unchanged.to_plain_stream(Vec::new()).unwrap();
     assert!(std::ptr::eq(&*package.opc, &*unchanged.opc));
-    assert!(std::ptr::eq(
-        package.mutable_doc.as_deref().unwrap(),
-        unchanged.mutable_doc.as_deref().unwrap()
-    ));
 
     let mut edit = package.edit().unwrap();
     edit.insert_paragraph(litchi_core::Position::new(0), "new paragraph")
         .unwrap();
     let commit = edit.commit().unwrap();
-    let changed = package.apply(commit.patch()).unwrap();
+    let changed = package.apply(commit.patch()).unwrap().into_package();
     assert_eq!(package.document().unwrap().text().unwrap(), "");
     assert_eq!(changed.document().unwrap().text().unwrap(), "new paragraph");
     assert!(!std::ptr::eq(&*package.opc, &*changed.opc));
@@ -1418,98 +1045,13 @@ fn immutable_apply_shares_noops_and_keeps_each_package_revision_readable() {
         changed.apply(commit.patch()),
         Err(crate::document::Error::PatchConflict)
     ));
-    let restored = changed.apply(&commit.patch().inverse()).unwrap();
+    let restored = changed
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(
         restored.document_snapshot().unwrap().xml_bytes(),
         source_xml.xml_bytes()
     );
     assert_eq!(changed.document().unwrap().text().unwrap(), "new paragraph");
-}
-
-#[test]
-fn cloned_dirty_writer_and_metadata_detach_and_remain_retryable() {
-    let mut source = Package::new().unwrap();
-    source
-        .authoring_document()
-        .unwrap()
-        .add_paragraph_with_text("source");
-    source.properties.put(Props {
-        title: Some("source title".to_owned()),
-        ..Props::default()
-    });
-    source
-        .custom_props_mut()
-        .insert("Marker", "source value")
-        .unwrap();
-    let mut changed = source.clone();
-    assert!(std::ptr::eq(
-        source.mutable_doc.as_deref().unwrap(),
-        changed.mutable_doc.as_deref().unwrap()
-    ));
-    assert!(std::ptr::eq(&*source.properties, &*changed.properties));
-    assert!(std::ptr::eq(&*source.custom_props, &*changed.custom_props));
-    changed
-        .authoring_document()
-        .unwrap()
-        .add_paragraph_with_text("changed");
-    changed.properties.get_mut().unwrap().title = Some("changed title".into());
-    changed
-        .custom_props_mut()
-        .insert("Marker", "changed value")
-        .unwrap();
-    assert!(changed.to_plain_stream(FailingWriter).is_err());
-    assert!(source.properties.is_dirty());
-    assert!(changed.properties.is_dirty());
-    assert!(source.custom_props_dirty);
-    assert!(changed.custom_props_dirty);
-    assert_eq!(
-        source.metadata().unwrap().title.as_deref(),
-        Some("source title")
-    );
-    assert_ne!(
-        source.custom_props().get("Marker"),
-        changed.custom_props().get("Marker")
-    );
-    let mut changed_bytes = Vec::new();
-    changed.to_plain_stream(&mut changed_bytes).unwrap();
-    assert!(!changed.properties.is_dirty());
-    assert!(source.properties.is_dirty());
-    let changed_read = Package::from_reader(Cursor::new(changed_bytes)).unwrap();
-    assert_eq!(
-        changed_read.document().unwrap().text().unwrap(),
-        "sourcechanged"
-    );
-    assert_eq!(
-        changed_read.metadata().unwrap().title.as_deref(),
-        Some("changed title")
-    );
-    let mut source_bytes = Vec::new();
-    source.to_plain_stream(&mut source_bytes).unwrap();
-    let source_read = Package::from_reader(Cursor::new(source_bytes)).unwrap();
-    assert_eq!(source_read.document().unwrap().text().unwrap(), "source");
-    assert_eq!(
-        source_read.metadata().unwrap().title.as_deref(),
-        Some("source title")
-    );
-    assert_eq!(
-        source_read.custom_props().get("Marker"),
-        source.custom_props().get("Marker")
-    );
-
-    let mut replaced = source.clone();
-    replaced.properties.put(Props {
-        title: Some("replacement".to_owned()),
-        ..Props::default()
-    });
-    let mut cleared = source.clone();
-    cleared.properties.clear();
-    assert_eq!(
-        source.metadata().unwrap().title.as_deref(),
-        Some("source title")
-    );
-    assert_eq!(
-        replaced.metadata().unwrap().title.as_deref(),
-        Some("replacement")
-    );
-    assert!(cleared.metadata().is_none());
 }

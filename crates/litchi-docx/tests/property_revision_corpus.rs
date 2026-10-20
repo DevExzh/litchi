@@ -114,13 +114,18 @@ fn producer_and_native_revision_corpus_queries_survive_save_and_reopen() {
             .collect();
         assert_eq!(actual_sha256, expected_sha256, "corpus changed: {relative}");
 
-        let mut package = Package::open(&path).expect("open owning package");
+        let package = Package::open(&path).expect("open owning package");
         let document = package.document().expect("read owning document");
         let records = document.revisions().expect("read owning revisions");
         assert_eq!(
             summarize(
-                &document
-                    .revisions_with_limits(Limits::default())
+                &package
+                    .with_semantic_limits(
+                        litchi_docx::SemanticLimits::default().revisions(Limits::default())
+                    )
+                    .document()
+                    .expect("read bounded owning document")
+                    .revisions()
                     .expect("read owning bounded revisions")
             ),
             summarize(&records),
@@ -144,8 +149,13 @@ fn producer_and_native_revision_corpus_queries_survive_save_and_reopen() {
             .expect("read source-backed revisions");
         assert_eq!(
             summarize(
-                &source_document
-                    .revisions_with_limits(Limits::default())
+                &source
+                    .with_semantic_limits(
+                        litchi_docx::SemanticLimits::default().revisions(Limits::default())
+                    )
+                    .document()
+                    .expect("read bounded source-backed document")
+                    .revisions()
                     .expect("read source-backed bounded revisions")
             ),
             owning_summary,

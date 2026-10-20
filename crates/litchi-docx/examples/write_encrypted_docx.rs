@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .document()?
         .add_paragraph()
         .add_run_with_text("This package was encrypted by litchi-crypto.");
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     package.save_encrypted(&output, &password, mode)?;
 
     let reopened = Package::open_with_password(&output, &password)?;

@@ -60,7 +60,9 @@ fn xml(handle: &Docx) -> Vec<u8> {
 
 fn apply(handle: &Docx, patch: &litchi_docx::document::Patch) -> Docx {
     match handle.owner() {
-        DocxOwner::Eager(package) => handle.adopt_eager_package(package.apply(patch).unwrap()),
+        DocxOwner::Eager(package) => {
+            handle.adopt_eager_package(package.apply(patch).unwrap().into_package())
+        },
         DocxOwner::Source(package) => handle.adopt_source_package(package.apply(patch).unwrap()),
     }
 }

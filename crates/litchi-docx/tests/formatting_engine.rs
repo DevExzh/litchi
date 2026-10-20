@@ -751,7 +751,7 @@ fn officecli_property_sets_read_back_from_a_blank_document() {
         }
         let commit = edit.commit().unwrap();
         let added_document = commit.snapshot().xml_bytes().to_vec();
-        added = added.apply(commit.patch()).unwrap();
+        added = added.apply(commit.patch()).unwrap().into_package();
         let added_bytes = saved(&mut added);
         let readback = read_back(&added_bytes);
         assert_eq!(readback.len(), existing + lines.len());
@@ -789,7 +789,7 @@ fn officecli_property_sets_read_back_from_a_blank_document() {
             added_document.as_slice(),
             "{script}: `set` and `add` disagree"
         );
-        set = set.apply(commit.patch()).unwrap();
+        set = set.apply(commit.patch()).unwrap().into_package();
         assert_eq!(read_back(&saved(&mut set)), readback, "{script}");
     }
 }
@@ -938,7 +938,7 @@ fn both_owners_publish_formatting_and_structure_identically() {
         let owned = Package::from_reader(Cursor::new(source.as_slice())).unwrap();
         let commit = stage(&owned.document_snapshot().unwrap());
         let mut owned = owned;
-        owned = owned.apply(commit.patch()).unwrap();
+        owned = owned.apply(commit.patch()).unwrap().into_package();
         let owned_bytes = saved(&mut owned);
 
         let backed = source_backed::Package::from_reader(Cursor::new(source.as_slice())).unwrap();
@@ -981,7 +981,10 @@ fn signed_packages_refuse_formatting_until_explicitly_unsigned() {
     let mut noop = snapshot.edit();
     noop.format_run(Position::new(0), Position::new(0), |_| {})
         .unwrap();
-    package = package.apply(noop.commit().unwrap().patch()).unwrap();
+    package = package
+        .apply(noop.commit().unwrap().patch())
+        .unwrap()
+        .into_package();
     assert!(package.is_signed());
     assert_eq!(saved(&mut package), original);
 
@@ -1010,8 +1013,8 @@ fn signed_packages_refuse_formatting_until_explicitly_unsigned() {
         ))
     ));
 
-    package.unsign();
-    package = package.apply(commit.patch()).unwrap();
+    package = package.unsign();
+    package = package.apply(commit.patch()).unwrap().into_package();
     assert!(!package.is_signed());
     let reopened = Package::from_reader(Cursor::new(saved(&mut package))).unwrap();
     let snapshot = reopened.document_snapshot().unwrap();
@@ -1081,7 +1084,7 @@ fn canonical_owner_commits_retain_source_and_support_inverse() {
     assert!(commit.diagnostics().changed());
     let inverse = commit.patch().inverse();
     let changed = commit.into_package();
-    let restored = changed.apply(&inverse).unwrap();
+    let restored = changed.apply(&inverse).unwrap().into_package();
     assert_eq!(restored.document_snapshot().unwrap().xml_bytes(), before);
 
     let source = source_backed::Package::from_bytes(&blank()).unwrap();

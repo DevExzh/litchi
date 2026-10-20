@@ -619,7 +619,7 @@ mod tests {
 
     #[test]
     fn stores_preserves_and_removes_word_project_graph() {
-        let mut package = Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         let project = authored_project();
         let mut supplemental = VbaSupplementalData::new();
         supplemental.add_document_event(VbaDocumentEvent::Open);
@@ -627,14 +627,16 @@ mod tests {
             .add_macro(VbaMacroDescriptor::new("WordProject.Module1.Hello").unwrap())
             .unwrap();
 
-        package
+        builder
+            .package_mut()
             .set_vba_with(project, &supplemental, &Limits::default())
             .unwrap();
-        package
-            .authoring_document()
+        builder
+            .document()
             .unwrap()
             .add_paragraph_with_text("materialize");
         let mut bytes = Cursor::new(Vec::new());
+        let package = builder.build().unwrap();
         package.write_to(&mut bytes).unwrap();
 
         bytes.set_position(0);
@@ -706,7 +708,7 @@ mod tests {
             .partname()
             .clone();
         package
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
                 opc.get_part_mut(&source)?
                     .set_content_type(content_type::WML_TEMPLATE_MAIN.to_string())?;
                 Ok(())

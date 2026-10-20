@@ -183,11 +183,11 @@ impl Paragraph {
         let source = self.xml_data.xml_ref()?;
         let _parser_admission = source.parser_admission()?;
         let Some(source_slice) = source.as_unmanaged_slice() else {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "paragraph.smart_tags",
-                reason: "managed paragraph views cannot detach smart-tag XmlSlice ownership",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "paragraph.smart_tags",
+                "managed paragraph views cannot detach smart-tag XmlSlice ownership",
+            ));
         };
         let source_arc = source_slice.arc();
         let base_offset = source_slice.start();

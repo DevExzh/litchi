@@ -645,7 +645,7 @@ fn managed_signed_batch_noop_is_exact_and_change_is_refused() {
     let result = edit.replace_body_paragraph_texts(&replacements());
     assert!(matches!(
         result,
-        Err(TransactionError::Document(Error::UnsafeEdit { .. }))
+        Err(TransactionError::Document(Error::Refused(_)))
     ));
     drop(edit);
     drop(snapshot);

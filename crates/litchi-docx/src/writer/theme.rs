@@ -1,7 +1,3 @@
-#![expect(
-    clippy::module_name_repetitions,
-    reason = "public names retain established OOXML facade terminology"
-)]
 //! Theme writer support for DOCX documents.
 //!
 //! Themes define the color scheme, fonts, and effects used in a document.
@@ -18,14 +14,14 @@ use std::fmt::Write as FmtWrite;
 /// # Examples
 ///
 /// ```rust,ignore
-/// use litchi_docx::writer::MutableTheme;
+/// use litchi_docx::writer::Theme;
 ///
-/// let mut theme = MutableTheme::new("Office Theme");
+/// let mut theme = Theme::new("Office Theme");
 /// theme.set_major_font("Calibri Light");
 /// theme.set_minor_font("Calibri");
 /// ```
 #[derive(Debug, Clone)]
-pub struct MutableTheme {
+pub struct Theme {
     /// Theme name
     name: String,
     /// Major font (for headings)
@@ -59,7 +55,7 @@ pub struct ColorScheme {
     fol_hlink: String,
 }
 
-impl MutableTheme {
+impl Theme {
     /// Create a new theme with the given name.
     ///
     /// # Arguments
@@ -69,7 +65,7 @@ impl MutableTheme {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// let theme = MutableTheme::new("My Custom Theme");
+    /// let theme = Theme::new("My Custom Theme");
     /// ```
     pub fn new(name: impl Into<String>) -> Self {
         Self {
@@ -295,7 +291,7 @@ mod tests {
 
     #[test]
     fn test_create_theme() {
-        let theme = MutableTheme::new("Test Theme");
+        let theme = Theme::new("Test Theme");
         assert_eq!(theme.name(), "Test Theme");
         assert_eq!(theme.major_font(), "Calibri Light");
         assert_eq!(theme.minor_font(), "Calibri");
@@ -303,13 +299,13 @@ mod tests {
 
     #[test]
     fn test_office_theme() {
-        let theme = MutableTheme::office_theme();
+        let theme = Theme::office_theme();
         assert_eq!(theme.name(), "Office Theme");
     }
 
     #[test]
     fn test_set_fonts() {
-        let mut theme = MutableTheme::new("Custom");
+        let mut theme = Theme::new("Custom");
         theme.set_major_font("Arial");
         theme.set_minor_font("Times New Roman");
 
@@ -329,7 +325,7 @@ mod tests {
 
     #[test]
     fn test_xml_generation() {
-        let theme = MutableTheme::office_theme();
+        let theme = Theme::office_theme();
         let xml = theme.to_xml().unwrap();
 
         assert!(xml.contains("<?xml version"));

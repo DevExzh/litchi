@@ -32,7 +32,7 @@ fn docx_ordinary_save_preserves_document_relationship_bytes() -> Result<(), Box<
     let count = package.document_snapshot()?.paragraph_count();
     let mut edit = package.edit()?;
     edit.insert_paragraph(litchi_core::Position::new(count), EDIT_MARKER)?;
-    let mut package = edit.commit()?.into_package();
+    let package = edit.commit()?.into_package();
     package.save(&output_path)?;
 
     let output = std::fs::read(&output_path)?;
@@ -73,7 +73,7 @@ fn docx_changed_document_relationships_are_serialized() -> Result<(), Box<dyn Er
         &HyperlinkTarget::Url(HYPERLINK_URL.to_owned()),
         &NewRun::new(HYPERLINK_TEXT),
     )?;
-    let mut package = edit.commit()?.into_package();
+    let package = edit.commit()?.into_package();
     package.save(&output_path)?;
 
     let output = std::fs::read(&output_path)?;

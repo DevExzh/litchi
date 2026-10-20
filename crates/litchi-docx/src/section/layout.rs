@@ -38,13 +38,8 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Parse an owned main-document XML snapshot.
-    pub fn from_xml(xml: Vec<u8>) -> Result<Self> {
-        Self::from_xml_with_limits(xml, &Limits::default())
-    }
-
     /// Parse an owned main-document XML snapshot with bounded section limits.
-    pub fn from_xml_with_limits(xml: Vec<u8>, limits: &Limits) -> Result<Self> {
+    pub fn from_xml(xml: Vec<u8>, limits: &Limits) -> Result<Self> {
         Self::from_shared_xml(Arc::new(xml), None, None, None, limits.clone())
     }
 
@@ -74,7 +69,7 @@ impl Snapshot {
         limits: Limits,
     ) -> Result<Self> {
         crate::source_backed::ensure_source_section_inventory_xml(&xml, &limits)?;
-        let inventory = Inventory::parse_with_limits(xml.as_slice(), &limits)?;
+        let inventory = Inventory::parse(xml.as_slice(), &limits)?;
         Ok(Self {
             xml,
             inventory,
@@ -219,11 +214,11 @@ impl Edit {
             base.limits.max_section_bytes,
         )?
         else {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "edit_section_layout",
-                reason: "the selected section has no locally authored main-story w:sectPr",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                "edit_section_layout",
+                "the selected section has no locally authored main-story w:sectPr",
+            ));
         };
         let source_context =
             FragmentContext::from_source(base.xml.as_slice(), &source_span, &base.limits)?;
@@ -298,12 +293,6 @@ impl Edit {
     /// Return the projected local columns.
     pub fn columns(&mut self) -> Result<Option<Columns>> {
         Ok(self.projected_state.columns.clone())
-    }
-
-    /// Whether the projected semantic state differs from the source state.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.projected_state != self.base_state
     }
 
     /// Replace or remove the locally authored page geometry.
@@ -472,12 +461,6 @@ impl Commit {
     #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
-    }
-
-    /// Move the projected snapshot out of the commit.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
     }
 
     /// The estimated bytes retained by the optional source base snapshot.
@@ -914,11 +897,11 @@ impl FragmentContext {
 
     fn fresh_word_attribute_prefix(&self, target_start: usize) -> Result<(Vec<u8>, Vec<u8>)> {
         let element = self.element(target_start)?;
-        let namespace = element.word_namespace.clone().ok_or(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "edit_section_layout",
-            reason: "the target section element has no resolved owning Word namespace",
-        })?;
+        let namespace = element.word_namespace.clone().ok_or(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_section_layout",
+            "the target section element has no resolved owning Word namespace",
+        ))?;
         let mut suffix = 0usize;
         loop {
             let prefix = if suffix == 0 {
@@ -1293,11 +1276,11 @@ fn rewrite_known_children(
             },
             (None, None, false) => {},
             _ => {
-                return Err(Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "edit_section_layout",
-                    reason: "the section layout codec could not express the requested local property",
-                });
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit_section_layout",
+                    "the section layout codec could not express the requested local property",
+                ));
             },
         }
     }
@@ -1325,11 +1308,11 @@ fn ensure_clear_is_lossless(
             .count()
             > 1
     }) {
-        return Err(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "edit_section_layout",
-            reason: "clearing the section property would discard duplicate markup",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_section_layout",
+            "clearing the section property would discard duplicate markup",
+        ));
     }
     if attributes.iter().any(|attribute| {
         attribute.prefix == b"xmlns"
@@ -1339,18 +1322,18 @@ fn ensure_clear_is_lossless(
                 local.as_slice() == attribute.local.as_slice() && prefix == &attribute.prefix
             })
     }) {
-        return Err(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "edit_section_layout",
-            reason: "clearing the section property would discard opaque markup",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_section_layout",
+            "clearing the section property would discard opaque markup",
+        ));
     }
     if !is_self_closing_root(original) && root_close_start(original)? != opening_end {
-        return Err(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "edit_section_layout",
-            reason: "clearing the section property would discard opaque child content",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_section_layout",
+            "clearing the section property would discard opaque child content",
+        ));
     }
     Ok(())
 }
@@ -1416,11 +1399,11 @@ fn unique_child<'a>(
     for child in children {
         if child.word && child.local(xml) == local {
             if found.is_some() {
-                return Err(Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "edit_section_layout",
-                    reason: "duplicate Word section-layout children are not safely editable",
-                });
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit_section_layout",
+                    "duplicate Word section-layout children are not safely editable",
+                ));
             }
             found = Some(child);
         }
@@ -1433,11 +1416,11 @@ fn insertion_offset(original: &[u8], children: &[ChildSpan], field: KnownChild) 
         .iter()
         .any(|child| child.word && section_child_rank(child.local(original)).is_none())
     {
-        return Err(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "edit_section_layout",
-            reason: "an unknown direct Word section child blocks safe modeled insertion",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_section_layout",
+            "an unknown direct Word section child blocks safe modeled insertion",
+        ));
     }
     for child in children {
         if !child.word {
@@ -1491,11 +1474,11 @@ fn patch_columns(
         .any(|child| child.word && child.local(original) != b"col")
         || original_columns.len() != candidate_columns.len()
     {
-        return Err(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "edit_section_layout",
-            reason: "column child structure changes are outside the lossless range-local closure",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_section_layout",
+            "column child structure changes are outside the lossless range-local closure",
+        ));
     }
 
     let mut output = original.to_vec();
@@ -1564,11 +1547,11 @@ fn patch_known_attributes_with_info(
             })
             .collect();
         if source_matches.len() > 1 {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "edit_section_layout",
-                reason: "duplicate expanded Word attributes are not safely editable",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_section_layout",
+                "duplicate expanded Word attributes are not safely editable",
+            ));
         }
         match (source_matches.first().copied(), desired) {
             (Some(source), Some(target)) => {
@@ -1664,11 +1647,11 @@ fn word_attribute_info(
 ) -> Result<WordAttributeInfo> {
     let element = fragment.element(target_start)?;
     if !element.word {
-        return Err(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "edit_section_layout",
-            reason: "the target section child is not WordprocessingML",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_section_layout",
+            "the target section child is not WordprocessingML",
+        ));
     }
     Ok(element.attributes.clone())
 }
@@ -2206,11 +2189,11 @@ fn bind_candidate_attribute_namespace(
     namespace: &[u8],
 ) -> Result<Vec<u8>> {
     if prefix.is_empty() {
-        return Err(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "edit_section_layout",
-            reason: "the inserted section property has no safe Word attribute prefix",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_section_layout",
+            "the inserted section property has no safe Word attribute prefix",
+        ));
     }
     let opening_end = opening_tag_end(candidate)?;
     let attributes = lexical_attributes(&candidate[..opening_end])?;
@@ -2221,11 +2204,11 @@ fn bind_candidate_attribute_namespace(
         if &candidate[existing.value_start..existing.value_end] == namespace {
             return Ok(candidate.to_vec());
         }
-        return Err(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "edit_section_layout",
-            reason: "the inserted section property has a conflicting Word attribute namespace",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_section_layout",
+            "the inserted section property has a conflicting Word attribute namespace",
+        ));
     }
     let insertion = if candidate[..opening_end].ends_with(b"/>") {
         opening_end - 2
@@ -2308,11 +2291,10 @@ fn replace_range(source: &[u8], start: usize, end: usize, replacement: &[u8]) ->
 
 fn ensure_same_topology(before: &Inventory, after: &Inventory) -> Result<()> {
     if !before.topology_matches(after) {
-        return Err(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "edit_section_layout",
-            reason: "section layout edit changed main-story topology",
-        });
+        return Err(Error::internal(
+            "edit_section_layout",
+            "section layout edit changed main-story topology",
+        ));
     }
     Ok(())
 }
@@ -2322,21 +2304,19 @@ fn ensure_semantic_readback(
     selector: Selector,
     expected: &LocalState,
 ) -> Result<()> {
-    let section = inventory.section(selector).ok_or(Error::UnsafeEdit {
-        format: "DOCX",
-        operation: "edit_section_layout",
-        reason: "section layout edit lost its selected main-story section",
-    })?;
+    let section = inventory.section(selector).ok_or(Error::internal(
+        "edit_section_layout",
+        "section layout edit lost its selected main-story section",
+    ))?;
     if section.page_size() != expected.page_size
         || section.margins() != expected.margins
         || section.start() != expected.start
         || section.columns() != expected.columns
     {
-        return Err(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "edit_section_layout",
-            reason: "section layout semantic readback differs from the projected edit",
-        });
+        return Err(Error::internal(
+            "edit_section_layout",
+            "section layout semantic readback differs from the projected edit",
+        ));
     }
     Ok(())
 }
@@ -2366,7 +2346,7 @@ mod tests {
 
     #[test]
     fn commit_apply_to_current_reuses_target_and_noop_current_allocations() {
-        let base = Snapshot::from_xml(DOCUMENT.to_vec()).unwrap();
+        let base = Snapshot::from_xml(DOCUMENT.to_vec(), &Default::default()).unwrap();
         let mut edit = base.edit(0).unwrap();
         edit.set_page_size(Some(PageSize {
             width: Some(Emu::from_twips(11906)),
@@ -2375,7 +2355,7 @@ mod tests {
         }))
         .unwrap();
         let changed = edit.commit().unwrap();
-        let current = Snapshot::from_xml(DOCUMENT.to_vec()).unwrap();
+        let current = Snapshot::from_xml(DOCUMENT.to_vec(), &Default::default()).unwrap();
         let target = changed.apply_to_current(&current).unwrap();
         let target_xml = target.shared_xml();
         let commit_xml = changed.snapshot.shared_xml();
@@ -2387,7 +2367,7 @@ mod tests {
         );
 
         let noop = base.edit(0).unwrap().commit().unwrap();
-        let current = Snapshot::from_xml(DOCUMENT.to_vec()).unwrap();
+        let current = Snapshot::from_xml(DOCUMENT.to_vec(), &Default::default()).unwrap();
         let target = noop.apply_to_current(&current).unwrap();
         let target_xml = target.shared_xml();
         let current_xml = current.shared_xml();

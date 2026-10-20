@@ -67,8 +67,8 @@ impl Snapshot {
 
     /// Start an isolated source-checked edit.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             base: self.clone(),
             next: self.variables.clone(),
         }
@@ -80,8 +80,8 @@ impl Snapshot {
     ///
     /// Returns an allocation error if the bounded variable collection cannot
     /// be cloned.
-    pub fn try_edit(&self) -> Result<Transaction> {
-        Ok(Transaction {
+    pub fn try_edit(&self) -> Result<Edit> {
+        Ok(Edit {
             base: self.clone(),
             next: self.variables.try_clone()?,
         })
@@ -104,12 +104,12 @@ impl Snapshot {
 
 /// A document-variable edit that has not yet been published.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     base: Snapshot,
     next: Variables,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow the projected document-variable collection.
     #[inline]
     #[must_use]
@@ -122,13 +122,6 @@ impl Transaction {
     #[must_use]
     pub const fn collection(&self) -> &Variables {
         self.variables()
-    }
-
-    /// Whether the staged collection differs from its source snapshot.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.next != self.base.variables
     }
 
     /// Insert or replace one document variable atomically.
@@ -294,12 +287,6 @@ impl Commit {
     #[must_use]
     pub const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-
-    /// Move the published snapshot out of the commit.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
     }
 
     /// Borrow the reversible source-checked patch.

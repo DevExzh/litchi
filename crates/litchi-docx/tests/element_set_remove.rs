@@ -69,7 +69,7 @@ fn with_pictures() -> Package {
 
 #[test]
 fn pictures_are_resized_renamed_and_described_in_place() {
-    let mut base = with_pictures();
+    let base = with_pictures();
     let mut edit = base.edit().unwrap();
     let change = PictureChange::new()
         .with_size(914_400, 457_200)
@@ -79,7 +79,7 @@ fn pictures_are_resized_renamed_and_described_in_place() {
         edit.set_picture_at(&paragraph(0), Position::new(1), &change)
             .unwrap()
     );
-    let (mut changed, patch) = edit.commit().unwrap().into_parts();
+    let (changed, patch) = edit.commit().unwrap().into_parts();
     let reopened = Package::from_bytes(&changed.to_bytes().unwrap()).unwrap();
     let images = reopened.document().unwrap().paragraphs().unwrap()[0]
         .images()
@@ -96,9 +96,9 @@ fn pictures_are_resized_renamed_and_described_in_place() {
     let xml = main_xml(&reopened);
     assert!(xml.contains(r#"<a:ext cx="914400" cy="457200"/>"#), "{xml}");
     // Replay and exact inverse.
-    let mut replayed = base.apply(&patch).unwrap();
+    let replayed = base.apply(&patch).unwrap().into_package();
     assert_eq!(replayed.to_bytes().unwrap(), changed.to_bytes().unwrap());
-    let mut restored = changed.apply(&patch.inverse()).unwrap();
+    let restored = changed.apply(&patch.inverse()).unwrap().into_package();
     assert_eq!(restored.to_bytes().unwrap(), base.to_bytes().unwrap());
     // The same values again change nothing.
     let mut edit = changed.edit().unwrap();
@@ -112,7 +112,7 @@ fn pictures_are_resized_renamed_and_described_in_place() {
 
 #[test]
 fn a_picture_image_is_replaced_by_a_new_media_part() {
-    let mut base = with_pictures();
+    let base = with_pictures();
     let before = base.document().unwrap().paragraphs().unwrap()[0]
         .images()
         .unwrap()[0]
@@ -128,7 +128,7 @@ fn a_picture_image_is_replaced_by_a_new_media_part() {
         )
         .unwrap()
     );
-    let (mut changed, patch) = edit.commit().unwrap().into_parts();
+    let (changed, patch) = edit.commit().unwrap().into_parts();
     let reopened = Package::from_bytes(&changed.to_bytes().unwrap()).unwrap();
     let images = reopened.document().unwrap().paragraphs().unwrap()[0]
         .images()
@@ -149,7 +149,7 @@ fn a_picture_image_is_replaced_by_a_new_media_part() {
     // The previous image stays, unreferenced; nothing else changed.
     assert_eq!(changed.opc_package().iter_parts().count(), parts + 1);
     assert_eq!(images[0].width_emu(), 19_050);
-    let mut restored = changed.apply(&patch.inverse()).unwrap();
+    let restored = changed.apply(&patch.inverse()).unwrap().into_package();
     assert_eq!(restored.to_bytes().unwrap(), base.to_bytes().unwrap());
     // Refusals stage nothing.
     let mut edit = base.edit().unwrap();
@@ -183,7 +183,7 @@ fn a_picture_image_is_replaced_by_a_new_media_part() {
 
 #[test]
 fn a_removed_picture_takes_its_run_and_inverts_exactly() {
-    let mut base = with_pictures();
+    let base = with_pictures();
     let mut edit = base.edit().unwrap();
     edit.remove_picture_at(&paragraph(0), Position::new(0))
         .unwrap();
@@ -194,7 +194,7 @@ fn a_removed_picture_takes_its_run_and_inverts_exactly() {
     assert_eq!(images.len(), 1);
     assert_eq!(images[0].name(), "Second");
     assert_eq!(changed.document().unwrap().text().unwrap(), "See Second");
-    let mut restored = changed.apply(&patch.inverse()).unwrap();
+    let restored = changed.apply(&patch.inverse()).unwrap().into_package();
     assert_eq!(restored.to_bytes().unwrap(), base.to_bytes().unwrap());
     let mut edit = changed.edit().unwrap();
     assert!(
@@ -213,7 +213,7 @@ fn comments_take_new_authors_initials_dates_and_text() {
             &NewComment::new("Ada", "Draft").with_initials("AL"),
         )
         .unwrap();
-    let mut base = edit.commit().unwrap().into_package();
+    let base = edit.commit().unwrap().into_package();
     let mut edit = base.edit().unwrap();
     let change = CommentChange::new()
         .with_author("Grace <H>")
@@ -221,7 +221,7 @@ fn comments_take_new_authors_initials_dates_and_text() {
         .with_date("2026-10-17T00:00:00Z")
         .with_text("Final");
     assert!(edit.set_comment(id, &change).unwrap());
-    let (mut changed, patch) = edit.commit().unwrap().into_parts();
+    let (changed, patch) = edit.commit().unwrap().into_parts();
     let reopened = Package::from_bytes(&changed.to_bytes().unwrap()).unwrap();
     let comments = reopened.document().unwrap().comments().unwrap();
     assert_eq!(comments[0].author(), "Grace <H>");
@@ -241,7 +241,7 @@ fn comments_take_new_authors_initials_dates_and_text() {
     .unwrap();
     assert!(part.contains("annotationRef"), "{part}");
     assert!(main_xml(&reopened).contains("commentReference"));
-    let mut restored = changed.apply(&patch.inverse()).unwrap();
+    let restored = changed.apply(&patch.inverse()).unwrap().into_package();
     assert_eq!(restored.to_bytes().unwrap(), base.to_bytes().unwrap());
     // The same values change nothing; refusals stage nothing.
     let mut edit = changed.edit().unwrap();
@@ -268,7 +268,7 @@ fn with_smartart() -> (Package, String) {
 
 #[test]
 fn smartart_parts_are_replaced_and_their_drawing_kept_consistent() {
-    let (mut base, id) = with_smartart();
+    let (base, id) = with_smartart();
     // The inventory reads the drawing's extent (the insertion default).
     assert_eq!(
         base.smart_arts().unwrap()[0].extent,
@@ -285,12 +285,12 @@ fn smartart_parts_are_replaced_and_their_drawing_kept_consistent() {
     next.data = spec.data_xml(Some("rId0")).unwrap().into_bytes();
     next.drawing = Some(spec.drawing_xml(5_760_000, 3_240_000).unwrap().into_bytes());
     assert!(edit.set_smartart(&id, next).unwrap());
-    let (mut changed, patch) = edit.commit().unwrap().into_parts();
+    let (changed, patch) = edit.commit().unwrap().into_parts();
     let reopened = Package::from_bytes(&changed.to_bytes().unwrap()).unwrap();
     let diagrams = reopened.smart_arts().unwrap();
     assert_eq!(diagrams[0].text(), "Plan\nBuild\nShip");
     assert!(diagrams[0].drawing_part_name.is_some());
-    let mut restored = changed.apply(&patch.inverse()).unwrap();
+    let restored = changed.apply(&patch.inverse()).unwrap().into_package();
     assert_eq!(restored.to_bytes().unwrap(), base.to_bytes().unwrap());
 
     // Without a drawing, the drawing part and its relationship go, and the
@@ -299,7 +299,7 @@ fn smartart_parts_are_replaced_and_their_drawing_kept_consistent() {
     let mut bare = parts.clone();
     bare.drawing = None;
     assert!(edit.set_smartart(&id, bare).unwrap());
-    let (mut undrawn, patch) = edit.commit().unwrap().into_parts();
+    let (undrawn, patch) = edit.commit().unwrap().into_parts();
     let reopened = Package::from_bytes(&undrawn.to_bytes().unwrap()).unwrap();
     let diagrams = reopened.smart_arts().unwrap();
     assert_eq!(diagrams[0].drawing_part_name, None);
@@ -309,7 +309,7 @@ fn smartart_parts_are_replaced_and_their_drawing_kept_consistent() {
             .iter_parts()
             .all(|part| !part.partname().as_str().contains("diagrams/drawing"))
     );
-    let mut restored = undrawn.apply(&patch.inverse()).unwrap();
+    let restored = undrawn.apply(&patch.inverse()).unwrap().into_package();
     assert_eq!(restored.to_bytes().unwrap(), base.to_bytes().unwrap());
 
     // A drawing comes back as a new part and relationship.
@@ -331,7 +331,7 @@ fn smartart_parts_are_replaced_and_their_drawing_kept_consistent() {
 
 #[test]
 fn a_removed_smartart_takes_its_parts_and_relationships() {
-    let (mut base, id) = with_smartart();
+    let (base, id) = with_smartart();
     let parts = base.opc_package().iter_parts().count();
     let relationships = base
         .opc_package()
@@ -341,7 +341,7 @@ fn a_removed_smartart_takes_its_parts_and_relationships() {
         .len();
     let mut edit = base.edit().unwrap();
     edit.remove_smartart(&id).unwrap();
-    let (mut removed, patch) = edit.commit().unwrap().into_parts();
+    let (removed, patch) = edit.commit().unwrap().into_parts();
     let reopened = Package::from_bytes(&removed.to_bytes().unwrap()).unwrap();
     assert!(reopened.smart_arts().unwrap().is_empty());
     assert_eq!(reopened.opc_package().iter_parts().count(), parts - 5);
@@ -356,9 +356,9 @@ fn a_removed_smartart_takes_its_parts_and_relationships() {
     );
     assert!(!main_xml(&reopened).contains("relIds"));
     assert_eq!(reopened.document().unwrap().text().unwrap(), "See Second");
-    let mut replayed = base.apply(&patch).unwrap();
+    let replayed = base.apply(&patch).unwrap().into_package();
     assert_eq!(replayed.to_bytes().unwrap(), removed.to_bytes().unwrap());
-    let mut restored = removed.apply(&patch.inverse()).unwrap();
+    let restored = removed.apply(&patch.inverse()).unwrap().into_package();
     assert_eq!(restored.to_bytes().unwrap(), base.to_bytes().unwrap());
     let mut edit = removed.edit().unwrap();
     assert!(edit.remove_smartart(&id).is_err());

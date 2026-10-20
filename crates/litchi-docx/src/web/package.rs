@@ -10,7 +10,7 @@
 
 use super::codec::{read, write};
 use super::model::{Conformance, Settings};
-use super::transaction::{Commit, Patch, Snapshot};
+use super::transaction::{Patch, Snapshot};
 use super::{
     CONTENT_TYPE, STRICT_OFFICE_DOCUMENT_RELATIONSHIP, invalid, is_web_settings_relationship,
 };
@@ -76,7 +76,7 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
     let owner = locate(package)?.ok_or_else(|| Error::PartNotFound("web-settings part".into()))?;
     let part = package.get_part(&owner.target)?;
     let (_, conformance) = read(part)?;
@@ -96,17 +96,6 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
         .ok_or_else(|| invalid("staged web-settings ownership disappeared"))?;
     *package = staged;
     Ok(published)
-}
-
-/// Apply a committed web-settings edit to its owning OPC part.
-///
-/// The signature policy is [`apply_patch`]'s.
-///
-/// # Errors
-///
-/// Returns an error if the operation cannot be completed.
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
-    apply_patch(package, &commit.into_patch())
 }
 
 /// Move a complete model into package ownership.

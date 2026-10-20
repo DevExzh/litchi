@@ -1,6 +1,6 @@
 use super::*;
 use crate::Paragraph;
-use crate::writer::MutableDocument;
+use crate::builder::Document as DraftDocument;
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const W12: &str = "http://schemas.microsoft.com/office/word/2012/wordml";
@@ -33,64 +33,6 @@ fn reads_closed_on_off_domain_and_preserves_opaque_ppr_content() {
 }
 
 #[test]
-fn transaction_commit_and_inverse_are_atomic_and_loss_preserving() {
-    let source = Snapshot::from_xml(
-        paragraph_xml(
-            r#"<w:pPr><w:pStyle w:val="Heading1"/><x:before/><x:after/></w:pPr><w:r><w:t>text</w:t></w:r>"#,
-        )
-        .into_bytes(),
-    )
-    .unwrap();
-    let mut edit = source.edit();
-    edit.set_collapsed(Some(Collapsed::Enabled)).unwrap();
-    let commit = edit.commit().unwrap();
-    assert_eq!(source.collapsed(), None);
-    let changed = commit.snapshot();
-    assert_eq!(changed.collapsed(), Some(Collapsed::Enabled));
-    let changed_xml = std::str::from_utf8(changed.xml_bytes()).unwrap();
-    assert!(changed_xml.contains("x:before"));
-    assert!(changed_xml.contains("x:after"));
-    assert_eq!(commit.patch().before(), None);
-    assert_eq!(commit.patch().after(), Some(Collapsed::Enabled));
-
-    let restored = commit.patch().inverse().apply(changed).unwrap();
-    assert_eq!(restored.collapsed(), None);
-    assert!(
-        std::str::from_utf8(restored.xml_bytes())
-            .unwrap()
-            .contains("w:pStyle")
-    );
-}
-
-#[test]
-fn invalid_inputs_and_patch_preconditions_leave_sources_unchanged() {
-    assert!(
-        Snapshot::from_xml(
-            paragraph_xml(r#"<w:pPr><w12:collapsed w12:val="maybe"/></w:pPr>"#).into_bytes()
-        )
-        .is_err()
-    );
-    assert!(
-        Snapshot::from_xml(
-            paragraph_xml(r#"<w:pPr><w12:collapsed/><w12:collapsed/></w:pPr>"#).into_bytes()
-        )
-        .is_err()
-    );
-    assert!(
-        Snapshot::from_xml(paragraph_xml(r#"<w:pPr><x:collapsed/></w:pPr>"#).into_bytes()).is_ok()
-    );
-
-    let source =
-        Snapshot::from_xml(paragraph_xml(r#"<w:r><w:t>unchanged</w:t></w:r>"#).into_bytes())
-            .unwrap();
-    let mut edit = source.edit();
-    edit.set_collapsed(Some(Collapsed::Disabled)).unwrap();
-    let commit = edit.commit().unwrap();
-    assert!(commit.patch().apply(&source).is_ok());
-    assert!(commit.patch().apply(commit.snapshot()).is_err());
-}
-
-#[test]
 fn direct_and_generated_paragraph_facades_emit_ignorable_extension() {
     let mut paragraph = Paragraph::new(paragraph_xml(r#"<w:r><w:t>one</w:t></w:r>"#).into_bytes());
     paragraph.set_collapsed(Some(Collapsed::Disabled)).unwrap();
@@ -99,7 +41,7 @@ fn direct_and_generated_paragraph_facades_emit_ignorable_extension() {
     assert!(output.contains("mc:Ignorable=\"w12\""));
     assert_eq!(paragraph.collapsed().unwrap(), Some(Collapsed::Disabled));
 
-    let mut document = MutableDocument::new();
+    let mut document = DraftDocument::new();
     let _ = document.add_paragraph_with_text("generated").collapse();
     let generated = document.to_xml().unwrap();
     assert!(generated.contains("w12:collapsed"));

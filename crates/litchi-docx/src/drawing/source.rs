@@ -859,22 +859,8 @@ impl PartialEq for SourceDrawing<'_> {
 impl Eq for SourceDrawing<'_> {}
 
 impl<'a> SourceDrawing<'a> {
-    /// Scan a complete main-story XML member.
-    pub fn scan(source: &'a [u8]) -> Result<Self> {
-        Self::scan_with_limits(source, 0, ScanLimits::default())
-    }
-
-    /// Scan with a caller-supplied semantic drawing ordinal.
-    pub fn scan_with_ordinal(source: &'a [u8], drawing_ordinal: usize) -> Result<Self> {
-        Self::scan_with_limits(source, drawing_ordinal, ScanLimits::default())
-    }
-
     /// Scan with explicit finite bounds.
-    pub fn scan_with_limits(
-        source: &'a [u8],
-        drawing_ordinal: usize,
-        limits: ScanLimits,
-    ) -> Result<Self> {
+    pub fn scan(source: &'a [u8], drawing_ordinal: usize, limits: ScanLimits) -> Result<Self> {
         Scanner::new(source, drawing_ordinal, limits)?.run()
     }
 

@@ -270,19 +270,32 @@ fn settings_patches_of_the_marked_fixture_match_its_unmarked_twin() {
         .collect();
     assert!(marked_members.contains("word/settings.xml"));
     let scenarios: [&dyn Fn(&mut Package) -> String; 3] = [
-        &|package| format!("{:?}", package.remove_attached_template().map(|_| ())),
         &|package| {
-            format!(
-                "{:?}",
-                package
-                    .set_attached_template_uri("https://example.invalid/template.dotx")
-                    .map(|_| ())
-            )
+            let mut edit = package.edit_attached_template();
+            let result = edit.remove().map(|_| ());
+            if let Ok(commit) = edit.commit() {
+                *package = commit.into_package();
+            }
+            format!("{result:?}")
         },
         &|package| {
-            let first = package.set_document_variable("first", "one & <two>");
-            let second = package.set_document_variable("second", "three");
-            let removed = package.remove_document_variable("first");
+            let mut edit = package.edit_attached_template();
+            let result = edit
+                .set_uri("https://example.invalid/template.dotx")
+                .map(|_| ());
+            if let Ok(commit) = edit.commit() {
+                *package = commit.into_package();
+            }
+            format!("{result:?}")
+        },
+        &|package| {
+            let mut edit = package.edit_document_variables();
+            let first = edit.set("first", "one & <two>");
+            let second = edit.set("second", "three");
+            let removed = edit.remove("first");
+            if let Ok(commit) = edit.commit() {
+                *package = commit.into_package();
+            }
             format!("{first:?}|{second:?}|{removed:?}")
         },
     ];

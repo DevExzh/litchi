@@ -325,12 +325,12 @@ mod edits {
             next.document().unwrap().text().unwrap(),
             "Dear Ada,unchangedBye Ada"
         );
-        let restored = next.apply(&patch.inverse()).unwrap();
+        let restored = next.apply(&patch.inverse()).unwrap().into_package();
         assert_eq!(
             restored.document().unwrap().text().unwrap(),
             package.document().unwrap().text().unwrap()
         );
-        let mut bytes = next.clone();
+        let bytes = next.clone();
         let reopened = crate::Package::from_bytes(&bytes.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.document().unwrap().text().unwrap(),

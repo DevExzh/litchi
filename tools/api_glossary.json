@@ -373,14 +373,89 @@
           "name": "StaleSource",
           "scope": "litchi_docx",
           "replacement": "Error::PatchConflict: a patch's base does not match (ADR 0034 §6; record 0343)"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_docx",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_docx",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_docx",
+          "replacement": "use the focused module's Edit (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_docx",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_docx",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_docx",
+          "replacement": "configure limits through OpenOptions (open_with_options/from_bytes_with_options) or the package's limits; raw/record APIs take limits as a required argument (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_docx",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_docx",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "name": "custom_props_mut",
+          "scope": "litchi_docx",
+          "replacement": "metadata::Edit::set_custom_props (record 0351)"
+        },
+        {
+          "name": "into_workbook",
+          "scope": "litchi_docx",
+          "replacement": "(record 0351)"
         }
       ],
       "families": [
         "litchi_docx::document",
-        "litchi_docx::metadata"
+        "litchi_docx::metadata",
+        "litchi_docx::attached_template",
+        "litchi_docx::bibliography",
+        "litchi_docx::chart",
+        "litchi_docx::content_control",
+        "litchi_docx::custom_xml",
+        "litchi_docx::document_variables",
+        "litchi_docx::font",
+        "litchi_docx::glossary",
+        "litchi_docx::ink",
+        "litchi_docx::mail_merge",
+        "litchi_docx::numbering",
+        "litchi_docx::opc",
+        "litchi_docx::revision::authoring",
+        "litchi_docx::revision::conflict",
+        "litchi_docx::ribbon",
+        "litchi_docx::settings::extensions",
+        "litchi_docx::styles::effects",
+        "litchi_docx::task_panes",
+        "litchi_docx::web",
+        "litchi_docx::package::story"
       ],
       "immutable_owners": [
-        "litchi_docx::Document"
+        "litchi_docx::Document",
+        "litchi_docx::Package",
+        "litchi_docx::source_backed::Package"
       ],
       "family_methods": true
     },
@@ -654,14 +729,90 @@
           "name": "StaleSource",
           "scope": "litchi_docx",
           "replacement": "Error::PatchConflict: a patch's base does not match (ADR 0034 §6; record 0343)"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_docx",
+          "replacement": "use Error::Refused(litchi_core::edit::Refusal), PatchConflict or SourceChanged (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_docx",
+          "replacement": "drop the Edit; Edit::reset discards staged changes in place (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_docx",
+          "replacement": "use the focused module's Edit (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_docx",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_docx",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_docx",
+          "replacement": "configure limits through OpenOptions (open_with_options/from_bytes_with_options) or the package's limits; raw/record APIs take limits as a required argument (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_docx",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_docx",
+          "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "name": "custom_props_mut",
+          "scope": "litchi_docx",
+          "replacement": "metadata::Edit::set_custom_props (record 0351)"
+        },
+        {
+          "name": "into_workbook",
+          "scope": "litchi_docx",
+          "replacement": "(record 0351)"
         }
       ],
       "families": [
         "litchi_docx::document",
-        "litchi_docx::metadata"
+        "litchi_docx::metadata",
+        "litchi_docx::attached_template",
+        "litchi_docx::bibliography",
+        "litchi_docx::chart",
+        "litchi_docx::content_control",
+        "litchi_docx::custom_xml",
+        "litchi_docx::document_variables",
+        "litchi_docx::font",
+        "litchi_docx::glossary",
+        "litchi_docx::ink",
+        "litchi_docx::mail_merge",
+        "litchi_docx::numbering",
+        "litchi_docx::opc",
+        "litchi_docx::revision::authoring",
+        "litchi_docx::revision::conflict",
+        "litchi_docx::ribbon",
+        "litchi_docx::settings::extensions",
+        "litchi_docx::styles::effects",
+        "litchi_docx::task_panes",
+        "litchi_docx::vba",
+        "litchi_docx::web",
+        "litchi_docx::package::story"
       ],
       "immutable_owners": [
-        "litchi_docx::Document"
+        "litchi_docx::Document",
+        "litchi_docx::Package",
+        "litchi_docx::source_backed::Package"
       ],
       "family_methods": true
     },

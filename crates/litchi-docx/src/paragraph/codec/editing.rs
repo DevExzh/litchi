@@ -54,11 +54,11 @@ impl Paragraph {
     /// Returns an error if the operation cannot be completed.
     pub fn set_spacing(&mut self, spacing: Option<ParagraphSpacing>) -> Result<&mut Self> {
         if self.xml_data.is_managed() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "paragraph.set_spacing",
-                reason: "managed paragraph views cannot detach source-owned XML",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "paragraph.set_spacing",
+                "managed paragraph views cannot detach source-owned XML",
+            ));
         }
         let _parser_admission = self.parser_admission()?;
         let original = self.xml_bytes();
@@ -73,11 +73,11 @@ impl Paragraph {
 fn rewrite_spacing(xml_bytes: &[u8], spacing: Option<ParagraphSpacing>) -> Result<Vec<u8>> {
     let layout = locate_layout(xml_bytes)?;
     if layout.spacing_has_unsupported_content {
-        return Err(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "set_spacing",
-            reason: "the existing paragraph spacing contains unsupported attributes or child content",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "set_spacing",
+            "the existing paragraph spacing contains unsupported attributes or child content",
+        ));
     }
     match (layout.spacing, spacing) {
         (Some(range), Some(spacing)) => {

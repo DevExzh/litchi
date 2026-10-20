@@ -553,7 +553,7 @@ fn markup_compatibility_branch_selection_is_refused_before_output() {
 
     assert!(matches!(
         package.publish_document_commit_to_stream(&mut output, &commit),
-        Err(TransactionError::Document(Error::UnsafeEdit { .. }))
+        Err(TransactionError::Document(Error::Refused(_)))
     ));
     assert!(output.is_empty());
 }
@@ -743,7 +743,7 @@ fn alt_chunk_overlay_refuses_shared_targets_and_signed_changes_but_keeps_signed_
             source_backed::AltChunkSelector::index(0),
             Data::Html(b"<html><body>ambiguous</body></html>".to_vec()),
         ),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
     assert!(output.is_empty());
 

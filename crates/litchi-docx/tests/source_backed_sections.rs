@@ -303,7 +303,9 @@ fn source_snapshot_applies_limits_and_rejects_a_changed_read_at() {
         ..Limits::default()
     };
     assert!(matches!(
-        package.section_inventory_snapshot_with_limits(&limits),
+        package
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().sections(limits.clone()))
+            .section_inventory_snapshot(),
         Err(Error::SectionInventoryLimit { .. })
     ));
 
@@ -327,7 +329,9 @@ fn source_snapshot_applies_limits_and_rejects_a_changed_read_at() {
         ..Limits::default()
     };
     assert!(matches!(
-        event_limited.section_inventory_snapshot_with_limits(&limits),
+        event_limited
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().sections(limits.clone()))
+            .section_inventory_snapshot(),
         Err(Error::SectionInventoryLimit {
             resource: "XML events",
             ..
@@ -346,7 +350,9 @@ fn source_snapshot_applies_limits_and_rejects_a_changed_read_at() {
         ..Limits::default()
     };
     assert!(matches!(
-        depth_limited.section_inventory_snapshot_with_limits(&limits),
+        depth_limited
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().sections(limits.clone()))
+            .section_inventory_snapshot(),
         Err(Error::SectionInventoryLimit {
             resource: "XML depth",
             ..
@@ -378,7 +384,7 @@ fn source_snapshot_refuses_mce_dtd_and_entity_syntax() {
         .unwrap();
         assert!(matches!(
             package.section_inventory_snapshot(),
-            Err(Error::UnsafeEdit { .. })
+            Err(Error::Refused(_))
         ));
     }
 
@@ -492,11 +498,8 @@ fn managed_document_refuses_only_actual_mce_and_retains_part_data() {
     );
     let (_budget, package) = managed_document_fixture(encoded_use.as_bytes());
     assert!(matches!(
-        package.document(),
-        Err(Error::UnsafeEdit {
-            operation: "source-backed document read",
-            ..
-        })
+            package.document(),
+            Err(Error::Refused(refusal)) if refusal.operation() == "source-backed document read"
     ));
 }
 
@@ -748,7 +751,8 @@ fn source_backed_existing_section_layout_is_exact_and_cell_safe() {
     assert!(commit.patch().apply(&source).is_ok());
     let mut stale_bytes = document.as_bytes().to_vec();
     stale_bytes.push(b' ');
-    let stale = litchi_docx::section::layout::Snapshot::from_xml(stale_bytes).unwrap();
+    let stale =
+        litchi_docx::section::layout::Snapshot::from_xml(stale_bytes, &Default::default()).unwrap();
     assert!(commit.patch().apply(&stale).is_err());
 
     let mut output = Vec::new();
@@ -845,14 +849,23 @@ fn source_backed_section_layout_noop_mce_strict_and_limits_are_typed() {
             .unwrap();
     assert!(matches!(
         mce_package.section_layout_snapshot(),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
-    assert!(litchi_docx::section::layout::Snapshot::from_xml(mce.as_bytes().to_vec()).is_err());
+    assert!(
+        litchi_docx::section::layout::Snapshot::from_xml(
+            mce.as_bytes().to_vec(),
+            &Default::default()
+        )
+        .is_err()
+    );
 
     let dtd = format!(
         r#"<!DOCTYPE w:document [<!ENTITY custom "x">]><w:document xmlns:w="{W}"><w:body><w:sectPr/></w:body></w:document>"#
     );
-    assert!(litchi_docx::section::layout::Snapshot::from_xml(dtd.into_bytes()).is_err());
+    assert!(
+        litchi_docx::section::layout::Snapshot::from_xml(dtd.into_bytes(), &Default::default())
+            .is_err()
+    );
 
     let strict = r#"<s:document xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:body><s:p/><s:sectPr><s:pgSz s:w="12240" s:h="15840"/></s:sectPr></s:body></s:document>"#;
     let strict_package = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(fixture(
@@ -866,10 +879,12 @@ fn source_backed_section_layout_noop_mce_strict_and_limits_are_typed() {
     ))))
     .unwrap();
     assert!(matches!(
-        limited.section_layout_snapshot_with_limits(&Limits {
-            max_section_bytes: 1,
-            ..Limits::default()
-        }),
+        limited
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().sections(Limits {
+                max_section_bytes: 1,
+                ..Limits::default()
+            }))
+            .section_layout_snapshot(),
         Err(Error::SectionInventoryLimit { .. })
     ));
 }
@@ -1073,7 +1088,7 @@ fn section_layout_clear_is_lossless_and_single_property_patch_preserves_siblings
 
     let mut clear = source.edit(0).unwrap();
     clear.clear_page_size().unwrap();
-    assert!(matches!(clear.commit(), Err(Error::UnsafeEdit { .. })));
+    assert!(matches!(clear.commit(), Err(Error::Refused(_))));
     assert!(source.inventory().sections()[0].page_size().is_some());
 
     let mut edit = source.edit(0).unwrap();
@@ -1501,12 +1516,8 @@ fn section_layout_missing_field_with_unknown_word_child_is_typed_unsafe_edit() {
     }))
     .unwrap();
     assert!(matches!(
-        edit.commit(),
-        Err(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "edit_section_layout",
-            ..
-        })
+            edit.commit(),
+            Err(Error::Refused(refusal)) if refusal.operation() == "edit_section_layout"
     ));
 }
 
@@ -1599,8 +1610,11 @@ fn section_layout_detached_patch_cannot_publish_to_source_package() {
     let document = format!(
         r#"<w:document xmlns:w="{W}"><w:body><w:p><w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:pPr></w:p></w:body></w:document>"#
     );
-    let detached =
-        litchi_docx::section::layout::Snapshot::from_xml(document.as_bytes().to_vec()).unwrap();
+    let detached = litchi_docx::section::layout::Snapshot::from_xml(
+        document.as_bytes().to_vec(),
+        &Default::default(),
+    )
+    .unwrap();
     let mut edit = detached.edit(0).unwrap();
     edit.set_page_size(Some(PageSize {
         width: Some(Emu::from_twips(11906)),
@@ -1633,7 +1647,7 @@ fn section_inventory_many_sections_stays_within_primary_event_budget() {
         ..Limits::default()
     };
     assert!(matches!(
-        litchi_docx::section::Inventory::parse_with_limits(document.as_bytes(), &limits),
+        litchi_docx::section::Inventory::parse(document.as_bytes(), &limits),
         Err(Error::SectionInventoryLimit {
             resource: "XML events",
             ..
@@ -1653,7 +1667,6 @@ fn section_inventory_many_sections_consumes_one_primary_event_budget() {
         max_events: 5 + 7 * SECTION_COUNT,
         ..Limits::default()
     };
-    let inventory =
-        litchi_docx::section::Inventory::parse_with_limits(document.as_bytes(), &limits).unwrap();
+    let inventory = litchi_docx::section::Inventory::parse(document.as_bytes(), &limits).unwrap();
     assert_eq!(inventory.sections().len(), SECTION_COUNT + 1);
 }

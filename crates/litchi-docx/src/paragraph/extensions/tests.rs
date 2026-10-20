@@ -1,7 +1,7 @@
 use super::*;
+use crate::builder::Document as DraftDocument;
 use crate::paragraph::Paragraph;
 use crate::table::Row;
-use crate::writer::MutableDocument;
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const W14: &str = WORD_2010_NAMESPACE;
@@ -60,7 +60,7 @@ fn rejects_invalid_lexical_values_and_dependency_states() {
 fn generated_paragraph_and_row_attributes_are_checked_and_ignorable() {
     let para_id = Id::new(0x2a).unwrap();
     let text_id = Id::new(0x2b).unwrap();
-    let mut document = MutableDocument::new();
+    let mut document = DraftDocument::new();
     let paragraph = document.add_paragraph_with_text("typed");
     paragraph
         .set_para_id(Some(para_id))
@@ -90,7 +90,7 @@ fn invalid_replacement_is_atomic_and_unknown_body_xml_survives() {
     let source = format!(
         r#"<?xml version="1.0"?><w:document xmlns:w="{W}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:test"><w:body><w:p><w:r><w:hyperlink r:id="rId9"><w:t>kept</w:t></w:hyperlink></w:r><x:opaque x:value="keep"/></w:p></w:body></w:document>"#
     );
-    let mut document = MutableDocument::from_xml(&source).unwrap();
+    let mut document = DraftDocument::from_xml(&source).unwrap();
     let paragraph = document.add_paragraph();
     let before = paragraph.extensions().to_owned();
     assert!(paragraph.set_text_id(Some(Id::new(3).unwrap())).is_err());

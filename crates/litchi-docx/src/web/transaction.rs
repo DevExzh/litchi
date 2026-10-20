@@ -86,7 +86,7 @@ impl Snapshot {
 
     /// Start an isolated source-checked edit.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> Transaction {
         Transaction {
             base: self.clone(),
             next: self.settings.clone(),
@@ -97,7 +97,7 @@ impl Snapshot {
 
 /// A web-settings edit that has not yet been published.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Transaction {
     base: Snapshot,
     next: Settings,
     edits: Vec<Edit>,
@@ -404,7 +404,7 @@ impl Transaction {
 /// A successful web-settings publication containing its new snapshot and
 /// reversible source patch.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
 }
@@ -439,7 +439,7 @@ impl Commit {
 
 /// A source-checked, reversible web-settings patch.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub(crate) struct Patch {
     before: Settings,
     after: Settings,
     before_xml: Arc<[u8]>,

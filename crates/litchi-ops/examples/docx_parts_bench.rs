@@ -412,7 +412,7 @@ fn fixture() -> Outcome<Vec<u8>> {
         },
         None => return Err("the Builder document has no styles part".into()),
     }
-    let mut package = edit.commit()?.into_package();
+    let package = edit.commit()?.into_package();
     Ok(package.to_bytes()?)
 }
 

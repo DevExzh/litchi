@@ -661,7 +661,7 @@ fn detach_native_svg_publishes_and_reopens_without_touching_raster_or_anchor() {
         assert_eq!(before.svg().unwrap().relationship_id(), "rId5");
         assert!(edit.detach_svg().expect("detach native SVG"));
         let commit = edit.commit().expect("commit native detach");
-        assert!(commit.is_changed());
+        assert!(!commit.patch().is_noop());
         assert_eq!(commit.diagnostics().operations(), 1);
         assert_eq!(commit.diagnostics().selected_pictures(), 1);
         assert!(commit.diagnostics().changed());
@@ -724,7 +724,7 @@ fn borrowed_attach_adds_graph_closure_and_reopens_with_raster_preserved() {
         let before = edit.source();
         assert!(edit.attach_svg(SvgInput::borrowed(payload)).unwrap());
         let commit = edit.commit().expect("commit borrowed attach");
-        assert!(commit.is_changed());
+        assert!(!commit.patch().is_noop());
         assert_eq!(commit.diagnostics().operation_count(), 1);
         assert_eq!(commit.diagnostics().selected_picture_count(), 1);
         assert!(commit.diagnostics().changed());
@@ -782,7 +782,7 @@ fn lifecycle_commit_diagnostics_retain_noop_scope() {
     let single_package = open(&raster_only_fixture("inline", "diagnostics-single-noop"));
     let single_edit = single_package.edit_svg_attachment(0).unwrap();
     let single_commit = single_edit.commit().expect("commit single no-op");
-    assert!(!single_commit.is_changed());
+    assert!(single_commit.patch().is_noop());
     assert_eq!(single_commit.diagnostics().operations(), 0);
     assert_eq!(single_commit.diagnostics().selected_pictures(), 1);
     assert!(!single_commit.diagnostics().changed());
@@ -799,7 +799,7 @@ fn lifecycle_commit_diagnostics_retain_noop_scope() {
         .edit_svg_attachments([0usize, 1usize])
         .unwrap();
     let batch_commit = batch_edit.commit().expect("commit batch no-op");
-    assert!(!batch_commit.is_changed());
+    assert!(batch_commit.patch().is_noop());
     assert_eq!(batch_commit.diagnostics().operation_count(), 0);
     assert_eq!(batch_commit.diagnostics().selected_picture_count(), 2);
     assert!(!batch_commit.diagnostics().changed());
@@ -928,7 +928,7 @@ fn batch_attach_and_shared_detach_are_one_atomic_edit() {
         second_payload
     );
     let commit = edit.commit().unwrap();
-    assert!(commit.is_changed());
+    assert!(!commit.patch().is_noop());
     assert_eq!(commit.diagnostics().operations(), 2);
     assert_eq!(commit.diagnostics().selected_pictures(), 2);
     assert!(commit.diagnostics().changed());
@@ -1514,7 +1514,12 @@ fn batch_reverse_order_projection_preserves_opaque_siblings_and_matches_commit()
             .unwrap()
     );
     let projected_after_first = edit.projected().story_xml().unwrap().to_vec();
-    let scanned_first = SourceDrawing::scan(&projected_after_first).unwrap();
+    let scanned_first = SourceDrawing::scan(
+        &projected_after_first,
+        Default::default(),
+        Default::default(),
+    )
+    .unwrap();
     assert_eq!(scanned_first.pictures().len(), 2);
     assert!(
         scanned_first
@@ -1562,7 +1567,8 @@ fn batch_reverse_order_projection_preserves_opaque_siblings_and_matches_commit()
             .unwrap()
     );
     let projected_final = edit.projected().story_xml().unwrap().to_vec();
-    let scanned_final = SourceDrawing::scan(&projected_final).unwrap();
+    let scanned_final =
+        SourceDrawing::scan(&projected_final, Default::default(), Default::default()).unwrap();
     assert_eq!(scanned_final.pictures().len(), 2);
     assert!(
         scanned_final

@@ -501,7 +501,7 @@ fn absent_multiple_external_wrong_type_and_mce_settings_fail_closed() {
     );
     assert!(matches!(
         open_source(fixture(Fixture::transitional(mce.as_bytes()))).document_variables_snapshot(),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
 }
 
@@ -587,7 +587,7 @@ fn selected_unknown_and_protected_changes_are_refused_but_noops_are_exact() {
         output.clear();
         assert!(matches!(
             package.publish_document_variables_commit_to_stream(&mut output, &commit),
-            Err(Error::UnsafeEdit { .. })
+            Err(Error::Refused(_))
         ));
         assert!(output.is_empty());
     }

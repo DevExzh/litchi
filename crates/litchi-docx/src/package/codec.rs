@@ -23,8 +23,8 @@
 pub(super) use super::model::Mode;
 use super::model::{
     CustomProps, CustomPropsHost, DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL,
-    DIAGRAM_QUICK_STYLE_REL, Error, MutableDocument, OpcPackage, PackURI, Package,
-    ParagraphIndexCache, Path, Read, Result, Slot, Write, WriteRollbackGuard, ct, docx_web,
+    DIAGRAM_QUICK_STYLE_REL, DraftDocument, Error, OpcPackage, PackURI, Package,
+    ParagraphIndexCache, Path, Read, Result, Slot, Write, ct, docx_web,
     validate_document_main_content_type,
 };
 use crate::OpenOptions;
@@ -83,29 +83,29 @@ impl Package {
             .map_err(|e| Error::InvalidUri(format!("styles partname: {e}")))?;
 
         // Generate default styles dynamically
-        use crate::writer::style::{MutableStyle, generate_styles_xml};
+        use crate::writer::style::{Style as DraftStyle, generate_styles_xml};
         let default_styles = vec![
-            MutableStyle::normal(),
-            MutableStyle::heading_1(),
-            MutableStyle::heading_2(),
-            MutableStyle::heading_3(),
-            MutableStyle::heading_4(),
-            MutableStyle::heading_5(),
-            MutableStyle::heading_6(),
-            MutableStyle::heading_7(),
-            MutableStyle::heading_8(),
-            MutableStyle::heading_9(),
-            MutableStyle::title(),
-            MutableStyle::default_paragraph_font(),
-            MutableStyle::toc_heading(),
-            MutableStyle::toc1(),
-            MutableStyle::toc2(),
-            MutableStyle::toc3(),
-            MutableStyle::hyperlink(),
-            MutableStyle::header(),
-            MutableStyle::footer(),
-            MutableStyle::footnote_text(),
-            MutableStyle::endnote_text(),
+            DraftStyle::normal(),
+            DraftStyle::heading_1(),
+            DraftStyle::heading_2(),
+            DraftStyle::heading_3(),
+            DraftStyle::heading_4(),
+            DraftStyle::heading_5(),
+            DraftStyle::heading_6(),
+            DraftStyle::heading_7(),
+            DraftStyle::heading_8(),
+            DraftStyle::heading_9(),
+            DraftStyle::title(),
+            DraftStyle::default_paragraph_font(),
+            DraftStyle::toc_heading(),
+            DraftStyle::toc1(),
+            DraftStyle::toc2(),
+            DraftStyle::toc3(),
+            DraftStyle::hyperlink(),
+            DraftStyle::header(),
+            DraftStyle::footer(),
+            DraftStyle::footnote_text(),
+            DraftStyle::endnote_text(),
         ];
         let styles_xml = generate_styles_xml(&default_styles)?;
 
@@ -215,9 +215,6 @@ impl Package {
             .relate_to("numbering.xml", rt::NUMBERING);
         opc.add_part(Box::new(numbering_part));
 
-        // Create a mutable document for writing
-        let mutable_doc = Some(MutableDocument::new().into());
-
         // Initialize document properties
         let properties = Slot::load(&opc)?;
 
@@ -228,13 +225,9 @@ impl Package {
             opc: opc.into(),
             paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
             main_admission: Arc::new(std::sync::Mutex::new(std::sync::Weak::new())),
-            mutable_doc,
-            raw_edit_committed: false,
             properties: properties.into(),
             custom_props: custom_props.into(),
-            custom_props_dirty: false,
-            #[cfg(feature = "automatic-fonts")]
-            font_embedding: None,
+            semantic_limits: Arc::default(),
             #[cfg(feature = "encryption")]
             source_encryption: Default::default(),
         })
@@ -243,7 +236,7 @@ impl Package {
     /// Create a new empty macro-free Word template (`.dotx`) package.
     ///
     /// Template packages are the native container for reusable `AutoText` and
-    /// other building blocks authored through [`Self::put_glossary`].
+    /// other building blocks authored through [`Self::edit_glossary`].
     ///
     /// # Errors
     ///
@@ -287,7 +280,10 @@ impl Package {
     /// Returns an error if the operation cannot be completed.
     pub fn open_with_options<P: AsRef<Path>>(path: P, options: OpenOptions) -> Result<Self> {
         options.check_owning()?;
-        Self::from_opc_package(OpcPackage::open_with_limits(path, options.source_limits)?)
+        Ok(
+            Self::from_opc_package(OpcPackage::open_with_limits(path, options.source_limits)?)?
+                .with_semantic_limits(options.semantic_limits),
+        )
     }
 
     /// Open a password-bearing DOCX path with standard finite policies.
@@ -357,13 +353,9 @@ impl Package {
             opc: opc.into(),
             paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
             main_admission: Arc::new(std::sync::Mutex::new(std::sync::Weak::new())),
-            mutable_doc: None,
-            raw_edit_committed: false,
             properties: properties.into(),
             custom_props: custom_props.into(),
-            custom_props_dirty: false,
-            #[cfg(feature = "automatic-fonts")]
-            font_embedding: None,
+            semantic_limits: Arc::default(),
             #[cfg(feature = "encryption")]
             source_encryption: Default::default(),
         })
@@ -401,10 +393,11 @@ impl Package {
     /// Returns an error if the operation cannot be completed.
     pub fn from_reader_with_options<R: Read>(reader: R, options: OpenOptions) -> Result<Self> {
         options.check_owning()?;
-        Self::from_opc_package(OpcPackage::from_reader_with_limits(
+        Ok(Self::from_opc_package(OpcPackage::from_reader_with_limits(
             reader,
             options.source_limits,
-        )?)
+        )?)?
+        .with_semantic_limits(options.semantic_limits))
     }
 
     /// Open a password-bearing DOCX reader with standard finite policies.
@@ -495,7 +488,8 @@ impl Package {
         options.check_owning()?;
         let source_encryption = opened.mode();
         let opc = OpcPackage::from_vec_with_limits(opened.into_bytes(), options.source_limits)?;
-        let mut package = Self::from_opc_package(opc)?;
+        let mut package =
+            Self::from_opc_package(opc)?.with_semantic_limits(options.semantic_limits);
         package.source_encryption = source_encryption.map_or_else(
             litchi_ooxml_common::package_encryption::PackageEncryption::plain,
             litchi_ooxml_common::package_encryption::PackageEncryption::encrypted,
@@ -527,7 +521,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         self.save_with_durability(path, Durability::Full)
     }
 
@@ -548,7 +542,7 @@ impl Package {
     /// that the destination was replaced but its directory could not be
     /// synchronized ([`litchi_opc::OpcError::Committed`]).
     pub fn save_with_durability<P: AsRef<Path>>(
-        &mut self,
+        &self,
         path: P,
         durability: Durability,
     ) -> Result<()> {
@@ -561,7 +555,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn save_plain<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+    pub fn save_plain<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         self.save_plain_with_durability(path, Durability::Full)
     }
 
@@ -572,14 +566,14 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn save_plain_with_durability<P: AsRef<Path>>(
-        &mut self,
+        &self,
         path: P,
         durability: Durability,
     ) -> Result<()> {
         self.save_plain_impl(path, durability)
     }
 
-    fn save_plain_impl<P: AsRef<Path>>(&mut self, path: P, durability: Durability) -> Result<()> {
+    fn save_plain_impl<P: AsRef<Path>>(&self, path: P, durability: Durability) -> Result<()> {
         litchi_opc::atomic::replace_with_durability::<Error>(
             path.as_ref(),
             durability,
@@ -614,7 +608,7 @@ impl Package {
     /// OPC publication errors retain their typed cause. After the sink accepts
     /// bytes, failures report [`litchi_opc::OpcError::IncompleteOutput`] with
     /// the accepted byte count. The package can be retried with another sink.
-    pub fn write_to<W: Write>(&mut self, writer: W) -> Result<()> {
+    pub fn write_to<W: Write>(&self, writer: W) -> Result<()> {
         self.ensure_plain_output("write_to")?;
         self.write_plain(writer)
     }
@@ -624,7 +618,7 @@ impl Package {
     /// # Errors
     /// Refuses ordinary output from an encrypted source; use explicit plaintext
     /// or re-encrypted output. Publication errors retain their typed causes.
-    pub fn to_bytes(&mut self) -> Result<Vec<u8>> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
         self.ensure_plain_output("to_bytes")?;
         self.to_plain_bytes()
     }
@@ -633,7 +627,7 @@ impl Package {
     ///
     /// # Errors
     /// Returns a typed publication error if the package cannot be serialized.
-    pub fn to_plain_bytes(&mut self) -> Result<Vec<u8>> {
+    pub fn to_plain_bytes(&self) -> Result<Vec<u8>> {
         let mut output = Vec::new();
         self.write_plain(&mut output)?;
         Ok(output)
@@ -644,7 +638,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn to_plain_stream<W: Write>(&mut self, writer: W) -> Result<()> {
+    pub fn to_plain_stream<W: Write>(&self, writer: W) -> Result<()> {
         self.write_plain(writer)
     }
 
@@ -654,7 +648,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn to_encrypted(&mut self, password: &str, mode: Mode) -> Result<Vec<u8>> {
+    pub fn to_encrypted(&self, password: &str, mode: Mode) -> Result<Vec<u8>> {
         crate::encryption::encrypt(self.to_plain_bytes()?, password, mode).map_err(Into::into)
     }
 
@@ -664,7 +658,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn to_reencrypted(&mut self, password: &str) -> Result<Vec<u8>> {
+    pub fn to_reencrypted(&self, password: &str) -> Result<Vec<u8>> {
         let mode = self.preserved_mode("to_reencrypted")?;
         self.to_encrypted(password, mode)
     }
@@ -676,7 +670,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn save_encrypted<P: AsRef<Path>>(
-        &mut self,
+        &self,
         path: P,
         password: &str,
         mode: Mode,
@@ -686,7 +680,6 @@ impl Package {
             temporary.write_all(&output)?;
             Ok(())
         })?;
-        self.source_encryption.mark_encrypted(mode);
         Ok(())
     }
 
@@ -696,7 +689,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn save_reencrypted<P: AsRef<Path>>(&mut self, path: P, password: &str) -> Result<()> {
+    pub fn save_reencrypted<P: AsRef<Path>>(&self, path: P, password: &str) -> Result<()> {
         let mode = self.preserved_mode("save_reencrypted")?;
         self.save_encrypted(path, password, mode)
     }
@@ -708,40 +701,14 @@ impl Package {
         self.source_encryption.mode()
     }
 
-    pub(super) fn ensure_opc_current(&self, operation: &'static str) -> Result<()> {
+    pub(super) fn ensure_opc_current(&self, _operation: &'static str) -> Result<()> {
         #[cfg(feature = "encryption")]
         if self.source_encryption.mode().is_some() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "raw OPC access would expose an encrypted source as plaintext; use the managed encryption or explicit plaintext APIs",
-            });
-        }
-
-        if self
-            .mutable_doc
-            .as_ref()
-            .is_some_and(|document| document.is_modified())
-        {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "the legacy document writer has unmaterialized changes; use a managed save or to_plain_stream first",
-            });
-        }
-        if self.properties.is_dirty() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "core properties have unmaterialized changes; use a managed save or to_plain_stream first",
-            });
-        }
-        if self.custom_props_dirty {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "custom properties have unmaterialized changes; use a managed save or to_plain_stream first",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                _operation,
+                "raw OPC access would expose an encrypted source as plaintext; use the managed encryption or explicit plaintext APIs",
+            ));
         }
 
         Ok(())
@@ -765,42 +732,27 @@ impl Package {
             .map_err(|source| Error::EncryptionPolicy { operation, source })
     }
 
-    /// Finalize builder-authored content into the package graph: the
-    /// authoring document, its fonts and any staged property facades. The
-    /// returned package carries no authoring state.
-    pub(crate) fn finish_authoring(mut self) -> Result<Self> {
-        let mut rollback = WriteRollbackGuard::new(&mut self);
-        if let Some(mutable_doc) = rollback.modified_doc_mut() {
-            self.materialize_document(mutable_doc)?;
+    /// Finalize builder-authored content into the package graph: the draft
+    /// document and, when selected, its embedded fonts. The returned package
+    /// carries no authoring state.
+    pub(crate) fn finish_authoring(
+        mut self,
+        document: &mut DraftDocument,
+        #[cfg(feature = "automatic-fonts")] font_embedding: Option<litchi_fonts::embedding::Mode>,
+    ) -> Result<Self> {
+        if document.is_modified() {
+            self.materialize_document(document)?;
         }
         #[cfg(feature = "automatic-fonts")]
-        if self.font_embedding.is_some() {
-            if let Some(mutable_doc) = rollback.mutable_doc() {
-                self.embed_fonts_for_document(mutable_doc)?;
-            }
-            self.font_embedding = None;
+        if let Some(mode) = font_embedding {
+            self.embed_fonts_for_document(document, mode)?;
         }
-        if self.custom_props_dirty {
-            self.custom_props
-                .write_for(&mut self.opc, CustomPropsHost::Word)
-                .map_err(crate::signature_policy::from_shared)?;
-            self.custom_props_dirty = false;
-        }
-        if self.properties.is_dirty() {
-            let Self {
-                opc, properties, ..
-            } = &mut self;
-            properties
-                .flush(opc)
-                .map_err(crate::signature_policy::from_shared)?;
-        }
-        drop(rollback);
         Ok(self)
     }
 
     /// Materialize the legacy authoring document into the OPC graph:
     /// the main part, its relationships and every generated related part.
-    pub(super) fn materialize_document(&mut self, mutable_doc: &mut MutableDocument) -> Result<()> {
+    pub(super) fn materialize_document(&mut self, mutable_doc: &mut DraftDocument) -> Result<()> {
         use crate::writer::relmap::RelationshipMapper;
         use litchi_opc::constants::relationship_type as rt;
 
@@ -1302,81 +1254,11 @@ impl Package {
         Ok(())
     }
 
-    fn write_plain<W: Write>(&mut self, writer: W) -> Result<()> {
-        // Keep both the source graph and the mutable semantic document
-        // available until the complete publication succeeds. Materializing a
-        // document rebuilds many related parts; an error half-way through must
-        // leave the caller with the same retryable edit rather than a dropped
-        // writer and a partially rewritten package.
-        let mut rollback = WriteRollbackGuard::new(self);
-        // A sink or a late writer hook may unwind instead of returning an
-        // error. Catch the unwind long enough to put both owned pieces of the
-        // host state back before resuming it; the staged-properties guard is
-        // dropped while unwinding the closure and therefore keeps its dirty
-        // intent for the next attempt.
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<()> {
-            // If we have a mutable document, update the document.xml part
-            if let Some(mutable_doc) = rollback.modified_doc_mut() {
-                self.materialize_document(mutable_doc)?;
-            }
-
-            // Preserve the original custom XML unless its facade was edited.
-            // Keep edit intent dirty until the complete publication succeeds,
-            // so validation or sink failures remain retryable.
-            // The shared owners refuse a change to a signed package (ADR
-            // 0006); the refusal keeps this crate's typed signed error.
-            if self.custom_props_dirty {
-                self.custom_props
-                    .write_for(&mut self.opc, CustomPropsHost::Word)
-                    .map_err(crate::signature_policy::from_shared)?;
-            }
-
-            // Embed fonts if feature enabled and requested in options
-            #[cfg(feature = "automatic-fonts")]
-            {
-                if let Some(mutable_doc) = rollback.mutable_doc() {
-                    self.embed_fonts_for_document(mutable_doc)?;
-                } else {
-                    self.embed_fonts()?;
-                }
-            }
-
-            // Stage only an explicitly edited core-properties slot. The guard
-            // keeps edit intent dirty until the output sink accepts the complete
-            // package, so a failed stream remains retryable.
-            // Avoid requesting mutable graph access for a clean slot: that
-            // would detach the shared graph even though stage changes nothing.
-            let staged_properties = if self.properties.is_dirty() {
-                Some(
-                    self.properties
-                        .stage(&mut self.opc)
-                        .map_err(crate::signature_policy::from_shared)?,
-                )
-            } else {
-                None
-            };
-
-            self.opc.write_to(writer)?;
-            if let Some(staged_properties) = staged_properties {
-                staged_properties.commit();
-            }
-            self.custom_props_dirty = false;
-            Ok(())
-        }));
-
-        match result {
-            Ok(Ok(())) => {
-                rollback.publish(self);
-                Ok(())
-            },
-            Ok(Err(error)) => {
-                rollback.rollback(self);
-                Err(error)
-            },
-            Err(payload) => {
-                rollback.rollback(self);
-                std::panic::resume_unwind(payload);
-            },
-        }
+    fn write_plain<W: Write>(&self, writer: W) -> Result<()> {
+        // The package holds no unmaterialized state: every change was
+        // published into the graph by its edit's commit, so output is a pure
+        // function of the graph and repeated output is byte-identical.
+        self.opc.write_to(writer)?;
+        Ok(())
     }
 }

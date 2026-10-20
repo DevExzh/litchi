@@ -133,7 +133,7 @@ fn sign(plain: &[u8]) -> Vec<u8> {
 /// and signed again: a signed document that holds the family's content.
 fn signed_with(edit: impl FnOnce(&mut Package)) -> Vec<u8> {
     let mut plain = open(&fixture(SIGNED[0]));
-    plain.unsign();
+    plain = plain.unsign();
     edit(&mut plain);
     sign(&bytes(&mut plain))
 }
@@ -171,18 +171,38 @@ mod web_settings {
             let original = fixture(name);
             let mut package = open(&original);
             let (settings, conformance) = package.web().unwrap().expect("web settings");
-            assert!(!package.put_web(settings.clone(), conformance).unwrap());
+            assert!(!{
+                let mut edit = package.edit_web();
+                let value = edit.put(settings.clone(), conformance).unwrap();
+                package = edit.commit().unwrap().into_package();
+                value
+            });
             assert_eq!(bytes(&mut package), original, "{name}: an equal store");
 
             let mut changed = settings.clone();
             changed.set_target_screen_size(Screen::Pixels1024x768);
-            assert_signed(package.put_web(changed.clone(), conformance));
-            assert_signed(package.remove_web());
+            assert_signed({
+                let mut edit = package.edit_web();
+                edit.put(changed.clone(), conformance)
+                    .map(|_| ())
+                    .and_then(|()| edit.commit().map(|_| ()))
+            });
+            assert_signed({
+                let mut edit = package.edit_web();
+                edit.remove()
+                    .map(|_| ())
+                    .and_then(|()| edit.commit().map(|_| ()))
+            });
             assert!(package.is_signed());
             assert_eq!(bytes(&mut package), original, "{name}: refusals");
 
-            package.unsign();
-            assert!(package.put_web(changed.clone(), conformance).unwrap());
+            package = package.unsign();
+            assert!({
+                let mut edit = package.edit_web();
+                let value = edit.put(changed.clone(), conformance).unwrap();
+                package = edit.commit().unwrap().into_package();
+                value
+            });
             let output = bytes(&mut package);
             assert!(!carries_signature(&output), "{name}");
             assert_eq!(open(&output).web().unwrap().unwrap().0, changed);
@@ -193,23 +213,34 @@ mod web_settings {
     fn a_web_settings_patch_refuses_a_signed_package() {
         for name in SIGNED {
             let original = fixture(name);
-            let mut package = OpcPackage::from_vec(original.clone()).unwrap();
-            let snapshot = web::load_snapshot(&package).unwrap().unwrap();
-            let empty = snapshot.edit().commit().unwrap().into_patch();
-            web::apply_patch(&mut package, &empty).unwrap();
-            let mut edit = snapshot.edit();
-            edit.set_target_screen_size(Some(Screen::Pixels800x600));
-            let patch = edit.commit().unwrap().into_patch();
-            assert_signed(web::apply_patch(&mut package, &patch));
+            let package = open(&original);
+            assert!(web::load_snapshot(package.opc_package()).unwrap().is_some());
+            let empty = package.edit_web().commit().unwrap();
+            assert!(!empty.diagnostics().changed());
+            assert!(empty.patch().is_noop());
+            let replayed = package.apply_web(empty.patch()).unwrap();
+            assert!(replayed.package().is_signed());
             assert_eq!(
-                PackageWriter::to_bytes(&package).unwrap(),
+                replayed.package().to_bytes().unwrap(),
                 original,
-                "{name}"
+                "{name}: an empty patch"
             );
+            // A signed package cannot commit the change, so the patch is
+            // captured over an explicitly unsigned copy.
+            let mut edit = package.clone().unsign().edit_web();
+            edit.set_target_screen_size(Some(Screen::Pixels800x600))
+                .unwrap();
+            let patch = edit.commit().unwrap().patch().clone();
+            assert_signed(package.apply_web(&patch));
+            assert_eq!(package.to_bytes().unwrap(), original, "{name}");
 
-            package.unsign();
-            web::apply_patch(&mut package, &patch).unwrap();
-            let output = PackageWriter::to_bytes(&package).unwrap();
+            let package = package.unsign();
+            let output = package
+                .apply_web(&patch)
+                .unwrap()
+                .package()
+                .to_bytes()
+                .unwrap();
             assert!(!carries_signature(&output), "{name}");
         }
     }
@@ -225,28 +256,40 @@ mod font_table {
             let original = fixture(name);
             let mut package = open(&original);
             let table = package.fonts().unwrap().expect("font table");
-            assert!(
-                !package
-                    .put_fonts(table.clone(), Conformance::Transitional)
-                    .unwrap()
-            );
+            assert!(!{
+                let mut edit = package.edit_fonts();
+                let value = edit.put(table.clone(), Conformance::Transitional).unwrap();
+                package = edit.commit().unwrap().into_package();
+                value
+            });
             assert_eq!(bytes(&mut package), original, "{name}: an equal table");
 
             let mut changed = table.clone();
             changed
                 .add(Font::new("Litchi Signed Sans").unwrap())
                 .unwrap();
-            assert_signed(package.put_fonts(changed.clone(), Conformance::Transitional));
-            assert_signed(package.remove_fonts());
+            assert_signed({
+                let mut edit = package.edit_fonts();
+                edit.put(changed.clone(), Conformance::Transitional)
+                    .map(|_| ())
+                    .and_then(|()| edit.commit().map(|_| ()))
+            });
+            assert_signed({
+                let mut edit = package.edit_fonts();
+                edit.remove()
+                    .map(|_| ())
+                    .and_then(|()| edit.commit().map(|_| ()))
+            });
             assert!(package.is_signed());
             assert_eq!(bytes(&mut package), original, "{name}: refusals");
 
-            package.unsign();
-            assert!(
-                package
-                    .put_fonts(changed, Conformance::Transitional)
-                    .unwrap()
-            );
+            package = package.unsign();
+            assert!({
+                let mut edit = package.edit_fonts();
+                let value = edit.put(changed, Conformance::Transitional).unwrap();
+                package = edit.commit().unwrap().into_package();
+                value
+            });
             let output = bytes(&mut package);
             assert!(!carries_signature(&output), "{name}");
             let reopened = open(&output).fonts().unwrap().unwrap();
@@ -257,7 +300,7 @@ mod font_table {
 
 mod glossary_family {
     use super::*;
-    use litchi_docx::glossary::{self, Catalog, Conformance, Entry, Transaction};
+    use litchi_docx::glossary::{self, Catalog, Conformance, Entry};
 
     const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
@@ -283,17 +326,38 @@ mod glossary_family {
         for name in SIGNED {
             let original = fixture(name);
             let mut package = open(&original);
-            assert!(!package.remove_glossary().unwrap());
-            assert!(package.take_glossary_graph().unwrap().is_none());
-            assert_signed(package.put_glossary(catalog(&["Keep"]), Conformance::Transitional));
+            assert!(!{
+                let mut edit = package.edit_glossary();
+                let value = edit.remove().unwrap();
+                package = edit.commit().unwrap().into_package();
+                value
+            });
+            assert!(
+                {
+                    let mut edit = package.edit_glossary();
+                    let value = edit.take_graph().unwrap();
+                    package = edit.commit().unwrap().into_package();
+                    value
+                }
+                .is_none()
+            );
+            assert_signed({
+                let mut edit = package.edit_glossary();
+                edit.put(catalog(&["Keep"]), Conformance::Transitional)
+                    .map(|_| ())
+                    .and_then(|()| edit.commit().map(|_| ()))
+            });
             assert_eq!(bytes(&mut package), original, "{name}");
 
-            package.unsign();
-            assert!(
-                package
-                    .put_glossary(catalog(&["Keep"]), Conformance::Transitional)
-                    .unwrap()
-            );
+            package = package.unsign();
+            assert!({
+                let mut edit = package.edit_glossary();
+                let value = edit
+                    .put(catalog(&["Keep"]), Conformance::Transitional)
+                    .unwrap();
+                package = edit.commit().unwrap().into_package();
+                value
+            });
             let output = bytes(&mut package);
             assert!(!carries_signature(&output), "{name}");
             assert!(open(&output).glossary().unwrap().is_some());
@@ -303,52 +367,77 @@ mod glossary_family {
     #[test]
     fn a_signed_glossary_refuses_changes_removal_and_patches() {
         let signed = signed_with(|plain| {
-            assert!(
-                plain
-                    .put_glossary(catalog(&["Keep"]), Conformance::Transitional)
-                    .unwrap()
-            );
+            assert!({
+                let mut edit = plain.edit_glossary();
+                let value = edit
+                    .put(catalog(&["Keep"]), Conformance::Transitional)
+                    .unwrap();
+                *plain = edit.commit().unwrap().into_package();
+                value
+            });
         });
         let mut package = open(&signed);
         let graph = package.glossary_graph().unwrap().unwrap();
-        assert!(!package.put_glossary_graph(&graph).unwrap());
+        assert!(!{
+            let mut edit = package.edit_glossary();
+            let value = edit.put_graph(&graph).unwrap();
+            package = edit.commit().unwrap().into_package();
+            value
+        });
         assert_eq!(bytes(&mut package), signed, "an identical graph");
 
         let mut changed = graph.clone();
         changed.catalog.add(entry("Changed")).unwrap();
-        assert_signed(package.put_glossary_graph(&changed));
-        assert_signed(package.take_glossary_graph());
-        assert_signed(package.remove_glossary());
+        assert_signed({
+            let mut edit = package.edit_glossary();
+            edit.put_graph(&changed)
+                .map(|_| ())
+                .and_then(|()| edit.commit().map(|_| ()))
+        });
+        assert_signed({
+            let mut edit = package.edit_glossary();
+            edit.take_graph()
+                .map(|_| ())
+                .and_then(|()| edit.commit().map(|_| ()))
+        });
+        assert_signed({
+            let mut edit = package.edit_glossary();
+            edit.remove()
+                .map(|_| ())
+                .and_then(|()| edit.commit().map(|_| ()))
+        });
         assert_eq!(bytes(&mut package), signed, "refused changes");
 
-        // The transaction and its patch over the OPC graph.
-        let mut opc = OpcPackage::from_vec(signed.clone()).unwrap();
-        let commit = Transaction::new(&mut opc).unwrap().commit().unwrap();
-        assert!(!commit.changed());
-        let mut transaction = Transaction::new(&mut opc).unwrap();
-        transaction.add_entry(entry("Staged")).unwrap();
-        assert_signed(transaction.commit());
+        // The edit and its patch over the package graph.
+        let commit = package.edit_glossary().commit().unwrap();
+        assert!(!commit.diagnostics().changed());
+        let mut edit = package.edit_glossary();
+        edit.add_entry(entry("Staged")).unwrap();
+        assert_signed(edit.commit());
         let patch = {
-            let mut plain = OpcPackage::from_vec(signed.clone()).unwrap();
-            plain.unsign();
-            let mut transaction = Transaction::new(&mut plain).unwrap();
-            transaction.add_entry(entry("Patched")).unwrap();
-            transaction.commit().unwrap().patch().clone()
+            let plain = open(&signed).unsign();
+            let mut edit = plain.edit_glossary();
+            edit.add_entry(entry("Patched")).unwrap();
+            edit.commit().unwrap().patch().clone()
         };
-        assert_signed(patch.apply(&mut opc));
-        assert_eq!(PackageWriter::to_bytes(&opc).unwrap(), signed);
+        assert_signed(package.apply_glossary(&patch));
+        assert_eq!(bytes(&mut package), signed);
 
-        opc.unsign();
-        patch.apply(&mut opc).unwrap();
-        let output = PackageWriter::to_bytes(&opc).unwrap();
+        let unsigned = open(&signed).unsign();
+        let output = bytes(&mut unsigned.apply_glossary(&patch).unwrap().into_package());
         assert!(!carries_signature(&output));
         let (catalog, _) = glossary::load(&OpcPackage::from_vec(output).unwrap())
             .unwrap()
             .unwrap();
         assert!(catalog.get("Patched").unwrap().is_some());
 
-        package.unsign();
-        assert!(package.remove_glossary().unwrap());
+        package = package.unsign();
+        assert!({
+            let mut edit = package.edit_glossary();
+            let value = edit.remove().unwrap();
+            package = edit.commit().unwrap().into_package();
+            value
+        });
         assert!(!carries_signature(&bytes(&mut package)));
     }
 }
@@ -377,42 +466,61 @@ mod mail_merge_family {
         for name in SIGNED {
             let original = fixture(name);
             let mut package = open(&original);
-            assert!(!package.clear_mail_merge().unwrap());
-            assert_signed(package.set_mail_merge(
-                settings(),
-                source(),
-                None,
-                None,
-                Conformance::Transitional,
-            ));
+            assert!(!{
+                let mut edit = package.edit_mail_merge();
+                let value = edit.clear().unwrap();
+                package = edit.commit().unwrap().into_package();
+                value
+            });
+            assert_signed({
+                let mut edit = package.edit_mail_merge();
+                edit.set(settings(), source(), None, None, Conformance::Transitional)
+                    .map(|_| ())
+                    .and_then(|()| edit.commit().map(|_| ()))
+            });
             assert_eq!(bytes(&mut package), original, "{name}");
 
-            package.unsign();
-            package
-                .set_mail_merge(settings(), source(), None, None, Conformance::Transitional)
-                .unwrap();
+            package = package.unsign();
+            package = {
+                let mut edit = package.edit_mail_merge();
+                edit.set(settings(), source(), None, None, Conformance::Transitional)
+                    .unwrap();
+                edit.commit().unwrap().into_package()
+            };
             let output = bytes(&mut package);
             assert!(!carries_signature(&output), "{name}");
             assert!(open(&output).mail_merge_settings().unwrap().is_some());
         }
 
         let signed = signed_with(|plain| {
-            plain
-                .set_mail_merge(settings(), source(), None, None, Conformance::Transitional)
-                .unwrap();
+            *plain = {
+                let mut edit = plain.edit_mail_merge();
+                edit.set(settings(), source(), None, None, Conformance::Transitional)
+                    .unwrap();
+                edit.commit().unwrap().into_package()
+            };
         });
         let mut package = open(&signed);
-        assert_signed(package.clear_mail_merge());
-        assert_signed(package.update_mail_merge(
-            settings(),
-            None,
-            None,
-            None,
-            Conformance::Transitional,
-        ));
+        assert_signed({
+            let mut edit = package.edit_mail_merge();
+            edit.clear()
+                .map(|_| ())
+                .and_then(|()| edit.commit().map(|_| ()))
+        });
+        assert_signed({
+            let mut edit = package.edit_mail_merge();
+            edit.update(settings(), None, None, None, Conformance::Transitional)
+                .map(|_| ())
+                .and_then(|()| edit.commit().map(|_| ()))
+        });
         assert_eq!(bytes(&mut package), signed);
-        package.unsign();
-        assert!(package.clear_mail_merge().unwrap());
+        package = package.unsign();
+        assert!({
+            let mut edit = package.edit_mail_merge();
+            let value = edit.clear().unwrap();
+            package = edit.commit().unwrap().into_package();
+            value
+        });
         assert!(!carries_signature(&bytes(&mut package)));
     }
 }
@@ -431,14 +539,26 @@ mod ribbon_family {
         for name in SIGNED {
             let original = fixture(name);
             let mut package = open(&original);
-            assert!(!package.remove_ribbon(Family::Legacy).unwrap());
-            assert_signed(package.put_ribbon(Version::V2007, UI_2007.to_vec()));
+            assert!(!{
+                let mut edit = package.edit_ribbon();
+                let value = edit.remove(Family::Legacy).unwrap();
+                package = edit.commit().unwrap().into_package();
+                value
+            });
+            assert_signed({
+                let mut edit = package.edit_ribbon();
+                edit.put(Version::V2007, UI_2007.to_vec())
+                    .map(|_| ())
+                    .and_then(|()| edit.commit().map(|_| ()))
+            });
             assert_eq!(bytes(&mut package), original, "{name}");
 
-            package.unsign();
-            package
-                .put_ribbon(Version::V2007, UI_2007.to_vec())
-                .unwrap();
+            package = package.unsign();
+            package = {
+                let mut edit = package.edit_ribbon();
+                edit.put(Version::V2007, UI_2007.to_vec()).unwrap();
+                edit.commit().unwrap().into_package()
+            };
             let output = bytes(&mut package);
             assert!(!carries_signature(&output), "{name}");
             assert_eq!(
@@ -448,40 +568,68 @@ mod ribbon_family {
         }
 
         let signed = signed_with(|plain| {
-            plain.put_ribbon(Version::V2007, UI_2007.to_vec()).unwrap();
+            *plain = {
+                let mut edit = plain.edit_ribbon();
+                edit.put(Version::V2007, UI_2007.to_vec()).unwrap();
+                edit.commit().unwrap().into_package()
+            };
         });
         let mut package = open(&signed);
-        package
-            .put_ribbon(Version::V2007, UI_2007.to_vec())
-            .unwrap();
-        assert!(!package.remove_ribbon(Family::Modern).unwrap());
+        package = {
+            let mut edit = package.edit_ribbon();
+            edit.put(Version::V2007, UI_2007.to_vec()).unwrap();
+            edit.commit().unwrap().into_package()
+        };
+        assert!(!{
+            let mut edit = package.edit_ribbon();
+            let value = edit.remove(Family::Modern).unwrap();
+            package = edit.commit().unwrap().into_package();
+            value
+        });
         assert_eq!(bytes(&mut package), signed, "exact no-ops");
-        assert_signed(package.put_ribbon(Version::V2007, UI_2007_CHANGED.to_vec()));
-        assert_signed(package.remove_ribbon(Family::Legacy));
+        assert_signed({
+            let mut edit = package.edit_ribbon();
+            edit.put(Version::V2007, UI_2007_CHANGED.to_vec())
+                .map(|_| ())
+                .and_then(|()| edit.commit().map(|_| ()))
+        });
+        assert_signed({
+            let mut edit = package.edit_ribbon();
+            edit.remove(Family::Legacy)
+                .map(|_| ())
+                .and_then(|()| edit.commit().map(|_| ()))
+        });
         assert_eq!(bytes(&mut package), signed, "refusals");
 
-        package.unsign();
-        assert!(package.remove_ribbon(Family::Legacy).unwrap());
+        package = package.unsign();
+        assert!({
+            let mut edit = package.edit_ribbon();
+            let value = edit.remove(Family::Legacy).unwrap();
+            package = edit.commit().unwrap().into_package();
+            value
+        });
         assert!(!carries_signature(&bytes(&mut package)));
     }
 }
 
 /// The shared core- and custom-properties owners of `litchi-ooxml-common`
 /// refuse a change to a signed document instead of removing the signature
-/// (unified-ops record 0014a, F1b): the core-properties transaction refuses
-/// at commit with `metadata::Error::Signed`, and a custom-property edit is
-/// refused at a managed save with this crate's typed signed error, staying
-/// pending so the save succeeds once the signature is removed explicitly.
+/// (unified-ops record 0014a, F1b): the metadata edit refuses a changed
+/// core- or custom-properties commit with `metadata::Error::Signed`, and the
+/// same change publishes once the signature is removed explicitly.
 mod shared_properties {
     use super::*;
+    use litchi_ooxml_common::custom::Props as CustomProps;
 
-    #[track_caller]
-    fn assert_save_refused(package: &mut Package) {
-        let mut sink = Cursor::new(Vec::new());
-        assert_signed(package.write_to(&mut sink));
-        assert_signed(package.to_bytes());
-        assert_signed(package.to_plain_bytes());
-        assert!(package.is_signed());
+    fn edit_custom(
+        package: &Package,
+        change: impl FnOnce(&mut CustomProps),
+    ) -> Result<litchi_docx::metadata::Commit, MetadataError> {
+        let mut edit = package.edit_metadata();
+        let mut custom = edit.custom_props().clone();
+        change(&mut custom);
+        edit.set_custom_props(custom);
+        edit.commit()
     }
 
     #[test]
@@ -496,12 +644,13 @@ mod shared_properties {
             edit.set(props);
             let commit = edit.commit().expect("exact no-op");
             assert!(!commit.diagnostics().changed());
-            let mut package = commit.into_package();
-            let _ = package.custom_props_mut();
+            let package = commit.into_package();
+            let unchanged_custom = edit_custom(&package, |_| {}).expect("exact custom no-op");
+            assert!(!unchanged_custom.diagnostics().changed());
+            let mut package = unchanged_custom.into_package();
             assert_eq!(bytes(&mut package), original, "{name}: exact no-ops");
 
-            // A changed title is refused at commit; a new custom property
-            // is refused at save.
+            // A changed title and a new custom property are refused at commit.
             let mut package = open(&original);
             let mut edit = package.edit_metadata();
             edit.update(|props| props.title = Some("Signed".into()));
@@ -510,7 +659,7 @@ mod shared_properties {
                 "{name}"
             );
             assert_eq!(bytes(&mut package), original, "{name}: refusal");
-            package.unsign();
+            package = package.unsign();
             let mut edit = package.edit_metadata();
             edit.update(|props| props.title = Some("Signed".into()));
             let output = bytes(&mut edit.commit().expect("unsigned").into_package());
@@ -523,13 +672,17 @@ mod shared_properties {
             );
 
             let mut package = open(&original);
-            package
-                .custom_props_mut()
-                .insert("Project", "Litchi")
-                .unwrap();
-            assert_save_refused(&mut package);
-            package.unsign();
-            let output = bytes(&mut package);
+            let insert = |custom: &mut CustomProps| {
+                custom.insert("Project", "Litchi").unwrap();
+            };
+            assert!(
+                matches!(edit_custom(&package, insert), Err(MetadataError::Signed)),
+                "{name}"
+            );
+            assert!(package.is_signed());
+            assert_eq!(bytes(&mut package), original, "{name}: custom refusal");
+            package = package.unsign();
+            let output = bytes(&mut edit_custom(&package, insert).unwrap().into_package());
             assert!(!carries_signature(&output), "{name}");
             assert!(open(&output).custom_props().get("Project").is_some());
         }
@@ -538,25 +691,37 @@ mod shared_properties {
     #[test]
     fn removing_properties_refuses_a_signed_document_at_save() {
         let signed = signed_with(|plain| {
-            plain
-                .custom_props_mut()
-                .insert("Project", "Litchi")
-                .unwrap();
+            *plain = edit_custom(plain, |custom| {
+                custom.insert("Project", "Litchi").unwrap();
+            })
+            .unwrap()
+            .into_package();
         });
-        let mut package = open(&signed);
-        let _ = package.custom_props_mut();
-        assert_eq!(bytes(&mut package), signed, "an unchanged custom set");
+        let package = open(&signed);
+        let unchanged = edit_custom(&package, |_| {}).unwrap();
+        assert!(!unchanged.diagnostics().changed());
+        assert_eq!(
+            bytes(&mut unchanged.into_package()),
+            signed,
+            "an unchanged custom set"
+        );
 
         let mut package = open(&signed);
-        assert!(package.custom_props_mut().remove("Project").is_some());
-        assert_save_refused(&mut package);
+        assert!(matches!(
+            edit_custom(&package, |custom| {
+                assert!(custom.remove("Project").is_some());
+            }),
+            Err(MetadataError::Signed)
+        ));
+        assert!(package.is_signed());
+        assert_eq!(bytes(&mut package), signed, "custom removal refusal");
         let mut package = open(&signed);
         let mut edit = package.edit_metadata();
         edit.clear();
         assert!(matches!(edit.commit(), Err(MetadataError::Signed)));
         assert_eq!(bytes(&mut package), signed, "refusal");
 
-        package.unsign();
+        package = package.unsign();
         let mut edit = package.edit_metadata();
         edit.clear();
         let output = bytes(&mut edit.commit().expect("unsigned").into_package());

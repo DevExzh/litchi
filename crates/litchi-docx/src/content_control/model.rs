@@ -549,21 +549,12 @@ pub struct Inventory {
 }
 
 impl Inventory {
-    /// Parse with production defaults and content-control-specific MCE capabilities.
+    /// Parse within `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn parse(xml: &[u8]) -> Result<Self> {
-        Self::parse_with_limits(xml, &Limits::default())
-    }
-
-    /// Parse with caller-provided resource limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Self> {
+    pub fn parse(xml: &[u8], limits: &Limits) -> Result<Self> {
         super::parse_inventory(xml, limits)
     }
 

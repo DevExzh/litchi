@@ -143,9 +143,12 @@ pub(super) fn validate(file: &File) -> Result<Validation> {
         #[cfg(feature = "docx")]
         FileFormat::Docx => {
             let bytes = Arc::new(file.to_bytes()?);
-            let leaf = litchi_docx::validate_read_at(Arc::new(litchi_core::OwnedSource::from_arc(
-                Arc::clone(&bytes),
-            )))
+            let leaf = litchi_docx::validate_read_at(
+                Arc::new(litchi_core::OwnedSource::from_arc(Arc::clone(&bytes))),
+                litchi_docx::SourceLimits::default(),
+                litchi_docx::DocxValidationLimits::default(),
+                ValidationLimits::default(),
+            )
             .map_err(Error::Docx)?;
             with_parts(leaf, bytes)?
         },

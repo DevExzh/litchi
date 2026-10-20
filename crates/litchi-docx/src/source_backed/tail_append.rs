@@ -93,6 +93,25 @@ pub enum Refusal {
     ComplexParagraph,
 }
 
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by (record
+    /// 0351).
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::MainDocumentShape => RefusalKind::UnsupportedTarget,
+            Self::SignatureInfrastructure | Self::Protection => RefusalKind::Protected,
+            Self::Encrypted
+            | Self::MacroEnabled
+            | Self::ExternalRelationship
+            | Self::UnsupportedDependency
+            | Self::ComplexDocument
+            | Self::ComplexParagraph => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
 impl std::fmt::Display for Refusal {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
@@ -522,27 +541,9 @@ impl Package {
         Edit {
             package: self,
             text: Some(text.into()),
-            limits: Limits::default(),
+            limits: self.semantic_limits().tail_append_value(),
             options: Options::default(),
         }
-    }
-
-    /// Start a bounded source-backed append under an explicit finite policy.
-    pub fn tail_append_plain_paragraph_with_limits<'package, 'text, T>(
-        &'package self,
-        text: T,
-        limits: Limits,
-    ) -> Result<Edit<'package, 'text>>
-    where
-        T: Into<Cow<'text, str>>,
-    {
-        limits.validate()?;
-        Ok(Edit {
-            package: self,
-            text: Some(text.into()),
-            limits,
-            options: Options::default(),
-        })
     }
 
     /// Start the explicit exact archive no-op route.
