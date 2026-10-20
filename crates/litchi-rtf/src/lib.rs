@@ -155,7 +155,7 @@ pub mod transport {
 /// This interface exposes format-specific structure. Ordinary read-only code
 /// should prefer [`crate::Document`].
 pub mod raw {
-    pub use crate::model::document::RtfDocument as Tree;
+    pub use crate::model::document::Tree;
     pub use crate::native::*;
 }
 
@@ -484,10 +484,10 @@ mod native {
     };
 }
 
-/// The retained tree under its crate-internal name for the unit tests; the
-/// public path is [`raw::Tree`].
+/// The retained tree at the crate root for the unit tests; the public path is
+/// [`raw::Tree`].
 #[cfg(test)]
-pub(crate) use model::document::RtfDocument;
+pub(crate) use model::document::Tree;
 
 #[cfg(doc)]
 pub(crate) use native::*;

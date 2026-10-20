@@ -9,7 +9,7 @@
 
 use super::super::*;
 use super::codec::{Charset, RtfWriter, WriterOptions};
-use crate::RtfDocument;
+use crate::Tree;
 use litchi_codepage::Mbcs;
 use std::io;
 
@@ -178,7 +178,7 @@ fn checked_charsets_write_their_exact_header_controls() {
 
         let result = String::from_utf8(output).unwrap();
         assert!(result.contains(expected), "{charset:?}: {result}");
-        assert!(RtfDocument::parse(&result).is_ok(), "{charset:?}: {result}");
+        assert!(Tree::parse(&result).is_ok(), "{charset:?}: {result}");
     }
 }
 
@@ -206,7 +206,7 @@ fn equation_writer_uses_an_empty_cached_result_without_evaluation() {
     assert!(serialized.contains(r"EQ \\f(1,2)"));
     assert!(serialized.contains(r"{\fldrslt}"));
 
-    let document = RtfDocument::parse(&serialized).unwrap();
+    let document = Tree::parse(&serialized).unwrap();
     let equations = document.equations();
     assert_eq!(equations.len(), 1);
     assert_eq!(equations[0].expression(), r"\f(1,2)");
@@ -215,7 +215,7 @@ fn equation_writer_uses_an_empty_cached_result_without_evaluation() {
 
 #[test]
 fn document_writer_round_trips_caller_authored_eq_fields() {
-    let mut document = RtfDocument::parse(r"{\rtf1\ansi BeforeAfter}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1\ansi BeforeAfter}").unwrap();
     let mut equation = Field::new_equation(r"\f(1,2)").unwrap();
     equation.owner = FieldOwner::Body;
     equation.position = "Before".len();
@@ -229,7 +229,7 @@ fn document_writer_round_trips_caller_authored_eq_fields() {
     let serialized = String::from_utf8(output).unwrap();
     assert!(serialized.contains(r"{\fldrslt}"));
 
-    let reparsed = RtfDocument::parse(&serialized).unwrap();
+    let reparsed = Tree::parse(&serialized).unwrap();
     assert_eq!(reparsed.text(), "BeforeAfter");
     assert_eq!(reparsed.equation_count(), 1);
     assert_eq!(reparsed.equations()[0].expression(), r"\f(1,2)");
@@ -251,7 +251,7 @@ fn document_info_writer_round_trips() {
     writer.write_str("}").unwrap();
 
     let rtf = String::from_utf8(output).unwrap();
-    let parsed = RtfDocument::parse(&rtf).unwrap();
+    let parsed = Tree::parse(&rtf).unwrap();
     assert_eq!(parsed.info().title.as_deref(), Some("Résumé 你"));
     assert_eq!(parsed.info().author.as_deref(), Some("Ada"));
     assert_eq!(
@@ -266,13 +266,13 @@ fn document_info_writer_round_trips() {
 #[test]
 fn document_writer_round_trips_bookmark_ranges() {
     let source = r"{\rtf1\ansi Start {\*\bkmkstart\bkmkcolf2\bkmkcoll4\bkmkpub Link}R\'e9sum\'e9 \u20320?{\*\bkmkend Link} end}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(&document)
         .unwrap();
 
-    let reparsed = RtfDocument::from_bytes(&output).unwrap();
+    let reparsed = Tree::from_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), document.text());
     let bookmark = reparsed.bookmarks().get("Link").unwrap();
     assert_eq!(bookmark.content, "Résumé 你");
@@ -283,13 +283,13 @@ fn document_writer_round_trips_bookmark_ranges() {
 
 #[test]
 fn document_writer_preserves_bookmark_in_empty_body() {
-    let document = RtfDocument::parse(r"{\rtf1{\*\bkmkstart Empty}{\*\bkmkend Empty}}").unwrap();
+    let document = Tree::parse(r"{\rtf1{\*\bkmkstart Empty}{\*\bkmkend Empty}}").unwrap();
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(&document)
         .unwrap();
 
-    let reparsed = RtfDocument::from_bytes(&output).unwrap();
+    let reparsed = Tree::from_bytes(&output).unwrap();
     let bookmark = reparsed.bookmarks().get("Empty").unwrap();
     assert_eq!(bookmark.position, 0);
     assert!(bookmark.content.is_empty());
@@ -299,13 +299,13 @@ fn document_writer_preserves_bookmark_in_empty_body() {
 #[test]
 fn document_writer_round_trips_annotations() {
     let source = r"{\rtf1\ansi Before {\*\atrfstart 12}range{\*\atrfend 12}{\*\atnid AM}{\*\atnauthor Ada M}\chatn{\*\annotation{\*\atnref 12}{\*\atndate 12345}{\*\atnparent 4}{\*\atnicn 3}{\*\atntime 99}Review \u20320? now} after}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(&document)
         .unwrap();
 
-    let reparsed = RtfDocument::from_bytes(&output).unwrap();
+    let reparsed = Tree::from_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.annotations().len(), 1);
     let annotation = &reparsed.annotations()[0];
@@ -323,7 +323,7 @@ fn document_writer_round_trips_annotations() {
 
 #[test]
 fn document_writer_round_trips_headers_and_footers() {
-    let document = RtfDocument::parse(
+    let document = Tree::parse(
         r"{\rtf1\ansi\sectd\sbkodd\pgwsxn11000\pghsxn15000\marglsxn910\margrsxn810\margtsxn710\margbsxn610\guttersxn130\headery310\footery410\lndscpsxn\cols3\colsx370\pgnstarts6\pgnlcltr\vertalb\linemod1\lineppage{\header Header \u20320? one\par Header two}{\footer Footer}Body}",
     )
     .unwrap();
@@ -332,7 +332,7 @@ fn document_writer_round_trips_headers_and_footers() {
         .write_document(&document)
         .unwrap();
 
-    let reparsed = RtfDocument::from_bytes(&output).unwrap();
+    let reparsed = Tree::from_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), "Body");
     assert_eq!(reparsed.sections().len(), 1);
     let section = &reparsed.sections()[0];
@@ -349,7 +349,7 @@ fn document_writer_round_trips_headers_and_footers() {
 
 #[test]
 fn document_writer_round_trips_stylesheets() {
-    let document = RtfDocument::parse(
+    let document = Tree::parse(
         r"{\rtf1\ansi{\stylesheet{\s0\snext0 Normal;}{\s1\b\qc\sbasedon0\snext0\slink2\sautoupd\shidden\slocked\ssemihidden\sunhideused\sqformat\spriority9\styrsid42 Heading \u20320?;}{\*\cs2\i\additive\slink1 Emphasis;}{\*\ds3 Section;}{\*\ts4 Table;}}Body}",
     )
     .unwrap();
@@ -358,7 +358,7 @@ fn document_writer_round_trips_stylesheets() {
         .write_document(&document)
         .unwrap();
 
-    let reparsed = RtfDocument::from_bytes(&output).unwrap();
+    let reparsed = Tree::from_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), "Body");
     assert_eq!(reparsed.stylesheet().styles().len(), 5);
     let heading = reparsed
@@ -400,7 +400,7 @@ fn document_writer_round_trips_stylesheets() {
 
 #[test]
 fn document_writer_round_trips_list_tables() {
-    let document = RtfDocument::parse(
+    let document = Tree::parse(
         r"{\rtf1\ansi{\*\listtable{\list\listtemplateid42\listhybrid{\listlevel\levelnfc0\leveljc2\levelfollow1\levelstartat3\levelspace120\levelindent360{\leveltext\'02\'00.;}{\levelnumbers\'01;}\f2}{\listlevel\levelnfc77\leveljc0\levelfollow2\levelstartat1{\leveltext\'01\u8226?;}{\levelnumbers;}}{\listname Outline;}\listid77}}{\*\listoverridetable{\listoverride\listid77\listoverridecount1{\lfolevel\listoverridestartat\levelstartat9}\ls4}}\pard\ls4\ilvl1 Body}",
     )
     .unwrap();
@@ -409,7 +409,7 @@ fn document_writer_round_trips_list_tables() {
         .write_document(&document)
         .unwrap();
 
-    let reparsed = RtfDocument::from_bytes(&output).unwrap();
+    let reparsed = Tree::from_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), "Body");
     let paragraph = reparsed.blocks().last().unwrap().paragraph;
     assert_eq!(paragraph.list_override, Some(4));
@@ -432,7 +432,7 @@ fn document_writer_round_trips_list_tables() {
 
 #[test]
 fn document_writer_round_trips_tracked_revision_ranges() {
-    let document = RtfDocument::parse(
+    let document = Tree::parse(
         r"{\rtf1\ansi{\*\revtbl{Unknown;}{Ada;}}Before {\deleted\revauthdel1\revdttmdel123 old}{\revised\revauth1\revdttm-456 new \u20320?} after}",
     )
     .unwrap();
@@ -441,7 +441,7 @@ fn document_writer_round_trips_tracked_revision_ranges() {
         .write_document(&document)
         .unwrap();
 
-    let reparsed = RtfDocument::from_bytes(&output).unwrap_or_else(|error| {
+    let reparsed = Tree::from_bytes(&output).unwrap_or_else(|error| {
         panic!(
             "failed to parse revision writer output: {error}\n{}",
             String::from_utf8_lossy(&output)
@@ -462,7 +462,7 @@ fn document_writer_round_trips_tracked_revision_ranges() {
 
 #[test]
 fn document_writer_round_trips_multiple_section_boundaries() {
-    let document = RtfDocument::parse(
+    let document = Tree::parse(
         r"{\rtf1\ansi\sectd\sbkpage\pgwsxn10000{\header First}One\sect\sectd\sbknone\pgwsxn12000{\header Second}Two\sect\sectd\sbkeven\pgwsxn14000{\header Third}Three}",
     )
     .unwrap();
@@ -483,7 +483,7 @@ fn document_writer_round_trips_multiple_section_boundaries() {
     let serialized = String::from_utf8_lossy(&output);
     assert!(serialized.contains("\\sect\\sectd"));
 
-    let reparsed = RtfDocument::from_bytes(&output).unwrap();
+    let reparsed = Tree::from_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.sections().len(), 3);
     assert_eq!(
@@ -516,7 +516,7 @@ fn document_writer_round_trips_multiple_section_boundaries() {
 #[test]
 fn document_writer_round_trips_boundary_to_first_explicit_section() {
     let document =
-        RtfDocument::parse(r"{\rtf1\ansi Before\sect\sectd\sbknone{\header Second}After}").unwrap();
+        Tree::parse(r"{\rtf1\ansi Before\sect\sectd\sbknone{\header Second}After}").unwrap();
     assert_eq!(document.text(), "BeforeAfter");
     assert_eq!(document.sections().len(), 1);
     assert_eq!(
@@ -528,7 +528,7 @@ fn document_writer_round_trips_boundary_to_first_explicit_section() {
     RtfWriter::new(&mut output)
         .write_document(&document)
         .unwrap();
-    let reparsed = RtfDocument::from_bytes(&output).unwrap();
+    let reparsed = Tree::from_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(
         reparsed.section_breaks().copied().collect::<Vec<_>>(),
@@ -546,7 +546,7 @@ fn document_writer_round_trips_boundary_to_first_explicit_section() {
 
 #[test]
 fn document_writer_preserves_inherited_section_boundary() {
-    let document = RtfDocument::parse(r"{\rtf1\ansi\sectd\sbknone One\sect Two}").unwrap();
+    let document = Tree::parse(r"{\rtf1\ansi\sectd\sbknone One\sect Two}").unwrap();
     assert_eq!(document.text(), "OneTwo");
     assert_eq!(document.sections().len(), 1);
     assert_eq!(
@@ -558,7 +558,7 @@ fn document_writer_preserves_inherited_section_boundary() {
     RtfWriter::new(&mut output)
         .write_document(&document)
         .unwrap();
-    let reparsed = RtfDocument::from_bytes(&output).unwrap();
+    let reparsed = Tree::from_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.sections().len(), 1);
     assert_eq!(
@@ -570,7 +570,7 @@ fn document_writer_preserves_inherited_section_boundary() {
 #[test]
 fn document_writer_preserves_page_then_section_break_order() {
     let document =
-        RtfDocument::parse(r"{\rtf1\ansi\sectd One\page\sect\sectd\sbknone Two}").unwrap();
+        Tree::parse(r"{\rtf1\ansi\sectd One\page\sect\sectd\sbknone Two}").unwrap();
     assert_eq!(document.text(), "OneTwo");
     assert_eq!(document.sections().len(), 2);
     assert_eq!(
@@ -585,14 +585,14 @@ fn document_writer_preserves_page_then_section_break_order() {
     RtfWriter::new(&mut output)
         .write_document(&document)
         .unwrap();
-    let reparsed = RtfDocument::from_bytes(&output).unwrap();
+    let reparsed = Tree::from_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.body_story_events(), document.body_story_events());
 }
 
 #[test]
 fn document_writer_round_trips_libreoffice_multi_section_fixture() {
-    let document = RtfDocument::parse(include_str!(concat!(
+    let document = Tree::parse(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf94043.rtf"
     )))
@@ -604,7 +604,7 @@ fn document_writer_round_trips_libreoffice_multi_section_fixture() {
     RtfWriter::new(&mut output)
         .write_document(&document)
         .unwrap();
-    let reparsed = RtfDocument::from_bytes(&output).unwrap();
+    let reparsed = Tree::from_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.sections().len(), document.sections().len());
     assert_eq!(

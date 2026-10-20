@@ -20,7 +20,10 @@
 
 use crate::records::{BoundSheetRecord, Encoding, SheetType, SheetVisible};
 use crate::workbook::{KeptCells, ValidationWorkbook};
-use crate::{Error, Result, SheetKind, SheetVisibility, raw::Reader};
+/// The sheet-visibility family error: the workbook error of the source or
+/// republished package.
+pub use crate::Error;
+use crate::{Result, SheetKind, SheetVisibility, raw::Reader};
 use litchi_biff::Records;
 use litchi_cfb::{
     ArtifactFingerprint, ComposedOverlaySource, OleFile, OverlayError, PublishReport,

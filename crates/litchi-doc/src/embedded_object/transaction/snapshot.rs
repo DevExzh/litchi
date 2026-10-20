@@ -65,12 +65,12 @@ impl Snapshot {
     ///
     /// Returns an error when the DOC FIB, field tables, CFB package, resource
     /// bounds, or `ObjectPool` ownership references are invalid.
-    pub fn open(input: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
+    pub(crate) fn open(input: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
         Self::open_with_policy(input, limits, ProtectionPolicy::default())
     }
 
     /// Opens and validates a snapshot with an explicit protected-edit policy.
-    pub fn open_with_policy(
+    pub(crate) fn open_with_policy(
         input: impl Into<Vec<u8>>,
         limits: Limits,
         protection_policy: ProtectionPolicy,
@@ -118,9 +118,9 @@ impl Snapshot {
 
     /// Returns a stable non-cryptographic source fingerprint.
     ///
-    /// Callers that need conflict safety must use
-    /// [`crate::embedded_object::Patch::apply`], which
-    /// checks both this fingerprint and the complete source bytes.
+    /// Callers that need conflict safety replay a patch with
+    /// [`crate::Package::apply_embedded_objects`], which checks the complete
+    /// source bytes.
     #[must_use]
     pub fn fingerprint(&self) -> u64 {
         fingerprint(self.source.as_bytes())
@@ -219,7 +219,7 @@ impl Snapshot {
 
     /// Starts an independent clone-staged transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> Transaction {
         Transaction::new(self.clone())
     }
 

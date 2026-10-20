@@ -16,6 +16,9 @@ pub use model::{
     ObjectProperties, ObjectSubrecord, RecordKind, TextOrientation, TextProperties, TextRun,
     VerticalAlignment, Visibility,
 };
+/// The comments family error: the workbook error of the source or
+/// republished package.
+pub use crate::Error;
 pub use transaction::{
     Commit, Diagnostics, Edit, LimitKind, Operation, Patch, Snapshot, SourceBackedCommit,
     SourceBackedDiagnostics, Update, Value, Worksheet,

@@ -3096,7 +3096,7 @@ fn run_rtf(
         (Leg::Unified, true) => "litchi::open_bytes(Vec<u8>) + File::text()",
         (Leg::Leaf, false) => "litchi_rtf::raw::Tree::from_owned_bytes(Vec<u8>)",
         (Leg::Leaf, true) => {
-            "litchi_rtf::raw::Tree::from_owned_bytes(Vec<u8>) + RtfDocument::text()"
+            "litchi_rtf::raw::Tree::from_owned_bytes(Vec<u8>) + Tree::text()"
         },
     };
     let summary = RouteSummary::for_case(entry.case, timed_calls)?.verified(&expected, samples)?;

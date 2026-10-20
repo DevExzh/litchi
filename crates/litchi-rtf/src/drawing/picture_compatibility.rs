@@ -18,7 +18,7 @@ pub struct PictureCompatibilityRecord {
     pub position: usize,
     /// Wrapper kind.
     pub kind: PictureCompatibilityKind,
-    /// Index into `RtfDocument::pictures()`.
+    /// Index into `Tree::pictures()`.
     pub picture_index: usize,
 }
 

@@ -546,7 +546,7 @@ fn root_plan(
 
 fn canonical_candidate(
     target: &Package,
-    mutation: impl FnOnce(&mut crate::document::RtfDocument<'static>) -> crate::RtfResult<()>,
+    mutation: impl FnOnce(&mut crate::document::Tree<'static>) -> crate::RtfResult<()>,
 ) -> Result<Vec<u8>, Error> {
     if !target.opaque().is_empty() {
         return Err(Error::UnsupportedSource(
@@ -562,7 +562,7 @@ fn canonical_candidate(
         ));
     }
     let mut model =
-        crate::document::RtfDocument::parse_bytes_with_options(bytes, target.options())?;
+        crate::document::Tree::parse_bytes_with_options(bytes, target.options())?;
     mutation(&mut model)?;
     let limit = target.limits().max_input_bytes();
     let mut output = BoundedOutput::new(limit);

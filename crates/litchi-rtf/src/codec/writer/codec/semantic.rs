@@ -5,7 +5,7 @@
 
 use super::{
     BodyStoryEvent, CellStoryEvent, Field, FieldOwner, HeaderFooterType, NavigationEntry, Revision,
-    RevisionType, RtfDocument, RtfWriter, Section, StoryEvent, StoryField, Table, Write, field, io,
+    RevisionType, Tree, RtfWriter, Section, StoryEvent, StoryField, Table, Write, field, io,
 };
 
 impl<W: Write> RtfWriter<W> {
@@ -51,7 +51,7 @@ impl<W: Write> RtfWriter<W> {
         clippy::wildcard_enum_match_arm,
         reason = "remaining variants share the same fallback by design"
     )]
-    pub(super) fn validate_table_story_metadata_ownership(doc: &RtfDocument<'_>) -> io::Result<()> {
+    pub(super) fn validate_table_story_metadata_ownership(doc: &Tree<'_>) -> io::Result<()> {
         let mut navigation_owners = vec![0u8; doc.navigation_entries().len()];
         let mut revision_owners = vec![0u8; doc.revisions().len()];
         let mut body_starts = vec![false; doc.revisions().len()];
@@ -444,7 +444,7 @@ impl<W: Write> RtfWriter<W> {
         Ok(())
     }
 
-    pub(super) fn validate_generic_field_ownership(doc: &RtfDocument<'_>) -> io::Result<()> {
+    pub(super) fn validate_generic_field_ownership(doc: &Tree<'_>) -> io::Result<()> {
         let fields = doc.fields();
         if fields.len() > field::MAX_GENERIC_FIELDS {
             return Err(io::Error::new(

@@ -4935,11 +4935,162 @@
           "scope": "litchi_doc",
           "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
           "match": "prefix"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_doc",
+          "replacement": "use the focused module's Edit (record 0359)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_doc",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0359)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_doc",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0359)"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_doc",
+          "replacement": "use Commit::into_package (record 0359)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_doc",
+          "replacement": "limits come from OpenOptions (owners) or a required limits argument (record APIs); record 0359",
+          "match": "suffix"
+        },
+        {
+          "name": "Package",
+          "scope": "litchi_doc::raw",
+          "replacement": "use raw::Reader (record 0359)",
+          "recursive": false
+        },
+        {
+          "name": "get_source_limits",
+          "scope": "litchi_doc",
+          "replacement": "use source_limits_value() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_leniency",
+          "scope": "litchi_doc",
+          "replacement": "use leniency_value() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_password",
+          "scope": "litchi_doc",
+          "replacement": "use password_value() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "with_revision_limits",
+          "scope": "litchi_doc",
+          "replacement": "use the noun setter revision_limits() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "with_transaction_limits",
+          "scope": "litchi_doc",
+          "replacement": "use the noun setter transaction_limits() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "with_protection_policy",
+          "scope": "litchi_doc",
+          "replacement": "use the noun setter protection_policy() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc",
+          "replacement": "use the scoped family Edit via Package::edit_x (record 0359)",
+          "recursive": false
+        },
+        {
+          "name": "RevisionEditor",
+          "scope": "litchi_doc",
+          "replacement": "use Package::edit_tracked_revisions -> tracked_revision::Edit (record 0359)"
+        },
+        {
+          "name": "CommandBarsEditor",
+          "scope": "litchi_doc",
+          "replacement": "use Package::edit_command_bars -> parts::command_bars::Edit (record 0359)"
+        },
+        {
+          "name": "EnvelopeEditor",
+          "scope": "litchi_doc",
+          "replacement": "use Package::edit_envelope -> parts::envelope::Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::embedded_object",
+          "replacement": "use Package::edit_embedded_objects and the family Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::route_slip",
+          "replacement": "use Package::edit_route_slip and the family Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::captions",
+          "replacement": "use Package::edit_captions and the family Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::parts::route_slip",
+          "replacement": "use Package::edit_route_slip and the family Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::parts::envelope",
+          "replacement": "use Package::edit_envelope and the family Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::parts::captions",
+          "replacement": "use Package::edit_captions and the family Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::parts::command_bars",
+          "replacement": "use Package::edit_command_bars and the family Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::parts::annotation_bookmarks",
+          "replacement": "use Package::edit_annotation_bookmarks and the family Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::parts::subdocuments",
+          "replacement": "use Package::edit_subdocuments and the family Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::parts::smart_tags",
+          "replacement": "use the codec-level Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::parts::ole_controls",
+          "replacement": "use the codec-level Edit (record 0359)"
         }
       ],
       "families": [
         "litchi_doc::package::edit",
-        "litchi_doc::package::metadata"
+        "litchi_doc::package::metadata",
+        "litchi_doc::route_slip",
+        "litchi_doc::captions",
+        "litchi_doc::embedded_object",
+        "litchi_doc::tracked_revision",
+        "litchi_doc::package::property_set",
+        "litchi_doc::annotation_bookmarks",
+        "litchi_doc::parts::route_slip",
+        "litchi_doc::parts::envelope",
+        "litchi_doc::parts::captions",
+        "litchi_doc::parts::command_bars",
+        "litchi_doc::parts::annotation_bookmarks",
+        "litchi_doc::parts::subdocuments"
       ],
       "immutable_owners": [
         "litchi_doc::Package",
@@ -5164,11 +5315,162 @@
           "scope": "litchi_doc",
           "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
           "match": "prefix"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_doc",
+          "replacement": "use the focused module's Edit (record 0359)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_doc",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0359)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_doc",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0359)"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_doc",
+          "replacement": "use Commit::into_package (record 0359)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_doc",
+          "replacement": "limits come from OpenOptions (owners) or a required limits argument (record APIs); record 0359",
+          "match": "suffix"
+        },
+        {
+          "name": "Package",
+          "scope": "litchi_doc::raw",
+          "replacement": "use raw::Reader (record 0359)",
+          "recursive": false
+        },
+        {
+          "name": "get_source_limits",
+          "scope": "litchi_doc",
+          "replacement": "use source_limits_value() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_leniency",
+          "scope": "litchi_doc",
+          "replacement": "use leniency_value() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_password",
+          "scope": "litchi_doc",
+          "replacement": "use password_value() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "with_revision_limits",
+          "scope": "litchi_doc",
+          "replacement": "use the noun setter revision_limits() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "with_transaction_limits",
+          "scope": "litchi_doc",
+          "replacement": "use the noun setter transaction_limits() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "with_protection_policy",
+          "scope": "litchi_doc",
+          "replacement": "use the noun setter protection_policy() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc",
+          "replacement": "use the scoped family Edit via Package::edit_x (record 0359)",
+          "recursive": false
+        },
+        {
+          "name": "RevisionEditor",
+          "scope": "litchi_doc",
+          "replacement": "use Package::edit_tracked_revisions -> tracked_revision::Edit (record 0359)"
+        },
+        {
+          "name": "CommandBarsEditor",
+          "scope": "litchi_doc",
+          "replacement": "use Package::edit_command_bars -> parts::command_bars::Edit (record 0359)"
+        },
+        {
+          "name": "EnvelopeEditor",
+          "scope": "litchi_doc",
+          "replacement": "use Package::edit_envelope -> parts::envelope::Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::embedded_object",
+          "replacement": "use Package::edit_embedded_objects and the family Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::route_slip",
+          "replacement": "use Package::edit_route_slip and the family Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::captions",
+          "replacement": "use Package::edit_captions and the family Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::parts::route_slip",
+          "replacement": "use Package::edit_route_slip and the family Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::parts::envelope",
+          "replacement": "use Package::edit_envelope and the family Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::parts::captions",
+          "replacement": "use Package::edit_captions and the family Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::parts::command_bars",
+          "replacement": "use Package::edit_command_bars and the family Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::parts::annotation_bookmarks",
+          "replacement": "use Package::edit_annotation_bookmarks and the family Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::parts::subdocuments",
+          "replacement": "use Package::edit_subdocuments and the family Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::parts::smart_tags",
+          "replacement": "use the codec-level Edit (record 0359)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_doc::parts::ole_controls",
+          "replacement": "use the codec-level Edit (record 0359)"
         }
       ],
       "families": [
         "litchi_doc::package::edit",
-        "litchi_doc::package::metadata"
+        "litchi_doc::package::metadata",
+        "litchi_doc::route_slip",
+        "litchi_doc::captions",
+        "litchi_doc::embedded_object",
+        "litchi_doc::tracked_revision",
+        "litchi_doc::package::property_set",
+        "litchi_doc::annotation_bookmarks",
+        "litchi_doc::parts::route_slip",
+        "litchi_doc::parts::envelope",
+        "litchi_doc::parts::captions",
+        "litchi_doc::parts::command_bars",
+        "litchi_doc::parts::annotation_bookmarks",
+        "litchi_doc::parts::subdocuments"
       ],
       "immutable_owners": [
         "litchi_doc::Package",
@@ -5502,12 +5804,66 @@
           "scope": "litchi_xls",
           "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
           "match": "prefix"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_xls",
+          "replacement": "use the focused module's Edit (record 0359)"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_xls",
+          "replacement": "use Commit::into_package (record 0359)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_xls",
+          "replacement": "limits come from OpenOptions (owners) or a required limits argument (record APIs); record 0359",
+          "match": "suffix"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_xls",
+          "replacement": "use Refused(Refusal), PatchConflict or Internal (record 0359)"
+        },
+        {
+          "name": "get_source_limits",
+          "scope": "litchi_xls",
+          "replacement": "use source_limits_value() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_leniency",
+          "scope": "litchi_xls",
+          "replacement": "use leniency_value() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_password",
+          "scope": "litchi_xls",
+          "replacement": "use password_value() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_compatibility_profile",
+          "scope": "litchi_xls",
+          "replacement": "use compatibility_profile_value() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_xls",
+          "replacement": "a package-level scoped family Edit or a builder (record 0359)",
+          "match": "suffix"
         }
       ],
       "families": [
         "litchi_xls::package::edit",
         "litchi_xls::package::metadata",
-        "litchi_xls::sheet_features::edit"
+        "litchi_xls::sheet_features::edit",
+        "litchi_xls::chart",
+        "litchi_xls::comments",
+        "litchi_xls::ole_object",
+        "litchi_xls::pivot_view",
+        "litchi_xls::sheet_visibility",
+        "litchi_xls::user_names::publication",
+        "litchi_xls::workbook::package::property_set"
       ],
       "immutable_owners": [
         "litchi_xls::Package",
@@ -7716,6 +8072,23 @@
           "name": "into_snapshot",
           "scope": "litchi_rtf",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_rtf",
+          "replacement": "limits come from OpenOptions (owners) or a required limits argument (record APIs); record 0359",
+          "match": "suffix"
+        },
+        {
+          "name": "Document",
+          "scope": "litchi_rtf::raw",
+          "replacement": "use raw::Tree (record 0359)",
+          "recursive": false
+        },
+        {
+          "name": "RtfDocument",
+          "scope": "litchi_rtf",
+          "replacement": "use raw::Tree (record 0359)"
         }
       ],
       "families": [
@@ -7725,6 +8098,192 @@
         "litchi_rtf::Package",
         "litchi_rtf::Document"
       ],
+      "family_methods": true
+    },
+    {
+      "id": "ole-common",
+      "package": "litchi-ole-common",
+      "default_features": false,
+      "features": [
+        "performance-diagnostics"
+      ],
+      "banned_names": [
+        {
+          "name": "Transaction",
+          "scope": "litchi_ole_common",
+          "replacement": "use the focused module's Edit (record 0359)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ole_common",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0359)",
+          "match": "suffix"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ole_common",
+          "replacement": "drop the Edit to discard it (record 0359)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ole_common",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0359)"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_ole_common",
+          "replacement": "use Commit::into_package (record 0359)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_ole_common",
+          "replacement": "limits come from OpenOptions (owners) or a required limits argument (record APIs); record 0359",
+          "match": "suffix"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_ole_common",
+          "replacement": "use Refused(Refusal), PatchConflict or Internal (record 0359)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_ole_common",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0359)",
+          "match": "prefix"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ole_common",
+          "replacement": "use the codec-level Edit (record 0359)"
+        }
+      ],
+      "families": [],
+      "family_methods": true
+    },
+    {
+      "id": "crypto",
+      "package": "litchi-crypto",
+      "default_features": false,
+      "features": [
+        "ooxml"
+      ],
+      "banned_names": [
+        {
+          "name": "Transaction",
+          "scope": "litchi_crypto",
+          "replacement": "use the focused module's Edit (record 0359)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_crypto",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0359)",
+          "match": "suffix"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_crypto",
+          "replacement": "drop the Edit to discard it (record 0359)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_crypto",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0359)"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_crypto",
+          "replacement": "use Commit::into_package (record 0359)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_crypto",
+          "replacement": "limits come from OpenOptions (owners) or a required limits argument (record APIs); record 0359",
+          "match": "suffix"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_crypto",
+          "replacement": "use Refused(Refusal), PatchConflict or Internal (record 0359)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_crypto",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0359)",
+          "match": "prefix"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_crypto",
+          "replacement": "use the codec-level Edit (record 0359)",
+          "match": "suffix"
+        }
+      ],
+      "families": [],
+      "family_methods": true
+    },
+    {
+      "id": "ograph",
+      "package": "litchi-ograph",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "Transaction",
+          "scope": "litchi_ograph",
+          "replacement": "use the focused module's Edit (record 0359)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ograph",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0359)",
+          "match": "suffix"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ograph",
+          "replacement": "drop the Edit to discard it (record 0359)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ograph",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0359)"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_ograph",
+          "replacement": "use Commit::into_package (record 0359)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_ograph",
+          "replacement": "limits come from OpenOptions (owners) or a required limits argument (record APIs); record 0359",
+          "match": "suffix"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_ograph",
+          "replacement": "use Refused(Refusal), PatchConflict or Internal (record 0359)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_ograph",
+          "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0359)",
+          "match": "prefix"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ograph",
+          "replacement": "use chart::Edit (record 0359)",
+          "match": "suffix"
+        },
+        {
+          "name": "Chart",
+          "scope": "litchi_ograph::chart",
+          "replacement": "use chart::Model (record 0359)",
+          "recursive": false
+        }
+      ],
+      "families": [],
       "family_methods": true
     },
     {

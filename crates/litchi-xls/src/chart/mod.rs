@@ -28,3 +28,6 @@ pub use model::{
 };
 pub use package::build_workbook;
 pub use package::{Commit, Diagnostics, Edit, EditOptions, Entry, LimitKind, Patch};
+/// The chart family error: the workbook error of the source or republished
+/// package.
+pub use crate::error::Error;

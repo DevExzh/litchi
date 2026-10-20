@@ -161,7 +161,7 @@ pub(crate) fn owned_table(
 ///
 /// This is the main entry point for parsing RTF documents.
 /// It provides access to the document's text content, paragraphs, runs, and tables.
-pub struct RtfDocument<'a> {
+pub struct Tree<'a> {
     /// Font table
     font_table: FontTable<'a>,
     /// Optional external-file metadata table.
@@ -378,7 +378,7 @@ pub struct RtfDocument<'a> {
     revision_authors: Vec<super::super::annotation::RevisionAuthor<'a>>,
 }
 
-impl<'a> RtfDocument<'a> {
+impl<'a> Tree<'a> {
     /// Parse an RTF document from a string.
     ///
     /// This method automatically detects and decompresses compressed RTF data.
@@ -396,7 +396,7 @@ impl<'a> RtfDocument<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn parse(input: &str) -> RtfResult<RtfDocument<'static>> {
+    pub fn parse(input: &str) -> RtfResult<Tree<'static>> {
         Self::parse_with_options(input, OpenOptions::default())
     }
 
@@ -408,7 +408,7 @@ impl<'a> RtfDocument<'a> {
     pub fn parse_with_options(
         input: &str,
         options: OpenOptions,
-    ) -> RtfResult<RtfDocument<'static>> {
+    ) -> RtfResult<Tree<'static>> {
         Self::parse_internal(input.as_bytes(), options)
     }
 
@@ -419,7 +419,7 @@ impl<'a> RtfDocument<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn parse_bytes(input: &[u8]) -> RtfResult<RtfDocument<'static>> {
+    pub fn parse_bytes(input: &[u8]) -> RtfResult<Tree<'static>> {
         Self::parse_bytes_with_options(input, OpenOptions::default())
     }
 
@@ -432,7 +432,7 @@ impl<'a> RtfDocument<'a> {
     pub fn parse_bytes_with_options(
         input: &[u8],
         options: OpenOptions,
-    ) -> RtfResult<RtfDocument<'static>> {
+    ) -> RtfResult<Tree<'static>> {
         Self::parse_internal(input, options)
     }
 
@@ -446,7 +446,7 @@ impl<'a> RtfDocument<'a> {
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is
     /// exceeded.
-    pub fn from_owned_bytes(bytes: Vec<u8>) -> RtfResult<RtfDocument<'static>> {
+    pub fn from_owned_bytes(bytes: Vec<u8>) -> RtfResult<Tree<'static>> {
         Self::from_owned_bytes_with_options(bytes, OpenOptions::default())
     }
 
@@ -459,7 +459,7 @@ impl<'a> RtfDocument<'a> {
     pub fn from_owned_bytes_with_options(
         bytes: Vec<u8>,
         options: OpenOptions,
-    ) -> RtfResult<RtfDocument<'static>> {
+    ) -> RtfResult<Tree<'static>> {
         Self::parse_internal_owned(bytes, options)
     }
 
@@ -471,7 +471,7 @@ impl<'a> RtfDocument<'a> {
     /// phase source-free is important for compressed RTF: the retained source
     /// must remain the original LZFu/MELA frame while the decompressed bytes
     /// remain a temporary parser input.
-    fn parse_transport(bytes: &[u8], options: OpenOptions) -> RtfResult<RtfDocument<'static>> {
+    fn parse_transport(bytes: &[u8], options: OpenOptions) -> RtfResult<Tree<'static>> {
         let limits = options.source_limits_value();
         if bytes.len() > limits.max_input_bytes() {
             return Err(RtfError::Limit {
@@ -528,7 +528,7 @@ impl<'a> RtfDocument<'a> {
 
     /// Parse borrowed transport bytes and retain an independent copy for
     /// exact-source writing.
-    fn parse_internal(bytes: &[u8], options: OpenOptions) -> RtfResult<RtfDocument<'static>> {
+    fn parse_internal(bytes: &[u8], options: OpenOptions) -> RtfResult<Tree<'static>> {
         let mut document = Self::parse_transport(bytes, options)?;
         let mut source = Vec::new();
         source
@@ -547,7 +547,7 @@ impl<'a> RtfDocument<'a> {
     fn parse_internal_owned(
         bytes: Vec<u8>,
         options: OpenOptions,
-    ) -> RtfResult<RtfDocument<'static>> {
+    ) -> RtfResult<Tree<'static>> {
         let mut document = Self::parse_transport(&bytes, options)?;
         document.preserved_source = Some(bytes);
         Ok(document)
@@ -588,7 +588,7 @@ impl<'a> RtfDocument<'a> {
         input: &str,
         options: OpenOptions,
         retain_ordinary_body_source_span: bool,
-    ) -> RtfResult<RtfDocument<'static>> {
+    ) -> RtfResult<Tree<'static>> {
         let limits = options.source_limits_value();
         // Create arena for temporary allocations during parsing
         let arena = Bump::new();
@@ -712,7 +712,7 @@ impl<'a> RtfDocument<'a> {
             .collect();
 
         // Convert all borrowed data to owned
-        Ok(RtfDocument {
+        Ok(Tree {
             font_table: owned_font_table,
             file_table: parsed.file_table.map(crate::FileTable::into_owned),
             color_table: parsed.color_table,
@@ -914,7 +914,7 @@ impl<'a> RtfDocument<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn open<P: AsRef<Path>>(path: P) -> RtfResult<RtfDocument<'static>> {
+    pub fn open<P: AsRef<Path>>(path: P) -> RtfResult<Tree<'static>> {
         Self::open_with_options(path, OpenOptions::default())
     }
 
@@ -926,7 +926,7 @@ impl<'a> RtfDocument<'a> {
     pub fn open_with_options<P: AsRef<Path>>(
         path: P,
         options: OpenOptions,
-    ) -> RtfResult<RtfDocument<'static>> {
+    ) -> RtfResult<Tree<'static>> {
         let bytes = read_file_with_limit(
             path.as_ref(),
             options.source_limits_value().max_input_bytes(),
@@ -951,7 +951,7 @@ impl<'a> RtfDocument<'a> {
     ///
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn from_bytes(bytes: &[u8]) -> RtfResult<RtfDocument<'static>> {
+    pub fn from_bytes(bytes: &[u8]) -> RtfResult<Tree<'static>> {
         Self::parse_bytes(bytes)
     }
 
@@ -6193,7 +6193,7 @@ impl<'a> RtfDocument<'a> {
 
 #[cfg(test)]
 mod source_tests {
-    use super::{RtfDocument, RtfError, SourceLimits, read_limited_source};
+    use super::{Tree, RtfError, SourceLimits, read_limited_source};
     use std::io::{self, Read};
     use std::path::PathBuf;
 
@@ -6290,7 +6290,7 @@ mod source_tests {
         let pointer = source.as_ptr();
         let capacity = source.capacity();
         let document =
-            RtfDocument::from_owned_bytes_with_options(source, crate::OpenOptions::default())
+            Tree::from_owned_bytes_with_options(source, crate::OpenOptions::default())
                 .expect("parse owned RTF");
         let retained = document
             .preserved_source
@@ -6310,7 +6310,7 @@ mod source_tests {
 
         for source in [plain, cp1252, lzfu, mela] {
             let expected = source.clone();
-            let document = RtfDocument::from_owned_bytes(source).expect("parse owned RTF");
+            let document = Tree::from_owned_bytes(source).expect("parse owned RTF");
             assert_eq!(document.preserved_source(), Some(expected.as_slice()));
         }
     }
@@ -6318,7 +6318,7 @@ mod source_tests {
     #[test]
     fn borrowed_byte_parsing_retains_an_independent_source_copy() {
         let mut source = br"{\rtf1\ansi borrowed source}".to_vec();
-        let document = RtfDocument::from_bytes(&source).expect("parse borrowed RTF");
+        let document = Tree::from_bytes(&source).expect("parse borrowed RTF");
         let retained = document
             .preserved_source()
             .expect("borrowed source retained")
@@ -6334,7 +6334,7 @@ mod source_tests {
         let source_limit = compressed.len() - 1;
         let source_file = TempRtf::new("source-limit", &compressed);
         assert!(matches!(
-            RtfDocument::open_with_options(
+            Tree::open_with_options(
                 &source_file.path,
                 crate::OpenOptions::from(SourceLimits::builder()
                     .max_input_bytes(source_limit)
@@ -6351,7 +6351,7 @@ mod source_tests {
 
         let decompressed_limit = raw.len() - 1;
         assert!(matches!(
-            RtfDocument::parse_bytes_with_options(
+            Tree::parse_bytes_with_options(
                 &compressed,
                 crate::OpenOptions::from(SourceLimits::builder()
                     .max_decompressed_bytes(decompressed_limit)
@@ -6367,7 +6367,7 @@ mod source_tests {
         ));
 
         let malformed = &compressed[..compressed.len() - 1];
-        assert!(RtfDocument::from_bytes(malformed).is_err());
+        assert!(Tree::from_bytes(malformed).is_err());
     }
 
     #[test]

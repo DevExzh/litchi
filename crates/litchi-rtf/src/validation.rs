@@ -8,7 +8,7 @@
 use crate::codec::error::RtfResult;
 use crate::codec::limits::{OpenOptions, SourceLimits};
 use crate::content::field::{FieldType, ParsedFieldCode};
-use crate::model::document::RtfDocument;
+use crate::model::document::Tree;
 
 /// Provenance emitted by the bounded lexer/parser after it has checked the
 /// complete transport token stream.  Keeping this beside the retained model
@@ -483,7 +483,7 @@ impl ValidationReport {
 
     /// Build a report from the advanced retained model without mutating it.
     #[must_use]
-    pub fn from_raw(document: &crate::raw::Tree<'_>) -> Self {
+    pub fn from_raw(document: &Tree<'_>) -> Self {
         build_report(document, document.parse_limits())
     }
 
@@ -610,7 +610,7 @@ pub fn validate_str_with_options(input: &str, options: OpenOptions) -> RtfResult
     ValidationReport::from_str_with_options(input, options)
 }
 
-fn build_report(document: &RtfDocument<'_>, parse_limits: SourceLimits) -> ValidationReport {
+fn build_report(document: &Tree<'_>, parse_limits: SourceLimits) -> ValidationReport {
     let counts = ValidationCounts {
         source_bytes: document.preserved_source().map_or(0, <[u8]>::len),
         fields: document.fields().len(),

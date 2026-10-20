@@ -13,7 +13,7 @@ use std::fmt;
 /// editor, so a failed lifecycle or metadata operation cannot partially
 /// publish a field, `ObjectPool` storage, or opaque stream change.
 #[derive(Clone)]
-pub struct Transaction {
+pub(crate) struct Transaction {
     source: Snapshot,
     editor: Editor,
 }
@@ -28,7 +28,7 @@ impl Transaction {
 
     /// Returns the immutable source snapshot used for stale-source checks.
     #[must_use]
-    pub const fn before(&self) -> &Snapshot {
+    pub(crate) const fn before(&self) -> &Snapshot {
         &self.source
     }
 
@@ -38,7 +38,7 @@ impl Transaction {
     ///
     /// Returns an error when the candidate cannot be rendered or fails DOC,
     /// CFB, resource-bound, or owner/reference validation.
-    pub fn snapshot(&self) -> Result<Snapshot, TransactionError> {
+    pub(crate) fn snapshot(&self) -> Result<Snapshot, TransactionError> {
         let bytes = self
             .editor
             .clone()
@@ -57,7 +57,7 @@ impl Transaction {
     ///
     /// Returns an error when the candidate contains an unresolved field
     /// reference or malformed recognized metadata.
-    pub fn inventory(&self) -> Result<Inventory, TransactionError> {
+    pub(crate) fn inventory(&self) -> Result<Inventory, TransactionError> {
         self.editor.inventory().map_err(TransactionError::Invalid)
     }
 
@@ -67,7 +67,7 @@ impl Transaction {
     ///
     /// Returns an error when a field reference has no owning `ObjectPool`
     /// storage.
-    pub fn objects(&self) -> Result<Vec<Reference>, TransactionError> {
+    pub(crate) fn objects(&self) -> Result<Vec<Reference>, TransactionError> {
         self.editor.objects().map_err(TransactionError::Invalid)
     }
 
@@ -77,7 +77,7 @@ impl Transaction {
     ///
     /// Returns an error when the options, field tables, payload bounds, or
     /// candidate CFB cannot be validated atomically.
-    pub fn add(&mut self, options: WriteOptions) -> Result<Reference, TransactionError> {
+    pub(crate) fn add(&mut self, options: WriteOptions) -> Result<Reference, TransactionError> {
         self.editor.add(options).map_err(TransactionError::Invalid)
     }
 
@@ -97,7 +97,7 @@ impl Transaction {
     ///
     /// Returns an error when the storage ID is not referenced or the candidate
     /// field/package rewrite fails validation.
-    pub fn remove(&mut self, storage_id: u32) -> Result<Reference, TransactionError> {
+    pub(crate) fn remove(&mut self, storage_id: u32) -> Result<Reference, TransactionError> {
         self.editor
             .remove(storage_id)
             .map_err(TransactionError::Invalid)
@@ -109,7 +109,7 @@ impl Transaction {
     ///
     /// Returns an error when the IDs are not a complete valid permutation or
     /// the candidate field/package rewrite fails validation.
-    pub fn reorder(&mut self, storage_ids: &[u32]) -> Result<(), TransactionError> {
+    pub(crate) fn reorder(&mut self, storage_ids: &[u32]) -> Result<(), TransactionError> {
         self.editor
             .reorder(storage_ids)
             .map_err(TransactionError::Invalid)
@@ -125,7 +125,7 @@ impl Transaction {
     ///
     /// Returns an error when the storage ID is not referenced, the replacement
     /// is malformed/oversized, or the candidate package cannot be validated.
-    pub fn replace_storage(
+    pub(crate) fn replace_storage(
         &mut self,
         storage_id: u32,
         compound_file: Vec<u8>,
@@ -141,7 +141,7 @@ impl Transaction {
     ///
     /// Returns an error when the storage ID is not referenced, the typed ODT
     /// is invalid, or the candidate package cannot be validated.
-    pub fn set_info(&mut self, storage_id: u32, info: Info) -> Result<(), TransactionError> {
+    pub(crate) fn set_info(&mut self, storage_id: u32, info: Info) -> Result<(), TransactionError> {
         self.editor
             .set_info(storage_id, info)
             .map_err(TransactionError::Invalid)
@@ -153,7 +153,7 @@ impl Transaction {
     ///
     /// Returns an error when the storage has no valid typed ODT or the edited
     /// candidate violates an ODT or package invariant.
-    pub fn update_info<F>(&mut self, storage_id: u32, edit: F) -> Result<(), TransactionError>
+    pub(crate) fn update_info<F>(&mut self, storage_id: u32, edit: F) -> Result<(), TransactionError>
     where
         F: FnOnce(&mut Info),
     {
@@ -168,7 +168,7 @@ impl Transaction {
     ///
     /// Returns an error when the storage has no valid OLEDS link stream, the
     /// callback rejects the candidate, or the package cannot be validated.
-    pub fn update_link<F>(&mut self, storage_id: u32, edit: F) -> Result<(), TransactionError>
+    pub(crate) fn update_link<F>(&mut self, storage_id: u32, edit: F) -> Result<(), TransactionError>
     where
         F: FnOnce(&mut litchi_ole_common::object::link::Link) -> Result<(), litchi_cfb::OleError>,
     {
@@ -178,7 +178,7 @@ impl Transaction {
     }
 
     /// Clone-edits one presentation under explicit OLEDS limits.
-    pub fn update_presentation<F>(
+    pub(crate) fn update_presentation<F>(
         &mut self,
         storage_id: u32,
         index: usize,
@@ -194,7 +194,7 @@ impl Transaction {
     }
 
     /// Clone-edits a reference-selected presentation under explicit limits.
-    pub fn update_presentation_for<F>(
+    pub(crate) fn update_presentation_for<F>(
         &mut self,
         reference: &Reference,
         index: usize,
@@ -210,7 +210,7 @@ impl Transaction {
     }
 
     /// Applies a source-checked presentation patch to one managed object.
-    pub fn apply_presentation_patch(
+    pub(crate) fn apply_presentation_patch(
         &mut self,
         storage_id: u32,
         index: usize,
@@ -222,7 +222,7 @@ impl Transaction {
     }
 
     /// Applies a presentation patch selected by a DOC object reference.
-    pub fn apply_presentation_patch_for(
+    pub(crate) fn apply_presentation_patch_for(
         &mut self,
         reference: &Reference,
         index: usize,
@@ -234,7 +234,7 @@ impl Transaction {
     }
 
     /// Clone-edits one native-data stream under explicit OLEDS limits.
-    pub fn update_native<F>(
+    pub(crate) fn update_native<F>(
         &mut self,
         storage_id: u32,
         limits: ole_streams::Limits,
@@ -249,7 +249,7 @@ impl Transaction {
     }
 
     /// Clone-edits reference-selected native data under explicit limits.
-    pub fn update_native_for<F>(
+    pub(crate) fn update_native_for<F>(
         &mut self,
         reference: &Reference,
         limits: ole_streams::Limits,
@@ -264,7 +264,7 @@ impl Transaction {
     }
 
     /// Applies a source-checked native-data patch to one managed object.
-    pub fn apply_native_patch(
+    pub(crate) fn apply_native_patch(
         &mut self,
         storage_id: u32,
         patch: &native::Patch,
@@ -275,7 +275,7 @@ impl Transaction {
     }
 
     /// Applies a native-data patch selected by a DOC object reference.
-    pub fn apply_native_patch_for(
+    pub(crate) fn apply_native_patch_for(
         &mut self,
         reference: &Reference,
         patch: &native::Patch,
@@ -290,7 +290,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error when the candidate cannot be rendered for comparison.
-    pub fn is_changed(&self) -> Result<bool, TransactionError> {
+    pub(crate) fn is_changed(&self) -> Result<bool, TransactionError> {
         self.editor
             .clone()
             .finish()
@@ -304,7 +304,7 @@ impl Transaction {
     ///
     /// Returns an error when the candidate cannot be rendered or the resulting
     /// snapshot fails bounded DOC/CFB validation.
-    pub fn commit(self) -> Result<Commit, TransactionError> {
+    pub(crate) fn commit(self) -> Result<Commit, TransactionError> {
         let before = self.source;
         let after = self.editor.finish().map_err(TransactionError::Invalid)?;
         let patch = Patch::new(before.source_bytes().to_vec(), after.clone());

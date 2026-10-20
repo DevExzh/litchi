@@ -16,7 +16,7 @@ use std::borrow::Cow;
 #[test]
 fn test_simple_document() {
     let rtf = r"{\rtf1\ansi Hello World!\par}";
-    let doc = RtfDocument::parse(rtf).unwrap();
+    let doc = Tree::parse(rtf).unwrap();
     let text = doc.text();
     assert!(text.contains("Hello World"));
 }
@@ -24,7 +24,7 @@ fn test_simple_document() {
 #[test]
 fn retains_only_proven_uncompressed_ascii_body_spans() {
     let source = br"{\rtf1\ansi Hello\par}";
-    let document = RtfDocument::parse_bytes(source).unwrap();
+    let document = Tree::parse_bytes(source).unwrap();
     let span = document.ordinary_body_source_span().unwrap();
     assert_eq!(&source[span], br"Hello\par");
 
@@ -34,18 +34,18 @@ fn retains_only_proven_uncompressed_ascii_body_spans() {
         br"{\rtf1\ansi\bin3 abc}".as_slice(),
         b"{\\rtf1\\ansi Caf\xe9}".as_slice(),
     ] {
-        let document = RtfDocument::parse_bytes(source).unwrap();
+        let document = Tree::parse_bytes(source).unwrap();
         assert!(document.ordinary_body_source_span().is_none());
     }
 
     let compressed = crate::compress(source, true).unwrap();
-    let document = RtfDocument::parse_bytes(&compressed).unwrap();
+    let document = Tree::parse_bytes(&compressed).unwrap();
     assert!(document.ordinary_body_source_span().is_none());
 }
 
 #[test]
 fn text_concatenates_fragmented_blocks_without_changing_separators() {
-    let doc = RtfDocument::parse(r"{\rtf1\ansi A{\b B}{\i C}\par D}").unwrap();
+    let doc = Tree::parse(r"{\rtf1\ansi A{\b B}{\i C}\par D}").unwrap();
 
     assert!(doc.blocks().len() >= 4);
     assert_eq!(doc.text(), "ABC\nD");
@@ -53,7 +53,7 @@ fn text_concatenates_fragmented_blocks_without_changing_separators() {
 
 #[test]
 fn paragraph_properties_after_a_break_attach_to_the_following_paragraph() {
-    let doc = RtfDocument::parse(
+    let doc = Tree::parse(
         r"{\rtf1\ansi\qc\sb40\li80\keepn First\par\sb120\li240\keep\pagebb\qr Second}",
     )
     .unwrap();
@@ -86,7 +86,7 @@ fn paragraph_properties_after_a_break_attach_to_the_following_paragraph() {
 
 #[test]
 fn root_drawing_mutations_preflight_corrupt_indices_and_events() {
-    let mut document = RtfDocument::parse(r"{\rtf1 body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 body}").unwrap();
     let mut first = crate::Shape::new(crate::ShapeType::Rectangle);
     first.position = document.text().len();
     let mut second = crate::Shape::new(crate::ShapeType::Ellipse);
@@ -106,7 +106,7 @@ fn root_drawing_mutations_preflight_corrupt_indices_and_events() {
     assert_eq!(document.drawing_order, order_before);
     assert_eq!(document.body_story_events, events_before);
 
-    let mut document = RtfDocument::parse(r"{\rtf1 body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 body}").unwrap();
     let mut first = crate::Shape::new(crate::ShapeType::Rectangle);
     first.position = document.text().len();
     let mut second = crate::Shape::new(crate::ShapeType::Ellipse);
@@ -128,7 +128,7 @@ fn root_drawing_mutations_preflight_corrupt_indices_and_events() {
 
 #[test]
 fn background_mutations_are_total_for_a_corrupt_private_index() {
-    let mut document = RtfDocument::parse(r"{\rtf1 body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 body}").unwrap();
     let mut shape = crate::Shape::new(crate::ShapeType::Rectangle);
     shape.position = document.text().len();
     document.add_shape(shape).unwrap();
@@ -154,7 +154,7 @@ fn background_mutations_are_total_for_a_corrupt_private_index() {
 #[test]
 fn test_formatted_text() {
     let rtf = r"{\rtf1\ansi{\b Bold}{\i Italic}\par}";
-    let doc = RtfDocument::parse(rtf).unwrap();
+    let doc = Tree::parse(rtf).unwrap();
     let runs = doc.runs();
     assert!(!runs.is_empty());
 }
@@ -185,7 +185,7 @@ fn parses_and_owns_shapes_and_shape_groups() {
                     {\sp{\sn wzName}{\sv Owned Nested Group}}
                     {\shp{\*\shpinst\shpleft1\shptop2\shpwidth3\shpheight4{\sp{\sn shapeType}{\sv 20}}}}}}}}
         }";
-    let doc = RtfDocument::parse(rtf).unwrap();
+    let doc = Tree::parse(rtf).unwrap();
 
     let shape = &doc.shapes()[0];
     assert_eq!(shape.shape_type, crate::ShapeType::TextBox);
@@ -260,7 +260,7 @@ fn rejects_excessively_nested_shape_groups() {
     }
     rtf.push('}');
 
-    let Err(error) = RtfDocument::parse(&rtf) else {
+    let Err(error) = Tree::parse(&rtf) else {
         panic!("excessive shape-group nesting should fail")
     };
     assert!(
@@ -270,7 +270,7 @@ fn rejects_excessively_nested_shape_groups() {
 
 #[test]
 fn ignores_and_records_content_after_the_root_group() {
-    let document = RtfDocument::parse("{\\rtf1 padded} \r\n\0\0")
+    let document = Tree::parse("{\\rtf1 padded} \r\n\0\0")
         .expect("whitespace and NUL transport padding");
     assert_eq!(document.text(), "padded");
 
@@ -278,7 +278,7 @@ fn ignores_and_records_content_after_the_root_group() {
 
     // Visible content after the root group is ignored, as Word and
     // LibreOffice stop at the root's closing brace, and recorded.
-    let document = RtfDocument::parse("{\\rtf1 padded} trailing").expect("trailing content");
+    let document = Tree::parse("{\\rtf1 padded} trailing").expect("trailing content");
     assert_eq!(document.text(), "padded");
     assert_eq!(
         document.tolerance_report().defects(),
@@ -295,7 +295,7 @@ fn parses_real_background_shape_fixture_with_trailing_newline() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/rtf/background.rtf"
     ));
-    let doc = RtfDocument::parse(rtf).unwrap();
+    let doc = Tree::parse(rtf).unwrap();
 
     assert_eq!(doc.shapes().len(), 2);
     assert_eq!(doc.shapes()[0].geometry.x, 2633);
@@ -318,7 +318,7 @@ fn preserves_real_watermark_office_art_properties() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/rtf/watermark.rtf"
     ));
-    let doc = RtfDocument::parse(rtf).unwrap();
+    let doc = Tree::parse(rtf).unwrap();
 
     assert!(doc.shapes().is_empty());
     let header_shapes: Vec<_> = doc
@@ -345,7 +345,7 @@ fn parses_shape_from_ignorable_page_background_destination() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/rtf/page-background.rtf"
     ));
-    let doc = RtfDocument::parse(rtf).unwrap();
+    let doc = Tree::parse(rtf).unwrap();
 
     assert_eq!(doc.shapes().len(), 1);
     let shape = &doc.shapes()[0];
@@ -366,7 +366,7 @@ fn extracts_embedded_object_metadata_and_native_bytes_without_activation() {
                 01050000 02000000 08000000 5061636b61676500
                 00000000 00000000 08000000 d0cf11e0a1b11ae1}
             {\result fallback {\pict\pngblip\picw10\pich20 89504e470d0a1a0a}}} After}";
-    let doc = RtfDocument::parse(rtf).unwrap();
+    let doc = Tree::parse(rtf).unwrap();
 
     assert_eq!(doc.text(), "Before  After");
     assert_eq!(doc.objects().len(), 1);
@@ -397,7 +397,7 @@ fn extracts_embedded_object_metadata_and_native_bytes_without_activation() {
 
 #[test]
 fn rejects_invalid_embedded_object_hex() {
-    let Err(error) = RtfDocument::parse(r"{\rtf1{\object{\*\objdata 0xz}}}") else {
+    let Err(error) = Tree::parse(r"{\rtf1{\object{\*\objdata 0xz}}}") else {
         panic!("invalid object hex should fail")
     };
     assert!(
@@ -414,7 +414,7 @@ fn preserves_exact_binary_picture_payload() {
     rtf.extend_from_slice(&payload);
     rtf.extend_from_slice(b"}}");
 
-    let doc = RtfDocument::parse_bytes(&rtf).unwrap();
+    let doc = Tree::parse_bytes(&rtf).unwrap();
     assert_eq!(doc.pictures().len(), 1);
     assert_eq!(doc.pictures()[0].image_type, crate::ImageType::Png);
     assert_eq!(doc.pictures()[0].data(), payload);
@@ -428,7 +428,7 @@ fn rejects_unclosed_document_and_destination_groups() {
         r"{\rtf1{\shp{\*\shpinst\shpleft1}}",
         r"{\rtf1{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 1}",
     ] {
-        let result = RtfDocument::parse(rtf);
+        let result = Tree::parse(rtf);
         match result {
             Err(RtfError::UnexpectedEof) => {},
             Err(error) => panic!("unexpected error for {rtf:?}: {error}"),
@@ -452,7 +452,7 @@ fn parses_complete_document_info_without_leaking_into_body() {
                 \nofchars4200\nofcharsws5000\id77
             }
             Body text\par}";
-    let doc = RtfDocument::parse(rtf).unwrap();
+    let doc = Tree::parse(rtf).unwrap();
     let info = doc.info();
     assert_eq!(info.title.as_deref(), Some("Annual 你 Report"));
     assert_eq!(info.subject.as_deref(), Some("Results"));
@@ -481,7 +481,7 @@ fn parses_complete_document_info_without_leaking_into_body() {
 #[test]
 fn ignores_unknown_nested_info_destinations() {
     let rtf = r"{\rtf1{\info{\*\unknown nested {data}}{\title Kept}}Text}";
-    let doc = RtfDocument::parse(rtf).unwrap();
+    let doc = Tree::parse(rtf).unwrap();
     assert_eq!(doc.info().title.as_deref(), Some("Kept"));
     assert_eq!(doc.text(), "Text");
 }
@@ -499,7 +499,7 @@ fn parses_complete_stylesheet_without_leaking_names_into_body() {
                 {\*\ts4{\*\unknown ignored} Table Style;}
             }
             Body}";
-    let doc = RtfDocument::parse(rtf).unwrap();
+    let doc = Tree::parse(rtf).unwrap();
     assert_eq!(doc.text().trim(), "Body");
     assert_eq!(doc.stylesheet().styles().len(), 5);
 
@@ -551,7 +551,7 @@ fn parses_list_and_override_tables_without_leaking_labels() {
                 {\listoverride\listid77\listoverridecount1
                     {\lfolevel\listoverridestartat\levelstartat9}\ls4}}
             Body}";
-    let doc = RtfDocument::parse(rtf).unwrap();
+    let doc = Tree::parse(rtf).unwrap();
     assert_eq!(doc.text().trim(), "Body");
     assert_eq!(doc.list_table().lists().len(), 1);
 
@@ -583,7 +583,7 @@ fn parses_list_and_override_tables_without_leaking_labels() {
 
 #[test]
 fn preserves_paragraph_list_instance_and_level() {
-    let doc = RtfDocument::parse(r"{\rtf1\pard\ls4\ilvl2 Listed text}").unwrap();
+    let doc = Tree::parse(r"{\rtf1\pard\ls4\ilvl2 Listed text}").unwrap();
     assert_eq!(doc.text(), "Listed text");
     let paragraph = doc.blocks().last().unwrap().paragraph;
     assert_eq!(paragraph.list_override, Some(4));
@@ -596,7 +596,7 @@ fn parses_tracked_insertions_and_deletions_with_author_ranges() {
             {\*\revtbl {Unknown;}{Max \u20320?;}}
             Before {\deleted\revauthdel1\revdttmdel1199059860 old \u20320? text}
             and {\revised\revauth1\revdttm-1501115711 new text} after}";
-    let doc = RtfDocument::parse(rtf).unwrap();
+    let doc = Tree::parse(rtf).unwrap();
     let body = doc.text();
     assert!(!body.contains("old 你 text"));
     assert!(body.contains("and new text after"));
@@ -630,7 +630,7 @@ fn text_flush_preserves_common_formatting_and_revision_metadata() {
             \pard\qc\b\f1\'82\'a0
             {\revised\revauth1 new}
             {\deleted\revauthdel1 old}}";
-    let doc = RtfDocument::parse(rtf).unwrap();
+    let doc = Tree::parse(rtf).unwrap();
 
     assert!(doc.text().contains("あ"));
     assert!(doc.text().contains("new"));
@@ -656,7 +656,7 @@ fn text_flush_preserves_common_formatting_and_revision_metadata() {
 
 #[test]
 fn revision_toggle_boundaries_flush_preceding_text() {
-    let doc = RtfDocument::parse(
+    let doc = Tree::parse(
         r"{\rtf1{\*\revtbl Unknown;}plain \revised\revauth0\revdttm1 changed\revised0 plain}",
     )
     .unwrap();
@@ -669,7 +669,7 @@ fn revision_toggle_boundaries_flush_preceding_text() {
 #[test]
 fn parses_nested_bookmarks_with_range_metadata() {
     let rtf = r"{\rtf1\ansi Before {\*\bkmkstart\bkmkcolf1\bkmkcoll3\bkmkpub Outer}alpha {\*\bkmkstart Inner}\u20320?{\*\bkmkend Inner} omega{\*\bkmkend Outer} After}";
-    let doc = RtfDocument::parse(rtf).unwrap();
+    let doc = Tree::parse(rtf).unwrap();
     assert_eq!(doc.text(), "Before alpha 你 omega After");
 
     let outer = doc.bookmarks().get("Outer").unwrap();
@@ -687,7 +687,7 @@ fn parses_nested_bookmarks_with_range_metadata() {
 #[test]
 fn parses_annotation_range_author_and_body_without_text_leakage() {
     let rtf = r"{\rtf1\ansi aaa {\*\atrfstart 7}bbb{\*\atrfend 7}{\*\atnid MM}{\*\atnauthor Max Mustermann}\chatn{\*\annotation{\*\atnref 7}{\*\atndate 667322855}{\*\atnparent root}{\*\atnicn 2}{\*\atntime 42}Comment \u20320?} ccc}";
-    let doc = RtfDocument::parse(rtf).unwrap();
+    let doc = Tree::parse(rtf).unwrap();
     assert_eq!(doc.text(), "aaa bbb ccc");
     assert_eq!(doc.annotations().len(), 1);
 
@@ -707,7 +707,7 @@ fn parses_annotation_range_author_and_body_without_text_leakage() {
 #[test]
 fn preserves_parsed_headers_and_footers_in_owned_document() {
     let rtf = r"{\rtf1\ansi\sectd\sbkeven\pgwsxn10000\pghsxn14000\marglsxn900\margrsxn800\margtsxn700\margbsxn600\guttersxn120\headery300\footery400\lndscpsxn\cols2\colsx360\pgnstarts5\pgnucrm\vertalc\linemod1\lineppage{\header Main \u20320? header\par Second line}{\footer Page footer}Body}";
-    let doc = RtfDocument::parse(rtf).unwrap();
+    let doc = Tree::parse(rtf).unwrap();
     assert_eq!(doc.text(), "Body");
     assert_eq!(doc.sections().len(), 1);
     let section = &doc.sections()[0];
@@ -763,34 +763,34 @@ fn preserves_parsed_headers_and_footers_in_owned_document() {
 #[test]
 fn decodes_hex_escapes_after_declared_codepage() {
     let cyrillic =
-        RtfDocument::parse(r"{\rtf1\ansi\ansicpg1251 \'cf\'f0\'e8\'e2\'e5\'f2}").unwrap();
+        Tree::parse(r"{\rtf1\ansi\ansicpg1251 \'cf\'f0\'e8\'e2\'e5\'f2}").unwrap();
     assert_eq!(cyrillic.text(), "Привет");
 
-    let japanese = RtfDocument::parse(r"{\rtf1\ansi\ansicpg932 \'82\'a0\'82\'a2}").unwrap();
+    let japanese = Tree::parse(r"{\rtf1\ansi\ansicpg932 \'82\'a0\'82\'a2}").unwrap();
     assert_eq!(japanese.text(), "あい");
 }
 
 #[test]
 fn font_switches_select_exact_explicit_and_charset_codepages() {
-    let explicit = RtfDocument::parse(
+    let explicit = Tree::parse(
             r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\cpg1252 Latin;}{\f1\fnil\cpg932 Japanese;}}\f0\'e9|\f1\'82\'a0|\plain\'e9}",
         )
         .unwrap();
     assert_eq!(explicit.text(), "é|あ|é");
 
-    let inferred = RtfDocument::parse(
+    let inferred = Tree::parse(
             r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset0 Latin;}{\f1\fnil\fcharset128 Japanese;}}\f0\'e9|\f1\'82\'a0|\f0\'e9}",
         )
         .unwrap();
     assert_eq!(inferred.text(), "é|あ|é");
 
-    let inherited = RtfDocument::parse(
+    let inherited = Tree::parse(
             r"{\rtf1\ansi\ansicpg1251{\fonttbl{\f0\fnil\fcharset1 Default;}}\f0\'cf\'f0\'e8\'e2\'e5\'f2}",
         )
         .unwrap();
     assert_eq!(inherited.text(), "Привет");
 
-    let override_page = RtfDocument::parse(
+    let override_page = Tree::parse(
         r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset78\cpg932 Japanese;}}\f0\'82\'a0}",
     )
     .unwrap();
@@ -798,7 +798,7 @@ fn font_switches_select_exact_explicit_and_charset_codepages() {
 
     // A charset without a code-page mapping (Mac Shift-JIS) takes the
     // document code page, as LibreOffice does, and its first use is recorded.
-    let unmapped = RtfDocument::parse(
+    let unmapped = Tree::parse(
         r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset78 Japanese;}}\f0\'82\'a0}",
     )
     .unwrap();
@@ -816,20 +816,20 @@ fn font_switches_select_exact_explicit_and_charset_codepages() {
 fn rejects_unsupported_or_wide_ansi_codepages() {
     for page in [-1, 1200, 65000, 99_999] {
         let source = format!(r"{{\rtf1\ansi\ansicpg{page} text}}");
-        assert!(RtfDocument::parse(&source).is_err(), "page {page}");
+        assert!(Tree::parse(&source).is_err(), "page {page}");
     }
 }
 
 #[test]
 fn decodes_macintosh_and_exact_dos_character_sets() {
-    let scoped = RtfDocument::parse(r"{\rtf1\ansi \'80{\mac \'80}\'80}").unwrap();
+    let scoped = Tree::parse(r"{\rtf1\ansi \'80{\mac \'80}\'80}").unwrap();
     assert_eq!(scoped.text(), "€Ä€");
 
-    let cp437 = RtfDocument::parse(r"{\rtf1\pc \'9b}").unwrap();
+    let cp437 = Tree::parse(r"{\rtf1\pc \'9b}").unwrap();
     assert_eq!(cp437.text(), "¢");
-    let cp850 = RtfDocument::parse(r"{\rtf1\pca \'9b}").unwrap();
+    let cp850 = Tree::parse(r"{\rtf1\pca \'9b}").unwrap();
     assert_eq!(cp850.text(), "ø");
-    let explicit_cp437 = RtfDocument::parse(r"{\rtf1\ansi\ansicpg437 \'9b}").unwrap();
+    let explicit_cp437 = Tree::parse(r"{\rtf1\ansi\ansicpg437 \'9b}").unwrap();
     assert_eq!(explicit_cp437.text(), "¢");
 }
 
@@ -838,15 +838,15 @@ fn decodes_unescaped_legacy_bytes_and_semantic_control_symbols() {
     let mut bytes = br"{\rtf1\ansi\ansicpg1252 ".to_vec();
     bytes.push(0xE9);
     bytes.push(b'}');
-    assert_eq!(RtfDocument::parse_bytes(&bytes).unwrap().text(), "é");
+    assert_eq!(Tree::parse_bytes(&bytes).unwrap().text(), "é");
 
-    let symbols = RtfDocument::parse(r"{\rtf1\pc A\~B\-C\_D}").unwrap();
+    let symbols = Tree::parse(r"{\rtf1\pc A\~B\-C\_D}").unwrap();
     assert_eq!(symbols.text(), "A\u{00A0}B\u{00AD}C\u{2011}D");
 }
 
 #[test]
 fn decodes_declared_codepage_in_semantic_destinations() {
-    let doc = RtfDocument::parse(
+    let doc = Tree::parse(
             r"{\rtf1\ansi\ansicpg1251{\info{\author \'cf\'f0\'e8\'e2\'e5\'f2\~X}}{\*\revtbl {\'cf\'f0\'e8\'e2\'e5\'f2;}}{\header \'cf\'f0\'e8\'e2\'e5\'f2\_X}Body{\footnote \'cf\'f0\'e8\'e2\'e5\'f2\~X}{\revised\revauth0 X}}",
         )
         .unwrap();

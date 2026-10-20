@@ -1,6 +1,6 @@
 //! Immutable, lifetime-free RTF document facade.
 
-use crate::document::RtfDocument;
+use crate::document::Tree;
 use crate::{OpenOptions, RtfResult, SourceLimits};
 use std::fmt;
 use std::io::{self, Write};
@@ -8,7 +8,7 @@ use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
 struct Inner {
-    model: RtfDocument<'static>,
+    model: Tree<'static>,
     options: OpenOptions,
     text: OnceLock<Box<str>>,
 }
@@ -82,7 +82,7 @@ impl Package {
 
     /// Borrow the advanced retained model without mutable access.
     #[must_use]
-    pub fn raw(&self) -> &RtfDocument<'static> {
+    pub fn raw(&self) -> &Tree<'static> {
         &self.inner.model
     }
 
@@ -106,7 +106,7 @@ impl Package {
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
     pub fn parse_with_options(input: &str, options: OpenOptions) -> RtfResult<Self> {
-        RtfDocument::parse_with_options(input, options)
+        Tree::parse_with_options(input, options)
             .map(|model| Self::from_model(model, options))
     }
 
@@ -129,7 +129,7 @@ impl Package {
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
     pub fn from_bytes_with_options(input: &[u8], options: OpenOptions) -> RtfResult<Self> {
-        RtfDocument::parse_bytes_with_options(input, options)
+        Tree::parse_bytes_with_options(input, options)
             .map(|model| Self::from_model(model, options))
     }
 
@@ -153,7 +153,7 @@ impl Package {
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
     pub fn from_owned_bytes_with_options(input: Vec<u8>, options: OpenOptions) -> RtfResult<Self> {
-        RtfDocument::from_owned_bytes_with_options(input, options)
+        Tree::from_owned_bytes_with_options(input, options)
             .map(|model| Self::from_model(model, options))
     }
 
@@ -171,10 +171,10 @@ impl Package {
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
     pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> RtfResult<Self> {
-        RtfDocument::open_with_options(path, options).map(|model| Self::from_model(model, options))
+        Tree::open_with_options(path, options).map(|model| Self::from_model(model, options))
     }
 
-    fn from_model(model: RtfDocument<'static>, options: OpenOptions) -> Self {
+    fn from_model(model: Tree<'static>, options: OpenOptions) -> Self {
         Self {
             inner: Arc::new(Inner {
                 model,
@@ -506,7 +506,7 @@ impl Package {
         Ok(output)
     }
 
-    pub(crate) fn model(&self) -> &RtfDocument<'static> {
+    pub(crate) fn model(&self) -> &Tree<'static> {
         &self.inner.model
     }
 

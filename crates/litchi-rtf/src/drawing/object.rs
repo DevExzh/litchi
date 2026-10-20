@@ -135,7 +135,7 @@ pub struct EmbeddedObject<'a> {
     pub result_kind: Option<ObjectResultKind>,
     /// Plain-text rendered fallback from the `result` destination
     pub result_text: Cow<'a, str>,
-    /// Indices into `RtfDocument::pictures()` for rendered fallback images
+    /// Indices into `Tree::pictures()` for rendered fallback images
     pub result_picture_indices: Vec<usize>,
     /// Decoded `objdata`, including the OLE `ObjectHeader`
     pub data: Vec<u8>,

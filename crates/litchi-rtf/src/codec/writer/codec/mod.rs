@@ -66,7 +66,7 @@ use super::super::{
     UnderlineStyle, UserProperty, VerticalAlignment, XmlNamespace, annotation, document_variable,
     field, form_field, navigation_entry, section, user_property,
 };
-use crate::model::document::RtfDocument;
+use crate::model::document::Tree;
 use litchi_codepage::Mbcs;
 use std::collections::HashSet;
 use std::io::{self, Write};
@@ -262,7 +262,7 @@ impl<W: Write> RtfWriter<W> {
     ///
     /// # Errors
     /// Returns an error when writing to the underlying output fails.
-    pub fn write_document(&mut self, doc: &RtfDocument<'_>) -> io::Result<()> {
+    pub fn write_document(&mut self, doc: &Tree<'_>) -> io::Result<()> {
         if doc.has_unmatched_move_bookmarks() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
