@@ -20,7 +20,8 @@ Build the input with, per crate (sequentially; RUSTC_BOOTSTRAP=1):
 then run: tools/api_debt_inventory.py target/doc/litchi_docx.json ... > out.tsv
 A wave is done for a category when its crate has no rows left in it. A
 `Commit` that aliases `litchi_core::edit::Commit` has the triad accessors
-(record 0356 P4).
+(record 0356 P4), and a type under a `builder` module is an authoring draft,
+whose `&mut self` methods are allowed (0351 §2.1 rule 7; record 0356b).
 """
 from __future__ import annotations
 
@@ -111,13 +112,14 @@ def rows(document, crate: str):
         owner = path[-2] if len(path) > 1 else ""
         if kind == "function":
             receiver = gate.self_receiver(item["inner"]["function"]) or "fn"
-            if receiver == "&mut self" and owner in OWNERS:
+            draft = "builder" in path[:-1]
+            if receiver == "&mut self" and owner in OWNERS and not draft:
                 if owner == "MutableDocument":
                     target = "primary Edit (opened) / Builder (fresh)"
                 else:
                     target = target_family(name)
                 yield "mut_owner", text, receiver, target
-            elif receiver == "&mut self" and crate != "litchi_iwa" and (
+            elif receiver == "&mut self" and crate != "litchi_iwa" and not draft and (
                     owner.startswith(("Mutable", "Flat")) or owner in DRAFT_NAMES):
                 yield "mut_draft", text, receiver, "Builder draft or Edit verb; no Mutable* type"
             if name.endswith("_with_limits"):

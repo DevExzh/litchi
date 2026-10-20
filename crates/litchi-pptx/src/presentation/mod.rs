@@ -23,12 +23,9 @@ pub mod media;
 pub use model::Presentation;
 
 pub use source::{
-    MAX_SOURCE_BACKED_SLIDE_BATCH, SourceBackedIntoEditorError, SourceBackedPresentation,
-    SourceBackedPresentationEditor, SourceImage, SourceImageDescriptor, SourceImageTarget,
-    SourceSlide, SourceSvgDescriptor, SourceSvgImage,
+    MAX_SOURCE_BACKED_SLIDE_BATCH, SourceBackedPresentation, SourceImage, SourceImageDescriptor,
+    SourceImageTarget, SourceSlide, SourceSvgDescriptor, SourceSvgImage,
 };
-pub use source_cross_copy::{SourceBackedCrossSlideCopyPlan, SourceBackedCrossSlideCopySnapshot};
-pub use source_removal::SourceBackedSlideRemovalPlan;
 
 /// Source-backed per-slide modern-comment snapshots.
 pub use source::modern_comments;

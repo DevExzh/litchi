@@ -4,7 +4,7 @@ use litchi_core::{
 };
 use litchi_opc::{SourceCacheLimits, SourceLimits};
 use litchi_perf_baseline::pptx_range_source::{PptxRangeSource, PptxRangeSourceConfig};
-use litchi_pptx::{SourceBackedPresentation, SourceBackedPresentationEditor};
+use litchi_pptx::SourceBackedPresentation;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use soapberry_zip::office::ArchiveReader;
@@ -257,13 +257,14 @@ fn iteration(
             .cache_limits(cache)
             .execution_context(source_context),
     )?;
-    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
+    let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at_with_options(
         destination_adapter.clone(),
         litchi_pptx::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .cache_limits(cache)
             .execution_context(destination_context),
     )?;
+    let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
     let open_ns = u64::try_from(started.elapsed().as_nanos())?;
     let opened =
         json!({"source":source_adapter.snapshot()?,"destination":destination_adapter.snapshot()?});
@@ -272,7 +273,9 @@ fn iteration(
     let plan_ns = u64::try_from(started.elapsed().as_nanos())?;
     let planned = json!({"source":source_adapter.snapshot()?,"destination":destination_adapter.snapshot()?,"source_budget":gauges(&source_budget),"destination_budget":gauges(&destination_budget)});
     let started = Instant::now();
-    let published = editor.publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
+    let mut editor_copy = editor.edit_cross_slide_copy()?;
+    let published = editor_copy.stage(&plan)?;
+    editor_copy.commit()?.package().write_to(&mut sink)?;
     let publication_ns = u64::try_from(started.elapsed().as_nanos())?;
     let published_reads = json!({
         "source": source_adapter.snapshot()?,

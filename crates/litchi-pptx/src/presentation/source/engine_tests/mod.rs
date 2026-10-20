@@ -9,6 +9,8 @@
     reason = "test assertions panic on failure by design"
 )]
 
+mod cross_copy;
 mod edit;
+mod slide_removal;
 mod svg_lifecycle;
 mod svg_transaction;
