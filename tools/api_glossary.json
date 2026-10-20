@@ -5513,6 +5513,12 @@
           "name": "from_path",
           "scope": "litchi_ppt::SourceBackedPackage",
           "replacement": "use open / open_with_options (record 0351 §2.5 rule 1)"
+        },
+        {
+          "name": "Chart",
+          "scope": "litchi_ppt::writer",
+          "replacement": "the chart draft lives at litchi_ppt::builder::Chart (record 0351 §2.1 rule 7)",
+          "recursive": false
         }
       ],
       "families": [
@@ -5799,6 +5805,12 @@
           "name": "from_path",
           "scope": "litchi_ppt::SourceBackedPackage",
           "replacement": "use open / open_with_options (record 0351 §2.5 rule 1)"
+        },
+        {
+          "name": "Chart",
+          "scope": "litchi_ppt::writer",
+          "replacement": "the chart draft lives at litchi_ppt::builder::Chart (record 0351 §2.1 rule 7)",
+          "recursive": false
         }
       ],
       "families": [
