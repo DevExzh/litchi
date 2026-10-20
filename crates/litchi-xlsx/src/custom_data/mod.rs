@@ -7,10 +7,7 @@ mod codec;
 mod model;
 mod package;
 
-pub use codec::{
-    XmlLimits, parse_properties, parse_properties_with_limits, validate_workbook_root,
-    validate_workbook_root_with_limits, write_properties, write_properties_with_limits,
-};
+pub use codec::{XmlLimits, parse_properties, validate_workbook_root, write_properties};
 pub use model::{CustomData, CustomDataView, ExtensionList, Properties, RemovalDisposition, Store};
 pub use package::{Commit, Limits, Part, Patch, Snapshot, Transaction};
 

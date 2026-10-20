@@ -61,11 +61,12 @@ pub(crate) fn read_with_limits(
                 "Custom XML Maps part exceeds its configured byte limit",
             ));
         }
-        let parsed = litchi_ooxml_common::spreadsheet_xml_maps::parse_xml_map_info_with_conformance_and_limits(
-            part.blob(),
-            &limits.xml_maps,
-        )
-        .map_err(|error| invalid(error.to_string()))?;
+        let parsed =
+            litchi_ooxml_common::spreadsheet_xml_maps::parse_xml_map_info_with_conformance(
+                part.blob(),
+                &limits.xml_maps,
+            )
+            .map_err(|error| invalid(error.to_string()))?;
         if parsed.conformance != conformance {
             return Err(invalid(
                 "Custom XML Maps root namespace disagrees with its relationship conformance",

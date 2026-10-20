@@ -34,9 +34,9 @@ const MAX_UID_UNITS: usize = 65_535;
 
 /// Resource ceilings for the bounded Custom Data XML codec.
 ///
-/// The public convenience functions use [`Self::standard`].  Package owners
-/// should pass a lower profile through the `_with_limits` functions before
-/// parsing or constructing any temporary XML state.  Every field is capped by
+/// Every codec function takes its profile as a required argument;
+/// [`Self::standard`] is the default one.  Package owners pass a lower
+/// profile before parsing or constructing any temporary XML state.  Every field is capped by
 /// an immutable format-wide maximum; callers may tighten, but never widen,
 /// those ceilings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -665,12 +665,10 @@ fn append_escaped_attribute(output: &mut Vec<u8>, value: &str) {
 /// returned standalone fragment receives equivalent declarations on its own
 /// root.  The package host retains the original document separately for
 /// source-bound no-op preservation.
-pub fn parse_properties(xml: &[u8]) -> Result<Properties> {
-    parse_properties_with_limits(xml, &Limits::standard())
-}
-
-/// Parse one Custom Data Properties part under an explicit resource profile.
-pub fn parse_properties_with_limits(xml: &[u8], limits: &Limits) -> Result<Properties> {
+///
+/// `limits` is the resource profile ([`Limits::standard`] for the default
+/// ceilings).
+pub fn parse_properties(xml: &[u8], limits: &Limits) -> Result<Properties> {
     let limits = limits.validate()?;
     let info = parse_document(xml, ExpectedRoot::Properties, false, &limits)?;
     let id = info
@@ -705,13 +703,9 @@ pub fn parse_properties_with_limits(xml: &[u8], limits: &Limits) -> Result<Prope
 ///
 /// The root wrapper is compact and stable.  A supplied extension list is
 /// validated and then copied byte-for-byte into the wrapper.
-pub fn write_properties(value: &Properties) -> Result<Vec<u8>> {
-    write_properties_with_limits(value, &Limits::standard())
-}
-
-/// Deterministically serialize Custom Data Properties under an explicit
-/// resource profile.
-pub fn write_properties_with_limits(value: &Properties, limits: &Limits) -> Result<Vec<u8>> {
+/// `limits` is the resource profile ([`Limits::standard`] for the default
+/// ceilings).
+pub fn write_properties(value: &Properties, limits: &Limits) -> Result<Vec<u8>> {
     let limits = limits.validate()?;
     validate_properties(value, false, &limits)?;
     let id_len = escaped_xstring_len(&value.id, &limits)?;
@@ -780,26 +774,13 @@ pub fn write_properties_with_limits(value: &Properties, limits: &Limits) -> Resu
     Ok(output)
 }
 
-/// Replace only the required root `id` value in a validated source part.
+/// Replace only the required root `id` value in a validated source part,
+/// under the source resource profile `limits` and a replacement-output
+/// ceiling `max_output_bytes` (at most `limits.properties_xml_bytes`
+/// applies). An exact no-op shares the source token without constructing
+/// output.
 #[doc(hidden)]
-pub fn rewrite_id(source: &litchi_opc::OwnedXmlPart, id: &str) -> Result<litchi_opc::OwnedXmlPart> {
-    rewrite_id_with_limits(source, id, &Limits::standard())
-}
-
-/// Rewrite one source-bound UID under an explicit resource profile.
-#[doc(hidden)]
-pub fn rewrite_id_with_limits(
-    source: &litchi_opc::OwnedXmlPart,
-    id: &str,
-    limits: &Limits,
-) -> Result<litchi_opc::OwnedXmlPart> {
-    rewrite_id_with_limits_and_output(source, id, limits, limits.properties_xml_bytes)
-}
-
-/// Rewrite a retained UID with independent source and replacement-output limits.
-/// An exact no-op shares the source token without constructing output.
-#[doc(hidden)]
-pub fn rewrite_id_with_limits_and_output(
+pub fn rewrite_id(
     source: &litchi_opc::OwnedXmlPart,
     id: &str,
     limits: &Limits,
@@ -836,35 +817,13 @@ pub fn rewrite_id_with_limits_and_output(
     Ok(result)
 }
 
-/// Replace or remove only the direct `extLst` child of a retained source root.
+/// Replace or remove only the direct `extLst` child of a retained source
+/// root, under the source resource profile `limits` and a
+/// replacement-output ceiling `max_output_bytes` (at most
+/// `limits.properties_xml_bytes` applies). Exact no-ops retain their
+/// original source token.
 #[doc(hidden)]
 pub fn rewrite_extension_list(
-    source: &litchi_opc::OwnedXmlPart,
-    extension: Option<&ExtensionList>,
-) -> Result<litchi_opc::OwnedXmlPart> {
-    rewrite_extension_list_with_limits(source, extension, &Limits::standard())
-}
-
-/// Replace or remove one source-bound extension list under an explicit
-/// resource profile.
-#[doc(hidden)]
-pub fn rewrite_extension_list_with_limits(
-    source: &litchi_opc::OwnedXmlPart,
-    extension: Option<&ExtensionList>,
-    limits: &Limits,
-) -> Result<litchi_opc::OwnedXmlPart> {
-    rewrite_extension_list_with_limits_and_output(
-        source,
-        extension,
-        limits,
-        limits.properties_xml_bytes,
-    )
-}
-
-/// Rewrite a retained extension with independent source and replacement-output
-/// limits. Exact no-ops retain their original source token.
-#[doc(hidden)]
-pub fn rewrite_extension_list_with_limits_and_output(
     source: &litchi_opc::OwnedXmlPart,
     extension: Option<&ExtensionList>,
     limits: &Limits,
@@ -957,13 +916,7 @@ pub fn rewrite_extension_list_with_limits_and_output(
 /// No canonicalization is performed: lexical source bytes are part of the
 /// preservation contract.
 #[doc(hidden)]
-pub fn canonical_extension(extension: Option<&ExtensionList>) -> Result<Option<Vec<u8>>> {
-    canonical_extension_with_limits(extension, &Limits::standard())
-}
-
-/// Validate and retain an extension projection under an explicit profile.
-#[doc(hidden)]
-pub fn canonical_extension_with_limits(
+pub fn canonical_extension(
     extension: Option<&ExtensionList>,
     limits: &Limits,
 ) -> Result<Option<Vec<u8>>> {
@@ -988,24 +941,15 @@ pub fn canonical_extension_with_limits(
 /// staged fragment that relies on a host root must be validated through the
 /// source-context rewrite path instead.
 #[doc(hidden)]
-pub fn validate_source_properties(value: &Properties) -> Result<()> {
-    validate_source_properties_with_limits(value, &Limits::standard())
-}
-
-/// Validate source-bound properties under an explicit resource profile.
-#[doc(hidden)]
-pub fn validate_source_properties_with_limits(value: &Properties, limits: &Limits) -> Result<()> {
+pub fn validate_source_properties(value: &Properties, limits: &Limits) -> Result<()> {
     let limits = limits.validate()?;
     validate_properties(value, false, &limits)
 }
 
-/// Validate that a source belongs to a SpreadsheetML workbook part.
-pub fn validate_workbook_root(xml: &[u8]) -> Result<()> {
-    validate_workbook_root_with_limits(xml, &Limits::standard())
-}
-
-/// Validate a workbook root under an explicit resource profile.
-pub fn validate_workbook_root_with_limits(xml: &[u8], limits: &Limits) -> Result<()> {
+/// Validate that a source belongs to a SpreadsheetML workbook part, under
+/// the resource profile `limits` ([`Limits::standard`] for the default
+/// ceilings).
+pub fn validate_workbook_root(xml: &[u8], limits: &Limits) -> Result<()> {
     let limits = limits.validate()?;
     let (namespace, name) = scan_generic_document(xml, &limits)?;
     if name == "workbook" && matches!(namespace.as_str(), SML | STRICT_SML) {
@@ -2222,7 +2166,7 @@ mod tests {
         let source = format!(
             "<?xml version=\"1.0\"?>\n<!--before--><p:datastoreItem xmlns:p=\"{XML}\" xmlns:s=\"{SML}\" id=\"Storage&#45;1\"> <?inside?><p:extLst>\n<s:ext uri=\"urn:test\"><v:opaque xmlns:v=\"urn:v\"><![CDATA[<? and ]]><?pi?></v:opaque><!--tail--></s:ext>\n</p:extLst><!--after--></p:datastoreItem>"
         );
-        let properties = parse_properties(source.as_bytes()).unwrap();
+        let properties = parse_properties(source.as_bytes(), &Limits::standard()).unwrap();
         assert_eq!(properties.id, "Storage-1");
         let extension = properties.extension_list.unwrap().xml;
         assert!(String::from_utf8_lossy(&extension).contains("<![CDATA[<? and ]]>"));
@@ -2244,7 +2188,11 @@ mod tests {
                 extension_list: None,
             };
             assert_eq!(
-                parse_properties(&write_properties(&value).unwrap()).unwrap(),
+                parse_properties(
+                    &write_properties(&value, &Limits::standard()).unwrap(),
+                    &Limits::standard()
+                )
+                .unwrap(),
                 value
             );
         }
@@ -2259,7 +2207,8 @@ mod tests {
         assert!(
             parse_properties(
                 format!("<x14:datastoreItem xmlns:x14=\"{XML}\" id=\"x\">text</x14:datastoreItem>")
-                    .as_bytes()
+                    .as_bytes(),
+                &Limits::standard()
             )
             .is_err()
         );
@@ -2272,7 +2221,7 @@ mod tests {
         );
         let mut source = vec![0xEF, 0xBB, 0xBF];
         source.extend_from_slice(body.as_bytes());
-        let parsed = parse_properties(&source).unwrap();
+        let parsed = parse_properties(&source, &Limits::standard()).unwrap();
         assert_eq!(parsed.id, "x");
         assert!(validate_extension_fragment(
             b"\xEF\xBB\xBF<x14:extLst xmlns:x14=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\"/>"
@@ -2285,7 +2234,7 @@ mod tests {
         let xml = format!(
             "<d:datastoreItem xmlns:d=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9&#x2F;main\" xmlns:s=\"{SML}\" id=\"x\"><d:extLst><s:ext uri=\"urn:test\"><q:opaque xmlns:q=\"urn:q\"/></s:ext></d:extLst></d:datastoreItem>"
         );
-        assert!(parse_properties(xml.as_bytes()).is_ok());
+        assert!(parse_properties(xml.as_bytes(), &Limits::standard()).is_ok());
     }
 
     #[test]
@@ -2293,7 +2242,7 @@ mod tests {
         let xml = format!(
             "<x14:datastoreItem xmlns:x14=\"{XML}\" xmlns:s=\"{SML}\" id=\"x\"><x14:extLst><s:ext uri=\"urn&#x3A;vendor\"><v:opaque xmlns:v=\"urn:v\"/></s:ext></x14:extLst></x14:datastoreItem>"
         );
-        let properties = parse_properties(xml.as_bytes()).unwrap();
+        let properties = parse_properties(xml.as_bytes(), &Limits::standard()).unwrap();
         assert_eq!(
             properties.extension_list.unwrap().xml,
             format!(
@@ -2306,10 +2255,11 @@ mod tests {
     #[test]
     fn rejects_cdata_outside_the_document_root() {
         let xml = format!("<![CDATA[before]]><x14:datastoreItem xmlns:x14=\"{XML}\" id=\"x\"/>");
-        assert!(parse_properties(xml.as_bytes()).is_err());
+        assert!(parse_properties(xml.as_bytes(), &Limits::standard()).is_err());
         assert!(
             validate_workbook_root(
-                format!("<![CDATA[before]]><workbook xmlns=\"{SML}\"/>").as_bytes()
+                format!("<![CDATA[before]]><workbook xmlns=\"{SML}\"/>").as_bytes(),
+                &Limits::standard()
             )
             .is_err()
         );
@@ -2320,7 +2270,7 @@ mod tests {
         let xml = format!(
             "<x14:datastoreItem xmlns:x14=\"{XML}\" xmlns:s=\"{SML}\" id=\"x\"><x14:extLst><s:ext uri=\"u\"><opaque>literal]]></opaque></s:ext></x14:extLst></x14:datastoreItem>"
         );
-        assert!(parse_properties(xml.as_bytes()).is_err());
+        assert!(parse_properties(xml.as_bytes(), &Limits::standard()).is_err());
     }
 
     #[test]
@@ -2328,7 +2278,7 @@ mod tests {
         let source = format!(
             "<p:datastoreItem xmlns:p=\"{XML}\" xmlns:s=\"{SML}\" xmlns:q=\"urn:opaque\" id=\"x\"><p:extLst><s:ext uri=\"u\"><q:opaque><q:child/></q:opaque></s:ext></p:extLst></p:datastoreItem>"
         );
-        let properties = parse_properties(source.as_bytes()).unwrap();
+        let properties = parse_properties(source.as_bytes(), &Limits::standard()).unwrap();
         let extension = properties.extension_list.as_ref().unwrap();
         assert_eq!(
             extension.xml,
@@ -2347,7 +2297,7 @@ mod tests {
         let source = format!(
             "<x14:datastoreItem xmlns:x14=\"{XML}\" xmlns:s=\"{STRICT_SML}\" id=\"x\"><x14:extLst><s:ext><opaque/></s:ext></x14:extLst></x14:datastoreItem>"
         );
-        assert!(parse_properties(source.as_bytes()).is_err());
+        assert!(parse_properties(source.as_bytes(), &Limits::standard()).is_err());
     }
 
     /// ` n000000="" ...`: `distinct` names of 11 bytes each, then as many
@@ -2377,8 +2327,8 @@ mod tests {
         let xml = format!("<x14:datastoreItem xmlns:x14=\"{XML}\" id=\"x\"/>");
         let exact = Limits::standard().with_attributes(2);
         let under = Limits::standard().with_attributes(1);
-        assert!(parse_properties_with_limits(xml.as_bytes(), &exact).is_ok());
-        let error = parse_properties_with_limits(xml.as_bytes(), &under).unwrap_err();
+        assert!(parse_properties(xml.as_bytes(), &exact).is_ok());
+        let error = parse_properties(xml.as_bytes(), &under).unwrap_err();
         assert!(
             matches!(
                 error,
@@ -2413,7 +2363,7 @@ mod tests {
     fn repeated_attribute_names_are_refused_where_quick_xml_reports_them() {
         let xml = format!("<x14:datastoreItem xmlns:x14=\"{XML}\" id=\"x\" id=\"y\"/>");
         let expected = duplicated_at(xml.rfind(" id=").unwrap(), xml.find(" id=").unwrap());
-        let error = parse_properties(xml.as_bytes()).unwrap_err();
+        let error = parse_properties(xml.as_bytes(), &Limits::standard()).unwrap_err();
         assert!(
             matches!(&error, Error::Decode(XmlError::Malformed(message)) if *message == expected),
             "{error}"
@@ -2439,7 +2389,7 @@ mod tests {
         let head = format!("<x14:datastoreItem xmlns:x14=\"{XML}\" id=\"x\"");
         let xml = format!("{head}{names}/>");
         let expected = duplicated_at(head.len() + 20_000 * 11, head.len() + 19_999 * 11);
-        let error = parse_properties(xml.as_bytes()).unwrap_err();
+        let error = parse_properties(xml.as_bytes(), &Limits::standard()).unwrap_err();
         assert!(
             matches!(&error, Error::Decode(XmlError::Malformed(message)) if *message == expected),
             "{error}"
@@ -2459,7 +2409,7 @@ mod tests {
         let xml = format!("<x14:datastoreItem xmlns:x14=\"{XML}\" id=\"x\"{names}/>");
         let extension = format!("<x14:extLst xmlns:x14=\"{XML}\"{names}/>");
         for error in [
-            parse_properties(xml.as_bytes()).unwrap_err(),
+            parse_properties(xml.as_bytes(), &Limits::standard()).unwrap_err(),
             extension_root_opening(extension.as_bytes(), &Limits::standard()).unwrap_err(),
         ] {
             assert!(

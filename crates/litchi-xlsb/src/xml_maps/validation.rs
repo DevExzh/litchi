@@ -268,7 +268,7 @@ pub(crate) fn single_cells(values: &[SingleCellBinding], limits: Limits) -> Resu
 
 /// Validate the shared catalog under caller-selected resource ceilings.
 pub fn validate_catalog(info: &XmlMapInfo, limits: XmlMapLimits) -> Result<()> {
-    litchi_ooxml_common::spreadsheet_xml_maps::validate_xml_map_info_with_limits(info, &limits)?;
+    litchi_ooxml_common::spreadsheet_xml_maps::validate_xml_map_info(info, &limits)?;
     Ok(())
 }
 

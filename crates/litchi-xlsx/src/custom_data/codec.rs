@@ -45,66 +45,44 @@ fn map_common_error(error: litchi_ooxml_common::Error) -> Error {
     }
 }
 
-pub fn parse_properties(xml: &[u8]) -> Result<Properties> {
-    litchi_ooxml_common::custom_data::parse_properties(xml).map_err(Error::from)
+/// Parse Custom Data Properties under the XML resource profile `limits`
+/// ([`XmlLimits::standard`] for the default ceilings).
+pub fn parse_properties(xml: &[u8], limits: &XmlLimits) -> Result<Properties> {
+    litchi_ooxml_common::custom_data::parse_properties(xml, limits).map_err(map_common_error)
 }
 
-/// Parse Custom Data Properties under an explicit XML resource profile.
-pub fn parse_properties_with_limits(xml: &[u8], limits: &XmlLimits) -> Result<Properties> {
-    litchi_ooxml_common::custom_data::parse_properties_with_limits(xml, limits)
+/// Validate a workbook root under the XML resource profile `limits`.
+pub fn validate_workbook_root(xml: &[u8], limits: &XmlLimits) -> Result<()> {
+    litchi_ooxml_common::custom_data::validate_workbook_root(xml, limits).map_err(map_common_error)
+}
+
+/// Serialize Custom Data Properties under the XML resource profile `limits`.
+pub fn write_properties(value: &Properties, limits: &XmlLimits) -> Result<Vec<u8>> {
+    litchi_ooxml_common::custom_data::write_properties(value, limits).map_err(map_common_error)
+}
+
+pub(crate) fn validate_source_properties(value: &Properties, limits: &XmlLimits) -> Result<()> {
+    litchi_ooxml_common::custom_data::codec::validate_source_properties(value, limits)
         .map_err(map_common_error)
 }
 
-pub fn validate_workbook_root(xml: &[u8]) -> Result<()> {
-    litchi_ooxml_common::custom_data::validate_workbook_root(xml).map_err(Error::from)
-}
-
-/// Validate a workbook root under an explicit XML resource profile.
-pub fn validate_workbook_root_with_limits(xml: &[u8], limits: &XmlLimits) -> Result<()> {
-    litchi_ooxml_common::custom_data::validate_workbook_root_with_limits(xml, limits)
-        .map_err(map_common_error)
-}
-
-pub fn write_properties(value: &Properties) -> Result<Vec<u8>> {
-    litchi_ooxml_common::custom_data::write_properties(value).map_err(Error::from)
-}
-
-/// Serialize Custom Data Properties under an explicit XML resource profile.
-pub fn write_properties_with_limits(value: &Properties, limits: &XmlLimits) -> Result<Vec<u8>> {
-    litchi_ooxml_common::custom_data::write_properties_with_limits(value, limits)
-        .map_err(map_common_error)
-}
-
-pub(crate) fn validate_source_properties_with_limits(
-    value: &Properties,
-    limits: &XmlLimits,
-) -> Result<()> {
-    litchi_ooxml_common::custom_data::codec::validate_source_properties_with_limits(value, limits)
-        .map_err(map_common_error)
-}
-
-pub(crate) fn rewrite_id_with_limits_and_output(
+pub(crate) fn rewrite_id(
     source: &litchi_opc::OwnedXmlPart,
     id: &str,
     limits: &XmlLimits,
     max_output_bytes: usize,
 ) -> Result<litchi_opc::OwnedXmlPart> {
-    litchi_ooxml_common::custom_data::codec::rewrite_id_with_limits_and_output(
-        source,
-        id,
-        limits,
-        max_output_bytes,
-    )
-    .map_err(map_common_error)
+    litchi_ooxml_common::custom_data::codec::rewrite_id(source, id, limits, max_output_bytes)
+        .map_err(map_common_error)
 }
 
-pub(crate) fn rewrite_extension_list_with_limits_and_output(
+pub(crate) fn rewrite_extension_list(
     source: &litchi_opc::OwnedXmlPart,
     extension: Option<&ExtensionList>,
     limits: &XmlLimits,
     max_output_bytes: usize,
 ) -> Result<litchi_opc::OwnedXmlPart> {
-    litchi_ooxml_common::custom_data::codec::rewrite_extension_list_with_limits_and_output(
+    litchi_ooxml_common::custom_data::codec::rewrite_extension_list(
         source,
         extension,
         limits,
@@ -113,10 +91,10 @@ pub(crate) fn rewrite_extension_list_with_limits_and_output(
     .map_err(map_common_error)
 }
 
-pub(crate) fn canonical_extension_with_limits(
+pub(crate) fn canonical_extension(
     extension: Option<&ExtensionList>,
     limits: &XmlLimits,
 ) -> Result<Option<Vec<u8>>> {
-    litchi_ooxml_common::custom_data::codec::canonical_extension_with_limits(extension, limits)
+    litchi_ooxml_common::custom_data::codec::canonical_extension(extension, limits)
         .map_err(map_common_error)
 }

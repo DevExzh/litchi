@@ -213,10 +213,7 @@ impl<'a> XmlMapInfoRef<'a> {
     ///
     /// Returns an error when input violates OOXML constraints, exceeds a configured
     /// bound, or an underlying XML or package operation fails.
-    pub fn from_owned_with_limits(
-        value: &'a XmlMapInfo,
-        limits: &XmlMapLimits,
-    ) -> crate::Result<Self> {
+    pub fn from_owned(value: &'a XmlMapInfo, limits: &XmlMapLimits) -> crate::Result<Self> {
         if value.schemas.len() > limits.max_schemas || value.maps.len() > limits.max_maps {
             return Err(crate::Error::SpreadsheetXmlMaps(
                 "custom XML maps descriptor count exceeds configured limit".into(),
@@ -241,13 +238,5 @@ impl<'a> XmlMapInfoRef<'a> {
             schemas,
             maps,
         })
-    }
-}
-
-impl<'a> TryFrom<&'a XmlMapInfo> for XmlMapInfoRef<'a> {
-    type Error = crate::Error;
-
-    fn try_from(value: &'a XmlMapInfo) -> Result<Self, Self::Error> {
-        Self::from_owned_with_limits(value, &XmlMapLimits::DEFAULT)
     }
 }

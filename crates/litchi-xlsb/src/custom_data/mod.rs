@@ -25,9 +25,12 @@ pub type Result<T> = crate::package::error::Result<T>;
 /// Validate one delegated `ST_Xstring` UID without exposing the XML codec in
 /// ordinary callers.
 pub(crate) fn validate_id(value: &str) -> Result<()> {
-    litchi_ooxml_common::custom_data::codec::validate_source_properties(&Properties {
-        id: value.to_owned(),
-        extension_list: None,
-    })
+    litchi_ooxml_common::custom_data::codec::validate_source_properties(
+        &Properties {
+            id: value.to_owned(),
+            extension_list: None,
+        },
+        &litchi_ooxml_common::custom_data::Limits::standard(),
+    )
     .map_err(Into::into)
 }

@@ -24,9 +24,8 @@ use crate::package::connections::package::{
 };
 use crate::package::error::Error;
 use litchi_ooxml_common::custom_data::codec::{
-    Limits as XmlLimits, canonical_extension_with_limits, parse_properties_with_limits,
-    rewrite_extension_list_with_limits, rewrite_id_with_limits,
-    validate_source_properties_with_limits, write_properties_with_limits,
+    Limits as XmlLimits, canonical_extension, parse_properties, rewrite_extension_list, rewrite_id,
+    validate_source_properties, write_properties,
 };
 
 const MAX_STORAGES: usize = 4_096;
@@ -1325,8 +1324,7 @@ fn validate_value(value: &CustomDataView, limits: &Limits) -> Result<()> {
         }
     }
     let xml_limits = codec_limits(*limits);
-    validate_source_properties_with_limits(&value.properties, &xml_limits)
-        .map_err(map_common_error)?;
+    validate_source_properties(&value.properties, &xml_limits).map_err(map_common_error)?;
     Ok(())
 }
 
@@ -1741,8 +1739,8 @@ fn load_entries(
         if !data_part.rels().is_empty() {
             return Err(invalid("Custom Data payload has outbound relationships"));
         }
-        let properties = parse_properties_with_limits(properties_xml, &codec_limits(limits))
-            .map_err(map_common_error)?;
+        let properties =
+            parse_properties(properties_xml, &codec_limits(limits)).map_err(map_common_error)?;
         validate_uid_limits(&properties.id, limits)?;
         if !ids.insert(properties.id.clone()) {
             return Err(invalid("Custom Data storage IDs must be unique"));
@@ -2877,29 +2875,38 @@ fn apply_existing_entry(
         let output_limit = replacement_output_limit(package, member.bytes.len(), *limits)?;
         let xml_limits =
             codec_limits_with_output(*limits, limits.max_temporary_bytes().min(output_limit));
-        let extension_same = canonical_extension_with_limits(
+        let extension_same = canonical_extension(
             previous.value.properties.extension_list.as_ref(),
             &xml_limits,
         )
         .map_err(map_common_error)?
-            == canonical_extension_with_limits(
-                entry.value.properties.extension_list.as_ref(),
-                &xml_limits,
-            )
-            .map_err(map_common_error)?;
+            == canonical_extension(entry.value.properties.extension_list.as_ref(), &xml_limits)
+                .map_err(map_common_error)?;
         let mut replacement = if extension_same {
-            rewrite_id_with_limits(proof, entry.id(), &xml_limits).map_err(map_common_error)?
+            rewrite_id(
+                proof,
+                entry.id(),
+                &xml_limits,
+                xml_limits.properties_xml_bytes,
+            )
+            .map_err(map_common_error)?
         } else {
-            rewrite_extension_list_with_limits(
+            rewrite_extension_list(
                 proof,
                 entry.value.properties.extension_list.as_ref(),
                 &xml_limits,
+                xml_limits.properties_xml_bytes,
             )
             .map_err(map_common_error)?
         };
         if !extension_same && previous.id() != entry.id() {
-            replacement = rewrite_id_with_limits(&replacement, entry.id(), &xml_limits)
-                .map_err(map_common_error)?;
+            replacement = rewrite_id(
+                &replacement,
+                entry.id(),
+                &xml_limits,
+                xml_limits.properties_xml_bytes,
+            )
+            .map_err(map_common_error)?;
         }
         if replacement.bytes().len() > limits.max_properties_xml_bytes() {
             return Err(Error::LimitExceeded {
@@ -2954,7 +2961,7 @@ fn add_entry(package: &mut OpcPackage, entry: &Storage, limits: &Limits) -> Resu
         });
     }
     let output_limit = replacement_output_limit(package, 0, *limits)?;
-    let properties_xml = write_properties_with_limits(
+    let properties_xml = write_properties(
         &entry.value.properties,
         &codec_limits_with_output(*limits, limits.max_temporary_bytes().min(output_limit)),
     )

@@ -39,6 +39,7 @@ pub(super) fn stage(
             Ok(crate::xml_maps::serialize_xml_map_info(
                 value,
                 crate::xml_maps::XmlMapConformance::Transitional,
+                &crate::xml_maps::XmlMapLimits::DEFAULT,
             )?)
         })
         .transpose()?;
@@ -389,7 +390,11 @@ mod tests {
             .get_part(&maps_rel.target_partname().unwrap())
             .unwrap();
         assert_eq!(
-            crate::xml_maps::parse_xml_map_info(maps_part.blob()).unwrap(),
+            crate::xml_maps::parse_xml_map_info(
+                maps_part.blob(),
+                &crate::xml_maps::XmlMapLimits::DEFAULT
+            )
+            .unwrap(),
             catalog()
         );
 

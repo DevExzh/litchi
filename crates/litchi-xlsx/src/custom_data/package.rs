@@ -18,9 +18,8 @@ use crate::connections::embedded_data::Bindings;
 use crate::error::{Error, Result, invalid};
 
 use super::codec::{
-    XmlLimits, canonical_extension_with_limits, parse_properties_with_limits,
-    rewrite_extension_list_with_limits_and_output, rewrite_id_with_limits_and_output,
-    validate_source_properties_with_limits, write_properties_with_limits,
+    XmlLimits, canonical_extension, parse_properties, rewrite_extension_list, rewrite_id,
+    validate_source_properties, write_properties,
 };
 use super::{
     CustomData, CustomDataView, DATA_CONTENT_TYPE, DATA_RELATIONSHIP_TYPE, PROPERTIES_CONTENT_TYPE,
@@ -685,10 +684,8 @@ fn same_value(left: &CustomDataView, right: &CustomDataView, limits: Limits) -> 
         return Ok(false);
     }
     let xml_limits = xml_limits(limits);
-    let left =
-        canonical_extension_with_limits(left.properties.extension_list.as_ref(), &xml_limits)?;
-    let right =
-        canonical_extension_with_limits(right.properties.extension_list.as_ref(), &xml_limits)?;
+    let left = canonical_extension(left.properties.extension_list.as_ref(), &xml_limits)?;
+    let right = canonical_extension(right.properties.extension_list.as_ref(), &xml_limits)?;
     Ok(left == right)
 }
 
@@ -1216,8 +1213,7 @@ fn load_entries(package: &OpcPackage, limits: &Limits) -> Result<Vec<Part>> {
                 limits.max_properties_xml_bytes(),
             ));
         }
-        let properties =
-            parse_properties_with_limits(properties_part.blob(), &xml_limits(*limits))?;
+        let properties = parse_properties(properties_part.blob(), &xml_limits(*limits))?;
         validate_uid_limit(&properties.id, *limits)?;
         if !ids.insert(properties.id.clone()) {
             return Err(invalid("Custom Data storage IDs must be unique"));
@@ -1366,7 +1362,7 @@ fn validate_value(value: &CustomDataView, limits: &Limits) -> Result<()> {
             limits.max_extension_xml_bytes(),
         ));
     }
-    validate_source_properties_with_limits(&value.properties, &xml_limits(*limits))
+    validate_source_properties(&value.properties, &xml_limits(*limits))
 }
 
 fn validate_entries(package: &OpcPackage, entries: &[Part], limits: &Limits) -> Result<()> {
@@ -1743,7 +1739,7 @@ fn apply_entries(
                 } else if previous.value.properties.extension_list
                     == entry.value.properties.extension_list
                 {
-                    Some(rewrite_id_with_limits_and_output(
+                    Some(rewrite_id(
                         previous
                             .source_properties_proof
                             .as_ref()
@@ -1754,7 +1750,7 @@ fn apply_entries(
                     )?)
                 } else {
                     let rewrite_limits = xml_limits(*limits);
-                    let mut proof = rewrite_extension_list_with_limits_and_output(
+                    let mut proof = rewrite_extension_list(
                         previous
                             .source_properties_proof
                             .as_ref()
@@ -1764,7 +1760,7 @@ fn apply_entries(
                         limits.max_temporary_bytes(),
                     )?;
                     if previous.id() != entry.id() {
-                        proof = rewrite_id_with_limits_and_output(
+                        proof = rewrite_id(
                             &proof,
                             entry.id(),
                             &rewrite_limits,
@@ -1784,7 +1780,7 @@ fn apply_entries(
                     }
                     package.try_replace_owned_xml_part(&previous.source_properties, proof)?;
                 } else {
-                    let properties = write_properties_with_limits(
+                    let properties = write_properties(
                         &entry.value.properties,
                         &xml_limits_with_output(*limits, limits.max_temporary_bytes()),
                     )?;
@@ -2250,7 +2246,7 @@ fn projected_properties_len(
     limits: Limits,
 ) -> Result<usize> {
     let Some(previous) = previous else {
-        let bytes = write_properties_with_limits(
+        let bytes = write_properties(
             &entry.value.properties,
             &xml_limits_with_output(limits, limits.max_temporary_bytes()),
         )?;
@@ -2270,7 +2266,7 @@ fn projected_properties_len(
             .as_ref()
             .clone()
     } else if previous.value.properties.extension_list == entry.value.properties.extension_list {
-        rewrite_id_with_limits_and_output(
+        rewrite_id(
             previous
                 .source_properties_proof
                 .as_ref()
@@ -2280,7 +2276,7 @@ fn projected_properties_len(
             limits.max_temporary_bytes(),
         )?
     } else {
-        let mut proof = rewrite_extension_list_with_limits_and_output(
+        let mut proof = rewrite_extension_list(
             previous
                 .source_properties_proof
                 .as_ref()
@@ -2290,7 +2286,7 @@ fn projected_properties_len(
             limits.max_temporary_bytes(),
         )?;
         if previous.id() != entry.id() {
-            proof = rewrite_id_with_limits_and_output(
+            proof = rewrite_id(
                 &proof,
                 entry.id(),
                 &rewrite_limits,
@@ -2336,7 +2332,7 @@ fn add_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Result<
     // in the workbook `.rels` member when the new edge is spliced in.
     let read_limits = bounded_read_limits(package, *limits)?;
     let properties_xml = if entry.source_properties.is_empty() {
-        Arc::new(write_properties_with_limits(
+        Arc::new(write_properties(
             &entry.value.properties,
             &xml_limits_with_output(*limits, limits.max_temporary_bytes()),
         )?)
