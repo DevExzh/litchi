@@ -58,6 +58,15 @@ How a committed package works (`source_backed/deferred.rs`):
   a family's `Change` (`is_noop`, `inverse`, `publish(&Package) ->
   Package`); the family adds `Edit` and `LimitKind`.
 
-Families converted so far: `document_variables`, `section_layout`,
-`hyperlink_detachment`, `hyperlink_redaction`, `story_hyperlink_redaction`,
-`alt_chunk_payload`, `story_text_edit`, `glossary_text`.
+Families (all under `litchi_docx::source_backed`): `document_variables`,
+`section_layout`, `hyperlink_detachment`, `hyperlink_redaction`,
+`story_hyperlink_redaction`, `alt_chunk_payload`, `story_text_edit`,
+`glossary_text`, `plain_paragraph_copy`, `plain_paragraph_removal`, `svg`,
+`tail_append` (`Edit::prepare()` → `Plan` with its proofs → `commit()`)
+and `paragraph_stream` (`ParagraphStreamEdit`). The source document edit
+already committed to a package; its detached-snapshot stream publishers are
+removed. No public `*_to_stream` publisher remains in `litchi-docx`.
+
+A prepared splice can be written more than once: litchi-opc gained
+`SourcePartSplicePlan::{into_owned, duplicate}`, so a committed tail append
+keeps the plan it prepared (no second scan) and every save streams it.

@@ -10,15 +10,13 @@ use crate::namespace::{STRICT_WORDPROCESSINGML_NAMESPACE, WORDPROCESSINGML_NAMES
 use litchi_core::{CancellationToken, ExecutionContext, Reservation, Resource};
 use litchi_opc::SourceArtifactFingerprint;
 use litchi_opc::source_backed::{
-    SourcePartSpliceLimits, SourcePartSpliceProof, SourcePartSplicePublication,
-    SourcePartSpliceReplay, SourcePartSpliceReplayError, SourcePartSpliceReplayProof,
-    VerifiedDecodedReaderError,
+    SourcePartSpliceLimits, SourcePartSpliceProof, SourcePartSpliceReplay,
+    SourcePartSpliceReplayError, SourcePartSpliceReplayProof, VerifiedDecodedReaderError,
 };
 use sha2::{Digest as _, Sha256};
 use std::fmt;
 use std::io::{self, BufRead, Read, Write};
 use std::marker::PhantomData;
-use std::path::Path;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
@@ -90,13 +88,13 @@ impl AuthoredReplayReference {
     ) -> std::result::Result<Self, AuthoredReplayError> {
         validate_replay_reference_maximum(maximum)?;
         let length = u64::try_from(bytes.len()).map_err(|_| AuthoredReplayError::Limit {
-            resource: "durable replay reference bytes",
+            kind: LimitKind::DurableReplayReferenceBytes,
             actual: u64::MAX,
             maximum,
         })?;
         if length == 0 || length > maximum {
             return Err(AuthoredReplayError::Limit {
-                resource: "durable replay reference bytes",
+                kind: LimitKind::DurableReplayReferenceBytes,
                 actual: length,
                 maximum,
             });
@@ -120,13 +118,13 @@ impl AuthoredReplayReference {
     ) -> std::result::Result<(), AuthoredReplayError> {
         validate_replay_reference_maximum(maximum)?;
         let length = u64::try_from(self.0.len()).map_err(|_| AuthoredReplayError::Limit {
-            resource: "durable replay reference bytes",
+            kind: LimitKind::DurableReplayReferenceBytes,
             actual: u64::MAX,
             maximum,
         })?;
         if length > maximum {
             return Err(AuthoredReplayError::Limit {
-                resource: "durable replay reference bytes",
+                kind: LimitKind::DurableReplayReferenceBytes,
                 actual: length,
                 maximum,
             });
@@ -156,14 +154,14 @@ impl AuthoredReplayReference {
 fn validate_replay_reference_maximum(maximum: u64) -> std::result::Result<(), AuthoredReplayError> {
     if maximum == 0 || maximum == u64::MAX {
         return Err(AuthoredReplayError::Limit {
-            resource: "durable replay reference bytes",
+            kind: LimitKind::DurableReplayReferenceBytes,
             actual: maximum,
             maximum: maximum.saturating_sub(1),
         });
     }
     if maximum > patch::ABSOLUTE_MAX_PATCH_BYTES as u64 {
         return Err(AuthoredReplayError::Limit {
-            resource: "durable replay reference bytes",
+            kind: LimitKind::DurableReplayReferenceBytes,
             actual: maximum,
             maximum: patch::ABSOLUTE_MAX_PATCH_BYTES as u64,
         });
@@ -213,10 +211,10 @@ pub enum AuthoredReplayError {
     #[error("authored paragraph stream is invalid: {0}")]
     Invalid(&'static str),
     /// A bounded authored resource was exceeded.
-    #[error("authored paragraph stream {resource} limit exceeded: {actual} > {maximum}")]
+    #[error("authored paragraph stream {kind} limit exceeded: {actual} > {maximum}")]
     Limit {
-        /// Resource name.
-        resource: &'static str,
+        /// The exceeded budget (record 0355a).
+        kind: LimitKind,
         /// Observed value.
         actual: u64,
         /// Configured ceiling.
@@ -417,18 +415,18 @@ impl ParagraphStreamLimits {
     pub fn validate(self) -> Result<(), Error> {
         self.source.validate_for_stream()?;
         for (resource, value) in [
-            ("authored paragraphs", self.max_authored_paragraphs),
-            ("authored events", self.max_authored_events),
-            ("authored chunk bytes", self.max_authored_chunk_bytes),
-            ("authored text bytes", self.max_authored_text_bytes),
-            ("authored XML bytes", self.max_authored_xml_bytes),
-            ("replay bytes", self.max_replay_bytes),
-            ("replay window bytes", self.max_replay_window_bytes),
-            ("patch bytes", self.max_patch_bytes),
+            (LimitKind::AuthoredParagraphs, self.max_authored_paragraphs),
+            (LimitKind::AuthoredEvents, self.max_authored_events),
+            (LimitKind::AuthoredChunkBytes, self.max_authored_chunk_bytes),
+            (LimitKind::AuthoredTextBytes, self.max_authored_text_bytes),
+            (LimitKind::AuthoredXmlBytes, self.max_authored_xml_bytes),
+            (LimitKind::ReplayBytes, self.max_replay_bytes),
+            (LimitKind::ReplayWindowBytes, self.max_replay_window_bytes),
+            (LimitKind::PatchBytes, self.max_patch_bytes),
         ] {
             if value == 0 || value == u64::MAX {
                 return Err(Error::Limit {
-                    resource,
+                    kind: resource,
                     actual: value,
                     maximum: value.saturating_sub(1),
                 });
@@ -438,20 +436,20 @@ impl ParagraphStreamLimits {
             .max_authored_chunk_bytes
             .checked_mul(6)
             .ok_or(Error::Limit {
-                resource: "replay window bytes",
+                kind: LimitKind::ReplayWindowBytes,
                 actual: u64::MAX,
                 maximum: self.max_replay_window_bytes,
             })?;
         if chunk_window > self.max_replay_window_bytes {
             return Err(Error::Limit {
-                resource: "replay window bytes",
+                kind: LimitKind::ReplayWindowBytes,
                 actual: chunk_window,
                 maximum: self.max_replay_window_bytes,
             });
         }
         if self.max_patch_bytes > patch::ABSOLUTE_MAX_PATCH_BYTES as u64 {
             return Err(Error::Limit {
-                resource: "patch bytes",
+                kind: LimitKind::PatchBytes,
                 actual: self.max_patch_bytes,
                 maximum: patch::ABSOLUTE_MAX_PATCH_BYTES as u64,
             });
@@ -477,10 +475,10 @@ pub enum Error {
     #[error(transparent)]
     Patch(#[from] patch::PatchError),
     /// An independent stream limit was exceeded.
-    #[error("paragraph stream {resource} limit exceeded: {actual} > {maximum}")]
+    #[error("paragraph stream {kind} limit exceeded: {actual} > {maximum}")]
     Limit {
-        /// Resource name.
-        resource: &'static str,
+        /// The exceeded budget (record 0355a).
+        kind: LimitKind,
         /// Observed value.
         actual: u64,
         /// Configured ceiling.
@@ -494,10 +492,10 @@ pub enum Error {
 /// Result type for the replayable paragraph stream operation.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-fn check_limit(resource: &'static str, actual: u64, maximum: u64) -> Result<(), Error> {
+fn check_limit(resource: LimitKind, actual: u64, maximum: u64) -> Result<(), Error> {
     if actual > maximum {
         return Err(Error::Limit {
-            resource,
+            kind: resource,
             actual,
             maximum,
         });
@@ -567,13 +565,13 @@ impl MemoryReplayStore {
     pub fn new(maximum: u64) -> Result<Self, AuthoredReplayError> {
         if maximum == 0 || maximum == u64::MAX {
             return Err(AuthoredReplayError::Limit {
-                resource: "replay bytes",
+                kind: LimitKind::ReplayBytes,
                 actual: maximum,
                 maximum: maximum.saturating_sub(1),
             });
         }
         usize::try_from(maximum).map_err(|_| AuthoredReplayError::Limit {
-            resource: "replay bytes",
+            kind: LimitKind::ReplayBytes,
             actual: maximum,
             maximum: usize::MAX as u64,
         })?;
@@ -604,7 +602,7 @@ impl MemoryReplayStore {
         check_store_operation(context, cancellation)
             .map_err(|error| AuthoredReplayError::Provider(Box::new(error)))?;
         let capacity = usize::try_from(maximum).map_err(|_| AuthoredReplayError::Limit {
-            resource: "replay bytes",
+            kind: LimitKind::ReplayBytes,
             actual: maximum,
             maximum: usize::MAX as u64,
         })?;
@@ -816,7 +814,7 @@ impl AuthoredReplayStore for MemoryReplayStore {
     ) -> Result<(), AuthoredReplayError> {
         if self.maximum > limits.max_replay_bytes {
             return Err(AuthoredReplayError::Limit {
-                resource: "replay bytes",
+                kind: LimitKind::ReplayBytes,
                 actual: self.maximum,
                 maximum: limits.max_replay_bytes,
             });
@@ -840,25 +838,25 @@ impl AuthoredReplayStore for MemoryReplayStore {
 
     fn append(&mut self, chunk: &[u8]) -> Result<(), AuthoredReplayError> {
         let current = u64::try_from(self.bytes.len()).map_err(|_| AuthoredReplayError::Limit {
-            resource: "replay bytes",
+            kind: LimitKind::ReplayBytes,
             actual: u64::MAX,
             maximum: self.maximum,
         })?;
         let amount = u64::try_from(chunk.len()).map_err(|_| AuthoredReplayError::Limit {
-            resource: "replay bytes",
+            kind: LimitKind::ReplayBytes,
             actual: u64::MAX,
             maximum: self.maximum,
         })?;
         let next = current
             .checked_add(amount)
             .ok_or(AuthoredReplayError::Limit {
-                resource: "replay bytes",
+                kind: LimitKind::ReplayBytes,
                 actual: u64::MAX,
                 maximum: self.maximum,
             })?;
         if next > self.maximum {
             return Err(AuthoredReplayError::Limit {
-                resource: "replay bytes",
+                kind: LimitKind::ReplayBytes,
                 actual: next,
                 maximum: self.maximum,
             });
@@ -870,7 +868,7 @@ impl AuthoredReplayStore for MemoryReplayStore {
 
     fn finish(mut self, proof: AuthoredStreamProof) -> Result<Self::Handle, AuthoredReplayError> {
         let length = u64::try_from(self.bytes.len()).map_err(|_| AuthoredReplayError::Limit {
-            resource: "replay bytes",
+            kind: LimitKind::ReplayBytes,
             actual: u64::MAX,
             maximum: self.maximum,
         })?;
@@ -1304,7 +1302,7 @@ impl AuthoredReplayHandle for BoundReplayHandle {
     }
 }
 
-trait AuthoredInput: Send + Sync {
+pub(crate) trait AuthoredInput: Send + Sync {
     fn seal(
         &self,
         strict_namespace: bool,
@@ -1414,7 +1412,7 @@ impl<S: encoder::ChunkSink> ParagraphEventSink for EncoderEventSink<'_, S> {
 }
 
 #[derive(Clone)]
-struct PatchExpectations {
+pub(crate) struct PatchExpectations {
     source: patch::StreamSourceProof,
     authored: AuthoredStreamProof,
     candidate: patch::StreamCandidateProof,
@@ -1515,9 +1513,14 @@ impl<'package, S> ParagraphStreamEdit<'package, S> {
         prepare_stream(self)
     }
 
-    /// Prepare and consume the stream edit as a named commit product.
-    pub fn commit(self) -> Result<ParagraphStreamCommit<'package>> {
-        Ok(self.prepare()?.commit())
+    /// Prepare and commit the stream append as a new source-backed package
+    /// (record 0355a); writing that package streams the append.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::prepare`].
+    pub fn commit(self) -> Result<super::paragraph_stream::Commit> {
+        self.prepare()?.commit()
     }
 }
 
@@ -1534,6 +1537,10 @@ pub struct ParagraphStreamPlan<'package> {
     replay: Arc<dyn AuthoredReplayHandle>,
     main_part: String,
     expected_candidate_archive: Option<patch::ArtifactProof>,
+    /// The authored input and expectations, kept for replaying the commit's
+    /// patch onto another package (record 0355a).
+    input: Arc<dyn AuthoredInput>,
+    expected: Option<PatchExpectations>,
 }
 
 impl fmt::Debug for ParagraphStreamPlan<'_> {
@@ -1596,10 +1603,10 @@ impl<'package> ParagraphStreamPlan<'package> {
         self.limits
     }
 
-    /// Borrow the replay handle for the durable patch owner.
+    /// The main-document part name the plan appends to.
     #[must_use]
-    pub(super) fn replay_handle(&self) -> &dyn AuthoredReplayHandle {
-        self.replay.as_ref()
+    pub fn main_part(&self) -> &str {
+        &self.main_part
     }
 
     /// Return the optional durable authored provider reference.
@@ -1608,165 +1615,58 @@ impl<'package> ParagraphStreamPlan<'package> {
         self.replay.durable_reference()
     }
 
-    /// Consume this plan into a named commit product.
-    #[must_use]
-    pub fn commit(self) -> ParagraphStreamCommit<'package> {
-        ParagraphStreamCommit { plan: self }
-    }
-
-    /// Publish this plan directly to a sequential sink.
-    pub fn write_to(self, writer: impl Write) -> Result<ParagraphStreamPublication> {
-        self.commit().write_to(writer)
-    }
-
-    /// Atomically publish this plan to a filesystem path.
+    /// Commit the prepared append as a new source-backed package; writing
+    /// that package streams this plan's splice (record 0355a).
     ///
-    /// The path publication uses the same consuming commit and source-backed
-    /// splice as [`Self::write_to`].  The existing splice callback
-    /// authenticates the source, candidate, replay, budget, and cancellation
-    /// state while writing the complete candidate to an atomic temporary
-    /// sibling; only then does the filesystem layer synchronize and replace
-    /// the destination.  This is not a compare-and-swap or a continuous source
-    /// watch, so source freshness remains the callback's existing contract.
-    /// A successful call returns the same source, candidate, replay, and
-    /// inverse evidence as stream publication.
-    pub fn write_to_path(self, path: impl AsRef<Path>) -> Result<ParagraphStreamPublication> {
-        self.commit().write_to_path(path)
-    }
-}
-
-/// Named consuming commit product for one stream append.
-pub struct ParagraphStreamCommit<'package> {
-    plan: ParagraphStreamPlan<'package>,
-}
-
-impl<'package> ParagraphStreamCommit<'package> {
-    /// Borrow the prepared source proof.
-    #[must_use]
-    pub const fn source_proof(&self) -> tail_append::SourceProof {
-        self.plan.source
-    }
-
-    /// Borrow the prepared authored proof.
-    #[must_use]
-    pub const fn authored_proof(&self) -> AuthoredStreamProof {
-        self.plan.authored
-    }
-
-    /// Publish to a sequential sink and retain an exact immediate inverse.
-    pub fn write_to(self, writer: impl Write) -> Result<ParagraphStreamPublication> {
-        publish_stream(self, writer)
-    }
-
-    /// Atomically publish this consuming commit to a filesystem path.
+    /// # Errors
     ///
-    /// OPC filesystem failures are returned as [`Error::Opc`], including
-    /// [`litchi_opc::error::OpcError::Committed`] when replacement succeeded
-    /// but the parent directory could not be synchronized.  `Committed` means
-    /// the destination has already been replaced; this method returns no
-    /// publication or inverse product in that case, so callers must inspect
-    /// the output and must not blindly retry.  A source, candidate, replay,
-    /// budget, cancellation, or inverse-proof failure from the splice callback
-    /// is passed through unchanged and leaves the destination untouched.
-    pub fn write_to_path(self, path: impl AsRef<Path>) -> Result<ParagraphStreamPublication> {
-        publish_stream_to_path(self, path.as_ref())
+    /// Returns a signature or encryption refusal of a changed source.
+    pub fn commit(self) -> Result<super::paragraph_stream::Commit> {
+        super::paragraph_stream::commit_plan(self)
+    }
+
+    pub(super) fn package_share(&self) -> Package {
+        self.package.clone()
+    }
+
+    pub(super) fn into_prepared(self) -> PreparedStream {
+        PreparedStream {
+            base: self.package.clone(),
+            splice: self.splice.into_owned(),
+            expected_candidate_archive: self.expected_candidate_archive,
+        }
+    }
+
+    pub(super) fn replay_input(&self) -> (Arc<dyn AuthoredInput>, Option<PatchExpectations>) {
+        (Arc::clone(&self.input), self.expected.clone())
     }
 }
 
-/// Successful stream publication and immediate exact-inverse authorization.
-#[derive(Debug)]
-pub struct ParagraphStreamPublication {
-    source: tail_append::SourceProof,
-    candidate: tail_append::CandidateProof,
-    authored: AuthoredStreamProof,
-    splice: SourcePartSplicePublication,
-    source_artifact_fingerprint: SourceArtifactFingerprint,
-    source_artifact_length: u64,
-    limits: ParagraphStreamLimits,
-    main_part: String,
-    replay_reference: Option<AuthoredReplayReference>,
+/// A prepared stream splice that outlives its preparation borrow.
+pub(crate) struct PreparedStream {
+    pub(super) base: Package,
+    splice: litchi_opc::source_backed::SourcePartSplicePlan<'static>,
+    expected_candidate_archive: Option<patch::ArtifactProof>,
 }
 
-impl ParagraphStreamPublication {
-    /// Borrow source semantic proof.
-    #[must_use]
-    pub const fn source_proof(&self) -> tail_append::SourceProof {
-        self.source
+impl PreparedStream {
+    pub(super) fn is_noop(&self) -> bool {
+        self.splice.is_noop()
     }
 
-    /// Borrow candidate semantic proof.
-    #[must_use]
-    pub const fn candidate_proof(&self) -> tail_append::CandidateProof {
-        self.candidate
-    }
-
-    /// Borrow authored stream proof.
-    #[must_use]
-    pub const fn authored_proof(&self) -> AuthoredStreamProof {
-        self.authored
-    }
-
-    /// Return the published raw archive fingerprint.
-    #[must_use]
-    pub const fn candidate_artifact_fingerprint(&self) -> SourceArtifactFingerprint {
-        self.splice.candidate_artifact_fingerprint()
-    }
-
-    /// Return the exact number of bytes in the published archive.
-    #[must_use]
-    pub const fn candidate_artifact_length(&self) -> u64 {
-        self.splice.candidate_artifact_len()
-    }
-
-    /// Return the raw source archive fingerprint captured before publication.
-    #[must_use]
-    pub const fn source_artifact_fingerprint(&self) -> SourceArtifactFingerprint {
-        self.source_artifact_fingerprint
-    }
-
-    /// Return the raw source archive length captured before publication.
-    #[must_use]
-    pub const fn source_artifact_length(&self) -> u64 {
-        self.source_artifact_length
-    }
-
-    /// Build the compact forward patch authorized by this publication.
-    pub fn patch(&self) -> patch::Result<patch::ParagraphStreamPatch> {
-        let source_archive = patch::ArtifactProof::new(
-            self.source_artifact_length,
-            self.source_artifact_fingerprint.into_sha256(),
-        );
-        let candidate_archive = patch::ArtifactProof::new(
-            self.candidate_artifact_length(),
-            self.candidate_artifact_fingerprint().into_sha256(),
-        );
-        patch::ParagraphStreamPatch::from_tail_append_proofs(
-            patch::PatchLimits::from_stream_limits(&self.limits),
-            self.main_part.clone(),
-            self.source,
-            self.authored,
-            self.candidate,
-            source_archive,
-            candidate_archive,
-            self.replay_reference.clone(),
-        )
-    }
-
-    /// Alias for callers that require an explicit durable-patch product.
-    pub fn durable_patch(&self) -> patch::Result<patch::ParagraphStreamPatch> {
-        self.patch()
-    }
-
-    /// Restore the exact original archive after authenticating the current candidate.
-    pub fn write_inverse_to_stream(
-        &self,
-        current: &Package,
-        writer: impl Write,
-    ) -> Result<(), Error> {
-        current.trim_clean_paragraph_index_for_operation();
-        self.splice
-            .write_inverse_to_stream(current.physical_opc_package()?, writer)
-            .map_err(Error::Opc)
+    pub(super) fn write(&self, writer: &mut dyn Write) -> Result<()> {
+        let splice = self.splice.duplicate();
+        match self.expected_candidate_archive {
+            Some(expected) => splice
+                .write_to_with_expected_artifact(
+                    writer,
+                    expected.len,
+                    SourceArtifactFingerprint::from_sha256(expected.sha256),
+                )
+                .map_err(Error::Opc)?,
+            None => splice.write_to(writer).map_err(Error::Opc)?,
+        };
+        Ok(())
     }
 }
 
@@ -1823,15 +1723,13 @@ impl Package {
     /// before the supplied sink is touched; the candidate archive identity is
     /// checked against the retained patch identity as the physical publication
     /// completes.
-    pub fn apply_tail_append_stream_patch<R, W>(
+    pub fn apply_tail_append_stream_patch<R>(
         &self,
         durable: &patch::ParagraphStreamPatch,
         resolver: &R,
-        writer: W,
-    ) -> Result<ParagraphStreamPublication>
+    ) -> Result<super::paragraph_stream::Commit>
     where
         R: patch::AuthoredReplayResolver,
-        W: Write,
     {
         self.trim_clean_paragraph_index_for_operation();
         let limits = ParagraphStreamLimits::from_patch_limits(durable.limits())?;
@@ -1871,22 +1769,20 @@ impl Package {
         };
         let plan = make_edit().prepare()?;
         ensure_current_archive(self, source_archive)?;
-        plan.write_to(writer)
+        plan.commit()
     }
 
     /// Apply a durable stream patch using the shorter transaction-family
     /// name.
-    pub fn apply_tail_append_patch<R, W>(
+    pub fn apply_tail_append_patch<R>(
         &self,
         durable: &patch::ParagraphStreamPatch,
         resolver: &R,
-        writer: W,
-    ) -> Result<ParagraphStreamPublication>
+    ) -> Result<super::paragraph_stream::Commit>
     where
         R: patch::AuthoredReplayResolver,
-        W: Write,
     {
-        self.apply_tail_append_stream_patch(durable, resolver, writer)
+        self.apply_tail_append_stream_patch(durable, resolver)
     }
 }
 
@@ -1982,7 +1878,7 @@ fn prepare_stream<'package, S>(
         .declared_uncompressed_size()
         .map_err(|error| Error::TailAppend(tail_append::Error::Document(error.into())))?;
     check_limit(
-        "source XML bytes",
+        LimitKind::SourceXmlBytes,
         source_len,
         limits.source.max_source_xml_bytes,
     )?;
@@ -2016,24 +1912,24 @@ fn prepare_stream<'package, S>(
     )?;
     let authored_proof = authored.proof();
     check_limit(
-        "authored XML bytes",
+        LimitKind::AuthoredXmlBytes,
         authored_proof.encoded_xml_bytes,
         limits.max_authored_xml_bytes,
     )?;
     check_limit(
-        "fragment bytes",
+        LimitKind::FragmentBytes,
         authored_proof.encoded_xml_bytes,
         limits.source.max_fragment_bytes,
     )?;
     let candidate_len = source_len
         .checked_add(authored_proof.encoded_xml_bytes)
         .ok_or(Error::Limit {
-            resource: "candidate XML bytes",
+            kind: LimitKind::CandidateXmlBytes,
             actual: u64::MAX,
             maximum: limits.source.max_candidate_xml_bytes,
         })?;
     check_limit(
-        "candidate XML bytes",
+        LimitKind::CandidateXmlBytes,
         candidate_len,
         limits.source.max_candidate_xml_bytes,
     )?;
@@ -2147,6 +2043,8 @@ fn prepare_stream<'package, S>(
         expected_candidate_archive: expected
             .as_ref()
             .map(|expectation| expectation.candidate.archive),
+        input: Arc::clone(&input),
+        expected,
     })
 }
 
@@ -2165,7 +2063,7 @@ fn validate_stream_candidate(
         .len
         .checked_add(authored.encoded_xml_bytes)
         .ok_or(Error::Limit {
-            resource: "candidate XML bytes",
+            kind: LimitKind::CandidateXmlBytes,
             actual: u64::MAX,
             maximum: limits.max_candidate_xml_bytes,
         })?;
@@ -2173,7 +2071,7 @@ fn validate_stream_candidate(
         .insertion_offset
         .checked_add(authored.encoded_xml_bytes)
         .ok_or(Error::Limit {
-            resource: "candidate XML bytes",
+            kind: LimitKind::CandidateXmlBytes,
             actual: u64::MAX,
             maximum: limits.max_candidate_xml_bytes,
         })?;
@@ -2181,7 +2079,7 @@ fn validate_stream_candidate(
         .paragraph_count
         .checked_add(authored.paragraph_count)
         .ok_or(Error::Limit {
-            resource: "paragraphs",
+            kind: LimitKind::Paragraphs,
             actual: u64::MAX,
             maximum: limits.max_paragraphs,
         })?;
@@ -2236,68 +2134,6 @@ fn candidate_proof_matches(
         && expected.sect_pr_sha256 == actual.sect_pr_sha256
 }
 
-fn publish_stream(
-    commit: ParagraphStreamCommit<'_>,
-    writer: impl Write,
-) -> Result<ParagraphStreamPublication> {
-    let ParagraphStreamCommit { plan } = commit;
-    plan.package.trim_clean_paragraph_index_for_operation();
-    let replay_reference = plan.replay_handle().durable_reference();
-    let ParagraphStreamPlan {
-        package: _,
-        splice,
-        source,
-        candidate,
-        authored,
-        limits,
-        source_artifact_fingerprint,
-        source_artifact_length,
-        replay: _,
-        main_part,
-        expected_candidate_archive,
-    } = plan;
-    let splice = match expected_candidate_archive {
-        Some(expected) => splice
-            .write_to_with_expected_artifact(
-                writer,
-                expected.len,
-                SourceArtifactFingerprint::from_sha256(expected.sha256),
-            )
-            .map_err(Error::Opc)?,
-        None => splice.write_to(writer).map_err(Error::Opc)?,
-    };
-    Ok(ParagraphStreamPublication {
-        source,
-        candidate,
-        authored,
-        splice,
-        source_artifact_fingerprint,
-        source_artifact_length,
-        limits,
-        main_part,
-        replay_reference,
-    })
-}
-
-fn publish_stream_to_path(
-    commit: ParagraphStreamCommit<'_>,
-    path: &Path,
-) -> Result<ParagraphStreamPublication> {
-    commit
-        .plan
-        .package
-        .trim_clean_paragraph_index_for_operation();
-    let mut publication = None;
-    litchi_opc::atomic::replace_with::<Error>(path, |temporary| {
-        let published = publish_stream(commit, temporary)?;
-        publication = Some(published);
-        Ok(())
-    })?;
-    publication.ok_or(Error::Invalid(
-        "atomic stream publication completed without a publication product",
-    ))
-}
-
 struct ReplaySpliceReader<'a> {
     source: &'a mut dyn BufRead,
     source_len: u64,
@@ -2326,13 +2162,13 @@ impl<'a> ReplaySpliceReader<'a> {
             ));
         }
         let window = usize::try_from(window).map_err(|_| AuthoredReplayError::Limit {
-            resource: "replay window bytes",
+            kind: LimitKind::ReplayWindowBytes,
             actual: window,
             maximum: usize::MAX as u64,
         })?;
         if window == 0 {
             return Err(AuthoredReplayError::Limit {
-                resource: "replay window bytes",
+                kind: LimitKind::ReplayWindowBytes,
                 actual: 0,
                 maximum: 0,
             });
@@ -2567,5 +2403,101 @@ mod authenticated_reader_tests {
             Some(AuthoredReplayError::Changed)
         ));
         assert!(reader.read(&mut [0; 1]).is_err());
+    }
+}
+
+impl From<crate::Error> for Error {
+    fn from(error: crate::Error) -> Self {
+        Self::TailAppend(tail_append::Error::Document(error))
+    }
+}
+
+impl Package {
+    /// A stream edit over a retained authored input (record 0355a replay).
+    pub(super) fn stream_edit(
+        &self,
+        input: Arc<dyn AuthoredInput>,
+        limits: ParagraphStreamLimits,
+        expected: Option<PatchExpectations>,
+    ) -> ParagraphStreamEdit<'_, ()> {
+        ParagraphStreamEdit {
+            package: self,
+            input,
+            limits,
+            cancellation: None,
+            expected,
+            marker: PhantomData,
+        }
+    }
+}
+/// The bounded resources of a paragraph-stream append, carried by [`Error::Limit`] and [`AuthoredReplayError::Limit`] (record 0355a).
+///
+/// Each variant names one bounded resource; [`std::fmt::Display`] gives its
+/// human-readable name, the one the error messages print.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Authored chunk bytes.
+    AuthoredChunkBytes,
+    /// Authored event work.
+    AuthoredEventWork,
+    /// Authored events.
+    AuthoredEvents,
+    /// Authored paragraphs.
+    AuthoredParagraphs,
+    /// Authored text bytes.
+    AuthoredTextBytes,
+    /// Authored text characters.
+    AuthoredTextCharacters,
+    /// Authored XML bytes.
+    AuthoredXmlBytes,
+    /// Candidate XML bytes.
+    CandidateXmlBytes,
+    /// Durable replay reference bytes.
+    DurableReplayReferenceBytes,
+    /// Fragment bytes.
+    FragmentBytes,
+    /// Paragraphs.
+    Paragraphs,
+    /// Patch bytes.
+    PatchBytes,
+    /// Replay bytes.
+    ReplayBytes,
+    /// Replay reader state bytes.
+    ReplayReaderStateBytes,
+    /// Replay window bytes.
+    ReplayWindowBytes,
+    /// Source XML bytes.
+    SourceXmlBytes,
+}
+
+impl LimitKind {
+    /// The resource's human-readable name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::AuthoredChunkBytes => "authored chunk bytes",
+            Self::AuthoredEventWork => "authored event work",
+            Self::AuthoredEvents => "authored events",
+            Self::AuthoredParagraphs => "authored paragraphs",
+            Self::AuthoredTextBytes => "authored text bytes",
+            Self::AuthoredTextCharacters => "authored text characters",
+            Self::AuthoredXmlBytes => "authored XML bytes",
+            Self::CandidateXmlBytes => "candidate XML bytes",
+            Self::DurableReplayReferenceBytes => "durable replay reference bytes",
+            Self::FragmentBytes => "fragment bytes",
+            Self::Paragraphs => "paragraphs",
+            Self::PatchBytes => "patch bytes",
+            Self::ReplayBytes => "replay bytes",
+            Self::ReplayReaderStateBytes => "replay reader state bytes",
+            Self::ReplayWindowBytes => "replay window bytes",
+            Self::SourceXmlBytes => "source XML bytes",
+        }
+    }
+}
+
+impl fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
     }
 }

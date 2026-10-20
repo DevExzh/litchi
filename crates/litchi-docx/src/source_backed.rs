@@ -27,10 +27,14 @@ pub mod hyperlink_detachment;
 pub mod hyperlink_redaction;
 pub mod paragraph_copy;
 pub mod paragraph_remove;
+pub mod paragraph_stream;
+pub mod plain_paragraph_copy;
+pub mod plain_paragraph_removal;
 pub mod section_layout;
 pub mod story_hyperlink_redaction;
 pub mod story_text;
 pub mod story_text_edit;
+pub mod svg;
 pub mod tail_append;
 pub mod tail_append_stream;
 
@@ -45,20 +49,16 @@ pub use story_text::{
 pub use svg_lifecycle::{
     PictureSelector, PictureSelector as SvgPictureSelector, RasterResourceSourceView,
     RasterResourceView, SourceBackedSvgAttachmentBatchCommit, SourceBackedSvgAttachmentBatchEdit,
-    SourceBackedSvgAttachmentBatchPatch, SourceBackedSvgAttachmentBatchPublication,
-    SourceBackedSvgAttachmentBatchSnapshot, SourceBackedSvgAttachmentCommit,
-    SourceBackedSvgAttachmentEdit, SourceBackedSvgAttachmentPatch,
-    SourceBackedSvgAttachmentPublication, SourceBackedSvgAttachmentReplacement,
-    SourceBackedSvgAttachmentSnapshot, SourceSvgAttachment, SourceSvgPictureSourceView,
-    SourceSvgPictureView, SvgAttachmentCommitDiagnostics, SvgInput, SvgPictureOwnerState,
-    SvgPictureView, SvgResourceSourceView, SvgResourceView,
+    SourceBackedSvgAttachmentBatchPatch, SourceBackedSvgAttachmentBatchSnapshot,
+    SourceBackedSvgAttachmentReplacement, SourceBackedSvgAttachmentSnapshot, SourceSvgAttachment,
+    SourceSvgPictureSourceView, SourceSvgPictureView, SvgAttachmentCommitDiagnostics, SvgInput,
+    SvgPictureOwnerState, SvgPictureView, SvgResourceSourceView, SvgResourceView,
 };
 
 pub use tail_append::{
     CandidateProof as TailAppendCandidateProof, Commit as TailAppendCommit, Edit as TailAppendEdit,
     Error as TailAppendError, Limits as TailAppendLimits, Options as TailAppendOptions,
-    Plan as TailAppendPlan, Publication as TailAppendPublication, Refusal as TailAppendRefusal,
-    SourceProof as TailAppendSourceProof,
+    Plan as TailAppendPlan, Refusal as TailAppendRefusal, SourceProof as TailAppendSourceProof,
 };
 
 pub use tail_append_stream::{
@@ -72,10 +72,8 @@ pub use tail_append_stream::{
     MemoryReplayStore as TailAppendStreamMemoryReplayStore,
     OneShotParagraphProducer as TailAppendStreamOneShotProducer,
     ParagraphCursor as TailAppendStreamCursor, ParagraphEventSink as TailAppendStreamEventSink,
-    ParagraphStreamCommit as TailAppendStreamCommit, ParagraphStreamEdit as TailAppendStreamEdit,
-    ParagraphStreamLimits as TailAppendStreamLimits, ParagraphStreamPlan as TailAppendStreamPlan,
-    ParagraphStreamPublication as TailAppendStreamPublication,
-    PlainParagraphEvent as TailAppendStreamEvent,
+    ParagraphStreamEdit as TailAppendStreamEdit, ParagraphStreamLimits as TailAppendStreamLimits,
+    ParagraphStreamPlan as TailAppendStreamPlan, PlainParagraphEvent as TailAppendStreamEvent,
     ReplayableParagraphSource as TailAppendStreamSource,
 };
 
@@ -94,7 +92,6 @@ pub use tail_append_stream::patch::{
     apply_exact_inverse as apply_tail_append_exact_inverse,
 };
 
-use crate::document::snapshot::Commit;
 use crate::document::{Result as TransactionResult, Snapshot};
 use crate::error::{Error, Result};
 use crate::namespace::scan_word_element_ranges;
@@ -119,8 +116,8 @@ use litchi_core::{ExecutionContext, ExecutionError, ReadAt, Reservation, Resourc
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    BlobPart, PackURI, Part, PartData, PartView, SourceArtifact, SourceArtifactFingerprint,
-    SourceBackedPackage, SourceCacheDiagnostics, SourceTopologyPlan,
+    BlobPart, PackURI, Part, PartData, PartView, SourceArtifactFingerprint, SourceBackedPackage,
+    SourceCacheDiagnostics, SourceTopologyPlan,
 };
 use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
@@ -203,48 +200,6 @@ struct DocumentVariablesSource {
     snapshot: variables::Snapshot,
     protected: bool,
     unique_inbound_owner: bool,
-}
-
-/// A completed main-document publication with authority to restore its exact
-/// original package, including unchanged ZIP framing and opaque members.
-///
-/// Clones retain immutable source and snapshot owners. The inverse accepts only
-/// the complete artifact emitted by this publication, even after reopening it
-/// through a different caller-supplied source.
-#[derive(Clone)]
-pub struct DocumentPublication {
-    snapshot: Snapshot,
-    original_snapshot: Snapshot,
-    original_artifact: SourceArtifact,
-    proof: litchi_opc::SourceArtifactRestoreProof,
-}
-
-impl DocumentPublication {
-    /// Borrow the committed main-document snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-}
-
-struct DocumentPublicationWriter<W> {
-    inner: FingerprintingWriter<W>,
-    written: u64,
-}
-
-impl<W: Write> Write for DocumentPublicationWriter<W> {
-    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-        let written = self.inner.write(bytes)?;
-        self.written = self
-            .written
-            .checked_add(written as u64)
-            .ok_or_else(|| std::io::Error::other("document publication byte count overflow"))?;
-        Ok(written)
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.inner.flush()
-    }
 }
 
 struct FingerprintingWriter<W> {
@@ -1575,162 +1530,6 @@ impl Package {
     pub fn plan_external_hyperlink_redaction(&self, target_urls: &[&str]) -> Result<redact::Plan> {
         self.external_hyperlink_redaction_snapshot()?
             .plan_target_urls(target_urls)
-    }
-
-    /// Publish one exact-source-checked main-document commit to a sequential
-    /// stream while preserving every other physical ZIP member.
-    ///
-    /// Only operations confined to the main-document payload are accepted.
-    /// Cross-package paragraph transfers are refused because their dependency
-    /// graph requires package-level publication. A no-op commit reproduces the
-    /// complete source artifact byte for byte. A changed signed package is
-    /// refused by the underlying OPC publisher, and a changed publication is
-    /// refused while document or write protection is enforced or revisions
-    /// are tracked; the owning [`crate::Package`] applies the same policy. The
-    /// current main document passes the markup-compatibility admission of
-    /// [`Self::document_snapshot`], proved once per source revision.
-    ///
-    /// All semantic, source-version, topology, signature, and replacement-XML
-    /// checks happen before output. A sink failure after output begins is
-    /// reported through the underlying typed incomplete-output error.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed transaction, package, unsafe-edit, signature, source,
-    /// XML-publication, or sink error.
-    pub fn publish_document_commit_to_stream<W: Write>(
-        &self,
-        writer: W,
-        commit: &Commit,
-    ) -> TransactionResult<Snapshot> {
-        self.trim_clean_paragraph_index_for_operation();
-        let (main, current) = self.main_document_snapshot_with_before(
-            "publish_document_commit_to_stream",
-            !commit.patch().is_noop(),
-            Some(commit.patch().source()),
-        )?;
-        let target = commit.patch().apply(&current)?;
-        if commit
-            .patch()
-            .operations()
-            .iter()
-            .any(|operation| !operation.supports_source_backed_main_document_overlay())
-        {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedOperation,
-                "publish_document_commit_to_stream",
-                "paragraph transfers require package-level dependency publication",
-            )
-            .into());
-        }
-        // Semantic operations are bookkeeping, not the publication
-        // authorization. An edit may temporarily change a document and then
-        // restore the exact source bytes before commit. Only the patch's
-        // byte-identity check is allowed to select the exact-source path;
-        // this also avoids asking a rewritten target to stand in for an
-        // unsupported source payload.
-        if !commit.patch().is_noop() {
-            document_policy::validate_changed_document(self)?;
-        }
-        if commit.patch().is_noop() {
-            self.physical_package()?
-                .clone()
-                .write_part_overlays_shared_to_stream(writer, Vec::new())
-                .map_err(Error::from)?;
-        } else if let Some(source_xml) = target.source_xml() {
-            let mut plan = SourceTopologyPlan::new();
-            plan.try_replace_source_xml_part(main, source_xml)
-                .map_err(Error::from)?;
-            self.physical_package()?
-                .clone()
-                .write_topology_to_stream(writer, plan)
-                .map_err(Error::from)?;
-        } else {
-            self.physical_package()?
-                .clone()
-                .write_part_overlay_shared_to_stream(
-                    writer,
-                    &main,
-                    target.shared_xml().map_err(transaction_error_to_document)?,
-                )
-                .map_err(Error::from)?;
-        }
-        Ok(target)
-    }
-
-    /// Publish an ordinary main-document commit and retain its exact inverse.
-    ///
-    /// This performs the same semantic and physical publication as
-    /// [`Self::publish_document_commit_to_stream`]. In addition, it fingerprints
-    /// the original artifact before output and the accepted output bytes while
-    /// writing. The returned handle pins the original positional source without
-    /// materializing the package. Fingerprinting uses the source's execution
-    /// context and bounded workspace.
-    ///
-    /// # Errors
-    ///
-    /// Returns the ordinary publication errors, or a typed source, budget, or
-    /// cancellation error while authenticating the original artifact.
-    pub fn publish_document_commit_with_inverse_to_stream<W: Write>(
-        &self,
-        writer: W,
-        commit: &Commit,
-    ) -> TransactionResult<DocumentPublication> {
-        self.trim_clean_paragraph_index_for_operation();
-        let original_artifact = self.physical_package()?.source_artifact();
-        let original_sha256 = original_artifact.fingerprint().map_err(Error::from)?;
-        let original_len = original_artifact.len();
-        let mut output = DocumentPublicationWriter {
-            inner: FingerprintingWriter {
-                inner: writer,
-                hasher: Sha256::new(),
-            },
-            written: 0,
-        };
-        let snapshot = self.publish_document_commit_to_stream(&mut output, commit)?;
-        let proof = litchi_opc::SourceArtifactRestoreProof {
-            current_len: output.written,
-            current_sha256: SourceArtifactFingerprint::from_sha256(
-                output.inner.hasher.finalize().into(),
-            ),
-            original_len,
-            original_sha256,
-        };
-        Ok(DocumentPublication {
-            snapshot,
-            original_snapshot: commit.patch().source().clone(),
-            original_artifact,
-            proof,
-        })
-    }
-
-    /// Restore the byte-exact original package of an ordinary document edit.
-    ///
-    /// The current complete artifact and the retained original are both
-    /// authenticated before output. A foreign artifact with identical document
-    /// XML is still refused. Source versions and cancellation are checked during
-    /// authentication and streaming; output uses the current package's execution
-    /// budget. Failure after accepted output retains the typed partial count.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed artifact mismatch, source-change, cancellation, resource,
-    /// allocation, or incomplete-output error.
-    pub fn publish_document_inverse_to_stream<W: Write>(
-        &self,
-        writer: W,
-        publication: &DocumentPublication,
-    ) -> TransactionResult<Snapshot> {
-        self.trim_clean_paragraph_index_for_operation();
-        self.physical_package()?
-            .restore_source_artifact_to_stream(
-                &publication.original_artifact,
-                publication.proof,
-                publication.proof.original_len,
-                writer,
-            )
-            .map_err(Error::from)?;
-        Ok(publication.original_snapshot.clone())
     }
 
     /// The payload part behind one active main-story altChunk anchor, for

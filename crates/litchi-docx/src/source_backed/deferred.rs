@@ -121,6 +121,16 @@ macro_rules! source_family {
         crate::source_backed::deferred::source_family!($what, $change, crate::Error);
     };
     ($what:literal, $change:ty, $error:ty) => {
+        #[doc = concat!("The error of the ", $what, " family.")]
+        pub type Error = $error;
+
+        crate::source_backed::deferred::source_family!(@core $what, $change, $error);
+    };
+    // A family module that defines its own `Error`.
+    ($what:literal, $change:ty, own_error $error:ty) => {
+        crate::source_backed::deferred::source_family!(@core $what, $change, $error);
+    };
+    (@core $what:literal, $change:ty, $error:ty) => {
         #[doc = concat!(
                     "A replayable ", $what, " change of a source-backed package: the ",
                     "exact before and after state of what it changed. Replay it with the ",
@@ -171,13 +181,10 @@ macro_rules! source_family {
 
         pub use litchi_core::edit::Diagnostics;
 
-        #[doc = concat!("The error of the ", $what, " family.")]
-        pub type Error = $error;
-
         fn commit_change(
             package: &crate::source_backed::Package,
             change: $change,
-        ) -> std::result::Result<Commit, Error> {
+        ) -> std::result::Result<Commit, $error> {
             let changed = !crate::source_backed::deferred::Change::is_noop(&change);
             let next = crate::source_backed::deferred::Change::publish(&change, package)?;
             let patch = Patch {
@@ -194,7 +201,7 @@ macro_rules! source_family {
         fn apply_change(
             package: &crate::source_backed::Package,
             patch: &Patch,
-        ) -> std::result::Result<Commit, Error> {
+        ) -> std::result::Result<Commit, $error> {
             if let Some((before, after)) = &patch.restore
                 && package.same_owner(before)
             {

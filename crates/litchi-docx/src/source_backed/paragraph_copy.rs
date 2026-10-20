@@ -6,6 +6,7 @@
 //! removed as exact source fragments, while every other package member is
 //! raw-copied by the OPC overlay publisher.
 
+use litchi_opc::PackURI;
 use std::io::Write;
 use std::sync::Arc;
 
@@ -114,10 +115,10 @@ pub enum Error {
     #[error("plain paragraph edit refused: {0}")]
     Refused(Refusal),
     /// A configured finite resource ceiling was exceeded.
-    #[error("plain paragraph edit {resource} limit exceeded: {actual} > {max}")]
+    #[error("plain paragraph edit {kind} limit exceeded: {actual} > {max}")]
     Limit {
-        /// Bounded resource.
-        resource: &'static str,
+        /// The exceeded budget (record 0355a).
+        kind: LimitKind,
         /// Maximum accepted value.
         max: usize,
         /// Observed or requested value.
@@ -348,7 +349,7 @@ impl Edit {
     ) -> Result<&mut Self> {
         if self.operation.is_some() {
             return Err(Error::Limit {
-                resource: "operations",
+                kind: LimitKind::Operations,
                 max: 1,
                 actual: 2,
             });
@@ -431,6 +432,20 @@ impl Patch {
     }
 
     /// Apply only to the byte-exact source artifact and main story.
+    /// Apply to a snapshot with the patch's exact before bytes, from any
+    /// source (record 0355a: a package replay reads the snapshot it applies
+    /// to).
+    pub(crate) fn apply_content(&self, source: &Snapshot) -> Result<Snapshot> {
+        if source.xml.as_slice() != self.before.as_slice() {
+            return Err(Error::PatchConflict);
+        }
+        source.with_xml(checked_clone(self.after.as_slice(), "patch application")?)
+    }
+
+    pub(crate) const fn limits(&self) -> Limits {
+        self.limits
+    }
+
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.artifact_fingerprint != self.expected_fingerprint
             || source.xml.as_slice() != self.before.as_slice()
@@ -487,7 +502,11 @@ impl Patch {
             .checked_add(self.before.len())
             .and_then(|value| value.checked_add(self.after.len()))
             .ok_or(Error::InvalidDurable)?;
-        check_limit("durable patch bytes", self.limits.max_durable_bytes, total)?;
+        check_limit(
+            LimitKind::DurablePatchBytes,
+            self.limits.max_durable_bytes,
+            total,
+        )?;
         let mut bytes = Vec::new();
         bytes
             .try_reserve_exact(total)
@@ -620,33 +639,6 @@ impl EffectReport {
     }
 }
 
-/// Exact publication evidence retained for one consuming inverse.
-pub struct Publication {
-    snapshot: Snapshot,
-    original_snapshot: Snapshot,
-    original_artifact: SourceArtifact,
-    published_fingerprint: [u8; 32],
-    inverse_patch: Patch,
-}
-
-impl Publication {
-    /// Borrow the published semantic snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the inverse patch authorized for the exact emitted artifact.
-    ///
-    /// This patch can be serialized, reopened, and published through
-    /// [`Package::publish_plain_paragraph_copy_patch_to_stream`]. A package
-    /// differing anywhere—not just in `document.xml`—is rejected.
-    #[must_use]
-    pub const fn inverse_patch(&self) -> &Patch {
-        &self.inverse_patch
-    }
-}
-
 /// One staged exact removal of a direct plain paragraph.
 #[derive(Debug, Clone)]
 pub struct RemovalEdit {
@@ -676,7 +668,7 @@ impl RemovalEdit {
     pub fn remove_plain_paragraph(&mut self, position: Position) -> Result<&mut Self> {
         if self.position.is_some() {
             return Err(Error::Limit {
-                resource: "operations",
+                kind: LimitKind::Operations,
                 max: 1,
                 actual: 2,
             });
@@ -753,6 +745,20 @@ impl RemovalPatch {
     }
 
     /// Apply only to the byte-exact source artifact and main story.
+    /// Apply to a snapshot with the patch's exact before bytes, from any
+    /// source (record 0355a: a package replay reads the snapshot it applies
+    /// to).
+    pub(crate) fn apply_content(&self, source: &Snapshot) -> Result<Snapshot> {
+        if source.xml.as_slice() != self.before.as_slice() {
+            return Err(Error::PatchConflict);
+        }
+        source.with_xml(checked_clone(self.after.as_slice(), "patch application")?)
+    }
+
+    pub(crate) const fn limits(&self) -> Limits {
+        self.limits
+    }
+
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.artifact_fingerprint != self.expected_fingerprint
             || source.xml.as_slice() != self.before.as_slice()
@@ -809,7 +815,11 @@ impl RemovalPatch {
             .checked_add(self.before.len())
             .and_then(|value| value.checked_add(self.after.len()))
             .ok_or(Error::InvalidDurable)?;
-        check_limit("durable patch bytes", self.limits.max_durable_bytes, total)?;
+        check_limit(
+            LimitKind::DurablePatchBytes,
+            self.limits.max_durable_bytes,
+            total,
+        )?;
         let mut bytes = Vec::new();
         bytes
             .try_reserve_exact(total)
@@ -935,29 +945,6 @@ impl RemovalEffectReport {
     }
 }
 
-/// Exact removal publication evidence retained for one consuming inverse.
-pub struct RemovalPublication {
-    snapshot: Snapshot,
-    original_snapshot: Snapshot,
-    original_artifact: SourceArtifact,
-    published_fingerprint: [u8; 32],
-    inverse_patch: RemovalPatch,
-}
-
-impl RemovalPublication {
-    /// Borrow the published semantic snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the inverse authorized for the exact emitted artifact.
-    #[must_use]
-    pub const fn inverse_patch(&self) -> &RemovalPatch {
-        &self.inverse_patch
-    }
-}
-
 impl Package {
     /// Capture the exact bounded closure for a plain main-story paragraph copy.
     pub fn plain_paragraph_copy_snapshot(&self) -> Result<Snapshot> {
@@ -1005,11 +992,6 @@ impl Package {
         })
     }
 
-    /// Start one isolated source-backed exact paragraph-copy edit.
-    pub fn edit_plain_paragraph_copy(&self) -> Result<Edit> {
-        Ok(self.plain_paragraph_copy_snapshot()?.edit())
-    }
-
     /// Capture the exact bounded closure for plain-paragraph removal.
     pub fn plain_paragraph_removal_snapshot(&self) -> Result<Snapshot> {
         self.plain_paragraph_removal_snapshot_bounded(self.semantic_limits.paragraph_copy_value())
@@ -1023,151 +1005,37 @@ impl Package {
         self.plain_paragraph_copy_snapshot_bounded(limits)
     }
 
-    /// Start one isolated source-backed exact paragraph-removal edit.
-    pub fn edit_plain_paragraph_removal(&self) -> Result<RemovalEdit> {
-        Ok(self.plain_paragraph_removal_snapshot()?.removal_edit())
-    }
-
-    /// Publish an exact-source-checked copy while raw-copying every other ZIP member.
-    pub fn publish_plain_paragraph_copy_to_stream<W: Write>(
+    /// Check a plain-paragraph copy patch against this package and return
+    /// the main part and its rewritten XML (record 0355a).
+    pub(crate) fn plain_paragraph_copy_target(
         &self,
-        writer: W,
-        commit: &Commit,
-    ) -> Result<Publication> {
-        self.publish_plain_paragraph_copy_patch_to_stream(writer, commit.patch())
-    }
-
-    /// Publish a live or rehydrated durable patch against its exact source.
-    ///
-    /// A live patch also requires its captured process-local source version.
-    /// A rehydrated patch instead authorizes an identical reopened package by
-    /// the complete source-artifact SHA-256 retained in its canonical wire.
-    pub fn publish_plain_paragraph_copy_patch_to_stream<W: Write>(
-        &self,
-        writer: W,
         patch: &Patch,
-    ) -> Result<Publication> {
+    ) -> Result<(PackURI, Arc<Vec<u8>>)> {
         self.trim_clean_paragraph_index_for_operation();
-        let current = self.plain_paragraph_copy_snapshot_bounded(patch.limits)?;
-        let target = patch.apply(&current)?;
-        let original_artifact = self.physical_package()?.source_artifact();
-        let main = self
-            .physical_package()?
-            .main_document_part()
-            .map_err(crate::Error::from)?
-            .partname()
-            .clone();
-        let mut output = FingerprintingWriter::new(writer);
-        if patch.is_noop() {
-            original_artifact
-                .write_to(&mut output)
-                .map_err(crate::Error::from)?;
-        } else {
-            let replacement = Arc::clone(&target.xml);
-            self.physical_package()?
-                .clone()
-                .write_part_overlay_shared_to_stream(&mut output, &main, replacement)
-                .map_err(crate::Error::from)?;
-        }
-        let published_fingerprint = output.finish();
-        let mut inverse_patch = patch.inverse();
-        inverse_patch.expected_fingerprint = published_fingerprint;
-        inverse_patch.source_version = None;
-        Ok(Publication {
-            snapshot: target,
-            original_snapshot: current,
-            original_artifact,
-            published_fingerprint,
-            inverse_patch,
-        })
+        let current = self.plain_paragraph_copy_snapshot_bounded(patch.limits())?;
+        let target = patch.apply_content(&current)?;
+        Ok((self.plain_paragraph_main()?, Arc::clone(&target.xml)))
     }
 
-    /// Restore the exact original package from a byte-exact published artifact.
-    pub fn publish_plain_paragraph_copy_inverse_to_stream<W: Write>(
+    /// Check a plain-paragraph removal patch against this package and return
+    /// the main part and its rewritten XML (record 0355a).
+    pub(crate) fn plain_paragraph_removal_target(
         &self,
-        writer: W,
-        publication: &Publication,
-    ) -> Result<Snapshot> {
-        self.trim_clean_paragraph_index_for_operation();
-        let current = fingerprint_artifact(&self.physical_package()?.source_artifact())?;
-        if current != publication.published_fingerprint {
-            return Err(Error::PatchConflict);
-        }
-        publication
-            .original_artifact
-            .write_to(writer)
-            .map_err(crate::Error::from)?;
-        Ok(publication.original_snapshot.clone())
-    }
-
-    /// Publish one exact-source-checked removal while raw-copying every other
-    /// physical ZIP member.
-    pub fn publish_plain_paragraph_removal_to_stream<W: Write>(
-        &self,
-        writer: W,
-        commit: &RemovalCommit,
-    ) -> Result<RemovalPublication> {
-        self.publish_plain_paragraph_removal_patch_to_stream(writer, commit.patch())
-    }
-
-    /// Publish a live or rehydrated durable removal patch against its exact
-    /// complete source artifact.
-    pub fn publish_plain_paragraph_removal_patch_to_stream<W: Write>(
-        &self,
-        writer: W,
         patch: &RemovalPatch,
-    ) -> Result<RemovalPublication> {
+    ) -> Result<(PackURI, Arc<Vec<u8>>)> {
         self.trim_clean_paragraph_index_for_operation();
-        let current = self.plain_paragraph_removal_snapshot_bounded(patch.limits)?;
-        let target = patch.apply(&current)?;
-        let original_artifact = self.physical_package()?.source_artifact();
-        let main = self
+        let current = self.plain_paragraph_removal_snapshot_bounded(patch.limits())?;
+        let target = patch.apply_content(&current)?;
+        Ok((self.plain_paragraph_main()?, Arc::clone(&target.xml)))
+    }
+
+    fn plain_paragraph_main(&self) -> Result<PackURI> {
+        Ok(self
             .physical_package()?
             .main_document_part()
             .map_err(crate::Error::from)?
             .partname()
-            .clone();
-        let mut output = FingerprintingWriter::new(writer);
-        if patch.is_noop() {
-            original_artifact
-                .write_to(&mut output)
-                .map_err(crate::Error::from)?;
-        } else {
-            let replacement = checked_clone(target.xml_bytes(), "removal publication replacement")?;
-            self.physical_package()?
-                .clone()
-                .write_part_overlay_to_stream(&mut output, &main, replacement)
-                .map_err(crate::Error::from)?;
-        }
-        let published_fingerprint = output.finish();
-        let mut inverse_patch = patch.inverse();
-        inverse_patch.expected_fingerprint = published_fingerprint;
-        inverse_patch.source_version = None;
-        Ok(RemovalPublication {
-            snapshot: target,
-            original_snapshot: current,
-            original_artifact,
-            published_fingerprint,
-            inverse_patch,
-        })
-    }
-
-    /// Restore the exact original package from a byte-exact removal output.
-    pub fn publish_plain_paragraph_removal_inverse_to_stream<W: Write>(
-        &self,
-        writer: W,
-        publication: &RemovalPublication,
-    ) -> Result<Snapshot> {
-        self.trim_clean_paragraph_index_for_operation();
-        let current = fingerprint_artifact(&self.physical_package()?.source_artifact())?;
-        if current != publication.published_fingerprint {
-            return Err(Error::PatchConflict);
-        }
-        publication
-            .original_artifact
-            .write_to(writer)
-            .map_err(crate::Error::from)?;
-        Ok(publication.original_snapshot.clone())
+            .clone())
     }
 
     fn validate_plain_paragraph_copy_topology(&self) -> Result<()> {
@@ -1391,7 +1259,11 @@ fn copy_fragment(source: &Snapshot, from: Position, before: Position) -> Result<
         .len()
         .checked_add(fragment.len())
         .ok_or(Error::InvalidDurable)?;
-    check_limit("output bytes", source.limits.max_output_bytes, output_len)?;
+    check_limit(
+        LimitKind::OutputBytes,
+        source.limits.max_output_bytes,
+        output_len,
+    )?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(output_len)
@@ -1431,7 +1303,11 @@ fn remove_fragment(source: &Snapshot, position: Position) -> Result<Snapshot> {
         .len()
         .checked_sub(removed_len)
         .ok_or(Error::InvalidDurable)?;
-    check_limit("output bytes", source.limits.max_output_bytes, output_len)?;
+    check_limit(
+        LimitKind::OutputBytes,
+        source.limits.max_output_bytes,
+        output_len,
+    )?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(output_len)
@@ -1602,7 +1478,7 @@ enum Scope {
 }
 
 fn scan_document(xml: &[u8], limits: Limits) -> Result<Layout> {
-    check_limit("XML bytes", limits.max_xml_bytes, xml.len())?;
+    check_limit(LimitKind::XmlBytes, limits.max_xml_bytes, xml.len())?;
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
@@ -1637,7 +1513,7 @@ fn scan_document(xml: &[u8], limits: Limits) -> Result<Layout> {
             .read_resolved_event_into(&mut buffer)
             .map_err(|_error| Error::Refused(Refusal::ComplexDocument))?;
         events = events.checked_add(1).ok_or(Error::InvalidDurable)?;
-        check_limit("XML events", limits.max_events, events)?;
+        check_limit(LimitKind::XmlEvents, limits.max_events, events)?;
         match event {
             Event::Start(start) => {
                 let local = start.local_name();
@@ -1666,7 +1542,7 @@ fn scan_document(xml: &[u8], limits: Limits) -> Result<Layout> {
                 }
                 reserve_one(&mut stack, "XML scope stack")?;
                 stack.push(scope);
-                check_limit("XML depth", limits.max_depth, stack.len())?;
+                check_limit(LimitKind::XmlDepth, limits.max_depth, stack.len())?;
             },
             Event::Empty(empty) => {
                 let local = empty.local_name();
@@ -1681,7 +1557,7 @@ fn scan_document(xml: &[u8], limits: Limits) -> Result<Layout> {
                 validate_attributes(&empty, scope, expected)?;
                 if scope == Scope::Paragraph {
                     check_limit(
-                        "paragraphs",
+                        LimitKind::Paragraphs,
                         limits.max_paragraphs,
                         paragraphs.len().saturating_add(1),
                     )?;
@@ -1711,7 +1587,7 @@ fn scan_document(xml: &[u8], limits: Limits) -> Result<Layout> {
                 }
                 if scope == Scope::Paragraph {
                     check_limit(
-                        "paragraphs",
+                        LimitKind::Paragraphs,
                         limits.max_paragraphs,
                         paragraphs.len().saturating_add(1),
                     )?;
@@ -1875,10 +1751,10 @@ fn validate_attributes(start: &BytesStart<'_>, scope: Scope, word_namespace: &[u
     Ok(())
 }
 
-fn check_limit(resource: &'static str, max: usize, actual: usize) -> Result<()> {
+fn check_limit(resource: LimitKind, max: usize, actual: usize) -> Result<()> {
     if actual > max {
         return Err(Error::Limit {
-            resource,
+            kind: resource,
             max,
             actual,
         });
@@ -1902,42 +1778,6 @@ fn reserve_one<T>(target: &mut Vec<T>, resource: &'static str) -> Result<()> {
             .map_err(|source| Error::Allocation { resource, source })?;
     }
     Ok(())
-}
-
-struct FingerprintingWriter<W> {
-    inner: W,
-    hasher: Sha256,
-}
-
-impl<W> FingerprintingWriter<W> {
-    fn new(inner: W) -> Self {
-        Self {
-            inner,
-            hasher: Sha256::new(),
-        }
-    }
-
-    fn finish(self) -> [u8; 32] {
-        self.hasher.finalize().into()
-    }
-}
-
-impl<W: Write> Write for FingerprintingWriter<W> {
-    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-        let written = self.inner.write(bytes)?;
-        if written > bytes.len() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "plain paragraph copy sink over-reported progress",
-            ));
-        }
-        self.hasher.update(&bytes[..written]);
-        Ok(written)
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.inner.flush()
-    }
 }
 
 struct HashWriter(Sha256);
@@ -1990,4 +1830,49 @@ fn take_usize(bytes: &[u8], cursor: &mut usize) -> Result<usize> {
         .try_into()
         .map_err(|_error| Error::InvalidDurable)?;
     usize::try_from(u64::from_le_bytes(raw)).map_err(|_error| Error::InvalidDurable)
+}
+
+/// The bounded resources of plain-paragraph copy and removal, carried by [`Error::Limit`] (record 0355a).
+///
+/// Each variant names one bounded resource; [`std::fmt::Display`] gives its
+/// human-readable name, the one the error messages print.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Durable patch bytes.
+    DurablePatchBytes,
+    /// Operations.
+    Operations,
+    /// Output bytes.
+    OutputBytes,
+    /// Paragraphs.
+    Paragraphs,
+    /// XML bytes.
+    XmlBytes,
+    /// XML depth.
+    XmlDepth,
+    /// XML events.
+    XmlEvents,
+}
+
+impl LimitKind {
+    /// The resource's human-readable name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::DurablePatchBytes => "durable patch bytes",
+            Self::Operations => "operations",
+            Self::OutputBytes => "output bytes",
+            Self::Paragraphs => "paragraphs",
+            Self::XmlBytes => "XML bytes",
+            Self::XmlDepth => "XML depth",
+            Self::XmlEvents => "XML events",
+        }
+    }
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
 }

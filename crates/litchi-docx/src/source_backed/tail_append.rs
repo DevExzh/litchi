@@ -29,8 +29,7 @@ use litchi_ooxml_common::xml_name::is_qualified_name;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::source_backed::VerifiedDecodedReaderError;
 use litchi_opc::{
-    SourceArtifactFingerprint, SourcePartSpliceFragment, SourcePartSpliceLimits,
-    SourcePartSplicePlan, SourcePartSpliceProof, SourcePartSplicePublication,
+    SourcePartSpliceFragment, SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
 };
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -139,10 +138,10 @@ pub enum Error {
     #[error("plain paragraph tail append refused: {0}")]
     Refused(Refusal),
     /// A finite operation ceiling was exceeded.
-    #[error("plain paragraph tail append {resource} limit exceeded: {actual} > {maximum}")]
+    #[error("plain paragraph tail append {kind} limit exceeded: {actual} > {maximum}")]
     Limit {
-        /// Resource whose ceiling was exceeded.
-        resource: &'static str,
+        /// The exceeded budget (record 0355a).
+        kind: LimitKind,
         /// First observed value beyond the ceiling.
         actual: u64,
         /// Configured ceiling.
@@ -231,21 +230,21 @@ impl Limits {
 
     fn validate(self) -> Result<()> {
         for (resource, value) in [
-            ("source XML bytes", self.max_source_xml_bytes),
-            ("text bytes", self.max_text_bytes),
-            ("fragment bytes", self.max_fragment_bytes),
-            ("candidate XML bytes", self.max_candidate_xml_bytes),
-            ("XML events", self.max_events),
-            ("XML depth", self.max_depth),
-            ("paragraphs", self.max_paragraphs),
-            ("settings XML bytes", self.max_settings_xml_bytes),
-            ("parser workspace", self.max_workspace_bytes),
-            ("output bytes", self.max_output_bytes),
-            ("XML token bytes", self.max_token_bytes),
+            (LimitKind::SourceXmlBytes, self.max_source_xml_bytes),
+            (LimitKind::TextBytes, self.max_text_bytes),
+            (LimitKind::FragmentBytes, self.max_fragment_bytes),
+            (LimitKind::CandidateXmlBytes, self.max_candidate_xml_bytes),
+            (LimitKind::XmlEvents, self.max_events),
+            (LimitKind::XmlDepth, self.max_depth),
+            (LimitKind::Paragraphs, self.max_paragraphs),
+            (LimitKind::SettingsXmlBytes, self.max_settings_xml_bytes),
+            (LimitKind::ParserWorkspace, self.max_workspace_bytes),
+            (LimitKind::OutputBytes, self.max_output_bytes),
+            (LimitKind::XmlTokenBytes, self.max_token_bytes),
         ] {
             if value == 0 || value == u64::MAX {
                 return Err(Error::Limit {
-                    resource,
+                    kind: resource,
                     actual: value,
                     maximum: value.saturating_sub(1),
                 });
@@ -253,7 +252,7 @@ impl Limits {
         }
         if self.max_depth > MAX_QUICK_XML_DEPTH {
             return Err(Error::Limit {
-                resource: "XML depth",
+                kind: LimitKind::XmlDepth,
                 actual: self.max_depth,
                 maximum: MAX_QUICK_XML_DEPTH,
             });
@@ -389,21 +388,31 @@ impl<'package, 'text> Edit<'package, 'text> {
         self.prepare()
     }
 
-    /// Prepare the edit as an explicit commit product.
-    pub fn commit(self) -> Result<Commit<'package>> {
-        Ok(self.prepare()?.commit())
+    /// Prepare and commit the append as a new source-backed package
+    /// (record 0355a).
+    ///
+    /// # Errors
+    ///
+    /// Returns the preparation errors of [`Self::prepare`].
+    pub fn commit(self) -> Result<Commit> {
+        self.prepare()?.commit()
     }
 
-    /// Prepare the edit and immediately retain the commit product under
-    /// explicit options.
-    pub fn commit_with_options(self, options: Options) -> Result<Commit<'package>> {
-        Ok(self.prepare_with_options(options)?.commit())
+    /// [`Self::commit`] under explicit options.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::commit`].
+    pub fn commit_with_options(self, options: Options) -> Result<Commit> {
+        self.prepare_with_options(options)?.commit()
     }
 }
 
 /// Prepared source/candidate semantic proof plus OPC splice plan.
 pub struct Plan<'package> {
     package: &'package Package,
+    /// The appended text, kept for replaying the commit's patch elsewhere.
+    text: Option<String>,
     splice: SourcePartSplicePlan<'package>,
     source: SourceProof,
     candidate: CandidateProof,
@@ -442,91 +451,127 @@ impl<'package> Plan<'package> {
         self.splice.is_noop()
     }
 
-    /// Consume the plan into a named commit product.
-    #[must_use]
-    pub fn commit(self) -> Commit<'package> {
-        Commit { plan: self }
-    }
-
-    /// Publish the prepared plan to a sequential sink.
-    pub fn write_to(self, writer: impl Write) -> Result<Publication> {
-        self.commit().write_to(writer)
-    }
-}
-
-/// Named commit product retaining the reversible source authorization.
-pub struct Commit<'package> {
-    plan: Plan<'package>,
-}
-
-impl<'package> Commit<'package> {
-    /// Borrow the prepared plan's source proof.
-    #[must_use]
-    pub const fn source_proof(&self) -> SourceProof {
-        self.plan.source
-    }
-
-    /// Borrow the prepared plan's candidate proof.
-    #[must_use]
-    pub const fn candidate_proof(&self) -> CandidateProof {
-        self.plan.candidate
-    }
-
-    /// Return whether this commit is the exact no-op route.
-    #[must_use]
-    pub const fn is_noop(&self) -> bool {
-        self.plan.splice.is_noop()
-    }
-
-    /// Publish and retain an exact inverse authorization.
-    pub fn write_to(self, writer: impl Write) -> Result<Publication> {
-        publish_commit(self, writer)
+    /// Commit the prepared append as a new source-backed package; writing
+    /// that package publishes this plan's source splice (record 0355a).
+    ///
+    /// # Errors
+    ///
+    /// Returns a signature or encryption refusal of a changed source.
+    pub fn commit(self) -> Result<Commit> {
+        let package = self.package.clone();
+        let change = TailChange::Forward {
+            text: self.text.clone(),
+            limits: self.limits,
+            options: self.options.clone(),
+            noop: self.splice.is_noop(),
+            prepared: Some(Arc::new(PreparedTail {
+                base: package.clone(),
+                splice: self.splice.into_owned(),
+                options: self.options,
+            })),
+        };
+        commit_change(&package, change)
     }
 }
 
-/// Exact publication evidence and immediate inverse authorization.
-#[derive(Debug)]
-pub struct Publication {
-    source: SourceProof,
-    candidate: CandidateProof,
-    splice: SourcePartSplicePublication,
+/// A prepared splice that outlives its preparation borrow.
+pub(crate) struct PreparedTail {
+    base: Package,
+    splice: SourcePartSplicePlan<'static>,
+    options: Options,
 }
 
-impl Publication {
-    /// Borrow the source semantic proof.
-    #[must_use]
-    pub const fn source_proof(&self) -> SourceProof {
-        self.source
-    }
-
-    /// Borrow the candidate semantic proof.
-    #[must_use]
-    pub const fn candidate_proof(&self) -> CandidateProof {
-        self.candidate
-    }
-
-    /// Return the exact published archive fingerprint.
-    #[must_use]
-    pub const fn candidate_artifact_fingerprint(&self) -> SourceArtifactFingerprint {
-        self.splice.candidate_artifact_fingerprint()
-    }
-
-    /// Return whether the publication copied the exact source archive.
-    #[must_use]
-    pub const fn is_noop(&self) -> bool {
-        self.splice.is_noop()
-    }
-
-    /// Restore the exact source archive after checking the current package's
-    /// complete artifact fingerprint. This is a new operation governed by the
-    /// current package's execution context, including its cancellation token.
-    pub fn write_inverse_to_stream(&self, current: &Package, writer: impl Write) -> Result<()> {
-        current.trim_clean_paragraph_index_for_operation();
-        self.splice
-            .write_inverse_to_stream(current.physical_package()?, writer)
-            .map_err(|error| Error::Document(DocumentError::from(error)))
+impl PreparedTail {
+    fn write(&self, writer: &mut dyn Write) -> Result<()> {
+        publish_splice(self.splice.duplicate(), &self.options, writer)
     }
 }
+
+/// The append (its text and policy, with the plan prepared for the commit's
+/// own package), or its restore-only inverse.
+#[derive(Clone)]
+pub(crate) enum TailChange {
+    Forward {
+        text: Option<String>,
+        limits: Limits,
+        options: Options,
+        noop: bool,
+        prepared: Option<Arc<PreparedTail>>,
+    },
+    Inverse {
+        noop: bool,
+        forward: Box<TailChange>,
+    },
+}
+
+impl crate::source_backed::deferred::Change for TailChange {
+    type Error = Error;
+
+    fn is_noop(&self) -> bool {
+        match self {
+            Self::Forward { noop, .. } | Self::Inverse { noop, .. } => *noop,
+        }
+    }
+
+    fn inverse(&self) -> Self {
+        match self {
+            Self::Forward { noop, .. } => Self::Inverse {
+                noop: *noop,
+                forward: Box::new(self.clone()),
+            },
+            Self::Inverse { forward, .. } => (**forward).clone(),
+        }
+    }
+
+    fn publish(&self, package: &Package) -> Result<Package> {
+        match self {
+            Self::Forward {
+                text,
+                limits,
+                options,
+                prepared,
+                ..
+            } => {
+                let prepared = match prepared {
+                    Some(prepared) if prepared.base.same_owner(package) => Arc::clone(prepared),
+                    _ => {
+                        let edit = Edit {
+                            package,
+                            text: text.clone().map(Cow::Owned),
+                            limits: *limits,
+                            options: options.clone(),
+                        };
+                        let plan = edit.prepare()?;
+                        Arc::new(PreparedTail {
+                            base: package.clone(),
+                            splice: plan.splice.into_owned(),
+                            options: plan.options,
+                        })
+                    },
+                };
+                if prepared.splice.is_noop() {
+                    return Ok(package.clone());
+                }
+                package
+                    .deferred(move |writer| prepared.write(writer).map_err(tail_to_document))
+                    .map_err(Error::Document)
+            },
+            Self::Inverse { noop: true, .. } => Ok(package.clone()),
+            // The appended paragraph's removal is restored only on the
+            // commit's own package (the exact source artifact).
+            Self::Inverse { .. } => Err(Error::PatchConflict),
+        }
+    }
+}
+
+fn tail_to_document(error: Error) -> DocumentError {
+    match error {
+        Error::Document(error) => error,
+        other => DocumentError::Other(other.to_string()),
+    }
+}
+
+crate::source_backed::deferred::source_family!("plain-paragraph tail append", TailChange, own_error Error);
 
 impl Package {
     /// Start a bounded source-backed append of one plain paragraph.
@@ -546,6 +591,18 @@ impl Package {
         }
     }
 
+    /// Replay a tail-append patch onto this package: the same paragraph is
+    /// appended to this package's main story (record 0355a). The inverse
+    /// restores only the commit's own package.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Edit::prepare`], or [`Error::PatchConflict`]
+    /// for an inverse applied elsewhere.
+    pub fn apply_tail_append(&self, patch: &Patch) -> Result<Commit> {
+        apply_change(self, patch)
+    }
+
     /// Start the explicit exact archive no-op route.
     #[must_use]
     pub fn tail_append_noop<'package>(&'package self) -> Edit<'package, 'package> {
@@ -561,6 +618,7 @@ impl Package {
 fn prepare_edit<'package, 'text>(mut edit: Edit<'package, 'text>) -> Result<Plan<'package>> {
     edit.limits.validate()?;
     let package = edit.package;
+    let text_owned = edit.text.as_deref().map(str::to_owned);
     package.trim_clean_paragraph_index_for_operation();
     check_options(&edit.options)?;
     let options = effective_options(package, &edit.options)?;
@@ -580,18 +638,18 @@ fn prepare_edit<'package, 'text>(mut edit: Edit<'package, 'text>) -> Result<Plan
         None => (0, 0),
     };
     let text_bytes = u64::try_from(text_bytes).map_err(|_| Error::Limit {
-        resource: "text bytes",
+        kind: LimitKind::TextBytes,
         actual: u64::MAX,
         maximum: edit.limits.max_text_bytes,
     })?;
-    check_limit("text bytes", text_bytes, edit.limits.max_text_bytes)?;
+    check_limit(LimitKind::TextBytes, text_bytes, edit.limits.max_text_bytes)?;
     let text_capacity = u64::try_from(text_capacity).map_err(|_| Error::Limit {
-        resource: "text capacity bytes",
+        kind: LimitKind::TextCapacityBytes,
         actual: u64::MAX,
         maximum: edit.limits.max_text_bytes,
     })?;
     check_limit(
-        "text capacity bytes",
+        LimitKind::TextCapacityBytes,
         text_capacity,
         edit.limits.max_text_bytes,
     )?;
@@ -626,8 +684,11 @@ fn prepare_edit<'package, 'text>(mut edit: Edit<'package, 'text>) -> Result<Plan
         .main_document_part()
         .map_err(|error| Error::Document(DocumentError::from(error)))?;
     validate_document_main_content_type(main.content_type()).map_err(Error::Document)?;
-    let source_len =
-        checked_declared_size(&main, edit.limits.max_source_xml_bytes, "source XML bytes")?;
+    let source_len = checked_declared_size(
+        &main,
+        edit.limits.max_source_xml_bytes,
+        LimitKind::SourceXmlBytes,
+    )?;
     let source_scan = scan_main_part(
         &main,
         source_len,
@@ -652,17 +713,17 @@ fn prepare_edit<'package, 'text>(mut edit: Edit<'package, 'text>) -> Result<Plan
     drop(text);
     drop(text_reservation);
     let fragment_len = u64::try_from(fragment.as_slice().len()).map_err(|_| Error::Limit {
-        resource: "fragment bytes",
+        kind: LimitKind::FragmentBytes,
         actual: u64::MAX,
         maximum: edit.limits.max_fragment_bytes,
     })?;
     let candidate_len = source_len.checked_add(fragment_len).ok_or(Error::Limit {
-        resource: "candidate XML bytes",
+        kind: LimitKind::CandidateXmlBytes,
         actual: u64::MAX,
         maximum: edit.limits.max_candidate_xml_bytes,
     })?;
     check_limit(
-        "candidate XML bytes",
+        LimitKind::CandidateXmlBytes,
         candidate_len,
         edit.limits.max_candidate_xml_bytes,
     )?;
@@ -704,6 +765,7 @@ fn prepare_edit<'package, 'text>(mut edit: Edit<'package, 'text>) -> Result<Plan
     check_options(&options)?;
     Ok(Plan {
         package,
+        text: text_owned,
         splice,
         source: source_scan.source_proof(source_version),
         candidate: candidate_scan.candidate_proof(),
@@ -730,7 +792,11 @@ fn prepare_noop(
         .physical_package()?
         .main_document_part()
         .map_err(|error| Error::Document(DocumentError::from(error)))?;
-    let source_len = checked_declared_size(&main, limits.max_source_xml_bytes, "source XML bytes")?;
+    let source_len = checked_declared_size(
+        &main,
+        limits.max_source_xml_bytes,
+        LimitKind::SourceXmlBytes,
+    )?;
     let charge_hash_work = package.physical_package()?.execution_context().is_none();
     let hash_context = options.execution.as_ref();
     let hash_cancellation = options.cancellation.as_ref();
@@ -789,6 +855,7 @@ fn prepare_noop(
     check_options(&options)?;
     Ok(Plan {
         package,
+        text: None,
         splice,
         source,
         candidate,
@@ -797,42 +864,36 @@ fn prepare_noop(
     })
 }
 
-fn publish_commit(commit: Commit<'_>, writer: impl Write) -> Result<Publication> {
-    let Commit { plan } = commit;
-    plan.package.trim_clean_paragraph_index_for_operation();
-    check_options(&plan.options)?;
-    let source = plan.source;
-    let candidate = plan.candidate;
-    let guarded_result = if plan.options.execution.is_none() && plan.options.cancellation.is_none()
-    {
-        (plan.splice.write_to(writer), None)
+fn publish_splice(
+    splice: SourcePartSplicePlan<'_>,
+    options: &Options,
+    writer: &mut dyn Write,
+) -> Result<()> {
+    check_options(options)?;
+    let guarded_result = if options.execution.is_none() && options.cancellation.is_none() {
+        (splice.write_to(writer), None)
     } else {
         let failure = Arc::new(Mutex::new(None));
         let guarded = PublicationCheckedWriter {
             inner: writer,
-            execution: plan.options.execution.clone(),
-            cancellation: plan.options.cancellation.clone(),
+            execution: options.execution.clone(),
+            cancellation: options.cancellation.clone(),
             failure: Arc::clone(&failure),
         };
-        let result = plan.splice.write_to(guarded);
+        let result = splice.write_to(guarded);
         let failure = failure
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .take();
         (result, failure)
     };
-    let splice = match guarded_result.0 {
-        Ok(splice) => splice,
-        Err(error) => return Err(Error::Document(DocumentError::from(error))),
-    };
+    if let Err(error) = guarded_result.0 {
+        return Err(Error::Document(DocumentError::from(error)));
+    }
     if let Some(error) = guarded_result.1 {
         return Err(Error::Execution(error));
     }
-    Ok(Publication {
-        source,
-        candidate,
-        splice,
-    })
+    Ok(())
 }
 
 struct PublicationCheckedWriter<W> {
@@ -910,10 +971,10 @@ fn check_progress(
     Ok(())
 }
 
-fn check_limit(resource: &'static str, actual: u64, maximum: u64) -> Result<()> {
+fn check_limit(resource: LimitKind, actual: u64, maximum: u64) -> Result<()> {
     if actual > maximum {
         return Err(Error::Limit {
-            resource,
+            kind: resource,
             actual,
             maximum,
         });
@@ -1034,7 +1095,7 @@ fn bounded_settings_mce_limits(
     observed_directive_tokens: usize,
 ) -> Result<MceLimits> {
     let configured_depth = usize::try_from(limits.max_depth).map_err(|_| Error::Limit {
-        resource: "XML depth",
+        kind: LimitKind::XmlDepth,
         actual: limits.max_depth,
         maximum: usize::MAX as u64,
     })?;
@@ -1058,7 +1119,7 @@ fn bounded_settings_mce_limits(
     // processing, even when a particular fallback shrinks the source.
     let max_output_bytes =
         usize::try_from(limits.max_settings_xml_bytes).map_err(|_| Error::Limit {
-            resource: "settings XML bytes",
+            kind: LimitKind::SettingsXmlBytes,
             actual: limits.max_settings_xml_bytes,
             maximum: usize::MAX as u64,
         })?;
@@ -1080,7 +1141,7 @@ fn mce_workspace_requirement(
     facts: SettingsGuardFacts,
 ) -> Result<u64> {
     let overflow = || Error::Limit {
-        resource: "settings XML workspace",
+        kind: LimitKind::SettingsXmlWorkspace,
         actual: u64::MAX,
         maximum: limits.max_workspace_bytes,
     };
@@ -1113,7 +1174,7 @@ fn settings_model_workspace_requirement(
     facts: SettingsGuardFacts,
 ) -> Result<u64> {
     let overflow = || Error::Limit {
-        resource: "settings XML workspace",
+        kind: LimitKind::SettingsXmlWorkspace,
         actual: u64::MAX,
         maximum: limits.max_workspace_bytes,
     };
@@ -1164,7 +1225,7 @@ pub(super) fn make_splice_limits_for_stream(limits: Limits) -> Result<SourcePart
 fn checked_declared_size(
     part: &litchi_opc::PartView<'_>,
     maximum: u64,
-    resource: &'static str,
+    resource: LimitKind,
 ) -> Result<u64> {
     let declared = part
         .declared_uncompressed_size()
@@ -1335,7 +1396,7 @@ pub(super) fn validate_topology(
         checked_declared_size(
             &settings_part,
             limits.max_settings_xml_bytes,
-            "settings XML bytes",
+            LimitKind::SettingsXmlBytes,
         )?;
         let package_context = package.physical_package()?.execution_context();
         let managed_context = context.cloned().or(package_context);
@@ -1344,12 +1405,12 @@ pub(super) fn validate_topology(
             .map_err(|error| Error::Document(DocumentError::from(error)))?;
         let settings_bytes = settings_data.as_bytes();
         let settings_len = u64::try_from(settings_bytes.len()).map_err(|_| Error::Limit {
-            resource: "settings XML bytes",
+            kind: LimitKind::SettingsXmlBytes,
             actual: u64::MAX,
             maximum: limits.max_settings_xml_bytes,
         })?;
         check_limit(
-            "settings XML bytes",
+            LimitKind::SettingsXmlBytes,
             settings_len,
             limits.max_settings_xml_bytes,
         )?;
@@ -1387,13 +1448,13 @@ pub(super) fn validate_topology(
             guard_facts,
         )?;
         check_limit(
-            "settings XML workspace",
+            LimitKind::SettingsXmlWorkspace,
             workspace,
             limits.max_workspace_bytes,
         )?;
         let output_bound = mce_workspace::output_memory_requirement(mce_limits.max_output_bytes)
             .ok_or(Error::Limit {
-                resource: "settings XML workspace",
+                kind: LimitKind::SettingsXmlWorkspace,
                 actual: u64::MAX,
                 maximum: limits.max_workspace_bytes,
             })?;
@@ -1436,7 +1497,7 @@ pub(super) fn validate_topology(
             .max_workspace_bytes
             .checked_sub(retained_output)
             .ok_or(Error::Limit {
-                resource: "settings XML workspace",
+                kind: LimitKind::SettingsXmlWorkspace,
                 actual: retained_output,
                 maximum: limits.max_workspace_bytes,
             })?;
@@ -1453,12 +1514,12 @@ pub(super) fn validate_topology(
         let model_peak = retained_output
             .checked_add(model_workspace)
             .ok_or(Error::Limit {
-                resource: "settings XML workspace",
+                kind: LimitKind::SettingsXmlWorkspace,
                 actual: u64::MAX,
                 maximum: limits.max_workspace_bytes,
             })?;
         check_limit(
-            "settings XML workspace",
+            LimitKind::SettingsXmlWorkspace,
             model_peak,
             limits.max_workspace_bytes,
         )?;
@@ -1469,7 +1530,7 @@ pub(super) fn validate_topology(
             .event_count
             .checked_mul(3)
             .ok_or(Error::Limit {
-                resource: "settings validation work",
+                kind: LimitKind::SettingsValidationWork,
                 actual: u64::MAX,
                 maximum: u64::MAX - 1,
             })?;
@@ -1620,11 +1681,11 @@ fn map_scan_error(error: ScanError) -> Error {
         ScanError::Parser => Error::Scan("XML parser rejected the bounded event".into()),
         ScanError::Semantic(message) => Error::Scan(message.into()),
         ScanError::Limit {
-            resource,
+            kind: resource,
             actual,
             maximum,
         } => Error::Limit {
-            resource,
+            kind: resource,
             actual,
             maximum,
         },
@@ -1642,23 +1703,27 @@ fn inspect_root_dialect(
     cancellation: Option<&CancellationToken>,
 ) -> Result<bool> {
     let expected_len = u64::try_from(bytes.len()).map_err(|_| Error::Limit {
-        resource: "settings XML bytes",
+        kind: LimitKind::SettingsXmlBytes,
         actual: u64::MAX,
         maximum: limits.max_settings_xml_bytes,
     })?;
     let max_token = usize::try_from(limits.max_token_bytes)
         .map_err(|_| Error::Limit {
-            resource: "XML token bytes",
+            kind: LimitKind::XmlTokenBytes,
             actual: limits.max_token_bytes,
             maximum: usize::MAX as u64,
         })?
         .min(bytes.len().max(1));
     let workspace = scanner_workspace_requirement(max_token, 0).ok_or(Error::Limit {
-        resource: "parser workspace",
+        kind: LimitKind::ParserWorkspace,
         actual: u64::MAX,
         maximum: limits.max_workspace_bytes,
     })?;
-    check_limit("parser workspace", workspace, limits.max_workspace_bytes)?;
+    check_limit(
+        LimitKind::ParserWorkspace,
+        workspace,
+        limits.max_workspace_bytes,
+    )?;
     let _reservation = context
         .map(|execution| {
             execution
@@ -1752,12 +1817,12 @@ fn settings_namespace_declarations(element: &BytesStart<'_>) -> Result<(usize, u
             .checked_add(prefix_bytes)
             .and_then(|value| value.checked_add(attribute.value.len()))
             .ok_or(Error::Limit {
-                resource: "settings XML namespace bytes",
+                kind: LimitKind::SettingsXmlNamespaceBytes,
                 actual: u64::MAX,
                 maximum: u64::MAX - 1,
             })?;
         count = count.checked_add(1).ok_or(Error::Limit {
-            resource: "settings XML namespace bindings",
+            kind: LimitKind::SettingsXmlNamespaceBindings,
             actual: u64::MAX,
             maximum: u64::MAX - 1,
         })?;
@@ -1787,7 +1852,7 @@ fn settings_event_owned_bytes(
     let mut owned = settings_namespace_len(namespace)
         .checked_add(settings_lossy_len(element.local_name().as_ref()))
         .ok_or(Error::Limit {
-            resource: "settings XML semantic bytes",
+            kind: LimitKind::SettingsXmlSemanticBytes,
             actual: u64::MAX,
             maximum: u64::MAX - 1,
         })?;
@@ -1807,12 +1872,12 @@ fn settings_event_owned_bytes(
             })
             .and_then(|value| value.checked_add(attribute.value.len()))
             .ok_or(Error::Limit {
-                resource: "settings XML semantic bytes",
+                kind: LimitKind::SettingsXmlSemanticBytes,
                 actual: u64::MAX,
                 maximum: u64::MAX - 1,
             })?;
         attributes = attributes.checked_add(1).ok_or(Error::Limit {
-            resource: "settings XML attributes",
+            kind: LimitKind::SettingsXmlAttributes,
             actual: u64::MAX,
             maximum: u64::MAX - 1,
         })?;
@@ -1847,14 +1912,14 @@ fn settings_mce_directive_facts(
                 continue;
             }
             tokens = tokens.checked_add(1).ok_or(Error::Limit {
-                resource: "settings XML MCE directive tokens",
+                kind: LimitKind::SettingsXmlMceDirectiveTokens,
                 actual: u64::MAX,
                 maximum: u64::MAX - 1,
             })?;
             owned = owned
                 .checked_add(settings_lossy_len(token))
                 .ok_or(Error::Limit {
-                    resource: "settings XML MCE directive bytes",
+                    kind: LimitKind::SettingsXmlMceDirectiveBytes,
                     actual: u64::MAX,
                     maximum: u64::MAX - 1,
                 })?;
@@ -1872,7 +1937,7 @@ fn settings_mce_directive_facts(
                         })
                     })
                     .ok_or(Error::Limit {
-                        resource: "settings XML MCE directive bytes",
+                        kind: LimitKind::SettingsXmlMceDirectiveBytes,
                         actual: u64::MAX,
                         maximum: u64::MAX - 1,
                     })?;
@@ -1930,30 +1995,34 @@ fn guard_settings_xml(
     cancellation: Option<&CancellationToken>,
 ) -> Result<SettingsGuardFacts> {
     let expected_len = u64::try_from(bytes.len()).map_err(|_| Error::Limit {
-        resource: "settings XML bytes",
+        kind: LimitKind::SettingsXmlBytes,
         actual: u64::MAX,
         maximum: limits.max_settings_xml_bytes,
     })?;
     let max_token = usize::try_from(limits.max_token_bytes)
         .map_err(|_| Error::Limit {
-            resource: "XML token bytes",
+            kind: LimitKind::XmlTokenBytes,
             actual: limits.max_token_bytes,
             maximum: usize::MAX as u64,
         })?
         .min(bytes.len().max(1));
     let max_depth = usize::try_from(limits.max_depth)
         .map_err(|_| Error::Limit {
-            resource: "XML depth",
+            kind: LimitKind::XmlDepth,
             actual: limits.max_depth,
             maximum: usize::MAX as u64,
         })?
         .min(bytes.len().checked_div(3).unwrap_or(0).max(1));
     let workspace = scanner_workspace_requirement(max_token, max_depth).ok_or(Error::Limit {
-        resource: "parser workspace",
+        kind: LimitKind::ParserWorkspace,
         actual: u64::MAX,
         maximum: limits.max_workspace_bytes,
     })?;
-    check_limit("parser workspace", workspace, limits.max_workspace_bytes)?;
+    check_limit(
+        LimitKind::ParserWorkspace,
+        workspace,
+        limits.max_workspace_bytes,
+    )?;
     let _reservation = context
         .map(|execution| {
             execution
@@ -1976,7 +2045,7 @@ fn guard_settings_xml(
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let token_window = max_token.checked_add(1).ok_or(Error::Limit {
-        resource: "XML token bytes",
+        kind: LimitKind::XmlTokenBytes,
         actual: u64::MAX,
         maximum: limits.max_token_bytes,
     })?;
@@ -1996,7 +2065,7 @@ fn guard_settings_xml(
     let mut namespace_bindings = 2usize;
     let mut namespace_scopes = Vec::<(usize, usize)>::new();
     let namespace_scope_capacity = max_depth.checked_add(1).ok_or(Error::Limit {
-        resource: "XML depth",
+        kind: LimitKind::XmlDepth,
         actual: u64::MAX,
         maximum: max_depth as u64,
     })?;
@@ -2013,13 +2082,13 @@ fn guard_settings_xml(
             .map_err(map_quick_xml_error)
             .map_err(map_scan_error)?;
         events = events.checked_add(1).ok_or(Error::Limit {
-            resource: "XML events",
+            kind: LimitKind::XmlEvents,
             actual: u64::MAX,
             maximum: limits.max_events,
         })?;
         if events > limits.max_events {
             return Err(Error::Limit {
-                resource: "XML events",
+                kind: LimitKind::XmlEvents,
                 actual: events,
                 maximum: limits.max_events,
             });
@@ -2055,7 +2124,7 @@ fn guard_settings_xml(
                     namespace_buffer
                         .checked_add(declared_bytes)
                         .ok_or(Error::Limit {
-                            resource: "settings XML namespace bytes",
+                            kind: LimitKind::SettingsXmlNamespaceBytes,
                             actual: u64::MAX,
                             maximum: u64::MAX - 1,
                         })?;
@@ -2063,7 +2132,7 @@ fn guard_settings_xml(
                     namespace_bindings
                         .checked_add(declared_bindings)
                         .ok_or(Error::Limit {
-                            resource: "settings XML namespace bindings",
+                            kind: LimitKind::SettingsXmlNamespaceBindings,
                             actual: u64::MAX,
                             maximum: u64::MAX - 1,
                         })?;
@@ -2071,7 +2140,7 @@ fn guard_settings_xml(
                     .namespace_declaration_count
                     .checked_add(declared_bindings)
                     .ok_or(Error::Limit {
-                        resource: "settings XML namespace bindings",
+                        kind: LimitKind::SettingsXmlNamespaceBindings,
                         actual: u64::MAX,
                         maximum: u64::MAX - 1,
                     })?;
@@ -2081,26 +2150,26 @@ fn guard_settings_xml(
                     .namespace_copy_bytes
                     .checked_add(namespace_buffer)
                     .ok_or(Error::Limit {
-                        resource: "settings XML namespace copy bytes",
+                        kind: LimitKind::SettingsXmlNamespaceCopyBytes,
                         actual: u64::MAX,
                         maximum: u64::MAX - 1,
                     })?;
                 namespace_scopes.push((declared_bytes, declared_bindings));
                 depth = depth.checked_add(1).ok_or(Error::Limit {
-                    resource: "XML depth",
+                    kind: LimitKind::XmlDepth,
                     actual: u64::MAX,
                     maximum: limits.max_depth,
                 })?;
                 if depth > max_depth {
                     return Err(Error::Limit {
-                        resource: "XML depth",
+                        kind: LimitKind::XmlDepth,
                         actual: depth as u64,
                         maximum: max_depth as u64,
                     });
                 }
                 facts.max_depth = facts.max_depth.max(depth);
                 facts.node_count = facts.node_count.checked_add(1).ok_or(Error::Limit {
-                    resource: "settings XML nodes",
+                    kind: LimitKind::SettingsXmlNodes,
                     actual: u64::MAX,
                     maximum: u64::MAX - 1,
                 })?;
@@ -2110,7 +2179,7 @@ fn guard_settings_xml(
                         .semantic_owned_bytes
                         .checked_add(owned)
                         .ok_or(Error::Limit {
-                            resource: "settings XML semantic bytes",
+                            kind: LimitKind::SettingsXmlSemanticBytes,
                             actual: u64::MAX,
                             maximum: u64::MAX - 1,
                         })?;
@@ -2119,7 +2188,7 @@ fn guard_settings_xml(
                         .attribute_count
                         .checked_add(attributes)
                         .ok_or(Error::Limit {
-                            resource: "settings XML attributes",
+                            kind: LimitKind::SettingsXmlAttributes,
                             actual: u64::MAX,
                             maximum: u64::MAX - 1,
                         })?;
@@ -2129,7 +2198,7 @@ fn guard_settings_xml(
                         .attribute_bearing_nodes
                         .checked_add(1)
                         .ok_or(Error::Limit {
-                            resource: "settings XML attribute-bearing nodes",
+                            kind: LimitKind::SettingsXmlAttributeBearingNodes,
                             actual: u64::MAX,
                             maximum: u64::MAX - 1,
                         })?;
@@ -2140,7 +2209,7 @@ fn guard_settings_xml(
                     .mce_directive_tokens
                     .checked_add(directive_tokens)
                     .ok_or(Error::Limit {
-                        resource: "settings XML MCE directive tokens",
+                        kind: LimitKind::SettingsXmlMceDirectiveTokens,
                         actual: u64::MAX,
                         maximum: u64::MAX - 1,
                     })?;
@@ -2148,20 +2217,20 @@ fn guard_settings_xml(
                     .mce_directive_owned_bytes
                     .checked_add(directive_bytes)
                     .ok_or(Error::Limit {
-                        resource: "settings XML MCE directive bytes",
+                        kind: LimitKind::SettingsXmlMceDirectiveBytes,
                         actual: u64::MAX,
                         maximum: u64::MAX - 1,
                     })?;
             },
             Event::Empty(start) => {
                 let child_depth = depth.checked_add(1).ok_or(Error::Limit {
-                    resource: "XML depth",
+                    kind: LimitKind::XmlDepth,
                     actual: u64::MAX,
                     maximum: limits.max_depth,
                 })?;
                 if child_depth > max_depth {
                     return Err(Error::Limit {
-                        resource: "XML depth",
+                        kind: LimitKind::XmlDepth,
                         actual: child_depth as u64,
                         maximum: max_depth as u64,
                     });
@@ -2172,7 +2241,7 @@ fn guard_settings_xml(
                     namespace_buffer
                         .checked_add(declared_bytes)
                         .ok_or(Error::Limit {
-                            resource: "settings XML namespace bytes",
+                            kind: LimitKind::SettingsXmlNamespaceBytes,
                             actual: u64::MAX,
                             maximum: u64::MAX - 1,
                         })?;
@@ -2180,7 +2249,7 @@ fn guard_settings_xml(
                     .namespace_declaration_count
                     .checked_add(declared_bindings)
                     .ok_or(Error::Limit {
-                        resource: "settings XML namespace bindings",
+                        kind: LimitKind::SettingsXmlNamespaceBindings,
                         actual: u64::MAX,
                         maximum: u64::MAX - 1,
                     })?;
@@ -2188,7 +2257,7 @@ fn guard_settings_xml(
                     namespace_bindings
                         .checked_add(declared_bindings)
                         .ok_or(Error::Limit {
-                            resource: "settings XML namespace bindings",
+                            kind: LimitKind::SettingsXmlNamespaceBindings,
                             actual: u64::MAX,
                             maximum: u64::MAX - 1,
                         })?;
@@ -2198,12 +2267,12 @@ fn guard_settings_xml(
                     .namespace_copy_bytes
                     .checked_add(namespace_buffer)
                     .ok_or(Error::Limit {
-                        resource: "settings XML namespace copy bytes",
+                        kind: LimitKind::SettingsXmlNamespaceCopyBytes,
                         actual: u64::MAX,
                         maximum: u64::MAX - 1,
                     })?;
                 facts.node_count = facts.node_count.checked_add(1).ok_or(Error::Limit {
-                    resource: "settings XML nodes",
+                    kind: LimitKind::SettingsXmlNodes,
                     actual: u64::MAX,
                     maximum: u64::MAX - 1,
                 })?;
@@ -2213,7 +2282,7 @@ fn guard_settings_xml(
                         .semantic_owned_bytes
                         .checked_add(owned)
                         .ok_or(Error::Limit {
-                            resource: "settings XML semantic bytes",
+                            kind: LimitKind::SettingsXmlSemanticBytes,
                             actual: u64::MAX,
                             maximum: u64::MAX - 1,
                         })?;
@@ -2222,7 +2291,7 @@ fn guard_settings_xml(
                         .attribute_count
                         .checked_add(attributes)
                         .ok_or(Error::Limit {
-                            resource: "settings XML attributes",
+                            kind: LimitKind::SettingsXmlAttributes,
                             actual: u64::MAX,
                             maximum: u64::MAX - 1,
                         })?;
@@ -2232,7 +2301,7 @@ fn guard_settings_xml(
                         .attribute_bearing_nodes
                         .checked_add(1)
                         .ok_or(Error::Limit {
-                            resource: "settings XML attribute-bearing nodes",
+                            kind: LimitKind::SettingsXmlAttributeBearingNodes,
                             actual: u64::MAX,
                             maximum: u64::MAX - 1,
                         })?;
@@ -2243,7 +2312,7 @@ fn guard_settings_xml(
                     .mce_directive_tokens
                     .checked_add(directive_tokens)
                     .ok_or(Error::Limit {
-                        resource: "settings XML MCE directive tokens",
+                        kind: LimitKind::SettingsXmlMceDirectiveTokens,
                         actual: u64::MAX,
                         maximum: u64::MAX - 1,
                     })?;
@@ -2251,7 +2320,7 @@ fn guard_settings_xml(
                     .mce_directive_owned_bytes
                     .checked_add(directive_bytes)
                     .ok_or(Error::Limit {
-                        resource: "settings XML MCE directive bytes",
+                        kind: LimitKind::SettingsXmlMceDirectiveBytes,
                         actual: u64::MAX,
                         maximum: u64::MAX - 1,
                     })?;
@@ -2299,11 +2368,11 @@ fn encode_fragment<'package>(
     cancellation: Option<&CancellationToken>,
 ) -> Result<SourcePartSpliceFragment<'package>> {
     let input_bytes = u64::try_from(text.len()).map_err(|_| Error::Limit {
-        resource: "text bytes",
+        kind: LimitKind::TextBytes,
         actual: u64::MAX,
         maximum: limits.max_text_bytes,
     })?;
-    check_limit("text bytes", input_bytes, limits.max_text_bytes)?;
+    check_limit(LimitKind::TextBytes, input_bytes, limits.max_text_bytes)?;
     check_progress(context, cancellation, 0).map_err(map_scan_error)?;
     let namespace = if strict {
         STRICT_WORDPROCESSINGML_NAMESPACE
@@ -2321,17 +2390,17 @@ fn encode_fragment<'package>(
             return Err(Error::Refused(Refusal::ComplexParagraph));
         }
         let bytes = u64::try_from(escaped_character_len(character)).map_err(|_| Error::Limit {
-            resource: "fragment bytes",
+            kind: LimitKind::FragmentBytes,
             actual: u64::MAX,
             maximum: limits.max_fragment_bytes,
         })?;
         encoded_text = encoded_text.checked_add(bytes).ok_or(Error::Limit {
-            resource: "fragment bytes",
+            kind: LimitKind::FragmentBytes,
             actual: u64::MAX,
             maximum: limits.max_fragment_bytes,
         })?;
         pending_work = pending_work.checked_add(1).ok_or(Error::Limit {
-            resource: "work",
+            kind: LimitKind::Work,
             actual: u64::MAX,
             maximum: limits.max_events,
         })?;
@@ -2348,7 +2417,7 @@ fn encode_fragment<'package>(
         .checked_add(u64::try_from(namespace.len()).unwrap_or(u64::MAX))
         .and_then(|value| value.checked_add(u64::try_from(prefix_b.len()).unwrap_or(u64::MAX)))
         .ok_or(Error::Limit {
-            resource: "fragment bytes",
+            kind: LimitKind::FragmentBytes,
             actual: u64::MAX,
             maximum: limits.max_fragment_bytes,
         })?;
@@ -2357,13 +2426,17 @@ fn encode_fragment<'package>(
         .checked_add(encoded_text)
         .and_then(|value| value.checked_add(suffix_len))
         .ok_or(Error::Limit {
-            resource: "fragment bytes",
+            kind: LimitKind::FragmentBytes,
             actual: u64::MAX,
             maximum: limits.max_fragment_bytes,
         })?;
-    check_limit("fragment bytes", fragment_len, limits.max_fragment_bytes)?;
+    check_limit(
+        LimitKind::FragmentBytes,
+        fragment_len,
+        limits.max_fragment_bytes,
+    )?;
     let capacity = usize::try_from(fragment_len).map_err(|_| Error::Limit {
-        resource: "fragment bytes",
+        kind: LimitKind::FragmentBytes,
         actual: fragment_len,
         maximum: limits.max_fragment_bytes,
     })?;
@@ -2418,9 +2491,9 @@ enum ScanError {
     Parser,
     #[error("{0}")]
     Semantic(&'static str),
-    #[error("{resource} limit exceeded: {actual} > {maximum}")]
+    #[error("{kind} limit exceeded: {actual} > {maximum}")]
     Limit {
-        resource: &'static str,
+        kind: LimitKind,
         actual: u64,
         maximum: u64,
     },
@@ -2574,7 +2647,7 @@ struct GuardedBufRead<R> {
 impl<R: BufRead> GuardedBufRead<R> {
     fn new(inner: R, max_total: u64, max_token: usize) -> std::result::Result<Self, ScanError> {
         let max_token_window = max_token.checked_add(1).ok_or(ScanError::Limit {
-            resource: "XML token bytes",
+            kind: LimitKind::XmlTokenBytes,
             actual: u64::MAX,
             maximum: max_token as u64,
         })?;
@@ -2819,12 +2892,12 @@ pub(super) fn scan_main_part(
         source
             .len
             .checked_add(u64::try_from(fragment.len()).map_err(|_| Error::Limit {
-                resource: "candidate XML bytes",
+                kind: LimitKind::CandidateXmlBytes,
                 actual: u64::MAX,
                 maximum: limits.max_candidate_xml_bytes,
             })?)
             .ok_or(Error::Limit {
-                resource: "candidate XML bytes",
+                kind: LimitKind::CandidateXmlBytes,
                 actual: u64::MAX,
                 maximum: limits.max_candidate_xml_bytes,
             })?
@@ -2878,29 +2951,29 @@ fn scan_reader<R: BufRead>(
     generated: Option<(u64, u64, u64)>,
 ) -> std::result::Result<ScanFacts, ScanError> {
     let max_token = usize::try_from(limits.max_token_bytes).map_err(|_| ScanError::Limit {
-        resource: "XML token bytes",
+        kind: LimitKind::XmlTokenBytes,
         actual: limits.max_token_bytes,
         maximum: usize::MAX as u64,
     })?;
     let max_depth = usize::try_from(limits.max_depth).map_err(|_| ScanError::Limit {
-        resource: "XML depth",
+        kind: LimitKind::XmlDepth,
         actual: limits.max_depth,
         maximum: usize::MAX as u64,
     })?;
     let token_window = max_token.checked_add(1).ok_or(ScanError::Limit {
-        resource: "XML token bytes",
+        kind: LimitKind::XmlTokenBytes,
         actual: u64::MAX,
         maximum: limits.max_token_bytes,
     })?;
     let workspace =
         scanner_workspace_requirement(max_token, max_depth).ok_or(ScanError::Limit {
-            resource: "parser workspace",
+            kind: LimitKind::ParserWorkspace,
             actual: u64::MAX,
             maximum: limits.max_workspace_bytes,
         })?;
     if workspace > limits.max_workspace_bytes {
         return Err(ScanError::Limit {
-            resource: "parser workspace",
+            kind: LimitKind::ParserWorkspace,
             actual: workspace,
             maximum: limits.max_workspace_bytes,
         });
@@ -2967,13 +3040,13 @@ fn scan_reader<R: BufRead>(
         let opaque_namespace_known = !matches!(&namespace, ResolveResult::Unknown(_));
         let event_end = parser.get_mut().position();
         event_count = event_count.checked_add(1).ok_or(ScanError::Limit {
-            resource: "XML events",
+            kind: LimitKind::XmlEvents,
             actual: u64::MAX,
             maximum: limits.max_events,
         })?;
         if event_count > limits.max_events {
             return Err(ScanError::Limit {
-                resource: "XML events",
+                kind: LimitKind::XmlEvents,
                 actual: event_count,
                 maximum: limits.max_events,
             });
@@ -3000,7 +3073,7 @@ fn scan_reader<R: BufRead>(
             section_len = section_len
                 .checked_add(raw_len as u64)
                 .ok_or(ScanError::Limit {
-                    resource: "section-properties bytes",
+                    kind: LimitKind::SectionPropertiesBytes,
                     actual: u64::MAX,
                     maximum: limits.max_source_xml_bytes,
                 })?;
@@ -3014,7 +3087,7 @@ fn scan_reader<R: BufRead>(
                         ));
                     }
                     section_depth = section_depth.checked_add(1).ok_or(ScanError::Limit {
-                        resource: "XML depth",
+                        kind: LimitKind::XmlDepth,
                         actual: u64::MAX,
                         maximum: limits.max_depth,
                     })?;
@@ -3065,7 +3138,7 @@ fn scan_reader<R: BufRead>(
                 .saturating_add(section_depth);
             if depth > limits.max_depth {
                 return Err(ScanError::Limit {
-                    resource: "XML depth",
+                    kind: LimitKind::XmlDepth,
                     actual: depth,
                     maximum: limits.max_depth,
                 });
@@ -3132,7 +3205,7 @@ fn scan_reader<R: BufRead>(
                         if matches!(frame, FrameKind::Paragraph) {
                             paragraph_count =
                                 paragraph_count.checked_add(1).ok_or(ScanError::Limit {
-                                    resource: "paragraphs",
+                                    kind: LimitKind::Paragraphs,
                                     actual: u64::MAX,
                                     maximum: limits.max_paragraphs,
                                 })?;
@@ -3141,7 +3214,7 @@ fn scan_reader<R: BufRead>(
                             );
                             if paragraph_count > paragraph_limit {
                                 return Err(ScanError::Limit {
-                                    resource: "paragraphs",
+                                    kind: LimitKind::Paragraphs,
                                     actual: paragraph_count,
                                     maximum: paragraph_limit,
                                 });
@@ -3164,7 +3237,7 @@ fn scan_reader<R: BufRead>(
                     .saturating_add(section_depth);
                 if depth > limits.max_depth {
                     return Err(ScanError::Limit {
-                        resource: "XML depth",
+                        kind: LimitKind::XmlDepth,
                         actual: depth,
                         maximum: limits.max_depth,
                     });
@@ -3188,7 +3261,7 @@ fn scan_reader<R: BufRead>(
                     section_len = raw_len as u64;
                     if 3 > limits.max_depth {
                         return Err(ScanError::Limit {
-                            resource: "XML depth",
+                            kind: LimitKind::XmlDepth,
                             actual: 3,
                             maximum: limits.max_depth,
                         });
@@ -3213,7 +3286,7 @@ fn scan_reader<R: BufRead>(
                     if matches!(frame, FrameKind::Paragraph) {
                         paragraph_count =
                             paragraph_count.checked_add(1).ok_or(ScanError::Limit {
-                                resource: "paragraphs",
+                                kind: LimitKind::Paragraphs,
                                 actual: u64::MAX,
                                 maximum: limits.max_paragraphs,
                             })?;
@@ -3222,7 +3295,7 @@ fn scan_reader<R: BufRead>(
                         );
                         if paragraph_count > paragraph_limit {
                             return Err(ScanError::Limit {
-                                resource: "paragraphs",
+                                kind: LimitKind::Paragraphs,
                                 actual: paragraph_count,
                                 maximum: paragraph_limit,
                             });
@@ -3236,7 +3309,7 @@ fn scan_reader<R: BufRead>(
                                 generated_offset.get_or_insert(event_start);
                                 generated_count =
                                     generated_count.checked_add(1).ok_or(ScanError::Limit {
-                                        resource: "generated paragraphs",
+                                        kind: LimitKind::GeneratedParagraphs,
                                         actual: u64::MAX,
                                         maximum: expected_count,
                                     })?;
@@ -3279,7 +3352,7 @@ fn scan_reader<R: BufRead>(
                         if event_end <= generated_end {
                             generated_count =
                                 generated_count.checked_add(1).ok_or(ScanError::Limit {
-                                    resource: "generated paragraphs",
+                                    kind: LimitKind::GeneratedParagraphs,
                                     actual: u64::MAX,
                                     maximum: expected_count,
                                 })?;
@@ -3645,7 +3718,7 @@ fn validate_candidate(
     limits: Limits,
 ) -> Result<()> {
     let expected_len = source.len.checked_add(fragment_len).ok_or(Error::Limit {
-        resource: "candidate XML bytes",
+        kind: LimitKind::CandidateXmlBytes,
         actual: u64::MAX,
         maximum: limits.max_candidate_xml_bytes,
     })?;
@@ -3654,7 +3727,7 @@ fn validate_candidate(
             .insertion_offset
             .checked_add(fragment_len)
             .ok_or(Error::Limit {
-                resource: "candidate XML bytes",
+                kind: LimitKind::CandidateXmlBytes,
                 actual: u64::MAX,
                 maximum: limits.max_candidate_xml_bytes,
             })?;
@@ -3674,4 +3747,105 @@ fn validate_candidate(
         ));
     }
     Ok(())
+}
+/// The bounded resources of a source-backed tail append, carried by [`Error::Limit`] (record 0355a).
+///
+/// Each variant names one bounded resource; [`std::fmt::Display`] gives its
+/// human-readable name, the one the error messages print.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Candidate XML bytes.
+    CandidateXmlBytes,
+    /// Fragment bytes.
+    FragmentBytes,
+    /// Generated paragraphs.
+    GeneratedParagraphs,
+    /// Output bytes.
+    OutputBytes,
+    /// Paragraphs.
+    Paragraphs,
+    /// Parser workspace.
+    ParserWorkspace,
+    /// Section-properties bytes.
+    SectionPropertiesBytes,
+    /// Settings validation work.
+    SettingsValidationWork,
+    /// Settings XML attribute-bearing nodes.
+    SettingsXmlAttributeBearingNodes,
+    /// Settings XML attributes.
+    SettingsXmlAttributes,
+    /// Settings XML bytes.
+    SettingsXmlBytes,
+    /// Settings XML MCE directive bytes.
+    SettingsXmlMceDirectiveBytes,
+    /// Settings XML MCE directive tokens.
+    SettingsXmlMceDirectiveTokens,
+    /// Settings XML namespace bindings.
+    SettingsXmlNamespaceBindings,
+    /// Settings XML namespace bytes.
+    SettingsXmlNamespaceBytes,
+    /// Settings XML namespace copy bytes.
+    SettingsXmlNamespaceCopyBytes,
+    /// Settings XML nodes.
+    SettingsXmlNodes,
+    /// Settings XML semantic bytes.
+    SettingsXmlSemanticBytes,
+    /// Settings XML workspace.
+    SettingsXmlWorkspace,
+    /// Source XML bytes.
+    SourceXmlBytes,
+    /// Text bytes.
+    TextBytes,
+    /// Text capacity bytes.
+    TextCapacityBytes,
+    /// Work.
+    Work,
+    /// XML depth.
+    XmlDepth,
+    /// XML events.
+    XmlEvents,
+    /// XML token bytes.
+    XmlTokenBytes,
+}
+
+impl LimitKind {
+    /// The resource's human-readable name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::CandidateXmlBytes => "candidate XML bytes",
+            Self::FragmentBytes => "fragment bytes",
+            Self::GeneratedParagraphs => "generated paragraphs",
+            Self::OutputBytes => "output bytes",
+            Self::Paragraphs => "paragraphs",
+            Self::ParserWorkspace => "parser workspace",
+            Self::SectionPropertiesBytes => "section-properties bytes",
+            Self::SettingsValidationWork => "settings validation work",
+            Self::SettingsXmlAttributeBearingNodes => "settings XML attribute-bearing nodes",
+            Self::SettingsXmlAttributes => "settings XML attributes",
+            Self::SettingsXmlBytes => "settings XML bytes",
+            Self::SettingsXmlMceDirectiveBytes => "settings XML MCE directive bytes",
+            Self::SettingsXmlMceDirectiveTokens => "settings XML MCE directive tokens",
+            Self::SettingsXmlNamespaceBindings => "settings XML namespace bindings",
+            Self::SettingsXmlNamespaceBytes => "settings XML namespace bytes",
+            Self::SettingsXmlNamespaceCopyBytes => "settings XML namespace copy bytes",
+            Self::SettingsXmlNodes => "settings XML nodes",
+            Self::SettingsXmlSemanticBytes => "settings XML semantic bytes",
+            Self::SettingsXmlWorkspace => "settings XML workspace",
+            Self::SourceXmlBytes => "source XML bytes",
+            Self::TextBytes => "text bytes",
+            Self::TextCapacityBytes => "text capacity bytes",
+            Self::Work => "work",
+            Self::XmlDepth => "XML depth",
+            Self::XmlEvents => "XML events",
+            Self::XmlTokenBytes => "XML token bytes",
+        }
+    }
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
 }

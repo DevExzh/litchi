@@ -222,7 +222,7 @@ impl EncoderState {
         event: PlainParagraphEvent<'event>,
     ) -> Result<EventBytes<'event>, AuthoredReplayError> {
         let next_events = checked_add(
-            "authored events",
+            crate::source_backed::tail_append_stream::LimitKind::AuthoredEvents,
             self.event_count,
             1,
             self.limits.max_authored_events,
@@ -234,14 +234,14 @@ impl EncoderState {
                     return Err(AuthoredReplayError::Invalid("nested paragraph start event"));
                 }
                 let paragraph_count = checked_add(
-                    "authored paragraphs",
+                    crate::source_backed::tail_append_stream::LimitKind::AuthoredParagraphs,
                     self.paragraph_count,
                     1,
                     self.limits.max_authored_paragraphs,
                 )?;
                 let prefix_len = paragraph_prefix_len(self.strict_namespace)?;
                 let next_xml = checked_add(
-                    "authored XML bytes",
+                    crate::source_backed::tail_append_stream::LimitKind::AuthoredXmlBytes,
                     self.encoded_xml_bytes,
                     prefix_len,
                     self.limits.max_authored_xml_bytes,
@@ -258,28 +258,37 @@ impl EncoderState {
                         "text event occurs outside a paragraph",
                     ));
                 }
-                let text_len = usize_to_u64(text.len(), "authored text bytes")?;
+                let text_len = usize_to_u64(
+                    text.len(),
+                    crate::source_backed::tail_append_stream::LimitKind::AuthoredTextBytes,
+                )?;
                 if text_len > self.limits.max_authored_chunk_bytes {
                     return Err(AuthoredReplayError::Limit {
-                        resource: "authored chunk bytes",
+                        kind:
+                            crate::source_backed::tail_append_stream::LimitKind::AuthoredChunkBytes,
                         actual: text_len,
                         maximum: self.limits.max_authored_chunk_bytes,
                     });
                 }
                 let (escaped_len, character_count) = scan_text(text)?;
                 let text_bytes = checked_add(
-                    "authored text bytes",
+                    crate::source_backed::tail_append_stream::LimitKind::AuthoredTextBytes,
                     self.text_bytes,
                     text_len,
                     self.limits.max_authored_text_bytes,
                 )?;
                 let encoded_xml_bytes = checked_add(
-                    "authored XML bytes",
+                    crate::source_backed::tail_append_stream::LimitKind::AuthoredXmlBytes,
                     self.encoded_xml_bytes,
                     escaped_len,
                     self.limits.max_authored_xml_bytes,
                 )?;
-                let work = checked_add("authored event work", 1, character_count, u64::MAX - 1)?;
+                let work = checked_add(
+                    crate::source_backed::tail_append_stream::LimitKind::AuthoredEventWork,
+                    1,
+                    character_count,
+                    u64::MAX - 1,
+                )?;
                 self.text_bytes = text_bytes;
                 self.encoded_xml_bytes = encoded_xml_bytes;
                 self.event_hash.update([EVENT_TEXT]);
@@ -293,9 +302,12 @@ impl EncoderState {
                         "paragraph end event has no open paragraph",
                     ));
                 }
-                let suffix_len = usize_to_u64(XML_PARAGRAPH_SUFFIX.len(), "authored XML bytes")?;
+                let suffix_len = usize_to_u64(
+                    XML_PARAGRAPH_SUFFIX.len(),
+                    crate::source_backed::tail_append_stream::LimitKind::AuthoredXmlBytes,
+                )?;
                 let encoded_xml_bytes = checked_add(
-                    "authored XML bytes",
+                    crate::source_backed::tail_append_stream::LimitKind::AuthoredXmlBytes,
                     self.encoded_xml_bytes,
                     suffix_len,
                     self.limits.max_authored_xml_bytes,
@@ -389,7 +401,7 @@ where
             },
         };
         let capacity = usize::try_from(window).map_err(|_| AuthoredReplayError::Limit {
-            resource: "replay window bytes",
+            kind: crate::source_backed::tail_append_stream::LimitKind::ReplayWindowBytes,
             actual: window,
             maximum: usize::MAX as u64,
         })?;
@@ -510,26 +522,37 @@ where
     }
 
     fn emit(&mut self, bytes: &[u8]) -> Result<(), AuthoredReplayError> {
-        let amount = usize_to_u64(bytes.len(), "authored XML bytes")?;
+        let amount = usize_to_u64(
+            bytes.len(),
+            crate::source_backed::tail_append_stream::LimitKind::AuthoredXmlBytes,
+        )?;
         // `event_preflight` already checked this addition before any bytes are
         // emitted.  Keep this assertion as a defensive fence for future
         // callers that add another event kind.
         if self.state.encoded_xml_bytes > self.limits.max_authored_xml_bytes {
             return Err(AuthoredReplayError::Limit {
-                resource: "authored XML bytes",
+                kind: crate::source_backed::tail_append_stream::LimitKind::AuthoredXmlBytes,
                 actual: self.state.encoded_xml_bytes,
                 maximum: self.limits.max_authored_xml_bytes,
             });
         }
         let available = self.window.capacity().saturating_sub(self.window.len());
-        if amount > usize_to_u64(available, "replay window bytes")? {
+        if amount
+            > usize_to_u64(
+                available,
+                crate::source_backed::tail_append_stream::LimitKind::ReplayWindowBytes,
+            )?
+        {
             self.flush_window()?;
         }
         let available = self.window.capacity().saturating_sub(self.window.len());
         if bytes.len() > available {
             return Err(AuthoredReplayError::Limit {
-                resource: "replay window bytes",
-                actual: usize_to_u64(bytes.len(), "replay window bytes")?,
+                kind: crate::source_backed::tail_append_stream::LimitKind::ReplayWindowBytes,
+                actual: usize_to_u64(
+                    bytes.len(),
+                    crate::source_backed::tail_append_stream::LimitKind::ReplayWindowBytes,
+                )?,
                 maximum: self.limits.max_replay_window_bytes,
             });
         }
@@ -646,7 +669,7 @@ where
             self.context.as_ref(),
             usize_to_u64(
                 size_of::<EncodingReader<'_, S>>(),
-                "replay reader state bytes",
+                crate::source_backed::tail_append_stream::LimitKind::ReplayReaderStateBytes,
             )?,
         )?;
         let cursor_reservations = reserve_cursor(
@@ -733,7 +756,7 @@ where
         validate_window_relation(limits)?;
         let window = usize::try_from(limits.max_replay_window_bytes).map_err(|_| {
             AuthoredReplayError::Limit {
-                resource: "replay window bytes",
+                kind: crate::source_backed::tail_append_stream::LimitKind::ReplayWindowBytes,
                 actual: limits.max_replay_window_bytes,
                 maximum: usize::MAX as u64,
             }
@@ -959,14 +982,17 @@ impl ChunkSink for PendingSink {
 
 fn validate_window_relation(limits: ParagraphStreamLimits) -> Result<(), AuthoredReplayError> {
     let envelope = checked_add(
-        "authored XML bytes",
+        crate::source_backed::tail_append_stream::LimitKind::AuthoredXmlBytes,
         paragraph_prefix_len(false)?,
-        usize_to_u64(XML_PARAGRAPH_SUFFIX.len(), "authored XML bytes")?,
+        usize_to_u64(
+            XML_PARAGRAPH_SUFFIX.len(),
+            crate::source_backed::tail_append_stream::LimitKind::AuthoredXmlBytes,
+        )?,
         u64::MAX - 1,
     )?;
     if envelope > limits.max_replay_window_bytes {
         return Err(AuthoredReplayError::Limit {
-            resource: "replay window bytes",
+            kind: crate::source_backed::tail_append_stream::LimitKind::ReplayWindowBytes,
             actual: envelope,
             maximum: limits.max_replay_window_bytes,
         });
@@ -985,11 +1011,14 @@ fn paragraph_prefix_len(strict_namespace: bool) -> Result<u64, AuthoredReplayErr
         .checked_add(namespace.len())
         .and_then(|value| value.checked_add(XML_NAMESPACE_TAIL.len()))
         .ok_or(AuthoredReplayError::Limit {
-            resource: "authored XML bytes",
+            kind: crate::source_backed::tail_append_stream::LimitKind::AuthoredXmlBytes,
             actual: u64::MAX,
             maximum: u64::MAX - 1,
         })?;
-    usize_to_u64(length, "authored XML bytes")
+    usize_to_u64(
+        length,
+        crate::source_backed::tail_append_stream::LimitKind::AuthoredXmlBytes,
+    )
 }
 
 fn write_prefix(
@@ -1006,7 +1035,7 @@ fn write_prefix(
         .checked_add(namespace.len())
         .and_then(|value| value.checked_add(XML_NAMESPACE_TAIL.len()))
         .ok_or(AuthoredReplayError::Limit {
-            resource: "authored XML bytes",
+            kind: crate::source_backed::tail_append_stream::LimitKind::AuthoredXmlBytes,
             actual: u64::MAX,
             maximum: u64::MAX - 1,
         })?;
@@ -1034,30 +1063,38 @@ fn scan_text(text: &str) -> Result<(u64, u64), AuthoredReplayError> {
             ));
         }
         escaped = checked_add(
-            "authored XML bytes",
+            crate::source_backed::tail_append_stream::LimitKind::AuthoredXmlBytes,
             escaped,
-            usize_to_u64(escaped_character_len(character), "authored XML bytes")?,
+            usize_to_u64(
+                escaped_character_len(character),
+                crate::source_backed::tail_append_stream::LimitKind::AuthoredXmlBytes,
+            )?,
             u64::MAX - 1,
         )?;
-        characters = checked_add("authored text characters", characters, 1, u64::MAX - 1)?;
+        characters = checked_add(
+            crate::source_backed::tail_append_stream::LimitKind::AuthoredTextCharacters,
+            characters,
+            1,
+            u64::MAX - 1,
+        )?;
     }
     Ok((escaped, characters))
 }
 
 fn checked_add(
-    resource: &'static str,
+    resource: crate::source_backed::tail_append_stream::LimitKind,
     left: u64,
     right: u64,
     maximum: u64,
 ) -> Result<u64, AuthoredReplayError> {
     let value = left.checked_add(right).ok_or(AuthoredReplayError::Limit {
-        resource,
+        kind: resource,
         actual: u64::MAX,
         maximum,
     })?;
     if value > maximum {
         return Err(AuthoredReplayError::Limit {
-            resource,
+            kind: resource,
             actual: value,
             maximum,
         });
@@ -1065,9 +1102,12 @@ fn checked_add(
     Ok(value)
 }
 
-fn usize_to_u64(value: usize, resource: &'static str) -> Result<u64, AuthoredReplayError> {
+fn usize_to_u64(
+    value: usize,
+    resource: crate::source_backed::tail_append_stream::LimitKind,
+) -> Result<u64, AuthoredReplayError> {
     u64::try_from(value).map_err(|_| AuthoredReplayError::Limit {
-        resource,
+        kind: resource,
         actual: u64::MAX,
         maximum: u64::MAX - 1,
     })
@@ -1076,11 +1116,11 @@ fn usize_to_u64(value: usize, resource: &'static str) -> Result<u64, AuthoredRep
 fn map_limits_error(error: super::Error) -> AuthoredReplayError {
     match error {
         super::Error::Limit {
-            resource,
+            kind: resource,
             actual,
             maximum,
         } => AuthoredReplayError::Limit {
-            resource,
+            kind: resource,
             actual,
             maximum,
         },
