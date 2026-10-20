@@ -13,7 +13,7 @@ use super::super::summary_information::{self, DocumentSecurity, FileTime};
 use super::model::SummaryProperties;
 use litchi_cfb::OleError;
 use litchi_core::Metadata;
-use litchi_core::metadata::Timestamp;
+use litchi_core::metadata::{Timestamp, keywords};
 use std::fmt;
 
 /// FILETIME ticks (100 ns) per minute of editing time.
@@ -159,6 +159,7 @@ impl SummaryProperties {
         let last_printed = utc_time("last_printed", *last_printed)?;
         refuse_present("last_backup", last_backup.as_ref())?;
 
+        let keywords = self.keyword_text(keywords)?;
         let mut draft = self.clone();
         if let Some(page) = *codepage {
             draft.set_code_page(page)?;
@@ -167,7 +168,7 @@ impl SummaryProperties {
             ("title", "title", title),
             ("subject", "subject", subject),
             ("author", "author", author),
-            ("keywords", "keywords", keywords),
+            ("keywords", "keywords", &keywords),
             ("description", "comments", description),
             ("template", "template", template),
             ("last_modified_by", "lastauthor", last_modified_by),
@@ -253,6 +254,27 @@ impl SummaryProperties {
         let changed = draft != *self;
         *self = draft;
         Ok(changed)
+    }
+
+    /// The PIDSI `KEYWORDS` text to write for `list`: `None` for an empty
+    /// list (left as it is) and for the list the current text already
+    /// splits into (its bytes are kept), else the list joined with `, `.
+    fn keyword_text(&self, list: &[String]) -> Result<Option<String>, MetadataError> {
+        if list.is_empty() {
+            return Ok(None);
+        }
+        let current = self.summary_information().keywords().map(keywords::split);
+        if current.as_deref() == Some(list) {
+            return Ok(None);
+        }
+        keywords::join(list).map(Some).map_err(|_| {
+            invalid(
+                "keywords",
+                super::super::model::invalid(
+                    "a keyword contains ';' or ',' or surrounding whitespace, which the keyword string cannot keep",
+                ),
+            )
+        })
     }
 
     /// Selects one code page for both standard sections.

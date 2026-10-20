@@ -1469,7 +1469,11 @@ fn metadata_from_sidecars(
             .author
             .or(diagnostic.document_author)
             .or(diagnostic.sfwp_author);
-        metadata.keywords = diagnostic.keywords;
+        metadata.keywords = diagnostic
+            .keywords
+            .as_deref()
+            .map(litchi_core::metadata::keywords::split)
+            .unwrap_or_default();
         metadata.description = diagnostic.comments;
         metadata.revision = diagnostic.revision;
         build_version = diagnostic.build_version;

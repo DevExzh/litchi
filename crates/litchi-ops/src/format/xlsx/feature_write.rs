@@ -89,6 +89,7 @@ impl Arg {
             Some(Scalar::Number(value)) => Self::Number(value),
             Some(Scalar::Length(value)) => Self::Length(value),
             Some(Scalar::Color(value)) => Self::Color(value),
+            Some(Scalar::List(items)) => Self::Text(items.join(", ")),
         }
     }
 

@@ -295,6 +295,7 @@ impl Out {
                 Value::Bool(value) => PropValue::Bool(*value),
                 Value::Int(value) => PropValue::Int(*value),
                 Value::Number(value) => PropValue::Number(*value),
+                Value::List(items) => PropValue::List(Cow::Owned(items.to_vec())),
                 _ => {
                     let text = prop.to_string();
                     // A read form the write coercion does not accept (a

@@ -655,8 +655,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         title: Some("Comprehensive DOCX Feature Test".to_owned()),
         subject: Some("Feature Verification and Regression Testing".to_owned()),
         author: Some("Litchi OOXML Library".to_owned()),
-        keywords: Some(
-            "docx, test, verification, regression, features, themes, watermarks, toc".to_owned(),
+        keywords: litchi::common::metadata::keywords::split(
+            "docx, test, verification, regression, features, themes, watermarks, toc",
         ),
         description: Some(
             "Complete test document for all DOCX writer features including new theme, watermark, and TOC support"

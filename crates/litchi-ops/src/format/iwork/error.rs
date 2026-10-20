@@ -554,7 +554,7 @@ fn pages_footnotes_code(error: &litchi_pages::footnote::body::transaction::Error
 fn pages_metadata_code(error: &litchi_pages::metadata::Error) -> Code {
     use litchi_pages::metadata::Error as E;
     match error {
-        E::InvalidValue => Code::InvalidValue,
+        E::InvalidValue | E::InvalidKeyword => Code::InvalidValue,
         E::LimitExceeded { .. } => Code::LimitExceeded,
         E::PatchConflict | E::InvalidSource => Code::InvalidInput,
         _ => Code::InternalError,

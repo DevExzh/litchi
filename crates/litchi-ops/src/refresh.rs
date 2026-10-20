@@ -1020,7 +1020,8 @@ pub(crate) fn odf_field(
         "title" => property(&metadata.title),
         "subject" => property(&metadata.subject),
         "description" => property(&metadata.description),
-        "keywords" => property(&metadata.keywords),
+        // LibreOffice shows the `meta:keyword` elements joined with `, `.
+        "keywords" => Ok(metadata.keywords.join(", ")),
         "initial-creator" => property(&metadata.author),
         "creator" => property(&metadata.last_modified_by),
         _ => Err((Status::Unsupported, None)),
@@ -1141,7 +1142,9 @@ mod word {
             "TITLE" => &metadata.title,
             "SUBJECT" => &metadata.subject,
             "AUTHOR" => &metadata.author,
-            "KEYWORDS" => &metadata.keywords,
+            // The keyword list joined with `, ` (record 0354): the
+            // source's own separators are not kept in the list.
+            "KEYWORDS" => return Some(metadata.keywords.join(", ")),
             "COMMENTS" => &metadata.description,
             "LASTSAVEDBY" => &metadata.last_modified_by,
             "CATEGORY" => &metadata.category,
