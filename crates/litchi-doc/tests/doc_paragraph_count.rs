@@ -1,7 +1,7 @@
 //! Regression coverage for the structural-only native-DOC paragraph count.
 
 use litchi_doc::builder::Builder;
-use litchi_doc::raw::Package;
+use litchi_doc::raw::Reader;
 use std::io::Cursor;
 
 #[test]
@@ -13,7 +13,7 @@ fn paragraph_count_matches_independent_materialized_oracle() {
     let mut output = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut output).unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package.document().unwrap();
     let paragraphs = document.paragraphs().unwrap();
 

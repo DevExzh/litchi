@@ -133,15 +133,15 @@ fn blob_snapshot_noop_retains_the_exact_source_allocation() {
     let snapshot = blob.snapshot();
     let commit = snapshot.edit().commit().unwrap();
 
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
     assert!(commit.patch().change().is_none());
     assert!(Arc::ptr_eq(
         &snapshot.bytes_shared(),
-        &commit.snapshot().bytes_shared()
+        &commit.package().bytes_shared()
     ));
     assert_eq!(commit.patch().apply(&snapshot).unwrap(), snapshot);
-    assert_eq!(blob.edit().commit().unwrap().snapshot().bytes(), source);
+    assert_eq!(blob.edit().commit().unwrap().package().bytes(), source);
 }
 
 #[test]
@@ -155,7 +155,7 @@ fn property_payload_replacement_updates_offsets_and_preserves_unknown_fields() {
         .set_certificate_store([8, 9])
         .unwrap();
     let commit = transaction.commit().unwrap();
-    let edited = commit.snapshot();
+    let edited = commit.package();
 
     assert_eq!(edited.info().signature(), [10, 11, 12, 13, 14]);
     assert_eq!(edited.info().certificate_store(), [8, 9]);
@@ -179,7 +179,7 @@ fn property_single_payload_resize_rewrites_aligned_outer_size() {
     let mut transaction = snapshot.edit();
     transaction.set_signature([10, 11, 12, 13, 14]).unwrap();
     let commit = transaction.commit().unwrap();
-    let edited = commit.snapshot();
+    let edited = commit.package();
 
     assert_eq!(edited.info().signature(), [10, 11, 12, 13, 14]);
     assert_eq!(edited.info().certificate_store(), [4, 5, 6, 7]);
@@ -200,7 +200,7 @@ fn word_payload_replacement_updates_utf16_outer_sizes_and_preserves_padding() {
     transaction.replace_signature([1, 2, 3, 4]).unwrap();
     transaction.replace_certificate_store([5]).unwrap();
     let commit = transaction.commit().unwrap();
-    let edited = commit.snapshot();
+    let edited = commit.package();
 
     assert_eq!(edited.kind(), Kind::Word);
     assert_eq!(edited.info().signature(), [1, 2, 3, 4]);

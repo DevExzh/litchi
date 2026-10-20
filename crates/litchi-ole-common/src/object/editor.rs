@@ -5,13 +5,10 @@ use super::codec::{self, Package};
 use super::discovery;
 use super::link::{self, Link};
 use super::model::{self, Limits, Objects};
-use super::patch::{Commit, Patch};
+use super::patch::{Commit, Diagnostics, Patch};
 use super::snapshot::Snapshot;
 use super::target::{Target, Targets};
-use crate::ole_streams::{
-    self, NativePatch, NativeSnapshot, NativeTransaction, PresentationPatch, PresentationSnapshot,
-    PresentationTransaction,
-};
+use crate::ole_streams::{self, native, presentation};
 use litchi_cfb::{OleError, OleFile, OleFileLimits, SectorLayoutPolicy};
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
@@ -77,9 +74,12 @@ fn observe_cfb_parse<T>(
     result
 }
 
-/// Transactional editor for target-selected OLE storages.
+/// A staged edit of target-selected OLE storages.
+///
+/// Dropping the edit discards it; the source bytes or snapshot it started
+/// from are never changed.
 #[derive(Debug, Clone)]
-pub struct Editor {
+pub struct Edit {
     targets: Targets,
     limits: Limits,
     cfb_limits: OleFileLimits,
@@ -92,7 +92,7 @@ pub struct Editor {
     validated_layout: SectorLayoutPolicy,
 }
 
-impl Editor {
+impl Edit {
     /// Opens a CFB package with an explicit host-resolved target catalog.
     ///
     /// # Errors
@@ -165,13 +165,13 @@ impl Editor {
     /// ```
     /// use std::io::Cursor;
     /// use litchi_cfb::{OleError, OleWriter};
-    /// use litchi_ole_common::object::{Editor, Limits, Targets};
+    /// use litchi_ole_common::object::{Edit, Limits, Targets};
     ///
     /// let mut writer = OleWriter::new();
     /// writer.create_stream(&["payload"], b"example")?;
     /// let mut bytes = Cursor::new(Vec::new());
     /// writer.write_to(&mut bytes)?;
-    /// let result = Editor::open_with_ole_file_with_admission::<OleError, _>(
+    /// let result = Edit::open_with_ole_file_with_admission::<OleError, _>(
     ///     bytes.into_inner(), Targets::default(), Limits::default(),
     ///     |ole| {
     ///         if ole.stream_len(&["payload"])? > 4 {
@@ -252,9 +252,9 @@ impl Editor {
     /// # #[cfg(feature = "performance-diagnostics")]
     /// # {
     /// use litchi_cfb::OleError;
-    /// use litchi_ole_common::object::{Editor, Limits, Targets};
+    /// use litchi_ole_common::object::{Edit, Limits, Targets};
     ///
-    /// let _result = Editor::open_with_ole_file_profiled_with_admission::<OleError, _>(
+    /// let _result = Edit::open_with_ole_file_profiled_with_admission::<OleError, _>(
     ///     Vec::new(),
     ///     Targets::default(),
     ///     Limits::default(),
@@ -354,12 +354,13 @@ impl Editor {
         }
     }
 
-    /// Captures the current read state as an immutable, shareable snapshot.
+    /// A read view of the staged state as an immutable, shareable snapshot.
     ///
-    /// Snapshot clones share large stream allocations and are independent of
-    /// this editor's subsequent edits.
+    /// The view shares large stream allocations, renders nothing, and is
+    /// independent of this edit's subsequent changes; publishing still goes
+    /// through [`Self::commit`].
     #[must_use]
-    pub fn snapshot(&self) -> Snapshot {
+    pub fn staged(&self) -> Snapshot {
         Snapshot::new(
             self.targets.clone(),
             self.limits,
@@ -411,12 +412,6 @@ impl Editor {
     #[must_use]
     pub fn objects(&self) -> &Objects {
         &self.objects
-    }
-
-    /// Whether a committed edit has changed the package.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.changed
     }
 
     /// Borrows an opaque package stream without copying it.
@@ -835,34 +830,9 @@ impl Editor {
         self.put_stream(&stream_path, link.to_bytes())
     }
 
-    /// Atomically edits one selected object's OLEDS presentation stream.
-    ///
-    /// The source stream is parsed into a bounded, shared snapshot before the
-    /// callback runs.  The codec transaction validates and reparses the
-    /// candidate, then this editor publishes it through the ordinary
-    /// clone-render-reopen path.  A callback failure or package validation
-    /// failure leaves this editor unchanged.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the target or indexed stream is absent, the
-    /// stream is malformed, the callback rejects the edit, or the resulting
-    /// package cannot be validated under the editor limits.
-    pub fn update_presentation<F>(
-        &mut self,
-        key: &str,
-        index: usize,
-        edit: F,
-    ) -> Result<(), OleError>
-    where
-        F: FnOnce(&mut PresentationTransaction) -> Result<(), OleError>,
-    {
-        self.update_presentation_with_limits(key, index, ole_streams::Limits::default(), edit)
-    }
-
     /// Atomically edits one selected object's OLEDS presentation under
     /// explicit stream limits.
-    pub fn update_presentation_with_limits<F>(
+    pub fn update_presentation<F>(
         &mut self,
         key: &str,
         index: usize,
@@ -870,7 +840,7 @@ impl Editor {
         edit: F,
     ) -> Result<(), OleError>
     where
-        F: FnOnce(&mut PresentationTransaction) -> Result<(), OleError>,
+        F: FnOnce(&mut presentation::Edit) -> Result<(), OleError>,
     {
         model::validate_ole_stream_limits(limits)?;
         let stream_path = self.object_presentation_path(key, index)?;
@@ -878,11 +848,11 @@ impl Editor {
             .package
             .stream_shared(&stream_path)
             .ok_or(OleError::StreamNotFound)
-            .and_then(|bytes| PresentationSnapshot::parse_shared(bytes, limits))?;
+            .and_then(|bytes| presentation::Snapshot::parse_shared(bytes, limits))?;
         let mut transaction = source.edit();
         edit(&mut transaction)?;
         let commit = transaction.commit()?;
-        self.put_stream_shared(&stream_path, commit.snapshot().bytes_shared())
+        self.put_stream_shared(&stream_path, commit.package().bytes_shared())
     }
 
     /// Applies a source-checked OLEDS presentation patch to one selected
@@ -894,7 +864,7 @@ impl Editor {
         &mut self,
         key: &str,
         index: usize,
-        patch: &PresentationPatch,
+        patch: &presentation::Patch,
     ) -> Result<(), OleError> {
         let stream_path = self.object_presentation_path(key, index)?;
         let bytes = self
@@ -906,32 +876,21 @@ impl Editor {
                 "OLEDS presentation patch source does not match object stream".into(),
             ));
         }
-        let source = PresentationSnapshot::parse_shared(bytes, patch.source().limits())?;
+        let source = presentation::Snapshot::parse_shared(bytes, patch.source().limits())?;
         let replacement = patch.apply(&source)?;
         self.put_stream_shared(&stream_path, replacement.bytes_shared())
     }
 
-    /// Atomically edits one selected object's OLEDS native-data stream.
-    ///
-    /// Native bytes remain opaque and inert; the callback only receives the
-    /// bounded stream transaction.
-    pub fn update_native<F>(&mut self, key: &str, edit: F) -> Result<(), OleError>
-    where
-        F: FnOnce(&mut NativeTransaction) -> Result<(), OleError>,
-    {
-        self.update_native_with_limits(key, ole_streams::Limits::default(), edit)
-    }
-
     /// Atomically edits one selected object's native-data stream under
     /// explicit stream limits.
-    pub fn update_native_with_limits<F>(
+    pub fn update_native<F>(
         &mut self,
         key: &str,
         limits: ole_streams::Limits,
         edit: F,
     ) -> Result<(), OleError>
     where
-        F: FnOnce(&mut NativeTransaction) -> Result<(), OleError>,
+        F: FnOnce(&mut native::Edit) -> Result<(), OleError>,
     {
         model::validate_ole_stream_limits(limits)?;
         let stream_path = self.object_native_path(key)?;
@@ -939,11 +898,11 @@ impl Editor {
             .package
             .stream_shared(&stream_path)
             .ok_or(OleError::StreamNotFound)
-            .and_then(|bytes| NativeSnapshot::parse_shared(bytes, limits))?;
+            .and_then(|bytes| native::Snapshot::parse_shared(bytes, limits))?;
         let mut transaction = source.edit();
         edit(&mut transaction)?;
         let commit = transaction.commit()?;
-        self.put_stream_shared(&stream_path, commit.snapshot().bytes_shared())
+        self.put_stream_shared(&stream_path, commit.package().bytes_shared())
     }
 
     /// Applies a source-checked OLEDS native-data patch to one selected object
@@ -951,7 +910,7 @@ impl Editor {
     ///
     /// The exact source bytes are compared before reparsing, so a stale patch
     /// is rejected before an editor candidate is cloned or rendered.
-    pub fn apply_native_patch(&mut self, key: &str, patch: &NativePatch) -> Result<(), OleError> {
+    pub fn apply_native_patch(&mut self, key: &str, patch: &native::Patch) -> Result<(), OleError> {
         let stream_path = self.object_native_path(key)?;
         let bytes = self
             .package
@@ -962,7 +921,7 @@ impl Editor {
                 "OLEDS native patch source does not match object stream".into(),
             ));
         }
-        let source = NativeSnapshot::parse_shared(bytes, patch.source().limits())?;
+        let source = native::Snapshot::parse_shared(bytes, patch.source().limits())?;
         let replacement = patch.apply(&source)?;
         self.put_stream_shared(&stream_path, replacement.bytes_shared())
     }
@@ -1106,9 +1065,11 @@ impl Editor {
     /// Returns an error when the edited package cannot be rendered.
     pub fn commit(self) -> Result<Commit, OleError> {
         let before = self.original.as_ref().clone();
-        let snapshot = self.snapshot();
+        let snapshot = self.staged();
         let after = self.finish()?;
-        Ok(Commit::new(snapshot, Patch::new(before, after)))
+        let patch = Patch::new(before, after);
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn commit_candidate(self) -> Result<Self, OleError> {

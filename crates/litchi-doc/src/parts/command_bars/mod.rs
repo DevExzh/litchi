@@ -6,6 +6,7 @@
 //! CTBWRAPPER snapshots. Unknown Tcg records remain explicitly unsupported.
 
 mod codec;
+mod family;
 mod model;
 mod package;
 mod transaction;
@@ -15,13 +16,18 @@ mod validation;
 mod tests;
 
 pub use codec::{parse_bytes, to_bytes, to_control_bytes};
+pub use family::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Result};
 pub use model::{
     Action, AllocatedCommand, AllocatedCommands, CommandBars, CommandId, CommandString,
     CommandStrings, Control, Customization, CustomizationData, Entry, KeyMap, KeyMapKind, KeyMaps,
     MacroCommand, MacroCommands, MacroName, MacroNames, Operation, Toolbar, ToolbarDelta,
     ToolbarWrapper, XString,
 };
-pub use package::{
-    Commit as PackageCommit, Editor, FIB_INDEX_CMDS, Snapshot as PackageSnapshot, parse, write,
-};
-pub use transaction::{Commit, Error as TransactionError, Snapshot, Transaction};
+pub use package::{FIB_INDEX_CMDS, parse, write};
+
+/// The part-level command-bar codec: the semantic [`record::Snapshot`] and its
+/// [`record::Edit`] staging, which publishes a new semantic snapshot; package
+/// edits go through [`Edit`].
+pub mod record {
+    pub use super::transaction::{Commit, Diagnostics, Edit, Error, Patch, Snapshot};
+}

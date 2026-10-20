@@ -44,9 +44,9 @@ fn inventories_exact_top_level_groups_and_redacts_forward_only() {
         .unwrap();
     assert_eq!(commit.diagnostics().removed_references(), 2);
     assert!(commit.diagnostics().is_complete());
-    assert_eq!(commit.document().text(), source.text());
-    assert!(commit.document().external_references().is_empty());
-    let output = commit.document().to_bytes().unwrap();
+    assert_eq!(commit.package().text(), source.text());
+    assert!(commit.package().external_references().is_empty());
+    let output = commit.package().to_bytes().unwrap();
     assert!(
         !output
             .windows(b"\\template".len())
@@ -98,8 +98,8 @@ fn strict_refuses_external_fields_but_best_effort_is_explicitly_incomplete() {
             .unsupported()
             .contains(&UnsupportedReference::Field)
     );
-    assert!(commit.document().external_references().is_empty());
-    assert_eq!(commit.document().text(), source.text());
+    assert!(commit.package().external_references().is_empty());
+    assert_eq!(commit.package().text(), source.text());
 }
 
 #[test]
@@ -346,7 +346,7 @@ fn compressed_transport_has_inventory_but_no_source_span_and_best_effort_noop() 
         .unwrap();
     assert!(commit.diagnostics().is_incomplete());
     assert_eq!(commit.diagnostics().removed_references(), 0);
-    assert_eq!(commit.document().to_bytes().unwrap(), compressed);
+    assert_eq!(commit.package().to_bytes().unwrap(), compressed);
 }
 
 #[test]

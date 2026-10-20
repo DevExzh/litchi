@@ -78,7 +78,7 @@ fn coordinate_index_preserves_source_order_and_refuses_duplicates() {
     let duplicate_index = CellIndex::from_entries(&duplicate_entries).unwrap();
     assert!(matches!(
         duplicate_index.unique_entry_index(&duplicate_entries, Reference { row: 2, column: 4 }),
-        Err(Error::UnsafeEdit(_))
+        Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
     ));
 }
 
@@ -158,7 +158,7 @@ fn structural_index_distinguishes_disjoint_cells_and_sheet_wide_axes() {
 
 #[test]
 fn joining_a_noop_then_staging_reuses_the_coordinate_slot() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let mut left = source.edit();
     left.set_number(
         Selector::Position(Position::new(0)),
@@ -182,7 +182,7 @@ fn joining_a_noop_then_staging_reuses_the_coordinate_slot() {
     )
     .unwrap();
     let commit = left.commit().unwrap();
-    let snapshot = commit.snapshot();
+    let snapshot = commit.package();
     let cell = snapshot
         .worksheet(Selector::Position(Position::new(0)))
         .unwrap()
@@ -195,7 +195,7 @@ fn joining_a_noop_then_staging_reuses_the_coordinate_slot() {
 
 #[test]
 fn joined_fixed_and_structural_cell_operations_conflict_in_both_orders() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let reference = Reference { row: 0, column: 0 };
     let style = StyleIndex::new(&source, 0).unwrap();
 
@@ -228,7 +228,7 @@ fn joined_fixed_and_structural_cell_operations_conflict_in_both_orders() {
 
 #[test]
 fn joined_cloned_edits_rebuild_indexes_across_sheets_and_invert_exactly() {
-    let source = Snapshot::from_bytes(multi_sheet_package()).unwrap();
+    let source = Snapshot::from_bytes(multi_sheet_package(), Limits::default()).unwrap();
     let expected_order = [reference(0, 0), reference(1, 1), reference(2, 2)];
     for worksheet in source.worksheets() {
         let actual: Vec<_> = worksheet.cells().map(Cell::reference).collect();
@@ -258,7 +258,7 @@ fn joined_cloned_edits_rebuild_indexes_across_sheets_and_invert_exactly() {
         .set_numeric(Selector::Position(Position::new(1)), reference(1, 1), 23.0)
         .unwrap();
     let fixed_commit = fixed_clone.commit().unwrap();
-    let fixed_snapshot = fixed_commit.snapshot();
+    let fixed_snapshot = fixed_commit.package();
     for (sheet, row, column, value) in [
         (0, 0, 0, 12.0),
         (0, 1, 1, 22.0),
@@ -310,7 +310,7 @@ fn joined_cloned_edits_rebuild_indexes_across_sheets_and_invert_exactly() {
         .remove_cell(Selector::Position(Position::new(1)), reference(1, 1))
         .unwrap();
     let structural_commit = structural_clone.commit().unwrap();
-    for (position, worksheet) in structural_commit.snapshot().worksheets().enumerate() {
+    for (position, worksheet) in structural_commit.package().worksheets().enumerate() {
         if position == 0 {
             assert_eq!(worksheet.cells().count(), 1);
             assert_eq!(
@@ -325,7 +325,7 @@ fn joined_cloned_edits_rebuild_indexes_across_sheets_and_invert_exactly() {
         structural_commit
             .patch()
             .inverse()
-            .apply(structural_commit.snapshot())
+            .apply(structural_commit.package())
             .unwrap()
             .bytes(),
         source.bytes()

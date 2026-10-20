@@ -11,7 +11,7 @@ use std::sync::Arc;
 /// and opaque embedded payloads form one dependency closure. Applying the
 /// patch never executes or resolves any embedded content.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct Patch {
     before: Arc<[u8]>,
     after: Arc<[u8]>,
     before_fingerprint: u64,
@@ -30,31 +30,31 @@ impl Patch {
 
     /// Returns the exact source bytes required by this patch.
     #[must_use]
-    pub fn before(&self) -> &[u8] {
+    pub(crate) fn before(&self) -> &[u8] {
         &self.before
     }
 
     /// Returns the exact result bytes produced by this patch.
     #[must_use]
-    pub fn after(&self) -> &[u8] {
+    pub(crate) fn after(&self) -> &[u8] {
         &self.after
     }
 
     /// Returns the source fingerprint used as a fast conflict precheck.
     #[must_use]
-    pub const fn source_fingerprint(&self) -> u64 {
+    pub(crate) const fn source_fingerprint(&self) -> u64 {
         self.before_fingerprint
     }
 
     /// Returns the result fingerprint.
     #[must_use]
-    pub const fn target_fingerprint(&self) -> u64 {
+    pub(crate) const fn target_fingerprint(&self) -> u64 {
         self.after_fingerprint
     }
 
     /// Whether the complete DOC artifact is byte-for-byte unchanged.
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before == self.after
     }
 
@@ -64,7 +64,7 @@ impl Patch {
     ///
     /// Returns a conflict when the source snapshot bytes do not exactly match
     /// the patch base, or a validation error when the replacement is invalid.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, TransactionError> {
+    pub(crate) fn apply(&self, source: &Snapshot) -> Result<Snapshot, TransactionError> {
         if source.fingerprint() != self.before_fingerprint
             || source.source_bytes() != self.before.as_ref()
         {
@@ -86,7 +86,7 @@ impl Patch {
 
     /// Returns the exact inverse replacement.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: Arc::clone(&self.after),
             after: Arc::clone(&self.before),
@@ -98,7 +98,7 @@ impl Patch {
 
 /// A validated post-edit snapshot paired with its reversible patch.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
 }
@@ -110,37 +110,37 @@ impl Commit {
 
     /// Whether publication changed any DOC artifact byte.
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         !self.patch.is_noop()
     }
 
     /// Borrows the validated post-edit snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrows the source-checked reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consumes the commit into its post-edit snapshot.
     #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
+    pub(crate) fn into_snapshot(self) -> Snapshot {
         self.snapshot
     }
 
     /// Consumes the commit into its reversible patch.
     #[must_use]
-    pub fn into_patch(self) -> Patch {
+    pub(crate) fn into_patch(self) -> Patch {
         self.patch
     }
 
     /// Splits the commit into its result snapshot and patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 }

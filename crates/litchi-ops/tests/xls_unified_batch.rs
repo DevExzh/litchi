@@ -106,7 +106,8 @@ fn formula_fixture() -> Vec<u8> {
 
 fn fixture_with_blank() -> Vec<u8> {
     let source = fixture();
-    let snapshot = Snapshot::from_bytes(source).expect("open blank fixture source");
+    let snapshot = Snapshot::from_bytes(source, litchi_xls::ole_object::Limits::default())
+        .expect("open blank fixture source");
     let mut edit = snapshot.edit();
     edit.insert_cell(
         Selector::Position(Position::new(0)),
@@ -116,7 +117,7 @@ fn fixture_with_blank() -> Vec<u8> {
     .expect("insert formatting-only blank");
     edit.commit()
         .expect("commit blank fixture")
-        .snapshot()
+        .package()
         .bytes()
         .to_vec()
 }
@@ -132,7 +133,8 @@ fn rich_fixture() -> Vec<u8> {
         .expect("build rich fixture")
         .to_bytes()
         .expect("serialize rich fixture");
-    let snapshot = Snapshot::from_bytes(bytes).expect("open rich fixture");
+    let snapshot = Snapshot::from_bytes(bytes, litchi_xls::ole_object::Limits::default())
+        .expect("open rich fixture");
     let mut edit = snapshot.edit();
     edit.insert_rich_text_cell(
         Selector::Position(Position::new(0)),
@@ -146,7 +148,7 @@ fn rich_fixture() -> Vec<u8> {
     .expect("insert rich cell");
     edit.commit()
         .expect("commit rich fixture")
-        .snapshot()
+        .package()
         .bytes()
         .to_vec()
 }

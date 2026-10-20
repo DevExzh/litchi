@@ -2,6 +2,6 @@
 
 mod transaction;
 
-pub use transaction::Editor;
+pub(crate) use transaction::Editor;
 #[cfg(test)]
 pub(super) use transaction::{read_workbook, targets_for_sheets};

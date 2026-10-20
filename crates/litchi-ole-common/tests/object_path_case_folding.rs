@@ -13,7 +13,7 @@
 //! must not treat them as one name.
 
 use litchi_cfb::OleWriter;
-use litchi_ole_common::object::{Editor, Limits, Target, Targets};
+use litchi_ole_common::object::{Edit, Limits, Target, Targets};
 use std::io::Cursor;
 
 const UPPER: &str = "\u{10400}";
@@ -34,9 +34,9 @@ fn siblings() -> Vec<u8> {
     output.into_inner()
 }
 
-fn editor_for(bytes: Vec<u8>, storage: &str) -> Editor {
+fn editor_for(bytes: Vec<u8>, storage: &str) -> Edit {
     let targets = Targets::one(Target::new("object", [storage]).expect("target should validate"));
-    Editor::open(bytes, targets, Limits::default()).expect("editor should open")
+    Edit::open(bytes, targets, Limits::default()).expect("editor should open")
 }
 
 #[test]

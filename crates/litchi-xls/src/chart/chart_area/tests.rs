@@ -1,7 +1,8 @@
 use super::super::codec::serialize_chart;
+use super::super::model::Chart;
 use super::super::package::{build_workbook_fixture, ranges};
 use super::super::wire::{CHART, EOF, record};
-use super::super::{Chart, Limits, Selector};
+use super::super::{Limits, Selector};
 use super::*;
 use crate::Error;
 
@@ -58,22 +59,19 @@ fn transaction_is_source_checked_and_reversible() {
     let change = patch.change().expect("effective change");
     assert_eq!(change.before(), source.rect());
     assert_eq!(change.after(), target);
-    assert_eq!(
-        patch.apply(source).expect("apply").snapshot().rect(),
-        target
-    );
+    assert_eq!(patch.apply(source).expect("apply").package().rect(), target);
     assert_eq!(
         patch
             .inverse()
             .apply(Snapshot::try_new(target).expect("target"))
             .expect("inverse")
-            .snapshot()
+            .package()
             .rect(),
         source.rect()
     );
     assert!(matches!(
         patch.apply(Snapshot::try_new(target).expect("diverged source")),
-        Err(Error::UnsafeEdit(_))
+        Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
     ));
 }
 
@@ -128,7 +126,7 @@ fn patch_changes_only_the_chart_payload_and_preserves_unknown_offsets() {
     };
     let mut edit = source_snapshot.edit().expect("transaction");
     edit.set_rect(target).expect("stage");
-    let patch = edit.commit().expect("commit").patch();
+    let patch = edit.commit().expect("commit").into_parts().1;
     let changed = super::patch(
         &original,
         patch.change().expect("change"),
@@ -167,7 +165,7 @@ fn patch_changes_only_the_chart_payload_and_preserves_unknown_offsets() {
 fn package_editor_exposes_contextual_area_edit_without_host_resize() {
     let limits = Limits::default();
     let bytes = build_workbook_fixture(Chart::default(), limits).expect("fixture workbook");
-    let mut editor = super::super::Editor::open(bytes, limits).expect("open workbook");
+    let mut editor = super::super::Edit::open(bytes, limits).expect("open workbook");
     let target = Rect {
         x: 0,
         y: 0,

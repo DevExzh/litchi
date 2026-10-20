@@ -128,8 +128,8 @@ impl Snapshot {
 
     /// Starts an independent transaction from this snapshot.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             before: self.clone(),
             working: self.clone(),
         }
@@ -187,7 +187,7 @@ impl Metadata {
     }
 
     /// Starts a validated semantic transaction from this metadata.
-    pub fn edit(&self) -> PackageResult<Transaction> {
+    pub fn edit(&self) -> PackageResult<Edit> {
         Ok(self.snapshot()?.edit())
     }
 }
@@ -245,45 +245,21 @@ impl Patch {
     }
 }
 
-/// The validated result of a semantic route-slip transaction.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    pub(crate) fn new(snapshot: Snapshot, patch: Patch) -> Self {
-        Self { snapshot, patch }
-    }
-
-    /// The immutable post-edit snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// The reversible semantic patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Splits the commit into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// A mutable candidate built from an immutable route-slip snapshot.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     before: Snapshot,
     working: Snapshot,
 }
 
-impl Transaction {
+impl Edit {
     /// Creates a transaction from an immutable snapshot.
     #[must_use]
     pub fn new(snapshot: Snapshot) -> Self {
@@ -293,16 +269,10 @@ impl Transaction {
         }
     }
 
-    /// Returns the current candidate snapshot without publishing it.
+    /// The staged candidate snapshot, not yet committed.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub fn staged(&self) -> &Snapshot {
         &self.working
-    }
-
-    /// Whether the candidate differs from its source snapshot.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.before != self.working
     }
 
     /// Replaces the route-slip metadata candidate.
@@ -430,7 +400,8 @@ impl Transaction {
     pub fn commit(self) -> Result<Commit, Error> {
         validation::metadata_option(&self.working.metadata)?;
         let patch = Patch::new(self.before, self.working.clone());
-        Ok(Commit::new(self.working, patch))
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(self.working, patch, diagnostics))
     }
 
     fn resolve(&self, selector: RecipientSelector<'_>) -> Result<usize, RecipientSelectionError> {

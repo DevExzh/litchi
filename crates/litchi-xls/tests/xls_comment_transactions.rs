@@ -6,6 +6,12 @@ use litchi_xls::{Visibility, raw::Reader};
 use std::collections::BTreeMap;
 use std::io::{self, Cursor, Write};
 
+/// The package a comments snapshot was read from, for the package-level
+/// comments family.
+fn xls_package(snapshot: &Snapshot) -> litchi_xls::Package {
+    litchi_xls::Package::from_bytes(snapshot.bytes()).unwrap()
+}
+
 fn authored(comments: usize) -> Vec<u8> {
     let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Notes").unwrap();
@@ -191,7 +197,7 @@ fn updates_existing_comments_atomically_and_reversibly() {
         Reference::new(2, 1).unwrap(),
         Value::new("Last", "x".repeat(9_000)).unwrap(),
     );
-    let mut edit = snapshot.edit();
+    let mut edit = xls_package(&snapshot).edit_comments().unwrap();
     edit.replace_many(Selector::Name("Notes"), [first, middle, last])
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -199,22 +205,22 @@ fn updates_existing_comments_atomically_and_reversibly() {
     assert_eq!(commit.diagnostics().touched_streams(), 1);
     assert_eq!(commit.patch().operations().len(), 3);
     assert_eq!(
-        read_value(commit.snapshot().bytes(), 0, 0),
+        read_value(commit.patch().after(), 0, 0),
         Value::new("Renamed", "short").unwrap()
     );
     assert_eq!(
-        read_value(commit.snapshot().bytes(), 0, 1),
+        read_value(commit.patch().after(), 0, 1),
         Value::new("Unicode 作者", "wide 😀 text").unwrap()
     );
     assert_eq!(
-        read_value(commit.snapshot().bytes(), 0, 2),
+        read_value(commit.patch().after(), 0, 2),
         Value::new("Last", "x".repeat(9_000)).unwrap()
     );
     assert_eq!(
-        read_value(commit.snapshot().bytes(), 1, 0),
+        read_value(commit.patch().after(), 1, 0),
         Value::new("Other", "preserve me").unwrap()
     );
-    let after_workbook = Reader::new(Cursor::new(commit.snapshot().bytes())).unwrap();
+    let after_workbook = Reader::new(Cursor::new(commit.patch().after())).unwrap();
     assert!(
         after_workbook
             .xls_worksheet(1)
@@ -241,7 +247,7 @@ fn updates_existing_comments_atomically_and_reversibly() {
         assert_eq!(before.object_padding(), after.object_padding());
         assert_eq!(before.text_properties(), after.text_properties());
     }
-    let after_streams = streams(commit.snapshot().bytes());
+    let after_streams = streams(commit.patch().after());
     assert_eq!(
         before_streams.keys().collect::<Vec<_>>(),
         after_streams.keys().collect::<Vec<_>>()
@@ -257,7 +263,7 @@ fn updates_existing_comments_atomically_and_reversibly() {
     }
 
     let applied = commit.patch().apply(&snapshot).unwrap();
-    assert_eq!(applied.bytes(), commit.snapshot().bytes());
+    assert_eq!(applied.bytes(), commit.patch().after());
     let restored = commit.patch().inverse().apply(&applied).unwrap();
     assert_eq!(restored.bytes(), bytes);
     assert!(commit.patch().apply(&applied).is_err());
@@ -267,7 +273,7 @@ fn updates_existing_comments_atomically_and_reversibly() {
 fn exact_noop_and_batch_failure_do_not_publish_bytes() {
     let snapshot = Snapshot::from_bytes(authored(3)).unwrap();
     let original = read_value(snapshot.bytes(), 0, 0);
-    let mut edit = snapshot.edit();
+    let mut edit = xls_package(&snapshot).edit_comments().unwrap();
     edit.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
@@ -290,7 +296,7 @@ fn exact_noop_and_batch_failure_do_not_publish_bytes() {
     );
     let commit = edit.commit().unwrap();
     assert!(commit.patch().is_noop());
-    assert_eq!(commit.snapshot().bytes(), snapshot.bytes());
+    assert_eq!(commit.patch().after(), snapshot.bytes());
 
     let good = Update::new(
         Reference::new(0, 1).unwrap(),
@@ -300,7 +306,7 @@ fn exact_noop_and_batch_failure_do_not_publish_bytes() {
         Reference::new(0, 1).unwrap(),
         Value::new("Other", "late").unwrap(),
     );
-    let mut edit = snapshot.edit();
+    let mut edit = xls_package(&snapshot).edit_comments().unwrap();
     assert!(
         edit.replace_many(Selector::Position(Position::new(0)), [good, duplicate])
             .is_err()
@@ -312,7 +318,7 @@ fn exact_noop_and_batch_failure_do_not_publish_bytes() {
 #[test]
 fn refuses_unsupported_lifecycle_and_enforces_batch_bound() {
     let snapshot = Snapshot::from_bytes(authored(257)).unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = xls_package(&snapshot).edit_comments().unwrap();
     assert!(
         edit.remove(
             Selector::Position(Position::new(0)),
@@ -344,7 +350,7 @@ fn refuses_protected_signed_encrypted_and_invalid_values() {
     let mut output = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut output).unwrap();
     let snapshot = Snapshot::from_bytes(output.into_inner()).unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = xls_package(&snapshot).edit_comments().unwrap();
     edit.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 0).unwrap(),
@@ -382,7 +388,7 @@ fn refuses_protected_signed_encrypted_and_invalid_values() {
     let mut output = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut output).unwrap();
     let empty = Snapshot::from_bytes(output.into_inner()).unwrap();
-    let mut edit = empty.edit();
+    let mut edit = xls_package(&empty).edit_comments().unwrap();
     assert!(
         edit.replace(
             Selector::Position(Position::new(0)),
@@ -434,7 +440,7 @@ fn updates_poi_fixture_and_reopens() {
         .unwrap();
     let source = worksheet.comments().next().unwrap();
     let reference = Reference::new(u32::from(source.row()), u32::from(source.column())).unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = xls_package(&snapshot).edit_comments().unwrap();
     edit.replace(
         Selector::Position(Position::new(0)),
         reference,
@@ -442,7 +448,7 @@ fn updates_poi_fixture_and_reopens() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    let workbook = Reader::new(Cursor::new(commit.snapshot().bytes())).unwrap();
+    let workbook = Reader::new(Cursor::new(commit.patch().after())).unwrap();
     let updated = &workbook.xls_worksheet(0).unwrap().comments()[0];
     assert_eq!(updated.author(), "POI");
     assert_eq!(updated.text(), "updated without normalizing OBJ");
@@ -455,7 +461,7 @@ fn updates_poi_fixture_and_reopens() {
         .unwrap();
     let source = worksheet.comments().next().unwrap();
     let reference = Reference::new(u32::from(source.row()), u32::from(source.column())).unwrap();
-    let mut edit = mixed.edit();
+    let mut edit = xls_package(&mixed).edit_comments().unwrap();
     edit.replace(
         Selector::Position(Position::new(0)),
         reference,
@@ -463,7 +469,7 @@ fn updates_poi_fixture_and_reopens() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    let workbook = Reader::new(Cursor::new(commit.snapshot().bytes())).unwrap();
+    let workbook = Reader::new(Cursor::new(commit.patch().after())).unwrap();
     assert_eq!(
         workbook.xls_worksheet(0).unwrap().comments()[0].text(),
         "comment beside unrelated drawing shapes"
@@ -473,7 +479,7 @@ fn updates_poi_fixture_and_reopens() {
 #[test]
 fn source_backed_commit_handles_one_and_two_hundred_fifty_six_updates() {
     let snapshot = Snapshot::from_bytes(authored(256)).unwrap();
-    let mut one = snapshot.edit();
+    let mut one = xls_package(&snapshot).edit_comments().unwrap();
     one.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
@@ -505,7 +511,7 @@ fn source_backed_commit_handles_one_and_two_hundred_fifty_six_updates() {
     );
 
     let snapshot = Snapshot::from_bytes(authored(256)).unwrap();
-    let mut all = snapshot.edit();
+    let mut all = xls_package(&snapshot).edit_comments().unwrap();
     let updates = (0..256).map(|row| {
         Update::new(
             Reference::new(row, 1).unwrap(),
@@ -545,7 +551,7 @@ fn source_backed_commit_preserves_compressed_and_utf16_widths() {
     let mut output = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut output).unwrap();
     let snapshot = Snapshot::from_bytes(output.into_inner()).unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = xls_package(&snapshot).edit_comments().unwrap();
     edit.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 0).unwrap(),
@@ -581,7 +587,7 @@ fn source_backed_commit_preserves_compressed_and_utf16_widths() {
 #[test]
 fn source_backed_commit_refuses_length_or_encoding_width_changes() {
     let snapshot = Snapshot::from_bytes(authored(1)).unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = xls_package(&snapshot).edit_comments().unwrap();
     edit.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
@@ -596,7 +602,7 @@ fn source_backed_commit_refuses_length_or_encoding_width_changes() {
     let mut output = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut output).unwrap();
     let snapshot = Snapshot::from_bytes(output.into_inner()).unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = xls_package(&snapshot).edit_comments().unwrap();
     // Both strings occupy two encoded bytes, but this changes compressed BIFF
     // text into UTF-16 and must remain an explicit refusal.
     edit.replace(
@@ -614,7 +620,7 @@ fn source_backed_commit_exact_noop_unknown_stream_and_atomic_save() {
     let before_streams = streams(&source);
     let snapshot = Snapshot::from_bytes(source.clone()).unwrap();
     let original = read_value(snapshot.bytes(), 0, 0);
-    let mut edit = snapshot.edit();
+    let mut edit = xls_package(&snapshot).edit_comments().unwrap();
     edit.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
@@ -630,7 +636,10 @@ fn source_backed_commit_exact_noop_unknown_stream_and_atomic_save() {
     noop.write_to(&mut output).unwrap();
     assert_eq!(output, source);
 
-    let mut edit = Snapshot::from_bytes(source.clone()).unwrap().edit();
+    let mut edit = litchi_xls::Package::from_bytes(&source)
+        .unwrap()
+        .edit_comments()
+        .unwrap();
     edit.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
@@ -703,7 +712,7 @@ impl Write for PartialSink {
 #[test]
 fn source_backed_commit_handles_short_and_partial_sinks() {
     let snapshot = Snapshot::from_bytes(authored(1)).unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = xls_package(&snapshot).edit_comments().unwrap();
     edit.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),

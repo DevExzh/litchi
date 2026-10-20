@@ -9,9 +9,10 @@
 
 mod repair_support;
 
-use litchi_rtf::{RtfDocument, RtfWriter};
+use litchi_rtf::RtfWriter;
+use litchi_rtf::raw::Tree;
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -21,8 +22,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_nested_editable_regions_and_round_trips() {
-    let document =
-        RtfDocument::parse(r"{\rtf1 a\ebcstart b\ebcstart c\ebcend d\ebcend e}").unwrap();
+    let document = Tree::parse(r"{\rtf1 a\ebcstart b\ebcstart c\ebcend d\ebcend e}").unwrap();
     assert_eq!(document.text(), "abcde");
     let regions = document.editable_regions();
     assert_eq!(regions.len(), 2);
@@ -31,14 +31,14 @@ fn parses_nested_editable_regions_and_round_trips() {
     assert_eq!(regions[1].position, 2);
     assert_eq!(regions[1].content, "c");
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.editable_regions(), regions);
 }
 
 #[test]
 fn parses_adjacent_regions_and_coexists_with_body_markup() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1{\*\protstart 01}a{\*\protend 01}"#,
         r#"\ebcstart b\ebcend\ebcstart cd\ebcend{\*\bkmkstart bm}e{\*\bkmkend bm}}"#,
     ))
@@ -53,7 +53,7 @@ fn parses_adjacent_regions_and_coexists_with_body_markup() {
     assert_eq!(document.protection_ranges().len(), 1);
     assert_eq!(document.bookmarks().bookmarks()[0].content, "e");
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.editable_regions(), regions);
     assert_eq!(reparsed.protection_ranges(), document.protection_ranges());
 }
@@ -76,7 +76,7 @@ fn rejects_unbalanced_or_misplaced_editable_region_marks() {
     ];
     for rtf in cases {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(rtf)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(rtf)),
             "accepted malformed {rtf}"
         );
     }

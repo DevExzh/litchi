@@ -749,26 +749,15 @@ impl Edit {
         self.append_paragraphs(std::slice::from_ref(&paragraph))
     }
 
-    /// Converts this staged transaction into a publication-only plan using
-    /// the default bounded source/write window.
-    ///
-    /// Unlike [`Self::commit`], this path does not construct, reopen, or retain
-    /// a complete candidate artifact.  It proves the exact source tail and
-    /// stores only the bounded inserted span; callers can later publish it to
-    /// a sequential non-seek sink with an explicit [`ExecutionContext`].
-    pub fn publication_plan(self) -> Result<TailAppendPublicationPlan, Error> {
-        self.publication_plan_with_limits(TailAppendPublicationLimits::default())
-    }
-
     /// Converts this staged transaction into a publication-only plan with an
     /// explicit hard source/write window.
     ///
     /// This constructor uses the transaction's finite [`SemanticLimits`]
     /// as its allocation boundary.  Call
-    /// [`Self::publication_plan_with_limits_and_context`] when planning must
+    /// [`Self::publication_plan_with_context`] when planning must
     /// also reserve execution-budget memory before the encoded insertion is
     /// allocated.
-    pub fn publication_plan_with_limits(
+    pub fn publication_plan(
         self,
         publication_limits: TailAppendPublicationLimits,
     ) -> Result<TailAppendPublicationPlan, Error> {
@@ -790,26 +779,8 @@ impl Edit {
             })
     }
 
-    /// Converts this staged transaction into a publication-only plan while
-    /// reserving its bounded retained insertion before encoding it.
-    ///
-    /// This context-aware constructor is the ownership boundary for callers
-    /// that need an execution budget to cover planning allocations.  The
-    /// returned plan retains that reservation until all clones of the plan are
-    /// dropped; publication itself borrows source and insertion windows
-    /// directly and therefore does not allocate a complete candidate.
-    pub fn publication_plan_with_context(
-        self,
-        context: &ExecutionContext,
-    ) -> Result<TailAppendPublicationPlan, TailAppendPublicationError> {
-        self.publication_plan_with_limits_and_context(
-            TailAppendPublicationLimits::default(),
-            context,
-        )
-    }
-
     /// Context-aware variant with explicit bounded source/write windows.
-    pub fn publication_plan_with_limits_and_context(
+    pub fn publication_plan_with_context(
         self,
         publication_limits: TailAppendPublicationLimits,
         context: &ExecutionContext,
@@ -1860,36 +1831,16 @@ impl TailAppendSourceEdit {
         self.append_paragraphs(std::slice::from_ref(&paragraph))
     }
 
-    /// Builds a source-backed publication plan with the default window.
-    pub fn publication_plan(
-        self,
-    ) -> Result<TailAppendSourcePublicationPlan, TailAppendPublicationError> {
-        self.publication_plan_with_limits(TailAppendPublicationLimits::default())
-    }
-
     /// Builds a source-backed publication plan with explicit source windows.
-    pub fn publication_plan_with_limits(
+    pub fn publication_plan(
         self,
         publication_limits: TailAppendPublicationLimits,
     ) -> Result<TailAppendSourcePublicationPlan, TailAppendPublicationError> {
         self.publication_plan_inner(publication_limits, None)
     }
 
-    /// Builds a source-backed plan while reserving its bounded insertion and
-    /// one source window from `context` during planning. Each later
-    /// publication reserves its own window independently.
-    pub fn publication_plan_with_context(
-        self,
-        context: &ExecutionContext,
-    ) -> Result<TailAppendSourcePublicationPlan, TailAppendPublicationError> {
-        self.publication_plan_with_limits_and_context(
-            TailAppendPublicationLimits::default(),
-            context,
-        )
-    }
-
     /// Context-aware source-backed planning with explicit source windows.
-    pub fn publication_plan_with_limits_and_context(
+    pub fn publication_plan_with_context(
         self,
         publication_limits: TailAppendPublicationLimits,
         context: &ExecutionContext,

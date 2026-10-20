@@ -7,11 +7,12 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{DocumentTheme, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DocumentTheme, RtfWriter};
 use std::borrow::Cow;
 use std::fs;
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -21,7 +22,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_inert_theme_bytes_and_round_trips_without_interpretation() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1{\*\themedata 504B03041400}"#,
         r#"{\*\colorschememapping 3C3F786D6C3E}Body}"#,
     ))
@@ -38,21 +39,21 @@ fn parses_inert_theme_bytes_and_round_trips_without_interpretation() {
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains(r"{\*\themedata 504b03041400}"));
     assert!(serialized.contains(r"{\*\colorschememapping 3c3f786d6c3e}"));
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.theme(), Some(theme));
 }
 
 #[test]
 fn mutation_validates_and_clear_preserves_body() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Text}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Text}").unwrap();
     let theme = DocumentTheme::new(
         Cow::Borrowed(b"PK\x03\x04"),
         Some(Cow::Borrowed(b"<mapping/>")),
     )
     .unwrap();
     document.set_theme(theme.clone()).unwrap();
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.theme(), Some(&theme));
     assert_eq!(reparsed.text(), "Text");
 
@@ -78,7 +79,7 @@ fn rejects_malformed_or_active_theme_payloads() {
         r"{\rtf1\themedata 00}",
     ];
     for rtf in cases {
-        assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
+        assert!(Tree::parse(rtf).is_err(), "accepted malformed {rtf}");
     }
 }
 
@@ -96,7 +97,7 @@ fn parses_bundled_libreoffice_theme_fixtures() {
     );
     for fixture in FIXTURES {
         let bytes = fs::read(format!("{root}/{fixture}")).unwrap();
-        let document = RtfDocument::parse_bytes(&bytes)
+        let document = Tree::parse_bytes(&bytes)
             .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
         let theme = document
             .theme()

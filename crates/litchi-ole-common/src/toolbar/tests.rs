@@ -318,16 +318,16 @@ fn control_snapshot_edits_text_icon_and_flags_without_losing_opaque_bytes() {
     ok(transaction.set_control_flags(ControlFlags::default().with_hidden(true)));
 
     let commit = ok(transaction.commit());
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(source.bytes(), source_bytes.as_slice());
-    assert_eq!(commit.snapshot().control().prefix(), &[0xCC, 0xDD]);
+    assert_eq!(commit.package().control().prefix(), &[0xCC, 0xDD]);
     assert_eq!(
-        commit.snapshot().control().data().unwrap().specific(),
+        commit.package().control().data().unwrap().specific(),
         &[0xA5, 0x5A, 0xFE]
     );
     assert_eq!(
         commit
-            .snapshot()
+            .package()
             .control()
             .data()
             .unwrap()
@@ -338,14 +338,14 @@ fn control_snapshot_edits_text_icon_and_flags_without_losing_opaque_bytes() {
         "Renamed"
     );
     assert_eq!(
-        commit.snapshot().header().specifics().text_icon(),
+        commit.package().header().specifics().text_icon(),
         TextIcon::TextOnly
     );
-    assert!(commit.snapshot().header().flags().hidden());
+    assert!(commit.package().header().flags().hidden());
 
     let applied = ok(commit.patch().apply(&source));
-    assert_eq!(applied, *commit.snapshot());
-    let reverted = ok(commit.patch().revert(commit.snapshot()));
+    assert_eq!(applied, *commit.package());
+    let reverted = ok(commit.patch().revert(commit.package()));
     assert_eq!(reverted, source);
 }
 
@@ -353,10 +353,10 @@ fn control_snapshot_edits_text_icon_and_flags_without_losing_opaque_bytes() {
 fn toolbar_control_no_op_is_exact_and_stale_sources_are_rejected() {
     let source = ok(Snapshot::from_control(button_control()));
     let commit = ok(source.edit().commit());
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
     assert!(commit.patch().change().is_none());
-    assert_eq!(commit.snapshot().bytes(), source.bytes());
+    assert_eq!(commit.package().bytes(), source.bytes());
 
     let other = {
         let mut transaction = source.edit();
@@ -405,9 +405,9 @@ fn toolbar_control_edits_fail_atomically_and_opaque_payloads_stay_inert() {
     assert!(opaque_edit.set_custom_text(Some("not decoded")).is_err());
     ok(opaque_edit.set_text_icon(TextIcon::TextAndIcon));
     let opaque_commit = ok(opaque_edit.commit());
-    assert_eq!(opaque_commit.snapshot().control().prefix(), &[0xFE, 0xED]);
+    assert_eq!(opaque_commit.package().control().prefix(), &[0xFE, 0xED]);
     assert_eq!(
-        opaque_commit.snapshot().body().opaque_bytes(),
+        opaque_commit.package().body().opaque_bytes(),
         Some(&[0xFA, 0xCE][..])
     );
 }

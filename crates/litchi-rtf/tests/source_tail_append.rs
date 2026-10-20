@@ -191,8 +191,7 @@ fn make_plan(
         EditOptions::new().semantic_limits(limits()),
     );
     edit.append_text_paragraphs(&[text]).unwrap();
-    edit.publication_plan_with_limits(publication_limits())
-        .unwrap()
+    edit.publication_plan(publication_limits()).unwrap()
 }
 
 #[test]
@@ -228,9 +227,7 @@ fn source_plan_noop_preserves_exact_bytes() {
         TailSelector::Body,
         EditOptions::new().semantic_limits(limits()),
     );
-    let plan = edit
-        .publication_plan_with_limits(publication_limits())
-        .unwrap();
+    let plan = edit.publication_plan(publication_limits()).unwrap();
     assert!(plan.is_noop());
     let (_budget, _cancel, execution) = context(4096, 4096, 4096, 4096);
     let mut output = Vec::new();
@@ -257,9 +254,7 @@ fn source_proof_uses_parser_break_tokens_not_raw_suffixes() {
         EditOptions::new().semantic_limits(limits()),
     );
     escaped_edit.append_text_paragraphs(&["C"]).unwrap();
-    let escaped_plan = escaped_edit
-        .publication_plan_with_limits(publication_limits())
-        .unwrap();
+    let escaped_plan = escaped_edit.publication_plan(publication_limits()).unwrap();
     let (_budget, _cancel, execution) = context(4096, 4096, 4096, 4096);
     let mut escaped_output = Vec::new();
     escaped_plan
@@ -287,9 +282,7 @@ fn source_proof_uses_parser_break_tokens_not_raw_suffixes() {
         EditOptions::new().semantic_limits(limits()),
     );
     real_edit.append_text_paragraphs(&["C"]).unwrap();
-    let real_plan = real_edit
-        .publication_plan_with_limits(publication_limits())
-        .unwrap();
+    let real_plan = real_edit.publication_plan(publication_limits()).unwrap();
     let mut real_output = Vec::new();
     real_plan.write_to(&mut real_output, &execution).unwrap();
     assert_eq!(Package::from_bytes(&real_output).unwrap().text(), "A\nC\n");
@@ -345,7 +338,7 @@ fn context_aware_source_planning_charges_digest_scan() {
     edit.append_text_paragraphs(&["C"]).unwrap();
     let (budget, _cancel, execution) = context(4096, 4096, 4096, 4096);
     let plan = edit
-        .publication_plan_with_limits_and_context(publication_limits(), &execution)
+        .publication_plan_with_context(publication_limits(), &execution)
         .unwrap();
     let one_scan = (plan.source_bytes() + plan.inserted_bytes()) as u64;
     assert_eq!(budget.used(Resource::Memory), 0);
@@ -371,7 +364,7 @@ fn source_publication_charges_three_passes_and_exact_window_memory() {
     );
     edit.append_text_paragraphs(&["C"]).unwrap();
     let publication = TailAppendPublicationLimits::new(2, 2);
-    let plan = edit.publication_plan_with_limits(publication).unwrap();
+    let plan = edit.publication_plan(publication).unwrap();
     let expected_output = plan.output_bytes() as u64;
     let expected_work = expected_output * 3;
     let memory = (plan
@@ -476,7 +469,7 @@ fn concurrent_source_publications_reserve_independent_windows() {
     );
     edit.append_text_paragraphs(&["C"]).unwrap();
     let publication = TailAppendPublicationLimits::new(2, 2);
-    let plan = Arc::new(edit.publication_plan_with_limits(publication).unwrap());
+    let plan = Arc::new(edit.publication_plan(publication).unwrap());
     let expected_output = plan.output_bytes() as u64;
     let expected_work = expected_output * 3;
     let memory = (plan
@@ -552,9 +545,7 @@ fn source_mutation_before_planning_is_refused() {
         EditOptions::new().semantic_limits(limits()),
     );
     edit.append_text_paragraphs(&["C"]).unwrap();
-    let error = edit
-        .publication_plan_with_limits(publication_limits())
-        .unwrap_err();
+    let error = edit.publication_plan(publication_limits()).unwrap_err();
     assert!(matches!(
         error,
         TailAppendPublicationError::SourceVersionChanged { .. }

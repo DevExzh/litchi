@@ -7,11 +7,12 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{DocumentDataStore, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DocumentDataStore, RtfWriter};
 use std::borrow::Cow;
 use std::fs;
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -21,8 +22,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_inert_data_store_bytes_and_round_trips() {
-    let document =
-        RtfDocument::parse(r"{\rtf1{\*\datastore 01050000 0200000018000000}Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1{\*\datastore 01050000 0200000018000000}Body}").unwrap();
     assert_eq!(document.text(), "Body");
     let store = document.data_store().unwrap();
     assert_eq!(store.data.as_ref(), [1, 5, 0, 0, 2, 0, 0, 0, 24, 0, 0, 0]);
@@ -30,7 +30,7 @@ fn parses_inert_data_store_bytes_and_round_trips() {
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains(r"{\*\datastore 010500000200000018000000}"));
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.data_store(), Some(store));
 }
@@ -38,9 +38,9 @@ fn parses_inert_data_store_bytes_and_round_trips() {
 #[test]
 fn mutation_validates_and_clear_preserves_body() {
     let store = DocumentDataStore::new(Cow::Borrowed(b"opaque\0bytes")).unwrap();
-    let mut document = RtfDocument::parse(r"{\rtf1 Text}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Text}").unwrap();
     document.set_data_store(store.clone()).unwrap();
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.data_store(), Some(&store));
     assert_eq!(reparsed.text(), "Text");
 
@@ -64,7 +64,7 @@ fn rejects_malformed_or_active_data_store_payloads() {
         r"{\rtf1\datastore 00}",
     ];
     for rtf in cases {
-        assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
+        assert!(Tree::parse(rtf).is_err(), "accepted malformed {rtf}");
     }
 }
 
@@ -82,7 +82,7 @@ fn parses_bundled_libreoffice_data_store_fixtures() {
     );
     for fixture in FIXTURES {
         let bytes = fs::read(format!("{root}/{fixture}")).unwrap();
-        let document = RtfDocument::parse_bytes(&bytes)
+        let document = Tree::parse_bytes(&bytes)
             .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
         let store = document
             .data_store()

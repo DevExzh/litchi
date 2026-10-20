@@ -17,7 +17,8 @@ use super::super::read;
 use super::super::stream::{
     self, Globals, MSO_DRAWING, NOTE, OBJ, Raw, Sheet, TXO, u16_at, u32_at,
 };
-use super::{Edit, Error, LimitKind, Result};
+use super::{Edit, Error, LimitKind, Result, refused};
+use litchi_core::edit::RefusalKind;
 
 /// A cell anchor: the top-left and bottom-right cells (the shape ends at the
 /// top-left corner of `last`) and the move/resize behavior.
@@ -68,7 +69,10 @@ impl Anchor {
             || self.first_row > self.last_row
             || self.first_column > self.last_column
         {
-            return Err(Error::Invalid("the anchor is outside the BIFF8 grid"));
+            return Err(refused(
+                RefusalKind::InvalidValue,
+                "the anchor is outside the BIFF8 grid",
+            ));
         }
         Ok(())
     }
@@ -229,7 +233,10 @@ fn complex_text(text: &str) -> Vec<u8> {
 
 fn fixed_rotation(degrees: f64) -> Result<i32> {
     if !degrees.is_finite() || degrees.abs() > 3_600.0 {
-        return Err(Error::Invalid("the rotation is not a finite angle"));
+        return Err(refused(
+            RefusalKind::InvalidValue,
+            "the rotation is not a finite angle",
+        ));
     }
     #[allow(clippy::cast_possible_truncation, reason = "bounded above")]
     Ok((degrees * 65_536.0).round() as i32)
@@ -266,7 +273,7 @@ fn shape_container(
     atom(&mut body, 0, Atom::ClientAnchor, &anchor).map_err(io)?;
     atom(&mut body, 0, Atom::ClientData, &[]).map_err(io)?;
     let length = u32::try_from(body.len() + if textbox { 8 } else { 0 })
-        .map_err(|_| Error::Invalid("a shape container is too large"))?;
+        .map_err(|_| refused(RefusalKind::InvalidValue, "a shape container is too large"))?;
     let mut out = Vec::with_capacity(body.len() + 8);
     container_header(&mut out, 0, Container::Sp, length).map_err(io)?;
     out.extend(body);
@@ -274,14 +281,20 @@ fn shape_container(
 }
 
 fn io(_: std::io::Error) -> Error {
-    Error::Invalid("an OfficeArt record cannot be written")
+    refused(
+        RefusalKind::InvalidValue,
+        "an OfficeArt record cannot be written",
+    )
 }
 
 fn textbox_records(text: &str) -> Result<Vec<u8>> {
     let mut atom_bytes = Vec::with_capacity(8);
     atom(&mut atom_bytes, 0, Atom::ClientTextbox, &[]).map_err(io)?;
     let mut out = stream::record(MSO_DRAWING, &atom_bytes)?;
-    out.extend(encode::txo(text).map_err(|_| Error::Invalid("the text is too long"))?);
+    out.extend(
+        encode::txo(text)
+            .map_err(|_| refused(RefusalKind::InvalidValue, "the text is too long"))?,
+    );
     Ok(out)
 }
 
@@ -353,7 +366,8 @@ impl Edit {
             .unwrap_or(0)
             + 1;
         let index = u32::try_from(clusters.len()).unwrap_or(u32::MAX);
-        let patriarch = (index + 1).checked_mul(1024).ok_or(Error::Unsupported(
+        let patriarch = (index + 1).checked_mul(1024).ok_or(refused(
+            RefusalKind::UnsupportedOperation,
             "the drawing group has too many clusters",
         ))?;
         Ok(Placement {
@@ -375,11 +389,15 @@ impl Edit {
             .write(&mut patriarch)
             .map_err(io)?;
         let spgr_length = u32::try_from(8 + patriarch.len() + children)
-            .map_err(|_| Error::Invalid("the drawing is too large"))?;
+            .map_err(|_| refused(RefusalKind::InvalidValue, "the drawing is too large"))?;
         let mut out = Vec::with_capacity(80);
         container_header(&mut out, 0, Container::Dg, 16 + 8 + spgr_length).map_err(io)?;
-        let instance = u16::try_from(drawing_id)
-            .map_err(|_| Error::Unsupported("the drawing id exceeds 12 bits"))?;
+        let instance = u16::try_from(drawing_id).map_err(|_| {
+            refused(
+                RefusalKind::UnsupportedOperation,
+                "the drawing id exceeds 12 bits",
+            )
+        })?;
         atom_header(&mut out, instance, Atom::Dg, 8).map_err(io)?;
         out.extend_from_slice(&2u32.to_le_bytes());
         out.extend_from_slice(&first_shape.to_le_bytes());
@@ -403,15 +421,16 @@ impl Edit {
     ) -> Result<(u16, u32)> {
         let (_, layout, block, group) = self.drawing(sheet)?;
         if block.as_ref().is_some_and(|block| !block.canonical) {
-            return Err(Error::Unsupported(
+            return Err(refused(
+                RefusalKind::UnsupportedOperation,
                 "the worksheet drawing's record layout is not rewritten",
             ));
         }
         let placement = Self::place(block.as_ref(), group.as_ref())?;
         let object_id = self.next_object_id(&layout, block.as_ref())?;
         let object = build(placement.shape_id, object_id)?;
-        let span =
-            u32::try_from(object.span()).map_err(|_| Error::Invalid("the shape is too large"))?;
+        let span = u32::try_from(object.span())
+            .map_err(|_| refused(RefusalKind::InvalidValue, "the shape is too large"))?;
         match &block {
             Some(block) => {
                 // Grow the containers and the drawing's shape count in the
@@ -456,10 +475,10 @@ impl Edit {
                 fdgg.drawings_saved += 1;
                 fdgg.shapes_saved += 2;
             } else {
-                let entry = fdgg
-                    .clusters
-                    .get_mut(cluster)
-                    .ok_or(Error::Unsupported("the drawing group lost its cluster"))?;
+                let entry = fdgg.clusters.get_mut(cluster).ok_or(refused(
+                    RefusalKind::UnsupportedOperation,
+                    "the drawing group lost its cluster",
+                ))?;
                 entry.used = entry.used.max(placement.shape_id % 1024 + 1);
                 fdgg.shapes_saved += 1;
             }
@@ -556,7 +575,10 @@ impl Edit {
                     .iter()
                     .find(|record| following.contains(&record.kind))
                     .map(|record| record.start)
-                    .ok_or(Error::Unsupported("the workbook globals have no EOF"))?;
+                    .ok_or(refused(
+                        RefusalKind::UnsupportedOperation,
+                        "the workbook globals have no EOF",
+                    ))?;
                 stream::splice(&mut self.stream, at, at, &encoded)?;
             },
         }
@@ -582,19 +604,25 @@ impl Edit {
     /// Remove the top-level object at `position` of the worksheet drawing.
     fn remove_object(&mut self, sheet: usize, position: usize) -> Result<Object> {
         let (_, layout, block, _) = self.drawing(sheet)?;
-        let block = block.ok_or(Error::Missing("the worksheet has no drawing"))?;
+        let block = block.ok_or(refused(
+            RefusalKind::NotFound,
+            "the worksheet has no drawing",
+        ))?;
         if !block.canonical {
-            return Err(Error::Unsupported(
+            return Err(refused(
+                RefusalKind::UnsupportedOperation,
                 "the worksheet drawing's record layout is not rewritten",
             ));
         }
-        let object = block
-            .objects
-            .get(position)
-            .cloned()
-            .ok_or(Error::Missing("the drawing object does not exist"))?;
+        let object = block.objects.get(position).cloned().ok_or(refused(
+            RefusalKind::NotFound,
+            "the drawing object does not exist",
+        ))?;
         if object.group {
-            return Err(Error::Unsupported("a group shape is not removed"));
+            return Err(refused(
+                RefusalKind::UnsupportedOperation,
+                "a group shape is not removed",
+            ));
         }
         if block.objects.len() == 1 {
             // The drawing's last shape: the whole block goes, with its
@@ -659,16 +687,20 @@ impl Edit {
         bytes: &[u8],
     ) -> Result<()> {
         let (_, layout, block, _) = self.drawing(sheet)?;
-        let block = block.ok_or(Error::Missing("the worksheet has no drawing"))?;
+        let block = block.ok_or(refused(
+            RefusalKind::NotFound,
+            "the worksheet has no drawing",
+        ))?;
         if !block.canonical {
-            return Err(Error::Unsupported(
+            return Err(refused(
+                RefusalKind::UnsupportedOperation,
                 "the worksheet drawing's record layout is not rewritten",
             ));
         }
-        let object = block
-            .objects
-            .get(position)
-            .ok_or(Error::Missing("the drawing object does not exist"))?;
+        let object = block.objects.get(position).ok_or(refused(
+            RefusalKind::NotFound,
+            "the drawing object does not exist",
+        ))?;
         let delta =
             i64::try_from(bytes.len()).unwrap_or(0) - i64::try_from(end - start).unwrap_or(0);
         let grow = |value: u32| u32::try_from(i64::from(value) + delta).unwrap_or(value);
@@ -743,7 +775,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Invalid`] for a cell outside the grid or an author
+    /// Returns [`Error::Refused`] for a cell outside the grid or an author
     /// longer than 54 characters.
     pub fn add_note(
         &mut self,
@@ -755,7 +787,10 @@ impl Edit {
     ) -> Result<Option<usize>> {
         self.step()?;
         if column > 255 {
-            return Err(Error::Invalid("the note cell is outside the BIFF8 grid"));
+            return Err(refused(
+                RefusalKind::InvalidValue,
+                "the note cell is outside the BIFF8 grid",
+            ));
         }
         let (_, layout) = self.sheet(sheet)?;
         let notes = self.note_records(&layout);
@@ -763,8 +798,12 @@ impl Edit {
             return Ok(None);
         }
         // Validate the NOTE before staging the shape.
-        encode::note(row, column, false, 1, author)
-            .map_err(|_| Error::Invalid("the note author is longer than 54 characters"))?;
+        encode::note(row, column, false, 1, author).map_err(|_| {
+            refused(
+                RefusalKind::InvalidValue,
+                "the note author is longer than 54 characters",
+            )
+        })?;
         let column_u8 = u8::try_from(column).unwrap_or(u8::MAX);
         let (object_id, _) = self.append_object(sheet, |shape_id, object_id| {
             let anchor = crate::writer::shape::Anchor::default_for_cell(row, column_u8);
@@ -778,8 +817,12 @@ impl Edit {
                 textbox: Some(textbox_records(text)?),
             })
         })?;
-        let note = encode::note(row, column, false, object_id, author)
-            .map_err(|_| Error::Invalid("the note author is longer than 54 characters"))?;
+        let note = encode::note(row, column, false, object_id, author).map_err(|_| {
+            refused(
+                RefusalKind::InvalidValue,
+                "the note author is longer than 54 characters",
+            )
+        })?;
         let (_, layout) = self.sheet(sheet)?;
         let at = layout.notes_insert();
         self.insert(&layout, at, &note)?;
@@ -801,8 +844,8 @@ impl Edit {
             .note_records(&layout)
             .iter()
             .find(|note| note.1 == row && note.2 == column)
-            .ok_or(Error::Missing("the cell has no note"))?;
-        let block = block.ok_or(Error::Missing("the note has no shape"))?;
+            .ok_or(refused(RefusalKind::NotFound, "the cell has no note"))?;
+        let block = block.ok_or(refused(RefusalKind::NotFound, "the note has no shape"))?;
         let position = block
             .objects
             .iter()
@@ -811,7 +854,7 @@ impl Edit {
                     .obj
                     .is_some_and(|(ot, id)| ot == 0x19 && id == object_id)
             })
-            .ok_or(Error::Missing("the note has no shape"))?;
+            .ok_or(refused(RefusalKind::NotFound, "the note has no shape"))?;
         Ok((layout, block, position, note_index))
     }
 
@@ -819,8 +862,8 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Missing`] when the cell has no note and
-    /// [`Error::Invalid`] when the target cell has one.
+    /// Returns [`Error::Refused`] when the cell has no note and
+    /// [`Error::Refused`] when the target cell has one.
     pub fn set_note(
         &mut self,
         sheet: usize,
@@ -831,7 +874,10 @@ impl Edit {
     ) -> Result<()> {
         self.step()?;
         if target.1 > 255 {
-            return Err(Error::Invalid("the note cell is outside the BIFF8 grid"));
+            return Err(refused(
+                RefusalKind::InvalidValue,
+                "the note cell is outside the BIFF8 grid",
+            ));
         }
         if cell != target {
             let (_, layout) = self.sheet(sheet)?;
@@ -840,7 +886,10 @@ impl Edit {
                 .iter()
                 .any(|note| (note.1, note.2) == target)
             {
-                return Err(Error::Invalid("the target cell already has a note"));
+                return Err(refused(
+                    RefusalKind::InvalidValue,
+                    "the target cell already has a note",
+                ));
             }
         }
         let (layout, block, position, note_index) = self.note_object(sheet, cell.0, cell.1)?;
@@ -849,8 +898,12 @@ impl Edit {
         let visible = u16_at(&note_payload, 4) & 2 != 0;
         let object_id = u16_at(&note_payload, 6);
         // The NOTE record (author, cell).
-        let note = encode::note(target.0, target.1, visible, object_id, author)
-            .map_err(|_| Error::Invalid("the note author is longer than 54 characters"))?;
+        let note = encode::note(target.0, target.1, visible, object_id, author).map_err(|_| {
+            refused(
+                RefusalKind::InvalidValue,
+                "the note author is longer than 54 characters",
+            )
+        })?;
         // The TXO family of the shape.
         let (first, end) = object.records;
         let txo = (first..end).find(|index| layout.records[*index].kind == TXO);
@@ -866,8 +919,8 @@ impl Edit {
         self.replace(&layout, note_index, note_index + 1, &note)?;
         if let (Some(txo), Some(txo_end)) = (txo, txo_end) {
             let (_, layout) = self.sheet(sheet)?;
-            let bytes =
-                encode::txo(text).map_err(|_| Error::Invalid("the note text is too long"))?;
+            let bytes = encode::txo(text)
+                .map_err(|_| refused(RefusalKind::InvalidValue, "the note text is too long"))?;
             self.replace(&layout, txo, txo_end, &bytes)?;
         }
         if cell != target {
@@ -887,7 +940,10 @@ impl Edit {
     /// Overwrite drawing-stream bytes in place (same length).
     fn patch_drawing(&mut self, sheet: usize, at: usize, bytes: &[u8]) -> Result<()> {
         let (_, layout, block, _) = self.drawing(sheet)?;
-        let block = block.ok_or(Error::Missing("the worksheet has no drawing"))?;
+        let block = block.ok_or(refused(
+            RefusalKind::NotFound,
+            "the worksheet has no drawing",
+        ))?;
         let mut cursor = 0usize;
         for index in block.first..block.end {
             let record: Raw = layout.records[index];
@@ -902,7 +958,8 @@ impl Edit {
             }
             cursor += length;
         }
-        Err(Error::Unsupported(
+        Err(refused(
+            RefusalKind::UnsupportedOperation,
             "a drawing atom crosses an MsoDrawing record",
         ))
     }
@@ -911,7 +968,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Missing`] when the cell has no note.
+    /// Returns [`Error::Refused`] when the cell has no note.
     pub fn remove_note(&mut self, sheet: usize, row: u16, column: u16) -> Result<()> {
         self.step()?;
         let (layout, _, position, note_index) = self.note_object(sheet, row, column)?;
@@ -949,7 +1006,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Invalid`] for an anchor outside the grid.
+    /// Returns [`Error::Refused`] for an anchor outside the grid.
     pub fn add_shape(&mut self, sheet: usize, spec: &ShapeSpec) -> Result<usize> {
         self.step()?;
         spec.anchor.check()?;
@@ -1025,12 +1082,15 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Invalid`] for an image that is not PNG or JPEG
+    /// Returns [`Error::Refused`] for an image that is not PNG or JPEG
     /// or an anchor outside the grid.
     pub fn add_picture(&mut self, sheet: usize, spec: &PictureSpec) -> Result<usize> {
         self.step()?;
         spec.anchor.check()?;
-        let kind = image_kind(&spec.data).ok_or(Error::Invalid("the image is not PNG or JPEG"))?;
+        let kind = image_kind(&spec.data).ok_or(refused(
+            RefusalKind::InvalidValue,
+            "the image is not PNG or JPEG",
+        ))?;
         let count = self.drawing_positions(sheet, true)?.len();
         let pib = self.add_blip(kind, &spec.data)?;
         let mut properties = PropertyBuilder::new();
@@ -1072,28 +1132,36 @@ impl Edit {
     fn add_blip(&mut self, kind: litchi_odraw::image::Kind, data: &[u8]) -> Result<u32> {
         let mut store = litchi_odraw::image::write::StoreBuilder::new();
         let blip = litchi_odraw::image::write::BlipBuilder::bitmap(kind, data)
-            .map_err(|_| Error::Invalid("the image cannot be stored"))?;
+            .map_err(|_| refused(RefusalKind::InvalidValue, "the image cannot be stored"))?;
         store
             .add_embedded(blip)
-            .map_err(|_| Error::Invalid("the image cannot be stored"))?;
+            .map_err(|_| refused(RefusalKind::InvalidValue, "the image cannot be stored"))?;
         let mut written = Vec::new();
         store.write_store(&mut written).map_err(io)?;
         let entry = written
             .get(8..)
-            .ok_or(Error::Invalid("the image cannot be stored"))?
+            .ok_or(refused(
+                RefusalKind::InvalidValue,
+                "the image cannot be stored",
+            ))?
             .to_vec();
         let uid: [u8; 16] = entry
             .get(10..26)
             .and_then(|bytes| bytes.try_into().ok())
-            .ok_or(Error::Invalid("the image cannot be stored"))?;
+            .ok_or(refused(
+                RefusalKind::InvalidValue,
+                "the image cannot be stored",
+            ))?;
         // Ensure a drawing group exists.
         let globals = Globals::parse(&self.stream)?;
         if Group::parse(&self.stream, &globals)?.is_none() {
             self.put_group(empty_group(), None, stream::CONTINUE)?;
         }
         let globals = Globals::parse(&self.stream)?;
-        let group = Group::parse(&self.stream, &globals)?
-            .ok_or(Error::Unsupported("the drawing group is missing"))?;
+        let group = Group::parse(&self.stream, &globals)?.ok_or(refused(
+            RefusalKind::UnsupportedOperation,
+            "the drawing group is missing",
+        ))?;
         let range = (
             globals.records[group.first].start,
             globals.records[group.end - 1].end,
@@ -1193,7 +1261,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Missing`] when there is no such drawing.
+    /// Returns [`Error::Refused`] when there is no such drawing.
     pub fn set_drawing(
         &mut self,
         sheet: usize,
@@ -1205,7 +1273,7 @@ impl Edit {
         let position = *self
             .drawing_positions(sheet, picture)?
             .get(index)
-            .ok_or(Error::Missing("the drawing does not exist"))?;
+            .ok_or(refused(RefusalKind::NotFound, "the drawing does not exist"))?;
         if let Some(anchor) = change.anchor {
             anchor.check()?;
             let (_, _, block, _) = self.drawing(sheet)?;
@@ -1216,17 +1284,21 @@ impl Edit {
                         .get(position)
                         .and_then(|object| object.anchor_at)
                 })
-                .ok_or(Error::Unsupported("the drawing has no cell anchor"))?;
+                .ok_or(refused(
+                    RefusalKind::UnsupportedOperation,
+                    "the drawing has no cell anchor",
+                ))?;
             self.patch_drawing(sheet, at, &anchor.bytes())?;
         }
         if let Some((flip_h, flip_v)) = change.flip {
             let (_, _, block, _) = self.drawing(sheet)?;
             let object = block
                 .and_then(|block| block.objects.get(position).cloned())
-                .ok_or(Error::Missing("the drawing does not exist"))?;
-            let at = object
-                .fsp_at
-                .ok_or(Error::Unsupported("the drawing has no FSP"))?;
+                .ok_or(refused(RefusalKind::NotFound, "the drawing does not exist"))?;
+            let at = object.fsp_at.ok_or(refused(
+                RefusalKind::UnsupportedOperation,
+                "the drawing has no FSP",
+            ))?;
             let mut flags = object.flags & !0xc0;
             if flip_h {
                 flags |= 0x40;
@@ -1238,7 +1310,10 @@ impl Edit {
         }
         if change.name.is_some() || change.description.is_some() || change.rotation.is_some() {
             let (_, _, block, _) = self.drawing(sheet)?;
-            let block = block.ok_or(Error::Missing("the worksheet has no drawing"))?;
+            let block = block.ok_or(refused(
+                RefusalKind::NotFound,
+                "the worksheet has no drawing",
+            ))?;
             let object = &block.objects[position];
             let (start, end, mut props) = fopt_of(&block.ds, object)?;
             let mut put = |id: u16, value: Option<Property>| {
@@ -1280,13 +1355,13 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Missing`] when there is no such drawing.
+    /// Returns [`Error::Refused`] when there is no such drawing.
     pub fn remove_drawing(&mut self, sheet: usize, picture: bool, index: usize) -> Result<()> {
         self.step()?;
         let position = *self
             .drawing_positions(sheet, picture)?
             .get(index)
-            .ok_or(Error::Missing("the drawing does not exist"))?;
+            .ok_or(refused(RefusalKind::NotFound, "the drawing does not exist"))?;
         let object = self.remove_object(sheet, position)?;
         if picture {
             if let Some(prop) = object.prop(0x0104) {
@@ -1406,7 +1481,8 @@ fn fopt_of(ds: &[u8], object: &Object) -> Result<(usize, usize, Vec<(u16, Proper
                     let length = value as usize;
                     let data = ds
                         .get(complex_at..complex_at + length)
-                        .ok_or(Error::Unsupported(
+                        .ok_or(refused(
+                            RefusalKind::UnsupportedOperation,
                             "an OfficeArt complex property is truncated",
                         ))?
                         .to_vec();
@@ -1427,10 +1503,10 @@ fn fopt_of(ds: &[u8], object: &Object) -> Result<(usize, usize, Vec<(u16, Proper
         at += 8 + header.length;
     }
     // No FOPT: an empty one goes after the FSP.
-    let fsp = object
-        .fsp_at
-        .ok_or(Error::Unsupported("the drawing has no FSP"))?
-        + 8;
+    let fsp = object.fsp_at.ok_or(refused(
+        RefusalKind::UnsupportedOperation,
+        "the drawing has no FSP",
+    ))? + 8;
     Ok((fsp, fsp, Vec::new()))
 }
 
@@ -1454,8 +1530,8 @@ fn encode_fopt(props: &[(u16, Property)]) -> Result<Vec<u8>> {
             },
         }
     }
-    let count =
-        u16::try_from(props.len()).map_err(|_| Error::Invalid("too many shape properties"))?;
+    let count = u16::try_from(props.len())
+        .map_err(|_| refused(RefusalKind::InvalidValue, "too many shape properties"))?;
     let mut out = Vec::with_capacity(8 + table.len() + complex.len());
     out.extend_from_slice(&(0x0003 | (count << 4)).to_le_bytes());
     out.extend_from_slice(&0xf00bu16.to_le_bytes());

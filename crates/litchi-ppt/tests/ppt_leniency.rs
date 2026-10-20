@@ -1331,7 +1331,7 @@ fn cyclic_user_edit_chain_is_fatal_by_default_and_cut_when_opted_in() {
 
 /// `bytes` with a 5000-byte `LeniencyProbe` stream added at the root.
 fn with_probe(bytes: Vec<u8>) -> Vec<u8> {
-    let mut package = litchi_ole_common::object::Editor::open(
+    let mut package = litchi_ole_common::object::Edit::open(
         bytes,
         litchi_ole_common::object::Targets::default(),
         litchi_ole_common::object::Limits::default(),
@@ -1450,7 +1450,7 @@ fn summary_information_with_unpaired_surrogate() -> Vec<u8> {
 /// by the title's property identifier.
 #[test]
 fn property_set_repairs_join_the_open_time_report() {
-    let mut package = litchi_ole_common::object::Editor::open(
+    let mut package = litchi_ole_common::object::Edit::open(
         Deck::new(2).bytes,
         litchi_ole_common::object::Targets::default(),
         litchi_ole_common::object::Limits::default(),

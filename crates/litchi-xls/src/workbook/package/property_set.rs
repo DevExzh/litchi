@@ -1,16 +1,23 @@
-//! Owned, XLS-contextual editing of OLE Summary Information property sets.
+//! The XLS property-set edit family (record 0351 §2.3): typed edits of the
+//! OLE `SummaryInformation`, `DocumentSummaryInformation` and user-defined
+//! property sets of one [`Package`].
 //!
-//! The compound-file and property-set grammars remain owned by
-//! `litchi-ole-common`. This module only validates the XLS host stream and
-//! turns the common editor into a source-checked whole-package transaction.
+//! [`Package::property_sets`] reads the sections, [`Package::edit_property_sets`]
+//! stages edits and [`Edit::commit`] publishes a new [`Package`] with a
+//! whole-package [`Patch`] and [`Diagnostics`]; [`Package::apply_property_sets`]
+//! replays the patch. The compound-file and property-set grammars remain owned
+//! by `litchi-ole-common`; this module validates the XLS host stream.
 
-use crate::error::Result;
+use crate::Package;
+/// The family error: the package error of the source or republished
+/// package.
+pub use crate::package::{Error, Result};
 use litchi_cfb::{OleError, OleFile};
 use litchi_ole_common::property_set::document_summary::Snapshot as DocumentSummary;
 use litchi_ole_common::property_set::summary_information::Snapshot as SummaryInformation;
 use litchi_ole_common::property_set::{
-    Binding, CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Editor, PropertySetReader,
-    SUMMARY_INFORMATION_FMTID, Section, USER_DEFINED_PROPERTIES_FMTID,
+    Binding, CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Edit as PropertySetEdit,
+    PropertySetReader, SUMMARY_INFORMATION_FMTID, Section, USER_DEFINED_PROPERTIES_FMTID,
 };
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
@@ -110,37 +117,56 @@ impl Snapshot {
     pub const fn user_defined_properties(&self) -> Option<&Section> {
         self.user_defined_properties.as_ref()
     }
-
-    /// Starts a transaction whose common editor owns a copy of this source.
-    ///
-    /// The common editor rejects signed and encrypted containers before any
-    /// edit can be staged.
-    /// # Errors
-    ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn transaction(&self) -> Result<Transaction> {
-        Ok(Transaction {
-            source: self.clone(),
-            editor: Editor::new(self.bytes.to_vec())?,
-        })
-    }
 }
 
 /// A failure-atomic XLS property-set transaction over an owned CFB editor.
-pub struct Transaction {
+/// A staged property-set edit of one package. Dropping it discards it.
+pub struct Edit {
+    /// The package a commit republishes; `None` only for codec-level tests.
+    base: Option<Package>,
     source: Snapshot,
-    editor: Editor,
+    editor: PropertySetEdit,
 }
 
-impl Transaction {
+impl std::fmt::Debug for Edit {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.debug_struct("Edit").finish_non_exhaustive()
+    }
+}
+
+impl Edit {
+    pub(crate) fn new(base: &Package) -> Result<Self> {
+        if base.is_encrypted() {
+            return Err(Error::EncryptionPolicy);
+        }
+        let source = Snapshot::from_bytes(base.to_bytes()?)?;
+        let editor = PropertySetEdit::new(source.bytes.to_vec()).map_err(crate::Error::from)?;
+        Ok(Self {
+            base: Some(base.clone()),
+            source,
+            editor,
+        })
+    }
+
+    /// A codec-level edit of a bare property-set snapshot (tests only).
+    #[cfg(test)]
+    fn detached(source: Snapshot) -> Result<Self> {
+        let editor = PropertySetEdit::new(source.bytes.to_vec()).map_err(crate::Error::from)?;
+        Ok(Self {
+            base: None,
+            source,
+            editor,
+        })
+    }
+
     /// The shared property-set editor, for the package metadata transaction.
-    pub(crate) const fn editor(&self) -> &Editor {
+    pub(crate) const fn editor(&self) -> &PropertySetEdit {
         &self.editor
     }
 
     /// Mutable access to the shared editor, for the package metadata
     /// transaction.
-    pub(crate) fn editor_mut(&mut self) -> &mut Editor {
+    pub(crate) fn editor_mut(&mut self) -> &mut PropertySetEdit {
         &mut self.editor
     }
 
@@ -174,12 +200,12 @@ impl Transaction {
                 CodePage::WINDOWS_1252,
             )?,
         };
-        let mut typed = snapshot.transaction()?;
-        edit(&mut typed.edit())?;
+        let mut typed = snapshot.edit()?;
+        edit(&mut typed)?;
         let commit = typed.commit()?;
-        if commit.changed() {
+        if commit.diagnostics().changed() {
             self.editor
-                .replace(Binding::SummaryInformation, commit.into_section())?;
+                .replace(Binding::SummaryInformation, commit.into_package())?;
         }
         Ok(())
     }
@@ -209,12 +235,12 @@ impl Transaction {
                 CodePage::WINDOWS_1252,
             )?,
         };
-        let mut typed = snapshot.transaction()?;
-        edit(&mut typed.edit())?;
+        let mut typed = snapshot.edit()?;
+        edit(&mut typed)?;
         let commit = typed.commit()?;
-        if commit.changed() {
+        if commit.diagnostics().changed() {
             self.editor
-                .replace(Binding::DocumentSummaryInformation, commit.into_section())?;
+                .replace(Binding::DocumentSummaryInformation, commit.into_package())?;
         }
         Ok(())
     }
@@ -254,73 +280,47 @@ impl Transaction {
         Ok(self.editor.remove(Binding::UserDefinedProperties)?)
     }
 
-    /// Publishes the edited package and its source-checked reversible patch.
+    /// Validate and publish the staged edits as a new package.
+    ///
     /// # Errors
     ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// Returns an error when the edited compound file cannot be rendered or
+    /// republished.
     pub fn commit(self) -> Result<Commit> {
-        let source = self.source;
-        let before = source.bytes().to_vec();
-        let bytes = self.editor.finish()?;
-        let changed = bytes != before;
-        let snapshot = if changed {
-            Snapshot::from_bytes(bytes)?
+        let base = self.base.clone().ok_or(Error::InvalidData(
+            "a detached property-set edit has no package",
+        ))?;
+        let (patch, changed) = self.finish()?;
+        let package = if changed {
+            crate::package::republish(&base, patch.after.to_vec())?
         } else {
-            source
+            base
         };
-        let patch = Patch::new(before, snapshot.bytes().to_vec());
-        Ok(Commit {
-            changed,
-            snapshot,
-            patch,
-        })
+        Ok(Commit::new(package, patch, Diagnostics::new(changed)))
+    }
+
+    /// Render the staged edits into a whole-package patch without
+    /// republishing it (the metadata family republishes it itself).
+    pub(crate) fn finish(self) -> Result<(Patch, bool)> {
+        let before = self.source.bytes().to_vec();
+        let bytes = self.editor.finish().map_err(crate::Error::from)?;
+        let changed = bytes != before;
+        Ok((Patch::new(before, bytes), changed))
     }
 }
 
-/// A committed XLS package result and its reversible whole-package patch.
-pub struct Commit {
-    changed: bool,
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published property-set edit: the new package, its whole-package patch
+/// and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
-impl Commit {
-    /// Whether publication changed any package byte.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
+/// Content-free diagnostics of one property-set commit.
+pub use litchi_core::edit::Diagnostics;
 
-    /// Returns the committed package snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Returns the source-checked whole-package patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consumes the commit into its committed snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Consumes the commit into its source-checked patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    /// Consumes the commit into owned package bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.snapshot.bytes.to_vec()
-    }
-}
+/// The property-set family has no caller-selected limit dimension: the
+/// republished package is admitted under the source package's limits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {}
 
 /// A reversible, source-checked replacement of a complete XLS CFB artifact.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -355,35 +355,6 @@ impl Patch {
         self.before == self.after
     }
 
-    /// Applies this patch only to a snapshot with the exact source bytes.
-    /// # Errors
-    ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
-        if source.bytes() != self.before() {
-            return Err(crate::error::Error::UnsafeEdit(
-                "XLS property-set patch source does not match its base snapshot".to_string(),
-            ));
-        }
-        if self.is_noop() {
-            return Ok(source.clone());
-        }
-        Snapshot::from_bytes(self.after.to_vec())
-    }
-
-    /// Reverts this patch only from its exact replacement snapshot.
-    /// # Errors
-    ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn revert(&self, replacement: &Snapshot) -> Result<Snapshot> {
-        if replacement.bytes() != self.after() {
-            return Err(crate::error::Error::UnsafeEdit(
-                "XLS property-set patch replacement does not match its target snapshot".to_string(),
-            ));
-        }
-        Snapshot::from_bytes(self.before.to_vec())
-    }
-
     /// Returns the exact inverse patch.
     #[must_use]
     pub fn inverse(&self) -> Self {
@@ -394,14 +365,61 @@ impl Patch {
     }
 }
 
+impl Package {
+    /// The property-set sections of this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the compound file or a property set is
+    /// malformed.
+    pub fn property_sets(&self) -> Result<Snapshot> {
+        Snapshot::from_bytes(self.to_bytes()?)
+    }
+
+    /// Start a property-set edit of this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::EncryptionPolicy`] for an encrypted workbook, or an
+    /// error when the compound file cannot be read.
+    pub fn edit_property_sets(&self) -> Result<Edit> {
+        Edit::new(self)
+    }
+
+    /// Replay a property-set patch onto the exact package it was made from.
+    ///
+    /// # Errors
+    ///
+    /// Returns a patch conflict when this package is not the patch's source.
+    pub fn apply_property_sets(&self, patch: &Patch) -> Result<Commit> {
+        if self.to_bytes()?.as_slice() != patch.before() {
+            return Err(Error::Reader(crate::Error::PatchConflict {
+                operation: "edit property sets",
+                reason: "the property-set patch was made from another package",
+            }));
+        }
+        let changed = !patch.is_noop();
+        let package = if changed {
+            crate::package::republish(self, patch.after.to_vec())?
+        } else {
+            self.clone()
+        };
+        Ok(Commit::new(
+            package,
+            patch.clone(),
+            Diagnostics::new(changed),
+        ))
+    }
+}
+
 fn validate_host<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<()> {
     match ole.open_stream(&["Workbook"]) {
         Ok(_) => Ok(()),
         Err(OleError::StreamNotFound) => match ole.open_stream(&["Book"]) {
             Ok(_) => Ok(()),
-            Err(OleError::StreamNotFound) => Err(crate::error::Error::InvalidData(
+            Err(OleError::StreamNotFound) => Err(Error::Reader(crate::error::Error::InvalidData(
                 "XLS package has no Workbook or Book stream".to_string(),
-            )),
+            ))),
             Err(error) => Err(error.into()),
         },
         Err(error) => Err(error.into()),
@@ -462,39 +480,36 @@ mod tests {
             Some("before company")
         );
 
-        let mut transaction = snapshot.transaction().unwrap();
+        let mut transaction = Edit::detached(snapshot).unwrap();
         transaction
             .edit_summary_information(|edit| edit.set_title("after"))
             .unwrap();
         transaction
             .edit_document_summary_information(|edit| edit.set_company("after company"))
             .unwrap();
-        let commit = transaction.commit().unwrap();
-        assert!(commit.changed());
-        assert_eq!(
-            commit.snapshot().summary_information().unwrap().title(),
-            Some("after")
-        );
+        let (patch, changed) = transaction.finish().unwrap();
+        assert!(changed);
+        let edited = Snapshot::from_bytes(patch.after().to_vec()).unwrap();
+        assert_eq!(edited.summary_information().unwrap().title(), Some("after"));
 
-        let mut ole = OleFile::open(Cursor::new(commit.snapshot().bytes().to_vec())).unwrap();
+        let mut ole = OleFile::open(Cursor::new(patch.after().to_vec())).unwrap();
         assert_eq!(
             ole.open_stream(&["Unrelated", "Nested"]).unwrap(),
             b"untouched"
         );
-        let applied = commit.patch().apply(&snapshot).unwrap();
-        assert_eq!(applied.bytes(), commit.snapshot().bytes());
-        assert_eq!(commit.patch().revert(&applied).unwrap().bytes(), source);
+        assert_eq!(patch.before(), source.as_slice());
+        assert_eq!(patch.inverse().after(), source.as_slice());
     }
 
     #[test]
     fn no_op_edits_return_the_exact_source_bytes() {
         let source = package_bytes(None);
         let snapshot = Snapshot::from_bytes(source.clone()).unwrap();
-        let mut transaction = snapshot.transaction().unwrap();
+        let mut transaction = Edit::detached(snapshot).unwrap();
         transaction.edit_summary_information(|_| Ok(())).unwrap();
-        let commit = transaction.commit().unwrap();
-        assert!(!commit.changed());
-        assert_eq!(commit.into_bytes(), source);
+        let (patch, changed) = transaction.finish().unwrap();
+        assert!(!changed);
+        assert_eq!(patch.after(), source.as_slice());
     }
 
     #[test]
@@ -535,15 +550,15 @@ mod tests {
         assert!(snapshot.document_summary_information().is_none());
         assert!(snapshot.user_defined_properties().is_some());
 
-        let mut transaction = snapshot.transaction().unwrap();
+        let mut transaction = Edit::detached(snapshot).unwrap();
         transaction
             .edit_summary_information(|edit| edit.set_title("title"))
             .unwrap();
         transaction
             .edit_document_summary_information(|edit| edit.set_company("company"))
             .unwrap();
-        let commit = transaction.commit().unwrap();
-        let edited = commit.snapshot();
+        let (patch, _) = transaction.finish().unwrap();
+        let edited = &Snapshot::from_bytes(patch.after().to_vec()).unwrap();
         assert_eq!(edited.summary_information().unwrap().title(), Some("title"));
         let document_summary = edited.document_summary_information().unwrap();
         assert_eq!(document_summary.company(), Some("company"));
@@ -561,14 +576,14 @@ mod tests {
     fn signed_and_encrypted_sources_are_refused_before_mutation() {
         assert!(
             Snapshot::from_bytes(package_bytes(Some("DigitalSignature")))
+                .map(Edit::detached)
                 .unwrap()
-                .transaction()
                 .is_err()
         );
         assert!(
             Snapshot::from_bytes(package_bytes(Some("EncryptedPackage")))
+                .map(Edit::detached)
                 .unwrap()
-                .transaction()
                 .is_err()
         );
     }

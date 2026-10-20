@@ -2637,7 +2637,7 @@ fn optional_text_outcome<E: std::fmt::Display>(text: Result<Option<String>, E>) 
 fn leaf_doc_open(path: &Path) -> Result<litchi_doc::Document, Box<dyn Error>> {
     let bytes = crate::ole2_range_source::read_bounded(path)?;
     let ole = litchi_cfb::OleFile::open(Cursor::new(bytes))?;
-    let mut package = litchi_doc::raw::Package::from_ole_file(ole)?;
+    let mut package = litchi_doc::raw::Reader::from_ole_file(ole)?;
     let document = package.document()?;
     std::hint::black_box(package.ole_file().get_metadata().map(Metadata::from).ok());
     Ok(document)
@@ -2982,7 +2982,7 @@ fn run_ole2(
             "fresh litchi::open(Path) + File::presentation()?.slide(target) + compat Slide::text()"
         },
         (Leg::Leaf, Ole2Query::DocOpen) => {
-            "fs::read + litchi_cfb::OleFile::open + litchi_doc::raw::Package::from_ole_file + Package::document() + OLE property-set metadata"
+            "fs::read + litchi_cfb::OleFile::open + litchi_doc::raw::Reader::from_ole_file + Package::document() + OLE property-set metadata"
         },
         (Leg::Leaf, Ole2Query::DocFullText) => {
             "fresh leaf DOC open (as for open) + Document::text()"
@@ -3068,7 +3068,7 @@ fn run_rtf(
             },
             Leg::Leaf => {
                 let started = Instant::now();
-                let document = litchi_rtf::RtfDocument::from_owned_bytes(owned)?;
+                let document = litchi_rtf::raw::Tree::from_owned_bytes(owned)?;
                 let text = lifecycle.then(|| document.text());
                 let duration = started.elapsed();
                 let observed = TextProjection {
@@ -3094,9 +3094,9 @@ fn run_rtf(
     let timed_calls = match (entry.leg, lifecycle) {
         (Leg::Unified, false) => "litchi::open_bytes(Vec<u8>) -> File::Rtf",
         (Leg::Unified, true) => "litchi::open_bytes(Vec<u8>) + File::text()",
-        (Leg::Leaf, false) => "litchi_rtf::RtfDocument::from_owned_bytes(Vec<u8>)",
+        (Leg::Leaf, false) => "litchi_rtf::raw::Tree::from_owned_bytes(Vec<u8>)",
         (Leg::Leaf, true) => {
-            "litchi_rtf::RtfDocument::from_owned_bytes(Vec<u8>) + RtfDocument::text()"
+            "litchi_rtf::raw::Tree::from_owned_bytes(Vec<u8>) + Tree::text()"
         },
     };
     let summary = RouteSummary::for_case(entry.case, timed_calls)?.verified(&expected, samples)?;

@@ -21,7 +21,7 @@ impl Editor {
     /// overwritten; callers can preserve and inspect them through the
     /// inventory's [`crate::embedded_object::Unknown`] view. Every other stream,
     /// including the embedded binary payload, stays source-identical.
-    pub fn set_info(&mut self, storage_id: u32, info: Info) -> Result<()> {
+    pub(crate) fn set_info(&mut self, storage_id: u32, info: Info) -> Result<()> {
         let reference = self
             .objects()?
             .into_iter()
@@ -62,7 +62,7 @@ impl Editor {
     ///
     /// Returns an error when the storage has no valid typed ODT or the edited
     /// candidate violates an ODT or package invariant.
-    pub fn update_info<F>(&mut self, storage_id: u32, edit: F) -> Result<()>
+    pub(crate) fn update_info<F>(&mut self, storage_id: u32, edit: F) -> Result<()>
     where
         F: FnOnce(&mut Info),
     {
@@ -96,7 +96,7 @@ impl Editor {
     ///
     /// Returns an error when the storage has no valid OLEDS link stream, the
     /// callback rejects the candidate, or the package cannot be validated.
-    pub fn update_link<F>(&mut self, storage_id: u32, edit: F) -> Result<()>
+    pub(crate) fn update_link<F>(&mut self, storage_id: u32, edit: F) -> Result<()>
     where
         F: FnOnce(&mut Link) -> StdResult<(), litchi_cfb::OleError>,
     {

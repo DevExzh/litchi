@@ -36,7 +36,7 @@ use litchi_doc::parts::fib::FileInformationBlock;
 use litchi_doc::parts::headers::HeaderFooterType;
 use litchi_doc::writer::FootnoteEntry;
 use litchi_doc::{
-    Builder, CharacterFormatting, HeaderFooterParagraph, ParagraphFormatting, raw::Package,
+    Builder, CharacterFormatting, HeaderFooterParagraph, ParagraphFormatting, raw::Reader,
 };
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -76,7 +76,7 @@ fn formatted_multi_paragraph_header_round_trips_through_plcfhdd() {
 
     let path = temporary_doc_path();
     writer.build().unwrap().save(&path).unwrap();
-    let mut package = Package::open(&path).unwrap();
+    let mut package = Reader::open(&path).unwrap();
     let document = package.document().unwrap();
     let headers = document.headers().unwrap();
     let header = headers
@@ -139,7 +139,7 @@ fn inert_header_field_round_trips_with_structural_markers() {
 
     let path = temporary_doc_path();
     writer.build().unwrap().save(&path).unwrap();
-    let mut package = Package::open(&path).unwrap();
+    let mut package = Reader::open(&path).unwrap();
     let document = package.document().unwrap();
     let footer = document
         .footers()
@@ -240,7 +240,7 @@ fn writes_header_and_note_plcfs_through_fib_pointers() {
     let endnote_txt = table_field(&fib, &table_stream, 47);
     assert_eq!(cps(endnote_txt), vec![0, 5, 6]);
 
-    let mut package = Package::from_reader(Cursor::new(document_bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(document_bytes)).unwrap();
     let document = package.document().unwrap();
     assert_eq!(document.footnotes().unwrap()[0].reference_position, 4);
     assert_eq!(document.endnotes().unwrap()[0].reference_position, 9);

@@ -1,7 +1,7 @@
 //! Authoring rules of [`SummaryProperties`] and its stream round trip.
 
 use super::super::binding::Binding;
-use super::super::codec::{Editor, PropertySetReader};
+use super::super::codec::{Edit, PropertySetReader};
 use super::super::model::{
     CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, SUMMARY_INFORMATION_FMTID, Section, Stream,
     USER_DEFINED_PROPERTIES_FMTID, Value,
@@ -470,7 +470,7 @@ fn a_document_summary_stream_is_written_with_its_code_page() {
 #[test]
 fn written_streams_are_editable_by_the_shared_editor() {
     let bytes = compound_file(populated().to_streams().unwrap());
-    let mut editor = Editor::new(bytes).unwrap();
+    let mut editor = Edit::new(bytes).unwrap();
     let mut summary = editor
         .property_set(Binding::SummaryInformation)
         .unwrap()
@@ -802,7 +802,7 @@ fn editor_bridge_stages_only_changed_sections() {
     assert_ne!(source_clsid, blank_clsid);
 
     // An exact no-op stages nothing and finishes with the source bytes.
-    let editor = Editor::new(source.clone()).unwrap();
+    let editor = Edit::new(source.clone()).unwrap();
     let base = SummaryProperties::from_editor(&editor).unwrap();
     assert!(base.is_empty());
     let mut editor = editor;
@@ -811,7 +811,7 @@ fn editor_bridge_stages_only_changed_sections() {
 
     // A missing stream is created with a code page, and the root CLSID of
     // the source survives the rebuild.
-    let mut editor = Editor::new(source).unwrap();
+    let mut editor = Edit::new(source).unwrap();
     let mut edited = base.clone();
     edited.set("title", "Created").unwrap();
     edited.set("Department", "Research").unwrap();
@@ -834,7 +834,7 @@ fn editor_bridge_stages_only_changed_sections() {
     );
 
     // Removing the last custom property drops the user-defined section.
-    let mut editor = Editor::new(bytes).unwrap();
+    let mut editor = Edit::new(bytes).unwrap();
     let base = SummaryProperties::from_editor(&editor).unwrap();
     assert_eq!(base.summary_information().title(), Some("Created"));
     let mut edited = base.clone();

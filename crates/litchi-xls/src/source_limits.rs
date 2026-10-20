@@ -60,7 +60,7 @@ impl SourceLimits {
     ///     .max_aggregate_bytes(64 * 1024 * 1024)?
     ///     .build()?;
     /// let options = OpenOptions::new().source_limits(limits);
-    /// assert_eq!(options.get_source_limits(), limits);
+    /// assert_eq!(options.source_limits_value(), limits);
     /// # Ok::<(), litchi_xls::Error>(())
     /// ```
     #[must_use]

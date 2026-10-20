@@ -12,7 +12,7 @@
 //! paragraph's table depth as 1; the reader used to require a stored depth of
 //! 1 and so dropped these tables, and their paragraphs, from `elements()`.
 
-use litchi_doc::raw::Package;
+use litchi_doc::raw::Reader;
 use litchi_doc::writer::Builder;
 use litchi_doc::{Document, Element, Table};
 use std::io::Cursor;
@@ -25,12 +25,12 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 fn open(name: &str) -> Document {
-    let mut package = Package::open(fixture(name)).expect("DOC fixture opens");
+    let mut package = Reader::open(fixture(name)).expect("DOC fixture opens");
     package.document().unwrap()
 }
 
 fn open_bytes(bytes: Vec<u8>) -> Document {
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("DOC bytes open");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("DOC bytes open");
     package.document().unwrap()
 }
 
@@ -234,7 +234,7 @@ fn corpus_tables_and_elements_agree() {
     names.sort();
     let mut checked = 0;
     for name in names {
-        let Ok(mut package) = Package::open(directory.join(&name)) else {
+        let Ok(mut package) = Reader::open(directory.join(&name)) else {
             continue;
         };
         let Ok(document) = package.document() else {

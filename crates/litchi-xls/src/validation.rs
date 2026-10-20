@@ -247,22 +247,6 @@ impl From<OleError> for XlsValidationError {
     }
 }
 
-/// Validate a positional XLS source under default finite bounds.
-///
-/// The source is opened through the canonical CFB ingress validator.  Only
-/// bounded CFB metadata and the Workbook/Book stream are inspected; no bytes
-/// are written back and no external target or signature trust decision is
-/// attempted.
-///
-/// # Errors
-///
-/// Returns an error only for source I/O/version changes, bounded allocation
-/// failure, or failure to retain the report. Definite format rejection and a
-/// configured resource ceiling are represented in the returned report.
-pub fn validate_source(source: Arc<dyn ReadAt>) -> Result<ValidateReport, XlsValidationError> {
-    validate_source_with_limits(source, XlsValidationLimits::default())
-}
-
 /// Validate a positional XLS source under explicit finite bounds.
 ///
 /// A source, directory, or stream ceiling produces a blocked capability. A
@@ -276,7 +260,7 @@ pub fn validate_source(source: Arc<dyn ReadAt>) -> Result<ValidateReport, XlsVal
 ///
 /// Returns an error for source I/O/version changes, bounded allocation
 /// failure, or bounded report-construction failure.
-pub fn validate_source_with_limits(
+pub fn validate_source(
     source: Arc<dyn ReadAt>,
     limits: XlsValidationLimits,
 ) -> Result<ValidateReport, XlsValidationError> {
@@ -1889,7 +1873,7 @@ impl<'a> StreamingRecordReader<'a> {
     /// source observations per record. With one, those two reads are memory
     /// copies and the walk pays one request per contiguous run of the
     /// allocation chain. The closing `SharedOleFile::source_version` that
-    /// every exit of `validate_source_with_limits` already takes still
+    /// every exit of `validate_source` already takes still
     /// brackets the whole analysis, so a mutation during it is refused as
     /// before; what moves is which read reports it.
     fn open_window(&mut self) {

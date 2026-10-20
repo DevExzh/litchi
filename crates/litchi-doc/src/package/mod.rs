@@ -6,9 +6,9 @@ pub mod metadata;
 mod model;
 pub mod property_set;
 /// Low-level cursor-backed CFB access for format-specific callers.
-pub mod raw {
+pub(crate) mod raw {
     pub use super::codec::{OpenOutcome, open_package};
-    pub use super::model::RawPackage as Package;
+    pub use super::model::Reader;
 }
 #[cfg(test)]
 mod tests;

@@ -654,9 +654,15 @@ fn patches_apply_and_invert() {
     edit.set_row_breaks(0, &[PageBreak::new(5)]).unwrap();
     let (after, patch) = edit.commit().unwrap().into_parts();
     let replayed = source.apply_sheet_features(&patch).unwrap();
-    assert_eq!(replayed.to_bytes().unwrap(), after.to_bytes().unwrap());
+    assert_eq!(
+        replayed.package().to_bytes().unwrap(),
+        after.to_bytes().unwrap()
+    );
     let undone = after.apply_sheet_features(&patch.inverse()).unwrap();
-    assert_eq!(undone.to_bytes().unwrap(), source.to_bytes().unwrap());
+    assert_eq!(
+        undone.package().to_bytes().unwrap(),
+        source.to_bytes().unwrap()
+    );
     assert!(matches!(
         after.apply_sheet_features(&patch),
         Err(litchi_xls::sheet_features::edit::Error::PatchConflict)

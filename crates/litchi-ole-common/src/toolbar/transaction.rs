@@ -13,12 +13,12 @@ use super::{
 
 /// An isolated typed edit over one toolbar-control snapshot.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     candidate: Control<'static>,
 }
 
-impl Transaction {
+impl Edit {
     pub(crate) fn new(source: Snapshot) -> Self {
         Self {
             candidate: source.control().clone(),
@@ -36,12 +36,6 @@ impl Transaction {
     #[must_use]
     pub const fn control(&self) -> &Control<'static> {
         &self.candidate
-    }
-
-    /// Whether the candidate currently serializes differently from its source.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.candidate.to_bytes().as_slice() != self.source.bytes()
     }
 
     /// Replace all general `TBCFlags`, retaining no invalid reserved bits.
@@ -200,16 +194,6 @@ impl Transaction {
         Ok(self)
     }
 
-    /// Capture the candidate as a snapshot without publishing it.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the candidate cannot be materialized as a valid
-    /// toolbar control.
-    pub fn snapshot(&self) -> Result<Snapshot, Error> {
-        self.materialize()
-    }
-
     /// Publish the candidate and its reversible source-checked patch.
     ///
     /// # Errors
@@ -219,22 +203,8 @@ impl Transaction {
     pub fn commit(self) -> Result<Commit, Error> {
         let snapshot = self.materialize()?;
         let patch = Patch::new(&self.source, &snapshot);
-        Ok(Commit { snapshot, patch })
-    }
-
-    /// Alias for move-oriented writer terminology.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::commit`].
-    pub fn finish(self) -> Result<Commit, Error> {
-        self.commit()
-    }
-
-    /// Discard staged changes and recover the source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn update_general<F>(&mut self, edit: F, enable_ui_strings: bool) -> Result<&mut Self, Error>
@@ -314,35 +284,9 @@ impl Transaction {
     }
 }
 
-/// A successful toolbar-control publication.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    /// Whether the publication changed source bytes.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Borrow the immutable target snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the reversible source-checked patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit into its target snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;

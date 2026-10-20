@@ -71,8 +71,24 @@ pub enum Error {
     UnsupportedFeature(String),
     /// Invalid data
     InvalidData(String),
-    /// A requested edit cannot preserve unsupported source records safely.
-    UnsafeEdit(String),
+    /// A well-formed edit request this route refuses, classified by
+    /// [`litchi_core::edit::RefusalKind`]. The refusal is content-free: its
+    /// operation and reason are static (record 0351 §2.4).
+    Refused(litchi_core::edit::Refusal),
+    /// A patch, plan or staged precondition was made against another source
+    /// than the one receiving it.
+    PatchConflict {
+        /// The edit route that detected the conflict.
+        operation: &'static str,
+        /// Static explanation of the mismatch.
+        reason: &'static str,
+    },
+    /// A changed write of a signed workbook (record 0351 §2.3 rule 5); remove
+    /// the signature explicitly before editing.
+    Signed,
+    /// A broken internal invariant of an edit route (for example a readback
+    /// that disagrees with the staged change); never caused by the request.
+    Internal(&'static str),
     /// The finite primary cell-edit staging bound was exceeded.
     StagedChangeLimit {
         /// Changes that would be retained after this operation.
@@ -219,7 +235,12 @@ impl fmt::Display for Error {
             Error::InvalidData(msg) => {
                 write!(f, "Invalid data: {msg}")
             },
-            Error::UnsafeEdit(msg) => write!(f, "Unsafe edit refused: {msg}"),
+            Error::Refused(refusal) => fmt::Display::fmt(refusal, f),
+            Error::PatchConflict { operation, reason } => {
+                write!(f, "XLS {operation} patch conflict: {reason}")
+            },
+            Error::Internal(reason) => write!(f, "XLS edit invariant failed: {reason}"),
+            Error::Signed => f.write_str("changed XLS writes require explicit signature removal"),
             Error::StagedChangeLimit { observed, maximum } => write!(
                 f,
                 "XLS staged change limit exceeded: {observed} > {maximum}"
@@ -302,6 +323,18 @@ impl std::error::Error for Error {
     }
 }
 
+impl Error {
+    /// A content-free refusal of `operation` for `reason`.
+    #[must_use]
+    pub const fn refused(
+        kind: litchi_core::edit::RefusalKind,
+        operation: &'static str,
+        reason: &'static str,
+    ) -> Self {
+        Self::Refused(litchi_core::edit::Refusal::new(kind, operation, reason))
+    }
+}
+
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
         Error::Io(err)
@@ -328,7 +361,13 @@ impl From<litchi_vba::Error> for Error {
 
 impl From<litchi_ograph::Error> for Error {
     fn from(err: litchi_ograph::Error) -> Self {
-        Self::Graph(err)
+        match err {
+            litchi_ograph::Error::Refused(refusal) => Self::Refused(refusal),
+            litchi_ograph::Error::PatchConflict { operation, reason } => {
+                Self::PatchConflict { operation, reason }
+            },
+            err => Self::Graph(err),
+        }
     }
 }
 

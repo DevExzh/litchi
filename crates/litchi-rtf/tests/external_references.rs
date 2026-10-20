@@ -7,10 +7,11 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{DocumentExternalReferences, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DocumentExternalReferences, RtfWriter};
 use std::borrow::Cow;
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -20,7 +21,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_both_opaque_reference_names_and_round_trips_deterministically() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\ansi{\*\template C:\\Templates\\\u20320?.dot}"#,
         r#"{\*\nextfile queue\\part2.rtf}Body}"#,
     ))
@@ -38,7 +39,7 @@ fn parses_both_opaque_reference_names_and_round_trips_deterministically() {
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.find("\\nextfile").unwrap() < serialized.find("\\template").unwrap());
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(
         reparsed.external_references(),
         document.external_references()
@@ -48,14 +49,14 @@ fn parses_both_opaque_reference_names_and_round_trips_deterministically() {
 
 #[test]
 fn typed_api_validates_and_clears_without_resolving_names() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Body}").unwrap();
     document
         .set_external_references(DocumentExternalReferences {
             next_file: Some(Cow::Borrowed("file:///never-opened.rtf")),
             template: Some(Cow::Borrowed("https://never-resolved.invalid/template.dot")),
         })
         .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(
         reparsed.external_references(),
         document.external_references()
@@ -81,14 +82,11 @@ fn rejects_bad_placement_cardinality_active_content_and_resource_exhaustion() {
         r"{\rtf1{\*\nextfile\bin2 xx}Body}",
         r"{\rtf1\template Body}",
     ] {
-        assert!(
-            RtfDocument::parse(source).is_err(),
-            "accepted malformed {source}"
-        );
+        assert!(Tree::parse(source).is_err(), "accepted malformed {source}");
     }
 
     let oversized = format!(r"{{\rtf1{{\*\template {}}}Body}}", "x".repeat(65_537));
-    assert!(RtfDocument::parse(&oversized).is_err());
+    assert!(Tree::parse(&oversized).is_err());
 }
 
 #[test]
@@ -98,7 +96,7 @@ fn parses_bundled_libreoffice_template_fixture() {
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf163003.rtf"
     ))
     .unwrap();
-    let document = RtfDocument::parse_bytes(&bytes).unwrap();
+    let document = Tree::parse_bytes(&bytes).unwrap();
     assert_eq!(
         document.external_references().template.as_deref(),
         Some(r"C:\Users\xk1c\AppData\Roaming\Microsoft\Templates\kis.3.0.dot")

@@ -92,7 +92,7 @@ use litchi_core::{
 };
 use litchi_core::{OwnedSource, Position, Resource};
 use litchi_ole_common::object::{
-    Editor as OleObjectEditor, Limits as OleObjectLimits, Targets as OleObjectTargets,
+    Edit as OleObjectEditor, Limits as OleObjectLimits, Targets as OleObjectTargets,
 };
 use litchi_ooxml_common::xml::{
     OMML_NAMESPACE_URI, extract_omml_formulas, scan_omml_formula_ranges,
@@ -16667,7 +16667,10 @@ fn semantic_rtf_bytes(
             let plain = semantic_rtf_plain_bytes(shape)?;
             let compressed = litchi_rtf::transport::compress(&plain, true)?;
             if !litchi_rtf::transport::is_compressed_rtf(&compressed)
-                || litchi_rtf::transport::decompress(&compressed)? != plain
+                || litchi_rtf::transport::decompress(
+                    &compressed,
+                    litchi_rtf::transport::DecompressionLimits::default(),
+                )? != plain
             {
                 return Err("semantic RTF LZFu transport verification failed".into());
             }
@@ -27910,7 +27913,7 @@ fn verify_semantic_doc(
         }
     }
 
-    let mut package = litchi_doc::raw::Package::from_reader(Cursor::new(bytes))?;
+    let mut package = litchi_doc::raw::Reader::from_reader(Cursor::new(bytes))?;
     let document = package.document()?;
     let paragraphs = document.paragraphs()?;
     if paragraphs.len() != count {
@@ -28258,17 +28261,17 @@ fn run_doc_owner_public_phases(
         &updated_writer_text("doc", 0, selected, 0),
     )?;
     let ordinary_commit = ordinary_edit.commit()?;
-    if !ordinary_commit.changed()
+    if !ordinary_commit.diagnostics().changed()
         || ordinary_commit.patch().is_noop()
         || ordinary_commit.patch().changes().len() != 1
     {
         return Err("DOC changed preflight did not produce one semantic change".into());
     }
-    let expected_changed = ordinary_commit.snapshot().finish();
+    let expected_changed = ordinary_commit.package().finish();
     verify_semantic_doc(&expected_changed, shape, Some(selected))?;
 
     let applied = ordinary_commit.patch().apply(&source)?;
-    if applied.bytes() != ordinary_commit.snapshot().bytes()
+    if applied.bytes() != ordinary_commit.package().bytes()
         || applied.bytes() != expected_changed.as_slice()
     {
         return Err("DOC changed patch replay differs from the expected output".into());
@@ -28290,10 +28293,10 @@ fn run_doc_owner_public_phases(
     }
 
     let no_op = source.clone().edit()?.commit()?;
-    if no_op.changed()
+    if no_op.diagnostics().changed()
         || !no_op.patch().is_noop()
         || no_op.patch().changes().len() != 0
-        || no_op.snapshot().bytes() != source.bytes()
+        || no_op.package().bytes() != source.bytes()
     {
         return Err("DOC exact no-op preflight changed the source".into());
     }
@@ -28311,9 +28314,9 @@ fn run_doc_owner_public_phases(
     let no_op_profile_commit =
         no_op_profile_edit.commit_profiled(|event| no_op_recorder.observe(event))?;
     no_op_recorder.validate(&no_op_expected)?;
-    if no_op_profile_commit.changed()
+    if no_op_profile_commit.diagnostics().changed()
         || !no_op_profile_commit.patch().is_noop()
-        || no_op_profile_commit.snapshot().bytes() != source.bytes()
+        || no_op_profile_commit.package().bytes() != source.bytes()
     {
         return Err("DOC profiled exact no-op contract changed the source".into());
     }
@@ -28367,7 +28370,7 @@ fn run_doc_owner_public_phases(
 
         let (commit, edit_phases, edit_commit_outer_ns) = profile_doc_changed_commit(edit)?;
         let output_started = Instant::now();
-        let output = commit.snapshot().finish();
+        let output = commit.package().finish();
         let output_materialization_ns = elapsed_ns(output_started.elapsed())?;
         let measured_total_ns = elapsed_ns(lifecycle_started.elapsed())?;
 
@@ -28420,7 +28423,7 @@ fn run_doc_owner_public_phases(
             workflow_with_fingerprint_demand_ns,
         ));
 
-        if !commit.changed()
+        if !commit.diagnostics().changed()
             || commit.patch().is_noop()
             || commit.patch().changes().len() != 1
             || output != expected_changed
@@ -28580,7 +28583,7 @@ fn run_semantic_doc(
     let selected = shape.doc_paragraph_count() / 2;
     let expected_paragraph_count = if case == Case::DocSemanticParagraphCount {
         let mut oracle_package =
-            litchi_doc::raw::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+            litchi_doc::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
         let oracle_document = oracle_package.document()?;
         let oracle_paragraphs = oracle_document.paragraphs()?;
         let expected = oracle_paragraphs.len();
@@ -28600,7 +28603,7 @@ fn run_semantic_doc(
             Position::new(selected),
             &updated_writer_text("doc", 0, selected, 0),
         )?;
-        edit.commit()?.snapshot().finish()
+        edit.commit()?.package().finish()
     } else {
         corpus.archive.clone()
     };
@@ -28610,7 +28613,7 @@ fn run_semantic_doc(
             Case::DocSemanticOpen => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
-                let mut package = litchi_doc::raw::Package::from_reader(Cursor::new(owned))?;
+                let mut package = litchi_doc::raw::Reader::from_reader(Cursor::new(owned))?;
                 let document = package.document()?;
                 let duration = started.elapsed();
                 verify_semantic_doc(&corpus.archive, shape, None)?;
@@ -28619,7 +28622,7 @@ fn run_semantic_doc(
             },
             Case::DocSemanticListParagraphs => {
                 let mut package =
-                    litchi_doc::raw::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_doc::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let document = package.document()?;
                 let started = Instant::now();
                 let paragraphs = document.paragraphs()?;
@@ -28635,7 +28638,7 @@ fn run_semantic_doc(
             },
             Case::DocSemanticParagraphCount => {
                 let mut package =
-                    litchi_doc::raw::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_doc::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let document = package.document()?;
                 let started = Instant::now();
                 let count = document.paragraph_count()?;
@@ -28652,7 +28655,7 @@ fn run_semantic_doc(
             },
             Case::DocSemanticOneParagraph => {
                 let mut package =
-                    litchi_doc::raw::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_doc::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let document = package.document()?;
                 let started = Instant::now();
                 let paragraph = document
@@ -28672,7 +28675,7 @@ fn run_semantic_doc(
             },
             Case::DocSemanticOneParagraphAt => {
                 let mut package =
-                    litchi_doc::raw::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_doc::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let document = package.document()?;
                 let started = Instant::now();
                 let paragraph = document
@@ -28690,7 +28693,7 @@ fn run_semantic_doc(
             },
             Case::DocSemanticFullText => {
                 let mut package =
-                    litchi_doc::raw::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_doc::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let document = package.document()?;
                 let started = Instant::now();
                 let text = document.text()?;
@@ -28711,9 +28714,9 @@ fn run_semantic_doc(
                     )?;
                 }
                 let commit = edit.commit()?;
-                let bytes = commit.snapshot().finish();
+                let bytes = commit.package().finish();
                 let duration = started.elapsed();
-                if commit.changed() != updated
+                if commit.diagnostics().changed() != updated
                     || commit.patch().is_noop() == updated
                     || commit.patch().changes().len() != usize::from(updated)
                     || bytes != expected_changed
@@ -28721,7 +28724,7 @@ fn run_semantic_doc(
                     return Err("semantic DOC edit/save has unexpected publication state".into());
                 }
                 let applied = commit.patch().apply(&source)?;
-                if applied.bytes() != commit.snapshot().bytes() {
+                if applied.bytes() != commit.package().bytes() {
                     return Err("semantic DOC exact patch replay differs from commit".into());
                 }
                 let restored = commit.patch().inverse().apply(&applied)?;
@@ -29991,7 +29994,7 @@ impl XlsVisibilityPublication {
     ) -> Result<Option<litchi_cfb::PublishReport>, Box<dyn Error>> {
         match self {
             Self::Eager { commit, .. } => {
-                for chunk in commit.snapshot().bytes().chunks(64 * 1024) {
+                for chunk in commit.package().to_bytes()?.chunks(64 * 1024) {
                     writer.write_all(chunk)?;
                 }
                 writer.flush()?;
@@ -30025,7 +30028,7 @@ impl XlsVisibilityPublication {
                     source_bytes: *source_bytes,
                     source_workbook_bytes: *source_workbook_bytes,
                     target_workbook_bytes: u64::try_from(
-                        commit.snapshot().workbook_stream().len(),
+                        commit.package().sheet_visibility()?.workbook_stream().len(),
                     )?,
                     splice_count: None,
                     replacement_bytes: None,
@@ -30068,7 +30071,8 @@ fn prepare_xls_visibility_publication(
 ) -> Result<XlsVisibilityPublication, Box<dyn Error>> {
     let source_bytes = u64::try_from(source.bytes().len())?;
     let source_workbook_bytes = u64::try_from(source.workbook_stream().len())?;
-    let mut transaction = source.edit();
+    let mut transaction =
+        litchi_xls::Package::from_bytes(source.bytes())?.edit_sheet_visibility()?;
     stage_xls_visibility_updates(&mut transaction, update_count)?;
     if source_backed {
         Ok(XlsVisibilityPublication::SourceBacked(
@@ -30202,11 +30206,12 @@ fn verify_xls_visibility_output(
 fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>> {
     use litchi_xls::SheetVisibility;
 
-    let snapshot = litchi_xls::sheet_visibility::Snapshot::from_bytes(source.to_vec())?;
+    let package = litchi_xls::Package::from_bytes(source)?;
+    let snapshot = package.sheet_visibility()?;
     if snapshot.worksheet_count() != XLS_VISIBILITY_SHEET_COUNT {
         return Err("XLS visibility source worksheet count differs from specification".into());
     }
-    let noop = snapshot.edit().commit_source_backed()?;
+    let noop = package.edit_sheet_visibility()?.commit_source_backed()?;
     if !noop.is_noop() || noop.diagnostics().changed_worksheets() != 0 {
         return Err("XLS visibility source-backed no-op was not exact".into());
     }
@@ -30216,7 +30221,7 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
         return Err("XLS visibility source-backed no-op changed source bytes".into());
     }
 
-    let mut capped = snapshot.edit();
+    let mut capped = package.edit_sheet_visibility()?;
     stage_xls_visibility_updates(&mut capped, XLS_VISIBILITY_BATCH_COUNT)?;
     let capped = capped.commit_source_backed()?;
     if capped.diagnostics().changed_worksheets() != XLS_VISIBILITY_BATCH_COUNT
@@ -30258,7 +30263,7 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
         XLS_VISIBILITY_BATCH_COUNT,
     )?;
 
-    let mut over_cap = snapshot.edit();
+    let mut over_cap = package.edit_sheet_visibility()?;
     if over_cap
         .set_visibility_batch(
             (1..=XLS_VISIBILITY_BATCH_COUNT + 1)
@@ -30292,9 +30297,8 @@ fn verify_xls_visibility_prepared(
     match prepared {
         XlsVisibilityPublication::Eager { commit, .. } => {
             let applied = commit.patch().apply(source)?;
-            if applied.bytes() != commit.snapshot().bytes()
-                || commit.patch().apply(commit.snapshot()).is_ok()
-            {
+            let published = commit.package().sheet_visibility()?;
+            if applied.bytes() != published.bytes() || commit.patch().apply(&published).is_ok() {
                 return Err("XLS visibility eager patch did not enforce exact source".into());
             }
             let restored = commit.patch().inverse().apply(&applied)?;
@@ -30510,7 +30514,7 @@ impl XlsCommentsPublication {
     ) -> Result<Option<litchi_cfb::PublishReport>, Box<dyn Error>> {
         match self {
             Self::Eager { commit, .. } => {
-                for chunk in commit.snapshot().bytes().chunks(64 * 1024) {
+                for chunk in commit.package().to_bytes()?.chunks(64 * 1024) {
                     writer.write_all(chunk)?;
                 }
                 writer.flush()?;
@@ -30544,7 +30548,7 @@ impl XlsCommentsPublication {
                     source_bytes: *source_bytes,
                     source_workbook_bytes: *source_workbook_bytes,
                     target_workbook_bytes: u64::try_from(
-                        commit.snapshot().workbook_stream().len(),
+                        commit.package().comments()?.workbook_stream().len(),
                     )?,
                     splice_count: None,
                     replacement_bytes: None,
@@ -30587,7 +30591,7 @@ fn prepare_xls_comments_publication(
 ) -> Result<XlsCommentsPublication, Box<dyn Error>> {
     let source_bytes = u64::try_from(source.bytes().len())?;
     let source_workbook_bytes = u64::try_from(source.workbook_stream().len())?;
-    let mut edit = source.edit();
+    let mut edit = litchi_xls::Package::from_bytes(source.bytes())?.edit_comments()?;
     stage_xls_comment_updates(&mut edit, update_count)?;
     if source_backed {
         Ok(XlsCommentsPublication::SourceBacked(
@@ -30776,8 +30780,8 @@ fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>
     use litchi_xls::cell_values::{Reference, Selector};
     use litchi_xls::comments::Value;
 
-    let snapshot = litchi_xls::comments::Snapshot::from_bytes(source.to_vec())?;
-    let mut rejected = snapshot.edit();
+    litchi_xls::comments::Snapshot::from_bytes(source.to_vec())?;
+    let mut rejected = litchi_xls::Package::from_bytes(source)?.edit_comments()?;
     rejected.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1)?,
@@ -30787,7 +30791,7 @@ fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>
         return Err("XLS source-backed comment edit accepted a length change".into());
     }
 
-    let mut rejected_width = snapshot.edit();
+    let mut rejected_width = litchi_xls::Package::from_bytes(source)?.edit_comments()?;
     rejected_width.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1)?,
@@ -30797,16 +30801,16 @@ fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>
         return Err("XLS source-backed comment edit accepted an encoding-width change".into());
     }
 
-    let mut fallback = snapshot.edit();
+    let mut fallback = litchi_xls::Package::from_bytes(source)?.edit_comments()?;
     fallback.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1)?,
         Value::new("Target 000", "comment target 000!")?,
     )?;
     let fallback = fallback.commit()?;
-    verify_xls_untouched_streams(source, fallback.snapshot().bytes(), false)?;
+    verify_xls_untouched_streams(source, fallback.patch().after(), false)?;
+    let fallback = fallback.package().comments()?;
     let changed = fallback
-        .snapshot()
         .worksheet(Selector::Position(Position::new(0)))?
         .ok_or("XLS eager fallback lost its worksheet")?
         .comment(Reference::new(0, 1)?)?
@@ -30822,7 +30826,7 @@ fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>
     let mut protected_bytes = Cursor::new(Vec::new());
     protected_builder.build()?.write_to(&mut protected_bytes)?;
     let protected = litchi_xls::comments::Snapshot::from_bytes(protected_bytes.into_inner())?;
-    let mut edit = protected.edit();
+    let mut edit = litchi_xls::Package::from_bytes(protected.bytes())?.edit_comments()?;
     if edit
         .replace(
             Selector::Position(Position::new(0)),
@@ -30844,9 +30848,8 @@ fn verify_xls_comments_prepared(
     match prepared {
         XlsCommentsPublication::Eager { commit, .. } => {
             let applied = commit.patch().apply(source)?;
-            if applied.bytes() != commit.snapshot().bytes()
-                || commit.patch().apply(commit.snapshot()).is_ok()
-            {
+            let published = commit.package().comments()?;
+            if applied.bytes() != published.bytes() || commit.patch().apply(&published).is_ok() {
                 return Err("XLS comment eager patch did not enforce its exact source".into());
             }
             let restored = commit.patch().inverse().apply(&applied)?;
@@ -31021,7 +31024,8 @@ fn verify_semantic_xls(
     let (sheet_count, rows, columns) = shape
         .xls_dimensions()
         .ok_or("payload-heavy XLS corpus is excluded from semantic verification")?;
-    let snapshot = Snapshot::from_bytes(bytes.to_vec())?;
+    let snapshot =
+        Snapshot::from_bytes(bytes.to_vec(), litchi_ole_common::object::Limits::default())?;
     if snapshot.worksheet_count() != sheet_count {
         return Err("semantic XLS worksheet count differs from writer specification".into());
     }
@@ -31067,10 +31071,13 @@ fn run_semantic_xls(
     let reference = Reference::new(selected.1 as u32, selected.2 as u32)?;
     let replacement = xls_expected_value(shape, selected.0, selected.1, selected.2)? + 0.5;
     let expected_changed = if case == Case::XlsSemanticOneEditSave {
-        let source = Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = Snapshot::from_bytes(
+            corpus.archive.clone(),
+            litchi_ole_common::object::Limits::default(),
+        )?;
         let mut edit = source.edit();
         edit.set_number(selected.0.into(), reference, replacement)?;
-        edit.commit()?.snapshot().bytes().to_vec()
+        edit.commit()?.package().bytes().to_vec()
     } else {
         corpus.archive.clone()
     };
@@ -31172,7 +31179,10 @@ fn run_semantic_xls(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::XlsSemanticNoopEditSave | Case::XlsSemanticOneEditSave => {
-                let source = Snapshot::from_bytes(corpus.archive.clone())?;
+                let source = Snapshot::from_bytes(
+                    corpus.archive.clone(),
+                    litchi_ole_common::object::Limits::default(),
+                )?;
                 let updated = case == Case::XlsSemanticOneEditSave;
                 let started = Instant::now();
                 let mut edit = source.edit();
@@ -31180,7 +31190,7 @@ fn run_semantic_xls(
                     edit.set_number(selected.0.into(), reference, replacement)?;
                 }
                 let commit = edit.commit()?;
-                let bytes = commit.snapshot().bytes().to_vec();
+                let bytes = commit.package().bytes().to_vec();
                 let duration = started.elapsed();
                 let diagnostics = commit.diagnostics();
                 if commit.patch().is_noop() == updated
@@ -31193,7 +31203,7 @@ fn run_semantic_xls(
                     return Err("semantic XLS edit/save has unexpected publication state".into());
                 }
                 let applied = commit.patch().apply(&source)?;
-                if applied.bytes() != commit.snapshot().bytes() {
+                if applied.bytes() != commit.package().bytes() {
                     return Err("semantic XLS exact patch replay differs from commit".into());
                 }
                 let restored = commit.patch().inverse().apply(&applied)?;
@@ -33812,7 +33822,7 @@ fn stage_rtf_tail_prepared(
     edit.append_text_paragraphs(paragraphs)?;
     let prepared = if plan_based {
         let context = rtf_tail_publication_context(expected_output_bytes, inserted_bytes)?;
-        let plan = edit.publication_plan_with_limits_and_context(publication_limits, &context)?;
+        let plan = edit.publication_plan_with_context(publication_limits, &context)?;
         RtfTailPrepared::Plan { plan, context }
     } else {
         RtfTailPrepared::Commit(edit.commit()?)
@@ -33988,8 +33998,7 @@ fn verify_rtf_tail_publication_plan_gates(
         u64::try_from(plan.inserted_bytes())?,
     )?;
     if !matches!(
-        bounded_edit
-            .publication_plan_with_limits_and_context(publication_limits, &bounded_context,),
+        bounded_edit.publication_plan_with_context(publication_limits, &bounded_context,),
         Err(litchi_rtf::TailAppendPublicationError::Plan(
             litchi_rtf::tail_append::Error::Limit {
                 kind: litchi_rtf::tail_append::LimitKind::OutputBytes,
@@ -34011,7 +34020,7 @@ fn verify_rtf_tail_publication_plan_gates(
         u64::try_from(plan.inserted_bytes())?,
     )?;
     if !matches!(
-        invalid_edit.publication_plan_with_limits_and_context(
+        invalid_edit.publication_plan_with_context(
             litchi_rtf::TailAppendPublicationLimits::new(0, 0),
             &invalid_context,
         ),
@@ -34129,7 +34138,7 @@ fn run_rtf_logical_tail_publication(
             litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
         );
         edit.append_text_paragraphs(&paragraph_inputs)?;
-        edit.publication_plan_with_limits(publication_limits)?
+        edit.publication_plan(publication_limits)?
     };
     let lifecycle_duration = verify_rtf_tail_publication_lifecycle(
         &source,
@@ -34348,7 +34357,12 @@ fn run_xls_validation_report(
         corpus,
         warmup_iterations,
         samples,
-        |source| Ok(litchi_xls::validation::validate_source(source)?),
+        |source| {
+            Ok(litchi_xls::validation::validate_source(
+                source,
+                litchi_xls::validation::XlsValidationLimits::default(),
+            )?)
+        },
     )
 }
 
@@ -60003,9 +60017,6 @@ fn run_ole_common_open(
         let started = Instant::now();
         let editor = OleObjectEditor::open(source, targets, limits)?;
         let duration = started.elapsed();
-        if editor.is_changed() {
-            return Err("fresh OLE common editor unexpectedly reports a change".into());
-        }
         std::hint::black_box(&editor);
         final_editor = Some(editor);
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
@@ -60033,7 +60044,7 @@ fn run_ole_common_put_stream_publish(
         OleObjectTargets::default(),
         ole_common_limits(&corpus)?,
     )?;
-    let source = opened.snapshot();
+    let source = opened.staged();
     let mut elapsed = Vec::with_capacity(samples);
     let mut final_editor = None;
 
@@ -60043,11 +60054,10 @@ fn run_ole_common_put_stream_publish(
         let started = Instant::now();
         editor.put_stream(&path, replacement)?;
         let duration = started.elapsed();
-        if !editor.is_changed()
-            || editor
-                .stream(&path)
-                .ok_or("OLE common target disappeared")?
-                != OLE_COMMON_REPLACEMENT
+        if editor
+            .stream(&path)
+            .ok_or("OLE common target disappeared")?
+            != OLE_COMMON_REPLACEMENT
         {
             return Err("OLE common candidate publication did not retain the replacement".into());
         }
@@ -60085,7 +60095,7 @@ fn run_ole_common_finish_render(
         ole_common_limits(&corpus)?,
     )?;
     editor.put_stream(&path, OLE_COMMON_REPLACEMENT.to_vec())?;
-    let changed = editor.snapshot();
+    let changed = editor.staged();
     let mut elapsed = Vec::with_capacity(samples);
     let mut final_output = None;
 
@@ -67347,7 +67357,7 @@ mod tests {
                 &updated_writer_text("doc", 0, selected, 0),
             )
             .unwrap();
-        let expected_target = expected_edit.commit().unwrap().snapshot().finish();
+        let expected_target = expected_edit.commit().unwrap().package().finish();
         assert_eq!(
             evidence.expected_target_fingerprint,
             doc_body_text_fnv1a(&expected_target)

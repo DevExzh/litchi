@@ -195,7 +195,7 @@ mod enabled {
         let path = guard.path().join("write.xls");
         std::fs::write(&path, bytes).expect("fixture");
         let native = Package::from_source(
-            litchi_xls::SourceBackedWorkbook::from_path(&path).expect("native source"),
+            litchi_xls::SourceBackedWorkbook::open(&path).expect("native source"),
         )
         .expect("native positional open");
         let unified =

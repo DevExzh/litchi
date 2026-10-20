@@ -194,7 +194,7 @@ impl Package {
     ///
     /// Returns [`edit::Error::PatchConflict`] when this package is not the
     /// patch's source.
-    pub fn apply_sheet_features(&self, patch: &edit::Patch) -> edit::Result<Self> {
+    pub fn apply_sheet_features(&self, patch: &edit::Patch) -> edit::Result<edit::Commit> {
         edit::apply(self, patch)
     }
 }

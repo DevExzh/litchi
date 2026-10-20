@@ -9,9 +9,10 @@
 
 mod repair_support;
 
-use litchi_rtf::{BorderStyle, RtfDocument, RtfWriter, StyleType};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{BorderStyle, RtfWriter, StyleType};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -21,7 +22,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_full_paragraph_borders_and_round_trips() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\ansi{\colortbl;\red255\green0\blue0;}"#,
         r#"\pard\brdrt\brdrs\brdrw20\brsp10\brdrcf1\brdrb\brdrdot"#,
         r#"\brdrl\brdrhair\brdrw5\brdrr\brdrdb\brdrsh\brdrframe Text\par}"#,
@@ -39,14 +40,14 @@ fn parses_full_paragraph_borders_and_round_trips() {
     assert!(borders.right.shadow);
     assert!(borders.right.frame);
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.blocks()[0].paragraph.borders, *borders);
 }
 
 #[test]
 fn normalizes_box_segment_and_retains_bar_and_between() {
-    let document = RtfDocument::parse(
+    let document = Tree::parse(
         r"{\rtf1\pard\box\brdrs\brdrw20\brdrbar\brdrth\brdrw40\brdrbtw\brdrdot Text\par}",
     )
     .unwrap();
@@ -63,13 +64,13 @@ fn normalizes_box_segment_and_retains_bar_and_between() {
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains("\\brdrbar"));
     assert!(serialized.contains("\\brdrbtw"));
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.blocks()[0].paragraph.borders, *borders);
 }
 
 #[test]
 fn parses_style_entry_borders_and_keeps_character_borders_distinct() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\ansi{\stylesheet{\s1\brdrt\brdrs\brdrw30 Bordered;}}"#,
         r#"{\*\defchp\chbrdr\brdrhair\brdrw5}\pard\chbrdr\brdrs\brdrw10 Text\par}"#,
     ))
@@ -94,7 +95,7 @@ fn parses_style_entry_borders_and_keeps_character_borders_distinct() {
         litchi_rtf::CharacterBorderStyle::Single
     );
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(
         reparsed.stylesheet().styles()[0]
             .paragraph
@@ -111,7 +112,7 @@ fn table_style_border_syntax_stays_out_of_paragraph_borders() {
     // Word's built-in table styles carry \trbrdr* row borders with shared
     // style components; those belong to the table-decoration machinery and
     // must not trip the paragraph-border segment rules.
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\ansi{\stylesheet{\ql Normal;}"#,
         r#"{\*\ts20\tsrowd\trbrdrt\brdrs\brdrw10 \trbrdrl\brdrs\brdrw10"#,
         r#" \trbrdrb\brdrs\brdrw10 \trbrdrr\brdrs\brdrw10 Table Grid;}}"#,
@@ -147,7 +148,7 @@ fn rejects_malformed_paragraph_borders() {
     ];
     for rtf in cases {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(rtf)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(rtf)),
             "accepted malformed {rtf}"
         );
     }

@@ -22,6 +22,7 @@ use crate::sheet_metadata::SheetMetadata;
 use crate::source_limits::{SourceLimitKind, SourceLimits};
 use litchi_biff::Records;
 use litchi_cfb::{OleFile, OleFileLimits};
+use litchi_core::edit::RefusalKind;
 use litchi_ole_common::property_set::{
     PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
 };
@@ -84,7 +85,7 @@ impl<R: Read + Seek> Reader<R> {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new_with_options(reader: R, options: OpenOptions<'_>) -> Result<Self> {
-        let source_limits = options.get_source_limits();
+        let source_limits = options.source_limits_value();
         let ole_file = Self::open_ole_file_with_limits(reader, source_limits)?;
         preflight_declared_streams(&ole_file, source_limits)?;
         Self::from_admitted_ole_file(ole_file, options)
@@ -113,7 +114,7 @@ impl<R: Read + Seek> Reader<R> {
         ole_file: OleFile<R>,
         options: OpenOptions<'_>,
     ) -> Result<Self> {
-        let source_limits = options.get_source_limits();
+        let source_limits = options.source_limits_value();
         Self::validate_ole_file(&ole_file, source_limits)?;
         Self::from_admitted_ole_file(ole_file, options)
     }
@@ -148,7 +149,7 @@ impl<R: Read + Seek> Reader<R> {
         ole_file: OleFile<R>,
         options: OpenOptions<'_>,
     ) -> Result<std::result::Result<Self, OleFile<R>>> {
-        let source_limits = options.get_source_limits();
+        let source_limits = options.source_limits_value();
         Self::validate_ole_file(&ole_file, source_limits)?;
         let mut workbook = Self::empty(ole_file);
 
@@ -201,9 +202,9 @@ impl<R: Read + Seek> Reader<R> {
             .open_stream(&["Workbook"])
             .or_else(|_| self.ole_file.open_stream(&["Book"]))?;
         let (workbook_data, encryption) =
-            prepare_workbook_stream_with_state(workbook_data, options.get_password())?;
+            prepare_workbook_stream_with_state(workbook_data, options.password_value())?;
         self.encryption = encryption;
-        let mut tolerance = ToleranceLog::new(options.get_leniency());
+        let mut tolerance = ToleranceLog::new(options.leniency_value());
         // Container repairs come first: the compound-file reader applied them
         // while the OLE file was opened, before any BIFF record was read.
         tolerance
@@ -277,7 +278,7 @@ impl<R: Read + Seek> Reader<R> {
                 sheet_index,
                 bound_sheet,
                 &encoding,
-                options.get_compatibility_profile(),
+                options.compatibility_profile_value(),
                 cells,
                 tolerance.report_mut(),
             ) {
@@ -362,7 +363,10 @@ impl<R: Read + Seek> Reader<R> {
     pub fn custom_xml_data_store(
         &mut self,
     ) -> litchi_ole_common::custom_xml::Result<Option<litchi_ole_common::custom_xml::Store>> {
-        litchi_ole_common::custom_xml::inspect(&mut self.ole_file)
+        litchi_ole_common::custom_xml::inspect(
+            &mut self.ole_file,
+            litchi_ole_common::custom_xml::Limits::default(),
+        )
     }
 
     /// # Errors
@@ -528,25 +532,6 @@ impl<R: Read + Seek> Reader<R> {
         })
     }
 
-    /// Parse the shared-workbook `User Names` stream on demand.
-    ///
-    /// The required `Revision Log` stream is scanned first for its bounded
-    /// outer grammar and `RRDHead.guid` closure; every `UsrInfo.guid` is
-    /// checked against that set before the snapshot is returned. The snapshot
-    /// also retains the exact Revision Log source identity so a later User
-    /// Names patch cannot apply to a workbook whose revision log changed
-    /// underneath it. The operation is inert: it never acquires the locks
-    /// represented by either stream and never merges or replays revisions.
-    /// # Errors
-    ///
-    /// Returns an error when the stream occurs more than once, the required
-    /// Revision Log is absent or duplicated, its bounded framing/header scan
-    /// is malformed or exceeds the configured limits, or a user GUID has no
-    /// Revision Log owner.
-    pub fn user_names(&mut self) -> Result<Option<crate::user_names::Snapshot>> {
-        self.user_names_with_limits(crate::user_names::Limits::default())
-    }
-
     /// Parse the shared-workbook `User Names` stream with explicit resource
     /// bounds. The read remains lazy and inert, and the Revision Log source
     /// identity is retained for source-checked patch application.
@@ -554,7 +539,7 @@ impl<R: Read + Seek> Reader<R> {
     ///
     /// Returns an error when a bound, stream grammar, required Revision Log,
     /// or GUID dependency closure is invalid.
-    pub fn user_names_with_limits(
+    pub fn user_names(
         &mut self,
         limits: crate::user_names::Limits,
     ) -> Result<Option<crate::user_names::Snapshot>> {
@@ -598,16 +583,20 @@ impl<R: Read + Seek> Reader<R> {
         };
         let revision_len = self.ole_file.stream_len(&[revision_name.as_str()])?;
         if revision_len > max_stream_bytes {
-            return Err(Error::UnsafeEdit(format!(
-                "Revision Log stream has {revision_len} bytes; maximum is {max_stream_bytes}"
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit workbook",
+                "the Revision Log stream exceeds its byte limit",
+            ));
         }
 
         let stream_len = self.ole_file.stream_len(&[name.as_str()])?;
         if stream_len > max_stream_bytes {
-            return Err(Error::UnsafeEdit(format!(
-                "User Names stream has {stream_len} bytes; maximum is {max_stream_bytes}"
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit workbook",
+                "the User Names stream exceeds its byte limit",
+            ));
         }
         let data = Arc::<[u8]>::from(
             self.ole_file

@@ -7,19 +7,20 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    CellStoryEvent, IndexEntry, NavigationEntry, Revision, RevisionAuthor, RevisionType,
-    RtfDocument, RtfWriter, TableCellCoordinate, TableCellPath,
+    CellStoryEvent, IndexEntry, NavigationEntry, Revision, RevisionAuthor, RevisionType, RtfWriter,
+    TableCellCoordinate, TableCellPath,
 };
 use std::borrow::Cow;
 
-fn round_trip(source: &str) -> RtfDocument<'static> {
-    let document = RtfDocument::parse(source).unwrap();
+fn round_trip(source: &str) -> Tree<'static> {
+    let document = Tree::parse(source).unwrap();
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(&document)
         .unwrap();
-    RtfDocument::parse_bytes(&output).unwrap()
+    Tree::parse_bytes(&output).unwrap()
 }
 
 #[test]
@@ -100,13 +101,13 @@ fn rejects_missing_metadata_conflicts_and_active_destinations() {
         r"{\rtf1\trowd\cellx1000{\intbl{\xe x{\field danger}}\cell}\row}",
         r"{\rtf1\trowd\cellx1000{\intbl{\tc\tcl10 bad}\cell}\row}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(Tree::parse(source).is_err(), "accepted {source}");
     }
 }
 
 #[test]
 fn writer_rejects_unowned_multiple_wrong_kind_and_out_of_range_mutations() {
-    let mut unowned = RtfDocument::parse(r"{\rtf1\trowd\cellx1000{\intbl A\cell}\row}").unwrap();
+    let mut unowned = Tree::parse(r"{\rtf1\trowd\cellx1000{\intbl A\cell}\row}").unwrap();
     unowned
         .push_cell_navigation_entry_metadata(NavigationEntry::Index(
             IndexEntry::new(0, Cow::Borrowed("x")).unwrap(),
@@ -114,7 +115,7 @@ fn writer_rejects_unowned_multiple_wrong_kind_and_out_of_range_mutations() {
         .unwrap();
     assert!(RtfWriter::new(Vec::new()).write_document(&unowned).is_err());
 
-    let mut duplicate = RtfDocument::parse(
+    let mut duplicate = Tree::parse(
         r"{\rtf1\trowd\cellx1000\cellx2000{\intbl A{\xe\v x}\cell}{\intbl B\cell}\row}",
     )
     .unwrap();
@@ -127,7 +128,7 @@ fn writer_rejects_unowned_multiple_wrong_kind_and_out_of_range_mutations() {
             .is_err()
     );
 
-    let mut wrong = RtfDocument::parse(
+    let mut wrong = Tree::parse(
         r"{\rtf1{\*\revtbl{A;}}\trowd\cellx1000{\intbl{\revised\revauth0 x}\cell}\row}",
     )
     .unwrap();
@@ -136,8 +137,7 @@ fn writer_rejects_unowned_multiple_wrong_kind_and_out_of_range_mutations() {
     cell.push_deletion_revision_reference(0, 0).unwrap();
     assert!(RtfWriter::new(Vec::new()).write_document(&wrong).is_err());
 
-    let mut out_of_range =
-        RtfDocument::parse(r"{\rtf1\trowd\cellx1000{\intbl A\cell}\row}").unwrap();
+    let mut out_of_range = Tree::parse(r"{\rtf1\trowd\cellx1000{\intbl A\cell}\row}").unwrap();
     out_of_range.tables_mut()[0].rows_mut()[0].cells_mut()[0]
         .push_navigation_entry_reference(99, 0)
         .unwrap();
@@ -150,7 +150,7 @@ fn writer_rejects_unowned_multiple_wrong_kind_and_out_of_range_mutations() {
 
 #[test]
 fn atomic_outer_and_nested_mutation_round_trips() {
-    let mut document = RtfDocument::parse(concat!(
+    let mut document = Tree::parse(concat!(
         r#"{\rtf1\trowd\cellx1000{\intbl O"#,
         r#"{\intbl\itap2 N\nestcell}"#,
         r#"{\*\nesttableprops\itap2\trowd\cellx500\nestrow}"#,

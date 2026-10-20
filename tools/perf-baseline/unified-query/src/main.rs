@@ -582,7 +582,7 @@ fn cold_xls_leaf(bytes: &[u8], path: Option<&std::path::Path>, limit: usize) -> 
     let mut matches = 0;
     match path {
         Some(path) => {
-            let leaf = litchi_xls::SourceBackedWorkbook::from_path(path).expect("opens");
+            let leaf = litchi_xls::SourceBackedWorkbook::open(path).expect("opens");
             let worksheet = leaf
                 .worksheet_by_index(0)
                 .expect("reads")

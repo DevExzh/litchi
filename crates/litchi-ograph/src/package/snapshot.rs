@@ -22,19 +22,14 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Parses an owned standalone Graph package with default bounds.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, Limits::default())
-    }
-
     /// Parses a borrowed standalone Graph package while retaining an owned
     /// source copy.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes(bytes.to_vec())
+    pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self> {
+        Self::from_bytes(bytes.to_vec(), limits)
     }
 
     /// Parses an owned package under explicit resource bounds.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+    pub fn from_bytes(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         validation::check_limit("package bytes", bytes.len(), limits.max_package_bytes)?;
         let validated = validation::validate(&bytes, limits)?;
@@ -76,18 +71,13 @@ impl Snapshot {
     }
 
     /// Parses the standalone Graph chart into its typed, inert semantic model.
-    pub fn chart(&self) -> Result<chart::Chart> {
+    pub fn chart(&self) -> Result<chart::Model> {
         codec::read_chart(self)
     }
 
-    /// Starts a source-checked transaction over the typed Workbook chart.
-    pub fn transaction(&self) -> Result<transaction::Transaction> {
-        transaction::Transaction::new(self.clone())
-    }
-
-    /// Contextual alias for [`Self::transaction`].
-    pub fn edit(&self) -> Result<transaction::Transaction> {
-        self.transaction()
+    /// Starts a source-checked edit of this package snapshot.
+    pub fn edit(&self) -> Result<transaction::Edit> {
+        transaction::Edit::new(self.clone())
     }
 
     /// Recovers the owned source bytes.

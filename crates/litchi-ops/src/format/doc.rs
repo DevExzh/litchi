@@ -443,7 +443,7 @@ pub(crate) struct WriteCommit {
 }
 
 fn edit_options(transaction_limits: BodyTransactionLimits) -> litchi_doc::EditOptions {
-    litchi_doc::EditOptions::default().with_transaction_limits(transaction_limits)
+    litchi_doc::EditOptions::default().transaction_limits(transaction_limits)
 }
 
 fn body_transaction_limits(limits: SemanticLimits) -> BodyTransactionLimits {
@@ -496,7 +496,7 @@ mod tests {
     use super::*;
     use crate::detect::{DetectedFormat, detect_format_smart};
     use crate::{Code, DocOptions};
-    use litchi_doc::{Leniency, raw::Package};
+    use litchi_doc::{Leniency, raw::Reader};
     use litchi_ole_common::property_set::PropertySetReader;
     use std::path::PathBuf;
 
@@ -565,7 +565,7 @@ mod tests {
     fn path_and_byte_routes_match_the_leaf_reader() {
         let mut opened = 0_usize;
         for name in corpus() {
-            let mut package = match Package::from_reader(Cursor::new(fixture(&name))) {
+            let mut package = match Reader::from_reader(Cursor::new(fixture(&name))) {
                 Ok(package) => package,
                 Err(_) => continue,
             };
@@ -633,7 +633,7 @@ mod tests {
         let options = OpenOptions::default()
             .doc(DocOptions::new().leniency(Leniency::TolerateStylesheetDefects));
         let name = "duplicate-style-names.doc";
-        let mut package = Package::from_reader(Cursor::new(fixture(name))).unwrap();
+        let mut package = Reader::from_reader(Cursor::new(fixture(name))).unwrap();
         let document = package
             .document_with_options(
                 litchi_doc::OpenOptions::default().leniency(Leniency::TolerateStylesheetDefects),

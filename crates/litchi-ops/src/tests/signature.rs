@@ -454,7 +454,7 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
             )
             .unwrap();
             let commit = edit.commit().unwrap();
-            (commit.snapshot().bytes().to_vec(), "4242".to_owned())
+            (commit.package().bytes().to_vec(), "4242".to_owned())
         },
         #[cfg(feature = "ppt")]
         File::Ppt(handle) => {
@@ -607,7 +607,11 @@ fn assert_exact_noop(input: &Input) {
         ),
         #[cfg(feature = "xls")]
         FileFormat::Xls => assert!(
-            litchi_xls::cell_values::Snapshot::from_bytes(bytes.clone()).is_err(),
+            litchi_xls::cell_values::Snapshot::from_bytes(
+                bytes.clone(),
+                litchi_ole_common::object::Limits::default()
+            )
+            .is_err(),
             "{label}: the XLS editor admitted a signed container"
         ),
         #[cfg(feature = "ppt")]

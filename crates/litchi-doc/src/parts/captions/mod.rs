@@ -7,6 +7,7 @@
 //! macro is opened or executed.
 
 mod codec;
+mod family;
 mod model;
 mod package;
 mod semantic;
@@ -19,12 +20,18 @@ mod tests;
 /// Shared MS-OSHARED numbering vocabulary used by caption numbers.
 pub use crate::parts::numbering::NumberFormat as Format;
 
+pub use family::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Result};
 pub use model::{
     AutoEntry, AutoTable, Definition, Heading, Info, LabelTable, Location, Numbering, Separator,
 };
-pub use package::{Commit as PackageCommit, Editor, Snapshot as PackageSnapshot};
 pub use semantic::Tables;
-pub use transaction::{Commit, Error as TransactionError, Snapshot, Transaction};
+
+/// The part-level caption codec: the semantic [`record::Snapshot`] and its
+/// [`record::Edit`] staging, which publishes a new semantic snapshot;
+/// package edits go through [`Edit`].
+pub mod record {
+    pub use super::transaction::{Commit, Diagnostics, Edit, Error, Patch, Snapshot};
+}
 
 // The document state predates the contextual facade and uses this name
 // internally. It is crate-visible only; the public path is `captions::Tables`.

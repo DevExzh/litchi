@@ -23,8 +23,11 @@ fn fixture(name: &str) -> PathBuf {
 fn real_excel_formula_references_shift_reopen_and_invert() {
     let path =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/xls/SimpleWithChoose.xls");
-    let source = Snapshot::from_bytes(std::fs::read(path).expect("read Microsoft Excel fixture"))
-        .expect("open Microsoft Excel formula fixture");
+    let source = Snapshot::from_bytes(
+        std::fs::read(path).expect("read Microsoft Excel fixture"),
+        litchi_xls::ole_object::Limits::default(),
+    )
+    .expect("open Microsoft Excel formula fixture");
     let mut transaction = source.edit();
     transaction
         .insert_rows(Selector::Position(Position::new(0)), 0, 1)
@@ -33,7 +36,7 @@ fn real_excel_formula_references_shift_reopen_and_invert() {
         .commit()
         .expect("commit and fully reopen real Formula shift");
 
-    let reopened = Reader::new(Cursor::new(commit.snapshot().bytes()))
+    let reopened = Reader::new(Cursor::new(commit.package().bytes()))
         .expect("reopen shifted Microsoft Excel fixture");
     assert_eq!(
         reopened
@@ -44,15 +47,15 @@ fn real_excel_formula_references_shift_reopen_and_invert() {
             .formula(),
         Some("=CHOOSE(2,A3,A4,A5)")
     );
-    assert_other_streams_equal(source.bytes(), commit.snapshot().bytes());
+    assert_other_streams_equal(source.bytes(), commit.package().bytes());
 
     let restored = commit
         .patch()
         .semantic()
         .inverse()
-        .apply(commit.snapshot())
+        .apply(commit.package())
         .expect("semantically invert real Formula shift");
-    let restored_reopen = Reader::new(Cursor::new(restored.snapshot().bytes()))
+    let restored_reopen = Reader::new(Cursor::new(restored.package().bytes()))
         .expect("reopen semantically restored Microsoft Excel fixture");
     assert_eq!(
         restored_reopen
@@ -68,7 +71,7 @@ fn real_excel_formula_references_shift_reopen_and_invert() {
         commit
             .patch()
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .expect("apply exact artifact inverse")
             .bytes(),
         source.bytes()
@@ -79,8 +82,11 @@ fn real_excel_formula_references_shift_reopen_and_invert() {
 fn real_mulrk_field_edit_remains_packed() {
     let path =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/xls/FormulaSheetRange.xls");
-    let source = Snapshot::from_bytes(std::fs::read(path).expect("read MulRk fixture"))
-        .expect("parse MulRk fixture");
+    let source = Snapshot::from_bytes(
+        std::fs::read(path).expect("read MulRk fixture"),
+        litchi_xls::ole_object::Limits::default(),
+    )
+    .expect("parse MulRk fixture");
     let (sheet_position, reference) = source
         .worksheets()
         .find_map(|sheet| {
@@ -99,7 +105,7 @@ fn real_mulrk_field_edit_remains_packed() {
     .expect("stage exact RK value");
     let commit = edit.commit().expect("commit MulRk field");
     let cell = commit
-        .snapshot()
+        .package()
         .worksheet(Selector::Position(Position::new(sheet_position)))
         .expect("resolve sheet")
         .expect("sheet exists")
@@ -112,7 +118,7 @@ fn real_mulrk_field_edit_remains_packed() {
         commit
             .patch()
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .expect("inverse MulRk patch")
             .bytes(),
         source.bytes()
@@ -123,8 +129,11 @@ fn real_mulrk_field_edit_remains_packed() {
 fn real_mulrk_edge_deletion_rebuilds_and_semantically_repacks() {
     let path =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/xls/FormulaSheetRange.xls");
-    let source = Snapshot::from_bytes(std::fs::read(path).expect("read MulRk fixture"))
-        .expect("parse MulRk fixture");
+    let source = Snapshot::from_bytes(
+        std::fs::read(path).expect("read MulRk fixture"),
+        litchi_xls::ole_object::Limits::default(),
+    )
+    .expect("parse MulRk fixture");
     let (sheet_position, reference) = source
         .worksheets()
         .find_map(|sheet| {
@@ -141,7 +150,7 @@ fn real_mulrk_edge_deletion_rebuilds_and_semantically_repacks() {
     let commit = transaction.commit().expect("remove and reopen packed edge");
     assert!(
         commit
-            .snapshot()
+            .package()
             .worksheet(Selector::Position(Position::new(sheet_position)))
             .expect("resolve edited sheet")
             .expect("edited sheet exists")
@@ -153,11 +162,11 @@ fn real_mulrk_edge_deletion_rebuilds_and_semantically_repacks() {
         .patch()
         .semantic()
         .inverse()
-        .apply(commit.snapshot())
+        .apply(commit.package())
         .expect("semantically restore packed edge");
     assert_eq!(
         restored
-            .snapshot()
+            .package()
             .worksheet(Selector::Position(Position::new(sheet_position)))
             .expect("resolve restored sheet")
             .expect("restored sheet exists")
@@ -173,6 +182,7 @@ fn real_mulrk_edge_deletion_rebuilds_and_semantically_repacks() {
 fn real_fixture_number_commit_reopens_and_preserves_other_streams() {
     let source = Snapshot::from_bytes(
         std::fs::read(fixture("44010-TwoCharts.xls")).expect("read real XLS fixture"),
+        litchi_xls::ole_object::Limits::default(),
     )
     .expect("parse real XLS fixture");
     let (sheet_position, number) = source
@@ -207,20 +217,20 @@ fn real_fixture_number_commit_reopens_and_preserves_other_streams() {
     assert_eq!(commit.diagnostics().touched_streams(), 1);
     assert_eq!(
         source.workbook_stream().len(),
-        commit.snapshot().workbook_stream().len()
+        commit.package().workbook_stream().len()
     );
     assert!(
         source
             .workbook_stream()
             .iter()
-            .zip(commit.snapshot().workbook_stream())
+            .zip(commit.package().workbook_stream())
             .filter(|(left, right)| left != right)
             .count()
             <= 8
     );
 
-    assert_other_streams_equal(source.bytes(), commit.snapshot().bytes());
-    let reopened = Reader::new(Cursor::new(commit.snapshot().bytes()))
+    assert_other_streams_equal(source.bytes(), commit.package().bytes());
+    let reopened = Reader::new(Cursor::new(commit.package().bytes()))
         .expect("committed package reopens through the public workbook reader");
     let parsed_index = reopened
         .sheet(sheet_position)
@@ -245,7 +255,7 @@ fn real_fixture_number_commit_reopens_and_preserves_other_streams() {
     assert_eq!(actual.to_bits(), replacement.to_bits());
 
     let applied = commit.patch().apply(&source).expect("apply exact source");
-    assert_eq!(applied.bytes(), commit.snapshot().bytes());
+    assert_eq!(applied.bytes(), commit.package().bytes());
     assert!(commit.patch().apply(&applied).is_err());
     assert_eq!(
         commit
@@ -264,8 +274,11 @@ fn multiple_real_fixtures_rename_and_fully_reopen() {
         ("44010-TwoCharts.xls", "Chart Data Renamed"),
         ("unicodeNameRecord.xls", "Unicode Renamed"),
     ] {
-        let source = Snapshot::from_bytes(std::fs::read(fixture(name)).expect("read real fixture"))
-            .expect("open real fixture transaction");
+        let source = Snapshot::from_bytes(
+            std::fs::read(fixture(name)).expect("read real fixture"),
+            litchi_xls::ole_object::Limits::default(),
+        )
+        .expect("open real fixture transaction");
         let position = source
             .worksheets()
             .next()
@@ -280,15 +293,15 @@ fn multiple_real_fixtures_rename_and_fully_reopen() {
             .expect("commit and reopen real fixture");
         assert_eq!(
             commit
-                .snapshot()
+                .package()
                 .worksheet(Selector::Position(Position::new(position)))
                 .expect("resolve reopened worksheet")
                 .expect("reopened worksheet exists")
                 .name(),
             replacement
         );
-        assert_other_streams_equal(source.bytes(), commit.snapshot().bytes());
-        Reader::new(Cursor::new(commit.snapshot().bytes()))
+        assert_other_streams_equal(source.bytes(), commit.package().bytes());
+        Reader::new(Cursor::new(commit.package().bytes()))
             .expect("renamed real fixture fully reopens");
     }
 }

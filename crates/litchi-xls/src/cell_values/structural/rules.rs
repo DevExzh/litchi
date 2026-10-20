@@ -21,6 +21,7 @@ use super::{
     patch_condfmt, patch_ref8, patch_reference_span, patch_sqref, shift_axis_point, target_3d,
 };
 use crate::formula::FormulaReferenceSpan;
+use litchi_core::edit::RefusalKind;
 
 pub(super) const CONDFMT12: u16 = 0x0879;
 pub(super) const CF12: u16 = 0x087a;
@@ -55,8 +56,10 @@ impl Bound {
     fn sqref(payload: &[u8]) -> Result<Self> {
         let count = usize::from(binary::read_u16_le_at(payload, 0)?);
         if count == 0 || payload.len() != 2 + count * 8 {
-            return Err(Error::UnsafeEdit(
-                "a range list does not fill its record and is not shifted".into(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit cells",
+                "a range list does not fill its record and is not shifted",
             ));
         }
         let mut bound = Self::ref8(&payload[2..10])?;
@@ -119,8 +122,10 @@ pub(super) fn patch_relative_component(
     let flags = binary::read_u16_le_at(tokens, flags_offset)?;
     let (start, count, insert, limit) = axis(shift);
     let crossing = || {
-        Err(Error::UnsafeEdit(
-            "a relative reference would cross the shift point".into(),
+        Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "a relative reference would cross the shift point",
         ))
     };
     if matches!(shift, AxisShift::Rows { .. }) {
@@ -193,16 +198,18 @@ pub(super) fn patch_rule_formula(
     tokens: &mut [u8],
     shift: AxisShift,
     bound: Bound,
-    what: &str,
+    _what: &str,
 ) -> Result<()> {
     if tokens.is_empty() {
         return Ok(());
     }
     let (same_sheet, relative, _three_d) = crate::formula::shared_formula_reference_spans(tokens)
         .ok_or_else(|| {
-        Error::UnsafeEdit(format!(
-            "row/column movement cannot read a {what} formula's references"
-        ))
+        Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "row/column movement cannot read this formula's references",
+        )
     })?;
     let (low, high) = match shift {
         AxisShift::Rows { .. } => bound.rows,
@@ -226,9 +233,11 @@ pub(super) fn patch_rule_formula(
                 AxisShift::Columns { .. } => i32::from(value as u8 as i8),
             };
             if value >= start || !(high < start && i32::from(high) + as_offset < i32::from(start)) {
-                return Err(Error::UnsafeEdit(format!(
-                    "row/column movement cannot close a {what} formula's relative PtgRef or PtgArea"
-                )));
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "edit cells",
+                    "row/column movement cannot close a formula's relative PtgRef or PtgArea",
+                ));
             }
         }
     }
@@ -303,7 +312,13 @@ fn cfvo(payload: &[u8], offset: usize) -> Result<(std::ops::Range<usize>, usize)
 /// color scale, data bar or icon set. A layout this walk does not account
 /// for byte for byte is refused.
 pub(super) fn cf12_formula_ranges(payload: &[u8]) -> Result<Vec<std::ops::Range<usize>>> {
-    let truncated = || Error::UnsafeEdit("CF12 record layout is not shiftable".into());
+    let truncated = || {
+        Error::refused(
+            RefusalKind::UnsupportedTarget,
+            "edit cells",
+            "CF12 record layout is not shiftable",
+        )
+    };
     let byte = |offset: usize| payload.get(offset).copied().ok_or_else(truncated);
     let word =
         |offset: usize| binary::read_u16_le_at(payload, offset).map_err(|_error| truncated());
@@ -404,10 +419,11 @@ pub(super) fn patch_rule_records(
             .get(position + 1)
             .is_some_and(|next| next.kind == CONTINUE)
         {
-            return Err(Error::UnsafeEdit(format!(
-                "row/column movement cannot close a continued record 0x{:04X}",
-                record.kind
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "row/column movement cannot close a continued record",
+            ));
         }
         let payload = payload_mut(worksheet, record)?;
         match record.kind {
@@ -437,7 +453,11 @@ pub(super) fn patch_rule_records(
             },
             CF | CF12 => {
                 let bound = bound.ok_or_else(|| {
-                    Error::UnsafeEdit("a conditional-format rule has no range".into())
+                    Error::refused(
+                        RefusalKind::UnsupportedTarget,
+                        "edit cells",
+                        "a conditional-format rule has no range",
+                    )
                 })?;
                 let ranges = if record.kind == CF {
                     cf_formula_ranges(payload)?.to_vec()
@@ -486,9 +506,7 @@ pub(super) fn patch_rule_3d_references(
     }
     let (_, _, three_d) =
         crate::formula::shared_formula_reference_spans(tokens).ok_or_else(|| {
-            Error::UnsafeEdit(
-                "row/column movement cannot read the references of a shared, array, conditional-format or validation formula".into(),
-            )
+            Error::refused(RefusalKind::UnsupportedOperation, "edit cells", "row/column movement cannot read the references of a shared, array, conditional-format or validation formula")
         })?;
     for reference in three_d {
         if matches!(
@@ -501,9 +519,10 @@ pub(super) fn patch_rule_3d_references(
             continue;
         };
         if relative_flags(tokens, span)? != 0 {
-            return Err(Error::UnsafeEdit(
-                "row/column movement cannot close a relative 3-D reference in a rule or shared formula"
-                    .into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit cells",
+                "row/column movement cannot close a relative 3-D reference in a rule or shared formula",
             ));
         }
         patch_reference_span(tokens, span, shift)?;
@@ -539,8 +558,10 @@ pub(super) fn array_tokens(payload: &[u8]) -> Result<std::ops::Range<usize>> {
         return Err(Error::InvalidData("Array formula is truncated".into()));
     }
     if end != payload.len() {
-        return Err(Error::UnsafeEdit(
-            "row/column movement refuses an array formula with ancillary data".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedTarget,
+            "edit cells",
+            "row/column movement refuses an array formula with ancillary data",
         ));
     }
     Ok(14..end)
@@ -562,7 +583,7 @@ fn range_moves(first: u16, last: u16, shift: AxisShift) -> Option<bool> {
 /// Moves a `Ref` (`rwFirst`, `rwLast`, `colFirst`, `colLast` as bytes) whole,
 /// with `margin` cells before it that must move with it (a data table's
 /// formula row and column). A shift point inside is refused.
-fn patch_ref_whole(range: &mut [u8], shift: AxisShift, margin: u16, what: &str) -> Result<()> {
+fn patch_ref_whole(range: &mut [u8], shift: AxisShift, margin: u16, _what: &str) -> Result<()> {
     let (start, count, insert, limit) = axis(shift);
     let (first, last) = match shift {
         AxisShift::Rows { .. } => (
@@ -582,17 +603,29 @@ fn patch_ref_whole(range: &mut [u8], shift: AxisShift, margin: u16, what: &str) 
                     range[2..4].copy_from_slice(&last.to_le_bytes());
                 },
                 AxisShift::Columns { .. } => {
-                    range[4] = u8::try_from(first)
-                        .map_err(|_error| Error::UnsafeEdit("column outside BIFF8".into()))?;
-                    range[5] = u8::try_from(last)
-                        .map_err(|_error| Error::UnsafeEdit("column outside BIFF8".into()))?;
+                    range[4] = u8::try_from(first).map_err(|_error| {
+                        Error::refused(
+                            RefusalKind::InvalidValue,
+                            "edit cells",
+                            "column outside BIFF8",
+                        )
+                    })?;
+                    range[5] = u8::try_from(last).map_err(|_error| {
+                        Error::refused(
+                            RefusalKind::InvalidValue,
+                            "edit cells",
+                            "column outside BIFF8",
+                        )
+                    })?;
                 },
             }
             Ok(())
         },
-        None => Err(Error::UnsafeEdit(format!(
-            "a row/column shift through {what} would split it"
-        ))),
+        None => Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "a row/column shift through this range would split it",
+        )),
     }
 }
 
@@ -635,7 +668,11 @@ pub(super) fn move_owner_range(
             for at in [0, 2] {
                 let row = i32::from(binary::read_u16_le_at(range, at)?) + delta;
                 let row = u16::try_from(row).map_err(|_error| {
-                    Error::UnsafeEdit("row movement moves a formula owner outside BIFF8".into())
+                    Error::refused(
+                        RefusalKind::InvalidValue,
+                        "edit cells",
+                        "row movement moves a formula owner outside BIFF8",
+                    )
                 })?;
                 range[at..at + 2].copy_from_slice(&row.to_le_bytes());
             }
@@ -644,8 +681,13 @@ pub(super) fn move_owner_range(
             let (start, count, insert, limit) = axis(shift);
             for at in [4, 5] {
                 let column = shift_axis_point(u16::from(range[at]), start, count, insert, limit)?;
-                range[at] = u8::try_from(column)
-                    .map_err(|_error| Error::UnsafeEdit("column outside BIFF8".into()))?;
+                range[at] = u8::try_from(column).map_err(|_error| {
+                    Error::refused(
+                        RefusalKind::InvalidValue,
+                        "edit cells",
+                        "column outside BIFF8",
+                    )
+                })?;
             }
         },
     }

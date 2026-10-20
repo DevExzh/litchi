@@ -182,7 +182,12 @@ fn metadata_transaction_round_trip() {
     );
 
     assert_eq!(
-        package.apply_metadata(&patch).unwrap().to_bytes().unwrap(),
+        package
+            .apply_metadata(&patch)
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap(),
         bytes
     );
     assert!(matches!(
@@ -193,6 +198,7 @@ fn metadata_transaction_round_trip() {
         edited
             .apply_metadata(&patch.inverse())
             .unwrap()
+            .package()
             .to_bytes()
             .unwrap(),
         source

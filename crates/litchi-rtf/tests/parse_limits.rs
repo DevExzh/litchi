@@ -7,7 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{OpenOptions, RtfDocument, RtfError, SourceLimitKind, SourceLimits, compress};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{OpenOptions, RtfError, SourceLimitKind, SourceLimits, compress};
 
 fn options(limits: SourceLimits) -> OpenOptions {
     OpenOptions::new().source_limits(limits)
@@ -34,7 +35,7 @@ fn source_and_token_limits_are_typed() {
     let source = br"{\rtf1 body}";
     let limits = limits_with_input_bytes(source.len() - 1);
     assert!(matches!(
-        RtfDocument::parse_bytes_with_options(source, options(limits)),
+        Tree::parse_bytes_with_options(source, options(limits)),
         Err(RtfError::Limit {
             kind: SourceLimitKind::InputBytes,
             observed,
@@ -44,7 +45,7 @@ fn source_and_token_limits_are_typed() {
 
     let limits = limits_with_events(3);
     assert!(matches!(
-        RtfDocument::parse_bytes_with_options(source, options(limits)),
+        Tree::parse_bytes_with_options(source, options(limits)),
         Err(RtfError::Limit {
             kind: SourceLimitKind::Events,
             observed: 4,
@@ -61,7 +62,7 @@ fn binary_and_compressed_expansion_limits_flow_through_document_parsing() {
         .build()
         .expect("binary profile is consistent");
     assert!(matches!(
-        RtfDocument::parse_with_options(r"{\rtf1\bin4 ABCD}", options(limits)),
+        Tree::parse_with_options(r"{\rtf1\bin4 ABCD}", options(limits)),
         Err(RtfError::Limit {
             kind: SourceLimitKind::BinaryBytes,
             observed: 4,
@@ -77,7 +78,7 @@ fn binary_and_compressed_expansion_limits_flow_through_document_parsing() {
         .build()
         .expect("decompression profile is consistent");
     assert!(matches!(
-        RtfDocument::parse_bytes_with_options(&compressed, options(limits)),
+        Tree::parse_bytes_with_options(&compressed, options(limits)),
         Err(RtfError::Limit {
             kind: SourceLimitKind::DecompressedBytes,
             observed,
@@ -93,7 +94,7 @@ fn bounded_file_open_rejects_metadata_before_reading() {
     let observed = usize::try_from(std::fs::metadata(&fixture).unwrap().len()).unwrap();
     let limits = limits_with_input_bytes(observed - 1);
     assert!(matches!(
-        RtfDocument::open_with_options(&fixture, options(limits)),
+        Tree::open_with_options(&fixture, options(limits)),
         Err(RtfError::Limit {
             kind: SourceLimitKind::InputBytes,
             observed: actual,
@@ -105,16 +106,10 @@ fn bounded_file_open_rejects_metadata_before_reading() {
 #[test]
 fn default_profile_preserves_existing_entry_points() {
     let source = br"{\rtf1\ansi finite defaults}";
+    assert_eq!(Tree::parse_bytes(source).unwrap().text(), "finite defaults");
+    assert_eq!(Tree::from_bytes(source).unwrap().text(), "finite defaults");
     assert_eq!(
-        RtfDocument::parse_bytes(source).unwrap().text(),
-        "finite defaults"
-    );
-    assert_eq!(
-        RtfDocument::from_bytes(source).unwrap().text(),
-        "finite defaults"
-    );
-    assert_eq!(
-        RtfDocument::parse_bytes_with_options(source, options(SourceLimits::default()))
+        Tree::parse_bytes_with_options(source, options(SourceLimits::default()))
             .unwrap()
             .text(),
         "finite defaults"
@@ -163,7 +158,7 @@ fn zero_opaque_nodes_is_an_explicit_denial_and_usize_max_is_invalid() {
         .build()
         .expect("zero opaque-node profile is consistent");
     assert!(matches!(
-        RtfDocument::parse_with_options(r"{\rtf1\future1 x}", options(zero_opaque)),
+        Tree::parse_with_options(r"{\rtf1\future1 x}", options(zero_opaque)),
         Err(RtfError::Limit {
             kind: SourceLimitKind::OpaqueNodes,
             observed: 1,

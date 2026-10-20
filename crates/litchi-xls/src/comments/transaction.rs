@@ -18,8 +18,9 @@ use litchi_cfb::{
     SameLengthStreamSplice, StreamSpliceLimits, ValidatedOverlayPlan,
 };
 use litchi_core::binary;
+use litchi_core::edit::RefusalKind;
 use litchi_core::{ReadAt, SourceVersion};
-use litchi_ole_common::object::{Editor as PackageEditor, Limits, Targets};
+use litchi_ole_common::object::{Edit as PackageEditor, Limits, Targets};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
@@ -219,14 +220,22 @@ impl Snapshot {
         }))
     }
 
+    /// A codec-level edit of this bare snapshot; its commit opens the
+    /// result with the default package policy. Package callers use
+    /// [`crate::Package::edit_comments`].
+    #[cfg(test)]
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
+        self.edit_based(None)
+    }
+
+    fn edit_based(&self, base: crate::scoped::Base) -> Edit {
         Edit {
+            base,
             source: self.clone(),
             changes: Vec::new(),
         }
     }
-
     fn resolve_sheet(&self, selector: Selector<'_>) -> Result<Option<usize>> {
         match selector {
             Selector::Position(position) => Ok(self
@@ -243,9 +252,11 @@ impl Snapshot {
                     .filter(|(_, sheet)| crate::sheet_name::equivalent(&sheet.name, name));
                 let found = matches.next().map(|(index, _)| index);
                 if matches.next().is_some() {
-                    return Err(Error::UnsafeEdit(format!(
-                        "worksheet name {name:?} is ambiguous"
-                    )));
+                    return Err(Error::refused(
+                        RefusalKind::InvalidValue,
+                        "edit comments",
+                        "worksheet name is ambiguous",
+                    ));
                 }
                 Ok(found)
             },
@@ -320,6 +331,7 @@ struct Change {
 /// Detached, failure-atomic replacement of existing BIFF8 comments.
 #[derive(Clone)]
 pub struct Edit {
+    base: crate::scoped::Base,
     source: Snapshot,
     changes: Vec<Change>,
 }
@@ -363,11 +375,11 @@ impl Edit {
         let mut seen = HashSet::new();
         for update in updates {
             if !seen.insert(update.reference) {
-                return Err(Error::UnsafeEdit(format!(
-                    "duplicate comment selector ({}, {}) in one batch",
-                    update.reference.row(),
-                    update.reference.column()
-                )));
+                return Err(Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit comments",
+                    "a comment selector occurs twice in one batch",
+                ));
             }
             staged.stage(sheet, update.reference, update.value)?;
         }
@@ -379,11 +391,12 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Always returns [`Error::UnsafeEdit`]; the transaction is unchanged.
+    /// Always returns [`Error::Refused`]; the transaction is unchanged.
     pub fn remove(&mut self, _selector: Selector<'_>, _reference: Reference) -> Result<()> {
-        Err(Error::UnsafeEdit(
-            "deleting an XLS NOTE requires lossless worksheet and workbook-global OfficeArt catalog updates"
-                .into(),
+        Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit comments",
+            "deleting an XLS NOTE requires lossless worksheet and workbook-global OfficeArt catalog updates",
         ))
     }
 
@@ -394,7 +407,10 @@ impl Edit {
             .inner
             .sheets
             .get(sheet)
-            .ok_or_else(|| Error::UnsafeEdit("comment worksheet inventory is stale".into()))?;
+            .ok_or(Error::PatchConflict {
+                operation: "edit comments",
+                reason: "comment worksheet inventory is stale",
+            })?;
         let entry = unique_entry_index(&owner.entries, reference)?.ok_or_else(|| {
             Error::UnsupportedFeature(format!(
                 "cell ({}, {}) has no existing BIFF8 NOTE comment",
@@ -414,14 +430,17 @@ impl Edit {
             return Ok(());
         }
         if before.text.is_empty() && !value.text.is_empty() {
-            return Err(Error::UnsafeEdit(
-                "an empty source TXO has no formatting-run identity for nonempty comment text"
-                    .into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit comments",
+                "an empty source TXO has no formatting-run identity for nonempty comment text",
             ));
         }
         if owner.protected {
-            return Err(Error::UnsafeEdit(
-                "comments on a protected BIFF8 worksheet cannot be changed".into(),
+            return Err(Error::refused(
+                RefusalKind::Protected,
+                "edit comments",
+                "comments on a protected BIFF8 worksheet cannot be changed",
             ));
         }
         if let Some(existing) = self
@@ -433,9 +452,11 @@ impl Edit {
             return Ok(());
         }
         if self.changes.len() >= MAX_EDITS {
-            return Err(Error::UnsafeEdit(format!(
-                "comment edit count exceeds the finite limit of {MAX_EDITS}"
-            )));
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit comments",
+                "the comment edit count exceeds its limit",
+            ));
         }
         self.changes
             .try_reserve(1)
@@ -480,8 +501,10 @@ impl Edit {
         if entry.comment.visibility() == visibility {
             return Ok(());
         }
-        Err(Error::UnsafeEdit(
-            "changing XLS comment visibility requires complete SpContainer/Opt ownership".into(),
+        Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit comments",
+            "changing XLS comment visibility requires complete SpContainer/Opt ownership",
         ))
     }
 
@@ -492,6 +515,13 @@ impl Edit {
     /// Returns a stale-source, BIFF splice, package, complete-reopen, or
     /// semantic-readback error without publishing a partial result.
     pub fn commit(self) -> Result<Commit> {
+        let base = self.base.clone();
+        let record = self.commit_record()?;
+        let package = crate::scoped::publish(base, record.patch.before(), record.patch.after())?;
+        Ok(Commit::new(package, record.patch, record.diagnostics))
+    }
+
+    pub(crate) fn commit_record(self) -> Result<RecordCommit> {
         let effective: Vec<_> = self
             .changes
             .iter()
@@ -503,7 +533,7 @@ impl Edit {
                 Arc::clone(&self.source.inner.bytes),
                 Vec::new(),
             );
-            return Ok(Commit {
+            return Ok(RecordCommit {
                 snapshot: self.source,
                 patch,
                 diagnostics: Diagnostics::default(),
@@ -584,7 +614,7 @@ impl Edit {
             Arc::clone(&snapshot.inner.bytes),
             operations,
         );
-        Ok(Commit {
+        Ok(RecordCommit {
             snapshot,
             patch,
             diagnostics: Diagnostics {
@@ -616,22 +646,33 @@ impl Edit {
             .collect();
 
         let mut replacements = Vec::new();
-        let replacement_capacity = effective
-            .len()
-            .checked_mul(2)
-            .ok_or_else(|| Error::UnsafeEdit("comment replacement count overflow".into()))?;
+        let replacement_capacity = effective.len().checked_mul(2).ok_or_else(|| {
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit comments",
+                "comment replacement count overflow",
+            )
+        })?;
         replacements
             .try_reserve_exact(replacement_capacity)
             .map_err(|_error| Error::Allocation("retaining source-backed XLS comment ranges"))?;
         for change in &effective {
-            let sheet =
-                self.source.inner.sheets.get(change.sheet).ok_or_else(|| {
-                    Error::UnsafeEdit("source-backed comment sheet is stale".into())
+            let sheet = self
+                .source
+                .inner
+                .sheets
+                .get(change.sheet)
+                .ok_or(Error::PatchConflict {
+                    operation: "edit comments",
+                    reason: "source-backed comment sheet is stale",
                 })?;
             let entry = sheet
                 .entries
                 .get(change.entry)
-                .ok_or_else(|| Error::UnsafeEdit("source-backed comment entry is stale".into()))?;
+                .ok_or(Error::PatchConflict {
+                    operation: "edit comments",
+                    reason: "source-backed comment entry is stale",
+                })?;
 
             if change.before.author != change.after.author {
                 let compressed = ensure_author_encoding_width(
@@ -687,7 +728,11 @@ impl Edit {
                 .workbook_stream
                 .get(start..end)
                 .ok_or_else(|| {
-                    Error::UnsafeEdit("source-backed comment range is outside Workbook".into())
+                    Error::refused(
+                        RefusalKind::InvalidValue,
+                        "edit comments",
+                        "source-backed comment range is outside Workbook",
+                    )
                 })?;
             let offset = u64::try_from(start).map_err(|_error| {
                 Error::InvalidData("source-backed comment range offset exceeds u64".into())
@@ -715,8 +760,12 @@ impl Edit {
         let source = Arc::clone(&self.source.inner.bytes);
         let source_version =
             SourceVersion::new(source.as_ptr() as usize as u64, source.len() as u64);
-        let publisher = SourceBackedOverlayPublisher::open_owned(source, source_version)
-            .map_err(overlay_to_error)?;
+        let publisher = SourceBackedOverlayPublisher::open_owned(
+            source,
+            source_version,
+            litchi_cfb::SharedOleFileLimits::default(),
+        )
+        .map_err(overlay_to_error)?;
         let (plan, owner_validated) = publisher
             .plan_splices_with_owner(splices, StreamSpliceLimits::default(), |candidate| {
                 verify_source_backed_candidate(candidate.clone(), &self.source, &effective)
@@ -837,9 +886,10 @@ impl Patch {
     /// Returns an exact-source conflict or candidate validation error.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.bytes() != self.before() {
-            return Err(Error::UnsafeEdit(
-                "XLS comment patch source does not match its base snapshot".into(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit comments",
+                reason: "XLS comment patch source does not match its base snapshot",
+            });
         }
         if self.is_noop() {
             return Ok(source.clone());
@@ -887,6 +937,19 @@ pub struct Diagnostics {
 }
 
 impl Diagnostics {
+    /// Whether the commit changed the package.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.touched_streams > 0
+    }
+
+    fn applied(patch: &Patch) -> Self {
+        Self {
+            touched_streams: usize::from(!patch.is_noop()),
+            ..Self::default()
+        }
+    }
+
     #[must_use]
     pub const fn changed_comments(self) -> usize {
         self.changed_comments
@@ -898,36 +961,80 @@ impl Diagnostics {
     }
 }
 
-/// Successful immutable XLS comment publication.
-#[derive(Clone, Debug)]
-pub struct Commit {
+/// A published comment edit: the new package, its exact reversible artifact
+/// patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<crate::Package, Patch, Diagnostics>;
+
+/// The comment family has no caller-selected limit dimension: the republished
+/// package is admitted under the source package's limits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {}
+
+/// The record-level result of a comment edit, before publication.
+#[derive(Clone)]
+pub(crate) struct RecordCommit {
+    #[cfg_attr(not(test), allow(dead_code, reason = "the record-level tests read it"))]
     snapshot: Snapshot,
     patch: Patch,
     diagnostics: Diagnostics,
 }
 
-impl Commit {
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+#[cfg(test)]
+#[allow(dead_code, reason = "not every record-level test reads every part")]
+impl RecordCommit {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
+    pub(crate) const fn diagnostics(&self) -> Diagnostics {
         self.diagnostics
-    }
-
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch, Diagnostics) {
-        (self.snapshot, self.patch, self.diagnostics)
     }
 }
 
+impl crate::Package {
+    /// The comment read view of this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package is not a supported BIFF8 workbook.
+    pub fn comments(&self) -> Result<Snapshot> {
+        let (_, bytes) = crate::scoped::capture(self)?;
+        Snapshot::from_bytes(bytes)
+    }
+
+    /// Start a comment edit of this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an encrypted, protected or unsupported workbook.
+    pub fn edit_comments(&self) -> Result<Edit> {
+        let (base, bytes) = crate::scoped::capture(self)?;
+        Ok(Snapshot::from_bytes(bytes)?.edit_based(base))
+    }
+
+    /// Replay a comment patch onto the exact package it was made from.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// source, or [`Error::Signed`] for a changed signed workbook.
+    pub fn apply_comments(&self, patch: &Patch) -> Result<Commit> {
+        let before = crate::scoped::replay_source(self, patch.before(), "edit comments")?;
+        let source = Snapshot::from_bytes(before)?;
+        let target = patch.apply(&source)?;
+        let package = crate::scoped::publish(Some(self.clone()), patch.before(), target.bytes())?;
+        Ok(Commit::new(
+            package,
+            patch.clone(),
+            Diagnostics::applied(patch),
+        ))
+    }
+}
 /// Content-free evidence for a same-length source-backed comment publication.
 ///
 /// The diagnostics intentionally retain only counts, lengths, and opaque CFB
@@ -1146,7 +1253,11 @@ fn overlay_to_error(error: OverlayError) -> Error {
     match error {
         OverlayError::Ole(error) => Error::Cfb(error),
         OverlayError::Io(error) => Error::Io(error),
-        other => Error::UnsafeEdit(format!("source-backed comment overlay refused: {other}")),
+        _ => Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit comments",
+            "source-backed comment overlay refused",
+        ),
     }
 }
 
@@ -1172,11 +1283,17 @@ impl From<OverlayError> for CommentOwnerError {
 
 fn ensure_equal_range_length(start: usize, end: usize, replacement: &[u8]) -> Result<()> {
     let source_length = end.checked_sub(start).ok_or_else(|| {
-        Error::UnsafeEdit("source-backed comment range has reversed bounds".into())
+        Error::refused(
+            RefusalKind::InvalidValue,
+            "edit comments",
+            "source-backed comment range has reversed bounds",
+        )
     })?;
     if source_length != replacement.len() {
-        return Err(Error::UnsafeEdit(
-            "source-backed comment replacement changes a NOTE/TXO range length".into(),
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit comments",
+            "source-backed comment replacement changes a NOTE/TXO range length",
         ));
     }
     Ok(())
@@ -1193,8 +1310,10 @@ fn ensure_author_encoding_width(stream: &[u8], entry: &Entry, author: &str) -> R
         == 0;
     let target_compressed = author.encode_utf16().all(|unit| unit <= 0x00FF);
     if source_compressed && !target_compressed {
-        return Err(Error::UnsafeEdit(
-            "source-backed comment author changes encoding width".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit comments",
+            "source-backed comment author changes encoding width",
         ));
     }
     Ok(source_compressed)
@@ -1204,13 +1323,17 @@ fn ensure_text_encoding_width(stream: &[u8], entry: &Entry, text: &str) -> Resul
     let source_compressed = source_text_compression(stream, entry)?;
     let target_compressed = text.encode_utf16().all(|unit| unit <= 0x00FF);
     if source_compressed.is_some_and(|value| value && !target_compressed) {
-        return Err(Error::UnsafeEdit(
-            "source-backed comment text changes encoding width".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit comments",
+            "source-backed comment text changes encoding width",
         ));
     }
     source_compressed.ok_or_else(|| {
-        Error::UnsafeEdit(
-            "source-backed comment text has no source encoding width for replacement".into(),
+        Error::refused(
+            RefusalKind::UnsupportedTarget,
+            "edit comments",
+            "source-backed comment text has no source encoding width for replacement",
         )
     })
 }
@@ -1253,8 +1376,10 @@ fn source_text_compression(stream: &[u8], entry: &Entry) -> Result<Option<bool>>
         }
         let compressed = flags & 1 == 0;
         if source_compressed.is_some_and(|value| value != compressed) {
-            return Err(Error::UnsafeEdit(
-                "source-backed comment TXO uses mixed encoding widths".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit comments",
+                "source-backed comment TXO uses mixed encoding widths",
             ));
         }
         source_compressed = Some(compressed);
@@ -1306,22 +1431,26 @@ fn verify_source_backed_candidate(
         .filter(|sheet| sheet.parsed_worksheet_index().is_some())
         .count();
     if worksheet_count != source.inner.sheets.len() {
-        return Err(Error::UnsafeEdit(
-            "source-backed comment publication changed the worksheet inventory".into(),
+        return Err(Error::Internal(
+            "source-backed comment publication changed the worksheet inventory",
         ));
     }
     for change in changes {
-        let sheet = source.inner.sheets.get(change.sheet).ok_or_else(|| {
-            Error::UnsafeEdit("source-backed comment sheet disappeared during readback".into())
-        })?;
-        let metadata = workbook.sheet(sheet.workbook_position).ok_or_else(|| {
-            Error::UnsafeEdit("source-backed comment worksheet disappeared during readback".into())
-        })?;
-        let worksheet_index = metadata.parsed_worksheet_index().ok_or_else(|| {
-            Error::UnsafeEdit(
-                "source-backed comment worksheet is not parsed during readback".into(),
-            )
-        })?;
+        let sheet = source
+            .inner
+            .sheets
+            .get(change.sheet)
+            .ok_or(Error::Internal(
+                "source-backed comment sheet disappeared during readback",
+            ))?;
+        let metadata = workbook
+            .sheet(sheet.workbook_position)
+            .ok_or(Error::Internal(
+                "source-backed comment worksheet disappeared during readback",
+            ))?;
+        let worksheet_index = metadata.parsed_worksheet_index().ok_or(Error::Internal(
+            "source-backed comment worksheet is not parsed during readback",
+        ))?;
         let comments = workbook.worksheet_comments(worksheet_index)?;
         let comment = comments.iter().find(|comment| {
             comment.row()
@@ -1333,12 +1462,12 @@ fn verify_source_backed_candidate(
                         .comment
                         .column()
         });
-        let comment = comment.ok_or_else(|| {
-            Error::UnsafeEdit("source-backed comment NOTE disappeared during readback".into())
-        })?;
+        let comment = comment.ok_or(Error::Internal(
+            "source-backed comment NOTE disappeared during readback",
+        ))?;
         if Value::from_comment(comment) != change.after {
-            return Err(Error::UnsafeEdit(
-                "source-backed comment semantic readback disagreed with the staged value".into(),
+            return Err(Error::Internal(
+                "source-backed comment semantic readback disagreed with the staged value",
             ));
         }
     }
@@ -1371,11 +1500,11 @@ fn unique_entry(entries: &[Entry], reference: Reference) -> Result<Option<&Entry
     });
     let found = matches.next();
     if matches.next().is_some() {
-        return Err(Error::UnsafeEdit(format!(
-            "duplicate NOTE cell ({}, {})",
-            reference.row(),
-            reference.column()
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedContent,
+            "edit comments",
+            "duplicate NOTE cell",
+        ));
     }
     Ok(found)
 }
@@ -1386,11 +1515,11 @@ fn unique_entry_index(entries: &[Entry], reference: Reference) -> Result<Option<
     });
     let found = matches.next().map(|(index, _)| index);
     if matches.next().is_some() {
-        return Err(Error::UnsafeEdit(format!(
-            "duplicate NOTE cell ({}, {})",
-            reference.row(),
-            reference.column()
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedContent,
+            "edit comments",
+            "duplicate NOTE cell",
+        ));
     }
     Ok(found)
 }
@@ -1430,26 +1559,36 @@ fn parse_inventory<R: Read + Seek>(
         return Err(Error::Eof("Workbook globals EOF"));
     }
     if bounds.len() != workbook.sheets().len() {
-        return Err(Error::UnsafeEdit(
-            "BoundSheet inventory disagrees with the complete workbook reader".into(),
+        return Err(Error::Internal(
+            "BoundSheet inventory disagrees with the complete workbook reader",
         ));
     }
     let mut positions = HashSet::new();
     let mut sheets = Vec::new();
     for (position, bound) in bounds.iter().enumerate() {
         if !positions.insert(bound.position) {
-            return Err(Error::UnsafeEdit(
-                "multiple BoundSheet records share one substream position".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit comments",
+                "multiple BoundSheet records share one substream position",
             ));
         }
         if bound.sheet_type != SheetType::WorkSheet {
             continue;
         }
         let metadata = workbook.sheet(position).ok_or_else(|| {
-            Error::UnsafeEdit("workbook sheet metadata inventory is incomplete".into())
+            Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit comments",
+                "workbook sheet metadata inventory is incomplete",
+            )
         })?;
         let parsed_index = metadata.parsed_worksheet_index().ok_or_else(|| {
-            Error::UnsafeEdit("a worksheet substream was not completely parsed".into())
+            Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit comments",
+                "a worksheet substream was not completely parsed",
+            )
         })?;
         let comments = workbook.worksheet_comments(parsed_index)?;
         let protection = workbook.worksheet_protection(parsed_index)?;
@@ -1579,9 +1718,11 @@ fn parse_sheet_sites(
                     continue;
                 };
                 if sites.contains_key(&object_id) {
-                    return Err(Error::UnsafeEdit(format!(
-                        "duplicate comment object id {object_id}"
-                    )));
+                    return Err(Error::refused(
+                        RefusalKind::InvalidValue,
+                        "edit comments",
+                        "duplicate comment object id",
+                    ));
                 }
                 sites.insert(
                     object_id,
@@ -1599,31 +1740,39 @@ fn parse_sheet_sites(
                 let boundary = record.payload() == [0, 0, 0x0D, 0xF0, 0, 0, 0, 0];
                 let Some(object_id) = pending_object else {
                     if boundary {
-                        return Err(Error::UnsafeEdit(
-                            "orphan or duplicate comment ClientTextbox drawing boundary".into(),
+                        return Err(Error::refused(
+                            RefusalKind::UnsupportedContent,
+                            "edit comments",
+                            "orphan or duplicate comment ClientTextbox drawing boundary",
                         ));
                     }
                     continue;
                 };
                 if !boundary {
-                    return Err(Error::UnsafeEdit(
-                        "comment object has an ambiguous ClientTextbox drawing boundary".into(),
+                    return Err(Error::refused(
+                        RefusalKind::UnsupportedOperation,
+                        "edit comments",
+                        "comment object has an ambiguous ClientTextbox drawing boundary",
                     ));
                 }
                 let site = sites
                     .get_mut(&object_id)
                     .ok_or_else(|| Error::InvalidData("comment site disappeared".into()))?;
                 if site.drawing.is_some() {
-                    return Err(Error::UnsafeEdit(
-                        "comment object has duplicate ClientTextbox drawing boundaries".into(),
+                    return Err(Error::refused(
+                        RefusalKind::UnsupportedContent,
+                        "edit comments",
+                        "comment object has duplicate ClientTextbox drawing boundaries",
                     ));
                 }
                 site.drawing = Some(raw.clone());
             },
             TXO_TYPE => {
                 let Some(object_id) = pending_object.take() else {
-                    return Err(Error::UnsafeEdit(
-                        "orphan or duplicate comment TXO record".into(),
+                    return Err(Error::refused(
+                        RefusalKind::UnsupportedContent,
+                        "edit comments",
+                        "orphan or duplicate comment TXO record",
                     ));
                 };
                 let payload = record.payload();
@@ -1636,13 +1785,17 @@ fn parse_sheet_sites(
                     .get_mut(&object_id)
                     .ok_or_else(|| Error::InvalidData("comment site disappeared".into()))?;
                 if site.drawing.is_none() {
-                    return Err(Error::UnsafeEdit(
-                        "comment TXO has no ClientTextbox drawing boundary".into(),
+                    return Err(Error::refused(
+                        RefusalKind::UnsupportedTarget,
+                        "edit comments",
+                        "comment TXO has no ClientTextbox drawing boundary",
                     ));
                 }
                 if !site.txo_family.is_empty() {
-                    return Err(Error::UnsafeEdit(
-                        "comment object has duplicate TXO records".into(),
+                    return Err(Error::refused(
+                        RefusalKind::UnsupportedContent,
+                        "edit comments",
+                        "comment object has duplicate TXO records",
                     ));
                 }
                 site.txo_family.push(raw.clone());
@@ -1660,14 +1813,18 @@ fn parse_sheet_sites(
                 }
                 let object_id = binary::read_u16_le_at(record.payload(), 6)?;
                 let site = sites.get_mut(&object_id).ok_or_else(|| {
-                    Error::UnsafeEdit(format!(
-                        "NOTE {object_id} has no uniquely located OfficeArt object"
-                    ))
+                    Error::refused(
+                        RefusalKind::UnsupportedTarget,
+                        "edit comments",
+                        "NOTE has no uniquely located OfficeArt object",
+                    )
                 })?;
                 if site.note.replace(raw.clone()).is_some() {
-                    return Err(Error::UnsafeEdit(format!(
-                        "comment object {object_id} has duplicate NOTE records"
-                    )));
+                    return Err(Error::refused(
+                        RefusalKind::UnsupportedContent,
+                        "edit comments",
+                        "comment object has duplicate NOTE records",
+                    ));
                 }
             },
             EOF => {
@@ -1684,8 +1841,8 @@ fn parse_sheet_sites(
     }
     let linked = collector.finish()?;
     if linked != comments {
-        return Err(Error::UnsafeEdit(
-            "source comment linkage disagrees with the complete workbook reader".into(),
+        return Err(Error::Internal(
+            "source comment linkage disagrees with the complete workbook reader",
         ));
     }
     let mut entries = Vec::new();
@@ -1695,14 +1852,26 @@ fn parse_sheet_sites(
     for comment in comments {
         let object_id = comment.identity().object_id();
         let site = sites.remove(&object_id).ok_or_else(|| {
-            Error::UnsafeEdit(format!("comment object {object_id} has no source site"))
+            Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit comments",
+                "comment object has no source site",
+            )
         })?;
         let drawing = site.drawing.ok_or_else(|| {
-            Error::UnsafeEdit(format!("comment object {object_id} has no ClientTextbox"))
+            Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit comments",
+                "comment object has no ClientTextbox",
+            )
         })?;
-        let note = site
-            .note
-            .ok_or_else(|| Error::UnsafeEdit(format!("comment object {object_id} has no NOTE")))?;
+        let note = site.note.ok_or_else(|| {
+            Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit comments",
+                "comment object has no NOTE",
+            )
+        })?;
         if site.object.start < last_dbcell_end
             || drawing.start < last_dbcell_end
             || note.start < last_dbcell_end
@@ -1711,9 +1880,10 @@ fn parse_sheet_sites(
                 .iter()
                 .any(|record| record.start < last_dbcell_end)
         {
-            return Err(Error::UnsafeEdit(
-                "comment records precede the worksheet's final DBCELL and would require INDEX regeneration"
-                    .into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit comments",
+                "comment records precede the worksheet's final DBCELL and would require INDEX regeneration",
             ));
         }
         let retained = Site {
@@ -1727,8 +1897,10 @@ fn parse_sheet_sites(
         });
     }
     if !sites.is_empty() {
-        return Err(Error::UnsafeEdit(
-            "worksheet contains unlinked comment drawing sites".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit comments",
+            "worksheet contains unlinked comment drawing sites",
         ));
     }
     Ok(entries)
@@ -1881,8 +2053,10 @@ fn retain_runs(source: &[u8], character_count: usize) -> Result<Vec<u8>> {
         return Ok(Vec::new());
     }
     if source.len() < 16 || !source.len().is_multiple_of(8) {
-        return Err(Error::UnsafeEdit(
-            "comment source has an unsupported formatting-run layout".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit comments",
+            "comment source has an unsupported formatting-run layout",
         ));
     }
     let terminal = source.len() - 8;
@@ -1894,8 +2068,10 @@ fn retain_runs(source: &[u8], character_count: usize) -> Result<Vec<u8>> {
         }
     }
     if output.is_empty() || output[0..2] != [0, 0] {
-        return Err(Error::UnsafeEdit(
-            "comment formatting runs do not begin at character zero".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit comments",
+            "comment formatting runs do not begin at character zero",
         ));
     }
     let mut last = source[terminal..].to_vec();
@@ -1906,8 +2082,10 @@ fn retain_runs(source: &[u8], character_count: usize) -> Result<Vec<u8>> {
     );
     output.extend_from_slice(&last);
     if output.len() > usize::from(u16::MAX) {
-        return Err(Error::UnsafeEdit(
-            "comment formatting runs exceed the BIFF8 cbRuns bound".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit comments",
+            "comment formatting runs exceed the BIFF8 cbRuns bound",
         ));
     }
     Ok(output)
@@ -1935,8 +2113,10 @@ fn ensure_disjoint(replacements: &[(usize, usize, Vec<u8>)]) -> Result<()> {
         let later = &pair[0];
         let earlier = &pair[1];
         if earlier.1 > later.0 {
-            return Err(Error::UnsafeEdit(
-                "comment replacement ranges overlap".into(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit comments",
+                "comment replacement ranges overlap",
             ));
         }
     }
@@ -1945,8 +2125,8 @@ fn ensure_disjoint(replacements: &[(usize, usize, Vec<u8>)]) -> Result<()> {
 
 fn verify_readback(target: &Snapshot, source: &Snapshot, changes: &[&Change]) -> Result<()> {
     if target.inner.sheets.len() != source.inner.sheets.len() {
-        return Err(Error::UnsafeEdit(
-            "comment publication changed the worksheet inventory".into(),
+        return Err(Error::Internal(
+            "comment publication changed the worksheet inventory",
         ));
     }
     let expected: BTreeMap<_, _> = changes
@@ -1969,12 +2149,7 @@ fn verify_readback(target: &Snapshot, source: &Snapshot, changes: &[&Change]) ->
             );
             if let Some(value) = expected.get(&key) {
                 if &Value::from_comment(&entry.comment) != *value {
-                    return Err(Error::UnsafeEdit(format!(
-                        "comment publication readback failed at sheet {} cell ({}, {})",
-                        sheet.workbook_position,
-                        entry.comment.row(),
-                        entry.comment.column()
-                    )));
+                    return Err(Error::Internal("comment publication readback failed"));
                 }
             }
         }
@@ -1987,8 +2162,8 @@ fn verify_readback(target: &Snapshot, source: &Snapshot, changes: &[&Change]) ->
                     .iter()
                     .any(|entry| entry.comment.row() == key.1 && entry.comment.column() == key.2)
         }) {
-            return Err(Error::UnsafeEdit(
-                "comment publication removed a targeted NOTE".into(),
+            return Err(Error::Internal(
+                "comment publication removed a targeted NOTE",
             ));
         }
     }

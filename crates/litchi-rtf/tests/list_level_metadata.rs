@@ -11,7 +11,8 @@
 //! `\levellegal`, `\levelnorestart`, `\levelold`, `\levelprev`,
 //! `\levelprevspace`, and `\leveltemplateid`.
 
-use litchi_rtf::{RtfDocument, RtfWriter};
+use litchi_rtf::RtfWriter;
+use litchi_rtf::raw::Tree;
 
 const SOURCE: &str = concat!(
     r"{\rtf1\ansi{\*\listtable{\list\listtemplateid42{\listlevel\levelnfc0\leveljc0\levelfollow0",
@@ -20,7 +21,7 @@ const SOURCE: &str = concat!(
     r"\pard Body\par}"
 );
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -30,7 +31,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn list_level_metadata_reaches_the_model() {
-    let document = RtfDocument::parse(SOURCE).unwrap();
+    let document = Tree::parse(SOURCE).unwrap();
     let level = &document.list_table().lists()[0].levels[0];
     assert!(level.tentative);
     assert!(level.legal_format);
@@ -43,7 +44,7 @@ fn list_level_metadata_reaches_the_model() {
 
 #[test]
 fn list_level_metadata_round_trips_through_the_writer() {
-    let document = RtfDocument::parse(SOURCE).unwrap();
+    let document = Tree::parse(SOURCE).unwrap();
     let output = write(&document);
     let serialized = String::from_utf8(output).unwrap();
     for marker in [
@@ -61,7 +62,7 @@ fn list_level_metadata_round_trips_through_the_writer() {
         );
     }
 
-    let reparsed = RtfDocument::parse(&serialized).unwrap();
+    let reparsed = Tree::parse(&serialized).unwrap();
     let level = &reparsed.list_table().lists()[0].levels[0];
     assert!(level.tentative);
     assert!(level.legal_format);
@@ -75,7 +76,7 @@ fn list_level_metadata_round_trips_through_the_writer() {
 #[test]
 fn list_levels_default_to_no_metadata() {
     let source = r"{\rtf1\ansi{\*\listtable{\list\listtemplateid1{\listlevel\levelnfc0{\leveltext\'02\'00.;}{\levelnumbers\'01;}}{\listname L;}\listid3}}\pard X\par}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     let level = &document.list_table().lists()[0].levels[0];
     assert!(!level.tentative);
     assert!(!level.legal_format);

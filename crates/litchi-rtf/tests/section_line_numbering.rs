@@ -7,12 +7,13 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    MAX_SECTION_LINE_INCREMENT, MAX_SECTION_LINE_START, RtfDocument, RtfWriter, Section,
+    MAX_SECTION_LINE_INCREMENT, MAX_SECTION_LINE_START, RtfWriter, Section,
     SectionLineNumberRestart, SectionLineNumbering,
 };
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -23,7 +24,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_grouped_line_numbering_and_round_trips_in_canonical_order() {
     let source = r"{\rtf1\sectd\linemod5{\linex283}\linestarts2\linecont Body}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     let numbering = document.sections()[0].properties.line_numbering;
     assert_eq!(
         numbering,
@@ -37,7 +38,7 @@ fn parses_grouped_line_numbering_and_round_trips_in_canonical_order() {
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains(r"\linemod5\linex283\linestarts2\linecont"));
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.sections()[0].properties.line_numbering, numbering);
 }
 
@@ -47,7 +48,7 @@ fn parses_bundled_libreoffice_line_numbering_fixtures() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/linenumbering.rtf"
     ));
-    let continuous = RtfDocument::parse_bytes(continuous).unwrap();
+    let continuous = Tree::parse_bytes(continuous).unwrap();
     assert!(continuous.sections().iter().any(|section| {
         section.properties.line_numbering
             == SectionLineNumbering {
@@ -62,7 +63,7 @@ fn parses_bundled_libreoffice_line_numbering_fixtures() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf66543.rtf"
     ));
-    let start = RtfDocument::parse_bytes(start).unwrap();
+    let start = Tree::parse_bytes(start).unwrap();
     assert!(start.sections().iter().any(|section| {
         section.properties.line_numbering.increment == Some(3)
             && section.properties.line_numbering.distance == Some(0)
@@ -72,7 +73,7 @@ fn parses_bundled_libreoffice_line_numbering_fixtures() {
 
 #[test]
 fn preserves_disabled_offset_defaults_restart_modes_and_sectd_reset() {
-    let offset_only = RtfDocument::parse(r"{\rtf1\linex0 Body}").unwrap();
+    let offset_only = Tree::parse(r"{\rtf1\linex0 Body}").unwrap();
     assert_eq!(
         offset_only.sections()[0].properties.line_numbering,
         SectionLineNumbering {
@@ -87,8 +88,7 @@ fn preserves_disabled_offset_defaults_restart_modes_and_sectd_reset() {
             .is_enabled()
     );
 
-    let defaults =
-        RtfDocument::parse(r"{\rtf1\linemod\linex\linestarts\linerestart X\sectd Y}").unwrap();
+    let defaults = Tree::parse(r"{\rtf1\linemod\linex\linestarts\linerestart X\sectd Y}").unwrap();
     assert_eq!(
         defaults.sections()[0].properties.line_numbering,
         SectionLineNumbering::default()
@@ -101,7 +101,7 @@ fn preserves_disabled_offset_defaults_restart_modes_and_sectd_reset() {
     ] {
         let source = format!(r"{{\rtf1\linemod1\{control} X}}");
         assert_eq!(
-            RtfDocument::parse(&source).unwrap().sections()[0]
+            Tree::parse(&source).unwrap().sections()[0]
                 .properties
                 .line_numbering
                 .restart,
@@ -120,7 +120,7 @@ fn inert_destinations_do_not_change_section_line_numbering() {
         r"{\rtf1 A{\footnote\linemod6\linex600 Note}Body}",
         r"{\rtf1{\object\linemod5\linex500}Body}",
     ] {
-        let document = RtfDocument::parse(source).unwrap();
+        let document = Tree::parse(source).unwrap();
         assert!(
             document
                 .sections()
@@ -144,7 +144,7 @@ fn rejects_out_of_range_values_and_invalid_public_writer_state() {
         r"{\rtf1\linestarts0 X}".to_string(),
         format!(r"{{\rtf1\linestarts{} X}}", MAX_SECTION_LINE_START + 1),
     ] {
-        assert!(RtfDocument::parse(&source).is_err(), "accepted {source}");
+        assert!(Tree::parse(&source).is_err(), "accepted {source}");
     }
 
     let mut section = Section::new();

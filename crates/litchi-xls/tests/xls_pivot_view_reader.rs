@@ -7,7 +7,7 @@ use litchi_xls::writer::{
 };
 use litchi_xls::{
     PivotAxis, PivotAxisField, PivotCacheGrouping, PivotCacheItem, PivotCacheNumericGrouping,
-    PivotViewEditor, raw::Reader,
+    raw::Reader,
 };
 
 fn generated_workbook() -> Vec<u8> {
@@ -169,14 +169,22 @@ fn libreoffice_pivot_views_parse_with_cache_links() {
 fn pivot_view_editor_is_byte_exact_for_noop_and_reopens_mutations() {
     let original = generated_workbook();
     assert_eq!(
-        PivotViewEditor::new(original.clone())
+        litchi_xls::Package::from_bytes(&original)
             .unwrap()
-            .finish()
-            .unwrap(),
+            .edit_pivot_views()
+            .unwrap()
+            .commit()
+            .unwrap()
+            .patch()
+            .after()
+            .to_vec(),
         original
     );
 
-    let mut editor = PivotViewEditor::new(original).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&original)
+        .unwrap()
+        .edit_pivot_views()
+        .unwrap();
     editor
         .update_by_name(0, "SalesPivot", |table| {
             table.view.name = "RenamedPivot".to_string();
@@ -186,7 +194,7 @@ fn pivot_view_editor_is_byte_exact_for_noop_and_reopens_mutations() {
             table.view.first_data_row += 2;
         })
         .unwrap();
-    let rewritten = editor.finish().unwrap();
+    let rewritten = editor.commit().unwrap().patch().after().to_vec();
     let workbook = Reader::new(Cursor::new(rewritten)).unwrap();
     let table = workbook
         .xls_worksheet(0)
@@ -204,14 +212,23 @@ fn pivot_view_editor_is_byte_exact_for_noop_and_reopens_mutations() {
 #[test]
 fn pivot_view_editor_rolls_back_invalid_cache_and_supports_remove_add() {
     let original = generated_workbook();
-    let mut editor = PivotViewEditor::new(original.clone()).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&original)
+        .unwrap()
+        .edit_pivot_views()
+        .unwrap();
     assert!(editor.reassign_cache_by_name(0, "SalesPivot", 99).is_err());
-    assert_eq!(editor.finish().unwrap(), original);
+    assert_eq!(editor.commit().unwrap().patch().after().to_vec(), original);
 
-    let mut editor = PivotViewEditor::new(original).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&original)
+        .unwrap()
+        .edit_pivot_views()
+        .unwrap();
     let table = editor.remove_by_name(0, "SalesPivot").unwrap();
     editor.add(0, table).unwrap();
-    let reopened = Reader::new(Cursor::new(editor.finish().unwrap())).unwrap();
+    let reopened = Reader::new(Cursor::new(
+        editor.commit().unwrap().patch().after().to_vec(),
+    ))
+    .unwrap();
     assert!(
         reopened
             .xls_worksheet(0)
@@ -223,7 +240,10 @@ fn pivot_view_editor_rolls_back_invalid_cache_and_supports_remove_add() {
 
 #[test]
 fn pivot_view_editor_regenerates_grouping_cache_and_preserves_fixture_noops() {
-    let mut editor = PivotViewEditor::new(generated_workbook()).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&generated_workbook())
+        .unwrap()
+        .edit_pivot_views()
+        .unwrap();
     editor
         .update_cache_grouping(
             0,
@@ -238,7 +258,10 @@ fn pivot_view_editor_regenerates_grouping_cache_and_preserves_fixture_noops() {
             })),
         )
         .unwrap();
-    let workbook = Reader::new(Cursor::new(editor.finish().unwrap())).unwrap();
+    let workbook = Reader::new(Cursor::new(
+        editor.commit().unwrap().patch().after().to_vec(),
+    ))
+    .unwrap();
     assert!(matches!(
         workbook.pivot_caches()[0].fields()[1].grouping(),
         Some(PivotCacheGrouping::Numeric(_))
@@ -249,10 +272,15 @@ fn pivot_view_editor_regenerates_grouping_cache_and_preserves_fixture_noops() {
     );
     let bytes = std::fs::read(fixture).unwrap();
     assert_eq!(
-        PivotViewEditor::new(bytes.clone())
+        litchi_xls::Package::from_bytes(&bytes)
             .unwrap()
-            .finish()
-            .unwrap(),
+            .edit_pivot_views()
+            .unwrap()
+            .commit()
+            .unwrap()
+            .patch()
+            .after()
+            .to_vec(),
         bytes
     );
 }

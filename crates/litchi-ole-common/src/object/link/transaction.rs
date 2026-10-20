@@ -33,12 +33,12 @@ impl Revision {
 
 /// An isolated typed edit over one source link snapshot.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     candidate: Link,
 }
 
-impl Transaction {
+impl Edit {
     pub(crate) fn new(source: Snapshot) -> Self {
         Self {
             candidate: source.link.clone(),
@@ -60,7 +60,7 @@ impl Transaction {
 
     /// Whether any typed field differs from the source snapshot.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn has_changes(&self) -> bool {
         self.candidate != self.source.link
     }
 
@@ -125,21 +125,6 @@ impl Transaction {
         Ok(self)
     }
 
-    /// Projects and validates the current candidate without publishing it.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the candidate has an invalid OLEDS layout.
-    pub fn snapshot(&self) -> Result<Snapshot, OleError> {
-        self.materialize()
-    }
-
-    /// Restores the source candidate and returns the immutable source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     /// Validates and publishes the candidate without mutating its source.
     ///
     /// # Errors
@@ -148,12 +133,13 @@ impl Transaction {
     pub fn commit(self) -> Result<Commit, OleError> {
         let snapshot = self.materialize()?;
         let patch = self.source.patch_to(&snapshot);
-        Ok(Commit { snapshot, patch })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn materialize(&self) -> Result<Snapshot, OleError> {
         validation::validate(&self.candidate)?;
-        if !self.is_changed() {
+        if !self.has_changes() {
             return Ok(self.source.clone());
         }
         let bytes = self.candidate.to_bytes().into();
@@ -161,51 +147,12 @@ impl Transaction {
     }
 }
 
-/// A successful link publication containing a new snapshot and reversible
-/// source-checked patch.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    /// Whether the publication changed any source bytes.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Borrows the published immutable snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrows the reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Moves the published snapshot out of this commit.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Moves the reversible patch out of this commit.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    /// Splits this publication into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// Runs one typed link edit and publishes it atomically.
 ///
@@ -215,7 +162,7 @@ impl Commit {
 /// layout.
 pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, OleError>
 where
-    F: FnOnce(&mut Transaction) -> Result<(), OleError>,
+    F: FnOnce(&mut Edit) -> Result<(), OleError>,
 {
     let mut transaction = snapshot.edit();
     edit(&mut transaction)?;

@@ -1,0 +1,50 @@
+start 18:31:36 load 6.36
+        doc/open_get        853.4 µs
+             doc/get          0.2 µs
+             doc/set       1716.7 µs
+        doc/batch256     666999.2 µs
+        xls/open_get        158.2 µs
+             xls/set         97.7 µs
+         xls/batch1k       4399.9 µs
+        rtf/open_get        206.0 µs
+             rtf/set        328.5 µs
+             rtf/add        554.4 µs
+         rtf/batch1k       5488.4 µs
+leg 1 before 18:31:59 load 6.11
+        doc/open_get        774.4 µs
+             doc/get          0.2 µs
+             doc/set       1749.2 µs
+        doc/batch256     663365.5 µs
+        xls/open_get        151.3 µs
+             xls/set        100.7 µs
+         xls/batch1k       4451.0 µs
+        rtf/open_get        213.5 µs
+             rtf/set        332.0 µs
+             rtf/add        546.0 µs
+         rtf/batch1k       5498.5 µs
+leg 2 after 18:32:22 load 6.90
+        doc/open_get        784.0 µs
+             doc/get          0.2 µs
+             doc/set       1649.4 µs
+        doc/batch256     636543.9 µs
+        xls/open_get        151.1 µs
+             xls/set        100.4 µs
+         xls/batch1k       4438.9 µs
+        rtf/open_get        208.2 µs
+             rtf/set        331.0 µs
+             rtf/add        568.3 µs
+         rtf/batch1k       5527.2 µs
+leg 3 after 18:32:45 load 6.31
+        doc/open_get        848.1 µs
+             doc/get          0.2 µs
+             doc/set       1739.2 µs
+        doc/batch256     672043.1 µs
+        xls/open_get        149.4 µs
+             xls/set         98.7 µs
+         xls/batch1k       4488.5 µs
+        rtf/open_get        210.8 µs
+             rtf/set        329.0 µs
+             rtf/add        565.4 µs
+         rtf/batch1k       6140.9 µs
+leg 4 before 18:33:08 load 6.78
+done

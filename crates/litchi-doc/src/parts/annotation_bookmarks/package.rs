@@ -1,19 +1,24 @@
 //! DOC/OLE package ownership for `SttbfAtnBkmk`.
 
+#![allow(
+    dead_code,
+    reason = "the byte-level editor keeps its record-level API for its unit tests; the package family drives a subset"
+)]
+
 use super::codec;
 use super::model::{Tag, Tags};
 use super::transaction::{
-    Error as TransactionError, Patch, Snapshot as TransactionSnapshot, Transaction,
+    Edit as RecordEdit, Error as TransactionError, Patch, Snapshot as TransactionSnapshot,
 };
 use super::validation;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{EditProtection, PackagePatch, ProtectionPolicy, classify};
-use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Targets};
+use litchi_ole_common::object::{Edit as ObjectEditor, Limits, Targets};
 
 /// Immutable package bytes plus the decoded annotation-tag state.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Snapshot {
+pub(crate) struct Snapshot {
     bytes: Vec<u8>,
     tags: TransactionSnapshot,
 }
@@ -25,31 +30,31 @@ impl Snapshot {
 
     /// The immutable semantic table state.
     #[must_use]
-    pub fn tags(&self) -> &TransactionSnapshot {
+    pub(crate) fn tags(&self) -> &TransactionSnapshot {
         &self.tags
     }
 
     /// The decoded tags, when the FIB range is present.
     #[must_use]
-    pub fn value(&self) -> Option<&Tags> {
+    pub(crate) fn value(&self) -> Option<&Tags> {
         self.tags.tags()
     }
 
     /// Return rendered package bytes.
-    pub fn finish(&self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(&self) -> Result<Vec<u8>> {
         Ok(self.bytes.clone())
     }
 
     /// Start an edit from this package snapshot.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> RecordEdit {
         self.tags.edit()
     }
 }
 
 /// A package commit containing semantic and whole-CFB patches.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     package_patch: PackagePatch,
@@ -58,26 +63,26 @@ pub struct Commit {
 impl Commit {
     /// Immutable post-edit package snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Reversible semantic patch.
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Reversible whole-CFB patch.
     #[must_use]
-    pub fn package_patch(&self) -> &PackagePatch {
+    pub(crate) fn package_patch(&self) -> &PackagePatch {
         &self.package_patch
     }
 }
 
 /// Transactional editor for the `WordDocument` and selected table stream.
 #[derive(Debug, Clone)]
-pub struct Editor {
+pub(crate) struct Editor {
     package: ObjectEditor,
     table_name: String,
     original: TransactionSnapshot,
@@ -89,23 +94,23 @@ pub struct Editor {
 
 impl Editor {
     /// Open a DOC package from complete CFB bytes.
-    pub fn open(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn open(bytes: Vec<u8>) -> Result<Self> {
         Self::open_bounded(bytes, Limits::default(), ProtectionPolicy::default())
     }
 
     /// Open a package with an explicit policy for changed protected content.
-    pub fn open_with_policy(bytes: Vec<u8>, policy: ProtectionPolicy) -> Result<Self> {
+    pub(crate) fn open_with_policy(bytes: Vec<u8>, policy: ProtectionPolicy) -> Result<Self> {
         Self::open_bounded(bytes, Limits::default(), policy)
     }
 
     /// Opens a package under one edit profile: its revision limits bound the
     /// compound-file parse and its protection policy governs changed
     /// protected content.
-    pub fn open_with_options(bytes: Vec<u8>, options: &crate::EditOptions) -> Result<Self> {
+    pub(crate) fn open_with_options(bytes: Vec<u8>, options: &crate::EditOptions) -> Result<Self> {
         Self::open_bounded(
             bytes,
-            options.revision_limits(),
-            options.protection_policy(),
+            options.revision_limits_value(),
+            options.protection_policy_value(),
         )
     }
 
@@ -147,35 +152,35 @@ impl Editor {
 
     /// Current immutable semantic table state.
     #[must_use]
-    pub fn tags(&self) -> &TransactionSnapshot {
+    pub(crate) fn tags(&self) -> &TransactionSnapshot {
         &self.tags
     }
 
     /// Decoded tags, when present.
     #[must_use]
-    pub fn value(&self) -> Option<&Tags> {
+    pub(crate) fn value(&self) -> Option<&Tags> {
         self.tags.tags()
     }
 
     /// Whether this editor has published changed package bytes.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    pub(crate) fn is_changed(&self) -> bool {
         self.changed
     }
 
     /// Start an independent semantic transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> RecordEdit {
         self.tags.edit()
     }
 
     /// Set or replace the complete present table.
-    pub fn set(&mut self, tags: Tags) -> Result<Commit> {
+    pub(crate) fn set(&mut self, tags: Tags) -> Result<Commit> {
         self.install(TransactionSnapshot::new(tags)?)
     }
 
     /// Replace the table, requiring an existing FIB range.
-    pub fn replace(&mut self, tags: Tags) -> Result<Commit> {
+    pub(crate) fn replace(&mut self, tags: Tags) -> Result<Commit> {
         if !self.tags.is_present() {
             return Err(PackageError::InvalidFormat(
                 "cannot replace missing SttbfAtnBkmk metadata".into(),
@@ -185,18 +190,18 @@ impl Editor {
     }
 
     /// Apply and publish a semantic transaction atomically.
-    pub fn apply(&mut self, transaction: Transaction) -> Result<Commit> {
+    pub(crate) fn apply(&mut self, transaction: RecordEdit) -> Result<Commit> {
         let commit = transaction.commit().map_err(transaction_error)?;
         if commit.patch().before() != &self.tags {
             return Err(PackageError::InvalidFormat(
                 "SttbfAtnBkmk transaction snapshot conflict".into(),
             ));
         }
-        self.install(commit.snapshot().clone())
+        self.install(commit.package().clone())
     }
 
     /// Replace one annotation tag and publish atomically.
-    pub fn replace_entry(&mut self, index: usize, tag: Tag) -> Result<Commit> {
+    pub(crate) fn replace_entry(&mut self, index: usize, tag: Tag) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction
             .replace_entry(index, tag)
@@ -205,34 +210,34 @@ impl Editor {
     }
 
     /// Insert one annotation tag and publish atomically.
-    pub fn insert(&mut self, index: usize, tag: Tag) -> Result<Commit> {
+    pub(crate) fn insert(&mut self, index: usize, tag: Tag) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.insert(index, tag).map_err(transaction_error)?;
         self.apply(transaction)
     }
 
     /// Remove one annotation tag and publish atomically.
-    pub fn remove(&mut self, index: usize) -> Result<Commit> {
+    pub(crate) fn remove(&mut self, index: usize) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.remove(index).map_err(transaction_error)?;
         self.apply(transaction)
     }
 
     /// Remove the complete FIB range.
-    pub fn clear(&mut self) -> Result<Commit> {
+    pub(crate) fn clear(&mut self) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.clear();
         self.apply(transaction)
     }
 
     /// Capture the current package as an immutable snapshot.
-    pub fn snapshot(&self) -> Result<Snapshot> {
+    pub(crate) fn snapshot(&self) -> Result<Snapshot> {
         let bytes = self.package.clone().finish().map_err(PackageError::from)?;
         Ok(Snapshot::new(bytes, self.tags.clone()))
     }
 
     /// Finish and return DOC bytes.
-    pub fn finish(self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(self) -> Result<Vec<u8>> {
         if self.changed {
             self.protection_policy.authorize(self.protection)?;
         }
@@ -240,7 +245,7 @@ impl Editor {
     }
 
     /// Commit semantic and byte-level reversible patches.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         if self.changed {
             self.protection_policy.authorize(self.protection)?;
         }
@@ -250,7 +255,7 @@ impl Editor {
         Ok(Commit {
             snapshot: Snapshot::new(bytes, self.tags),
             patch,
-            package_patch: PackagePatch::new(object_commit.into_patch(), self.protection),
+            package_patch: PackagePatch::new(object_commit.into_parts().1, self.protection),
         })
     }
 
@@ -262,7 +267,8 @@ impl Editor {
                 .clone()
                 .commit()
                 .map_err(PackageError::from)?
-                .into_patch();
+                .into_parts()
+                .1;
             let package_patch = PackagePatch::new(package_patch, self.protection);
             return Ok(Commit {
                 snapshot: self.snapshot()?,
@@ -283,7 +289,7 @@ impl Editor {
             .commit()
             .map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
-        let package_patch = PackagePatch::new(object_commit.into_patch(), candidate.protection);
+        let package_patch = PackagePatch::new(object_commit.into_parts().1, candidate.protection);
         let package_snapshot = Snapshot::new(bytes, candidate.tags.clone());
         *self = candidate;
         Ok(Commit {

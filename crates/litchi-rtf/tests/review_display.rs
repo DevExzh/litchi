@@ -9,9 +9,10 @@
 
 mod repair_support;
 
-use litchi_rtf::{DocumentReviewDisplay, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DocumentReviewDisplay, RtfWriter};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -22,8 +23,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_all_passive_review_display_flags_and_round_trips_in_stable_order() {
     let document =
-        RtfDocument::parse(r"{\rtf1\donotshowinsdel\donotshowcomments\donotshowmarkup Body}")
-            .unwrap();
+        Tree::parse(r"{\rtf1\donotshowinsdel\donotshowcomments\donotshowmarkup Body}").unwrap();
     assert_eq!(
         *document.review_display(),
         DocumentReviewDisplay {
@@ -44,21 +44,21 @@ fn parses_all_passive_review_display_flags_and_round_trips_in_stable_order() {
         serialized.find("\\donotshowcomments").unwrap()
             < serialized.find("\\donotshowinsdel").unwrap()
     );
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.review_display(), document.review_display());
     assert_eq!(reparsed.text(), document.text());
 }
 
 #[test]
 fn typed_api_mutates_and_clears_fixed_size_metadata() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Body}").unwrap();
     assert!(document.review_display().is_empty());
     document.set_review_display(DocumentReviewDisplay {
         hide_markup: false,
         hide_comments: true,
         hide_insertions_and_deletions: false,
     });
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.review_display(), document.review_display());
     document.clear_review_display();
     assert!(document.review_display().is_empty());
@@ -79,7 +79,7 @@ fn rejects_parameters_duplicates_starred_nested_and_late_flags() {
         r"{\rtf1 Body\donotshowmarkup}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
             "accepted malformed {source}"
         );
     }
@@ -87,7 +87,7 @@ fn rejects_parameters_duplicates_starred_nested_and_late_flags() {
 
 #[test]
 fn display_preferences_do_not_remove_or_accept_review_content() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\donotshowmarkup\donotshowcomments\donotshowinsdel"#,
         r#"{\*\revtbl{Ada;}}{\revised\revauth0 kept}"#,
         r#"{\*\atnid C}{\*\atnauthor Ada}\chatn{\*\annotation note}}"#,

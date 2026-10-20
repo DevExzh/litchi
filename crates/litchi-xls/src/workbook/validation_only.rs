@@ -119,7 +119,7 @@ impl<R: Read + Seek> Reader<R> {
     /// refusal it does not propagate (the `Err(_)` arm of `parse_workbook`),
     /// so the worksheet is simply not published and its
     /// `parsed_worksheet_index` stays unset. The edit owners then refuse the
-    /// package with their coverage refusal, an [`crate::Error::UnsafeEdit`]:
+    /// package with their coverage refusal, an [`crate::Error::Refused`]:
     /// the `cell_values` and sheet-visibility owners name the tab the complete
     /// reader did not publish, and the comments owner reports a worksheet
     /// substream that was not completely parsed.
@@ -278,8 +278,8 @@ impl<R: Read + Seek> ValidationWorkbook<R> {
             .position(|sheet| sheet.parsed_worksheet_index() == Some(worksheet_index))
             .is_some_and(|tab| self.kept.contains(tab, (row, column)));
         if !kept {
-            return Err(Error::UnsafeEdit(
-                "the validation-only XLS open was not asked to keep the requested cell".into(),
+            return Err(Error::Internal(
+                "the validation-only XLS open was not asked to keep the requested cell",
             ));
         }
         Ok(worksheet.get_cell(u32::from(row), u32::from(column)))

@@ -7,20 +7,25 @@
 //! editor supplies exact no-op bytes, source checks, CLSID preservation, and
 //! candidate reparse validation.
 
+#![allow(
+    dead_code,
+    reason = "the byte-level editor keeps its record-level API for its unit tests; the package family drives a subset"
+)]
+
 use super::model::Collection;
 use super::transaction::{
-    Commit as TransactionCommit, Error as TransactionError, Patch, Snapshot as TransactionSnapshot,
-    Transaction,
+    Commit as TransactionCommit, Edit as RecordEdit, Error as TransactionError, Patch,
+    Snapshot as TransactionSnapshot,
 };
 use super::validation;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{EditProtection, PackagePatch, ProtectionPolicy, classify};
-use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Targets};
+use litchi_ole_common::object::{Edit as ObjectEditor, Limits, Targets};
 
 /// Immutable package bytes plus the contextual subdocument snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Snapshot {
+pub(crate) struct Snapshot {
     bytes: Vec<u8>,
     subdocuments: TransactionSnapshot,
 }
@@ -35,24 +40,24 @@ impl Snapshot {
 
     /// The immutable semantic and detached-wire snapshot.
     #[must_use]
-    pub fn subdocuments(&self) -> &TransactionSnapshot {
+    pub(crate) fn subdocuments(&self) -> &TransactionSnapshot {
         &self.subdocuments
     }
 
     /// The decoded master-document subdocument metadata.
     #[must_use]
-    pub fn value(&self) -> &Collection {
+    pub(crate) fn value(&self) -> &Collection {
         self.subdocuments.collection()
     }
 
     /// Return the rendered package bytes.
-    pub fn finish(&self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(&self) -> Result<Vec<u8>> {
         Ok(self.bytes.clone())
     }
 
     /// Start an independent semantic transaction from this package snapshot.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> RecordEdit {
         self.subdocuments.edit()
     }
 }
@@ -61,7 +66,7 @@ impl Snapshot {
 /// patch. The semantic patch remains detached; [`Self::package_patch`] is the
 /// publication boundary that includes FIB pointer relocation.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     package_patch: PackagePatch,
@@ -70,32 +75,32 @@ pub struct Commit {
 impl Commit {
     /// The immutable post-edit package snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// The reversible semantic and detached table patch.
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// The source-checked whole-CFB patch, including `WordDocument` FIB edits.
     #[must_use]
-    pub fn package_patch(&self) -> &PackagePatch {
+    pub(crate) fn package_patch(&self) -> &PackagePatch {
         &self.package_patch
     }
 
     /// Split the package snapshot and both reversible patches.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch, PackagePatch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch, PackagePatch) {
         (self.snapshot, self.patch, self.package_patch)
     }
 }
 
 /// Transactional owner for the `WordDocument` and selected table stream.
 #[derive(Debug, Clone)]
-pub struct Editor {
+pub(crate) struct Editor {
     package: ObjectEditor,
     table_name: String,
     original: TransactionSnapshot,
@@ -110,23 +115,23 @@ pub struct Editor {
 
 impl Editor {
     /// Open a DOC package from complete CFB bytes.
-    pub fn open(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn open(bytes: Vec<u8>) -> Result<Self> {
         Self::open_bounded(bytes, Limits::default(), ProtectionPolicy::default())
     }
 
     /// Open a package with an explicit policy for changed protected content.
-    pub fn open_with_policy(bytes: Vec<u8>, policy: ProtectionPolicy) -> Result<Self> {
+    pub(crate) fn open_with_policy(bytes: Vec<u8>, policy: ProtectionPolicy) -> Result<Self> {
         Self::open_bounded(bytes, Limits::default(), policy)
     }
 
     /// Opens a package under one edit profile: its revision limits bound the
     /// compound-file parse and its protection policy governs changed
     /// protected content.
-    pub fn open_with_options(bytes: Vec<u8>, options: &crate::EditOptions) -> Result<Self> {
+    pub(crate) fn open_with_options(bytes: Vec<u8>, options: &crate::EditOptions) -> Result<Self> {
         Self::open_bounded(
             bytes,
-            options.revision_limits(),
-            options.protection_policy(),
+            options.revision_limits_value(),
+            options.protection_policy_value(),
         )
     }
 
@@ -172,30 +177,30 @@ impl Editor {
 
     /// The current contextual subdocument snapshot.
     #[must_use]
-    pub fn subdocuments(&self) -> &TransactionSnapshot {
+    pub(crate) fn subdocuments(&self) -> &TransactionSnapshot {
         &self.subdocuments
     }
 
     /// The decoded master-document subdocument metadata.
     #[must_use]
-    pub fn value(&self) -> &Collection {
+    pub(crate) fn value(&self) -> &Collection {
         self.subdocuments.collection()
     }
 
     /// Whether this editor has published changed package bytes.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    pub(crate) fn is_changed(&self) -> bool {
         self.changed
     }
 
     /// Start an independent semantic transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> RecordEdit {
         self.subdocuments.edit()
     }
 
     /// Apply and publish a validated semantic transaction atomically.
-    pub fn apply(&mut self, transaction: Transaction) -> Result<Commit> {
+    pub(crate) fn apply(&mut self, transaction: RecordEdit) -> Result<Commit> {
         let commit = transaction.commit().map_err(transaction_error)?;
         if commit.patch().before() != &self.subdocuments {
             return Err(PackageError::InvalidFormat(
@@ -206,13 +211,13 @@ impl Editor {
     }
 
     /// Capture the current package as an immutable snapshot.
-    pub fn snapshot(&self) -> Result<Snapshot> {
+    pub(crate) fn snapshot(&self) -> Result<Snapshot> {
         let bytes = self.package.clone().finish().map_err(PackageError::from)?;
         Ok(Snapshot::new(bytes, self.subdocuments.clone()))
     }
 
     /// Finish the edit and return rendered DOC bytes.
-    pub fn finish(self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(self) -> Result<Vec<u8>> {
         if self.changed {
             self.protection_policy.authorize(self.protection)?;
         }
@@ -221,7 +226,7 @@ impl Editor {
 
     /// Commit the current package as a semantic snapshot plus reversible
     /// semantic and whole-CFB patches.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         if self.changed {
             self.protection_policy.authorize(self.protection)?;
         }
@@ -231,7 +236,7 @@ impl Editor {
         Ok(Commit {
             snapshot: Snapshot::new(bytes, self.subdocuments),
             patch,
-            package_patch: PackagePatch::new(object_commit.into_patch(), self.protection),
+            package_patch: PackagePatch::new(object_commit.into_parts().1, self.protection),
         })
     }
 
@@ -243,7 +248,8 @@ impl Editor {
                 .clone()
                 .commit()
                 .map_err(PackageError::from)?
-                .into_patch();
+                .into_parts()
+                .1;
             let package_patch = PackagePatch::new(package_patch, self.protection);
             return Ok(Commit {
                 snapshot: self.snapshot()?,
@@ -267,7 +273,7 @@ impl Editor {
             .commit()
             .map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
-        let package_patch = PackagePatch::new(object_commit.into_patch(), candidate.protection);
+        let package_patch = PackagePatch::new(object_commit.into_parts().1, candidate.protection);
         let package_snapshot = Snapshot::new(bytes, candidate.subdocuments.clone());
         *self = candidate;
         Ok(Commit {

@@ -76,7 +76,7 @@ fn without_nested_fields(
 mod tests {
     use super::*;
     use crate::builder::Builder;
-    use crate::raw::Package;
+    use crate::raw::Reader;
     use std::io::Cursor;
 
     #[test]
@@ -95,7 +95,7 @@ mod tests {
 
         let mut bytes = Cursor::new(Vec::new());
         writer.build().unwrap().write_to(&mut bytes).unwrap();
-        let mut package = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
+        let mut package = Reader::from_reader(Cursor::new(bytes.into_inner())).unwrap();
         let document = package.document().unwrap();
         let fields = document.fields().unwrap();
         assert_eq!(fields.len(), 2);
