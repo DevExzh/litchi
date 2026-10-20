@@ -136,13 +136,18 @@ fn a_missing_broadcast_is_not_found() {
     ));
 }
 
-/// The path of movie `id` in the live document. The edit's read view is used
-/// because `Presentation::external_media` scans every `DocumentContainer` of
-/// the stream and refuses an append-only republished package.
+/// The path of movie `id` in the live document, read through the
+/// presentation reader (which reads the live `DocumentContainer` of an
+/// append-only republished package, record 0357).
 fn movie_path(package: &Package, id: u32) -> Option<String> {
-    let edit = package.edit_external_media().unwrap();
-    match edit
-        .objects()
+    let media = package
+        .presentation()
+        .unwrap()
+        .external_media()
+        .unwrap()
+        .expect("the fixture's media collection");
+    match media
+        .objects
         .iter()
         .find(|object| object.id() == id)
         .expect("the fixture's movie")

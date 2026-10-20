@@ -5946,6 +5946,27 @@
           "name": "finish",
           "scope": "litchi_ppt::master_layout::Edit",
           "replacement": "use Edit::commit"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt",
+          "replacement": "PPT crate-wide: drop the Edit / diagnostics().changed() / family Edit (record 0357)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt",
+          "replacement": "PPT crate-wide: drop the Edit / diagnostics().changed() / family Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt",
+          "replacement": "PPT crate-wide: drop the Edit / diagnostics().changed() / family Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt",
+          "replacement": "use the family's Edit (record 0357)",
+          "match": "suffix"
         }
       ],
       "families": [
@@ -6676,6 +6697,27 @@
           "name": "finish",
           "scope": "litchi_ppt::master_layout::Edit",
           "replacement": "use Edit::commit"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt",
+          "replacement": "PPT crate-wide: drop the Edit / diagnostics().changed() / family Edit (record 0357)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt",
+          "replacement": "PPT crate-wide: drop the Edit / diagnostics().changed() / family Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt",
+          "replacement": "PPT crate-wide: drop the Edit / diagnostics().changed() / family Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt",
+          "replacement": "use the family's Edit (record 0357)",
+          "match": "suffix"
         }
       ],
       "families": [
