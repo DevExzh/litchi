@@ -9,21 +9,11 @@
 //! Package-backed alternative-format anchors and relationship lifecycle.
 
 use super::super::model::{
-    BlobPart, Chunk, Conformance, Error, Import, MAX_CHUNKS, PackURI, Package, Rel, Result,
-    TargetMode, is_relationship,
+    BlobPart, Chunk, Conformance, DraftDocument, Error, Import, MAX_CHUNKS, PackURI, Package, Rel,
+    Result, TargetMode, is_relationship,
 };
 
 impl Package {
-    /// Append a package-backed alternative-format import to the document body.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn add_alt(&mut self, import: Import, match_source: Option<bool>) -> Result<Chunk> {
-        let index = self.authoring_document()?.alts().len();
-        self.insert_alt(index, import, match_source)
-    }
-
     /// Insert a package-backed alternative-format import by anchor-relative index.
     ///
     /// Part, relationship, and body mutations are rolled back together on error.
@@ -31,13 +21,14 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn insert_alt(
+    pub(crate) fn insert_alt(
         &mut self,
+        document: &mut DraftDocument,
         index: usize,
         import: Import,
         match_source: Option<bool>,
     ) -> Result<Chunk> {
-        let count = self.authoring_document()?.alts().len();
+        let count = document.alts().len();
         if index > count {
             return Err(Error::InvalidFormat(format!(
                 "altChunk index {index} is out of range"
@@ -51,10 +42,7 @@ impl Package {
         let namespace = self.alt_chunk_namespace()?;
         let (chunk, installed_part) =
             self.install_alt_chunk_target(import, match_source, namespace)?;
-        if let Err(error) = self
-            .authoring_document()?
-            .insert_alt(index, chunk.clone(), namespace)
-        {
+        if let Err(error) = document.insert_alt(index, chunk.clone(), namespace) {
             self.rollback_alt_chunk_target(chunk.relationship().as_str(), installed_part.as_ref())?;
             return Err(error);
         }
@@ -66,32 +54,25 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn replace_alt(
+    pub(crate) fn replace_alt(
         &mut self,
+        document: &mut DraftDocument,
         index: usize,
         import: Import,
         match_source: Option<bool>,
     ) -> Result<Chunk> {
-        let old = self
-            .authoring_document()?
-            .alts()
-            .get(index)
-            .cloned()
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!("altChunk index {index} is out of range"))
-            })?;
+        let old = document.alts().get(index).cloned().ok_or_else(|| {
+            Error::InvalidFormat(format!("altChunk index {index} is out of range"))
+        })?;
         let old_target = self.validate_alt_chunk_relationship(&old)?;
         let namespace = self.alt_chunk_namespace()?;
         let (new, installed_part) =
             self.install_alt_chunk_target(import, match_source, namespace)?;
-        if let Err(error) = self
-            .authoring_document()?
-            .replace_alt(index, new.clone(), namespace)
-        {
+        if let Err(error) = document.replace_alt(index, new.clone(), namespace) {
             self.rollback_alt_chunk_target(new.relationship().as_str(), installed_part.as_ref())?;
             return Err(error);
         }
-        self.remove_alt_relationship(&old, old_target.as_ref())?;
+        self.remove_alt_relationship(document, &old, old_target.as_ref())?;
         Ok(old)
     }
 
@@ -100,28 +81,18 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn remove_alt(&mut self, index: usize) -> Result<Chunk> {
-        let old = self
-            .authoring_document()?
-            .alts()
-            .get(index)
-            .cloned()
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!("altChunk index {index} is out of range"))
-            })?;
+    pub(crate) fn remove_alt(
+        &mut self,
+        document: &mut DraftDocument,
+        index: usize,
+    ) -> Result<Chunk> {
+        let old = document.alts().get(index).cloned().ok_or_else(|| {
+            Error::InvalidFormat(format!("altChunk index {index} is out of range"))
+        })?;
         let old_target = self.validate_alt_chunk_relationship(&old)?;
-        self.authoring_document()?.remove_alt(index)?;
-        self.remove_alt_relationship(&old, old_target.as_ref())?;
+        document.remove_alt(index)?;
+        self.remove_alt_relationship(document, &old, old_target.as_ref())?;
         Ok(old)
-    }
-
-    /// Reorder body anchors without changing their package relationships.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn move_alt(&mut self, from: usize, to: usize) -> Result<()> {
-        self.authoring_document()?.move_alt(from, to)
     }
 
     fn alt_chunk_namespace(&self) -> Result<Conformance> {
@@ -256,13 +227,17 @@ impl Package {
         Ok(())
     }
 
-    fn remove_alt_relationship(&mut self, chunk: &Chunk, target: Option<&PackURI>) -> Result<()> {
-        if self.mutable_doc.as_ref().is_some_and(|document| {
-            document
-                .alts()
-                .iter()
-                .any(|remaining| remaining.relationship() == chunk.relationship())
-        }) {
+    fn remove_alt_relationship(
+        &mut self,
+        document: &DraftDocument,
+        chunk: &Chunk,
+        target: Option<&PackURI>,
+    ) -> Result<()> {
+        if document
+            .alts()
+            .iter()
+            .any(|remaining| remaining.relationship() == chunk.relationship())
+        {
             return Ok(());
         }
         let document_uri = PackURI::new("/word/document.xml")

@@ -1,7 +1,7 @@
 //! Bounded, forward-only authoring of plain DOCX paragraphs and runs.
 //!
 //! [`StreamingDocumentWriter`] is deliberately narrower than the regular
-//! [`crate::Package`] and [`crate::writer`] APIs.  It creates a fresh
+//! [`crate::Package`] and [`crate::builder`] APIs.  It creates a fresh
 //! transitional WordprocessingML package over a sequential sink.  The writer
 //! owns no document model and cannot revisit a paragraph or run after it has
 //! been flushed.

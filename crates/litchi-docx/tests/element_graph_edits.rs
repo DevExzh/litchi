@@ -66,7 +66,7 @@ fn url_hyperlinks_publish_markup_and_relationship_atomically() {
     assert_eq!(position, Position::new(0));
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
-    let (mut changed, patch) = commit.into_parts();
+    let (changed, patch) = commit.into_parts();
     assert_eq!(main_relationships(&changed), before_relationships + 1);
     assert_eq!(main_relationships(&base), before_relationships);
     assert_eq!(
@@ -85,9 +85,9 @@ fn url_hyperlinks_publish_markup_and_relationship_atomically() {
     );
 
     // The patch replays onto the source and its inverse restores it.
-    let mut replayed = base.apply(&patch).unwrap();
+    let replayed = base.apply(&patch).unwrap().into_package();
     assert_eq!(links(&replayed, 0), links(&changed, 0));
-    let mut restored = changed.apply(&patch.inverse()).unwrap();
+    let restored = changed.apply(&patch.inverse()).unwrap().into_package();
     assert_eq!(main_relationships(&restored), before_relationships);
     assert!(links(&restored, 0).is_empty());
     assert_eq!(
@@ -137,7 +137,7 @@ fn bookmark_hyperlinks_and_retargeting() {
             "go ".to_owned()
         )]
     );
-    let back = retargeted.apply(&patch.inverse()).unwrap();
+    let back = retargeted.apply(&patch.inverse()).unwrap().into_package();
     assert_eq!(links(&back, 1), links(&anchored, 1));
 }
 
@@ -161,7 +161,7 @@ fn hyperlinks_go_into_nested_paragraphs() {
         &NewRun::new(" link"),
     )
     .unwrap();
-    let mut changed = edit.commit().unwrap().into_package();
+    let changed = edit.commit().unwrap().into_package();
     let reopened = Package::from_bytes(&changed.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.document().unwrap().text().unwrap(), "cell link");
 }
@@ -216,7 +216,7 @@ fn comments_are_added_into_new_and_existing_parts_and_removed_exactly() {
                 .with_date("2026-10-13T00:00:00Z"),
         )
         .unwrap();
-    let (mut one, add_patch) = edit.commit().unwrap().into_parts();
+    let (one, add_patch) = edit.commit().unwrap().into_parts();
     let comments = one.document().unwrap().comments().unwrap();
     assert_eq!(comments.len(), 1);
     assert_eq!(comments[0].id(), first);
@@ -240,7 +240,7 @@ fn comments_are_added_into_new_and_existing_parts_and_removed_exactly() {
         )
         .unwrap();
     assert_eq!(second, first + 1);
-    let mut two = edit.commit().unwrap().into_package();
+    let two = edit.commit().unwrap().into_package();
     let reopened = Package::from_bytes(&two.to_bytes().unwrap()).unwrap();
     let texts: Vec<String> = reopened
         .document()
@@ -263,11 +263,14 @@ fn comments_are_added_into_new_and_existing_parts_and_removed_exactly() {
     let xml = main_xml(&removed);
     assert!(!xml.contains(&format!(r#"w:id="{first}""#)), "{xml}");
     assert_eq!(removed.document().unwrap().text().unwrap(), "See Second");
-    let restored = removed.apply(&remove_patch.inverse()).unwrap();
+    let restored = removed
+        .apply(&remove_patch.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.document().unwrap().comments().unwrap().len(), 2);
 
     // The first add's inverse removes the part it created.
-    let mut back = one.apply(&add_patch.inverse()).unwrap();
+    let back = one.apply(&add_patch.inverse()).unwrap().into_package();
     assert!(back.document().unwrap().comments().unwrap().is_empty());
     assert_eq!(back.to_bytes().unwrap(), base.clone().to_bytes().unwrap());
     assert!(one.to_bytes().is_ok());
@@ -305,7 +308,7 @@ fn pictures_publish_their_media_part_and_drawing_atomically() {
         &NewPicture::new(png()).with_size(Some(914_400), None),
     )
     .unwrap();
-    let (mut changed, patch) = edit.commit().unwrap().into_parts();
+    let (changed, patch) = edit.commit().unwrap().into_parts();
     assert_eq!(changed.opc_package().iter_parts().count(), parts + 2);
     let reopened = Package::from_bytes(&changed.to_bytes().unwrap()).unwrap();
     let document = reopened.document().unwrap();
@@ -347,9 +350,9 @@ fn pictures_publish_their_media_part_and_drawing_atomically() {
     assert_eq!(reopened.document().unwrap().text().unwrap(), "See Second");
 
     // Replay and exact inverse.
-    let mut replayed = base.apply(&patch).unwrap();
+    let replayed = base.apply(&patch).unwrap().into_package();
     assert_eq!(replayed.to_bytes().unwrap(), changed.to_bytes().unwrap());
-    let mut restored = changed.apply(&patch.inverse()).unwrap();
+    let restored = changed.apply(&patch.inverse()).unwrap().into_package();
     assert_eq!(
         restored.to_bytes().unwrap(),
         base.clone().to_bytes().unwrap()
@@ -404,7 +407,7 @@ fn lists_create_the_numbering_part_and_extend_it_exactly() {
         .unwrap();
     edit.format_paragraph_at(&paragraph(1), joined(numbers.num_id()))
         .unwrap();
-    let (mut changed, patch) = edit.commit().unwrap().into_parts();
+    let (changed, patch) = edit.commit().unwrap().into_parts();
     let reopened = Package::from_bytes(&changed.to_bytes().unwrap()).unwrap();
     assert!(
         reopened
@@ -455,9 +458,9 @@ fn lists_create_the_numbering_part_and_extend_it_exactly() {
     );
 
     // Replay and exact inverse of the first edit.
-    let mut replayed = base.apply(&patch).unwrap();
+    let replayed = base.apply(&patch).unwrap().into_package();
     assert_eq!(replayed.to_bytes().unwrap(), changed.to_bytes().unwrap());
-    let mut restored = changed.apply(&patch.inverse()).unwrap();
+    let restored = changed.apply(&patch.inverse()).unwrap().into_package();
     assert_eq!(
         restored.to_bytes().unwrap(),
         base.clone().to_bytes().unwrap()

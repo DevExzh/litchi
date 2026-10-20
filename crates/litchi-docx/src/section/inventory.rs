@@ -332,13 +332,8 @@ impl SourceSpan {
 }
 
 impl Inventory {
-    /// Parse a main-document XML payload with production defaults.
-    pub fn parse(xml: &[u8]) -> Result<Self> {
-        Self::parse_with_limits(xml, &Limits::default())
-    }
-
     /// Parse a main-document XML payload with caller-provided limits.
-    pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Self> {
+    pub fn parse(xml: &[u8], limits: &Limits) -> Result<Self> {
         parse_inventory(xml, limits)
     }
 
@@ -540,15 +535,10 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Capture an owned XML snapshot without a positional-source lineage.
-    pub fn from_xml(xml: Vec<u8>) -> Result<Self> {
-        Self::from_xml_with_limits(xml, &Limits::default())
-    }
-
     /// Capture owned XML with caller-provided semantic limits.
-    pub fn from_xml_with_limits(xml: Vec<u8>, limits: &Limits) -> Result<Self> {
+    pub fn from_xml(xml: Vec<u8>, limits: &Limits) -> Result<Self> {
         Ok(Self {
-            inventory: Inventory::parse_with_limits(&xml, limits)?,
+            inventory: Inventory::parse(&xml, limits)?,
             source_version: None,
         })
     }
@@ -559,7 +549,7 @@ impl Snapshot {
         limits: &Limits,
     ) -> Result<Self> {
         Ok(Self {
-            inventory: Inventory::parse_with_limits(xml, limits)?,
+            inventory: Inventory::parse(xml, limits)?,
             source_version: Some(source_version),
         })
     }

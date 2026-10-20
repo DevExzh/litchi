@@ -738,11 +738,11 @@ impl Plan {
                 if crate::paragraph::extract_word_text(story.xml.as_bytes())?
                     != crate::paragraph::extract_word_text(&rewritten)?
                 {
-                    return Err(Error::UnsafeEdit {
-                        format: "DOCX",
-                        operation: "story_hyperlink_redaction",
-                        reason: "redaction changed visible story text",
-                    });
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "story_hyperlink_redaction",
+                        "redaction changed visible story text",
+                    ));
                 }
                 rewritten
             };
@@ -773,11 +773,10 @@ impl Plan {
                     .binary_search(&wrapper.relationship_id)
                     .is_ok()
             }) {
-                return Err(Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "story_hyperlink_redaction",
-                    reason: "selected story hyperlink wrapper remained after rewrite",
-                });
+                return Err(Error::internal(
+                    "story_hyperlink_redaction",
+                    "selected story hyperlink wrapper remained after rewrite",
+                ));
             }
             let mut replacement = Vec::new();
             replacement
@@ -2136,11 +2135,11 @@ fn unsupported(operation: &'static str, diagnostics: &[Diagnostic]) -> Error {
     } else {
         "story package contains external-reference classes outside the supported hyperlink closure"
     };
-    Error::UnsafeEdit {
-        format: "DOCX",
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
         operation,
         reason,
-    }
+    )
 }
 
 fn invalid(message: impl Into<String>) -> Error {

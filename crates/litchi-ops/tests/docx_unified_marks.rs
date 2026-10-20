@@ -176,7 +176,7 @@ fn the_watermark_and_text_boxes_are_read() {
         .document()
         .expect("document")
         .set_watermark(litchi_docx::Watermark::text("DRAFT"));
-    let mut package = builder.build().expect("build");
+    let package = builder.build().expect("build");
     let bytes = package.to_bytes().expect("bytes");
     for eager in [false, true] {
         let file = open(eager, bytes.clone());

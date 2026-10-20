@@ -194,14 +194,15 @@ fn a_candidate_the_writer_would_refuse_carries_no_proof() {
 }
 
 fn generated_package(paragraphs: usize) -> crate::Package {
-    let mut package = crate::Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.authoring_document().unwrap();
+        let document = builder.document().unwrap();
         for index in 0..paragraphs {
             document.add_paragraph_with_text(&format!("paragraph {index:05}"));
         }
     }
     let mut output = std::io::Cursor::new(Vec::new());
+    let package = builder.build().unwrap();
     package.write_to(&mut output).unwrap();
     crate::Package::from_reader(std::io::Cursor::new(output.into_inner())).unwrap()
 }
@@ -240,7 +241,10 @@ fn publishing_with_the_proof_emits_what_publishing_without_it_emits() {
     commit.snapshot.publication = None;
     commit.patch.after.publication = None;
     assert!(commit.patch().target().publication_proof().is_none());
-    unproven_package = unproven_package.apply(commit.patch()).unwrap();
+    unproven_package = unproven_package
+        .apply(commit.patch())
+        .unwrap()
+        .into_package();
 
     assert_eq!(saved(&mut proven_package), saved(&mut unproven_package));
 
@@ -264,7 +268,7 @@ fn a_source_with_identity_is_proven_for_the_source_backed_writer() {
     let package = generated_package(16);
     let plain = package.document_snapshot().unwrap();
     let mut archive = std::io::Cursor::new(Vec::new());
-    let mut writable = generated_package(16);
+    let writable = generated_package(16);
     writable.write_to(&mut archive).unwrap();
     let source_backed = crate::source_backed::Package::from_read_at(Arc::new(
         litchi_core::OwnedSource::new(archive.into_inner()),

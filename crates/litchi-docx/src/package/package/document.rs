@@ -1,11 +1,10 @@
 //! Immutable document transactions and legacy history orchestration.
 
-use super::super::model::{Error, MutableDocument, PackURI, Package, Result};
+use super::super::model::{Error, Package};
 use super::transfer::{
     apply_graph_change, apply_transfer_graph, relationship_graph_digest,
     relationship_graph_digest_opc,
 };
-use litchi_opc::OpcError;
 
 /// The main-document bytes `apply` publishes.
 enum MainReplacement {
@@ -35,7 +34,7 @@ impl Package {
     ///
     /// Returns a typed snapshot error when package state is stale, malformed,
     /// or outside the document transaction bounds.
-    pub fn edit(&self) -> std::result::Result<crate::document::Edit, crate::document::Error> {
+    pub fn edit(&self) -> Result<crate::document::Edit, crate::document::Error> {
         self.document_snapshot()
             .map(|snapshot| crate::document::Edit::new(self.clone(), snapshot.edit()))
     }
@@ -67,9 +66,7 @@ impl Package {
     ///
     /// Returns a typed transaction error when the package state is stale or
     /// the main document is missing, malformed, or over its resource bounds.
-    pub fn document_snapshot(
-        &self,
-    ) -> std::result::Result<crate::document::Snapshot, crate::document::Error> {
+    pub fn document_snapshot(&self) -> Result<crate::document::Snapshot, crate::document::Error> {
         self.ensure_story_opc_current("document_snapshot")?;
         let main = self.opc.main_document_part().map_err(Error::from)?;
         let xml = main.blob_arc();
@@ -87,7 +84,7 @@ impl Package {
         &self,
         xml: &std::sync::Arc<Vec<u8>>,
         operation: &'static str,
-    ) -> std::result::Result<(), crate::document::Error> {
+    ) -> Result<(), crate::document::Error> {
         let proved = |memo: &std::sync::Weak<Vec<u8>>| {
             memo.upgrade()
                 .is_some_and(|admitted| std::sync::Arc::ptr_eq(&admitted, xml))
@@ -127,7 +124,7 @@ impl Package {
     fn document_patch_source(
         &self,
         patch: &crate::document::Patch,
-    ) -> std::result::Result<DocumentPatchSource, crate::document::Error> {
+    ) -> Result<DocumentPatchSource, crate::document::Error> {
         self.ensure_story_opc_current("document_snapshot")?;
         let main = self.opc.main_document_part().map_err(Error::from)?;
         if let Some(candidate) = patch.target_for_exact_unmanaged_source(main.blob()) {
@@ -142,7 +139,7 @@ impl Package {
         Ok(DocumentPatchSource::Rescanned(self.document_snapshot()?))
     }
 
-    /// Apply a main-document patch and return a new package.
+    /// Apply a main-document patch and publish a new package.
     ///
     /// The source is retained unchanged on success and failure. An exact
     /// no-op shares its physical graph, metadata and retained writer state.
@@ -152,7 +149,7 @@ impl Package {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let package = Package::new()?;
     /// let commit = package.edit()?.commit()?;
-    /// let next = package.apply(commit.patch())?;
+    /// let next = package.apply(commit.patch())?.into_package();
     /// assert_eq!(package.document()?.text()?, next.document()?.text()?);
     /// # Ok(())
     /// # }
@@ -170,10 +167,19 @@ impl Package {
     ///
     /// Returns a stale-source or package-validation error without publishing
     /// any partial package mutation.
-    pub fn apply(&self, patch: &crate::document::Patch) -> crate::document::Result<Self> {
+    pub fn apply(
+        &self,
+        patch: &crate::document::Patch,
+    ) -> crate::document::Result<crate::document::Commit> {
         let mut package = self.clone();
         package.publish_patch(patch)?;
-        Ok(package)
+        let changed = !patch.is_noop();
+        let package = if changed { package } else { self.clone() };
+        Ok(crate::document::Commit::from_parts(
+            package,
+            patch.clone(),
+            crate::document::Diagnostics::new(patch.operations().len(), changed),
+        ))
     }
 
     // Internal publication engine for the remaining legacy/history adapters.
@@ -181,7 +187,7 @@ impl Package {
     fn publish_patch(
         &mut self,
         patch: &crate::document::Patch,
-    ) -> std::result::Result<crate::document::Snapshot, crate::document::Error> {
+    ) -> Result<crate::document::Snapshot, crate::document::Error> {
         let source = self.document_patch_source(patch)?;
         self.validate_transfer_operations(patch.operations())?;
         let graph_transition = transfer_graph_transition(patch.operations())?;
@@ -241,54 +247,70 @@ impl Package {
         Ok(candidate)
     }
 
-    /// Publish a commit and record it in bounded history as one coupled action.
+    /// Publish a snapshot commit and record it in bounded history as one
+    /// coupled action; returns the published package.
     ///
     /// History capacity is preflighted before package publication, and the
-    /// exact history head must match the commit source.
+    /// exact history head must match the commit source. This package is not
+    /// changed.
     ///
     /// # Errors
     ///
     /// Returns a stale-source, history-bound, or package-validation error.
     pub fn publish_document_commit_with_history(
-        &mut self,
+        &self,
         commit: crate::document::snapshot::Commit,
         history: &mut crate::document::History,
-    ) -> std::result::Result<Vec<crate::document::Snapshot>, crate::document::Error> {
+    ) -> Result<crate::document::Commit, crate::document::Error> {
         if history.current().xml_bytes() != commit.patch().source().xml_bytes() {
             return Err(crate::document::Error::PatchConflict);
         }
-        if commit.patch().is_noop() {
-            self.publish_patch(commit.patch())?;
-            return Ok(Vec::new());
+        let diagnostics = commit.diagnostics();
+        let patch = commit.patch().clone();
+        let mut next = self.clone();
+        if patch.is_noop() {
+            next.publish_patch(&patch)?;
+            return Ok(crate::document::Commit::from_parts(
+                next,
+                patch,
+                diagnostics,
+            ));
         }
         history.ensure_can_record(&commit)?;
-        self.publish_patch(commit.patch())?;
-        history.record(commit)
+        next.publish_patch(&patch)?;
+        history.record(commit)?;
+        Ok(crate::document::Commit::from_parts(
+            next,
+            patch,
+            diagnostics,
+        ))
     }
 
-    /// Publish one bounded undo transition atomically with the package graph.
+    /// Publish one bounded undo transition; returns the published package,
+    /// which is this package unchanged when there is nothing to undo.
     ///
     /// # Errors
     ///
     /// Returns a stale-source or package-validation error. A publication
     /// failure restores the history cursor before returning.
     pub fn undo_document(
-        &mut self,
+        &self,
         history: &mut crate::document::History,
-    ) -> std::result::Result<bool, crate::document::Error> {
+    ) -> Result<crate::document::Commit, crate::document::Error> {
         self.publish_history_transition(history, false)
     }
 
-    /// Publish one bounded redo transition atomically with the package graph.
+    /// Publish one bounded redo transition; returns the published package,
+    /// which is this package unchanged when there is nothing to redo.
     ///
     /// # Errors
     ///
     /// Returns a stale-source or package-validation error. A publication
     /// failure restores the history cursor before returning.
     pub fn redo_document(
-        &mut self,
+        &self,
         history: &mut crate::document::History,
-    ) -> std::result::Result<bool, crate::document::Error> {
+    ) -> Result<crate::document::Commit, crate::document::Error> {
         self.publish_history_transition(history, true)
     }
 
@@ -301,11 +323,27 @@ impl Package {
     ///
     /// Returns a durable-vocabulary, stale-source, semantic-precondition, or
     /// package-validation error without publishing a partial mutation.
-    pub fn apply_durable_document_patch<Mode>(
+    pub fn apply_durable_document<Mode>(
+        &self,
+        patch: &litchi_core::patch::Patch<Mode>,
+    ) -> Result<crate::document::Commit, crate::document::Error> {
+        let current = self.document_snapshot()?;
+        let mut next = self.clone();
+        let candidate = next.apply_durable_document_in_place(patch, current.clone())?;
+        let changed = candidate.xml_bytes() != current.xml_bytes();
+        let package = if changed { next } else { self.clone() };
+        Ok(crate::document::Commit::from_parts(
+            package,
+            crate::document::Patch::transition(current, candidate),
+            crate::document::Diagnostics::new(patch.operations().len(), changed),
+        ))
+    }
+
+    fn apply_durable_document_in_place<Mode>(
         &mut self,
         patch: &litchi_core::patch::Patch<Mode>,
-    ) -> std::result::Result<crate::document::Snapshot, crate::document::Error> {
-        let current = self.document_snapshot()?;
+        current: crate::document::Snapshot,
+    ) -> Result<crate::document::Snapshot, crate::document::Error> {
         let has_transfer = patch.operations().iter().any(|operation| {
             matches!(
                 operation.op.as_str(),
@@ -373,18 +411,24 @@ impl Package {
     }
 
     fn publish_history_transition(
-        &mut self,
+        &self,
         history: &mut crate::document::History,
         redo: bool,
-    ) -> std::result::Result<bool, crate::document::Error> {
+    ) -> Result<crate::document::Commit, crate::document::Error> {
         let current = self.document_snapshot()?;
         if current.xml_bytes() != history.current().xml_bytes() {
             return Err(crate::document::Error::PatchConflict);
         }
         let moved = if redo { history.redo() } else { history.undo() };
         if !moved {
-            return Ok(false);
+            let patch = crate::document::Patch::transition(current.clone(), current);
+            return Ok(crate::document::Commit::from_parts(
+                self.clone(),
+                patch,
+                crate::document::Diagnostics::new(0, false),
+            ));
         }
+        let mut next = self.clone();
         let graph_transition = history.take_graph_transition();
         if let Some((transition, forward)) = &graph_transition {
             let expected_source = if *forward {
@@ -392,7 +436,7 @@ impl Package {
             } else {
                 transition.after_digest.as_ref()
             };
-            if relationship_graph_digest(self)? != expected_source {
+            if relationship_graph_digest(&next)? != expected_source {
                 if redo {
                     let _restored = history.undo();
                 } else {
@@ -402,8 +446,9 @@ impl Package {
                 return Err(crate::document::Error::PatchConflict);
             }
         }
-        let replacement = history.current().xml_bytes().to_vec();
-        let result = self.edit_semantic_opc("publish_document_history", move |opc| {
+        let target = history.current().clone();
+        let replacement = target.xml_bytes().to_vec();
+        let result = next.edit_semantic_opc("publish_document_history", move |opc| {
             if let Some((transition, forward)) = graph_transition {
                 let insert = if forward {
                     transition.forward_insert
@@ -438,13 +483,18 @@ impl Package {
             let _pending = history.take_graph_transition();
             return Err(crate::document::Error::from(error));
         }
-        Ok(true)
+        let patch = crate::document::Patch::transition(current, target);
+        Ok(crate::document::Commit::from_parts(
+            next,
+            patch,
+            crate::document::Diagnostics::new(0, true),
+        ))
     }
 
     fn validate_transfer_operations(
         &self,
         operations: &[crate::document::Operation],
-    ) -> std::result::Result<(), crate::document::Error> {
+    ) -> Result<(), crate::document::Error> {
         if !operations.iter().any(|operation| {
             matches!(
                 operation,
@@ -471,48 +521,11 @@ impl Package {
         }
         Ok(())
     }
-
-    /// The legacy authoring document, hydrated from the main part on first
-    /// use. Public authoring goes through [`crate::Builder::document`];
-    /// opened packages change through [`Self::edit`].
-    pub(crate) fn authoring_document(&mut self) -> Result<&mut MutableDocument> {
-        if self.raw_edit_committed {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "authoring_document",
-                reason: "a raw OPC edit committed; use edit_opc for further low-level changes",
-            });
-        }
-
-        // If we don't have a mutable document, try to load it from the package
-        if self.mutable_doc.is_none() {
-            let doc_uri = PackURI::new("/word/document.xml")
-                .map_err(|error| Error::InvalidUri(format!("document URI: {error}")))?;
-
-            // Try to get existing document content
-            match self.opc.get_part(&doc_uri) {
-                Ok(part) => {
-                    let xml = std::str::from_utf8(part.blob())
-                        .map_err(|error| Error::InvalidFormat(format!("Invalid UTF-8: {error}")))?;
-                    self.mutable_doc = Some(MutableDocument::from_xml(xml)?.into());
-                },
-                Err(OpcError::PartNotFound(_)) => {
-                    // Create a new empty document
-                    self.mutable_doc = Some(MutableDocument::new().into());
-                },
-                Err(error) => return Err(error.into()),
-            }
-        }
-
-        self.mutable_doc.as_deref_mut().ok_or_else(|| {
-            Error::InvalidFormat("mutable document initialization did not complete".into())
-        })
-    }
 }
 
 fn transfer_graph_transition(
     operations: &[crate::document::Operation],
-) -> std::result::Result<
+) -> Result<
     Option<(
         std::sync::Arc<crate::document::TransferGraph>,
         bool,

@@ -88,14 +88,27 @@ pub enum Error {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
-    /// A package edit cannot preserve the opened artifact safely.
-    #[error("unsafe DOCX edit '{operation}' rejected: {reason}")]
-    UnsafeEdit {
-        /// Format whose package graph would be damaged.
-        format: &'static str,
-        /// Operation that was rejected.
+    /// A well-formed request this route refuses (record 0351): the kind
+    /// classifies it, the operation and reason are static text.
+    #[error("DOCX {0}")]
+    Refused(litchi_core::edit::Refusal),
+
+    /// A patch or staged plan was made against another base (record 0351).
+    #[error("DOCX {operation} patch conflict: {reason}")]
+    PatchConflict {
+        /// Operation whose base did not match.
         operation: &'static str,
-        /// Reason the operation cannot be lossless.
+        /// What did not match.
+        reason: &'static str,
+    },
+
+    /// A broken internal invariant: state the crate itself should have
+    /// provided is missing or inconsistent.
+    #[error("DOCX {operation} internal invariant failed: {reason}")]
+    Internal {
+        /// Operation that detected the broken invariant.
+        operation: &'static str,
+        /// The invariant that failed.
         reason: &'static str,
     },
 
@@ -246,6 +259,36 @@ pub enum Error {
     /// A changed document-variable publication cannot preserve selected markup.
     #[error("unsafe DOCX document-variable edit rejected: {0}")]
     DocumentVariablesPreservation(&'static str),
+}
+
+impl Error {
+    /// A refusal of `operation` for `reason`, classified by `kind`.
+    pub(crate) const fn refused(
+        kind: litchi_core::edit::RefusalKind,
+        operation: &'static str,
+        reason: &'static str,
+    ) -> Self {
+        Self::Refused(litchi_core::edit::Refusal::new(kind, operation, reason))
+    }
+
+    /// A patch or plan applied to another base.
+    pub(crate) const fn conflict(operation: &'static str, reason: &'static str) -> Self {
+        Self::PatchConflict { operation, reason }
+    }
+
+    /// A broken internal invariant.
+    pub(crate) const fn internal(operation: &'static str, reason: &'static str) -> Self {
+        Self::Internal { operation, reason }
+    }
+
+    /// The refusal this error carries, when it is one.
+    #[must_use]
+    pub const fn refusal(&self) -> Option<&litchi_core::edit::Refusal> {
+        match self {
+            Self::Refused(refusal) => Some(refusal),
+            _ => None,
+        }
+    }
 }
 
 impl From<quick_xml::Error> for Error {

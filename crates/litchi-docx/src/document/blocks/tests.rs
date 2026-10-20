@@ -103,7 +103,7 @@ fn body_children_are_classified_in_visible_order_with_customxml_flattened() {
     assert_eq!(wrapped.direct_position().map(Position::get), None);
     assert!(matches!(
         wrapped.transaction_position(),
-        Err(Error::UnsafeEdit { reason, .. }) if reason.contains("customXml")
+        Err(Error::Refused(refusal)) if refusal.reason().contains("customXml")
     ));
     assert!(
         blocks
@@ -249,7 +249,7 @@ fn body_index_matches_ordered_block_view_and_handles_markup_compatibility() {
     for block in blocks.iter() {
         assert!(matches!(
             block.transaction_position(),
-            Err(Error::UnsafeEdit { reason, .. }) if reason.contains("not proven")
+            Err(Error::Refused(refusal)) if refusal.reason().contains("not proven")
         ));
     }
     // The raw part holds two direct paragraphs; the unchecked visible

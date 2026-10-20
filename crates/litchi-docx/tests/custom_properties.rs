@@ -1,7 +1,11 @@
+#![allow(
+    clippy::redundant_closure_call,
+    reason = "raw OPC test edits stage one closure over the edit's graph"
+)]
 use std::io::{self, Cursor, Write};
 
 use litchi_docx::Package;
-use litchi_ooxml_common::custom::Value;
+use litchi_ooxml_common::custom::{Props as CustomProps, Value};
 use litchi_opc::OpcPackage;
 use litchi_opc::PackURI;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -32,6 +36,19 @@ fn abandoned_document_edit(package: &mut Package) {
     );
 }
 
+/// Stage a custom-properties change through the metadata edit family and
+/// publish it as a new package.
+fn edit_custom_props(
+    package: &Package,
+    change: impl FnOnce(&mut CustomProps),
+) -> litchi_docx::metadata::Result<Package> {
+    let mut edit = package.edit_metadata();
+    let mut custom = edit.custom_props().clone();
+    change(&mut custom);
+    edit.set_custom_props(custom);
+    Ok(edit.commit()?.into_package())
+}
+
 struct FailingSink {
     remaining: usize,
 }
@@ -55,18 +72,18 @@ impl Write for FailingSink {
 fn custom_props_round_trip_and_clear_remove_the_package_graph() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let path = directory.path().join("custom-props.docx");
-    let mut package = Package::new().expect("new DOCX package");
-    package
-        .custom_props_mut()
-        .insert("Project", "Litchi")
-        .expect("valid custom property");
-    package
-        .custom_props_mut()
-        .insert("Version", Value::I32(38))
-        .expect("valid custom property");
+    let package = edit_custom_props(&Package::new().expect("new DOCX package"), |custom| {
+        custom
+            .insert("Project", "Litchi")
+            .expect("valid custom property");
+        custom
+            .insert("Version", Value::I32(38))
+            .expect("valid custom property");
+    })
+    .expect("publish custom properties");
     package.save(&path).expect("save custom properties");
 
-    let mut reopened = Package::open(&path).expect("reopen custom properties");
+    let reopened = Package::open(&path).expect("reopen custom properties");
     assert_eq!(
         reopened.custom_props().get("project"),
         Some(&Value::Text("Litchi".to_string()))
@@ -75,7 +92,8 @@ fn custom_props_round_trip_and_clear_remove_the_package_graph() {
         reopened.custom_props().get("VERSION"),
         Some(&Value::I32(38))
     );
-    reopened.custom_props_mut().clear();
+    let reopened =
+        edit_custom_props(&reopened, CustomProps::clear).expect("clear custom properties");
     reopened.save(&path).expect("save cleared properties");
 
     let graph = OpcPackage::open(&path).expect("open cleared OPC graph");
@@ -102,7 +120,7 @@ fn custom_props_round_trip_and_clear_remove_the_package_graph() {
 fn malformed_custom_props_are_not_treated_as_absent() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let path = directory.path().join("malformed-custom-props.docx");
-    let mut package = Package::new().expect("new DOCX package");
+    let package = Package::new().expect("new DOCX package");
     package.save(&path).expect("save base package");
 
     let mut opc = OpcPackage::open(&path).expect("open base OPC package");
@@ -121,14 +139,15 @@ fn malformed_custom_props_are_not_treated_as_absent() {
 fn word_reserved_custom_properties_are_host_scoped_and_transactional() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let valid_path = directory.path().join("word-reserved-props.docx");
-    let mut valid = Package::new().expect("new DOCX package");
-    valid
-        .custom_props_mut()
-        .insert(
-            "ClassificationContentMarkingHeaderFontProps",
-            "#ffFF00,23,Calibri",
-        )
-        .expect("valid Word header font properties");
+    let valid = edit_custom_props(&Package::new().expect("new DOCX package"), |custom| {
+        custom
+            .insert(
+                "ClassificationContentMarkingHeaderFontProps",
+                "#ffFF00,23,Calibri",
+            )
+            .expect("valid Word header font properties");
+    })
+    .expect("publish Word reserved properties");
     valid
         .save(&valid_path)
         .expect("save Word reserved properties");
@@ -141,15 +160,21 @@ fn word_reserved_custom_properties_are_host_scoped_and_transactional() {
     );
 
     let invalid_path = directory.path().join("non-word-reserved-props.docx");
-    let mut invalid = Package::new().expect("new DOCX package");
-    invalid
-        .custom_props_mut()
-        .insert(
-            "ClassificationContentMarkingHeaderLocations",
-            r"Office\:Suite:10",
-        )
-        .expect("valid PowerPoint location syntax");
-    assert!(invalid.save(&invalid_path).is_err());
+    let invalid = Package::new().expect("new DOCX package");
+    // The host-scoped property is refused when the edit is published, and the
+    // source package keeps no custom-properties part.
+    assert!(
+        edit_custom_props(&invalid, |custom| {
+            custom
+                .insert(
+                    "ClassificationContentMarkingHeaderLocations",
+                    r"Office\:Suite:10",
+                )
+                .expect("valid PowerPoint location syntax");
+        })
+        .is_err()
+    );
+    assert!(invalid.save(&invalid_path).is_ok());
     assert!(
         invalid
             .opc_package()
@@ -162,7 +187,7 @@ fn word_reserved_custom_properties_are_host_scoped_and_transactional() {
 fn clean_real_fixture_preserves_custom_properties_for_stream_and_path_save() {
     let expected = custom_properties_xml(HEADER_FIXTURE);
 
-    let mut streamed = Package::from_reader(Cursor::new(HEADER_FIXTURE))
+    let streamed = Package::from_reader(Cursor::new(HEADER_FIXTURE))
         .expect("open alt-chunk-header fixture for stream save");
     let mut stream_output = Vec::new();
     streamed
@@ -172,7 +197,7 @@ fn clean_real_fixture_preserves_custom_properties_for_stream_and_path_save() {
 
     let directory = tempfile::tempdir().expect("temporary directory");
     let path = directory.path().join("clean-alt-chunk-header.docx");
-    let mut saved = Package::from_reader(Cursor::new(HEADER_FIXTURE))
+    let saved = Package::from_reader(Cursor::new(HEADER_FIXTURE))
         .expect("open alt-chunk-header fixture for path save");
     saved
         .save(&path)
@@ -207,38 +232,6 @@ fn abandoned_document_edit_preserves_custom_properties_for_stream_and_path_save(
 }
 
 #[test]
-fn dirty_custom_properties_survive_a_failed_stream_and_retry() {
-    let mut package = Package::new().expect("new DOCX package");
-    package
-        .custom_props_mut()
-        .insert("RetryMarker", "custom property retry")
-        .expect("valid retry property");
-    let custom_uri = PackURI::new("/docProps/custom.xml").expect("static custom-properties URI");
-    assert!(package.opc_package().get_part(&custom_uri).is_err());
-
-    assert!(matches!(
-        package.write_to(FailingSink { remaining: 1 }),
-        Err(litchi_docx::Error::Opc(
-            litchi_opc::OpcError::IncompleteOutput { written: 1, .. }
-        ))
-    ));
-    assert!(
-        package.opc_package().get_part(&custom_uri).is_err(),
-        "failed publication must roll back the staged custom-properties part"
-    );
-
-    let mut output = Vec::new();
-    package
-        .write_to(&mut output)
-        .expect("retry custom-property stream after sink failure");
-    let reopened = Package::from_reader(Cursor::new(output)).expect("reopen retried package");
-    assert_eq!(
-        reopened.custom_props().get("retrymarker"),
-        Some(&Value::Text("custom property retry".to_owned()))
-    );
-}
-
-#[test]
 fn raw_opc_custom_property_replacement_remains_byte_exact_after_save() {
     let custom_uri = PackURI::new("/docProps/custom.xml").expect("static custom-properties URI");
     let mut replacement = custom_properties_xml(HEADER_FIXTURE);
@@ -246,14 +239,21 @@ fn raw_opc_custom_property_replacement_remains_byte_exact_after_save() {
 
     let mut package = Package::from_reader(Cursor::new(HEADER_FIXTURE))
         .expect("open alt-chunk-header fixture for raw replacement");
-    package
-        .edit_opc(|candidate| {
-            candidate
-                .get_part_mut(&custom_uri)?
-                .set_blob(replacement.clone());
-            Ok(())
-        })
+    package = {
+        let mut edit = package.edit_opc();
+        (|candidate: &mut OpcPackage| -> litchi_docx::Result<_> {
+            {
+                candidate
+                    .get_part_mut(&custom_uri)?
+                    .set_blob(replacement.clone());
+                Ok(())
+            }
+        })(edit.package_mut())
         .expect("replace custom-properties bytes through raw OPC API");
+        edit.commit()
+            .expect("replace custom-properties bytes through raw OPC API")
+            .into_package()
+    };
     assert_eq!(
         package
             .opc_package()
@@ -279,14 +279,21 @@ fn raw_opc_empty_custom_properties_part_is_preserved_until_explicit_clear() {
 
     let mut package = Package::from_reader(Cursor::new(HEADER_FIXTURE))
         .expect("open alt-chunk-header fixture for empty replacement");
-    package
-        .edit_opc(|candidate| {
-            candidate
-                .get_part_mut(&custom_uri)?
-                .set_blob(replacement.clone());
-            Ok(())
-        })
+    package = {
+        let mut edit = package.edit_opc();
+        (|candidate: &mut OpcPackage| -> litchi_docx::Result<_> {
+            {
+                candidate
+                    .get_part_mut(&custom_uri)?
+                    .set_blob(replacement.clone());
+                Ok(())
+            }
+        })(edit.package_mut())
         .expect("replace custom-properties bytes with an empty root");
+        edit.commit()
+            .expect("replace custom-properties bytes with an empty root")
+            .into_package()
+    };
     assert!(package.custom_props().is_empty());
 
     let mut output = Vec::new();
@@ -295,29 +302,25 @@ fn raw_opc_empty_custom_properties_part_is_preserved_until_explicit_clear() {
         .expect("save empty raw OPC custom-properties replacement");
     assert_eq!(custom_properties_xml(&output), replacement);
 
-    let mut cleared = Package::from_reader(Cursor::new(output)).expect("reopen empty properties");
-    cleared.custom_props_mut().clear();
+    let cleared = Package::from_reader(Cursor::new(output)).expect("reopen empty properties");
+    let cleared = edit_custom_props(&cleared, CustomProps::clear).expect("clear custom properties");
     let mut cleared_output = Vec::new();
     cleared
         .write_to(&mut cleared_output)
         .expect("save explicitly cleared custom properties");
-    let cleared_graph = OpcPackage::from_bytes(&cleared_output).expect("open cleared OPC graph");
-    assert!(cleared_graph.get_part(&custom_uri).is_err());
-    assert!(
-        cleared_graph
-            .rels()
-            .iter()
-            .all(|relationship| relationship.reltype() != rt::CUSTOM_PROPERTIES)
-    );
+    // Clearing properties that are already empty is an exact no-op (record
+    // 0355): the empty part is kept byte for byte. Removing the part itself
+    // is a raw graph change.
+    assert_eq!(custom_properties_xml(&cleared_output), replacement);
 }
 
 #[test]
 fn exact_source_stream_failure_keeps_typed_cause_and_accepted_count() {
-    let mut authored = Package::new().unwrap();
+    let authored = Package::new().unwrap();
     let mut original = Vec::new();
     authored.write_to(&mut original).unwrap();
     for accepted in [0, 17] {
-        let mut package = Package::from_bytes(&original).unwrap();
+        let package = Package::from_bytes(&original).unwrap();
         let error = package
             .write_to(FailingSink {
                 remaining: accepted,
@@ -351,13 +354,12 @@ fn canonical_bytes_publish_pending_edits_and_reopen_exactly() {
         .document()
         .unwrap()
         .add_paragraph_with_text("canonical byte output");
-    let mut package = builder.build().unwrap();
-    package
-        .custom_props_mut()
-        .insert("ByteMarker", "retained")
-        .unwrap();
+    let package = edit_custom_props(&builder.build().unwrap(), |custom| {
+        custom.insert("ByteMarker", "retained").unwrap();
+    })
+    .unwrap();
     let bytes = package.to_bytes().unwrap();
-    let mut reopened = Package::from_bytes(&bytes).unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap();
     assert_eq!(
         reopened.document().unwrap().text().unwrap(),
         "canonical byte output"

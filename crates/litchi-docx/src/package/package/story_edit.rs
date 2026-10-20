@@ -44,14 +44,14 @@ impl Package {
     /// Returns a typed document transaction error when a selector is
     /// ambiguous, a story is not an editable main/header/footer story, a leaf
     /// cannot be represented safely, or candidate package validation fails.
-    pub fn replace_story_hyperlink_texts(
+    pub(crate) fn replace_story_hyperlink_texts(
         &mut self,
         replacements: &[StoryHyperlinkTextReplacement],
     ) -> TransactionResult<StoryInventory> {
         validate_replacements(replacements)?;
         let limits = StoryLimits::default();
         let inventory = self
-            .story_inventory_with_limits(limits)
+            .story_inventory_bounded(limits)
             .map_err(TransactionError::from)?;
         let mut grouped = BTreeMap::<&str, Vec<HyperlinkTextReplacement>>::new();
         for replacement in replacements {
@@ -416,7 +416,7 @@ mod tests {
                 "rBodyLink".to_owned(),
                 true,
             );
-        package.mutable_doc = None;
+
         package
     }
 

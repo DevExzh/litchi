@@ -184,6 +184,50 @@ pub enum Refusal {
     UnmodelledProperty,
 }
 
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by (record
+    /// 0351).
+    ///
+    /// Only an invalid property value is a value error. Every other reason
+    /// is a request this route cannot perform on the selected content: a
+    /// selector that does not resolve to a direct child the route edits, a
+    /// target without editable text, or content it would lose. Those keep
+    /// the single `unsupported_capability` code the unified layer reported
+    /// before record 0355; finer kinds (`NotFound`, `UnsupportedTarget`,
+    /// `UnsupportedProperty`) would change OfficeCLI-visible codes and are
+    /// follow-up 0355-F3.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::InvalidPropertyValue => RefusalKind::InvalidValue,
+            Self::HyperlinkNotFound
+            | Self::RunNotFound
+            | Self::FieldNotFound
+            | Self::ComplexFieldNotFound
+            | Self::RevisionNotFound
+            | Self::ContentControlNotFound
+            | Self::CellNotFound
+            | Self::BlockNotFound
+            | Self::AmbiguousCompositeSelector
+            | Self::TransitionalValue
+            | Self::ComplexRun
+            | Self::SectionBreak
+            | Self::FieldInterior
+            | Self::UnmodelledProperty => RefusalKind::UnsupportedOperation,
+            Self::ComplexContent
+            | Self::RevisionDependency
+            | Self::StructuralText
+            | Self::DuplicateProperty
+            | Self::TrackedChange
+            | Self::NamespaceBinding
+            | Self::OpenRange
+            | Self::StoryReference
+            | Self::AlternateContentText => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
 impl std::fmt::Display for Refusal {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
@@ -539,6 +583,16 @@ pub enum TransferRefusal {
     /// own `mc:Ignorable`, so moving it to another document would change
     /// whether readers see it.
     MarkupCompatibilityScope,
+}
+
+impl TransferRefusal {
+    /// The shared refusal kind litchi-ops classifies this reason by (record
+    /// 0351): every transfer refusal is source content the closure cannot
+    /// carry.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        litchi_core::edit::RefusalKind::UnsupportedContent
+    }
 }
 
 impl std::fmt::Display for TransferRefusal {
@@ -1825,11 +1879,11 @@ impl Snapshot {
             XmlStorage::Owned(xml) => Ok(Arc::clone(xml)),
             XmlStorage::OwnedWithIdentity { xml, .. } => Ok(Arc::clone(xml)),
             XmlStorage::Managed(_) | XmlStorage::Source { .. } => {
-                Err(Error::Document(crate::Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "snapshot.shared_xml",
-                    reason: "managed document XML cannot escape its retained source owner",
-                }))
+                Err(Error::Document(crate::Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "snapshot.shared_xml",
+                    "managed document XML cannot escape its retained source owner",
+                )))
             },
         }
     }
@@ -3156,11 +3210,10 @@ impl Edit {
         input_capacity_admission: Option<Arc<StringAdmission>>,
     ) -> Result<&mut Self> {
         let context = self.base.managed_context().ok_or({
-            Error::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "replace_paragraph_text",
-                reason: "managed candidate is missing its execution admission",
-            })
+            Error::Document(crate::Error::internal(
+                "replace_paragraph_text",
+                "managed candidate is missing its execution admission",
+            ))
         })?;
         context.check().map_err(managed_execution)?;
         validate_paragraph_text(position, &authored_text)?;
@@ -3250,11 +3303,11 @@ impl Edit {
                 ..
             } = operation
             else {
-                return Err(Error::Document(crate::Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "replace_paragraph_text",
-                    reason: "managed transactions only support direct paragraph text operations",
-                }));
+                return Err(Error::Document(crate::Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "replace_paragraph_text",
+                    "managed transactions only support direct paragraph text operations",
+                )));
             };
             if *operation_position == position {
                 if existing_index.replace(index).is_some() {
@@ -3349,19 +3402,16 @@ impl Edit {
             return Ok(self);
         }
 
-        let source = self.base.source_xml().ok_or(crate::Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "replace_paragraph_text",
-            reason: "managed paragraph source authorization is unavailable",
-        })?;
-        let identity = self
-            .base
-            .source_identity()
-            .ok_or(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "replace_paragraph_text",
-                reason: "managed paragraph source identity is unavailable",
-            })?;
+        let source = self.base.source_xml().ok_or(crate::Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "replace_paragraph_text",
+            "managed paragraph source authorization is unavailable",
+        ))?;
+        let identity = self.base.source_identity().ok_or(crate::Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "replace_paragraph_text",
+            "managed paragraph source identity is unavailable",
+        ))?;
 
         // Admit the replacement ledger and all retained operation strings
         // before cloning or growing the prospective operation vector. The
@@ -3388,11 +3438,11 @@ impl Edit {
                 after,
             } = operation
             else {
-                return Err(Error::Document(crate::Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "replace_paragraph_text",
-                    reason: "managed transactions only support direct paragraph text operations",
-                }));
+                return Err(Error::Document(crate::Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "replace_paragraph_text",
+                    "managed transactions only support direct paragraph text operations",
+                )));
             };
             if Some(index) == existing_index {
                 if remove_existing {
@@ -3454,11 +3504,10 @@ impl Edit {
         _temporary_admissions: impl Sized,
     ) -> Result<&mut Self> {
         let context = self.base.managed_context().ok_or({
-            Error::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
+            Error::Document(crate::Error::internal(
                 operation,
-                reason: "managed candidate is missing its execution admission",
-            })
+                "managed candidate is missing its execution admission",
+            ))
         })?;
         context.check().map_err(managed_execution)?;
         debug_assert!(!planned_operations.is_empty());
@@ -3491,11 +3540,11 @@ impl Edit {
                 after,
             } = planned_operation
             else {
-                return Err(Error::Document(crate::Error::UnsafeEdit {
-                    format: "DOCX",
+                return Err(Error::Document(crate::Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
                     operation,
-                    reason: "managed transactions only support direct paragraph text operations",
-                }));
+                    "managed transactions only support direct paragraph text operations",
+                )));
             };
             let range = self.base.range(*operation_position)?;
             let paragraph_start = checked_start(range, "base paragraph")?;
@@ -3507,11 +3556,10 @@ impl Edit {
                 "base paragraph",
             )?;
             let base_admission = self.base.admission.as_ref().ok_or({
-                Error::Document(crate::Error::UnsafeEdit {
-                    format: "DOCX",
+                Error::Document(crate::Error::internal(
                     operation,
-                    reason: "managed base snapshot is missing its execution admission",
-                })
+                    "managed base snapshot is missing its execution admission",
+                ))
             })?;
             let mut scan_admission = base_admission.owner_scan(paragraph.len())?;
             let owner = scan_text_owner(paragraph, b"p").map_err(|reason| Error::Refused {
@@ -3838,11 +3886,10 @@ impl Edit {
         replacements: &[ParagraphTextReplacement],
     ) -> Result<&mut Self> {
         let context = self.base.managed_context().ok_or({
-            Error::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "replace_body_paragraph_texts",
-                reason: "managed candidate is missing its execution admission",
-            })
+            Error::Document(crate::Error::internal(
+                "replace_body_paragraph_texts",
+                "managed candidate is missing its execution admission",
+            ))
         })?;
         context.check().map_err(managed_execution)?;
 
@@ -3919,11 +3966,10 @@ impl Edit {
             )?;
             let (owner, _projected_scan) = {
                 let admission = self.projected.admission.as_ref().ok_or({
-                    Error::Document(crate::Error::UnsafeEdit {
-                        format: "DOCX",
-                        operation: "replace_body_paragraph_texts",
-                        reason: "managed projected snapshot is missing its execution admission",
-                    })
+                    Error::Document(crate::Error::internal(
+                        "replace_body_paragraph_texts",
+                        "managed projected snapshot is missing its execution admission",
+                    ))
                 })?;
                 let mut scan = admission.owner_scan(paragraph.len())?;
                 let owner = scan_text_owner(paragraph, b"p").map_err(|reason| Error::Refused {
@@ -3947,11 +3993,10 @@ impl Edit {
                 "base paragraph",
             )?;
             let base_admission = self.base.admission.as_ref().ok_or({
-                Error::Document(crate::Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "replace_body_paragraph_texts",
-                    reason: "managed base snapshot is missing its execution admission",
-                })
+                Error::Document(crate::Error::internal(
+                    "replace_body_paragraph_texts",
+                    "managed base snapshot is missing its execution admission",
+                ))
             })?;
             let mut base_scan = base_admission.owner_scan(base_paragraph.len())?;
             let base_owner =
@@ -3970,11 +4015,11 @@ impl Edit {
                     ..
                 } = operation
                 else {
-                    return Err(Error::Document(crate::Error::UnsafeEdit {
-                        format: "DOCX",
-                        operation: "replace_body_paragraph_texts",
-                        reason: "managed transactions only support direct paragraph text operations",
-                    }));
+                    return Err(Error::Document(crate::Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "replace_body_paragraph_texts",
+                        "managed transactions only support direct paragraph text operations",
+                    )));
                 };
                 if *operation_position == replacement.position {
                     if existing_index.replace(index).is_some() {
@@ -4046,19 +4091,16 @@ impl Edit {
             return Ok(self);
         }
 
-        let source = self.base.source_xml().ok_or(crate::Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "replace_body_paragraph_texts",
-            reason: "managed paragraph source authorization is unavailable",
-        })?;
-        let identity = self
-            .base
-            .source_identity()
-            .ok_or(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "replace_body_paragraph_texts",
-                reason: "managed paragraph source identity is unavailable",
-            })?;
+        let source = self.base.source_xml().ok_or(crate::Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "replace_body_paragraph_texts",
+            "managed paragraph source authorization is unavailable",
+        ))?;
+        let identity = self.base.source_identity().ok_or(crate::Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "replace_body_paragraph_texts",
+            "managed paragraph source identity is unavailable",
+        ))?;
 
         // Existing edits may have been staged in arbitrary scalar order. Map
         // each retained operation to its batch decision once so final-ledger
@@ -4106,11 +4148,11 @@ impl Edit {
                     continue;
                 }
                 let Operation::ReplaceParagraphText { before, .. } = operation else {
-                    return Err(Error::Document(crate::Error::UnsafeEdit {
-                        format: "DOCX",
-                        operation: "replace_body_paragraph_texts",
-                        reason: "managed transactions only support direct paragraph text operations",
-                    }));
+                    return Err(Error::Document(crate::Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "replace_body_paragraph_texts",
+                        "managed transactions only support direct paragraph text operations",
+                    )));
                 };
                 planned_string_bytes = planned_string_bytes
                     .checked_add(before.capacity())
@@ -4165,11 +4207,11 @@ impl Edit {
                     position, before, ..
                 } = operation
                 else {
-                    return Err(Error::Document(crate::Error::UnsafeEdit {
-                        format: "DOCX",
-                        operation: "replace_body_paragraph_texts",
-                        reason: "managed transactions only support direct paragraph text operations",
-                    }));
+                    return Err(Error::Document(crate::Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "replace_body_paragraph_texts",
+                        "managed transactions only support direct paragraph text operations",
+                    )));
                 };
                 planned_operations.push(Operation::ReplaceParagraphText {
                     position: *position,
@@ -6496,11 +6538,10 @@ impl Edit {
             // A managed operation ledger must always cover every retained
             // operation. Multi-paragraph source reconstruction installs a
             // freshly sized ledger atomically before replacing this vector.
-            return Err(Error::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "document.edit",
-                reason: "managed operation metadata admission is inconsistent",
-            }));
+            return Err(Error::Document(crate::Error::internal(
+                "document.edit",
+                "managed operation metadata admission is inconsistent",
+            )));
         }
         Ok(())
     }
@@ -6510,11 +6551,10 @@ impl Edit {
         operation_count: usize,
     ) -> Result<Arc<OperationAdmission>> {
         let admission = self.projected.admission.as_ref().ok_or({
-            Error::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "document.edit",
-                reason: "managed operation admission is unavailable",
-            })
+            Error::Document(crate::Error::internal(
+                "document.edit",
+                "managed operation admission is unavailable",
+            ))
         })?;
         let operation_bytes = managed_operation_memory_bytes(operation_count)?;
         let memory = reserve_managed(&admission.context, Resource::Memory, operation_bytes)?;
@@ -6534,11 +6574,10 @@ impl Edit {
 
     fn reserve_string_admission(&self, bytes: usize) -> Result<Arc<StringAdmission>> {
         let admission = self.projected.admission.as_ref().ok_or({
-            Error::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "document.edit",
-                reason: "managed string admission is unavailable",
-            })
+            Error::Document(crate::Error::internal(
+                "document.edit",
+                "managed string admission is unavailable",
+            ))
         })?;
         let memory = bytes
             .checked_add(size_of::<StringAdmission>())
@@ -6578,11 +6617,11 @@ impl Edit {
 
     fn ensure_unmanaged(&self, operation: &'static str) -> Result<()> {
         if self.projected.is_managed() {
-            return Err(Error::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
+            return Err(Error::Document(crate::Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
                 operation,
-                reason: "this managed transaction operation has no retained source-preserving implementation",
-            }));
+                "this managed transaction operation has no retained source-preserving implementation",
+            )));
         }
         Ok(())
     }
@@ -6615,6 +6654,13 @@ pub struct Diagnostics {
 }
 
 impl Diagnostics {
+    pub(crate) const fn new(operations: usize, changed: bool) -> Self {
+        Self {
+            operations,
+            changed,
+        }
+    }
+
     /// Number of semantic operations in the commit.
     #[must_use]
     pub const fn operations(self) -> usize {
@@ -6676,6 +6722,21 @@ pub struct Patch {
 }
 
 impl Patch {
+    /// The operation-free patch that moves `before` to `after`: a recorded
+    /// history transition replayed as one main-document replacement.
+    pub(crate) fn transition(before: Snapshot, after: Snapshot) -> Self {
+        Self {
+            before,
+            after,
+            operations: OperationList::Empty,
+            operation_admission: None,
+            operation_string_admission: None,
+            inverse_operations: OperationList::Empty,
+            inverse_admission: None,
+            inverse_string_admission: None,
+        }
+    }
+
     /// Exact immutable source required by this patch.
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
@@ -6881,11 +6942,10 @@ fn operation_string_bytes(operation: &Operation) -> usize {
 fn managed_replacement_text_bytes(operations: &[Operation]) -> Result<usize> {
     operations.iter().try_fold(0usize, |total, operation| {
         let Operation::ReplaceParagraphText { after, .. } = operation else {
-            return Err(Error::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "document.edit",
-                reason: "managed operation ledger contains an unsupported operation",
-            }));
+            return Err(Error::Document(crate::Error::internal(
+                "document.edit",
+                "managed operation ledger contains an unsupported operation",
+            )));
         };
         let total = total.checked_add(after.len()).ok_or(Error::Limit {
             kind: crate::document::LimitKind::ReplacementTextBytes,
@@ -13331,9 +13391,9 @@ mod tests {
     }
 
     fn generated_corpus_snapshot(paragraphs: usize) -> Snapshot {
-        let mut package = crate::Package::new().unwrap();
+        let mut builder = crate::Builder::new().unwrap();
         {
-            let document = package.authoring_document().unwrap();
+            let document = builder.document().unwrap();
             for index in 0..paragraphs {
                 document.add_paragraph_with_text(&format!(
                     "litchi-perf-baseline-docx-semantic-v1-source-{index:05}"
@@ -13341,6 +13401,7 @@ mod tests {
             }
         }
         let mut output = std::io::Cursor::new(Vec::new());
+        let package = builder.build().unwrap();
         package.write_to(&mut output).unwrap();
         crate::Package::from_reader(std::io::Cursor::new(output.into_inner()))
             .unwrap()
@@ -15054,12 +15115,8 @@ mod tests {
         let reserved = budget.used(Resource::Memory);
 
         assert!(matches!(
-            managed.replace_run_text_node(Position::new(0), Position::new(0), "managed"),
-            Err(Error::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "replace_run_text_node",
-                ..
-            }))
+                    managed.replace_run_text_node(Position::new(0), Position::new(0), "managed"),
+                    Err(Error::Document(crate::Error::Refused(refusal))) if refusal.operation() == "replace_run_text_node"
         ));
         assert!(managed.projected.is_managed());
         assert_eq!(managed.projected().xml_bytes(), projected.as_slice());
@@ -15067,12 +15124,8 @@ mod tests {
         assert_eq!(budget.used(Resource::Memory), reserved);
 
         assert!(matches!(
-            managed.mark_cached_run_field_dirty(Position::new(0), Position::new(0)),
-            Err(Error::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "mark_cached_run_field_dirty",
-                ..
-            }))
+                    managed.mark_cached_run_field_dirty(Position::new(0), Position::new(0)),
+                    Err(Error::Document(crate::Error::Refused(refusal))) if refusal.operation() == "mark_cached_run_field_dirty"
         ));
         assert!(managed.projected.is_managed());
         assert_eq!(managed.projected().xml_bytes(), projected.as_slice());
@@ -15080,12 +15133,8 @@ mod tests {
         assert_eq!(budget.used(Resource::Memory), reserved);
 
         assert!(matches!(
-            managed.apply_operation(&recorded),
-            Err(Error::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "apply_revision",
-                ..
-            }))
+                    managed.apply_operation(&recorded),
+                    Err(Error::Document(crate::Error::Refused(refusal))) if refusal.operation() == "apply_revision"
         ));
         assert!(managed.projected.is_managed());
         assert_eq!(managed.projected().xml_bytes(), projected.as_slice());

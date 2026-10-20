@@ -358,40 +358,31 @@ fn full_artifact_fingerprint_defeats_colliding_custom_source_versions() {
 fn refuses_non_main_shared_owners_fields_and_partial_sink_is_typed() {
     let one = vec![link("rFirst", "https://shared.invalid/")];
     assert!(matches!(
-        open(fixture(one_document(), one.clone(), true, false))
-            .external_hyperlink_redaction_snapshot(),
-        Err(Error::UnsafeEdit {
-            operation: "external_hyperlink_redaction",
-            ..
-        })
+            open(fixture(one_document(), one.clone(), true, false))
+                .external_hyperlink_redaction_snapshot(),
+            Err(Error::Refused(refusal)) if refusal.operation() == "external_hyperlink_redaction"
     ));
     let field = format!(
         r#"<w:document xmlns:w="{W}" xmlns:r="{R}"><w:body><w:p><w:fldSimple w:instr="HYPERLINK https://field.invalid/"/><w:hyperlink r:id="rFirst"/></w:p></w:body></w:document>"#
     )
     .into_bytes();
     assert!(matches!(
-        open(fixture(field, one.clone(), false, false)).external_hyperlink_redaction_snapshot(),
-        Err(Error::UnsafeEdit {
-            operation: "external_hyperlink_redaction",
-            ..
-        })
+            open(fixture(field, one.clone(), false, false)).external_hyperlink_redaction_snapshot(),
+            Err(Error::Refused(refusal)) if refusal.operation() == "external_hyperlink_redaction"
     ));
     let unknown_relationship_attribute = format!(
         r#"<w:document xmlns:w="{W}" xmlns:r="{R}"><w:body><w:p><w:drawing r:embed="rFirst"/><w:hyperlink r:id="rFirst"/></w:p></w:body></w:document>"#
     )
     .into_bytes();
     assert!(matches!(
-        open(fixture(
-            unknown_relationship_attribute,
-            one.clone(),
-            false,
-            false
-        ))
-        .external_hyperlink_redaction_snapshot(),
-        Err(Error::UnsafeEdit {
-            operation: "external_hyperlink_redaction",
-            ..
-        })
+            open(fixture(
+                unknown_relationship_attribute,
+                one.clone(),
+                false,
+                false
+            ))
+            .external_hyperlink_redaction_snapshot(),
+            Err(Error::Refused(refusal)) if refusal.operation() == "external_hyperlink_redaction"
     ));
     let base = fixture(one_document(), one.clone(), false, false);
     for foreign_owner in [
@@ -399,11 +390,8 @@ fn refuses_non_main_shared_owners_fields_and_partial_sink_is_typed() {
         add_external_owner(&base, true, rt::HYPERLINK),
     ] {
         assert!(matches!(
-            open(foreign_owner).external_hyperlink_redaction_snapshot(),
-            Err(Error::UnsafeEdit {
-                operation: "external_hyperlink_redaction",
-                ..
-            })
+                    open(foreign_owner).external_hyperlink_redaction_snapshot(),
+                    Err(Error::Refused(refusal)) if refusal.operation() == "external_hyperlink_redaction"
         ));
     }
 

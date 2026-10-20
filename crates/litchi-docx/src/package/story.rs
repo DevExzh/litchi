@@ -21,7 +21,7 @@
 //! activated while an inventory is built.
 
 use super::Package;
-use crate::{Error, Result};
+use crate::Result;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI};
 use quick_xml::events::Event;
@@ -32,7 +32,10 @@ use std::sync::Arc;
 
 use crate::document::ParagraphHyperlinkAddress;
 
+mod edit;
 mod source;
+
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 #[allow(
     unused_imports,
     reason = "source-backed consumers use the inventory and part types as they land"
@@ -414,7 +417,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn story_inventory(&self) -> Result<StoryInventory> {
-        self.story_inventory_with_limits(StoryLimits::default())
+        self.story_inventory_bounded(self.semantic_limits().stories_value())
     }
 
     /// Inventory Word stories under an explicit semantic resource policy.
@@ -422,8 +425,8 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn story_inventory_with_limits(&self, limits: StoryLimits) -> Result<StoryInventory> {
-        self.ensure_story_opc_current("story_inventory_with_limits")?;
+    pub(crate) fn story_inventory_bounded(&self, limits: StoryLimits) -> Result<StoryInventory> {
+        self.ensure_story_opc_current("story_inventory_bounded")?;
         capture(self.opc_package(), limits)
     }
 }

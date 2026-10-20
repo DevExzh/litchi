@@ -135,7 +135,7 @@ pub(super) fn new_picture(props: &Props<'_>) -> Result<NewPicture> {
         .with_format(FileFormat::Docx));
     };
     let data = read_source(&src, SemanticLimits::default().max_staged_bytes())?;
-    if litchi_docx::writer::ImageFormat::detect_from_bytes(&data).is_none() {
+    if litchi_docx::ImageFormat::detect_from_bytes(&data).is_none() {
         return Err(error(
             Code::InvalidValue,
             "the picture source is not a recognized image",
@@ -200,7 +200,7 @@ fn picture_change(props: &Props<'_>) -> Result<(PictureChange, (Option<i64>, Opt
             })?;
         if let Some(source) = source {
             let data = read_source(&source, SemanticLimits::default().max_staged_bytes())?;
-            if litchi_docx::writer::ImageFormat::detect_from_bytes(&data).is_none() {
+            if litchi_docx::ImageFormat::detect_from_bytes(&data).is_none() {
                 return Err(error(
                     Code::InvalidValue,
                     "the picture source is not a recognized image",

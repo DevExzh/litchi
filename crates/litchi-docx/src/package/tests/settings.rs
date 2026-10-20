@@ -2,14 +2,21 @@ use super::*;
 
 #[test]
 fn body_edits_preserve_settings_part_byte_for_byte() {
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     let settings_uri = PackURI::new("/word/settings.xml").unwrap();
-    let before = package.opc.get_part(&settings_uri).unwrap().blob().to_vec();
+    let before = builder
+        .package_mut()
+        .opc
+        .get_part(&settings_uri)
+        .unwrap()
+        .blob()
+        .to_vec();
 
-    package
-        .authoring_document()
+    builder
+        .document()
         .unwrap()
         .add_paragraph_with_text("body-only edit");
+    let package = builder.build().unwrap();
     package.write_to(Cursor::new(Vec::new())).unwrap();
 
     assert_eq!(package.opc.get_part(&settings_uri).unwrap().blob(), before);
@@ -28,19 +35,21 @@ fn new_package_uses_leaf_owned_web_settings_bytes() {
 
 #[test]
 fn body_edits_preserve_web_settings_part_byte_for_byte() {
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     let web_settings_uri = PackURI::new("/word/webSettings.xml").unwrap();
-    let before = package
+    let before = builder
+        .package_mut()
         .opc
         .get_part(&web_settings_uri)
         .unwrap()
         .blob()
         .to_vec();
 
-    package
-        .authoring_document()
+    builder
+        .document()
         .unwrap()
         .add_paragraph_with_text("body-only edit");
+    let package = builder.build().unwrap();
     package.write_to(Cursor::new(Vec::new())).unwrap();
 
     assert_eq!(
@@ -399,20 +408,23 @@ fn attached_template_failures_are_atomic() {
 fn protection_rewrite_preserves_attached_template_relationship() {
     use crate::settings::ProtectionType;
 
-    let mut package = Package::new().unwrap();
-    package
+    let mut builder = crate::Builder::new().unwrap();
+    builder
+        .package_mut()
         .set_attached_template_uri("file:///templates/Protected.dotx")
         .unwrap();
-    let relationship_id = package
+    let relationship_id = builder
+        .package_mut()
         .attached_template()
         .unwrap()
         .unwrap()
         .relationship_id()
         .to_owned();
-    package
-        .authoring_document()
+    builder
+        .document()
         .unwrap()
         .set_protection(ProtectionType::ReadOnly);
+    let package = builder.build().unwrap();
     package.write_to(Cursor::new(Vec::new())).unwrap();
 
     let attached = package.attached_template().unwrap().unwrap();
@@ -479,12 +491,13 @@ fn document_variable_package_lifecycle_is_deterministic_and_reopens() {
 fn document_variable_mutation_preserves_xml_relationships_and_protection() {
     use crate::settings::ProtectionType;
 
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     let settings_uri = PackURI::new("/word/settings.xml").unwrap();
-    package.opc.get_part_mut(&settings_uri).unwrap().set_blob(
+    builder.package_mut().opc.get_part_mut(&settings_uri).unwrap().set_blob(
             br#"<?xml version="1.0"?><q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:opaque"><!--keep--><q:zoom q:percent="133"/><x:opaque><![CDATA[a < b]]></x:opaque><q:rsids/></q:settings>"#.to_vec(),
         );
-    package
+    builder
+        .package_mut()
         .opc
         .get_part_mut(&settings_uri)
         .unwrap()
@@ -495,17 +508,22 @@ fn document_variable_mutation_preserves_xml_relationships_and_protection() {
             "keep-id".to_owned(),
             true,
         );
-    package
+    builder
+        .package_mut()
         .set_attached_template_uri("file:///templates/Variables.dotx")
         .unwrap();
-    let attached_id = package
+    let attached_id = builder
+        .package_mut()
         .attached_template()
         .unwrap()
         .unwrap()
         .relationship_id()
         .to_owned();
-    package.set_document_variable("project", "Litchi").unwrap();
-    let part = package.opc.get_part(&settings_uri).unwrap();
+    builder
+        .package_mut()
+        .set_document_variable("project", "Litchi")
+        .unwrap();
+    let part = builder.package_mut().opc.get_part(&settings_uri).unwrap();
     let xml = String::from_utf8_lossy(part.blob());
     assert!(
         xml.contains(
@@ -515,10 +533,11 @@ fn document_variable_mutation_preserves_xml_relationships_and_protection() {
     assert!(part.rels().get("keep-id").is_some());
     assert!(part.rels().get(&attached_id).is_some());
 
-    package
-        .authoring_document()
+    builder
+        .document()
         .unwrap()
         .set_protection(ProtectionType::ReadOnly);
+    let package = builder.build().unwrap();
     package.write_to(Cursor::new(Vec::new())).unwrap();
     assert_eq!(
         package

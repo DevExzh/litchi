@@ -1213,10 +1213,8 @@ fn finite_context() -> Result<(Budget, ExecutionContext), Box<dyn Error>> {
 fn is_managed_boundary_refusal(error: &(dyn Error + 'static)) -> bool {
     matches!(
         error.downcast_ref::<TransactionError>(),
-        Some(TransactionError::Document(litchi_docx::Error::UnsafeEdit {
-            operation: "document_snapshot",
-            ..
-        }))
+        Some(TransactionError::Document(litchi_docx::Error::Refused(refusal)))
+            if refusal.operation() == "document_snapshot"
     )
 }
 

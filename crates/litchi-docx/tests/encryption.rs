@@ -10,7 +10,7 @@ const NEW_PASSWORD: &str = "Litchi changed password 7!";
 fn package_round_trips_the_supported_encryption_profiles() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("encrypted.docx");
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     package
         .save_encrypted(&path, PASSWORD, Mode::Standard)
         .unwrap();
@@ -24,7 +24,7 @@ fn package_round_trips_the_supported_encryption_profiles() {
 fn wrong_password_does_not_mutate_the_source() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("encrypted.docx");
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     package
         .save_encrypted(&path, PASSWORD, Mode::Agile)
         .unwrap();
@@ -43,11 +43,11 @@ fn encrypted_sources_require_an_explicit_plaintext_save() {
     let source = directory.path().join("source.docx");
     let target = directory.path().join("target.docx");
     let sentinel = b"existing output must survive";
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     package
         .save_encrypted(&source, PASSWORD, Mode::Agile)
         .unwrap();
-    let mut package = Package::open_with_password(&source, PASSWORD).unwrap();
+    let package = Package::open_with_password(&source, PASSWORD).unwrap();
 
     std::fs::write(&target, sentinel).unwrap();
     assert!(matches!(
@@ -67,12 +67,12 @@ fn reencrypted_output_preserves_mode_but_not_the_old_password() {
     let directory = tempfile::tempdir().unwrap();
     let source = directory.path().join("source.docx");
     let changed = directory.path().join("changed.docx");
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     package
         .save_encrypted(&source, PASSWORD, Mode::Standard)
         .unwrap();
 
-    let mut package = Package::open_with_password(&source, PASSWORD).unwrap();
+    let package = Package::open_with_password(&source, PASSWORD).unwrap();
     package.save_reencrypted(&changed, NEW_PASSWORD).unwrap();
     assert!(Package::open_with_password(&changed, PASSWORD).is_err());
     let reopened = Package::open_with_password(&changed, NEW_PASSWORD).unwrap();
@@ -106,14 +106,14 @@ fn bounded_reader_rejects_input_before_package_parsing() {
 fn cloned_encrypted_package_retains_policy_and_refuses_plain_apply() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("encrypted.docx");
-    let mut plain = Package::new().unwrap();
+    let plain = Package::new().unwrap();
     let noop = plain.edit().unwrap().commit().unwrap();
     plain
         .save_encrypted(&path, PASSWORD, Mode::Standard)
         .unwrap();
     let encrypted = Package::open_with_password(&path, PASSWORD).unwrap();
     assert!(encrypted.edit().is_err());
-    let mut shared = encrypted.clone();
+    let shared = encrypted.clone();
     assert_eq!(shared.encryption(), Some(Mode::Standard));
     assert!(shared.apply(noop.patch()).is_err());
     let mut output = Vec::new();
@@ -134,10 +134,10 @@ fn byte_output_requires_explicit_plaintext_and_retains_provenance() {
             .document()
             .unwrap()
             .add_paragraph_with_text("byte output");
-        let mut source = builder.build().unwrap();
+        let source = builder.build().unwrap();
         let plain = source.to_bytes().unwrap();
         let encrypted = source.to_encrypted(PASSWORD, mode).unwrap();
-        let mut package = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();
+        let package = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();
         assert!(matches!(package.to_bytes(), Err(Error::EncryptionPolicy {
             operation: "to_bytes", source: PolicyError::OrdinaryOutputWouldRemoveEncryption { mode: retained }
         }) if retained == mode));
@@ -156,7 +156,7 @@ fn byte_output_requires_explicit_plaintext_and_retains_provenance() {
             package.to_bytes(),
             Err(Error::EncryptionPolicy { .. })
         ));
-        let mut cloned = package.clone();
+        let cloned = package.clone();
         assert!(matches!(
             cloned.to_bytes(),
             Err(Error::EncryptionPolicy { .. })
@@ -167,7 +167,7 @@ fn byte_output_requires_explicit_plaintext_and_retains_provenance() {
 
 #[test]
 fn reencrypted_output_without_source_mode_is_a_typed_policy_refusal() {
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     assert!(matches!(
         package.to_reencrypted(PASSWORD),
         Err(Error::EncryptionPolicy {

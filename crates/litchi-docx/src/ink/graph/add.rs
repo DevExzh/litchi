@@ -679,11 +679,11 @@ fn ensure_no_foreign_incoming_batch(
 }
 
 fn unsupported_add(reason: &'static str) -> Error {
-    Error::UnsafeEdit {
-        format: "DOCX",
-        operation: "add_ink",
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "add_ink",
         reason,
-    }
+    )
 }
 
 #[cfg(test)]

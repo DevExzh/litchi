@@ -13,10 +13,10 @@ use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use std::fmt::Write as FmtWrite;
 
-use super::model::{MutableDocument, Protection};
+use super::model::{Document, Protection};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
-impl MutableDocument {
+impl Document {
     pub(super) fn write_document_prefix(&self, xml: &mut String) {
         if let Some(prefix) = &self.preserved_prefix {
             xml.push_str(prefix);

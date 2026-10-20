@@ -1626,3 +1626,69 @@ fn edit_refusals_classify_by_kind_alone() {
         assert_eq!(refusal.classify().code, code, "{kind}");
     }
 }
+
+// Record 0351 (W1): DOCX refusals classify by kind alone, a patch made for
+// another base is the caller's input, and a broken invariant is internal.
+#[cfg(feature = "docx")]
+#[test]
+fn docx_refusals_classify_by_kind_and_patch_conflicts_are_invalid_input() {
+    use litchi_core::edit::{Refusal, RefusalKind};
+
+    for (kind, code) in [
+        (
+            RefusalKind::UnsupportedOperation,
+            Code::UnsupportedCapability,
+        ),
+        (RefusalKind::UnsupportedContent, Code::UnsupportedCapability),
+        (RefusalKind::UnsupportedTarget, Code::UnsupportedType),
+        (RefusalKind::NotFound, Code::NotFound),
+        (RefusalKind::Protected, Code::DocumentProtected),
+    ] {
+        let error = assert_code(
+            litchi_docx::Error::Refused(Refusal::new(kind, "edit", "reason")),
+            code,
+        );
+        assert!(matches!(
+            error.leaf(),
+            Source::Docx(litchi_docx::Error::Refused(_))
+        ));
+    }
+    assert_code(
+        litchi_docx::Error::PatchConflict {
+            operation: "apply",
+            reason: "another base",
+        },
+        Code::InvalidInput,
+    );
+    assert_code(
+        litchi_docx::Error::Internal {
+            operation: "edit",
+            reason: "invariant",
+        },
+        Code::InternalError,
+    );
+    assert_code(
+        litchi_docx::document::Error::PatchConflict,
+        Code::InvalidInput,
+    );
+    assert_code(
+        litchi_docx::metadata::Error::PatchConflict,
+        Code::InvalidInput,
+    );
+    // Record 0355 §3: the document refusal reasons keep their established
+    // codes; only an invalid property value is a value error.
+    assert_code(
+        litchi_docx::document::Error::Refused {
+            position: 0,
+            reason: litchi_docx::document::Refusal::RunNotFound,
+        },
+        Code::UnsupportedCapability,
+    );
+    assert_code(
+        litchi_docx::document::Error::Refused {
+            position: 0,
+            reason: litchi_docx::document::Refusal::InvalidPropertyValue,
+        },
+        Code::InvalidValue,
+    );
+}

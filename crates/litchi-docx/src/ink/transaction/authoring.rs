@@ -7,7 +7,7 @@ use litchi_opc::{OwnedElementEdit, OwnedElementUpdate};
 
 use super::drawing_ids::DrawingIds;
 use super::{
-    Commit, Edit, GraphChange, Patch, State, StoryChange, bound, is_annotation, unsupported,
+    Edit, GraphChange, Patch, Planned, State, StoryChange, bound, is_annotation, unsupported,
 };
 use crate::ink::codec::Form;
 use crate::ink::graph::{AddDelta, Binding, Delta, NewTarget};
@@ -31,7 +31,7 @@ enum StructuralEdit {
     Append(Vec<u8>),
 }
 
-pub(super) fn commit(mut edit: Edit) -> Result<Commit> {
+pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
     bound(
         "annotations",
         edit.base
@@ -462,7 +462,7 @@ pub(super) fn commit(mut edit: Edit) -> Result<Commit> {
         binding,
         snapshot,
     });
-    Ok(Commit {
+    Ok(Planned {
         patch: Patch {
             before: edit.base,
             after,

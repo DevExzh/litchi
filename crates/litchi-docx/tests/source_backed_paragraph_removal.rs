@@ -249,7 +249,11 @@ fn invalid_positions_operation_and_resource_limits_leave_projection_unchanged() 
 
     let paragraph_limited = Limits::new(1024, 1, 100, 8, 2048, 4096).unwrap();
     assert!(matches!(
-        open(source.clone()).plain_paragraph_removal_snapshot_with_limits(paragraph_limited),
+        open(source.clone())
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().paragraph_copy(paragraph_limited)
+            )
+            .plain_paragraph_removal_snapshot(),
         Err(Error::Limit {
             resource: "paragraphs",
             ..
@@ -258,7 +262,8 @@ fn invalid_positions_operation_and_resource_limits_leave_projection_unchanged() 
 
     let output_limited = Limits::new(1024, 4, 100, 8, 1, 4096).unwrap();
     let snapshot = open(source)
-        .plain_paragraph_removal_snapshot_with_limits(output_limited)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().paragraph_copy(output_limited))
+        .plain_paragraph_removal_snapshot()
         .unwrap();
     let mut edit = snapshot.removal_edit();
     assert!(matches!(
@@ -272,7 +277,10 @@ fn invalid_positions_operation_and_resource_limits_leave_projection_unchanged() 
 
     let durable_limited = Limits::new(1024, 4, 100, 8, 2048, 128).unwrap();
     let snapshot = open(bytes(&fixture(document(&["a"]))))
-        .plain_paragraph_removal_snapshot_with_limits(durable_limited)
+        .with_semantic_limits(
+            litchi_docx::SemanticLimits::default().paragraph_copy(durable_limited),
+        )
+        .plain_paragraph_removal_snapshot()
         .unwrap();
     let mut edit = snapshot.removal_edit();
     edit.remove_plain_paragraph(Position::new(0)).unwrap();

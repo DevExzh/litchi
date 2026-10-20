@@ -31,7 +31,14 @@ fn deck(slides: usize) -> Result<Vec<u8>> {
     let mut builder = litchi_ppt::writer::Builder::new();
     for index in 0..slides {
         let slide = builder.add_slide()?;
-        builder.add_textbox(slide, 24, 24, 400, 48, &format!("Hello brave new world {index}"))?;
+        builder.add_textbox(
+            slide,
+            24,
+            24,
+            400,
+            48,
+            &format!("Hello brave new world {index}"),
+        )?;
         let mut table = Table::new(3, 3)?;
         for row in 0..3 {
             for column in 0..3 {
@@ -39,7 +46,10 @@ fn deck(slides: usize) -> Result<Vec<u8>> {
             }
         }
         builder.add_table(slide, 24, 120, table)?;
-        builder.add_comment(slide, SlideComment::new("Ada Lovelace", "Check the figures", 10, 20))?;
+        builder.add_comment(
+            slide,
+            SlideComment::new("Ada Lovelace", "Check the figures", 10, 20),
+        )?;
     }
     Ok(builder.build()?.to_bytes()?)
 }
@@ -204,7 +214,9 @@ fn writes(rounds: usize, slides: usize, lines: &mut Vec<String>) -> Result<()> {
         "ppt_run_format_v1",
         {
             let mut edit = native.edit()?;
-            let units = format!("Hello brave new world {}", 0).encode_utf16().count();
+            let units = format!("Hello brave new world {}", 0)
+                .encode_utf16()
+                .count();
             edit.set_run_format(
                 shape,
                 0,

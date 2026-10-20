@@ -12,11 +12,12 @@
 //! 2. Regression test baseline
 //! 3. Visual reference for all capabilities
 
+use litchi::docx::builder::{Document as DraftDocument, Theme};
 use litchi::docx::metadata::Metadata;
 use litchi::docx::{
     Border, Borders, Color, EndnotePos, Endnotes, FootnotePos, Footnotes, ListType,
-    MutableDocument, MutableTheme, PageNumberFormat, PageOrientation, ParagraphAlignment, Style,
-    TableOfContents, UnderlineStyle, Watermark,
+    PageNumberFormat, PageOrientation, ParagraphAlignment, Style, TableOfContents, UnderlineStyle,
+    Watermark,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -24,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("║     COMPREHENSIVE DOCX FEATURE TEST & VERIFICATION        ║");
     println!("╚════════════════════════════════════════════════════════════╝\n");
 
-    let mut doc = MutableDocument::new();
+    let mut doc = DraftDocument::new();
 
     // ═══════════════════════════════════════════════════════════════════════════
     // PART 1: NEW ADVANCED FEATURES (Themes, Watermarks, TOC)
@@ -38,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1.1 Theme Configuration
     // ───────────────────────────────────────────────────────────────────────────
     println!("   [1/3] Configuring custom theme...");
-    let mut theme = MutableTheme::new("Comprehensive Test Theme");
+    let mut theme = Theme::new("Comprehensive Test Theme");
     theme.set_major_font("Georgia");
     theme.set_minor_font("Calibri");
 
@@ -663,7 +664,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
         ..Metadata::default()
     });
-    let mut package = metadata.commit()?.into_package();
+    let package = metadata.commit()?.into_package();
 
     let filename = "comprehensive_test.docx";
     package.save(filename)?;

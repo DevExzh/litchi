@@ -35,7 +35,7 @@ fn removing_notes_strips_references_and_keeps_ids_unique() {
         assert_eq!(removed_endnote.id(), 1);
         assert!(!doc.has_endnotes());
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
     package.write_to(&mut bytes).unwrap();
@@ -66,7 +66,7 @@ fn removing_comments_updates_the_comments_part() {
         let (third, _) = doc.add_comment("Carol", "fresh");
         assert_eq!(third, 3);
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
     package.write_to(&mut bytes).unwrap();

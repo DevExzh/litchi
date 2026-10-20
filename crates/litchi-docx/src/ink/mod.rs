@@ -20,7 +20,7 @@
 //! };
 //! use litchi_core::Position;
 //!
-//! # fn insert(package: &mut litchi_docx::Package) -> Result<(), Box<dyn std::error::Error>> {
+//! # fn insert(package: &litchi_docx::Package) -> Result<(), Box<dyn std::error::Error>> {
 //! let payload = Draft::default()
 //!     .context(ContextDraft::new(ContextKind::InkDrawing).with_xml_id("ctx")?)?
 //!     .brush(BrushDraft::new("brush")?)?
@@ -30,7 +30,8 @@
 //! let mut edit = package.edit_ink()?;
 //! edit.insert(Destination::main(Position::new(0)), payload,
 //!     Style::Base(BaseProfile::InkContent))?;
-//! package.publish_ink_edit(edit)?;
+//! let commit = edit.commit()?;
+//! assert!(commit.diagnostics().changed());
 //! # Ok(())
 //! # }
 //! ```
@@ -56,6 +57,23 @@ pub use litchi_drawingml::ink::{
     Draft, EffectiveBrushProperty, Guid, InkEffect, Prepared, SemanticType, TraceDraft,
 };
 pub use model::{Annotation, BrushProperty, Context, Limits, Location, Snapshot};
-pub use transaction::{Commit, Destination, Edit, EditLimits, Patch};
+pub use transaction::{Commit, Destination, Diagnostics, Edit, EditOptions, Patch};
+
+/// Error of the ink family: the crate error. Ink budget refusals are
+/// [`crate::Error::InkLimit`], which names the exceeded resource.
+pub type Error = crate::Error;
+
+/// Typed budget kinds of the ink family. Ink budgets are still reported
+/// through [`crate::Error::InkLimit`] by resource name, so this has no
+/// variants yet (record 0355 follow-up).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, _formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {}
+    }
+}
 
 pub(crate) const CONTENT_TYPE: &str = "application/inkml+xml";

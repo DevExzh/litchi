@@ -1446,7 +1446,7 @@ mod tests {
             .document()
             .expect("document")
             .add_paragraph_with_text("source-change");
-        let mut package = builder.build().expect("finalized DOCX package");
+        let package = builder.build().expect("finalized DOCX package");
         let mut bytes = Cursor::new(Vec::new());
         package.write_to(&mut bytes).expect("serialize DOCX");
         let source: Arc<dyn ReadAt> = Arc::new(ChangingSource {
