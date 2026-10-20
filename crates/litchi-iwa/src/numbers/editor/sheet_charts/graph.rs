@@ -11,14 +11,14 @@ pub(super) struct SheetChartGraph {
     pub(super) component_id: u64,
     /// Component that owns the sheet's cross-component drawable reference.
     pub(super) sheet_component_id: u64,
-    pub(super) info: NumbersSheetChartInfo,
+    pub(super) info: SheetChartInfo,
     pub(super) object_ids: Vec<u64>,
     pub(super) uuid_object_ids: Vec<u64>,
     pub(super) private_preset_id: Option<u64>,
 }
 
 pub(super) fn chart_graph(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<SheetChartGraph> {
@@ -290,7 +290,7 @@ pub(super) fn chart_graph(
         sheet_archive_name,
         component_id,
         sheet_component_id,
-        info: NumbersSheetChartInfo {
+        info: SheetChartInfo {
             sheet_id,
             drawable_object_id,
             kind: Kind::from_native(

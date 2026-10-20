@@ -9,7 +9,7 @@ use crate::image_caption::{
 };
 use crate::package::PackageLimits;
 
-impl PagesEditor {
+impl Editor {
     /// Read the native caption attached to one body chart.
     pub fn body_chart_caption(&self, drawable_object_id: u64) -> Result<Option<String>> {
         body_chart_caption(self, drawable_object_id)
@@ -30,7 +30,7 @@ impl PagesEditor {
     }
 }
 
-fn body_chart_caption(editor: &PagesEditor, drawable_object_id: u64) -> Result<Option<String>> {
+fn body_chart_caption(editor: &Editor, drawable_object_id: u64) -> Result<Option<String>> {
     let slot = body_chart_caption_slot(editor, drawable_object_id)?;
     slot.storage_id
         .map(|storage_id| {
@@ -42,7 +42,7 @@ fn body_chart_caption(editor: &PagesEditor, drawable_object_id: u64) -> Result<O
 }
 
 fn body_chart_caption_slot(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
 ) -> Result<DrawableCaptionSlot> {
     let source = body_chart_graph(editor, drawable_object_id)?;
@@ -71,11 +71,7 @@ fn body_chart_caption_slot(
     )
 }
 
-fn set_body_chart_caption(
-    editor: &mut PagesEditor,
-    drawable_object_id: u64,
-    text: &str,
-) -> Result<()> {
+fn set_body_chart_caption(editor: &mut Editor, drawable_object_id: u64, text: &str) -> Result<()> {
     let source = body_chart_graph(editor, drawable_object_id)?;
     let slot = body_chart_caption_slot(editor, drawable_object_id)?;
     let expected = Some(text.to_owned());
@@ -108,7 +104,7 @@ fn set_body_chart_caption(
         set_package_last_object_identifier(&mut staged, ids.last())?;
         staged
     };
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_caption(drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Pages chart caption update failed validation".to_owned(),
@@ -118,7 +114,7 @@ fn set_body_chart_caption(
     Ok(())
 }
 
-fn remove_body_chart_caption(editor: &mut PagesEditor, drawable_object_id: u64) -> Result<bool> {
+fn remove_body_chart_caption(editor: &mut Editor, drawable_object_id: u64) -> Result<bool> {
     let source = body_chart_graph(editor, drawable_object_id)?;
     let slot = body_chart_caption_slot(editor, drawable_object_id)?;
     if slot.storage_id.is_none() {
@@ -135,7 +131,7 @@ fn remove_body_chart_caption(editor: &mut PagesEditor, drawable_object_id: u64) 
     )?;
     add_component_object_uuids(&mut staged, source.component_id, &[standin_id])?;
     set_package_last_object_identifier(&mut staged, standin_id)?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_caption(drawable_object_id)?.is_some() {
         return Err(Error::InvalidFormat(
             "Pages chart caption removal failed validation".to_owned(),
@@ -145,7 +141,7 @@ fn remove_body_chart_caption(editor: &mut PagesEditor, drawable_object_id: u64) 
     Ok(true)
 }
 
-fn body_chart_caption_theme(editor: &PagesEditor) -> Result<(CaptionThemeStyle, Option<String>)> {
+fn body_chart_caption_theme(editor: &Editor) -> Result<(CaptionThemeStyle, Option<String>)> {
     let root = pages_document_root_facts(editor.package())?;
     let theme_id = root
         .theme

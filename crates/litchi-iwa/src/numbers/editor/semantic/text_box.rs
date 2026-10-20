@@ -8,9 +8,9 @@ use litchi_iwa_text::columns::Columns;
 use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
 use litchi_iwa_text::position::TextPosition;
 
-impl NumbersEditor {
+impl Editor {
     /// List ordinary text boxes owned by a reachable Numbers sheet.
-    pub fn sheet_text_boxes(&self, sheet_id: u64) -> Result<Vec<NumbersTextBoxInfo>> {
+    pub fn sheet_text_boxes(&self, sheet_id: u64) -> Result<Vec<TextBoxInfo>> {
         let mut catalog = NumbersObjectCatalog::build(&self.package)?;
         let drawable_ids = catalog
             .sheet_drawable_ids(&self.package, sheet_id)?
@@ -23,7 +23,7 @@ impl NumbersEditor {
                 continue;
             };
             let storage = catalog.text_storage_info(&self.package, graph.storage_id)?;
-            result.push(NumbersTextBoxInfo {
+            result.push(TextBoxInfo {
                 sheet_id,
                 drawable_object_id: drawable_id,
                 storage,

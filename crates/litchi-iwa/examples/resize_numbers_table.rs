@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::numbers::NumbersEditor;
+use litchi_iwa::numbers;
 use litchi_numbers::TableSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rows: usize = arguments.next().ok_or("missing row count")?.parse()?;
     let columns: usize = arguments.next().ok_or("missing column count")?.parse()?;
 
-    let mut editor = NumbersEditor::open(input)?;
+    let mut editor = numbers::Editor::open(input)?;
     editor
         .tables()?
         .get(table_index)

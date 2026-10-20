@@ -3,7 +3,7 @@
 use super::*;
 use litchi_iwa_common::comment::{TableCellComment, TableCellReply};
 
-impl PagesEditor {
+impl Editor {
     /// Read the comment attached to a reachable body-table cell.
     pub fn table_cell_comment(
         &self,
@@ -180,7 +180,7 @@ impl PagesEditor {
 }
 
 fn require_reply(
-    editor: &PagesEditor,
+    editor: &Editor,
     model_object_id: u64,
     row: usize,
     column: usize,
@@ -203,11 +203,11 @@ fn require_reply(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pages::PagesDocumentBuilder;
+    use crate::pages;
 
     #[test]
     fn source_built_table_comment_threads_support_full_crud() {
-        let mut editor = PagesDocumentBuilder::new()
+        let mut editor = pages::Builder::new()
             .body_text("Comment validation\n")
             .body_table("Review", 2, 2)
             .build()
@@ -268,7 +268,7 @@ mod tests {
         editor.clear_table_cell_comment(table_id, 1, 1).unwrap();
         assert!(editor.table_cell_comment(table_id, 1, 1).unwrap().is_none());
 
-        let reparsed = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reparsed = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(
             reparsed
                 .table_cell_comment(table_id, 1, 1)

@@ -21,7 +21,7 @@ use litchi_numbers::cell::data_format::{
     percentage::transaction as percentage_transaction,
     scientific::transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path},
 };
-use litchi_numbers::{CellPosition, Package, SheetSelector, TableSelector};
+use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::{BncCell, CellDataFormatKind};
 use prost::Message as _;
 
@@ -47,12 +47,12 @@ fn fixed_scientific(places: u8) -> Scientific {
     Scientific::new(FixedDecimalPlaces::new(places).expect("fixture precision is valid"))
 }
 
-fn selected_position() -> CellPosition {
-    CellPosition::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
+fn selected_position() -> At {
+    At::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
 }
 
-fn sibling_position() -> CellPosition {
-    CellPosition::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
+fn sibling_position() -> At {
+    At::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
 }
 
 fn shared_source() -> TestResult<Vec<u8>> {
@@ -292,11 +292,7 @@ fn scientific_selectors_and_option_semantics_are_explicit() -> TestResult {
 fn scientific_coordinate_boundaries_return_cell_not_found_without_mutation() -> TestResult {
     let package = Package::from_bytes(&shared_source()?)?;
     let before = package.exact_bytes();
-    for position in [
-        CellPosition::new(1, 0),
-        CellPosition::new(0, 2),
-        CellPosition::new(u32::MAX, u32::MAX),
-    ] {
+    for position in [At::new(1, 0), At::new(0, 2), At::new(u32::MAX, u32::MAX)] {
         assert!(matches!(
             package.table_cell_scientific_format(0usize, 0usize, position),
             Err(Error::CellNotFound)

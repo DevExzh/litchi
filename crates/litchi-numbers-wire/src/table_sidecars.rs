@@ -1463,7 +1463,7 @@ where
 
 /// Construct one common cell-comment record for a selected position.
 pub fn positioned_comment(
-    position: litchi_iwa_common::table::coordinate::CellPosition,
+    position: litchi_iwa_common::table::coordinate::At,
     comment: Comment,
 ) -> CellComment {
     CellComment::new(position, comment)

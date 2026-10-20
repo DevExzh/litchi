@@ -13,6 +13,7 @@
 //! needed to exercise dependency boundaries that the writer does not expose
 //! as a public authoring surface.
 
+use litchi_core::sheet::{Cell as _, Worksheet as _};
 use litchi_core::sheet::{CellValue, WorkbookTrait as _};
 use litchi_opc::PackURI;
 use litchi_xlsb::Package;

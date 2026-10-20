@@ -3,9 +3,9 @@
 //! provided.
 
 use litchi_core::FileFormat;
-use litchi_core::sheet::{
-    Result as SheetResult, WorkbookTrait, Worksheet as CoreWorksheet, WorksheetIterator,
-};
+use litchi_core::sheet::{Result as SheetResult, WorkbookTrait};
+
+use super::sheet::{Worksheet, Worksheets};
 
 use crate::Result;
 #[cfg(feature = "ods")]
@@ -154,22 +154,20 @@ fn ods_unsupported(what: &str) -> Box<dyn std::error::Error + Send + Sync> {
     )
 }
 
-/// An iterator that yields one refusal.
-#[cfg(feature = "ods")]
-struct Refused(bool);
-
-#[cfg(feature = "ods")]
-impl<'a> WorksheetIterator<'a> for Refused {
-    fn next(&mut self) -> Option<SheetResult<Box<dyn CoreWorksheet + 'a>>> {
-        std::mem::take(&mut self.0).then(|| Err(ods_unsupported("worksheet iteration")))
-    }
-}
-
 /// Static dispatch to the format handle's [`WorkbookTrait`]: XLSX and XLSB
 /// as their handles implement it, XLS through its eager reader (read once
 /// from the file on first use when the workbook was opened from a path), and
 /// ODS refused as described on [`WorkbookView`].
 impl WorkbookTrait for WorkbookView<'_> {
+    type Worksheet<'b>
+        = Worksheet<'b>
+    where
+        Self: 'b;
+    type Worksheets<'b>
+        = Worksheets<'b>
+    where
+        Self: 'b;
+
     fn active_sheet_index(&self) -> usize {
         match self.0 {
             #[cfg(feature = "xlsx")]
@@ -183,7 +181,7 @@ impl WorkbookTrait for WorkbookView<'_> {
         }
     }
 
-    fn active_worksheet(&self) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
+    fn active_worksheet(&self) -> SheetResult<Worksheet<'_>> {
         match self.0 {
             #[cfg(feature = "xlsx")]
             Inner::Xlsx(handle) => WorkbookTrait::active_worksheet(handle),
@@ -209,7 +207,7 @@ impl WorkbookTrait for WorkbookView<'_> {
         }
     }
 
-    fn worksheet_by_index(&self, index: usize) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
+    fn worksheet_by_index(&self, index: usize) -> SheetResult<Worksheet<'_>> {
         match self.0 {
             #[cfg(feature = "xlsx")]
             Inner::Xlsx(handle) => WorkbookTrait::worksheet_by_index(handle, index),
@@ -222,7 +220,7 @@ impl WorkbookTrait for WorkbookView<'_> {
         }
     }
 
-    fn worksheet_by_name(&self, name: &str) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
+    fn worksheet_by_name(&self, name: &str) -> SheetResult<Worksheet<'_>> {
         match self.0 {
             #[cfg(feature = "xlsx")]
             Inner::Xlsx(handle) => WorkbookTrait::worksheet_by_name(handle, name),
@@ -261,7 +259,7 @@ impl WorkbookTrait for WorkbookView<'_> {
         }
     }
 
-    fn worksheets(&self) -> Box<dyn WorksheetIterator<'_> + '_> {
+    fn worksheets(&self) -> Worksheets<'_> {
         match self.0 {
             #[cfg(feature = "xlsx")]
             Inner::Xlsx(handle) => WorkbookTrait::worksheets(handle),
@@ -270,7 +268,9 @@ impl WorkbookTrait for WorkbookView<'_> {
             #[cfg(feature = "xls")]
             Inner::Xls(handle) => WorkbookTrait::worksheets(handle),
             #[cfg(feature = "ods")]
-            Inner::Ods(_) => Box::new(Refused(true)),
+            Inner::Ods(_) => Worksheets::new(super::sheet::WorksheetsInner::Refused(Some(
+                ods_unsupported("worksheet iteration"),
+            ))),
         }
     }
 }

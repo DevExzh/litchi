@@ -3,9 +3,9 @@ use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSet
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
-use litchi_iwa::pages::PagesDocumentBuilder;
+use litchi_iwa::keynote::{self};
+use litchi_iwa::numbers::{self};
+use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_keynote::slide::table::headers::{
     Count as KeynoteHeaderCount, Settings as KeynoteHeaderSettings,
@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn create_numbers(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_name("Section CRUD")
         .table_dimensions(TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
@@ -69,9 +69,9 @@ fn create_numbers(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std
 }
 
 fn set_focused_table_headers(
-    editor: NumbersEditor,
+    editor: numbers::Editor,
     settings: HeaderSettings,
-) -> Result<NumbersEditor, Box<dyn std::error::Error>> {
+) -> Result<numbers::Editor, Box<dyn std::error::Error>> {
     let package = Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_table_headers(SheetSelector::index(0), TableSelector::index(0))?
@@ -79,11 +79,11 @@ fn set_focused_table_headers(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(NumbersEditor::from_bytes(&bytes)?)
+    Ok(numbers::Editor::from_bytes(&bytes)?)
 }
 
 fn create_pages(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Section-aware table CRUD\n")
         .body_table("Section CRUD", TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
@@ -110,7 +110,7 @@ fn create_pages(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std::
 }
 
 fn create_keynote(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = KeynoteDocumentBuilder::new()
+    let mut editor = keynote::Builder::new()
         .title("Section-aware table CRUD")
         .build()?;
     let table = editor.add_slide_table(
@@ -146,7 +146,7 @@ fn create_keynote(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std
 }
 
 fn set_pages_table_headers(
-    editor: &mut litchi_iwa::pages::PagesEditor,
+    editor: &mut litchi_iwa::pages::Editor,
     settings: PagesHeaderSettings,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let package = PagesPackage::from_bytes(&editor.to_bytes()?)?;
@@ -156,14 +156,14 @@ fn set_pages_table_headers(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    *editor = litchi_iwa::pages::PagesEditor::from_bytes(&bytes)?;
+    *editor = litchi_iwa::pages::Editor::from_bytes(&bytes)?;
     Ok(())
 }
 
 fn set_focused_keynote_table_headers(
-    editor: KeynoteEditor,
+    editor: keynote::Editor,
     settings: KeynoteHeaderSettings,
-) -> Result<KeynoteEditor, Box<dyn std::error::Error>> {
+) -> Result<keynote::Editor, Box<dyn std::error::Error>> {
     let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_slide_table_headers(
@@ -174,7 +174,7 @@ fn set_focused_keynote_table_headers(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(KeynoteEditor::from_bytes(&bytes)?)
+    Ok(keynote::Editor::from_bytes(&bytes)?)
 }
 
 fn section_values() -> Vec<TableCellUpdate> {
@@ -193,7 +193,7 @@ fn section_values() -> Vec<TableCellUpdate> {
 }
 
 fn set_numbers_cells(
-    editor: &mut NumbersEditor,
+    editor: &mut numbers::Editor,
     updates: impl IntoIterator<Item = litchi_numbers::cell::Update>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let changes = updates
@@ -210,14 +210,14 @@ fn set_numbers_cells(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    *editor = NumbersEditor::from_bytes(&bytes)?;
+    *editor = numbers::Editor::from_bytes(&bytes)?;
     Ok(())
 }
 
 fn numbers_cell_change(
     update: litchi_numbers::cell::Update,
 ) -> Result<litchi_numbers::table::cells::Change, Box<dyn std::error::Error>> {
-    let position = litchi_numbers::CellPosition::try_from_usize(update.row, update.column)?;
+    let position = litchi_numbers::At::try_from_usize(update.row, update.column)?;
     let change = match update.value {
         CellValue::Empty => litchi_numbers::table::cells::Change::clear(position),
         CellValue::Text(value) => litchi_numbers::table::cells::Change::set(

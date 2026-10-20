@@ -14,7 +14,7 @@ use crate::{
     formula::{BinaryOperator, Node},
     package::function_map::function_identifier,
     table::{
-        CellPosition,
+        At,
         cells::{Change, Error, Input, LimitKind, Path},
     },
 };
@@ -24,7 +24,7 @@ use super::{budget, cache_commit, lists, resolve, tile};
 #[derive(Debug)]
 pub(super) struct AuthoredFormula {
     pub(super) change_index: usize,
-    pub(super) position: CellPosition,
+    pub(super) position: At,
     pub(super) bytes: Vec<u8>,
     pub(super) precedents: Vec<FormulaWritePrecedent>,
     pub(super) ranges: Vec<FormulaWriteRange>,

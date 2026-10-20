@@ -7,7 +7,7 @@ use crate::charts::axis_label_position_3d::{
     set_chart_3d_value_axis_label_position as set_native_3d_value_axis_label_position,
 };
 
-impl NumbersEditor {
+impl Editor {
     /// Read one sheet chart's 3D primary value-axis label position.
     pub fn sheet_chart_3d_value_axis_label_position(
         &self,
@@ -51,7 +51,7 @@ impl NumbersEditor {
             graph.info.kind,
             position,
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_3d_value_axis_label_position(sheet_id, drawable_object_id)?
             != position
         {
@@ -67,12 +67,12 @@ impl NumbersEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn duplicated_sheet_charts_have_copy_on_write_axis_label_positions() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
             .add_sheet_chart(

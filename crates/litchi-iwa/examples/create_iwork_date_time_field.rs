@@ -1,8 +1,8 @@
 use std::path::Path;
 
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::keynote;
+use litchi_iwa::numbers;
+use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::text::TextPosition;
 use litchi_iwa_text::date_time::{
@@ -18,10 +18,6 @@ const SIZE: DrawableSize = DrawableSize {
     height: 120.0,
 };
 
-#[expect(
-    deprecated,
-    reason = "demonstrates the legacy raw-ID Keynote editor API, which takes native object IDs; litchi_keynote::Package has no equivalent text-box route yet"
-)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
         .nth(1)
@@ -33,12 +29,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|value| value.to_str())
     {
         Some("pages") => {
-            let mut editor = PagesEditor::create_with_text(PREFIX)?;
+            let mut editor = pages::Editor::create_with_text(PREFIX)?;
             editor.insert_body_date_time_field(position, display()?, settings()?)?;
             editor.save(output)?;
         },
         Some("numbers") => {
-            let mut editor = NumbersDocumentBuilder::new().build()?;
+            let mut editor = numbers::Builder::new().build()?;
             let sheet_id = editor.sheets()?[0].id();
             let text_box = editor.add_sheet_text_box(sheet_id, PREFIX, POSITION, SIZE)?;
             editor.insert_sheet_text_box_date_time_field(
@@ -51,7 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             editor.save(output)?;
         },
         Some("key") => {
-            let mut editor = KeynoteDocumentBuilder::new().build()?;
+            let mut editor = keynote::Builder::new().build()?;
             let text_box = editor.add_slide_text_box(0, PREFIX, POSITION, SIZE)?;
             editor.insert_slide_text_box_date_time_field(
                 0,

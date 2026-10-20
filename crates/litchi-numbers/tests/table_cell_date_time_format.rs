@@ -17,7 +17,7 @@ use litchi_numbers::cell::data_format::{
     DateTime,
     date_time::transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path},
 };
-use litchi_numbers::{CellPosition, Package, SheetSelector, TableSelector};
+use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::{BncCell, CellDataFormatKind, StoredValue};
 use prost::Message as _;
 
@@ -39,8 +39,8 @@ impl ExactBytes for Package {
     }
 }
 
-fn selected_position() -> CellPosition {
-    CellPosition::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
+fn selected_position() -> At {
+    At::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
 }
 
 fn source() -> TestResult<Vec<u8>> {
@@ -567,7 +567,7 @@ fn date_time_shared_format_key_uses_cow_and_keeps_refcounts_consistent() -> Test
 
     let both = first
         .package()
-        .edit_table_cell_date_time_format(0usize, 0usize, CellPosition::new(0, 1))?
+        .edit_table_cell_date_time_format(0usize, 0usize, At::new(0, 1))?
         .set(replacement)
         .commit()?;
     let both_bytes = both.package().exact_bytes();
@@ -597,7 +597,7 @@ fn date_time_shared_format_key_uses_cow_and_keeps_refcounts_consistent() -> Test
 
     let all_cleared = one_cleared
         .package()
-        .edit_table_cell_date_time_format(0usize, 0usize, CellPosition::new(0, 1))?
+        .edit_table_cell_date_time_format(0usize, 0usize, At::new(0, 1))?
         .clear()
         .commit()?;
     let all_cleared_bytes = all_cleared.package().exact_bytes();

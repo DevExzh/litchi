@@ -14,7 +14,7 @@ use litchi_iwa_protos::{
 use super::super::{Package, table_headers};
 use crate::{
     package::table_cells::{DependencyKind, Error, LimitKind, Path},
-    table::{CellPosition, Dimensions, lock::State as LockState},
+    table::{At, Dimensions, lock::State as LockState},
 };
 
 const TILE_MESSAGE_TYPE: u32 = 6_002;
@@ -264,7 +264,7 @@ pub(super) fn resolve_changed_target(
     source: &Package,
     sheet_position: usize,
     table_position: usize,
-    positions: &[CellPosition],
+    positions: &[At],
 ) -> Result<(Target, ResolveReport), Error> {
     let remaining = super::budget::TransactionBudget::new(source)?.remaining()?;
     resolve_changed_target_with_remaining(
@@ -281,7 +281,7 @@ pub(super) fn resolve_changed_target_with_remaining(
     source: &Package,
     sheet_position: usize,
     table_position: usize,
-    positions: &[CellPosition],
+    positions: &[At],
     remaining: super::budget::Remaining,
 ) -> Result<(Target, ResolveReport), Error> {
     resolve_target_with_remaining(
@@ -298,7 +298,7 @@ pub(super) fn resolve_formula_read_target_with_remaining(
     source: &Package,
     sheet_position: usize,
     table_position: usize,
-    positions: &[CellPosition],
+    positions: &[At],
     remaining: super::budget::Remaining,
 ) -> Result<(Target, ResolveReport), Error> {
     resolve_target_with_remaining(
@@ -315,7 +315,7 @@ fn resolve_target_with_remaining(
     source: &Package,
     sheet_position: usize,
     table_position: usize,
-    positions: &[CellPosition],
+    positions: &[At],
     remaining: super::budget::Remaining,
     permit_locked_read: bool,
 ) -> Result<(Target, ResolveReport), Error> {
@@ -545,12 +545,7 @@ fn resolve_target_with_remaining(
     ))
 }
 
-fn validate_positions(
-    positions: &[CellPosition],
-    rows: u32,
-    columns: u32,
-    path: Path,
-) -> Result<(), Error> {
+fn validate_positions(positions: &[At], rows: u32, columns: u32, path: Path) -> Result<(), Error> {
     let dimensions = Dimensions::new(rows, columns);
     let mut previous = None;
     for &position in positions {
@@ -1859,7 +1854,7 @@ fn resolve_merge_map(
         field
             .validate_canonical_framing()
             .map_err(|_error| Error::InvalidSource { path })?;
-        // Each field 1 is a CellRange. Scalar publication cannot safely
+        // Each field 1 is an `Area`. Scalar publication cannot safely
         // regenerate an active merge map or distinguish covered followers.
         active = true;
     }
@@ -3420,7 +3415,7 @@ fn codec_usage_delta(
 fn resolve_dependencies(
     source: &Package,
     native: table_headers::Target,
-    positions: &[CellPosition],
+    positions: &[At],
     owner_markers: ModelOwnerMarkers,
     identities: &mut RoleIdentities,
     budget: &mut ResolutionBudget,
@@ -4391,7 +4386,7 @@ fn rooted_engine_reference(
 
 fn touches_header_coordinate(
     native: table_headers::Target,
-    positions: &[CellPosition],
+    positions: &[At],
     path: Path,
 ) -> Result<bool, Error> {
     let header_rows = u32::try_from(native.settings.header_row_count())
@@ -5493,10 +5488,10 @@ mod tests {
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/iwork/numbers/basic.numbers");
         let source = Package::open(fixture).expect("open native basic fixture");
-        let body = CellPosition::from_a1("B3").expect("valid body coordinate");
+        let body = At::from_a1("B3").expect("valid body coordinate");
         resolve_changed_target(&source, 0, 0, &[body]).expect("body admission");
 
-        let header = CellPosition::from_a1("A1").expect("valid header coordinate");
+        let header = At::from_a1("A1").expect("valid header coordinate");
         assert!(matches!(
             resolve_changed_target(&source, 0, 0, &[header]),
             Err(Error::UnsupportedDependency {
@@ -5513,15 +5508,15 @@ mod tests {
             "/private/tmp/litchi-numbers-cell-batch-native.wuaiMp/oracle-preserved.numbers",
         );
         let source = Package::open(fixture).expect("open formula-rich oracle");
-        let position = CellPosition::from_a1("C2").expect("valid formula-rich coordinate");
+        let position = At::from_a1("C2").expect("valid formula-rich coordinate");
         resolve_changed_target(&source, 0, 0, &[position]).expect("formula-rich admission");
     }
 
     #[test]
     fn changed_positions_must_be_sorted_unique_and_in_bounds() {
         let path = Path::Table { sheet: 0, table: 0 };
-        let a = CellPosition::new(0, 0);
-        let b = CellPosition::new(1, 0);
+        let a = At::new(0, 0);
+        let b = At::new(1, 0);
         assert!(validate_positions(&[a, b], 2, 1, path).is_ok());
         assert!(matches!(
             validate_positions(&[a, a], 2, 1, path),
@@ -5532,7 +5527,7 @@ mod tests {
             Err(Error::InvalidSource { .. })
         ));
         assert!(matches!(
-            validate_positions(&[CellPosition::new(2, 0)], 2, 1, path),
+            validate_positions(&[At::new(2, 0)], 2, 1, path),
             Err(Error::OutOfBounds { .. })
         ));
     }

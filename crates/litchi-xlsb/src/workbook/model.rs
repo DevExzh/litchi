@@ -12,9 +12,7 @@ use crate::package::shared_strings::SharedString;
 use crate::package::styles_table::{CellFormat, StylesTable};
 use crate::sheet::{Grid, Selector, Tab, Worksheet};
 use litchi_core::Position;
-use litchi_core::sheet::{
-    Result as SheetResult, Worksheet as SheetTrait, WorksheetIterator as SheetIterator,
-};
+use litchi_core::sheet::Result as SheetResult;
 use litchi_opc::OpcPackage;
 use std::sync::Arc;
 
@@ -485,11 +483,16 @@ impl Workbook {
 }
 
 impl litchi_core::sheet::WorkbookTrait for Workbook {
+    /// The worksheet snapshot the owner's cache retains, shared rather than
+    /// copied.
+    type Worksheet<'a> = Arc<Worksheet>;
+    type Worksheets<'a> = Worksheets<'a>;
+
     fn active_sheet_index(&self) -> usize {
         self.active_worksheet_index().unwrap_or(0)
     }
 
-    fn active_worksheet(&self) -> SheetResult<Box<dyn SheetTrait + '_>> {
+    fn active_worksheet(&self) -> SheetResult<Arc<Worksheet>> {
         let index = self.active_worksheet_index().ok_or_else(|| {
             Box::new(crate::package::error::Error::UnsupportedFeature(
                 "XLSB active sheet is not a worksheet".to_string(),
@@ -507,12 +510,11 @@ impl litchi_core::sheet::WorkbookTrait for Workbook {
         &self.worksheet_names
     }
 
-    fn worksheet_by_index(&self, index: usize) -> SheetResult<Box<dyn SheetTrait + '_>> {
-        let worksheet = self.worksheet(index)?;
-        Ok(Box::new(worksheet))
+    fn worksheet_by_index(&self, index: usize) -> SheetResult<Arc<Worksheet>> {
+        Ok(self.cached_worksheet(index)?)
     }
 
-    fn worksheet_by_name(&self, name: &str) -> SheetResult<Box<dyn SheetTrait + '_>> {
+    fn worksheet_by_name(&self, name: &str) -> SheetResult<Arc<Worksheet>> {
         for (i, ws_name) in self.worksheet_names.iter().enumerate() {
             if ws_name == name {
                 return self.worksheet_by_index(i);
@@ -523,11 +525,11 @@ impl litchi_core::sheet::WorkbookTrait for Workbook {
         )))
     }
 
-    fn worksheets<'a>(&'a self) -> Box<dyn SheetIterator<'a> + 'a> {
-        Box::new(WorksheetIterator {
+    fn worksheets(&self) -> Worksheets<'_> {
+        Worksheets {
             workbook: self,
             index: 0,
-        })
+        }
     }
 
     fn is_1904_date_system(&self) -> bool {
@@ -535,24 +537,28 @@ impl litchi_core::sheet::WorkbookTrait for Workbook {
     }
 }
 
-pub struct WorksheetIterator<'a> {
+/// The worksheets of an eager XLSB workbook, in workbook order: the iterator
+/// [`WorkbookTrait::worksheets`](litchi_core::sheet::WorkbookTrait::worksheets)
+/// returns. A worksheet that fails to parse yields its error, and iteration
+/// continues with the next one.
+pub struct Worksheets<'a> {
     workbook: &'a Workbook,
     index: usize,
 }
 
-impl<'a> SheetIterator<'a> for WorksheetIterator<'a> {
-    fn next(&mut self) -> Option<SheetResult<Box<dyn SheetTrait + 'a>>> {
+impl Iterator for Worksheets<'_> {
+    type Item = SheetResult<Arc<Worksheet>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.workbook.worksheet_names.len() {
-            match self.workbook.worksheet(self.index) {
-                Ok(worksheet) => {
-                    self.index += 1;
-                    Some(Ok(Box::new(worksheet)))
-                },
-                Err(e) => {
-                    self.index += 1; // Continue to next worksheet even on error
-                    Some(Err(Box::new(e)))
-                },
-            }
+            let result = self.workbook.cached_worksheet(self.index);
+            // Continue to the next worksheet even on error.
+            self.index += 1;
+            Some(
+                result.map_err(|error| -> Box<dyn std::error::Error + Send + Sync> {
+                    Box::new(error)
+                }),
+            )
         } else {
             None
         }

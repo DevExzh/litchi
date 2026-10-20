@@ -7,7 +7,7 @@ use crate::charts::radar_start_angle::{
     set_chart_radar_start_angle as set_native_chart_radar_start_angle,
 };
 
-impl NumbersEditor {
+impl Editor {
     /// Read one radar chart's `Rotation Angle`.
     pub fn sheet_chart_radar_start_angle(
         &self,
@@ -51,7 +51,7 @@ impl NumbersEditor {
             graph.info.kind,
             angle,
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_radar_start_angle(sheet_id, drawable_object_id)? != angle {
             return Err(Error::InvalidFormat(
                 "Numbers radar chart start-angle update failed validation".to_owned(),
@@ -65,12 +65,12 @@ impl NumbersEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn duplicated_radar_charts_have_copy_on_write_start_angles() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
             .add_sheet_chart(

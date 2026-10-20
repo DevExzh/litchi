@@ -11,8 +11,7 @@
 use std::borrow::Cow;
 
 use litchi_core::sheet::{
-    Cell as CoreCell, CellIterator, CellValue, Result as SheetResult, RowIterator,
-    Worksheet as CoreWorksheet,
+    Cell as CoreCell, CellValue, Result as SheetResult, Worksheet as CoreWorksheet,
 };
 use litchi_xlsx::{self as xlsx, Address, Rect};
 
@@ -84,7 +83,7 @@ fn zero_based_cell(row: u32, column: u32) -> Result<(u32, u32)> {
 /// One worksheet of an [`Xlsx`](super::Xlsx) workbook, eager or
 /// source-backed.
 #[derive(Clone)]
-pub(super) struct Sheet {
+pub(crate) struct Sheet {
     model: SheetModel,
 }
 
@@ -242,6 +241,10 @@ impl Sheet {
 }
 
 impl CoreWorksheet for Sheet {
+    type Cell<'a> = XlsxCell;
+    type Cells<'a> = Cells;
+    type Rows<'a> = Rows<'a>;
+
     fn name(&self) -> &str {
         match &self.model {
             SheetModel::Owned(worksheet) => worksheet.name(),
@@ -267,38 +270,38 @@ impl CoreWorksheet for Sheet {
         self.dimensions_typed().ok().flatten()
     }
 
-    fn cell(&self, row: u32, column: u32) -> SheetResult<Box<dyn CoreCell + '_>> {
+    fn cell(&self, row: u32, column: u32) -> SheetResult<XlsxCell> {
         let (row, column) = zero_based_cell(row, column).map_err(boxed)?;
-        Ok(Box::new(XlsxCell::new(
+        Ok(XlsxCell::new(
             row,
             column,
             self.value_at(row, column).map_err(boxed)?,
-        )))
+        ))
     }
 
-    fn cell_by_coordinate(&self, coordinate: &str) -> SheetResult<Box<dyn CoreCell + '_>> {
+    fn cell_by_coordinate(&self, coordinate: &str) -> SheetResult<XlsxCell> {
         let address = super::selection::resolve_cell(coordinate.into()).map_err(boxed)?;
         self.cell(address.row().get() + 1, address.column().get() + 1)
     }
 
-    fn cells(&self) -> Box<dyn CellIterator<'_> + '_> {
-        Box::new(match self.stored_cells() {
+    fn cells(&self) -> Cells {
+        match self.stored_cells() {
             Ok(cells) => cells,
             Err(error) => Cells::error(boxed(error)),
-        })
+        }
     }
 
-    fn rows(&self) -> Box<dyn RowIterator<'_> + '_> {
+    fn rows(&self) -> Rows<'_> {
         let (end, error) = match self.row_end() {
             Ok(end) => (end, None),
             Err(error) => (0, Some(boxed(error))),
         };
-        Box::new(Rows {
+        Rows {
             worksheet: self,
             index: 0,
             end,
             error,
-        })
+        }
     }
 
     fn row(&self, row_idx: usize) -> SheetResult<Cow<'_, [CellValue]>> {
@@ -320,7 +323,8 @@ impl CoreWorksheet for Sheet {
     }
 }
 
-struct Cells {
+/// The stored cells of an XLSX worksheet.
+pub(crate) struct Cells {
     inner: CellsInner,
 }
 
@@ -344,8 +348,10 @@ impl Cells {
     }
 }
 
-impl<'a> CellIterator<'a> for Cells {
-    fn next(&mut self) -> Option<SheetResult<Box<dyn CoreCell + 'a>>> {
+impl Iterator for Cells {
+    type Item = SheetResult<XlsxCell>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         let cell = match &mut self.inner {
             CellsInner::Owned(cells) => cells.next(),
             CellsInner::Source(cells) => cells.next().map(|entry| {
@@ -357,20 +363,22 @@ impl<'a> CellIterator<'a> for Cells {
             }),
             CellsInner::Error(error) => return error.take().map(Err),
         }?;
-        let cell: Box<dyn CoreCell + 'a> = Box::new(cell);
         Some(Ok(cell))
     }
 }
 
-struct Rows<'a> {
+/// The rows of an XLSX worksheet.
+pub(crate) struct Rows<'a> {
     worksheet: &'a Sheet,
     index: usize,
     end: usize,
     error: Option<BoxError>,
 }
 
-impl<'a> RowIterator<'a> for Rows<'a> {
-    fn next(&mut self) -> Option<SheetResult<Cow<'a, [CellValue]>>> {
+impl<'a> Iterator for Rows<'a> {
+    type Item = SheetResult<Cow<'a, [CellValue]>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         if let Some(error) = self.error.take() {
             return Some(Err(error));
         }
@@ -388,8 +396,9 @@ impl<'a> RowIterator<'a> for Rows<'a> {
     }
 }
 
+/// One XLSX cell read through the generic traits.
 #[derive(Debug, Clone)]
-struct XlsxCell {
+pub(crate) struct XlsxCell {
     row: u32,
     column: u32,
     value: CellValue,

@@ -1,5 +1,5 @@
 use crate::archive::RawMessage;
-use crate::pages::PagesEditor;
+use crate::pages;
 use crate::protobuf::tswp;
 use crate::wire::{
     parse_wire_fields, patch_nested_varint_field, patch_varint_field,
@@ -16,7 +16,7 @@ use litchi_iwa_text::number_attachment::{
 use prost::Message;
 
 fn fixture() -> (super::super::IWorkTextEditor, TextStorageId) {
-    let pages = PagesEditor::create_with_text("Page ").unwrap();
+    let pages = pages::Editor::create_with_text("Page ").unwrap();
     let storage_id = pages.body_storage().unwrap().id;
     (
         super::super::IWorkTextEditor::from_package(pages.into_package()),

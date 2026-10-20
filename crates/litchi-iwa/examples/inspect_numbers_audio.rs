@@ -2,13 +2,13 @@
 
 use std::env;
 
-use litchi_iwa::numbers::NumbersEditor;
+use litchi_iwa::numbers;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = env::args()
         .nth(1)
         .ok_or("usage: inspect_numbers_audio <input.numbers>")?;
-    let editor = NumbersEditor::open(input)?;
+    let editor = numbers::Editor::open(input)?;
     for sheet in editor.sheets()? {
         for (audio_index, audio) in editor.sheet_audio(sheet.id())?.iter().enumerate() {
             println!(

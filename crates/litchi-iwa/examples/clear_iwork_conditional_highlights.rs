@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::KeynoteEditor;
-use litchi_iwa::numbers::NumbersEditor;
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::keynote;
+use litchi_iwa::numbers;
+use litchi_iwa::pages;
 
 const HIGHLIGHT_ROW: usize = 1;
 const HIGHLIGHT_COLUMN: usize = 1;
@@ -35,12 +35,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn clear_numbers(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = NumbersEditor::open(source)?;
+    let mut editor = numbers::Editor::open(source)?;
     let table_id = editor.tables()?.remove(0).id();
     editor.clear_cell_conditional_highlighting(table_id, HIGHLIGHT_ROW, HIGHLIGHT_COLUMN)?;
     editor.save(output)?;
     assert!(
-        NumbersEditor::open(output)?
+        numbers::Editor::open(output)?
             .cell_conditional_highlighting(table_id, HIGHLIGHT_ROW, HIGHLIGHT_COLUMN)?
             .is_none()
     );
@@ -48,12 +48,12 @@ fn clear_numbers(source: &Path, output: &Path) -> Result<(), Box<dyn std::error:
 }
 
 fn clear_pages(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = PagesEditor::open(source)?;
+    let mut editor = pages::Editor::open(source)?;
     let table_id = editor.tables()?.remove(0).model_object_id;
     editor.clear_table_cell_conditional_highlighting(table_id, HIGHLIGHT_ROW, HIGHLIGHT_COLUMN)?;
     editor.save(output)?;
     assert!(
-        PagesEditor::open(output)?
+        pages::Editor::open(output)?
             .table_cell_conditional_highlighting(table_id, HIGHLIGHT_ROW, HIGHLIGHT_COLUMN)?
             .is_none()
     );
@@ -61,7 +61,7 @@ fn clear_pages(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::E
 }
 
 fn clear_keynote(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = KeynoteEditor::open(source)?;
+    let mut editor = keynote::Editor::open(source)?;
     let table_id = editor.slide_tables(0)?.remove(0).model_object_id;
     editor.clear_slide_table_cell_conditional_highlighting(
         0,
@@ -71,7 +71,7 @@ fn clear_keynote(source: &Path, output: &Path) -> Result<(), Box<dyn std::error:
     )?;
     editor.save(output)?;
     assert!(
-        KeynoteEditor::open(output)?
+        keynote::Editor::open(output)?
             .slide_table_cell_conditional_highlighting(
                 0,
                 table_id,

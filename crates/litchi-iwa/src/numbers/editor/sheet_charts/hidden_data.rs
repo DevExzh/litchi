@@ -6,7 +6,7 @@ use crate::charts::hidden_data::{
     set_chart_includes_hidden_data as set_native_hidden_data,
 };
 
-impl NumbersEditor {
+impl Editor {
     /// Read whether a sheet chart includes data from hidden rows and columns.
     pub fn sheet_chart_includes_hidden_data(
         &self,
@@ -33,7 +33,7 @@ impl NumbersEditor {
 }
 
 fn sheet_chart_includes_hidden_data(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<bool> {
@@ -47,7 +47,7 @@ fn sheet_chart_includes_hidden_data(
 }
 
 fn set_sheet_chart_includes_hidden_data(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     includes_hidden_data: bool,
@@ -66,7 +66,7 @@ fn set_sheet_chart_includes_hidden_data(
         "Numbers",
         includes_hidden_data,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_includes_hidden_data(sheet_id, drawable_object_id)?
         != includes_hidden_data
     {

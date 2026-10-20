@@ -3,7 +3,7 @@
 use super::*;
 use crate::numbers::editor::TableTopologyMutation;
 
-impl KeynoteEditor {
+impl Editor {
     /// Insert one blank row at a section-relative position.
     ///
     /// Cell storage, formulas, dimension overrides, stable row identities, and

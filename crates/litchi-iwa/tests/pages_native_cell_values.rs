@@ -8,7 +8,7 @@
 
 use std::error::Error;
 
-use litchi_iwa::pages::{PagesCellValue, PagesEditor};
+use litchi_iwa::pages::{self};
 use litchi_pages::Package as FocusedPagesPackage;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -38,15 +38,15 @@ const EXPECTED_TABLES: [ExpectedTable; 2] = [
     },
 ];
 
-fn number(value: f64) -> PagesCellValue {
-    PagesCellValue::number(value).expect("fixture number is finite")
+fn number(value: f64) -> pages::CellValue {
+    pages::CellValue::number(value).expect("fixture number is finite")
 }
 
 fn assert_cell(
-    table: &litchi_iwa::pages::PagesTable,
+    table: &litchi_iwa::pages::Table,
     row: usize,
     column: usize,
-    expected: Option<PagesCellValue>,
+    expected: Option<pages::CellValue>,
 ) {
     assert_eq!(
         table.get_cell(row, column),
@@ -56,34 +56,84 @@ fn assert_cell(
     );
 }
 
-fn assert_table_one(editor: &PagesEditor, model_object_id: u64) -> TestResult {
+fn assert_table_one(editor: &pages::Editor, model_object_id: u64) -> TestResult {
     let table = editor.table(model_object_id)?;
-    assert_cell(&table, 0, 0, Some(PagesCellValue::Text("Label".to_owned())));
-    assert_cell(&table, 0, 1, Some(PagesCellValue::Text("Value".to_owned())));
-    assert_cell(&table, 0, 2, Some(PagesCellValue::Text("Flag".to_owned())));
-    assert_cell(&table, 0, 3, Some(PagesCellValue::Text("Note".to_owned())));
+    assert_cell(
+        &table,
+        0,
+        0,
+        Some(pages::CellValue::Text("Label".to_owned())),
+    );
+    assert_cell(
+        &table,
+        0,
+        1,
+        Some(pages::CellValue::Text("Value".to_owned())),
+    );
+    assert_cell(
+        &table,
+        0,
+        2,
+        Some(pages::CellValue::Text("Flag".to_owned())),
+    );
+    assert_cell(
+        &table,
+        0,
+        3,
+        Some(pages::CellValue::Text("Note".to_owned())),
+    );
 
-    assert_cell(&table, 1, 0, Some(PagesCellValue::Text("Alpha".to_owned())));
+    assert_cell(
+        &table,
+        1,
+        0,
+        Some(pages::CellValue::Text("Alpha".to_owned())),
+    );
     assert_cell(&table, 1, 1, Some(number(12.5)));
-    assert_cell(&table, 1, 2, Some(PagesCellValue::Boolean(true)));
-    assert_cell(&table, 1, 3, Some(PagesCellValue::Text("北京".to_owned())));
+    assert_cell(&table, 1, 2, Some(pages::CellValue::Boolean(true)));
+    assert_cell(
+        &table,
+        1,
+        3,
+        Some(pages::CellValue::Text("北京".to_owned())),
+    );
 
-    assert_cell(&table, 2, 0, Some(PagesCellValue::Text("Beta".to_owned())));
+    assert_cell(
+        &table,
+        2,
+        0,
+        Some(pages::CellValue::Text("Beta".to_owned())),
+    );
     assert_cell(&table, 2, 1, Some(number(-7.0)));
-    assert_cell(&table, 2, 2, Some(PagesCellValue::Boolean(false)));
-    assert_cell(&table, 2, 3, Some(PagesCellValue::Text("Café".to_owned())));
+    assert_cell(&table, 2, 2, Some(pages::CellValue::Boolean(false)));
+    assert_cell(
+        &table,
+        2,
+        3,
+        Some(pages::CellValue::Text("Café".to_owned())),
+    );
 
-    assert_cell(&table, 3, 0, Some(PagesCellValue::Text("Total".to_owned())));
+    assert_cell(
+        &table,
+        3,
+        0,
+        Some(pages::CellValue::Text("Total".to_owned())),
+    );
     assert_cell(
         &table,
         3,
         1,
-        Some(PagesCellValue::Formula("=SUM(B2:B3)".to_owned())),
+        Some(pages::CellValue::Formula("=SUM(B2:B3)".to_owned())),
     );
     assert_cell(&table, 3, 2, None);
     assert_cell(&table, 3, 3, None);
 
-    assert_cell(&table, 4, 0, Some(PagesCellValue::Text("Tail".to_owned())));
+    assert_cell(
+        &table,
+        4,
+        0,
+        Some(pages::CellValue::Text("Tail".to_owned())),
+    );
     assert_cell(&table, 4, 1, Some(number(0.0)));
     assert_cell(&table, 4, 2, None);
     assert_cell(&table, 4, 3, None);
@@ -95,25 +145,25 @@ fn assert_table_one(editor: &PagesEditor, model_object_id: u64) -> TestResult {
     Ok(())
 }
 
-fn assert_table_two(editor: &PagesEditor, model_object_id: u64) -> TestResult {
+fn assert_table_two(editor: &pages::Editor, model_object_id: u64) -> TestResult {
     let table = editor.table(model_object_id)?;
     assert_cell(
         &table,
         0,
         0,
-        Some(PagesCellValue::Text("2026-09-09".to_owned())),
+        Some(pages::CellValue::Text("2026-09-09".to_owned())),
     );
     assert_cell(
         &table,
         0,
         1,
-        Some(PagesCellValue::Text("1h 30m".to_owned())),
+        Some(pages::CellValue::Text("1h 30m".to_owned())),
     );
     assert_cell(
         &table,
         1,
         0,
-        Some(PagesCellValue::Formula("=(1/0)".to_owned())),
+        Some(pages::CellValue::Formula("=(1/0)".to_owned())),
     );
     assert_cell(&table, 1, 1, None);
     assert_cell(&table, 2, 0, None);
@@ -126,7 +176,7 @@ fn assert_table_two(editor: &PagesEditor, model_object_id: u64) -> TestResult {
     Ok(())
 }
 
-fn assert_host_tables(editor: &PagesEditor) -> TestResult {
+fn assert_host_tables(editor: &pages::Editor) -> TestResult {
     let tables = editor.tables()?;
     assert_eq!(tables.len(), EXPECTED_TABLES.len());
     for (index, (info, expected)) in tables.iter().zip(EXPECTED_TABLES).enumerate() {
@@ -151,7 +201,7 @@ fn focused_bytes(package: &FocusedPagesPackage) -> TestResult<Vec<u8>> {
 
 #[test]
 fn native_pages_cell_values_and_catalog_roundtrip_exactly() -> TestResult {
-    let editor = PagesEditor::from_bytes(NATIVE_CELLS)?;
+    let editor = pages::Editor::from_bytes(NATIVE_CELLS)?;
     assert_eq!(
         editor.to_bytes()?,
         NATIVE_CELLS,
@@ -177,7 +227,7 @@ fn native_pages_cell_values_and_catalog_roundtrip_exactly() -> TestResult {
     );
 
     let source_bytes = editor.to_bytes()?;
-    let reopened_editor = PagesEditor::from_bytes(&source_bytes)?;
+    let reopened_editor = pages::Editor::from_bytes(&source_bytes)?;
     assert_eq!(reopened_editor.to_bytes()?, NATIVE_CELLS);
     assert_host_tables(&reopened_editor)?;
 

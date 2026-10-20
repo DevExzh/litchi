@@ -7,8 +7,8 @@ use litchi_iwa_protos::tsce::ast_node_array_archive::{AstNodeArchive, AstNodeTyp
 use litchi_iwa_protos::{tn, tsce, tsp, tst, tswp};
 use litchi_numbers::cell::Value;
 use litchi_numbers::{
-    CellPosition, Dimensions, MAX_MATERIALIZED_CELLS, MAX_SHEETS, MAX_TABLES, MAX_TEXT_BYTES,
-    Package, SheetBuilder, TableBuilder, Workbook, workbook::ReadError as DocumentReadError,
+    At, Dimensions, MAX_MATERIALIZED_CELLS, MAX_SHEETS, MAX_TABLES, MAX_TEXT_BYTES, Package,
+    SheetBuilder, TableBuilder, Workbook, workbook::ReadError as DocumentReadError,
     workbook::ReadLimitKind as DocumentReadLimitKind, workbook::Stats as DocumentStats,
 };
 use litchi_numbers_wire::BncCell;
@@ -422,18 +422,15 @@ fn assert_native_metadata(
 fn semantic_document() -> TestResult<Workbook> {
     let mut table = TableBuilder::new("Types", Dimensions::new(3, 3));
     for (position, value) in [
-        (CellPosition::new(0, 0), Value::Text("alpha".to_owned())),
-        (CellPosition::new(0, 1), Value::Empty),
-        (
-            CellPosition::new(0, 2),
-            Value::Formula("=SUM(A1,2)".to_owned()),
-        ),
-        (CellPosition::new(1, 0), Value::number(42.5)?),
-        (CellPosition::new(1, 1), Value::Boolean(true)),
-        (CellPosition::new(1, 2), Value::date(12.25)?),
-        (CellPosition::new(2, 0), Value::duration(-3.5)?),
-        (CellPosition::new(2, 1), Value::Error("bad".to_owned())),
-        (CellPosition::new(2, 2), Value::Text(String::new())),
+        (At::new(0, 0), Value::Text("alpha".to_owned())),
+        (At::new(0, 1), Value::Empty),
+        (At::new(0, 2), Value::Formula("=SUM(A1,2)".to_owned())),
+        (At::new(1, 0), Value::number(42.5)?),
+        (At::new(1, 1), Value::Boolean(true)),
+        (At::new(1, 2), Value::date(12.25)?),
+        (At::new(2, 0), Value::duration(-3.5)?),
+        (At::new(2, 1), Value::Error("bad".to_owned())),
+        (At::new(2, 2), Value::Text(String::new())),
     ] {
         assert!(table.set(position, value).is_ok());
     }

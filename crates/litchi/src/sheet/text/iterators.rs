@@ -1,10 +1,8 @@
 //! Iterator implementations for text-based formats
 
 use super::cell::TextCell;
-use crate::sheet::{
-    Cell, CellIterator, CellValue, Result as SheetResult, RowIterator, WorkbookTrait, Worksheet,
-    WorksheetIterator,
-};
+use super::worksheet::TextWorksheet;
+use crate::sheet::{CellValue, Result as SheetResult, WorkbookTrait};
 use std::borrow::Cow;
 
 /// Iterator over worksheets in a text workbook
@@ -23,8 +21,10 @@ impl<'a> TextWorksheetIterator<'a> {
     }
 }
 
-impl<'a> WorksheetIterator<'a> for TextWorksheetIterator<'a> {
-    fn next(&mut self) -> Option<SheetResult<Box<dyn Worksheet + 'a>>> {
+impl Iterator for TextWorksheetIterator<'_> {
+    type Item = SheetResult<TextWorksheet>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         if !self.yielded {
             self.yielded = true;
             Some(self.workbook.active_worksheet())
@@ -52,8 +52,10 @@ impl<'a> TextCellIterator<'a> {
     }
 }
 
-impl<'a> CellIterator<'a> for TextCellIterator<'a> {
-    fn next(&mut self) -> Option<SheetResult<Box<dyn Cell + 'a>>> {
+impl Iterator for TextCellIterator<'_> {
+    type Item = SheetResult<TextCell>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         // Find the next cell
         while self.current_row < self.data.len() {
             let row = &self.data[self.current_row];
@@ -65,7 +67,7 @@ impl<'a> CellIterator<'a> for TextCellIterator<'a> {
                 let cell = TextCell::new(row_num, col_num, value);
                 self.current_col += 1;
 
-                return Some(Ok(Box::new(cell)));
+                return Some(Ok(cell));
             } else {
                 // Move to next row
                 self.current_row += 1;
@@ -93,8 +95,10 @@ impl<'a> TextRowIterator<'a> {
     }
 }
 
-impl<'a> RowIterator<'a> for TextRowIterator<'a> {
-    fn next(&mut self) -> Option<SheetResult<Cow<'a, [CellValue]>>> {
+impl<'a> Iterator for TextRowIterator<'a> {
+    type Item = SheetResult<Cow<'a, [CellValue]>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         if self.current_row < self.data.len() {
             let row = Cow::Borrowed(self.data[self.current_row].as_slice()); // Zero-copy!
             self.current_row += 1;

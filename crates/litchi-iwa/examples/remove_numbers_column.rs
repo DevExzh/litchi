@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use litchi_iwa::numbers::NumbersEditor;
+use litchi_iwa::numbers;
 use litchi_numbers::TableSelector;
 use litchi_numbers::table::topology::ColumnDeletion;
 
@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => return Err(format!("unsupported column section {section:?}").into()),
     };
 
-    let mut editor = NumbersEditor::open(input)?;
+    let mut editor = numbers::Editor::open(input)?;
     editor.remove_table_column(TableSelector::index(table_index), deletion)?;
     editor.save(output)?;
     Ok(())

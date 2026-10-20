@@ -2,7 +2,7 @@
 
 use super::*;
 
-use litchi_numbers::CellPosition;
+use litchi_numbers::At;
 use litchi_numbers::table::edit::{Batch, Budget, Error as BatchError};
 
 const MAX_TABLE_CELL_BATCH: usize = 1 << 20;
@@ -40,9 +40,7 @@ impl TableCellBatch {
 /// by the private formula-cache implementation. Keeping this allocation at
 /// the archive boundary prevents platform-sized coordinates from widening the
 /// owned semantic batch.
-fn into_formula_cache_coordinates(
-    coordinates: Box<[CellPosition]>,
-) -> Result<Box<[(usize, usize)]>> {
+fn into_formula_cache_coordinates(coordinates: Box<[At]>) -> Result<Box<[(usize, usize)]>> {
     coordinates
         .into_vec()
         .into_iter()

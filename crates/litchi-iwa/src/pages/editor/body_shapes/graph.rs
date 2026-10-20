@@ -11,7 +11,7 @@ const DEFAULT_ROTATION_DEGREES: f32 = 0.0;
 
 pub(super) struct BodyShapeGraph {
     pub(super) archive_name: String,
-    pub(super) info: PagesBodyShapeInfo,
+    pub(super) info: BodyShapeInfo,
     pub(super) attachment_id: u64,
     pub(super) object_ids: Vec<u64>,
     pub(super) uuid_object_ids: Vec<u64>,
@@ -68,7 +68,7 @@ pub(super) fn shape_style_id(package: &IWorkPackage, root: &PagesDocumentRootFac
         .ok_or_else(|| Error::InvalidFormat("Pages theme has no shape style preset".to_owned()))
 }
 
-pub(super) fn body_shape_infos(editor: &PagesEditor) -> Result<Vec<PagesBodyShapeInfo>> {
+pub(super) fn body_shape_infos(editor: &Editor) -> Result<Vec<BodyShapeInfo>> {
     let mut shapes = Vec::new();
     for text in editor.drawable_text_storages()? {
         let Some(shape) = shape_payload(editor.package(), text.drawable_object_id)? else {
@@ -82,10 +82,7 @@ pub(super) fn body_shape_infos(editor: &PagesEditor) -> Result<Vec<PagesBodyShap
     Ok(shapes)
 }
 
-pub(super) fn body_shape_graph(
-    editor: &PagesEditor,
-    drawable_object_id: u64,
-) -> Result<BodyShapeGraph> {
+pub(super) fn body_shape_graph(editor: &Editor, drawable_object_id: u64) -> Result<BodyShapeGraph> {
     let text = editor
         .drawable_text_storages()?
         .into_iter()
@@ -105,8 +102,8 @@ pub(super) fn body_shape_graph(
 
 #[allow(deprecated)]
 fn body_shape_graph_from_text(
-    editor: &PagesEditor,
-    text: PagesDrawableTextInfo,
+    editor: &Editor,
+    text: DrawableTextInfo,
     shape: crate::protobuf::tswp::ShapeInfoArchive,
 ) -> Result<BodyShapeGraph> {
     let drawable_object_id = text.drawable_object_id;
@@ -301,7 +298,7 @@ fn body_shape_graph_from_text(
     let properties = shape_properties(editor.package(), &archive_name, drawable_object_id)?;
     Ok(BodyShapeGraph {
         archive_name,
-        info: PagesBodyShapeInfo {
+        info: BodyShapeInfo {
             drawable_object_id,
             anchor_character_index: *anchor_character_index,
             kind,

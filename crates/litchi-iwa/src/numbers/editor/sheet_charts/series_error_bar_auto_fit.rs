@@ -8,7 +8,7 @@ use crate::charts::series_error_bar_auto_fit::{
 };
 use crate::charts::{ChartSeriesErrorBarAutoFit, Index};
 
-impl NumbersEditor {
+impl Editor {
     /// Read every series' error-bar Auto-Fit setting.
     pub fn sheet_chart_series_error_bar_auto_fits(
         &self,
@@ -64,7 +64,7 @@ impl NumbersEditor {
 }
 
 fn sheet_chart_series_error_bar_auto_fits(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Vec<ChartSeriesErrorBarAutoFit>> {
@@ -86,7 +86,7 @@ fn sheet_chart_series_error_bar_auto_fits(
 }
 
 fn set_sheet_chart_series_error_bar_auto_fits(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     values: &[ChartSeriesErrorBarAutoFit],
@@ -123,7 +123,7 @@ fn set_sheet_chart_series_error_bar_auto_fits(
         "Numbers",
         values,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_series_error_bar_auto_fits(sheet_id, drawable_object_id)? != values {
         return Err(Error::InvalidFormat(
             "Numbers chart series error-bar Auto-Fit update failed validation".to_owned(),

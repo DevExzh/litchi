@@ -103,7 +103,7 @@ const PAGES_DOCUMENT_ROOT_FIELD_MULTIPLIER: usize = 8;
 const PAGES_DOCUMENT_ROOT_WORK_MULTIPLIER: usize = 64;
 
 use litchi_pages::header_footer::{HeaderFooterSelector, Kind, Template};
-pub use types::{PagesDrawableTextInfo, PagesSectionInfo, RemovedPagesTextBox};
+pub use types::{DrawableTextInfo, RemovedPagesTextBox, SectionInfo};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct HeaderFooterLocation {
@@ -119,17 +119,17 @@ struct HeaderFooterLocation {
 
 /// Transactional editor for a Pages package.
 #[derive(Debug, Clone)]
-pub struct PagesEditor {
+pub struct Editor {
     text: IWorkTextEditor,
     body_storage_id: TextStorageId,
-    sections: Vec<PagesSectionInfo>,
+    sections: Vec<SectionInfo>,
     header_footers: Vec<HeaderFooterLocation>,
 }
 
-impl PagesEditor {
+impl Editor {
     /// Start configuring a new Pages package built from typed IWA objects.
-    pub fn builder() -> crate::pages::PagesDocumentBuilder {
-        crate::pages::PagesDocumentBuilder::new()
+    pub fn builder() -> crate::pages::Builder {
+        crate::pages::Builder::new()
     }
 
     /// Create a blank, independent Pages document without a bundled template.
@@ -203,7 +203,7 @@ impl PagesEditor {
     /// Results are ordered by drawable object identifier. Shared storage
     /// ownership is rejected because a mutation could otherwise affect more
     /// than the caller-selected object.
-    pub fn drawable_text_storages(&self) -> Result<Vec<PagesDrawableTextInfo>> {
+    pub fn drawable_text_storages(&self) -> Result<Vec<DrawableTextInfo>> {
         let mut storage_owners = HashMap::<u64, u64>::new();
         let mut result = Vec::new();
         for drawable in self.drawables()? {
@@ -225,7 +225,7 @@ impl PagesEditor {
                         drawable.id
                     ))
                 })?;
-            result.push(PagesDrawableTextInfo {
+            result.push(DrawableTextInfo {
                 drawable_object_id: drawable.id.get(),
                 storage,
             });
@@ -2169,7 +2169,7 @@ impl PagesEditor {
         source_drawable_object_id: u64,
         anchor_character_index: usize,
         text: &str,
-    ) -> Result<PagesDrawableTextInfo> {
+    ) -> Result<DrawableTextInfo> {
         let source = self.text_box_graph(source_drawable_object_id)?;
         let mut staged = self.package().clone();
         let first_identifier = next_object_identifier(&staged)?;
@@ -2414,7 +2414,7 @@ impl PagesEditor {
     }
 
     /// List body section boundaries in UTF-16 document order.
-    pub fn sections(&self) -> &[PagesSectionInfo] {
+    pub fn sections(&self) -> &[SectionInfo] {
         &self.sections
     }
 
@@ -2429,7 +2429,7 @@ impl PagesEditor {
         source_section_id: u64,
         character_index: usize,
         name: &str,
-    ) -> Result<PagesSectionInfo> {
+    ) -> Result<SectionInfo> {
         if name.contains('\0') {
             return Err(Error::ParseError(
                 "Pages section names cannot contain NUL".to_owned(),
@@ -2560,18 +2560,14 @@ impl PagesEditor {
 
     /// Append an empty section at the current end of the body, inheriting a
     /// reachable source section's layout into independent page masters.
-    pub fn append_section(
-        &mut self,
-        source_section_id: u64,
-        name: &str,
-    ) -> Result<PagesSectionInfo> {
+    pub fn append_section(&mut self, source_section_id: u64, name: &str) -> Result<SectionInfo> {
         let character_index = self.body_text()?.encode_utf16().count();
         self.insert_section(source_section_id, character_index, name)
     }
 
     /// Remove a non-initial section boundary and its now-unreferenced section
     /// archive. Body text is retained and joins the preceding section.
-    pub fn remove_section(&mut self, section_id: u64) -> Result<PagesSectionInfo> {
+    pub fn remove_section(&mut self, section_id: u64) -> Result<SectionInfo> {
         if self.sections.len() <= 1 {
             return Err(Error::ParseError(
                 "Cannot remove the final Pages section".to_owned(),
@@ -5155,7 +5151,7 @@ fn discover_structure(
     package: &IWorkPackage,
     body_storage_id: u64,
     document: DocumentBodySnapshot,
-) -> Result<(Vec<PagesSectionInfo>, Vec<HeaderFooterLocation>)> {
+) -> Result<(Vec<SectionInfo>, Vec<HeaderFooterLocation>)> {
     let mut body = None;
     let mut sections = HashMap::<u64, DiscoveredPagesSection>::new();
     let mut section_objects = HashSet::new();
@@ -5286,7 +5282,7 @@ fn discover_structure(
                 "Pages section object {section_id} is missing or invalid"
             ))
         })?;
-        section_infos.push(PagesSectionInfo {
+        section_infos.push(SectionInfo {
             object_id: section_id,
             character_index,
             name: section.name.clone(),
@@ -5389,28 +5385,25 @@ mod tables;
 mod text_box_create;
 mod types;
 
-pub use audio::{PagesAudioInfo, RemovedPagesAudio};
-pub use body_shapes::{PagesBodyShapeInfo, RemovedPagesBodyShape};
-pub use charts::{PagesBodyChartInfo, RemovedPagesBodyChart};
-pub use images::{PagesImageInfo, RemovedPagesImage};
-pub use movies::{PagesMovieInfo, RemovedPagesMovie};
+pub use audio::{AudioInfo, RemovedPagesAudio};
+pub use body_shapes::{BodyShapeInfo, RemovedPagesBodyShape};
+pub use charts::{BodyChartInfo, RemovedPagesBodyChart};
+pub use images::{ImageInfo, RemovedPagesImage};
+pub use movies::{MovieInfo, RemovedPagesMovie};
 pub use tables::{
-    PagesCellValue, PagesTable, PagesTableCellConditionalHighlightInfo, PagesTableCellInset,
-    PagesTableCellInsets, PagesTableCellLayout, PagesTableCellParagraphList,
-    PagesTableCellParagraphListBullet, PagesTableCellParagraphListBulletGeometry,
-    PagesTableCellParagraphListIndentation, PagesTableCellParagraphListLabelColor,
-    PagesTableCellParagraphListLevel, PagesTableCellParagraphListLevelPlacement,
-    PagesTableCellParagraphListNumberFormat, PagesTableCellParagraphListNumberScale,
-    PagesTableCellParagraphListNumberTiering, PagesTableCellParagraphListNumbering,
-    PagesTableCellParagraphListPlacement, PagesTableCellParagraphTabStops,
-    PagesTableCellTextBackground, PagesTableCellTextBaselineShift,
-    PagesTableCellTextCapitalization, PagesTableCellTextCharacterSpacing, PagesTableCellTextColor,
-    PagesTableCellTextDecorations, PagesTableCellTextFont, PagesTableCellTextLigatures,
-    PagesTableCellTextOutline, PagesTableCellTextScript, PagesTableCellTextShadow,
-    PagesTableCellTextStyle, PagesTableCellTextWrap, PagesTableCellUpdate,
-    PagesTableCellVerticalAlignment, PagesTableFormulaAxisReference,
-    PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue, PagesTableFormulaCellReference,
-    PagesTableFormulaExpression, PagesTableInfo, PagesTableSortRowRange,
+    CellValue, Table, TableCellConditionalHighlightInfo, TableCellInset, TableCellInsets,
+    TableCellLayout, TableCellParagraphList, TableCellParagraphListBullet,
+    TableCellParagraphListBulletGeometry, TableCellParagraphListIndentation,
+    TableCellParagraphListLabelColor, TableCellParagraphListLevel,
+    TableCellParagraphListLevelPlacement, TableCellParagraphListNumberFormat,
+    TableCellParagraphListNumberScale, TableCellParagraphListNumberTiering,
+    TableCellParagraphListNumbering, TableCellParagraphListPlacement, TableCellParagraphTabStops,
+    TableCellTextBackground, TableCellTextBaselineShift, TableCellTextCapitalization,
+    TableCellTextCharacterSpacing, TableCellTextColor, TableCellTextDecorations, TableCellTextFont,
+    TableCellTextLigatures, TableCellTextOutline, TableCellTextScript, TableCellTextShadow,
+    TableCellTextStyle, TableCellTextWrap, TableCellUpdate, TableCellVerticalAlignment,
+    TableFormulaAxisReference, TableFormulaBinaryOperator, TableFormulaCachedValue,
+    TableFormulaCellReference, TableFormulaExpression, TableInfo, TableSortRowRange,
 };
 
 #[cfg(test)]
@@ -5430,14 +5423,14 @@ mod strict_selector_tests {
         assert_eq!(DrawableId::new(0), None);
         assert_eq!(StorageId::new(0), None);
 
-        let _: fn(&PagesEditor, DrawableId) -> Result<Vec<DrawableReply>> =
-            PagesEditor::drawable_comment_replies;
-        let _: fn(&mut PagesEditor, DrawableId, String) -> Result<StorageId> =
-            PagesEditor::add_drawable_comment_reply;
-        let _: fn(&mut PagesEditor, DrawableId, StorageId, String) -> Result<StorageId> =
-            PagesEditor::set_drawable_comment_reply;
-        let _: fn(&mut PagesEditor, DrawableId, StorageId) -> Result<()> =
-            PagesEditor::remove_drawable_comment_reply;
+        let _: fn(&Editor, DrawableId) -> Result<Vec<DrawableReply>> =
+            Editor::drawable_comment_replies;
+        let _: fn(&mut Editor, DrawableId, String) -> Result<StorageId> =
+            Editor::add_drawable_comment_reply;
+        let _: fn(&mut Editor, DrawableId, StorageId, String) -> Result<StorageId> =
+            Editor::set_drawable_comment_reply;
+        let _: fn(&mut Editor, DrawableId, StorageId) -> Result<()> =
+            Editor::remove_drawable_comment_reply;
     }
 }
 

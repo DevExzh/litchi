@@ -229,9 +229,9 @@ pub(super) fn note_clone_object_ids(
 }
 
 pub(super) fn find_note_source(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     graph: &ObjectGraph,
-    slides: &[KeynoteSlideInfo],
+    slides: &[SlideInfo],
 ) -> Result<NoteSource> {
     let mut best = None;
     for slide in slides {

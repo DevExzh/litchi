@@ -3,17 +3,17 @@
 use super::*;
 
 /// A typed whole-row or whole-column reference used by a table formula.
-pub type PagesTableFormulaAxisReference = crate::numbers::FormulaAxisReference;
+pub type TableFormulaAxisReference = crate::numbers::FormulaAxisReference;
 /// A typed binary operator used by a table formula.
-pub type PagesTableFormulaBinaryOperator = crate::numbers::FormulaBinaryOperator;
+pub type TableFormulaBinaryOperator = crate::numbers::FormulaBinaryOperator;
 /// A typed formula AST compiled into native iWork table storage.
-pub type PagesTableFormulaExpression = crate::numbers::FormulaExpression;
+pub type TableFormulaExpression = crate::numbers::FormulaExpression;
 /// A typed formula result displayed before Pages next recalculates the cell.
-pub type PagesTableFormulaCachedValue = crate::numbers::FormulaCachedValue;
+pub type TableFormulaCachedValue = crate::numbers::FormulaCachedValue;
 /// A typed cell address used by a table formula.
-pub type PagesTableFormulaCellReference = crate::numbers::FormulaCellReference;
+pub type TableFormulaCellReference = crate::numbers::FormulaCellReference;
 
-impl PagesEditor {
+impl Editor {
     /// Read a cell's canonical formula source, including the leading equals sign.
     pub fn table_formula(
         &self,
@@ -23,7 +23,7 @@ impl PagesEditor {
     ) -> Result<Option<String>> {
         let table = self.table(model_object_id)?;
         Ok(match table.get_cell(row, column) {
-            Some(PagesCellValue::Formula(formula)) => Some(formula.clone()),
+            Some(CellValue::Formula(formula)) => Some(formula.clone()),
             _ => None,
         })
     }
@@ -34,8 +34,8 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        expression: PagesTableFormulaExpression,
-        cached_value: PagesTableFormulaCachedValue,
+        expression: TableFormulaExpression,
+        cached_value: TableFormulaCachedValue,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();

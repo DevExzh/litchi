@@ -1,7 +1,7 @@
 use super::{TextHyperlinkTarget, TextPosition, TextRange};
-use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use crate::numbers::{NumbersDocumentBuilder, NumbersEditor};
-use crate::pages::PagesEditor;
+use crate::keynote::{self};
+use crate::numbers::{self};
+use crate::pages;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_text::date_time::{
     DisplayText, Format, FormatterStyle, Instant, LocaleIdentifier, Settings, UpdatePlan,
@@ -32,7 +32,7 @@ fn range(start: usize, end: usize) -> TextRange {
 
 #[test]
 fn scratch_pages_date_time_insert_update_remove_round_trips() {
-    let mut pages = PagesEditor::create_with_text("Report: ").unwrap();
+    let mut pages = pages::Editor::create_with_text("Report: ").unwrap();
     let baseline = pages.to_bytes().unwrap();
     let position = TextPosition::from_utf16_index(8).unwrap();
     let created = pages
@@ -44,7 +44,7 @@ fn scratch_pages_date_time_insert_update_remove_round_trips() {
         std::slice::from_ref(&created)
     );
 
-    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     let updated_settings = settings().with_update_plan(UpdatePlan::Automatic).unwrap();
     let updated = pages
         .update_body_date_time_field(created.id, created.range, updated_settings.clone())
@@ -65,7 +65,7 @@ fn scratch_pages_date_time_insert_update_remove_round_trips() {
 
 #[test]
 fn attach_delete_cycle_is_byte_exact_and_overlap_is_transactional() {
-    let mut pages = PagesEditor::create_with_text(DISPLAY).unwrap();
+    let mut pages = pages::Editor::create_with_text(DISPLAY).unwrap();
     let baseline = pages.to_bytes().unwrap();
     let whole = range(0, DISPLAY.encode_utf16().count());
     let created = pages.add_body_date_time_field(whole, settings()).unwrap();
@@ -86,7 +86,7 @@ fn attach_delete_cycle_is_byte_exact_and_overlap_is_transactional() {
 
 #[test]
 fn invalid_positions_and_text_replacement_are_safe() {
-    let mut pages = PagesEditor::create_with_text("A😀B").unwrap();
+    let mut pages = pages::Editor::create_with_text("A😀B").unwrap();
     let baseline = pages.to_bytes().unwrap();
     assert!(
         pages
@@ -121,15 +121,11 @@ fn invalid_positions_and_text_replacement_are_safe() {
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn scratch_text_box_date_time_fields_work_across_the_suite() {
     let prefix = "When: ";
     let position = TextPosition::from_utf16_index(prefix.encode_utf16().count()).unwrap();
 
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let pages_box = pages.add_text_box(4, prefix, POSITION, SIZE).unwrap();
     let pages_field = pages
         .insert_text_box_date_time_field(
@@ -139,7 +135,7 @@ fn scratch_text_box_date_time_fields_work_across_the_suite() {
             settings(),
         )
         .unwrap();
-    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_date_time_fields(pages_box.drawable_object_id)
@@ -151,7 +147,7 @@ fn scratch_text_box_date_time_fields_work_across_the_suite() {
         .remove_text_box_date_time_field(pages_box.drawable_object_id, pages_field.id)
         .unwrap();
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(sheet_id, prefix, POSITION, SIZE)
@@ -165,7 +161,7 @@ fn scratch_text_box_date_time_fields_work_across_the_suite() {
             settings(),
         )
         .unwrap();
-    let mut numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_date_time_fields(sheet_id, numbers_box.drawable_object_id)
@@ -181,7 +177,7 @@ fn scratch_text_box_date_time_fields_work_across_the_suite() {
         )
         .unwrap();
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(0, prefix, POSITION, SIZE)
         .unwrap();
@@ -194,7 +190,7 @@ fn scratch_text_box_date_time_fields_work_across_the_suite() {
             settings(),
         )
         .unwrap();
-    let mut keynote = KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_date_time_fields(0, keynote_box.drawable_object_id)

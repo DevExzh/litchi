@@ -3,9 +3,9 @@
 use std::env;
 use std::path::Path;
 
-use litchi_iwa::keynote::KeynoteEditor;
-use litchi_iwa::numbers::NumbersEditor;
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::keynote;
+use litchi_iwa::numbers;
+use litchi_iwa::pages;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn list_numbers(input: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let editor = NumbersEditor::open(input)?;
+    let editor = numbers::Editor::open(input)?;
     for sheet in editor.sheets()? {
         for chart in editor.sheet_charts(sheet.id())? {
             println!(
@@ -45,7 +45,7 @@ fn list_numbers(input: &str) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn list_pages(input: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let editor = PagesEditor::open(input)?;
+    let editor = pages::Editor::open(input)?;
     for chart in editor.body_charts()? {
         println!(
             "Pages chart={} fills={:?} strokes={:?}",
@@ -58,7 +58,7 @@ fn list_pages(input: &str) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn list_keynote(input: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let editor = KeynoteEditor::open(input)?;
+    let editor = keynote::Editor::open(input)?;
     for slide in editor.slides()? {
         for chart in editor.slide_charts(slide.index)? {
             println!(

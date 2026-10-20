@@ -13,7 +13,7 @@ mod cases {
     use std::time::Duration;
 
     use crate::archive::RawMessage;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{DrawablePoint, DrawableSize};
     use crate::wire::remove_repeated_length_delimited_field_where;
     use litchi_keynote::slide::audio::Options as SlideAudioOptions;
@@ -85,7 +85,7 @@ mod cases {
             .unwrap()
     }
 
-    fn focused_package(editor: &KeynoteEditor) -> TestResult<FocusedKeynotePackage> {
+    fn focused_package(editor: &Editor) -> TestResult<FocusedKeynotePackage> {
         Ok(FocusedKeynotePackage::from_bytes(&editor.to_bytes()?)?)
     }
 
@@ -96,10 +96,10 @@ mod cases {
     }
 
     fn reopen_focused_package(
-        editor: &mut KeynoteEditor,
+        editor: &mut Editor,
         package: &FocusedKeynotePackage,
     ) -> TestResult<()> {
-        *editor = KeynoteEditor::from_bytes(&focused_bytes(package)?)?;
+        *editor = Editor::from_bytes(&focused_bytes(package)?)?;
         Ok(())
     }
 
@@ -116,7 +116,7 @@ mod cases {
         Ok(MovieSnapshot { info, properties })
     }
 
-    fn movie_graph(editor: &KeynoteEditor, slide_index: usize) -> TestResult<MovieGraphOracle> {
+    fn movie_graph(editor: &Editor, slide_index: usize) -> TestResult<MovieGraphOracle> {
         let slides = editor.slides()?;
         let slide = slides
             .get(slide_index)
@@ -188,10 +188,7 @@ mod cases {
         }
     }
 
-    fn native_movie_properties(
-        editor: &KeynoteEditor,
-        object_id: u64,
-    ) -> TestResult<MediaProperties> {
+    fn native_movie_properties(editor: &Editor, object_id: u64) -> TestResult<MediaProperties> {
         let graph = ObjectGraph::read(editor.package())?;
         let raw = graph.message_data_type(object_id, MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")?;
         let movie = tsd::MovieArchive::decode(raw)?;
@@ -204,7 +201,7 @@ mod cases {
     }
 
     fn add_audio(
-        editor: &mut KeynoteEditor,
+        editor: &mut Editor,
         preferred_filename: &str,
         data: &[u8],
         options: SlideAudioOptions,
@@ -216,7 +213,7 @@ mod cases {
     }
 
     fn add_movie(
-        editor: &mut KeynoteEditor,
+        editor: &mut Editor,
         preferred_movie_filename: &str,
         movie_data: &[u8],
         preferred_poster_filename: &str,
@@ -235,7 +232,7 @@ mod cases {
     }
 
     fn add_movie_at(
-        editor: &mut KeynoteEditor,
+        editor: &mut Editor,
         slide_index: usize,
         preferred_movie_filename: &str,
         movie_data: &[u8],
@@ -260,7 +257,7 @@ mod cases {
     }
 
     fn remove_movie_poster(
-        editor: &mut KeynoteEditor,
+        editor: &mut Editor,
         drawable_object_id: u64,
         poster_data_identifier: u64,
     ) -> TestResult<()> {
@@ -294,12 +291,12 @@ mod cases {
                 .retain(|identifier| *identifier != poster_data_identifier);
             Ok(())
         })?;
-        *editor = KeynoteEditor::from_bytes(&package.to_bytes()?)?;
+        *editor = Editor::from_bytes(&package.to_bytes()?)?;
         Ok(())
     }
 
     fn remove_movie_data(
-        editor: &mut KeynoteEditor,
+        editor: &mut Editor,
         drawable_object_id: u64,
         movie_data_identifier: u64,
     ) -> TestResult<()> {
@@ -333,14 +330,11 @@ mod cases {
                 .retain(|identifier| *identifier != movie_data_identifier);
             Ok(())
         })?;
-        *editor = KeynoteEditor::from_bytes(&package.to_bytes()?)?;
+        *editor = Editor::from_bytes(&package.to_bytes()?)?;
         Ok(())
     }
 
-    fn duplicate_movie(
-        editor: &mut KeynoteEditor,
-        movie: MovieSelector,
-    ) -> TestResult<MovieSnapshot> {
+    fn duplicate_movie(editor: &mut Editor, movie: MovieSelector) -> TestResult<MovieSnapshot> {
         let package = focused_package(editor)?;
         let commit = package.duplicate_slide_movie(SlideSelector::index(0), movie)?;
         reopen_focused_package(editor, commit.package())?;
@@ -352,21 +346,17 @@ mod cases {
         movie_snapshot(&package, index)
     }
 
-    fn remove_movie(editor: &mut KeynoteEditor, movie: MovieSelector) -> TestResult<()> {
+    fn remove_movie(editor: &mut Editor, movie: MovieSelector) -> TestResult<()> {
         let package = focused_package(editor)?;
         let commit = package.remove_slide_movie(SlideSelector::index(0), movie)?;
         reopen_focused_package(editor, commit.package())
     }
 
-    fn movie_title(editor: &KeynoteEditor, movie: MovieSelector) -> TestResult<Option<String>> {
+    fn movie_title(editor: &Editor, movie: MovieSelector) -> TestResult<Option<String>> {
         Ok(focused_package(editor)?.slide_movie_title(SlideSelector::index(0), movie)?)
     }
 
-    fn set_movie_title(
-        editor: &mut KeynoteEditor,
-        movie: MovieSelector,
-        title: &str,
-    ) -> TestResult<()> {
+    fn set_movie_title(editor: &mut Editor, movie: MovieSelector, title: &str) -> TestResult<()> {
         let package = focused_package(editor)?;
         let commit = package
             .edit_slide_movie_title(SlideSelector::index(0), movie)?
@@ -375,7 +365,7 @@ mod cases {
         reopen_focused_package(editor, commit.package())
     }
 
-    fn remove_movie_title(editor: &mut KeynoteEditor, movie: MovieSelector) -> TestResult<bool> {
+    fn remove_movie_title(editor: &mut Editor, movie: MovieSelector) -> TestResult<bool> {
         let package = focused_package(editor)?;
         let edit = package.edit_slide_movie_title(SlideSelector::index(0), movie)?;
         let had_title = edit.before().is_some();
@@ -386,12 +376,12 @@ mod cases {
         Ok(had_title)
     }
 
-    fn movie_caption(editor: &KeynoteEditor, movie: MovieSelector) -> TestResult<Option<String>> {
+    fn movie_caption(editor: &Editor, movie: MovieSelector) -> TestResult<Option<String>> {
         Ok(focused_package(editor)?.slide_movie_caption(SlideSelector::index(0), movie)?)
     }
 
     fn set_movie_caption(
-        editor: &mut KeynoteEditor,
+        editor: &mut Editor,
         movie: MovieSelector,
         caption: &str,
     ) -> TestResult<()> {
@@ -403,7 +393,7 @@ mod cases {
         reopen_focused_package(editor, commit.package())
     }
 
-    fn remove_movie_caption(editor: &mut KeynoteEditor, movie: MovieSelector) -> TestResult<bool> {
+    fn remove_movie_caption(editor: &mut Editor, movie: MovieSelector) -> TestResult<bool> {
         let package = focused_package(editor)?;
         let edit = package.edit_slide_movie_caption(SlideSelector::index(0), movie)?;
         let had_caption = edit.before().is_some();
@@ -423,7 +413,7 @@ mod cases {
     }
 
     fn set_movie_properties(
-        editor: &mut KeynoteEditor,
+        editor: &mut Editor,
         movie: MovieSelector,
         properties: MediaProperties,
     ) -> TestResult<()> {
@@ -436,7 +426,7 @@ mod cases {
     }
 
     fn replace_movie_media(
-        editor: &mut KeynoteEditor,
+        editor: &mut Editor,
         movie: MovieSelector,
         part: MediaPart,
         replacement: &[u8],
@@ -461,7 +451,7 @@ mod cases {
 
     #[test]
     fn source_built_movie_properties_project_through_focused_updates() -> TestResult {
-        let mut seed = KeynoteDocumentBuilder::new()
+        let mut seed = keynote::Builder::new()
             .title("Movie properties projection")
             .build()?;
         add_movie(
@@ -472,7 +462,7 @@ mod cases {
             POSTER,
             options(),
         )?;
-        let mut editor = KeynoteEditor::from_bytes(&seed.to_bytes()?)?;
+        let mut editor = Editor::from_bytes(&seed.to_bytes()?)?;
         let package = focused_package(&editor)?;
         let baseline = movie_snapshot(&package, 0)?;
         assert_eq!(
@@ -521,7 +511,7 @@ mod cases {
 
     #[test]
     fn native_file_movie_properties_match_focused_source_projection() -> TestResult {
-        let editor = KeynoteEditor::from_bytes(NATIVE_MEDIA_BASELINE)?;
+        let editor = Editor::from_bytes(NATIVE_MEDIA_BASELINE)?;
         let package = focused_package(&editor)?;
         let graph = movie_graph(&editor, 0)?;
         assert_movie_graph_is_local(&graph);
@@ -558,7 +548,7 @@ mod cases {
 
     #[test]
     fn source_built_movie_properties_support_an_absent_poster() -> TestResult {
-        let mut seed = KeynoteDocumentBuilder::new()
+        let mut seed = keynote::Builder::new()
             .title("Movie properties without poster")
             .build()?;
         add_movie(
@@ -569,7 +559,7 @@ mod cases {
             POSTER,
             options(),
         )?;
-        let seed_editor = KeynoteEditor::from_bytes(&seed.to_bytes()?)?;
+        let seed_editor = Editor::from_bytes(&seed.to_bytes()?)?;
         let graph = movie_graph(&seed_editor, 0)?;
         let movie = graph.movies.first().ok_or("movie graph is empty")?;
         let mut editor = seed_editor;
@@ -611,7 +601,7 @@ mod cases {
 
     #[test]
     fn source_built_movie_properties_support_missing_content_data() -> TestResult {
-        let mut seed = KeynoteDocumentBuilder::new()
+        let mut seed = keynote::Builder::new()
             .title("Movie properties without content")
             .build()?;
         add_movie(
@@ -622,7 +612,7 @@ mod cases {
             POSTER,
             options(),
         )?;
-        let seed_editor = KeynoteEditor::from_bytes(&seed.to_bytes()?)?;
+        let seed_editor = Editor::from_bytes(&seed.to_bytes()?)?;
         let graph = movie_graph(&seed_editor, 0)?;
         let movie = graph.movies.first().ok_or("movie graph is empty")?;
         let mut editor = seed_editor;
@@ -670,7 +660,7 @@ mod cases {
 
     #[test]
     fn scratch_presentation_supports_movie_crud_without_a_source_drawable() -> TestResult {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Scratch movie")
             .subtitle("No embedded package")
             .build()?;
@@ -725,10 +715,10 @@ mod cases {
         let builds = editor.slide_builds(0)?;
         assert_eq!(builds.len(), 1);
         assert_eq!(builds[0].drawable_object_id, original_object_id);
-        assert_eq!(builds[0].settings, KeynoteBuildSettings::movie_start());
+        assert_eq!(builds[0].settings, BuildSettings::movie_start());
         assert_eq!(builds[0].chunks.len(), 1);
 
-        let roundtripped = KeynoteEditor::from_bytes(&editor.to_bytes()?)?;
+        let roundtripped = Editor::from_bytes(&editor.to_bytes()?)?;
         assert_eq!(
             movie_snapshot(&focused_package(&roundtripped)?, 0)?,
             created
@@ -856,15 +846,13 @@ mod cases {
                 )
                 .is_err()
         );
-        KeynoteEditor::from_bytes(&editor.to_bytes()?)?;
+        Editor::from_bytes(&editor.to_bytes()?)?;
         Ok(())
     }
 
     #[test]
     fn scratch_presentation_supports_native_movie_title_caption_crud() -> TestResult {
-        let mut editor = KeynoteDocumentBuilder::new()
-            .title("Movie labels")
-            .build()?;
+        let mut editor = keynote::Builder::new().title("Movie labels").build()?;
         add_movie(
             &mut editor,
             "movie.mov",
@@ -911,7 +899,7 @@ mod cases {
         assert_eq!(movie_title(&editor, MovieSelector::index(0))?, None);
         assert_eq!(movie_caption(&editor, MovieSelector::index(0))?, None);
 
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes()?)?;
+        let reopened = Editor::from_bytes(&editor.to_bytes()?)?;
         assert_eq!(
             movie_caption(&reopened, MovieSelector::index(1))?,
             Some("Updated revenue overview".to_owned())
@@ -924,7 +912,7 @@ mod cases {
 
     #[test]
     fn movie_caption_package_preserves_movie_selector_order_after_audio() -> TestResult {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Movie caption selector order")
             .build()?;
         add_audio(
@@ -970,7 +958,7 @@ mod cases {
 
     #[test]
     fn invalid_movie_creation_is_transactional() -> TestResult {
-        let mut editor = KeynoteDocumentBuilder::new().build()?;
+        let mut editor = keynote::Builder::new().build()?;
         let baseline = editor.to_bytes()?;
 
         for result in [

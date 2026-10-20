@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::Path;
 
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote;
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_keynote::slide::image::Options as ImageOptions;
 
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .file_name()
         .and_then(|name| name.to_str())
         .ok_or("image path has no UTF-8 filename")?;
-    let mut editor = KeynoteDocumentBuilder::new()
+    let mut editor = keynote::Builder::new()
         .title("Created from scratch")
         .subtitle("Image labels built from typed IWA objects")
         .build()?;

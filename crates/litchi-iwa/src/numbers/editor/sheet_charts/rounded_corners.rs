@@ -7,7 +7,7 @@ use crate::charts::rounded_corners::{
     set_chart_rounded_corners as set_native_chart_rounded_corners,
 };
 
-impl NumbersEditor {
+impl Editor {
     /// Read the rounded-corner settings for one native Numbers sheet chart.
     pub fn sheet_chart_rounded_corners(
         &self,
@@ -29,7 +29,7 @@ impl NumbersEditor {
 }
 
 fn sheet_chart_rounded_corners(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<ChartRoundedCorners> {
@@ -43,7 +43,7 @@ fn sheet_chart_rounded_corners(
 }
 
 fn set_sheet_chart_rounded_corners(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     rounded_corners: ChartRoundedCorners,
@@ -60,7 +60,7 @@ fn set_sheet_chart_rounded_corners(
         "Numbers",
         rounded_corners,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_rounded_corners(sheet_id, drawable_object_id)? != rounded_corners {
         return Err(Error::InvalidFormat(
             "Numbers chart rounded-corner update failed validation".to_owned(),

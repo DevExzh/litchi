@@ -3,10 +3,10 @@
 use super::*;
 
 /// Storage identity and rule count for one conditionally highlighted Keynote cell.
-pub type KeynoteTableCellConditionalHighlightInfo =
+pub type TableCellConditionalHighlightInfo =
     crate::numbers::editor::TableCellConditionalHighlightInfo;
 
-impl KeynoteEditor {
+impl Editor {
     /// Inspect conditional highlighting attached to a reachable slide-table cell.
     pub fn slide_table_cell_conditional_highlighting(
         &self,
@@ -14,7 +14,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<KeynoteTableCellConditionalHighlightInfo>> {
+    ) -> Result<Option<TableCellConditionalHighlightInfo>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_conditional_highlighting_in_package(
             self.package(),
@@ -78,7 +78,7 @@ impl KeynoteEditor {
         row: usize,
         column: usize,
         rules: &[litchi_iwa_common::table::cell::conditional_highlight::Rule],
-    ) -> Result<KeynoteTableCellConditionalHighlightInfo> {
+    ) -> Result<TableCellConditionalHighlightInfo> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
         crate::numbers::editor::set_table_cell_conditional_highlighting_in_package(

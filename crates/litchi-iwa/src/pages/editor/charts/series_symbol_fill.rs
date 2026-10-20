@@ -11,7 +11,7 @@ use crate::charts::series_symbol_fill::{
 use crate::charts::{ChartSeriesSymbolFill, Index};
 use crate::shapes::{RgbaColor, ShapeImageFill, ShapeImageFillTechnique};
 
-impl PagesEditor {
+impl Editor {
     pub fn body_chart_series_symbol_fills(
         &self,
         drawable_object_id: u64,
@@ -74,7 +74,7 @@ impl PagesEditor {
             count,
             series.zero_based(),
         )?;
-        let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_series_symbol_fill(drawable_object_id, series)? != inherited {
             return Err(Error::InvalidFormat(
                 "Pages chart data-symbol fill reset failed validation".to_owned(),
@@ -116,7 +116,7 @@ impl PagesEditor {
             fill_size,
             tint,
         )?;
-        let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_series_symbol_fill(drawable_object_id, series)?
             != ChartSeriesSymbolFill::Custom(crate::shapes::ShapeFill::Image(image.clone()))
         {
@@ -129,7 +129,7 @@ impl PagesEditor {
     }
 }
 
-fn read(editor: &PagesEditor, drawable_object_id: u64) -> Result<Vec<ChartSeriesSymbolFill>> {
+fn read(editor: &Editor, drawable_object_id: u64) -> Result<Vec<ChartSeriesSymbolFill>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native(
         editor.package(),
@@ -142,7 +142,7 @@ fn read(editor: &PagesEditor, drawable_object_id: u64) -> Result<Vec<ChartSeries
 }
 
 fn set(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     fills: &[ChartSeriesSymbolFill],
 ) -> Result<()> {
@@ -160,7 +160,7 @@ fn set(
         series_count(&graph, drawable_object_id)?,
         fills,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_series_symbol_fills(drawable_object_id)? != fills {
         return Err(Error::InvalidFormat(
             "Pages chart data-symbol fill update failed validation".to_owned(),

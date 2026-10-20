@@ -5,7 +5,7 @@
 use super::*;
 
 #[allow(deprecated)]
-impl NumbersEditor {
+impl Editor {
     /// List supported direct-comment drawables owned by one reachable sheet.
     pub fn sheet_drawables(&self, sheet_id: u64) -> Result<Vec<DrawableInfo>> {
         let owned = self.sheet_owned_drawable_ids(sheet_id)?;

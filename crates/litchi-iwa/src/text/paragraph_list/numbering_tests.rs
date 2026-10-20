@@ -1,7 +1,7 @@
 use super::*;
-use crate::keynote::KeynoteDocumentBuilder;
-use crate::numbers::NumbersDocumentBuilder;
-use crate::pages::PagesEditor;
+use crate::keynote;
+use crate::numbers;
+use crate::pages;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use crate::text::TextPosition;
 
@@ -25,14 +25,10 @@ fn restart_at_seven() -> ParagraphListNumbering {
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn list_numbering_round_trips_and_continues_independently_in_every_suite() {
     let restart = restart_at_seven();
 
-    let mut pages = PagesEditor::create_with_text("Lists").unwrap();
+    let mut pages = pages::Editor::create_with_text("Lists").unwrap();
     let pages_box = pages.add_text_box(5, TEXT, POSITION, SIZE).unwrap();
     pages
         .set_text_box_paragraph_list(pages_box.drawable_object_id, ParagraphList::Numbered)
@@ -45,7 +41,7 @@ fn list_numbering_round_trips_and_continues_independently_in_every_suite() {
             restart,
         )
         .unwrap();
-    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_paragraph_list_numbering(pages_box.drawable_object_id, second_start())
@@ -67,7 +63,7 @@ fn list_numbering_round_trips_and_continues_independently_in_every_suite() {
         .unwrap();
     assert_eq!(pages.to_bytes().unwrap(), pages_before);
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(sheet_id, TEXT, POSITION, SIZE)
@@ -87,7 +83,7 @@ fn list_numbering_round_trips_and_continues_independently_in_every_suite() {
             restart,
         )
         .unwrap();
-    let numbers = crate::numbers::NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_paragraph_list_numbering(
@@ -99,7 +95,7 @@ fn list_numbering_round_trips_and_continues_independently_in_every_suite() {
         restart
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote.add_slide_text_box(0, TEXT, POSITION, SIZE).unwrap();
     keynote
         .set_slide_text_box_paragraph_list(
@@ -116,7 +112,7 @@ fn list_numbering_round_trips_and_continues_independently_in_every_suite() {
             restart,
         )
         .unwrap();
-    let keynote = crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_paragraph_list_numbering(
@@ -131,7 +127,7 @@ fn list_numbering_round_trips_and_continues_independently_in_every_suite() {
 
 #[test]
 fn invalid_or_non_numbered_restarts_are_transactional() {
-    let mut pages = PagesEditor::create_with_text("Lists").unwrap();
+    let mut pages = pages::Editor::create_with_text("Lists").unwrap();
     let text_box = pages.add_text_box(5, TEXT, POSITION, SIZE).unwrap();
     let before = pages.to_bytes().unwrap();
     assert!(

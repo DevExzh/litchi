@@ -141,13 +141,13 @@ pub(super) struct SheetImageGraph {
     pub(super) sheet_id: u64,
     pub(super) archive_name: String,
     pub(super) component_id: u64,
-    pub(super) info: NumbersSheetImageInfo,
+    pub(super) info: SheetImageInfo,
     pub(super) object_ids: Vec<u64>,
     pub(super) uuid_object_ids: Vec<u64>,
     pub(super) data_references: Vec<(u64, u64)>,
 }
 
-pub(super) fn image_creation_values(options: NumbersSheetImageOptions) -> Result<DrawableGeometry> {
+pub(super) fn image_creation_values(options: SheetImageOptions) -> Result<DrawableGeometry> {
     if !options.natural_size.width.is_finite()
         || !options.natural_size.height.is_finite()
         || options.natural_size.width <= 0.0
@@ -167,7 +167,7 @@ pub(super) fn image_creation_values(options: NumbersSheetImageOptions) -> Result
 }
 
 pub(super) fn image_creation_context(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
 ) -> Result<ImageCreationContext> {
     let (archive_name, _, _) = numbers_sheet(editor.package(), sheet_id)?;
@@ -283,10 +283,7 @@ fn image_caption_theme(
     })
 }
 
-pub(super) fn image_infos(
-    editor: &NumbersEditor,
-    sheet_id: u64,
-) -> Result<Vec<NumbersSheetImageInfo>> {
+pub(super) fn image_infos(editor: &Editor, sheet_id: u64) -> Result<Vec<SheetImageInfo>> {
     let (_, _, sheet) = numbers_sheet(editor.package(), sheet_id)?;
     let locations = object_locations(editor.package())?;
     let mut images = Vec::new();
@@ -328,7 +325,7 @@ pub(super) fn image_infos(
 }
 
 pub(super) fn image_graph(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<SheetImageGraph> {
@@ -482,7 +479,7 @@ pub(super) fn image_graph(
 }
 
 pub(super) fn image_title_caption(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<DrawableTitleCaption> {
@@ -520,7 +517,7 @@ pub(super) fn image_title_caption(
 }
 
 pub(super) fn image_caption_slot(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     kind: DrawableCaptionKind,
@@ -770,11 +767,7 @@ fn replace_image_caption_reference(
     Ok(())
 }
 
-fn image_info(
-    package: &IWorkPackage,
-    sheet_id: u64,
-    identifier: u64,
-) -> Result<NumbersSheetImageInfo> {
+fn image_info(package: &IWorkPackage, sheet_id: u64, identifier: u64) -> Result<SheetImageInfo> {
     let locations = object_locations(package)?;
     let archive_name = locations
         .get(&identifier)
@@ -812,7 +805,7 @@ fn image_info(
         .thumbnail_data
         .map(|reference| MediaAssetId::try_from(reference.identifier))
         .transpose()?;
-    Ok(NumbersSheetImageInfo {
+    Ok(SheetImageInfo {
         sheet_id,
         drawable_object_id: identifier,
         image_data_identifier,

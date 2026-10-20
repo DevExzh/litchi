@@ -32,7 +32,7 @@ use crate::charts::{
     ChartLegendStroke,
 };
 
-impl NumbersEditor {
+impl Editor {
     /// Read whether Numbers shows the native legend for one sheet chart.
     pub fn sheet_chart_legend_visible(
         &self,
@@ -86,7 +86,7 @@ impl NumbersEditor {
             "Numbers",
             frame,
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_legend_frame(sheet_id, drawable_object_id)? != frame {
             return Err(Error::InvalidFormat(
                 "Numbers chart legend-frame update failed validation".to_owned(),
@@ -130,7 +130,7 @@ impl NumbersEditor {
             "Numbers",
             fill,
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_legend_fill(sheet_id, drawable_object_id)? != *fill {
             return Err(Error::InvalidFormat(
                 "Numbers chart legend-fill update failed validation".to_owned(),
@@ -174,7 +174,7 @@ impl NumbersEditor {
             "Numbers",
             font,
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_legend_font(sheet_id, drawable_object_id)? != *font {
             return Err(Error::InvalidFormat(
                 "Numbers chart legend font update failed validation".to_owned(),
@@ -218,7 +218,7 @@ impl NumbersEditor {
             "Numbers",
             size,
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_legend_font_size(sheet_id, drawable_object_id)? != size {
             return Err(Error::InvalidFormat(
                 "Numbers chart legend font-size update failed validation".to_owned(),
@@ -262,7 +262,7 @@ impl NumbersEditor {
             "Numbers",
             stroke,
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_legend_stroke(sheet_id, drawable_object_id)? != stroke {
             return Err(Error::InvalidFormat(
                 "Numbers chart legend-stroke update failed validation".to_owned(),
@@ -306,7 +306,7 @@ impl NumbersEditor {
             "Numbers",
             shadow,
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_legend_shadow(sheet_id, drawable_object_id)? != shadow {
             return Err(Error::InvalidFormat(
                 "Numbers chart legend-shadow update failed validation".to_owned(),
@@ -318,7 +318,7 @@ impl NumbersEditor {
 }
 
 fn sheet_chart_legend_visible(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<bool> {
@@ -332,7 +332,7 @@ fn sheet_chart_legend_visible(
 }
 
 fn set_sheet_chart_legend_visible(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     visible: bool,
@@ -349,7 +349,7 @@ fn set_sheet_chart_legend_visible(
         "Numbers",
         visible,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_legend_visible(sheet_id, drawable_object_id)? != visible {
         return Err(Error::InvalidFormat(
             "Numbers chart legend update failed validation".to_owned(),

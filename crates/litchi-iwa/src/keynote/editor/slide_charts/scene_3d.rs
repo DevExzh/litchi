@@ -7,7 +7,7 @@ use crate::charts::scene_3d::{
     set_chart_3d_rotation as set_native_chart_3d_rotation,
 };
 
-impl KeynoteEditor {
+impl Editor {
     /// Read the X/Y orientation of one slide chart's native 3D scene.
     pub fn slide_chart_3d_rotation(
         &self,
@@ -50,7 +50,7 @@ impl KeynoteEditor {
             "Keynote",
             rotation,
         )?;
-        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_3d_rotation(slide_index, drawable_object_id)? != rotation {
             return Err(Error::InvalidFormat(
                 "Keynote chart 3D rotation update failed validation".to_owned(),
@@ -73,12 +73,12 @@ fn require_3d_scene(kind: Kind, drawable_object_id: u64) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_presentation_supports_3d_chart_rotation_crud() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let chart = editor
             .add_slide_chart(
                 0,
@@ -98,7 +98,7 @@ mod tests {
         let duplicate = editor
             .duplicate_slide_chart(0, chart_selector(&editor, &chart))
             .unwrap();
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_chart_3d_rotation(0, chart.drawable_object_id)

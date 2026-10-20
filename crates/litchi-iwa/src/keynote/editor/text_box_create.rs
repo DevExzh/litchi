@@ -77,7 +77,7 @@ impl TextBoxObjectIds {
     }
 }
 
-impl KeynoteEditor {
+impl Editor {
     /// Add an independently editable text box to a slide.
     ///
     /// The shape, writable storage, title/caption stand-ins, drawable
@@ -90,7 +90,7 @@ impl KeynoteEditor {
         text: &str,
         position: DrawablePoint,
         size: DrawableSize,
-    ) -> Result<KeynoteSlideTextInfo> {
+    ) -> Result<SlideTextInfo> {
         let geometry = validate_text_box_geometry(position, size)?;
         let graph = ObjectGraph::read(self.package())?;
         let context = text_box_context(&graph, slide_index)?;
@@ -140,7 +140,7 @@ impl KeynoteEditor {
                 Error::InvalidFormat("Keynote text-box creation failed validation".to_owned())
             })?;
         let created_graph = verified.text_box_graph(slide_index, ids.drawable)?;
-        if created.role != KeynoteSlideTextRole::TextBox
+        if created.role != SlideTextRole::TextBox
             || created.storage.id.get() != ids.storage
             || created.storage.storage.text() != text
             || created_graph.object_ids != ids.all()
@@ -460,7 +460,7 @@ fn reference(identifier: u64) -> tsp::Reference {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
 
     const FIRST_POSITION: DrawablePoint = DrawablePoint { x: 144.0, y: 216.0 };
     const FIRST_SIZE: DrawableSize = DrawableSize {
@@ -469,12 +469,8 @@ mod tests {
     };
 
     #[test]
-    #[expect(
-        deprecated,
-        reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-    )]
     fn scratch_presentation_supports_text_box_crud_without_a_source_drawable() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Scratch presentation")
             .subtitle("No embedded package")
             .build()
@@ -484,14 +480,14 @@ mod tests {
                 .slide_text_storages(0)
                 .unwrap()
                 .iter()
-                .all(|text| text.role != KeynoteSlideTextRole::TextBox)
+                .all(|text| text.role != SlideTextRole::TextBox)
         );
         let baseline = editor.to_bytes().unwrap();
 
         let created = editor
             .add_slide_text_box(0, "Built from typed objects", FIRST_POSITION, FIRST_SIZE)
             .unwrap();
-        assert_eq!(created.role, KeynoteSlideTextRole::TextBox);
+        assert_eq!(created.role, SlideTextRole::TextBox);
         assert_eq!(created.storage.storage.text(), "Built from typed objects");
         assert_eq!(
             editor
@@ -513,12 +509,12 @@ mod tests {
             .unwrap();
         assert_ne!(duplicate.storage.id, created.storage.id);
 
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let text_boxes = reopened
             .slide_text_storages(0)
             .unwrap()
             .into_iter()
-            .filter(|text| text.role == KeynoteSlideTextRole::TextBox)
+            .filter(|text| text.role == SlideTextRole::TextBox)
             .collect::<Vec<_>>();
         assert_eq!(text_boxes.len(), 2);
         assert_eq!(
@@ -539,7 +535,7 @@ mod tests {
 
     #[test]
     fn scratch_text_box_creation_is_transactional() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let baseline = editor.to_bytes().unwrap();
 
         assert!(
@@ -566,7 +562,7 @@ mod tests {
 
     #[test]
     fn slide_without_placeholders_uses_theme_text_styles() {
-        let editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let editor = keynote::Builder::new().build().unwrap();
         let graph = ObjectGraph::read(editor.package()).unwrap();
         let context = text_box_context(&graph, 0).unwrap();
         let slide_id = context.slide_id;
@@ -600,22 +596,18 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        let mut editor = KeynoteEditor::from_package(package).unwrap();
+        let mut editor = Editor::from_package(package).unwrap();
 
         let created = editor
             .add_slide_text_box(0, "On a truly blank slide", FIRST_POSITION, FIRST_SIZE)
             .unwrap();
         assert_eq!(created.storage.storage.text(), "On a truly blank slide");
-        assert_eq!(created.role, KeynoteSlideTextRole::TextBox);
+        assert_eq!(created.role, SlideTextRole::TextBox);
     }
 
     #[test]
-    #[expect(
-        deprecated,
-        reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-    )]
     fn created_text_box_graph_has_private_objects_and_component_uuids() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let created = editor
             .add_slide_text_box(0, "Metadata", FIRST_POSITION, FIRST_SIZE)
             .unwrap();

@@ -1,11 +1,9 @@
 use std::env;
 use std::path::Path;
 
-use litchi_iwa::keynote::KeynoteEditor;
-use litchi_iwa::numbers::{
-    FormulaCachedValue, FormulaCellReference, FormulaExpression, NumbersEditor,
-};
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::keynote;
+use litchi_iwa::numbers::{self, FormulaCachedValue, FormulaCellReference, FormulaExpression};
+use litchi_iwa::pages;
 
 fn parse_cell(address: &str) -> Result<FormulaCellReference, String> {
     let letter_count = address.bytes().take_while(u8::is_ascii_alphabetic).count();
@@ -50,12 +48,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|extension| extension.to_str())
     {
         Some("numbers") => {
-            let mut editor = NumbersEditor::open(input)?;
+            let mut editor = numbers::Editor::open(input)?;
             editor.set_formula(table_id, row, column, expression)?;
             editor.save(output)?;
         },
         Some("pages") => {
-            let mut editor = PagesEditor::open(input)?;
+            let mut editor = pages::Editor::open(input)?;
             editor.set_table_formula(
                 table_id,
                 row,
@@ -71,7 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map(|value| value.parse::<usize>())
                 .transpose()?
                 .unwrap_or(0);
-            let mut editor = KeynoteEditor::open(input)?;
+            let mut editor = keynote::Editor::open(input)?;
             editor.set_slide_table_formula(
                 slide_index,
                 table_id,

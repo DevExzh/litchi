@@ -8,7 +8,7 @@ use crate::charts::axis::{
     set_chart_axis_title as set_native_chart_axis_title,
 };
 
-impl PagesEditor {
+impl Editor {
     /// Read the title shown by Pages for one native body-chart axis.
     pub fn body_chart_axis_title(
         &self,
@@ -41,7 +41,7 @@ impl PagesEditor {
 }
 
 fn body_chart_axis_title(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
     axis: Axis,
 ) -> Result<Option<String>> {
@@ -56,7 +56,7 @@ fn body_chart_axis_title(
 }
 
 fn set_body_chart_axis_title(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     axis: Axis,
     title: &str,
@@ -71,7 +71,7 @@ fn set_body_chart_axis_title(
         axis,
         title,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified
         .body_chart_axis_title(drawable_object_id, axis)?
         .as_deref()
@@ -86,7 +86,7 @@ fn set_body_chart_axis_title(
 }
 
 fn remove_body_chart_axis_title(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     axis: Axis,
 ) -> Result<bool> {
@@ -102,7 +102,7 @@ fn remove_body_chart_axis_title(
     if !removed {
         return Ok(false);
     }
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified
         .body_chart_axis_title(drawable_object_id, axis)?
         .is_some()

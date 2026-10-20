@@ -2,7 +2,7 @@
 //!
 //! These helpers keep archive traversal, wire updates, and package graph
 //! mutations behind the semantic editor facade. They are crate-visible only;
-//! consumers operate through the typed [`super::NumbersEditor`] API.
+//! consumers operate through the typed [`super::Editor`] API.
 
 use super::*;
 use crate::text::{Alignment, Indents, LineSpacing, Spacing};

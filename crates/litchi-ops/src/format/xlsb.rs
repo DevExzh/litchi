@@ -35,9 +35,7 @@ use std::ops::Deref;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-use litchi_core::sheet::{
-    Result as SheetResult, WorkbookTrait, Worksheet as CoreWorksheet, WorksheetIterator,
-};
+use litchi_core::sheet::{Result as SheetResult, WorkbookTrait};
 use litchi_core::{FileFormat, Metadata};
 use litchi_opc::{OpcPackage, SourceBackedPackage, SourceLimits};
 use litchi_xlsb as xlsb;
@@ -64,7 +62,7 @@ mod node;
 mod owner;
 #[cfg(test)]
 mod read_tests;
-mod source;
+pub(crate) mod source;
 mod spec;
 mod views;
 pub(crate) mod write;
@@ -77,6 +75,7 @@ pub(crate) use node::Props;
 pub(crate) use spec::{CELL_WRITE_TABLE, SPEC};
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
 
+use crate::view::sheet::{Worksheet as Sheet, WorksheetsInner};
 use source::{SourceWorkbook, SourceWorksheets, internal};
 
 /// An opened Excel binary workbook.
@@ -523,8 +522,7 @@ impl Xlsb {
                 let mut out = String::new();
                 for index in 0..WorkbookTrait::worksheet_count(workbook.as_ref()) {
                     let worksheet = workbook.worksheet(index)?;
-                    let mut rows = worksheet.rows();
-                    while let Some(row) = rows.next() {
+                    for row in litchi_core::sheet::Worksheet::rows(&worksheet) {
                         cell_text::append_row(&mut out, &row.map_err(sheet_error)?);
                     }
                 }
@@ -679,6 +677,9 @@ impl std::fmt::Debug for Xlsb {
 }
 
 impl WorkbookTrait for Xlsb {
+    type Worksheet<'a> = Sheet<'a>;
+    type Worksheets<'a> = crate::view::sheet::Worksheets<'a>;
+
     fn active_sheet_index(&self) -> usize {
         match &self.0.owner {
             XlsbOwner::Source(workbook) => workbook.active_worksheet_ordinal().unwrap_or(0),
@@ -686,10 +687,10 @@ impl WorkbookTrait for Xlsb {
         }
     }
 
-    fn active_worksheet(&self) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
+    fn active_worksheet(&self) -> SheetResult<Sheet<'_>> {
         match &self.0.owner {
-            XlsbOwner::Source(workbook) => workbook.active_worksheet(),
-            XlsbOwner::Eager(workbook) => workbook.active_worksheet(),
+            XlsbOwner::Source(workbook) => workbook.active_worksheet().map(Sheet::xlsb_source),
+            XlsbOwner::Eager(workbook) => workbook.active_worksheet().map(Sheet::xlsb_eager),
         }
     }
 
@@ -700,17 +701,17 @@ impl WorkbookTrait for Xlsb {
         }
     }
 
-    fn worksheet_by_index(&self, index: usize) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
+    fn worksheet_by_index(&self, index: usize) -> SheetResult<Sheet<'_>> {
         match &self.0.owner {
-            XlsbOwner::Source(workbook) => workbook.worksheet(index),
-            XlsbOwner::Eager(workbook) => workbook.worksheet_by_index(index),
+            XlsbOwner::Source(workbook) => workbook.worksheet(index).map(Sheet::xlsb_source),
+            XlsbOwner::Eager(workbook) => workbook.worksheet_by_index(index).map(Sheet::xlsb_eager),
         }
     }
 
-    fn worksheet_by_name(&self, name: &str) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
+    fn worksheet_by_name(&self, name: &str) -> SheetResult<Sheet<'_>> {
         match &self.0.owner {
-            XlsbOwner::Source(workbook) => workbook.worksheet_named(name),
-            XlsbOwner::Eager(workbook) => workbook.worksheet_by_name(name),
+            XlsbOwner::Source(workbook) => workbook.worksheet_named(name).map(Sheet::xlsb_source),
+            XlsbOwner::Eager(workbook) => workbook.worksheet_by_name(name).map(Sheet::xlsb_eager),
         }
     }
 
@@ -728,11 +729,13 @@ impl WorkbookTrait for Xlsb {
         }
     }
 
-    fn worksheets(&self) -> Box<dyn WorksheetIterator<'_> + '_> {
-        match &self.0.owner {
-            XlsbOwner::Source(workbook) => Box::new(SourceWorksheets { workbook, index: 0 }),
-            XlsbOwner::Eager(workbook) => workbook.worksheets(),
-        }
+    fn worksheets(&self) -> Self::Worksheets<'_> {
+        crate::view::sheet::Worksheets::new(match &self.0.owner {
+            XlsbOwner::Source(workbook) => {
+                WorksheetsInner::XlsbSource(SourceWorksheets { workbook, index: 0 })
+            },
+            XlsbOwner::Eager(workbook) => WorksheetsInner::XlsbEager(workbook.worksheets()),
+        })
     }
 }
 

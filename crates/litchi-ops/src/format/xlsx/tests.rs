@@ -13,6 +13,7 @@ use litchi_xlsx::{Cell, Value};
 use super::{SelectedCellView, Xlsx, XlsxOwner};
 use crate::error::{Code, Error, Source};
 use crate::options::{OpenOptions, SourceMode};
+use litchi_core::sheet::{Cell as _, Worksheet as _};
 
 fn fixture_path(name: &str) -> PathBuf {
     PathBuf::from(concat!(
@@ -213,7 +214,7 @@ fn two_sheets() -> Vec<u8> {
     ])
 }
 
-fn assert_workbook_trait_surface(workbook: &dyn WorkbookTrait) {
+fn assert_workbook_trait_surface(workbook: &impl WorkbookTrait) {
     assert_eq!(workbook.worksheet_names(), ["First", "Second"]);
     assert_eq!(workbook.worksheet_count(), 2);
     assert_eq!(workbook.active_sheet_index(), 1);
@@ -612,8 +613,7 @@ fn a_changed_source_is_a_typed_io_error_on_every_read() {
     ] {
         changed(
             *result
-                .err()
-                .expect("selection refuses stale source")
+                .expect_err("selection refuses stale source")
                 .downcast::<Error>()
                 .expect("typed trait error"),
         );
@@ -622,14 +622,12 @@ fn a_changed_source_is_a_typed_io_error_on_every_read() {
         *sheets
             .next()
             .unwrap()
-            .err()
-            .expect("iterator refuses stale source")
+            .expect_err("iterator refuses stale source")
             .downcast::<Error>()
             .expect("typed trait error"),
     );
     assert!(sheets.next().is_none());
     assert!(sheets.next().is_none());
-    drop(sheets);
     drop(generic);
     for _ in 0..2 {
         changed(

@@ -7,7 +7,7 @@
 /// A neutral table-cell value.
 pub use litchi_iwa_common::table::cell::value::Value;
 /// A checked sparse table coordinate.
-pub use litchi_iwa_common::table::coordinate::CellPosition;
+pub use litchi_iwa_common::table::coordinate::At;
 /// A positioned semantic table-cell comment.
 pub use litchi_iwa_common::table::read::CellComment as TableCellComment;
 /// A semantic table-cell comment value.

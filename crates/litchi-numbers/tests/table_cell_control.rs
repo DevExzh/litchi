@@ -13,7 +13,7 @@ use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsce, tsd, tsk, tsp, tst};
-use litchi_numbers::CellPosition;
+use litchi_numbers::At;
 use litchi_numbers::cell::data_format::control::{
     CellControl, DisplayFormat, Range, Slider, Stepper,
 };
@@ -1783,7 +1783,7 @@ fn assert_changed_edit_rejects(source: &[u8], label: &str) -> TestResult {
     let edit = match package.edit_table_cell_control_format(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     ) {
         Err(_) => return Ok(()),
         Ok(edit) => edit,
@@ -1806,7 +1806,7 @@ fn assert_read_rejects(source: &[u8], label: &str) -> TestResult {
     match package.table_cell_control_format(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     ) {
         Err(_) => Ok(()),
         Ok(value) => Err(io::Error::other(format!(
@@ -1827,7 +1827,7 @@ fn assert_split_owner_rejects(source: &[u8], label: &str) -> TestResult {
             .table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(0, 0),
+                At::new(0, 0),
             )
             .is_err(),
         "hostile split graph read was accepted: {label}"
@@ -1836,7 +1836,7 @@ fn assert_split_owner_rejects(source: &[u8], label: &str) -> TestResult {
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )
         .and_then(|edit| edit.set(CellControl::StarRating(StarRating)).commit());
     assert!(result.is_err(), "hostile split graph published: {label}");
@@ -1850,7 +1850,7 @@ fn assert_split_popup_owner_rejects(source: &[u8], label: &str) -> TestResult {
         Ok(package) => package,
     };
     let before = package.exact_bytes();
-    let position = CellPosition::new(4, 0);
+    let position = At::new(4, 0);
     assert!(
         package
             .table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), position)
@@ -2402,7 +2402,7 @@ fn mixed_controls_read_through_one_typed_facade() -> TestResult {
             package.table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::name("Cell Controls"),
-                CellPosition::new(row as u32, 0),
+                At::new(row as u32, 0),
             )?,
             Some(expected)
         );
@@ -2411,7 +2411,7 @@ fn mixed_controls_read_through_one_typed_facade() -> TestResult {
         package.table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 1),
+            At::new(0, 1),
         )?,
         None
     );
@@ -2426,7 +2426,7 @@ fn mixed_control_noop_is_byte_exact_and_does_not_touch_siblings() -> TestResult 
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(CellControl::Checkbox(Checkbox))
         .commit()?;
@@ -2449,7 +2449,7 @@ fn cross_kind_replacement_is_cow_reversible_and_column_aware() -> TestResult {
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(replacement.clone())
         .commit()?;
@@ -2458,7 +2458,7 @@ fn cross_kind_replacement_is_cow_reversible_and_column_aware() -> TestResult {
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         Some(replacement)
     );
@@ -2466,7 +2466,7 @@ fn cross_kind_replacement_is_cow_reversible_and_column_aware() -> TestResult {
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?,
         Some(CellControl::StarRating(StarRating))
     );
@@ -2474,7 +2474,7 @@ fn cross_kind_replacement_is_cow_reversible_and_column_aware() -> TestResult {
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 1),
+            At::new(0, 1),
         )?,
         None
     );
@@ -2510,11 +2510,11 @@ fn cross_kind_replacement_is_cow_reversible_and_column_aware() -> TestResult {
 fn every_control_kind_can_replace_an_existing_kind() -> TestResult {
     let source = fixture(FixtureMode::Mixed)?;
     let positions = [
-        CellPosition::new(0, 0),
-        CellPosition::new(1, 0),
-        CellPosition::new(2, 0),
-        CellPosition::new(3, 0),
-        CellPosition::new(4, 0),
+        At::new(0, 0),
+        At::new(1, 0),
+        At::new(2, 0),
+        At::new(3, 0),
+        At::new(4, 0),
     ];
     for (position, replacement) in positions.into_iter().zip(controls()?) {
         let package = Package::from_bytes(&source)?;
@@ -2551,11 +2551,11 @@ fn empty_cells_seed_all_five_control_kinds_at_arbitrary_columns() -> TestResult 
     let package = Package::from_bytes(&source)?;
     let values = controls()?;
     let positions = [
-        CellPosition::new(0, 0),
-        CellPosition::new(0, 1),
-        CellPosition::new(0, 2),
-        CellPosition::new(1, 1),
-        CellPosition::new(1, 2),
+        At::new(0, 0),
+        At::new(0, 1),
+        At::new(0, 2),
+        At::new(1, 1),
+        At::new(1, 2),
     ];
     for (position, value) in positions.into_iter().zip(values) {
         let commit = package
@@ -2591,7 +2591,7 @@ fn numeric_scalar_seeding_preserves_cell_position_and_value_route() -> TestResul
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(replacement.clone())
         .commit()?;
@@ -2599,7 +2599,7 @@ fn numeric_scalar_seeding_preserves_cell_position_and_value_route() -> TestResul
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         Some(replacement)
     );
@@ -2607,7 +2607,7 @@ fn numeric_scalar_seeding_preserves_cell_position_and_value_route() -> TestResul
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 2),
+            At::new(0, 2),
         )?,
         None
     );
@@ -2625,7 +2625,7 @@ fn shared_control_entries_are_refcounted_and_final_reset_culls() -> TestResult {
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(slider.clone())
         .commit()?;
@@ -2633,7 +2633,7 @@ fn shared_control_entries_are_refcounted_and_final_reset_culls() -> TestResult {
         changed.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?,
         Some(CellControl::Checkbox(Checkbox))
     );
@@ -2643,7 +2643,7 @@ fn shared_control_entries_are_refcounted_and_final_reset_culls() -> TestResult {
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .reset()
         .commit()?;
@@ -2651,7 +2651,7 @@ fn shared_control_entries_are_refcounted_and_final_reset_culls() -> TestResult {
         reset.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         None
     );
@@ -2660,7 +2660,7 @@ fn shared_control_entries_are_refcounted_and_final_reset_culls() -> TestResult {
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?
         .reset()
         .commit()?;
@@ -2685,7 +2685,7 @@ fn clear_and_reset_are_equivalent_automatic_transitions() -> TestResult {
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .clear()
         .commit()?;
@@ -2693,7 +2693,7 @@ fn clear_and_reset_are_equivalent_automatic_transitions() -> TestResult {
         cleared.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         None
     );
@@ -2706,7 +2706,7 @@ fn clear_and_reset_are_equivalent_automatic_transitions() -> TestResult {
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(2, 2),
+            At::new(2, 2),
         )?
         .clear()
         .commit()?;
@@ -2797,7 +2797,7 @@ fn missing_metadata_and_unknown_root_fields_are_atomic() -> TestResult {
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(CellControl::StarRating(StarRating))
         .commit();
@@ -2817,7 +2817,7 @@ fn explicit_locator_alias_and_reserved_identifier_policies_are_atomic() -> TestR
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(replacement.clone())
         .commit()?;
@@ -2825,7 +2825,7 @@ fn explicit_locator_alias_and_reserved_identifier_policies_are_atomic() -> TestR
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         Some(replacement)
     );
@@ -2846,7 +2846,7 @@ fn explicit_locator_alias_and_reserved_identifier_policies_are_atomic() -> TestR
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(2, 2),
+            At::new(2, 2),
         )?
         .set(CellControl::Checkbox(Checkbox))
         .commit();
@@ -2875,7 +2875,7 @@ fn unknown_control_and_metadata_framing_survives_admitted_rewrite() -> TestResul
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(CellControl::StarRating(StarRating))
         .commit()
@@ -2902,14 +2902,14 @@ fn selector_conflict_position_and_public_limits_are_typed_and_atomic() -> TestRe
             .table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(99, 2),
+                At::new(99, 2),
             )
             .is_err()
     );
     let edit = package.edit_table_cell_control_format(
         SheetSelector::name("Cell Control Sheet"),
         TableSelector::name("Cell Controls"),
-        CellPosition::new(1, 2),
+        At::new(1, 2),
     )?;
     let commit = edit.set(CellControl::Checkbox(Checkbox)).commit()?;
     assert!(
@@ -2963,7 +2963,7 @@ fn locked_table_refuses_control_mutation_without_source_changes() -> TestResult 
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(CellControl::Checkbox(Checkbox))
         .commit();
@@ -2972,11 +2972,7 @@ fn locked_table_refuses_control_mutation_without_source_changes() -> TestResult 
     Ok(())
 }
 
-fn assert_split_read_noop(
-    source: &[u8],
-    position: CellPosition,
-    expected_before: CellControl,
-) -> TestResult {
+fn assert_split_read_noop(source: &[u8], position: At, expected_before: CellControl) -> TestResult {
     let package = Package::from_bytes(source)?;
     let before = package.exact_bytes();
     let observed = package.table_cell_control_format(
@@ -3005,7 +3001,7 @@ fn split_components_read_noop_and_popup_transition_remains_atomic() -> TestResul
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(controls()?[0].clone())
         .commit()?;
@@ -3013,11 +3009,11 @@ fn split_components_read_noop_and_popup_transition_remains_atomic() -> TestResul
     assert_eq!(no_op.package().exact_bytes(), source);
 
     let positions = [
-        CellPosition::new(0, 0),
-        CellPosition::new(1, 0),
-        CellPosition::new(2, 0),
-        CellPosition::new(3, 0),
-        CellPosition::new(4, 0),
+        At::new(0, 0),
+        At::new(1, 0),
+        At::new(2, 0),
+        At::new(3, 0),
+        At::new(4, 0),
     ];
     for (position, expected) in positions.into_iter().zip(controls()?) {
         assert_split_read_noop(&source, position, expected)?;
@@ -3029,7 +3025,7 @@ fn split_components_read_noop_and_popup_transition_remains_atomic() -> TestResul
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?
         .set(replacement.clone())
         .commit()?;
@@ -3037,7 +3033,7 @@ fn split_components_read_noop_and_popup_transition_remains_atomic() -> TestResul
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?,
         Some(replacement),
     );
@@ -3071,12 +3067,7 @@ fn split_scalar_replacements() -> [CellControl; 4] {
 fn split_scalar_controls_support_cross_kind_cow_inverse_apply_and_locality() -> TestResult {
     let source = split_component_fixture()?;
     assert_split_native_metadata_shape(&source)?;
-    let positions = [
-        CellPosition::new(0, 0),
-        CellPosition::new(1, 0),
-        CellPosition::new(2, 0),
-        CellPosition::new(3, 0),
-    ];
+    let positions = [At::new(0, 0), At::new(1, 0), At::new(2, 0), At::new(3, 0)];
     for (position, replacement) in positions.into_iter().zip(split_scalar_replacements()) {
         let package = Package::from_bytes(&source)?;
         let before = package.table_cell_control_format(
@@ -3151,7 +3142,7 @@ fn split_scalar_controls_support_cross_kind_cow_inverse_apply_and_locality() -> 
 fn split_scalar_create_reset_culls_entries_and_preserves_inverse() -> TestResult {
     let source = split_component_fixture()?;
     assert_split_native_metadata_shape(&source)?;
-    let position = CellPosition::new(0, 1);
+    let position = At::new(0, 1);
     let package = Package::from_bytes(&source)?;
     assert_eq!(
         package.table_cell_control_format(
@@ -3290,7 +3281,7 @@ fn split_scalar_refcounts_locks_and_limits_remain_atomic() -> TestResult {
             .edit_table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(0, 0),
+                At::new(0, 0),
             )
             .and_then(|edit| edit.set(CellControl::StarRating(StarRating)).commit());
         assert!(
@@ -3308,7 +3299,7 @@ fn split_scalar_refcounts_locks_and_limits_remain_atomic() -> TestResult {
             .edit_table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(0, 0),
+                At::new(0, 0),
             )?
             .set(CellControl::StarRating(StarRating))
             .commit()
@@ -3347,7 +3338,7 @@ fn split_scalar_clear_is_reversible_and_local() -> TestResult {
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .clear()
         .commit()?;
@@ -3356,7 +3347,7 @@ fn split_scalar_clear_is_reversible_and_local() -> TestResult {
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         None
     );
@@ -3421,7 +3412,7 @@ fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically(
         package.table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?,
         Some(CellControl::PopUpMenu(menu()?)),
     );
@@ -3430,7 +3421,7 @@ fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically(
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )
         .and_then(|edit| edit.clear().commit());
     assert!(result.is_err());
@@ -3451,7 +3442,7 @@ fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically(
 #[test]
 fn split_popup_native_aggregate_only_metadata_mutates_and_reopens() -> TestResult {
     let source = split_native_compatible_popup_fixture()?;
-    let position = CellPosition::new(4, 0);
+    let position = At::new(4, 0);
     let package = Package::from_bytes(&source)?;
     let original = CellControl::PopUpMenu(menu()?);
     assert_eq!(
@@ -3537,7 +3528,7 @@ fn split_popup_candidate_serialization_limits_are_inclusive_and_atomic() -> Test
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?
         .set(desired.clone())
         .commit()?;
@@ -3572,7 +3563,7 @@ fn split_popup_candidate_serialization_limits_are_inclusive_and_atomic() -> Test
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?
         .set(desired.clone())
         .commit()?;
@@ -3599,7 +3590,7 @@ fn split_popup_candidate_serialization_limits_are_inclusive_and_atomic() -> Test
             .edit_table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(4, 0),
+                At::new(4, 0),
             )?
             .set(desired.clone())
             .commit()
@@ -3629,7 +3620,7 @@ fn split_popup_candidate_serialization_limits_are_inclusive_and_atomic() -> Test
             .edit_table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(4, 0),
+                At::new(4, 0),
             )?
             .set(desired)
             .commit()
@@ -3645,7 +3636,7 @@ fn split_popup_some_to_some_cow_apply_conflict_inverse_and_locality() -> TestRes
     let source = split_shared_popup_fixture()?;
     let package = Package::from_bytes(&source)?;
     let original = CellControl::PopUpMenu(menu()?);
-    for position in [CellPosition::new(4, 0), CellPosition::new(4, 1)] {
+    for position in [At::new(4, 0), At::new(4, 1)] {
         assert_eq!(
             package.table_cell_control_format(
                 SheetSelector::index(0),
@@ -3659,7 +3650,7 @@ fn split_popup_some_to_some_cow_apply_conflict_inverse_and_locality() -> TestRes
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?
         .set(original.clone())
         .commit()?;
@@ -3675,7 +3666,7 @@ fn split_popup_some_to_some_cow_apply_conflict_inverse_and_locality() -> TestRes
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?
         .set(replacement.clone())
         .commit()?;
@@ -3686,7 +3677,7 @@ fn split_popup_some_to_some_cow_apply_conflict_inverse_and_locality() -> TestRes
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?,
         Some(replacement),
     );
@@ -3694,7 +3685,7 @@ fn split_popup_some_to_some_cow_apply_conflict_inverse_and_locality() -> TestRes
         commit.package().table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 1),
+            At::new(4, 1),
         )?,
         Some(original),
     );
@@ -3761,7 +3752,7 @@ fn split_popup_some_to_some_cow_apply_conflict_inverse_and_locality() -> TestRes
 fn split_popup_create_reuse_clear_and_final_cull_are_reversible() -> TestResult {
     let source = split_component_fixture()?;
     let package = Package::from_bytes(&source)?;
-    let position = CellPosition::new(0, 1);
+    let position = At::new(0, 1);
     assert_eq!(
         package.table_cell_control_format(
             SheetSelector::index(0),
@@ -3841,7 +3832,7 @@ fn split_popup_create_reuse_clear_and_final_cull_are_reversible() -> TestResult 
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?
         .clear()
         .commit()?;
@@ -3864,7 +3855,7 @@ fn split_popup_create_reuse_clear_and_final_cull_are_reversible() -> TestResult 
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 1),
+            At::new(4, 1),
         )?
         .clear()
         .commit()?;
@@ -3971,7 +3962,7 @@ fn split_popup_ownership_aliases_undercounts_inbound_and_limits_fail_closed() ->
             .edit_table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(4, 0),
+                At::new(4, 0),
             )
             .and_then(|edit| edit.clear().commit());
         assert!(
@@ -3987,7 +3978,7 @@ fn split_popup_ownership_aliases_undercounts_inbound_and_limits_fail_closed() ->
         package.table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?,
         Some(CellControl::PopUpMenu(menu()?)),
     );
@@ -3996,7 +3987,7 @@ fn split_popup_ownership_aliases_undercounts_inbound_and_limits_fail_closed() ->
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )
         .and_then(|edit| edit.clear().commit());
     assert!(result.is_err());
@@ -4013,7 +4004,7 @@ fn split_popup_ownership_aliases_undercounts_inbound_and_limits_fail_closed() ->
             .edit_table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(4, 0),
+                At::new(4, 0),
             )
             .and_then(|edit| { edit.set(CellControl::PopUpMenu(desired.clone())).commit() })
             .is_err()

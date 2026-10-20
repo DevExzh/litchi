@@ -1,7 +1,7 @@
 use std::env;
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages;
 use litchi_pages::Package;
 use litchi_pages::footnote::body::{Position, Selector};
 use tempfile::NamedTempFile;
@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .nth(1)
             .ok_or("usage: create_pages_footnotes <output.pages>")?,
     );
-    let pages = PagesEditor::create_with_text(BODY)?;
+    let pages = pages::Editor::create_with_text(BODY)?;
     let package = Package::from_bytes(&pages.to_bytes()?)?;
     let position = Position::from_utf16_index(FOOTNOTE_POSITION)?;
     let inserted = Package::insert_body_footnote(&package, position, INITIAL_FOOTNOTE_TEXT, None)?;

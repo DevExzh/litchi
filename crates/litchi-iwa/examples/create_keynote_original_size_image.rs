@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::Path;
 
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote;
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_keynote::slide::image::Options as ImageOptions;
 
@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let image_filename = filename(&image_path)?;
     let image = fs::read(&image_path)?;
 
-    let mut editor = KeynoteDocumentBuilder::new()
+    let mut editor = keynote::Builder::new()
         .title("Original Size Image")
         .subtitle("Typed native image dimensions")
         .build()?;

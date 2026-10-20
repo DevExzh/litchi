@@ -7,7 +7,7 @@ use crate::charts::series_gap_3d::{
     set_chart_3d_series_gap as set_native_chart_3d_series_gap,
 };
 
-impl PagesEditor {
+impl Editor {
     /// Read one 3D line/area chart's `Between Series` gap.
     pub fn body_chart_3d_series_gap(&self, drawable_object_id: u64) -> Result<Chart3dSeriesGap> {
         let graph = body_chart_graph(self, drawable_object_id)?;
@@ -46,7 +46,7 @@ impl PagesEditor {
             graph.info.kind,
             gap,
         )?;
-        let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_3d_series_gap(drawable_object_id)? != gap {
             return Err(Error::InvalidFormat(
                 "Pages chart 3D series-gap update failed validation".to_owned(),
@@ -60,12 +60,12 @@ impl PagesEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pages::PagesDocumentBuilder;
+    use crate::pages;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_document_supports_3d_series_gap_crud() {
-        let mut editor = PagesDocumentBuilder::new().build().unwrap();
+        let mut editor = pages::Builder::new().build().unwrap();
         let chart = editor
             .add_body_chart(
                 0,
@@ -88,7 +88,7 @@ mod tests {
         editor
             .set_body_chart_3d_series_gap(chart.drawable_object_id, gap)
             .unwrap();
-        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_chart_3d_series_gap(chart.drawable_object_id)
@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn charts_without_between_series_control_reject_access() {
-        let mut editor = PagesDocumentBuilder::new().build().unwrap();
+        let mut editor = pages::Builder::new().build().unwrap();
         for kind in [Kind::Area2d, Kind::StackedArea3d, Kind::Column3d] {
             let chart = editor
                 .add_body_chart(

@@ -210,7 +210,7 @@ fn sets_display_formats() {
         .expect("decimal format");
     let package = leaf(&edited);
     let format = package
-        .table_cell_number_format(0, 0, litchi_numbers::CellPosition::new(2, 1))
+        .table_cell_number_format(0, 0, litchi_numbers::At::new(2, 1))
         .expect("read format")
         .expect("explicit format");
     assert_eq!(
@@ -837,7 +837,7 @@ fn cell_fonts_are_written() {
         .expect("font");
     let package = leaf(&styled);
     let style = package
-        .table_cell_text_style(0, 0, litchi_numbers::CellPosition::new(1, 1))
+        .table_cell_text_style(0, 0, litchi_numbers::At::new(1, 1))
         .expect("style");
     assert_eq!(style.bold, Some(true));
     assert_eq!(style.italic, Some(true));
@@ -866,7 +866,7 @@ fn cell_fonts_are_written() {
     let package = leaf(&batch.file);
     assert_eq!(
         package
-            .table_cell_text_style(0, 0, litchi_numbers::CellPosition::new(1, 1))
+            .table_cell_text_style(0, 0, litchi_numbers::At::new(1, 1))
             .expect("style")
             .bold,
         Some(true)

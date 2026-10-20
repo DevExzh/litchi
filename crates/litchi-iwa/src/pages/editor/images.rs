@@ -25,7 +25,7 @@ use graph::*;
 
 /// One image anchored to the Pages body text flow.
 #[derive(Debug, Clone, PartialEq)]
-pub struct PagesImageInfo {
+pub struct ImageInfo {
     pub drawable_object_id: u64,
     /// UTF-16 index of the object-replacement character in the body text.
     pub anchor_character_index: u32,
@@ -43,14 +43,14 @@ pub struct PagesImageInfo {
 /// Result of removing a body-anchored Pages image.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedPagesImage {
-    pub image: PagesImageInfo,
+    pub image: ImageInfo,
     /// Assets culled because the removed image held their final package reference.
     pub removed_data_identifiers: Vec<MediaAssetId>,
 }
 
-impl PagesEditor {
+impl Editor {
     /// List images anchored to the document body in text-flow order.
-    pub fn body_images(&self) -> Result<Vec<PagesImageInfo>> {
+    pub fn body_images(&self) -> Result<Vec<ImageInfo>> {
         body_image_infos(self)
     }
 
@@ -65,7 +65,7 @@ impl PagesEditor {
         preferred_filename: &str,
         data: &[u8],
         options: PagesImageOptions,
-    ) -> Result<PagesImageInfo> {
+    ) -> Result<ImageInfo> {
         let geometry = image_creation_values(options)?;
         let root = pages_document_root_facts(self.package())?;
         let style_id = image_style_id(self.package(), &root)?;
@@ -362,7 +362,7 @@ impl PagesEditor {
         &mut self,
         source_drawable_object_id: DrawableId,
         anchor_character_index: usize,
-    ) -> Result<PagesImageInfo> {
+    ) -> Result<ImageInfo> {
         let raw_source_drawable_object_id = source_drawable_object_id.get();
         let source = body_image_graph(self, raw_source_drawable_object_id)?;
         let mut staged = self.package().clone();
@@ -592,7 +592,7 @@ impl PagesEditor {
 }
 
 fn set_body_image_caption(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: DrawableId,
     text: &str,
     kind: DrawableCaptionKind,
@@ -632,7 +632,7 @@ fn set_body_image_caption(
         set_package_last_object_identifier(&mut staged, ids.last())?;
         staged
     };
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     let actual = verified.body_image_title_caption(drawable_object_id)?;
     let expected = match kind {
         DrawableCaptionKind::Caption => crate::DrawableTitleCaption {
@@ -654,7 +654,7 @@ fn set_body_image_caption(
 }
 
 fn remove_body_image_caption(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: DrawableId,
     kind: DrawableCaptionKind,
 ) -> Result<bool> {
@@ -677,7 +677,7 @@ fn remove_body_image_caption(
     )?;
     add_component_object_uuids(&mut staged, DOCUMENT_OBJECT_ID, &[standin_id])?;
     set_package_last_object_identifier(&mut staged, standin_id)?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     let actual = verified.body_image_title_caption(drawable_object_id)?;
     let expected = match kind {
         DrawableCaptionKind::Caption => crate::DrawableTitleCaption {
@@ -725,7 +725,7 @@ mod tests {
             .unwrap_or_else(|error| panic!("valid Pages natural image size: {error}"))
     }
 
-    fn selector(image: &PagesImageInfo) -> DrawableId {
+    fn selector(image: &ImageInfo) -> DrawableId {
         DrawableId::from_raw(image.drawable_object_id).unwrap()
     }
 
@@ -733,7 +733,7 @@ mod tests {
         DrawableId::from_raw(999).unwrap()
     }
 
-    fn focused_image_adjustments(editor: &PagesEditor) -> ImageAdjustments {
+    fn focused_image_adjustments(editor: &Editor) -> ImageAdjustments {
         let bytes = editor.to_bytes().unwrap();
         litchi_pages::Package::from_bytes(&bytes)
             .unwrap()
@@ -741,7 +741,7 @@ mod tests {
             .unwrap()
     }
 
-    fn set_focused_image_adjustments(editor: &mut PagesEditor, adjustments: ImageAdjustments) {
+    fn set_focused_image_adjustments(editor: &mut Editor, adjustments: ImageAdjustments) {
         let bytes = editor.to_bytes().unwrap();
         let package = litchi_pages::Package::from_bytes(&bytes).unwrap();
         let commit = package
@@ -753,46 +753,40 @@ mod tests {
             .unwrap();
         let mut changed = Vec::new();
         commit.package().write_to(&mut changed).unwrap();
-        *editor = PagesEditor::from_bytes(&changed).unwrap();
+        *editor = Editor::from_bytes(&changed).unwrap();
     }
 
     #[test]
     fn image_selectors_use_drawable_object_id() {
-        let _: fn(&PagesEditor, DrawableId) -> Result<DrawableGeometry> =
-            PagesEditor::body_image_geometry;
-        let _: fn(&mut PagesEditor, DrawableId) -> Result<DrawableGeometry> =
-            PagesEditor::restore_body_image_original_size;
-        let _: fn(&mut PagesEditor, DrawableId, DrawableFlipAxis) -> Result<DrawableGeometry> =
-            PagesEditor::flip_body_image;
-        let _: fn(&mut PagesEditor, DrawableId, DrawableGeometry) -> Result<()> =
-            PagesEditor::set_body_image_geometry;
-        let _: fn(&PagesEditor, DrawableId) -> Result<DrawableProperties> =
-            PagesEditor::body_image_properties;
-        let _: fn(&mut PagesEditor, DrawableId, DrawableProperties) -> Result<()> =
-            PagesEditor::set_body_image_properties;
-        let _: fn(&PagesEditor, DrawableId) -> Result<crate::DrawableTitleCaption> =
-            PagesEditor::body_image_title_caption;
-        let _: fn(&mut PagesEditor, DrawableId, &str) -> Result<()> =
-            PagesEditor::set_body_image_title;
-        let _: fn(&mut PagesEditor, DrawableId) -> Result<bool> =
-            PagesEditor::remove_body_image_title;
-        let _: fn(&mut PagesEditor, DrawableId, &str) -> Result<()> =
-            PagesEditor::set_body_image_caption;
-        let _: fn(&mut PagesEditor, DrawableId) -> Result<bool> =
-            PagesEditor::remove_body_image_caption;
-        let _: fn(&mut PagesEditor, DrawableId, usize) -> Result<PagesImageInfo> =
-            PagesEditor::duplicate_body_image;
-        let _: fn(&mut PagesEditor, DrawableId, &[u8]) -> Result<Vec<u8>> =
-            PagesEditor::replace_body_image_data;
-        let _: fn(&mut PagesEditor, DrawableId) -> Result<RemovedPagesImage> =
-            PagesEditor::remove_body_image;
+        let _: fn(&Editor, DrawableId) -> Result<DrawableGeometry> = Editor::body_image_geometry;
+        let _: fn(&mut Editor, DrawableId) -> Result<DrawableGeometry> =
+            Editor::restore_body_image_original_size;
+        let _: fn(&mut Editor, DrawableId, DrawableFlipAxis) -> Result<DrawableGeometry> =
+            Editor::flip_body_image;
+        let _: fn(&mut Editor, DrawableId, DrawableGeometry) -> Result<()> =
+            Editor::set_body_image_geometry;
+        let _: fn(&Editor, DrawableId) -> Result<DrawableProperties> =
+            Editor::body_image_properties;
+        let _: fn(&mut Editor, DrawableId, DrawableProperties) -> Result<()> =
+            Editor::set_body_image_properties;
+        let _: fn(&Editor, DrawableId) -> Result<crate::DrawableTitleCaption> =
+            Editor::body_image_title_caption;
+        let _: fn(&mut Editor, DrawableId, &str) -> Result<()> = Editor::set_body_image_title;
+        let _: fn(&mut Editor, DrawableId) -> Result<bool> = Editor::remove_body_image_title;
+        let _: fn(&mut Editor, DrawableId, &str) -> Result<()> = Editor::set_body_image_caption;
+        let _: fn(&mut Editor, DrawableId) -> Result<bool> = Editor::remove_body_image_caption;
+        let _: fn(&mut Editor, DrawableId, usize) -> Result<ImageInfo> =
+            Editor::duplicate_body_image;
+        let _: fn(&mut Editor, DrawableId, &[u8]) -> Result<Vec<u8>> =
+            Editor::replace_body_image_data;
+        let _: fn(&mut Editor, DrawableId) -> Result<RemovedPagesImage> = Editor::remove_body_image;
     }
 
     #[test]
     fn scratch_document_supports_image_crud_without_a_source_package() {
         let original = fixture("test-data/images/png/lena.png");
         let replacement = fixture("crates/soapberry-zip/assets/gophercolor16x16.png");
-        let mut editor = PagesEditor::create_with_text("Quarterly report").unwrap();
+        let mut editor = Editor::create_with_text("Quarterly report").unwrap();
 
         assert!(editor.body_images().unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
@@ -814,7 +808,7 @@ mod tests {
             original
         );
 
-        let roundtripped = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let roundtripped = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             roundtripped.body_images().unwrap(),
             std::slice::from_ref(&created)
@@ -936,13 +930,13 @@ mod tests {
         assert_eq!(editor.body_text().unwrap(), "Quarterly report");
         assert!(editor.body_images().unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
     fn scratch_document_supports_native_image_title_caption_crud() {
         let original = fixture("test-data/images/png/lena.png");
-        let mut editor = PagesEditor::create_with_text("Image labels").unwrap();
+        let mut editor = Editor::create_with_text("Image labels").unwrap();
         let image = editor
             .add_body_image(
                 "Image labels".encode_utf16().count(),
@@ -985,7 +979,7 @@ mod tests {
         editor
             .set_body_image_caption(image_id, "Recreated caption")
             .unwrap();
-        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.body_image_title_caption(image_id).unwrap(),
             crate::DrawableTitleCaption {
@@ -999,7 +993,7 @@ mod tests {
     fn scratch_document_supports_native_image_duplication() {
         let original = fixture("test-data/images/png/lena.png");
         let replacement = fixture("crates/soapberry-zip/assets/gophercolor16x16.png");
-        let mut editor = PagesEditor::create_with_text("Quarterly report").unwrap();
+        let mut editor = Editor::create_with_text("Quarterly report").unwrap();
         let source = editor
             .add_body_image(
                 "Quarterly report".encode_utf16().count(),
@@ -1120,7 +1114,7 @@ mod tests {
             editor.extract_media(source.image_data_identifier).unwrap(),
             replacement
         );
-        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.body_images().unwrap().len(), 2);
         assert_eq!(
             reopened
@@ -1143,13 +1137,13 @@ mod tests {
         );
         assert!(editor.body_images().unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
     fn invalid_image_creation_and_geometry_are_transactional() {
         let original = fixture("test-data/images/png/lena.png");
-        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let mut editor = Editor::create_with_text("Body").unwrap();
         let baseline = editor.to_bytes().unwrap();
 
         let missing_id = missing_selector();

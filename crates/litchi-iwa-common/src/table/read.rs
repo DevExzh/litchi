@@ -8,7 +8,7 @@
 //! concrete iWork adapter that produced the read.
 
 use super::cell::value::{FiniteF64, FiniteF64Error, Value};
-use super::coordinate::{CellPosition, CellRange};
+use super::coordinate::{Area, At};
 use super::model::{self, Cell, Dimensions, Error, Grid, GridBudget, InsertError, Table, View};
 use std::fmt;
 
@@ -447,20 +447,20 @@ impl Comment {
 /// A typed semantic position and its cell comment.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CellComment {
-    position: CellPosition,
+    position: At,
     comment: Comment,
 }
 
 impl CellComment {
     /// Creates a comment record at a zero-based table position.
     #[must_use]
-    pub const fn new(position: CellPosition, comment: Comment) -> Self {
+    pub const fn new(position: At, comment: Comment) -> Self {
         Self { position, comment }
     }
 
     /// Returns the typed zero-based position.
     #[must_use]
-    pub const fn position(&self) -> CellPosition {
+    pub const fn position(&self) -> At {
         self.position
     }
 
@@ -472,13 +472,13 @@ impl CellComment {
 
     /// Consumes the record and returns its position and comment.
     #[must_use]
-    pub fn into_parts(self) -> (CellPosition, Comment) {
+    pub fn into_parts(self) -> (At, Comment) {
         (self.position, self.comment)
     }
 }
 
-impl From<(CellPosition, Comment)> for CellComment {
-    fn from((position, comment): (CellPosition, Comment)) -> Self {
+impl From<(At, Comment)> for CellComment {
+    fn from((position, comment): (At, Comment)) -> Self {
         Self::new(position, comment)
     }
 }
@@ -604,7 +604,7 @@ impl TableRead {
 
     /// Returns the full positioned comment record at `position`.
     #[must_use]
-    pub fn comment_at(&self, position: CellPosition) -> Option<&CellComment> {
+    pub fn comment_at(&self, position: At) -> Option<&CellComment> {
         self.comments
             .binary_search_by_key(&position, CellComment::position)
             .ok()
@@ -613,7 +613,7 @@ impl TableRead {
 
     /// Returns only the comment value at `position`.
     #[must_use]
-    pub fn get_comment(&self, position: CellPosition) -> Option<&Comment> {
+    pub fn get_comment(&self, position: At) -> Option<&Comment> {
         self.comment_at(position).map(CellComment::comment)
     }
 
@@ -624,7 +624,7 @@ impl TableRead {
     /// Returns a typed address or bounds error.  An in-grid position with no
     /// comment returns `Ok(None)`.
     pub fn get_comment_a1(&self, address: &str) -> Result<Option<&Comment>> {
-        let position = CellPosition::from_a1(address)?;
+        let position = At::from_a1(address)?;
         ensure_position(self.table.dimensions(), position)?;
         Ok(self.get_comment(position))
     }
@@ -636,14 +636,14 @@ impl TableRead {
     /// Returns a typed address or bounds error.  An in-grid position with no
     /// comment returns `Ok(None)`.
     pub fn comment_at_a1(&self, address: &str) -> Result<Option<&CellComment>> {
-        let position = CellPosition::from_a1(address)?;
+        let position = At::from_a1(address)?;
         ensure_position(self.table.dimensions(), position)?;
         Ok(self.comment_at(position))
     }
 
     /// Borrows a materialized value at a typed position.
     #[must_use]
-    pub fn get(&self, position: CellPosition) -> Option<&Value> {
+    pub fn get(&self, position: At) -> Option<&Value> {
         self.table.get(position)
     }
 
@@ -654,7 +654,7 @@ impl TableRead {
 
     /// Returns the stored or missing view at a typed position.
     #[must_use]
-    pub fn view(&self, position: CellPosition) -> View<'_> {
+    pub fn view(&self, position: At) -> View<'_> {
         self.table.view(position)
     }
 
@@ -664,7 +664,7 @@ impl TableRead {
     }
 
     /// Iterates sparse cells in a checked range.
-    pub fn cells(&self, range: CellRange) -> model::Result<impl Iterator<Item = &Cell> + '_> {
+    pub fn cells(&self, range: Area) -> model::Result<impl Iterator<Item = &Cell> + '_> {
         self.table.cells(range)
     }
 
@@ -734,7 +734,7 @@ impl TableRead {
     }
 
     /// Creates a bounded dense view over the table values.
-    pub fn grid(&self, range: CellRange, budget: GridBudget) -> model::Result<Grid<'_>> {
+    pub fn grid(&self, range: Area, budget: GridBudget) -> model::Result<Grid<'_>> {
         self.table.grid(range, budget)
     }
 
@@ -790,7 +790,7 @@ impl Builder {
 
     /// Returns the staged comment at a typed position.
     #[must_use]
-    pub fn get_comment(&self, position: CellPosition) -> Option<&Comment> {
+    pub fn get_comment(&self, position: At) -> Option<&Comment> {
         if self.sorted {
             self.comments
                 .binary_search_by_key(&position, CellComment::position)
@@ -810,7 +810,7 @@ impl Builder {
     /// allocation error, preserving ownership at the read boundary.
     pub fn insert_comment(
         &mut self,
-        position: CellPosition,
+        position: At,
         comment: Comment,
     ) -> std::result::Result<(), InsertError<Comment>> {
         if let Err(error) = ensure_position(self.table.dimensions(), position) {
@@ -846,7 +846,7 @@ impl Builder {
     /// Alias for [`Self::insert_comment`] using the shorter builder verb.
     pub fn insert(
         &mut self,
-        position: CellPosition,
+        position: At,
         comment: Comment,
     ) -> std::result::Result<(), InsertError<Comment>> {
         self.insert_comment(position, comment)
@@ -857,7 +857,7 @@ impl Builder {
     /// The rejected comment is returned for bounds or allocation failures.
     pub fn set_comment(
         &mut self,
-        position: CellPosition,
+        position: At,
         comment: Comment,
     ) -> std::result::Result<(), InsertError<Comment>> {
         if let Err(error) = ensure_position(self.table.dimensions(), position) {
@@ -891,7 +891,7 @@ impl Builder {
     /// Alias for [`Self::set_comment`] using the shorter builder verb.
     pub fn set(
         &mut self,
-        position: CellPosition,
+        position: At,
         comment: Comment,
     ) -> std::result::Result<(), InsertError<Comment>> {
         self.set_comment(position, comment)
@@ -981,7 +981,7 @@ impl Builder {
     }
 }
 
-fn ensure_position(dimensions: Dimensions, position: CellPosition) -> Result<()> {
+fn ensure_position(dimensions: Dimensions, position: At) -> Result<()> {
     if position.row() >= dimensions.rows() || position.column() >= dimensions.columns() {
         return Err(Error::OutOfBounds {
             position,
@@ -1010,7 +1010,7 @@ mod tests {
     fn table() -> Table {
         let mut builder = Table::builder("Summary", Dimensions::new(3, 3));
         builder
-            .set(CellPosition::new(0, 0), Value::Text("value".to_owned()))
+            .set(At::new(0, 0), Value::Text("value".to_owned()))
             .expect("test cell is in bounds");
         builder.finish().expect("test table is valid")
     }
@@ -1029,14 +1029,10 @@ mod tests {
 
     #[test]
     fn owned_comments_are_sorted_and_validated() {
-        let comment =
-            |row, column| CellComment::new(CellPosition::new(row, column), Comment::new("note"));
+        let comment = |row, column| CellComment::new(At::new(row, column), Comment::new("note"));
         let read = TableRead::try_from_owned_parts(table(), vec![comment(2, 1), comment(0, 0)])
             .expect("valid comments");
-        assert_eq!(
-            read.comments().next().unwrap().position(),
-            CellPosition::new(0, 0)
-        );
+        assert_eq!(read.comments().next().unwrap().position(), At::new(0, 0));
         assert!(matches!(
             TableRead::try_from_owned_parts(table(), vec![comment(3, 0)]),
             Err(Error::OutOfBounds { .. })
@@ -1078,22 +1074,19 @@ mod tests {
         );
         let mut builder = TableRead::builder(table());
         builder
-            .push_comment(CellComment::new(
-                CellPosition::new(2, 2),
-                Comment::new("late"),
-            ))
+            .push_comment(CellComment::new(At::new(2, 2), Comment::new("late")))
             .expect("late comment is in bounds");
         builder
-            .insert_comment(CellPosition::new(0, 1), comment)
+            .insert_comment(At::new(0, 1), comment)
             .expect("first comment is unique");
         let read = builder.finish().expect("comments are valid");
 
         assert_eq!(
-            read.get(CellPosition::new(0, 0)),
+            read.get(At::new(0, 0)),
             Some(&Value::Text("value".to_owned()))
         );
         assert_eq!(
-            read.get_comment(CellPosition::new(0, 1)).map(Comment::text),
+            read.get_comment(At::new(0, 1)).map(Comment::text),
             Some("root")
         );
         assert_eq!(
@@ -1105,11 +1098,9 @@ mod tests {
             read.iter_comments()
                 .map(CellComment::position)
                 .collect::<Vec<_>>(),
-            [CellPosition::new(0, 1), CellPosition::new(2, 2),]
+            [At::new(0, 1), At::new(2, 2),]
         );
-        let root = read
-            .get_comment(CellPosition::new(0, 1))
-            .expect("root comment");
+        let root = read.get_comment(At::new(0, 1)).expect("root comment");
         assert_eq!(root.replies().map(<[CommentReply]>::len), Some(1));
         assert_eq!(
             root.author().and_then(CommentAuthor::display_name),
@@ -1121,27 +1112,21 @@ mod tests {
     fn strict_insert_and_finish_reject_duplicate_positions() {
         let mut builder = TableRead::builder(table());
         builder
-            .push(CellComment::new(
-                CellPosition::new(1, 1),
-                Comment::new("one"),
-            ))
+            .push(CellComment::new(At::new(1, 1), Comment::new("one")))
             .expect("first comment is in bounds");
-        let duplicate = builder.push(CellComment::new(
-            CellPosition::new(1, 1),
-            Comment::new("two"),
-        ));
+        let duplicate = builder.push(CellComment::new(At::new(1, 1), Comment::new("two")));
         assert!(duplicate.is_ok());
         assert!(matches!(
             builder.finish(),
-            Err(Error::DuplicatePosition { position }) if position == CellPosition::new(1, 1)
+            Err(Error::DuplicatePosition { position }) if position == At::new(1, 1)
         ));
 
         let mut builder = TableRead::builder(table());
         builder
-            .insert(CellPosition::new(1, 1), Comment::new("one"))
+            .insert(At::new(1, 1), Comment::new("one"))
             .expect("first comment is unique");
         let duplicate = builder
-            .insert(CellPosition::new(1, 1), Comment::new("two"))
+            .insert(At::new(1, 1), Comment::new("two"))
             .expect_err("strict insert rejects duplicates");
         let (error, comment) = duplicate.into_parts();
         assert!(matches!(error, Error::DuplicatePosition { .. }));
@@ -1152,7 +1137,7 @@ mod tests {
     fn builder_rejects_out_of_bounds_comments_without_publishing_them() {
         let mut builder = TableRead::builder(table());
         let error = builder
-            .insert_comment(CellPosition::new(3, 0), Comment::new("outside"))
+            .insert_comment(At::new(3, 0), Comment::new("outside"))
             .expect_err("row three is outside a three-row table");
         let (error, comment) = error.into_parts();
         assert!(matches!(error, Error::OutOfBounds { .. }));

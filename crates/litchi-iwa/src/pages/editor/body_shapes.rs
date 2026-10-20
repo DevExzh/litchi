@@ -34,7 +34,7 @@ use graph::*;
 
 /// One ordinary, non-text-box shape anchored to the Pages body text flow.
 #[derive(Debug, Clone, PartialEq)]
-pub struct PagesBodyShapeInfo {
+pub struct BodyShapeInfo {
     pub drawable_object_id: u64,
     /// UTF-16 index of the object-replacement character in the body text.
     pub anchor_character_index: u32,
@@ -53,12 +53,12 @@ pub struct PagesBodyShapeInfo {
 /// Result of removing an ordinary body shape and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedPagesBodyShape {
-    pub shape: PagesBodyShapeInfo,
+    pub shape: BodyShapeInfo,
 }
 
-impl PagesEditor {
+impl Editor {
     /// List ordinary non-text-box shapes anchored to the document body.
-    pub fn body_shapes(&self) -> Result<Vec<PagesBodyShapeInfo>> {
+    pub fn body_shapes(&self) -> Result<Vec<BodyShapeInfo>> {
         body_shape_infos(self)
     }
 
@@ -73,7 +73,7 @@ impl PagesEditor {
         text: &str,
         position: DrawablePoint,
         size: DrawableSize,
-    ) -> Result<PagesBodyShapeInfo> {
+    ) -> Result<BodyShapeInfo> {
         self.add_body_shape(
             anchor_character_index,
             text,
@@ -95,7 +95,7 @@ impl PagesEditor {
         position: DrawablePoint,
         size: DrawableSize,
         preset: Preset,
-    ) -> Result<PagesBodyShapeInfo> {
+    ) -> Result<BodyShapeInfo> {
         let geometry = new_shape_geometry(position, size)?;
         self.add_body_shape_path(
             anchor_character_index,
@@ -116,7 +116,7 @@ impl PagesEditor {
         size: DrawableSize,
         preset: Preset,
         fill: ShapeFill,
-    ) -> Result<PagesBodyShapeInfo> {
+    ) -> Result<BodyShapeInfo> {
         let created = self.add_body_shape(anchor_character_index, text, position, size, preset)?;
         self.set_body_shape_fill(created.drawable_object_id, &fill)?;
         Ok(body_shape_graph(self, created.drawable_object_id)?.info)
@@ -132,7 +132,7 @@ impl PagesEditor {
         anchor_character_index: usize,
         start: DrawablePoint,
         end: DrawablePoint,
-    ) -> Result<PagesBodyShapeInfo> {
+    ) -> Result<BodyShapeInfo> {
         let segment = LineSegment::new(start, end)?;
         self.add_body_shape_path(
             anchor_character_index,
@@ -151,7 +151,7 @@ impl PagesEditor {
         start: DrawablePoint,
         end: DrawablePoint,
         endpoints: Endpoints,
-    ) -> Result<PagesBodyShapeInfo> {
+    ) -> Result<BodyShapeInfo> {
         let created = self.add_body_line(anchor_character_index, start, end)?;
         self.set_body_line_endpoints(created.drawable_object_id, endpoints)?;
         Ok(body_shape_graph(self, created.drawable_object_id)?.info)
@@ -164,7 +164,7 @@ impl PagesEditor {
         start: DrawablePoint,
         end: DrawablePoint,
         style: LineStyle,
-    ) -> Result<PagesBodyShapeInfo> {
+    ) -> Result<BodyShapeInfo> {
         let created = self.add_body_line(anchor_character_index, start, end)?;
         self.set_body_shape_stroke(created.drawable_object_id, style.stroke)?;
         self.set_body_line_endpoints(created.drawable_object_id, style.endpoints)?;
@@ -179,7 +179,7 @@ impl PagesEditor {
         path_source: tsd::PathSourceArchive,
         expected_preset: Option<Preset>,
         expected_line: Option<LineSegment>,
-    ) -> Result<PagesBodyShapeInfo> {
+    ) -> Result<BodyShapeInfo> {
         let root = pages_document_root_facts(self.package())?;
         let body: StorageArchive = decode_typed_package_object(
             self.package(),
@@ -766,7 +766,7 @@ impl PagesEditor {
         &mut self,
         source_drawable_object_id: u64,
         anchor_character_index: usize,
-    ) -> Result<PagesBodyShapeInfo> {
+    ) -> Result<BodyShapeInfo> {
         let source = body_shape_graph(self, source_drawable_object_id)?;
         let mut staged = self.package().clone();
         let first_identifier = next_object_identifier(&staged)?;
@@ -949,7 +949,7 @@ mod tests {
 
     #[test]
     fn scratch_document_supports_rectangle_crud_without_a_source_drawable() {
-        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let mut editor = Editor::create_with_text("Body").unwrap();
         let baseline_body = editor.body_text().unwrap();
         assert!(editor.body_shapes().unwrap().is_empty());
 
@@ -1012,7 +1012,7 @@ mod tests {
             .set_body_shape_stroke(created.drawable_object_id, rectangle_stroke)
             .unwrap();
 
-        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let shape = &reopened.body_shapes().unwrap()[0];
         assert_eq!(shape.storage.storage.text(), "Made from typed objects");
         assert_eq!(shape.geometry, geometry);
@@ -1043,7 +1043,7 @@ mod tests {
             created.drawable_object_id,
         )
         .unwrap();
-        editor = PagesEditor::from_package(package).unwrap();
+        editor = Editor::from_package(package).unwrap();
 
         let removed = editor
             .remove_body_shape(created.drawable_object_id)
@@ -1072,7 +1072,7 @@ mod tests {
 
     #[test]
     fn scratch_document_supports_native_shape_duplication() {
-        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let mut editor = Editor::create_with_text("Body").unwrap();
         let created = editor
             .add_body_shape(4, "Source shape", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
@@ -1135,7 +1135,7 @@ mod tests {
                 .text(),
             "Source shape"
         );
-        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_shapes()
@@ -1159,7 +1159,7 @@ mod tests {
 
     #[test]
     fn scratch_document_supports_straight_line_crud() {
-        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let mut editor = Editor::create_with_text("Body").unwrap();
         let baseline_body = editor.body_text().unwrap();
         let created = editor.add_body_line(4, LINE_START, LINE_END).unwrap();
         assert_eq!(created.kind, ShapePathKind::Line);
@@ -1170,7 +1170,7 @@ mod tests {
             LineSegment::new(LINE_START, LINE_END).unwrap()
         ));
 
-        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(line_segments_match(
             reopened
                 .body_line_segment(created.drawable_object_id)
@@ -1214,7 +1214,7 @@ mod tests {
 
     #[test]
     fn scratch_document_supports_typed_shape_stroke_crud() {
-        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let mut editor = Editor::create_with_text("Body").unwrap();
         let stroke = Stroke::new(
             RgbaColor::new(0.8, 0.1, 0.2, 0.9, RgbColorSpace::DisplayP3).unwrap(),
             Width::new(3.5).unwrap(),
@@ -1290,7 +1290,7 @@ mod tests {
             .set_body_line_endpoints(created.drawable_object_id, endpoints)
             .unwrap();
 
-        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_shape_stroke(created.drawable_object_id)
@@ -1323,7 +1323,7 @@ mod tests {
 
     #[test]
     fn scratch_document_supports_composable_shape_fill_crud() {
-        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let mut editor = Editor::create_with_text("Body").unwrap();
         let fill = ShapeFill::Solid(
             RgbaColor::new(0.85, 0.2, 0.15, 0.9, RgbColorSpace::DisplayP3).unwrap(),
         );
@@ -1371,7 +1371,7 @@ mod tests {
             object_count
         );
 
-        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_shape_fill(created.drawable_object_id)
@@ -1406,7 +1406,7 @@ mod tests {
     fn scratch_document_supports_embedded_shape_image_fill_crud() {
         let image_bytes = fixture("test-data/images/png/lena.png");
         let replacement_bytes = fixture("crates/soapberry-zip/assets/gophercolor16x16.png");
-        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let mut editor = Editor::create_with_text("Body").unwrap();
         let created = editor
             .add_body_shape(4, "Image", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
@@ -1453,7 +1453,7 @@ mod tests {
             image_bytes
         );
 
-        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(
             reopened
                 .reset_body_shape_fill(created.drawable_object_id)
@@ -1470,7 +1470,7 @@ mod tests {
 
     #[test]
     fn scratch_document_supports_composable_shape_effect_crud() {
-        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let mut editor = Editor::create_with_text("Body").unwrap();
         let fill =
             ShapeFill::Solid(RgbaColor::new(0.15, 0.45, 0.85, 1.0, RgbColorSpace::Srgb).unwrap());
         let created = editor
@@ -1504,7 +1504,7 @@ mod tests {
         editor
             .set_body_shape_effects(created.drawable_object_id, replacement)
             .unwrap();
-        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_shape_effects(created.drawable_object_id)
@@ -1537,7 +1537,7 @@ mod tests {
 
     #[test]
     fn scratch_document_supports_drop_shadow_crud() {
-        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let mut editor = Editor::create_with_text("Body").unwrap();
         let created = editor
             .add_body_shape(4, "Shadow", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
@@ -1560,7 +1560,7 @@ mod tests {
             .set_body_shape_shadow(created.drawable_object_id, shadow)
             .unwrap();
 
-        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_shape_shadow(created.drawable_object_id)
@@ -1602,7 +1602,7 @@ mod tests {
 
     #[test]
     fn scratch_document_supports_shape_text_layout_crud() {
-        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let mut editor = Editor::create_with_text("Body").unwrap();
         let created = editor
             .add_body_shape(4, "Layout", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
@@ -1630,7 +1630,7 @@ mod tests {
             .set_body_shape_text_layout(created.drawable_object_id, layout)
             .unwrap();
 
-        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_shape_text_layout(created.drawable_object_id)
@@ -1669,7 +1669,7 @@ mod tests {
 
     #[test]
     fn scratch_document_supports_typed_line_endpoint_crud() {
-        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let mut editor = Editor::create_with_text("Body").unwrap();
         let created = editor
             .add_body_line_with_endpoints(
                 4,
@@ -1688,7 +1688,7 @@ mod tests {
             .map(|name| editor.package().archive(name).unwrap().objects.len())
             .sum::<usize>();
 
-        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let replacement = Endpoints::new(Endpoint::Line, Endpoint::SimpleArrow);
         reopened
             .set_body_line_endpoints(created.drawable_object_id, replacement)
@@ -1736,7 +1736,7 @@ mod tests {
 
     #[test]
     fn scratch_document_supports_typed_preset_shape_crud() {
-        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let mut editor = Editor::create_with_text("Body").unwrap();
         let baseline_body = editor.body_text().unwrap();
         let created = editor
             .add_body_shape(4, "Rounded", POSITION, SIZE, Preset::ROUNDED_RECTANGLE)
@@ -1744,7 +1744,7 @@ mod tests {
         assert_eq!(created.kind, ShapePathKind::RoundedRectangle);
         assert_eq!(created.preset, Some(Preset::ROUNDED_RECTANGLE));
 
-        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_shape_preset(created.drawable_object_id)
@@ -1779,7 +1779,7 @@ mod tests {
 
     #[test]
     fn invalid_creation_and_cross_type_updates_are_transactional() {
-        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let mut editor = Editor::create_with_text("Body").unwrap();
         let baseline = editor.to_bytes().unwrap();
         assert!(
             editor

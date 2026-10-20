@@ -249,7 +249,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// Read the generated XLS file back using `raw::Reader` and print
 /// the parsed merged cells, hyperlinks, comments, and auto-filter data.
 fn round_trip_verify(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
-    use litchi_core::sheet::WorkbookTrait;
+    use litchi_core::sheet::{WorkbookTrait, Worksheet as _};
     use litchi_xls::raw::Reader;
     use std::io::Cursor;
 
@@ -263,12 +263,9 @@ fn round_trip_verify(path: &std::path::Path) -> Result<(), Box<dyn std::error::E
     for (idx, name) in wb.worksheet_names().iter().enumerate() {
         println!("\n--- Sheet {idx}: \"{name}\" ---");
 
-        // Access the underlying Worksheet to inspect new features.
-        // The WorkbookTrait gives us a dyn Worksheet, but we stored
-        // typed worksheets inside Workbook. The easiest way to
-        // inspect features is through the typed accessor.
-        //
-        // For now, print basic cell info via the trait.
+        // The WorkbookTrait lends the typed `litchi_xls::Worksheet`, so
+        // the generic reads below and the typed feature accessors work on
+        // the same borrowed worksheet.
         let sheet = wb
             .worksheet_by_index(idx)
             .map_err(|e| -> Box<dyn std::error::Error> { e })?;

@@ -96,7 +96,7 @@ pub(super) struct SlideImageGraph {
     pub(super) slide_id: u64,
     pub(super) component_id: u64,
     pub(super) archive_name: String,
-    pub(super) info: KeynoteSlideImageInfo,
+    pub(super) info: SlideImageInfo,
     pub(super) object_ids: Vec<u64>,
     pub(super) uuid_object_ids: Vec<u64>,
     pub(super) data_references: Vec<(u64, u64)>,
@@ -113,7 +113,7 @@ pub(super) fn image_creation_values(options: ImageOptions) -> Result<DrawableGeo
 }
 
 pub(super) fn image_creation_context(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
 ) -> Result<ImageCreationContext> {
     let slides = editor.slides()?;
@@ -204,10 +204,7 @@ fn caption_theme_style(
     })
 }
 
-pub(super) fn image_infos(
-    editor: &KeynoteEditor,
-    slide_index: usize,
-) -> Result<Vec<KeynoteSlideImageInfo>> {
+pub(super) fn image_infos(editor: &Editor, slide_index: usize) -> Result<Vec<SlideImageInfo>> {
     let slides = editor.slides()?;
     let slide = slides.get(slide_index).ok_or_else(|| {
         Error::ParseError(format!(
@@ -244,12 +241,12 @@ fn image_root_ids(graph: &ObjectGraph, slide_id: u64) -> Result<Vec<u64>> {
 }
 
 pub(super) fn require_file_image(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<SlideImageGraph> {
     let graph = image_graph(editor, slide_index, drawable_object_id)?;
-    if graph.info.kind != KeynoteSlideImageKind::File {
+    if graph.info.kind != SlideImageKind::File {
         return Err(Error::ParseError(format!(
             "Keynote image {drawable_object_id} is layout-owned, not an ordinary file-backed image"
         )));
@@ -258,7 +255,7 @@ pub(super) fn require_file_image(
 }
 
 pub(super) fn image_title_caption(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<DrawableTitleCaption> {
@@ -287,7 +284,7 @@ pub(super) fn image_title_caption(
 }
 
 pub(super) fn image_caption_slot(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
     kind: DrawableCaptionKind,
@@ -446,7 +443,7 @@ fn replace_image_caption_reference(
 }
 
 pub(super) fn image_graph(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<SlideImageGraph> {
@@ -559,11 +556,11 @@ fn image_adjustments_wire_limits(package: &IWorkPackage) -> Result<WireLimits> {
 }
 
 fn image_info(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     graph: &ObjectGraph,
     slide_index: usize,
     identifier: u64,
-) -> Result<KeynoteSlideImageInfo> {
+) -> Result<SlideImageInfo> {
     let image: tsd::ImageArchive =
         graph.decode_type(identifier, IMAGE_MESSAGE_TYPE, "TSD.ImageArchive")?;
     let image_data_identifier = image
@@ -599,16 +596,16 @@ fn image_info(
             "Keynote image {identifier} has invalid image adjustments: {error}"
         ))
     })?;
-    Ok(KeynoteSlideImageInfo {
+    Ok(SlideImageInfo {
         slide_index,
         drawable_object_id: identifier,
         kind: if image
             .flags
             .is_some_and(|flags| flags & LAYOUT_IMAGE_FLAG != 0)
         {
-            KeynoteSlideImageKind::Layout
+            SlideImageKind::Layout
         } else {
-            KeynoteSlideImageKind::File
+            SlideImageKind::File
         },
         image_data_identifier,
         thumbnail_data_identifier,

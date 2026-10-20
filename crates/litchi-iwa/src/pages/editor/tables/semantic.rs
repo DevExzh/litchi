@@ -14,7 +14,7 @@ use litchi_pages::{BodyTableSelector, Package as FocusedPagesPackage};
 
 /// Stable identity and dimensions of one native table attached to the Pages body.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PagesTableInfo {
+pub struct TableInfo {
     /// Object identifier of the body-owned table drawable.
     pub drawable_object_id: u64,
     /// Object identifier accepted by cell-editing APIs.
@@ -35,23 +35,23 @@ pub struct PagesTableInfo {
 
 /// Materialized values from one Pages table.
 #[derive(Debug, Clone)]
-pub struct PagesTable {
+pub struct Table {
     /// Stable identity and dimensions of this table.
-    pub info: PagesTableInfo,
+    pub info: TableInfo,
     table_read: TableRead,
     merges: Vec<Region>,
 }
 
-impl PagesTable {
+impl Table {
     /// Borrow a materialized cell value, or return `None` for an empty cell.
-    pub fn get_cell(&self, row: usize, column: usize) -> Option<&PagesCellValue> {
+    pub fn get_cell(&self, row: usize, column: usize) -> Option<&CellValue> {
         let position =
-            litchi_iwa_common::table::coordinate::CellPosition::try_from_usize(row, column).ok()?;
+            litchi_iwa_common::table::coordinate::At::try_from_usize(row, column).ok()?;
         self.table_read.get(position)
     }
 
     /// Iterate over materialized cells without exposing the backing map.
-    pub fn iter_cells(&self) -> impl Iterator<Item = ((usize, usize), &PagesCellValue)> + '_ {
+    pub fn iter_cells(&self) -> impl Iterator<Item = ((usize, usize), &CellValue)> + '_ {
         self.table_read.iter_cells().map(|cell| {
             (
                 (
@@ -71,7 +71,7 @@ impl PagesTable {
     /// Borrow the comment attached to a materialized cell, if any.
     pub fn get_comment(&self, row: usize, column: usize) -> Option<&Comment> {
         let position =
-            litchi_iwa_common::table::coordinate::CellPosition::try_from_usize(row, column).ok()?;
+            litchi_iwa_common::table::coordinate::At::try_from_usize(row, column).ok()?;
         self.table_read.get_comment(position)
     }
 
@@ -246,9 +246,9 @@ fn map_wire_limit_kind(kind: impl IntoWireLimitKind) -> Option<LimitKind> {
 }
 
 pub(super) fn focused_body_table_source(
-    editor: &PagesEditor,
+    editor: &Editor,
     model_object_id: u64,
-) -> Result<(FocusedPagesPackage, usize, PagesTableInfo)> {
+) -> Result<(FocusedPagesPackage, usize, TableInfo)> {
     let tables = editor.tables()?;
     let (table_position, info) = tables
         .into_iter()
@@ -279,7 +279,7 @@ fn focused_options(limits: crate::package::PackageLimits) -> Result<litchi_pages
     Ok(litchi_pages::OpenOptions::new().source_limits(source))
 }
 
-fn focused_body_table_package(editor: &PagesEditor) -> Result<FocusedPagesPackage> {
+fn focused_body_table_package(editor: &Editor) -> Result<FocusedPagesPackage> {
     let source = editor.package().exact_source_bytes().ok_or_else(|| {
         Error::InvalidFormat("focused Pages table source is not exact".to_owned())
     })?;
@@ -301,9 +301,9 @@ fn focused_body_table_package(editor: &PagesEditor) -> Result<FocusedPagesPackag
 /// that the host projection can see, the serialized package is admitted
 /// through the same focused source parser.
 fn focused_body_table_deletion_source(
-    editor: &PagesEditor,
+    editor: &Editor,
     model_object_id: u64,
-) -> Result<(FocusedPagesPackage, usize, PagesTableInfo, bool)> {
+) -> Result<(FocusedPagesPackage, usize, TableInfo, bool)> {
     if editor.package().exact_source_owner().is_none() {
         let (focused, table_position, info) = focused_body_table_source(editor, model_object_id)?;
         return Ok((focused, table_position, info, true));
@@ -352,17 +352,17 @@ fn pages_editor_from_deletion_bytes(
     bytes: &[u8],
     package_limits: crate::pages::editor::PackageLimits,
     compatibility_source: bool,
-) -> Result<PagesEditor> {
+) -> Result<Editor> {
     let mut package = IWorkPackage::from_bytes_with_limits(bytes, package_limits)?;
     if compatibility_source {
         package.discard_exact_source_for_compatibility();
     }
-    PagesEditor::from_package(package)
+    Editor::from_package(package)
 }
 
-impl PagesEditor {
+impl Editor {
     /// List native tables anchored in the main body in document order.
-    pub fn tables(&self) -> Result<Vec<PagesTableInfo>> {
+    pub fn tables(&self) -> Result<Vec<TableInfo>> {
         Ok(body_table_graphs(self)?
             .into_iter()
             .map(|graph| graph.info)
@@ -370,7 +370,7 @@ impl PagesEditor {
     }
 
     /// Read all materialized cell values from one reachable body table.
-    pub fn table(&self, model_object_id: u64) -> Result<PagesTable> {
+    pub fn table(&self, model_object_id: u64) -> Result<Table> {
         let (focused, table_position, info) = focused_body_table_source(self, model_object_id)?;
         let table_read = focused
             .body_table_cells(BodyTableSelector::index(table_position))
@@ -383,7 +383,7 @@ impl PagesEditor {
                 "focused Pages table at position {table_position} does not match host model {model_object_id}"
             )));
         }
-        Ok(PagesTable {
+        Ok(Table {
             info,
             table_read,
             merges: super::reader::regions_in_editor(self, model_object_id)?,
@@ -400,7 +400,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        value: PagesCellValue,
+        value: CellValue,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -424,7 +424,7 @@ impl PagesEditor {
     pub fn set_table_cells(
         &mut self,
         model_object_id: u64,
-        updates: impl IntoIterator<Item = PagesTableCellUpdate>,
+        updates: impl IntoIterator<Item = TableCellUpdate>,
     ) -> Result<usize> {
         self.require_body_table(model_object_id)?;
         let batch = crate::numbers::editor::TableCellBatch::collect(updates)?;
@@ -452,7 +452,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
     ) -> Result<()> {
-        self.set_table_cell(model_object_id, row, column, PagesCellValue::Empty)
+        self.set_table_cell(model_object_id, row, column, CellValue::Empty)
     }
 
     /// Read the explicit typed data format for one body-table cell.
@@ -1394,7 +1394,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellLayout> {
+    ) -> Result<TableCellLayout> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_layout_in_package(
             self.package(),
@@ -1410,7 +1410,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        layout: PagesTableCellLayout,
+        layout: TableCellLayout,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -1662,7 +1662,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellParagraphList> {
+    ) -> Result<TableCellParagraphList> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_in_package(
             self.package(),
@@ -1678,7 +1678,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        list: PagesTableCellParagraphList,
+        list: TableCellParagraphList,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -1729,7 +1729,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Vec<PagesTableCellParagraphListPlacement>> {
+    ) -> Result<Vec<TableCellParagraphListPlacement>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_lists_in_package(
             self.package(),
@@ -1745,7 +1745,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        placements: &[PagesTableCellParagraphListPlacement],
+        placements: &[TableCellParagraphListPlacement],
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -1779,7 +1779,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Vec<PagesTableCellParagraphListLevelPlacement>> {
+    ) -> Result<Vec<TableCellParagraphListLevelPlacement>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_levels_in_package(
             self.package(),
@@ -1796,7 +1796,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-        level: PagesTableCellParagraphListLevel,
+        level: TableCellParagraphListLevel,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -1857,7 +1857,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-    ) -> Result<PagesTableCellParagraphListNumbering> {
+    ) -> Result<TableCellParagraphListNumbering> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_numbering_in_package(
             self.package(),
@@ -1875,7 +1875,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-        numbering: PagesTableCellParagraphListNumbering,
+        numbering: TableCellParagraphListNumbering,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -1907,7 +1907,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-    ) -> Result<PagesTableCellParagraphListNumberFormat> {
+    ) -> Result<TableCellParagraphListNumberFormat> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_number_format_in_package(
             self.package(),
@@ -1925,7 +1925,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-        format: PagesTableCellParagraphListNumberFormat,
+        format: TableCellParagraphListNumberFormat,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -1988,7 +1988,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-    ) -> Result<PagesTableCellParagraphListNumberTiering> {
+    ) -> Result<TableCellParagraphListNumberTiering> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_number_tiering_in_package(
             self.package(),
@@ -2006,7 +2006,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-        tiering: PagesTableCellParagraphListNumberTiering,
+        tiering: TableCellParagraphListNumberTiering,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -2069,7 +2069,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-    ) -> Result<PagesTableCellParagraphListNumberScale> {
+    ) -> Result<TableCellParagraphListNumberScale> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_number_scale_in_package(
             self.package(),
@@ -2087,7 +2087,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-        scale: PagesTableCellParagraphListNumberScale,
+        scale: TableCellParagraphListNumberScale,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -2149,7 +2149,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-    ) -> Result<PagesTableCellParagraphListBullet> {
+    ) -> Result<TableCellParagraphListBullet> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_bullet_in_package(
             self.package(),
@@ -2167,7 +2167,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-        bullet: &PagesTableCellParagraphListBullet,
+        bullet: &TableCellParagraphListBullet,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -2224,7 +2224,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-    ) -> Result<PagesTableCellParagraphListBulletGeometry> {
+    ) -> Result<TableCellParagraphListBulletGeometry> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_bullet_geometry_in_package(
             self.package(),
@@ -2242,7 +2242,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-        geometry: PagesTableCellParagraphListBulletGeometry,
+        geometry: TableCellParagraphListBulletGeometry,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -2304,7 +2304,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-    ) -> Result<PagesTableCellParagraphListIndentation> {
+    ) -> Result<TableCellParagraphListIndentation> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_indentation_in_package(
             self.package(),
@@ -2322,7 +2322,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-        indentation: PagesTableCellParagraphListIndentation,
+        indentation: TableCellParagraphListIndentation,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -2384,7 +2384,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-    ) -> Result<PagesTableCellParagraphListLabelColor> {
+    ) -> Result<TableCellParagraphListLabelColor> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_label_color_in_package(
             self.package(),
@@ -2402,7 +2402,7 @@ impl PagesEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-        color: PagesTableCellParagraphListLabelColor,
+        color: TableCellParagraphListLabelColor,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -2530,7 +2530,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellParagraphTabStops> {
+    ) -> Result<TableCellParagraphTabStops> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_tab_stops_in_package(
             self.package(),
@@ -2546,7 +2546,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        stops: PagesTableCellParagraphTabStops,
+        stops: TableCellParagraphTabStops,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -2597,7 +2597,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellTextBackground> {
+    ) -> Result<TableCellTextBackground> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_text_background_in_package(
             self.package(),
@@ -2613,7 +2613,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        background: PagesTableCellTextBackground,
+        background: TableCellTextBackground,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -2664,7 +2664,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellTextBaselineShift> {
+    ) -> Result<TableCellTextBaselineShift> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_text_baseline_shift_in_package(
             self.package(),
@@ -2680,7 +2680,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        shift: PagesTableCellTextBaselineShift,
+        shift: TableCellTextBaselineShift,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -2731,7 +2731,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellTextCapitalization> {
+    ) -> Result<TableCellTextCapitalization> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_text_capitalization_in_package(
             self.package(),
@@ -2747,7 +2747,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        capitalization: PagesTableCellTextCapitalization,
+        capitalization: TableCellTextCapitalization,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -2799,7 +2799,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellTextCharacterSpacing> {
+    ) -> Result<TableCellTextCharacterSpacing> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_text_character_spacing_in_package(
             self.package(),
@@ -2815,7 +2815,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        spacing: PagesTableCellTextCharacterSpacing,
+        spacing: TableCellTextCharacterSpacing,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -2866,7 +2866,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellTextColor> {
+    ) -> Result<TableCellTextColor> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_text_color_in_package(
             self.package(),
@@ -2882,7 +2882,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        color: PagesTableCellTextColor,
+        color: TableCellTextColor,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -2933,7 +2933,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellTextDecorations> {
+    ) -> Result<TableCellTextDecorations> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_text_decorations_in_package(
             self.package(),
@@ -2949,7 +2949,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        decorations: PagesTableCellTextDecorations,
+        decorations: TableCellTextDecorations,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -3000,7 +3000,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellTextFont> {
+    ) -> Result<TableCellTextFont> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_text_font_in_package(
             self.package(),
@@ -3016,7 +3016,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        font: PagesTableCellTextFont,
+        font: TableCellTextFont,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -3067,7 +3067,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellTextLigatures> {
+    ) -> Result<TableCellTextLigatures> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_text_ligatures_in_package(
             self.package(),
@@ -3083,7 +3083,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        ligatures: PagesTableCellTextLigatures,
+        ligatures: TableCellTextLigatures,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -3134,7 +3134,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellTextOutline> {
+    ) -> Result<TableCellTextOutline> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_text_outline_in_package(
             self.package(),
@@ -3150,7 +3150,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        outline: PagesTableCellTextOutline,
+        outline: TableCellTextOutline,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -3201,7 +3201,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellTextScript> {
+    ) -> Result<TableCellTextScript> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_text_script_in_package(
             self.package(),
@@ -3217,7 +3217,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        script: PagesTableCellTextScript,
+        script: TableCellTextScript,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -3268,7 +3268,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellTextShadow> {
+    ) -> Result<TableCellTextShadow> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_text_shadow_in_package(
             self.package(),
@@ -3284,7 +3284,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        shadow: PagesTableCellTextShadow,
+        shadow: TableCellTextShadow,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -3335,7 +3335,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellTextStyle> {
+    ) -> Result<TableCellTextStyle> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_text_style_in_package(
             self.package(),
@@ -3351,7 +3351,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        style: PagesTableCellTextStyle,
+        style: TableCellTextStyle,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -3693,7 +3693,7 @@ impl PagesEditor {
     /// Insert an independent empty native table at a UTF-16 body position.
     ///
     /// An existing body table supplies native style and storage templates. A
-    /// table-less document created by [`PagesEditor::create`] bootstraps that
+    /// table-less document created by [`Editor::create`] bootstraps that
     /// native scaffold automatically. No cells or formula state are shared,
     /// and the insertion transaction shifts later text attributes and
     /// attachments.
@@ -3703,7 +3703,7 @@ impl PagesEditor {
         name: &str,
         rows: usize,
         columns: usize,
-    ) -> Result<PagesTableInfo> {
+    ) -> Result<TableInfo> {
         let template = body_table_graphs(self)?.into_iter().next();
         let body_length = self.body_text()?.encode_utf16().count();
         if anchor_character_index > body_length {
@@ -3792,7 +3792,7 @@ impl PagesEditor {
         &mut self,
         model_object_id: u64,
         anchor_character_index: usize,
-    ) -> Result<PagesTableInfo> {
+    ) -> Result<TableInfo> {
         let body_length = self.body_text()?.encode_utf16().count();
         if anchor_character_index > body_length {
             return Err(Error::ParseError(format!(
@@ -3875,7 +3875,7 @@ impl PagesEditor {
     /// The body attachment marker, drawable, model, private cell stores,
     /// formula owner family, component references, and UUID registrations are
     /// removed transactionally. Storage shared with another table is retained.
-    pub fn remove_table(&mut self, model_object_id: u64) -> Result<PagesTableInfo> {
+    pub fn remove_table(&mut self, model_object_id: u64) -> Result<TableInfo> {
         let (focused, table_position, info, compatibility_source) =
             focused_body_table_deletion_source(self, model_object_id)?;
         let commit = focused

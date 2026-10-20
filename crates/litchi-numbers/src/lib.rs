@@ -36,7 +36,7 @@
 //! remain private implementation details.
 //!
 //! ```no_run
-//! use litchi_numbers::{CellPosition, CellRange, Package, SheetSelector, TableSelector};
+//! use litchi_numbers::{At, Area, Package, SheetSelector, TableSelector};
 //! use litchi_numbers::table::cells::Storage;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -44,12 +44,12 @@
 //! let sheet = SheetSelector::name("Summary");
 //! let table = TableSelector::name("Revenue");
 //!
-//! let b2 = package.table_cell(sheet, table, CellPosition::from_a1("B2")?)?;
+//! let b2 = package.table_cell(sheet, table, At::from_a1("B2")?)?;
 //! if let Storage::Stored(value) = b2.storage() {
 //!     println!("B2 is a {} cell", value.cell_type().name());
 //! }
 //!
-//! let range = CellRange::from_a1("B2:C3")?;
+//! let range = Area::from_a1("B2:C3")?;
 //! let states = package.table_cells(sheet, table, range)?;
 //! assert_eq!(states.len(), 4); // Dense, row-major: B2, C2, B3, C3.
 //! # Ok(())
@@ -136,14 +136,14 @@
 //! ```no_run
 //! use litchi_numbers::{
 //!     cell::data_format::{Fraction, FractionAccuracy},
-//!     CellPosition, Package, SheetSelector, TableSelector,
+//!     At, Package, SheetSelector, TableSelector,
 //! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let package = Package::open("input.numbers")?;
 //! let sheet = SheetSelector::name("Summary");
 //! let table = TableSelector::name("Revenue");
-//! let position = CellPosition::from_a1("B3")?;
+//! let position = At::from_a1("B3")?;
 //!
 //! let _before = package.table_cell_fraction_format(sheet, table, position)?;
 //! let commit = package
@@ -175,14 +175,14 @@
 //! members.
 //!
 //! ```no_run
-//! use litchi_numbers::{cell::data_format::DateTime, CellPosition, Package};
+//! use litchi_numbers::{cell::data_format::DateTime, At, Package};
 //! use litchi_numbers::{SheetSelector, TableSelector};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let package = Package::open("input.numbers")?;
 //! let sheet = SheetSelector::name("Summary");
 //! let table = TableSelector::name("Revenue");
-//! let position = CellPosition::from_a1("B3")?;
+//! let position = At::from_a1("B3")?;
 //! let _before = package.table_cell_date_time_format(sheet, table, position)?;
 //! let commit = package
 //!     .edit_table_cell_date_time_format(sheet, table, position)?
@@ -369,7 +369,7 @@ pub use table::appearance::{Appearance, Banding, GridlineVisibility, Gridlines, 
 pub use table::dimension::{Dimension, Points, Size};
 pub use table::topology::{ColumnDeletion, RowDeletion};
 pub use table::{
-    AddressError, Builder as TableBuilder, Cell, CellPosition, CellRange, CoordinateError,
-    Dimensions, Error as TableError, Grid, GridBudget, InsertError, InsertResult, Table, View,
+    AddressError, Area, At, Builder as TableBuilder, Cell, CoordinateError, Dimensions,
+    Error as TableError, Grid, GridBudget, InsertError, InsertResult, Table, View,
 };
 pub use workbook::Workbook;
