@@ -3,7 +3,7 @@
 - Status: implemented on `uo2/w2-pptx` after the coordinator review of
   record [0356](0356-pptx-api-contract.md) (tip `02f405c299`, merged into
   trunk as `5e55079b38`); trunk merged at `184dd4d908` (records 0357, 0353a,
-  0356); for coordinator review.
+  0356) and at `7893492f9e` (record 0355a); for coordinator review.
 - Date: 2026-10-20.
 - Input: the review's decisions P1–P4 on 0356's gaps 0356-P1 to 0356-P4, and
   its two acceptances (the per-part conflict check and the unchanged
@@ -26,7 +26,7 @@
 
 Commits: `83892956f8` (P3, P4 tool), `8d766e76fd` (P2), `2a1aaa45e8`
 (P1), this record's commit (evidence, matrix, glossary line, inventory);
-trunk merge `efbdebe2de`.
+trunk merges `efbdebe2de` and `2764481df0`.
 
 ## 2. What landed
 
@@ -154,8 +154,9 @@ are the ten `&mut self` methods of the `builder::Presentation` draft
 (drafts keep `&mut self`, 0351 §2.1 rule 7; the inventory's owner list
 names every `Presentation`). The regenerated
 `results/0351/inventory.tsv` covers the 25 crates and `litchi-ops` of 0351
-§1 on this branch's tree (trunk `184dd4d908` merged): 217,350 bytes,
-SHA-256 `e0dba2a3d200bf46be0db25b0c925fb532dcdf16244e766af126aed1ab657e27`
+§1 on this branch's tree (trunk `7893492f9e` merged, record 0355a
+included): 216,674 bytes, SHA-256
+`19f315dde216931d280662d8f655a8a7c1240a407db3f1384ecec9fde3cbf6fd`
 (0351 cites the trunk `5ff605692e` file). Regenerate with
 `.coord/w2-pptx/scripts/inventory.sh` (the 0351 docstring commands, one
 crate at a time).

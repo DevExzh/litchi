@@ -84,15 +84,10 @@ litchi-docx	edit_type	litchi_docx::source_backed::GlossaryBatchEdit		rename to t
 litchi-docx	commit_type	litchi_docx::source_backed::SourceBackedSvgAttachmentBatchCommit	diagnostics,patch,snapshot	add package,into_package,into_parts; delete snapshot
 litchi-docx	commit_snapshot	litchi_docx::source_backed::SourceBackedSvgAttachmentBatchCommit::snapshot	&self	delete: Commit::package/into_package
 litchi-docx	edit_type	litchi_docx::source_backed::SourceBackedSvgAttachmentBatchEdit		rename to the focused module's Edit
-litchi-docx	commit_type	litchi_docx::source_backed::SourceBackedSvgAttachmentCommit	diagnostics,patch,snapshot	add package,into_package,into_parts; delete snapshot
-litchi-docx	commit_snapshot	litchi_docx::source_backed::SourceBackedSvgAttachmentCommit::snapshot	&self	delete: Commit::package/into_package
-litchi-docx	edit_type	litchi_docx::source_backed::SourceBackedSvgAttachmentEdit		rename to the focused module's Edit
 litchi-docx	commit_type	litchi_docx::source_backed::StoryTextCommit	patch,snapshot	add package,into_package,diagnostics,into_parts; delete snapshot
 litchi-docx	commit_snapshot	litchi_docx::source_backed::StoryTextCommit::snapshot	&self	delete: Commit::package/into_package
 litchi-docx	edit_type	litchi_docx::source_backed::StoryTextEdit		rename to the focused module's Edit
-litchi-docx	commit_type	litchi_docx::source_backed::TailAppendCommit		add package,into_package,patch,diagnostics,into_parts
 litchi-docx	edit_type	litchi_docx::source_backed::TailAppendEdit		rename to the focused module's Edit
-litchi-docx	commit_type	litchi_docx::source_backed::TailAppendStreamCommit		add package,into_package,patch,diagnostics,into_parts
 litchi-docx	edit_type	litchi_docx::source_backed::TailAppendStreamEdit		rename to the focused module's Edit
 litchi-docx	commit_type	litchi_docx::source_backed::paragraph_copy::Commit	patch	add package,into_package,diagnostics,into_parts
 litchi-docx	commit_type	litchi_docx::source_backed::paragraph_copy::RemovalCommit	patch	add package,into_package,diagnostics,into_parts
