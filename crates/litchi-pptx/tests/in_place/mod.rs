@@ -156,6 +156,30 @@ pub(crate) trait InPlace {
         source: &Package,
         patch: &litchi_pptx::cross_slide_copy::Patch,
     ) -> Result<()>;
+    fn edit_guides_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(
+            &mut litchi_pptx::presentation_properties::metadata::guides::Edit<'_>,
+        ) -> Result<T>,
+    ) -> Result<T>;
+    fn edit_structure_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(
+            &mut litchi_pptx::presentation_properties::metadata::structure::Edit<'_>,
+        ) -> Result<T>,
+    ) -> Result<T>;
+    fn edit_custom_shows_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(
+            &mut litchi_pptx::presentation_properties::metadata::custom_show::Edit<'_>,
+        ) -> Result<T>,
+    ) -> Result<T>;
+    fn edit_changes_info_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(
+            &mut litchi_pptx::presentation_properties::metadata::changes::Edit<'_>,
+        ) -> Result<T>,
+    ) -> Result<T>;
 }
 
 impl InPlace for Package {
@@ -453,5 +477,45 @@ impl InPlace for Package {
         let committed = self.apply_cross_slide_copy(source, patch)?.into_package();
         *self = committed;
         Ok(())
+    }
+
+    fn edit_guides_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(
+            &mut litchi_pptx::presentation_properties::metadata::guides::Edit<'_>,
+        ) -> Result<T>,
+    ) -> Result<T> {
+        let package = self;
+        in_place!(package, edit_guides, |edit| operation(&mut edit))
+    }
+
+    fn edit_structure_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(
+            &mut litchi_pptx::presentation_properties::metadata::structure::Edit<'_>,
+        ) -> Result<T>,
+    ) -> Result<T> {
+        let package = self;
+        in_place!(package, edit_structure, |edit| operation(&mut edit))
+    }
+
+    fn edit_custom_shows_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(
+            &mut litchi_pptx::presentation_properties::metadata::custom_show::Edit<'_>,
+        ) -> Result<T>,
+    ) -> Result<T> {
+        let package = self;
+        in_place!(package, edit_custom_shows, |edit| operation(&mut edit))
+    }
+
+    fn edit_changes_info_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(
+            &mut litchi_pptx::presentation_properties::metadata::changes::Edit<'_>,
+        ) -> Result<T>,
+    ) -> Result<T> {
+        let package = self;
+        in_place!(package, edit_changes_info, |edit| operation(&mut edit))
     }
 }

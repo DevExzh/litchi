@@ -33,17 +33,15 @@ fn package_and_presentation_manage_local_revision_and_changes_information() {
     };
 
     revision::store(&mut opc, &revision_part).unwrap();
-    changes::store(&mut opc, &changes_part).unwrap();
     assert!(matches!(
         revision::store(&mut opc, &revision_part),
         Err(Error::Invalid(_))
     ));
-    assert!(matches!(
-        changes::store(&mut opc, &changes_part),
-        Err(Error::Invalid(_))
-    ));
-
     let package = Package::from_opc_package(opc).unwrap();
+    let mut edit = package.edit_changes_info().unwrap();
+    edit.set(&changes_part).unwrap();
+    assert!(matches!(edit.set(&changes_part), Err(Error::Invalid(_))));
+    let package = edit.commit().unwrap().into_package();
     let opc = package.opc().unwrap();
     assert_eq!(revision::load(opc).unwrap(), Some(revision_part.clone()));
     assert_eq!(changes::load(opc).unwrap(), Some(changes_part.clone()));

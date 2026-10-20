@@ -55,7 +55,7 @@ pub fn load(package: &OpcPackage) -> Result<Graph> {
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store(package: &mut OpcPackage, value: &Graph) -> Result<()> {
+pub(crate) fn store(package: &mut OpcPackage, value: &Graph) -> Result<()> {
     validate_graph(package, value)?;
     let presentation_name = package.main_document_part()?.partname().clone();
     let original = package.get_part(&presentation_name)?.blob().to_vec();
@@ -168,7 +168,7 @@ pub fn find_custom_show(package: &OpcPackage, id: u32) -> Result<Option<Show>> {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn add_custom_show(package: &mut OpcPackage, show: Show) -> Result<()> {
+pub(crate) fn add_custom_show(package: &mut OpcPackage, show: Show) -> Result<()> {
     mutate(package, |graph| {
         if graph.custom_shows.get_by_id(show.id).is_some()
             || graph.custom_shows.get_by_name(&show.name).is_some()
@@ -190,7 +190,11 @@ pub fn add_custom_show(package: &mut OpcPackage, show: Show) -> Result<()> {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn update_custom_show(package: &mut OpcPackage, id: u32, replacement: Show) -> Result<()> {
+pub(crate) fn update_custom_show(
+    package: &mut OpcPackage,
+    id: u32,
+    replacement: Show,
+) -> Result<()> {
     mutate(package, |graph| {
         graph.custom_shows.replace_by_id(id, replacement)
     })
@@ -206,21 +210,7 @@ pub fn update_custom_show(package: &mut OpcPackage, id: u32, replacement: Show) 
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn replace_custom_show(package: &mut OpcPackage, id: u32, replacement: Show) -> Result<()> {
-    update_custom_show(package, id, replacement)
-}
-
-/// A change to a signed package is refused with
-/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// (ADR 0006) before anything is mutated: remove the signature explicitly
-/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
-/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
-/// no-op keeps the signature.
-///
-/// # Errors
-///
-/// Returns an error if the operation fails.
-pub fn remove_custom_show(package: &mut OpcPackage, id: u32) -> Result<bool> {
+pub(crate) fn remove_custom_show(package: &mut OpcPackage, id: u32) -> Result<bool> {
     let mut graph = load(package)?;
     let removed = graph.custom_shows.remove_by_id(id).is_some();
     if removed {
@@ -239,7 +229,7 @@ pub fn remove_custom_show(package: &mut OpcPackage, id: u32) -> Result<bool> {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn reorder_custom_shows(package: &mut OpcPackage, ordered_ids: &[u32]) -> Result<()> {
+pub(crate) fn reorder_custom_shows(package: &mut OpcPackage, ordered_ids: &[u32]) -> Result<()> {
     mutate(package, |graph| graph.custom_shows.reorder(ordered_ids))
 }
 
@@ -253,7 +243,11 @@ pub fn reorder_custom_shows(package: &mut OpcPackage, ordered_ids: &[u32]) -> Re
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn add_custom_show_slide(package: &mut OpcPackage, show_id: u32, slide_id: u32) -> Result<()> {
+pub(crate) fn add_custom_show_slide(
+    package: &mut OpcPackage,
+    show_id: u32,
+    slide_id: u32,
+) -> Result<()> {
     mutate(package, |graph| {
         require_slide(graph, slide_id)?;
         let show = graph
@@ -278,7 +272,7 @@ pub fn add_custom_show_slide(package: &mut OpcPackage, show_id: u32, slide_id: u
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn remove_custom_show_slide(
+pub(crate) fn remove_custom_show_slide(
     package: &mut OpcPackage,
     show_id: u32,
     slide_id: u32,
@@ -306,7 +300,7 @@ pub fn remove_custom_show_slide(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn reorder_custom_show_slides(
+pub(crate) fn reorder_custom_show_slides(
     package: &mut OpcPackage,
     show_id: u32,
     ordered_slide_ids: &[u32],
@@ -339,7 +333,7 @@ pub fn find_section(package: &OpcPackage, id: &str) -> Result<Option<Section>> {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn add_section(package: &mut OpcPackage, mut section: Section) -> Result<String> {
+pub(crate) fn add_section(package: &mut OpcPackage, mut section: Section) -> Result<String> {
     if section.id.is_none() {
         section.id = Some(new_guid());
     }
@@ -375,7 +369,11 @@ pub fn add_section(package: &mut OpcPackage, mut section: Section) -> Result<Str
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn update_section(package: &mut OpcPackage, id: &str, replacement: Section) -> Result<()> {
+pub(crate) fn update_section(
+    package: &mut OpcPackage,
+    id: &str,
+    replacement: Section,
+) -> Result<()> {
     let id = id.to_owned();
     mutate(package, move |graph| {
         graph.sections.replace_by_id(&id, replacement)?;
@@ -400,21 +398,7 @@ pub fn update_section(package: &mut OpcPackage, id: &str, replacement: Section) 
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn replace_section(package: &mut OpcPackage, id: &str, replacement: Section) -> Result<()> {
-    update_section(package, id, replacement)
-}
-
-/// A change to a signed package is refused with
-/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// (ADR 0006) before anything is mutated: remove the signature explicitly
-/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
-/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
-/// no-op keeps the signature.
-///
-/// # Errors
-///
-/// Returns an error if the operation fails.
-pub fn remove_section(package: &mut OpcPackage, id: &str) -> Result<bool> {
+pub(crate) fn remove_section(package: &mut OpcPackage, id: &str) -> Result<bool> {
     let mut graph = load(package)?;
     let removed = graph.sections.remove_by_id(id).is_some();
     if removed {
@@ -433,7 +417,7 @@ pub fn remove_section(package: &mut OpcPackage, id: &str) -> Result<bool> {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn reorder_sections(package: &mut OpcPackage, ordered_ids: &[String]) -> Result<()> {
+pub(crate) fn reorder_sections(package: &mut OpcPackage, ordered_ids: &[String]) -> Result<()> {
     mutate(package, |graph| graph.sections.reorder(ordered_ids))
 }
 
@@ -447,7 +431,11 @@ pub fn reorder_sections(package: &mut OpcPackage, ordered_ids: &[String]) -> Res
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn add_section_slide(package: &mut OpcPackage, section_id: &str, slide_id: u32) -> Result<()> {
+pub(crate) fn add_section_slide(
+    package: &mut OpcPackage,
+    section_id: &str,
+    slide_id: u32,
+) -> Result<()> {
     let section_id = section_id.to_owned();
     mutate(package, move |graph| {
         require_slide(graph, slide_id)?;
@@ -486,7 +474,7 @@ pub fn add_section_slide(package: &mut OpcPackage, section_id: &str, slide_id: u
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn remove_section_slide(
+pub(crate) fn remove_section_slide(
     package: &mut OpcPackage,
     section_id: &str,
     slide_id: u32,
@@ -514,7 +502,7 @@ pub fn remove_section_slide(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn reorder_section_slides(
+pub(crate) fn reorder_section_slides(
     package: &mut OpcPackage,
     section_id: &str,
     ordered_slide_ids: &[u32],
@@ -529,45 +517,6 @@ pub fn reorder_section_slides(
         section.slide_ids = ordered_slide_ids.to_vec();
         Ok(())
     })
-}
-
-/// Reconcile memberships after another API has inserted, removed, or reordered slides.
-///
-/// Deleted slide references are removed, custom-show order is retained, and section
-/// memberships are sorted to the current `p:sldIdLst` order.
-///
-/// A change to a signed package is refused with
-/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// (ADR 0006) before anything is mutated: remove the signature explicitly
-/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
-/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
-/// no-op keeps the signature.
-///
-/// # Errors
-///
-/// Returns an error if the operation fails.
-pub fn synchronize_after_slide_mutation(package: &mut OpcPackage) -> Result<()> {
-    let presentation = package.main_document_part()?;
-    let mut graph = parse_structure_blob(package, presentation.blob(), false)?;
-    let live = graph
-        .slides
-        .iter()
-        .map(|slide| slide.slide_id)
-        .collect::<HashSet<_>>();
-    for show in &mut graph.custom_shows.shows {
-        show.slide_ids.retain(|id| live.contains(id));
-    }
-    for section in graph.sections.sections_mut() {
-        section.slide_ids.retain(|id| live.contains(id));
-    }
-    graph.sections.sort_slide_membership(
-        &graph
-            .slides
-            .iter()
-            .map(|slide| slide.slide_id)
-            .collect::<Vec<_>>(),
-    );
-    store(package, &graph)
 }
 
 fn mutate<F>(package: &mut OpcPackage, operation: F) -> Result<()>

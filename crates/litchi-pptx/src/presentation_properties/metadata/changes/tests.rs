@@ -6,6 +6,7 @@
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 
+use super::package::*;
 use super::*;
 
 const MAIN_CONTENT_TYPE: &str =

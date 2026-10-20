@@ -112,8 +112,8 @@ impl Snapshot {
     /// Start an atomic detached edit over the typed guide value.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Edit {
-        Edit {
+    pub(crate) fn edit(&self) -> Draft {
+        Draft {
             original: self.clone(),
             working: self.guides.clone(),
         }
@@ -133,12 +133,12 @@ impl Snapshot {
 
 /// A failure-atomic edit staged against one guide catalog.
 #[derive(Clone, Debug)]
-pub struct Edit {
+pub struct Draft {
     original: Snapshot,
     working: Guides,
 }
 
-impl Edit {
+impl Draft {
     /// Borrow the immutable source snapshot used by this edit.
     #[inline]
     #[must_use]
@@ -398,10 +398,10 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Prepared> {
         if !self.is_changed() {
-            let patch = Patch::new(self.original.clone(), self.original.clone());
-            return Ok(Commit {
+            let patch = Change::new(self.original.clone(), self.original.clone());
+            return Ok(Prepared {
                 snapshot: self.original,
                 patch,
                 changed: false,
@@ -423,8 +423,8 @@ impl Edit {
             self.original.presentation_content_type.clone(),
             updated,
         )?;
-        let patch = Patch::new(self.original, snapshot.clone());
-        Ok(Commit {
+        let patch = Change::new(self.original, snapshot.clone());
+        Ok(Prepared {
             snapshot,
             patch,
             changed: true,
@@ -434,52 +434,64 @@ impl Edit {
 
 /// A successful guide edit and its reversible package patch.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Prepared {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: Snapshot,
-    patch: Patch,
+    patch: Change,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     changed: bool,
 }
 
-impl Commit {
+impl Prepared {
+    #[cfg(test)]
     fn is_changed(&self) -> bool {
         self.changed
     }
 
     /// The outcome of this edit or commit.
     #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
         crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Borrow the projected post-edit snapshot.
     #[inline]
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the reversible source-checked patch.
     #[inline]
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &Change {
         &self.patch
     }
 
     /// Consume the commit into its patch.
     #[must_use]
-    pub fn into_patch(self) -> Patch {
+    #[cfg(test)]
+    pub(crate) fn into_patch(self) -> Change {
         self.patch
     }
 }
 
 /// A reversible source-checked replacement of one presentation XML source.
 #[derive(Clone, Debug)]
-pub struct Patch {
+pub(crate) struct Change {
     before: Snapshot,
     after: Snapshot,
 }
 
-impl Patch {
+impl Change {
     fn new(before: Snapshot, after: Snapshot) -> Self {
         Self { before, after }
     }
@@ -487,38 +499,32 @@ impl Patch {
     /// Source context required before publication.
     #[inline]
     #[must_use]
-    pub fn before(&self) -> &Snapshot {
+    pub(crate) fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Source context produced by publication.
     #[inline]
     #[must_use]
-    pub fn after(&self) -> &Snapshot {
+    pub(crate) fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether this patch is an exact no-op.
     #[inline]
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Return the exact inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
         }
-    }
-
-    /// Return the source fingerprint required for publication.
-    #[inline]
-    #[must_use]
-    pub const fn expected_revision(&self) -> Revision {
-        self.before.revision
     }
 
     /// Apply this patch atomically to an OPC package.
@@ -533,7 +539,8 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
+    #[cfg(test)]
+    pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
         super::package::apply_patch(target, self)
     }
 
@@ -542,7 +549,8 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn apply_xml(&self, target: &mut Vec<u8>) -> Result<Snapshot> {
+    #[cfg(test)]
+    pub(crate) fn apply_xml(&self, target: &mut Vec<u8>) -> Result<Snapshot> {
         if target.as_slice() != self.before.source_xml() {
             return Err(invalid("extended-guide source is stale"));
         }

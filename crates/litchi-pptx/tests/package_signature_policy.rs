@@ -33,7 +33,7 @@ use litchi_pptx::presentation_properties::metadata::changes::{self, Info, Part a
 use litchi_pptx::presentation_properties::metadata::custom_show::{self, List as CustomShows};
 use litchi_pptx::presentation_properties::metadata::events::{self, Draft};
 use litchi_pptx::presentation_properties::metadata::sections::Section;
-use litchi_pptx::presentation_properties::metadata::{guides, structure};
+use litchi_pptx::presentation_properties::metadata::structure;
 use litchi_pptx::shape::classification::Outcome;
 use litchi_pptx::shape::designer::{DrawingProperties, Tag as DesignerTag, Tags as DesignerTags};
 use litchi_pptx::shape::theme::{self, Override};
@@ -586,8 +586,8 @@ fn families() -> Vec<Family> {
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    package.edit_opc_in_place(|opc| {
-                        structure::add_section(opc, Section::new("Signed", SECTION)).map(drop)
+                    package.edit_structure_in_place(|edit| {
+                        edit.add_section(Section::new("Signed", SECTION)).map(drop)
                     })
                 },
                 shows: |package| {
@@ -595,8 +595,8 @@ fn families() -> Vec<Family> {
                 },
             }),
             no_op: Some(|package| {
-                package.edit_opc_in_place(|opc| {
-                    assert!(!structure::remove_section(opc, SECTION)?);
+                package.edit_structure_in_place(|edit| {
+                    assert!(!edit.remove_section(SECTION)?);
                     Ok(())
                 })
             }),
@@ -606,17 +606,18 @@ fn families() -> Vec<Family> {
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    package.edit_opc_in_place(|opc| {
+                    let slide_id = package.with_opc(first_slide_id)?;
+                    package.edit_custom_shows_in_place(|edit| {
                         let mut shows = CustomShows::new();
-                        shows.create("Signed", vec![first_slide_id(opc)?]);
-                        custom_show::store(opc, &shows)
+                        shows.create("Signed", vec![slide_id]);
+                        edit.set(&shows)
                     })
                 },
                 shows: |package| package.with_opc(|opc| Ok(!custom_show::load(opc)?.is_empty())),
             }),
             no_op: Some(|package| {
-                package.edit_opc_in_place(|opc| {
-                    assert!(custom_show::remove(opc)?.is_none());
+                package.edit_custom_shows_in_place(|edit| {
+                    assert!(edit.remove()?.is_none());
                     Ok(())
                 })
             }),
@@ -644,7 +645,7 @@ fn families() -> Vec<Family> {
             prepare: None,
             // A guide graph is not authored here; removing none is the no-op.
             change: None,
-            no_op: Some(|package| package.edit_opc_in_place(|opc| guides::remove(opc).map(drop))),
+            no_op: Some(|package| package.edit_guides_in_place(|edit| edit.remove().map(drop))),
         },
         Family {
             name: "slide Designer tags",
@@ -670,13 +671,13 @@ fn families() -> Vec<Family> {
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    package.edit_opc_in_place(|opc| changes::store(opc, &changes_part()))
+                    package.edit_changes_info_in_place(|edit| edit.set(&changes_part()))
                 },
                 shows: |package| package.with_opc(|opc| Ok(changes::load(opc)?.is_some())),
             }),
             no_op: Some(|package| {
-                package.edit_opc_in_place(|opc| {
-                    assert!(changes::remove(opc)?.is_none());
+                package.edit_changes_info_in_place(|edit| {
+                    assert!(edit.remove()?.is_none());
                     Ok(())
                 })
             }),
@@ -1208,8 +1209,10 @@ fn modern_comment_no_ops_keep_a_signed_package_exact() {
 fn modern_comment_command_no_op_keeps_a_signed_package_exact() {
     let source = signed_with(SIGNED[0], |package| {
         package
+            .edit_changes_info_in_place(|edit| edit.set(&changes_part()))
+            .unwrap();
+        package
             .edit_opc_in_place(|opc| {
-                changes::store(opc, &changes_part())?;
                 // Publish the commands in this library's own spelling first,
                 // so the no-op below reproduces the stored bytes.
                 assert!(modern_comments::update_modern_comment_changes(opc, |_| {})?);
