@@ -2560,6 +2560,8 @@ W1_DOCX_OPS = {
     "set / title": ("metadata set", SINGLE, "unified/native"),
     "File::edit 1k paragraph text sets": ("batch", BATCH, "unified/native (one leaf edit)"),
     "File::batch 1k paragraph text sets": ("batch", BATCH, "unified/native (one leaf edit)"),
+    "File::batch 1k paragraph text sets (eager owner)": ("batch", BATCH,
+                                                          "unified/native (one leaf edit)"),
     "save (to_bytes) after one set": ("save", SINGLE, "unified/native"),
     "repeated save of one package (second to_bytes)": ("save", SINGLE, "unified/native"),
 }
