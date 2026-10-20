@@ -124,6 +124,9 @@ pub enum Error {
     PatchConflict,
     /// A changed write would invalidate the package signature.
     Signed,
+    /// A durable patch could not be built within the selected bounds
+    /// (record 0357a).
+    Durable(litchi_core::patch::PatchError),
 }
 
 impl From<PackageError> for Error {
@@ -175,6 +178,7 @@ impl fmt::Debug for Error {
                 .finish(),
             Self::PatchConflict => formatter.write_str("Error::PatchConflict"),
             Self::Signed => formatter.write_str("Error::Signed"),
+            Self::Durable(_) => formatter.write_str("Error::Durable(..)"),
         }
     }
 }
@@ -206,6 +210,7 @@ impl fmt::Display for Error {
             Self::PatchConflict => formatter.write_str(
                 "PPT package patch source does not match the exact package receiving it",
             ),
+            Self::Durable(_) => formatter.write_str("PPT durable patch conversion failed"),
         }
     }
 }
@@ -215,6 +220,7 @@ impl std::error::Error for Error {
         match self {
             Self::Package(error) => Some(error),
             Self::Native(error) => Some(error),
+            Self::Durable(error) => Some(error),
             Self::InvalidLimit { .. } | Self::Limit { .. } | Self::PatchConflict | Self::Signed => {
                 None
             },
@@ -228,7 +234,11 @@ impl Error {
     pub const fn limit_kind(&self) -> Option<LimitKind> {
         match self {
             Self::InvalidLimit { kind, .. } | Self::Limit { kind, .. } => Some(*kind),
-            Self::Package(_) | Self::Native(_) | Self::PatchConflict | Self::Signed => None,
+            Self::Package(_)
+            | Self::Native(_)
+            | Self::PatchConflict
+            | Self::Signed
+            | Self::Durable(_) => None,
         }
     }
 
@@ -242,7 +252,11 @@ impl Error {
                 maximum,
                 ..
             } => Some((*value, *maximum)),
-            Self::Package(_) | Self::Native(_) | Self::PatchConflict | Self::Signed => None,
+            Self::Package(_)
+            | Self::Native(_)
+            | Self::PatchConflict
+            | Self::Signed
+            | Self::Durable(_) => None,
         }
     }
 }
@@ -284,6 +298,8 @@ impl Diagnostics {
 pub struct Patch {
     inner: slide_order::Patch,
     operation_count: usize,
+    /// Built by a durable replay: exact bytes, no semantic operations.
+    replayed: bool,
 }
 
 impl fmt::Debug for Patch {
@@ -303,6 +319,7 @@ impl Patch {
         Self {
             inner,
             operation_count,
+            replayed: false,
         }
     }
 
@@ -333,7 +350,112 @@ impl Patch {
     /// Return the exact inverse patch.
     #[must_use]
     pub fn inverse(&self) -> Self {
-        Self::from_native(self.inner.inverse(), self.operation_count)
+        Self {
+            inner: self.inner.inverse(),
+            operation_count: self.operation_count,
+            replayed: self.replayed,
+        }
+    }
+
+    /// Convert this patch to the shared durable patch envelope
+    /// (`litchi_core::patch`), replayed by [`Package::apply_durable`].
+    ///
+    /// The operations carry semantic zero-based positions, the SHA-256 of
+    /// the exact artifacts they bind and a content-free order fingerprint;
+    /// native slide and persist identifiers are never serialized.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Durable`] when `limits` cannot hold the operations, and
+    /// [`slide_order::Refusal::UnsupportedPatch`] for a changed patch that a
+    /// durable replay produced (it keeps the exact bytes, not the
+    /// operations; convert the durable patch that was replayed instead).
+    pub fn to_durable(
+        &self,
+        limits: litchi_core::patch::PatchLimits,
+    ) -> Result<litchi_core::patch::Patch<litchi_core::patch::Reversible>> {
+        if self.replayed && !self.is_noop() {
+            return Err(Error::Native(slide_order::Error::Refused(
+                slide_order::Refusal::UnsupportedPatch {
+                    reason: "a replayed durable patch keeps no semantic operations",
+                },
+            )));
+        }
+        self.inner.to_durable(limits).map_err(Error::Durable)
+    }
+
+    /// Join an independently prepared patch over the same exact source.
+    ///
+    /// Both patches must consist only of slide moves, and the slide
+    /// positions they permute must be disjoint, so the two commute. The
+    /// joined patch applies `self`'s moves, then `other`'s, and counts the
+    /// operations of both. This is the composition of independently
+    /// prepared moves (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::PatchConflict`] when the patches start from different
+    /// packages; [`slide_order::Refusal::UnsupportedPatch`] (kind
+    /// `UnsupportedOperation`) for a patch with other operations or for
+    /// overlapping moves.
+    pub fn join(&self, other: &Self) -> Result<Self> {
+        if self.before() != other.before() {
+            return Err(Error::PatchConflict);
+        }
+        if self.replayed || other.replayed {
+            return Err(Error::Native(slide_order::Error::Refused(
+                slide_order::Refusal::UnsupportedPatch {
+                    reason: "a replayed durable patch keeps no semantic operations",
+                },
+            )));
+        }
+        let operation_count = self
+            .operation_count
+            .checked_add(other.operation_count)
+            .ok_or(Error::Limit {
+                kind: LimitKind::Operations,
+                observed: usize::MAX,
+                maximum: MAX_OPERATIONS,
+            })?;
+        let inner = self.inner.join(&other.inner)?;
+        Ok(Self::from_native(inner, operation_count))
+    }
+}
+
+/// One semantic target written by both patches of a [`ThreeWayPlan`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Conflict {
+    target: String,
+}
+
+impl Conflict {
+    /// Stable semantic target written by both patches, such as
+    /// `slide-id:256/transition-visual` or `slide-list/position:1`.
+    #[must_use]
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+}
+
+/// Read-only three-way plan of two patches made from one exact package.
+///
+/// It lists the semantic targets both patches write; a clean plan has none.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ThreeWayPlan {
+    conflicts: Vec<Conflict>,
+}
+
+impl ThreeWayPlan {
+    /// Whether the two patches write no common semantic target.
+    #[must_use]
+    pub fn is_clean(&self) -> bool {
+        self.conflicts.is_empty()
+    }
+
+    /// The common semantic targets, sorted.
+    #[must_use]
+    pub fn conflicts(&self) -> &[Conflict] {
+        &self.conflicts
     }
 }
 
@@ -760,6 +882,80 @@ impl Package {
             package,
             patch: patch.clone(),
             diagnostics: Diagnostics::new(!patch.is_noop(), patch.operation_count),
+        })
+    }
+
+    /// Replay a durable patch (see [`Patch::to_durable`]) on this package.
+    ///
+    /// Each operation checks its own preconditions (the exact artifact
+    /// SHA-256 of structural operations, the before value of property
+    /// operations). The commit's patch is exact (`apply`, `inverse`) and
+    /// counts the durable operations; it keeps no semantic operations of its
+    /// own. An empty durable patch publishes this package unchanged.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Native`] for another format, malformed operations or failed
+    /// preconditions, [`Error::Signed`] for a changed replay on a signed
+    /// package, and [`Error::Package`] for an encrypted package.
+    pub fn apply_durable<Mode>(&self, patch: &litchi_core::patch::Patch<Mode>) -> Result<Commit> {
+        if self.is_encrypted() {
+            return Err(Error::Package(PackageError::EncryptionPolicy));
+        }
+        let expected = self.source_version().map_err(Error::Package)?;
+        let bytes = self.to_encrypted_bytes().map_err(Error::Package)?;
+        ensure_source_version(self, expected)?;
+        let replay = (|| {
+            let source = slide_order::Snapshot::from_bytes_with_options(bytes, open_options(self))?;
+            let target = source.apply_durable(patch)?;
+            Ok::<_, slide_order::Error>((source, target))
+        })();
+        ensure_source_version(self, expected)?;
+        let (source, target) = replay?;
+        let operation_count = patch.operations().len();
+        let changed = source.bytes() != target.bytes();
+        let package = if changed {
+            package_from_bytes(self, target.bytes())?
+        } else {
+            self.clone()
+        };
+        ensure_source_version(self, expected)?;
+        let mut patch =
+            Patch::from_native(slide_order::Patch::exact(source, target), operation_count);
+        patch.replayed = true;
+        Ok(Commit {
+            package,
+            patch,
+            diagnostics: Diagnostics::new(changed, operation_count),
+        })
+    }
+
+    /// Plan two patches made from this exact package against each other
+    /// without applying either.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::PatchConflict`] when either patch starts from another
+    /// package.
+    pub fn plan_three_way(&self, left: &Patch, right: &Patch) -> Result<ThreeWayPlan> {
+        if self.is_encrypted() {
+            return Err(Error::Package(PackageError::EncryptionPolicy));
+        }
+        let expected = self.source_version().map_err(Error::Package)?;
+        let bytes = self.to_encrypted_bytes().map_err(Error::Package)?;
+        ensure_source_version(self, expected)?;
+        if left.before() != bytes || right.before() != bytes {
+            return Err(Error::PatchConflict);
+        }
+        let native = slide_order::ThreeWayPlan::new(&left.inner, &right.inner);
+        Ok(ThreeWayPlan {
+            conflicts: native
+                .conflicts()
+                .iter()
+                .map(|conflict| Conflict {
+                    target: conflict.target().to_owned(),
+                })
+                .collect(),
         })
     }
 

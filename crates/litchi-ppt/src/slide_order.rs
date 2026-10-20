@@ -14,9 +14,12 @@
 //! [`Error`](crate::slide_order::Error)/[`Refusal`](crate::slide_order::Refusal)
 //! they return, and [`Snapshot`](crate::slide_order::Snapshot), an immutable
 //! whole-artifact read view of the slide list and its slide-level state.
+//! Its durable patches, patch joins and three-way planning are reached
+//! through `package::edit::Patch::{to_durable, join}` and
+//! `Package::{apply_durable, plan_three_way}` (record 0357a).
 #![allow(
     dead_code,
-    reason = "crate-private native owner of the primary edit (record 0357): its history, composition, three-way and durable-patch surfaces keep their tests until a Package-level route promotes them"
+    reason = "crate-private native owner of the primary edit (record 0357); its durable, join and three-way surfaces are public through package::edit (record 0357a), the rest stays exercised by the unit tests"
 )]
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -25,14 +28,10 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 pub use litchi_core::Position;
-pub(crate) use litchi_core::patch::{CompositionLimits, HistoryLimits, SubEditJoinFailure};
 
 use crate::document_structure;
 use crate::package::{Error as PackageError, OpenOptions, SourceLimits};
 use crate::raw::Reader;
-
-/// Explicit bounded undo/redo history for slide-order snapshots.
-pub(crate) type History = litchi_core::patch::History<Snapshot>;
 
 /// Maximum automatic slide-advance delay permitted by `[MS-PPT]` 2.6.6.
 pub const MAX_SLIDE_ADVANCE_MS: u32 = 86_399_000;
@@ -294,6 +293,9 @@ pub enum Refusal {
         element: &'static str,
         reason: &'static str,
     },
+    /// A patch operation (a join, or a durable conversion) is not supported
+    /// for the content of this patch (record 0357a).
+    UnsupportedPatch { reason: &'static str },
 }
 
 impl fmt::Display for Refusal {
@@ -363,6 +365,9 @@ impl fmt::Display for Refusal {
             Self::InvalidElementValue { element, reason } => {
                 write!(formatter, "PPT {element} value is invalid: {reason}")
             },
+            Self::UnsupportedPatch { reason } => {
+                write!(formatter, "PPT patch operation is not supported: {reason}")
+            },
         }
     }
 }
@@ -386,7 +391,9 @@ impl Refusal {
             | Self::UnsupportedSlideAdvance { .. }
             | Self::UnsupportedSlideVisibility { .. }
             | Self::UnsupportedSlideTransitionVisual { .. } => RefusalKind::UnsupportedTarget,
-            Self::UncommittedSlideDependency => RefusalKind::UnsupportedOperation,
+            Self::UncommittedSlideDependency | Self::UnsupportedPatch { .. } => {
+                RefusalKind::UnsupportedOperation
+            },
             Self::UnsupportedSource
             | Self::RepairedUserEditChain
             | Self::ReviewHistoryDependency
@@ -544,15 +551,6 @@ where
     result
 }
 
-#[derive(Clone, PartialEq, Eq)]
-struct Lineage(Arc<[u8]>);
-
-impl fmt::Debug for Lineage {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("Lineage(..)")
-    }
-}
-
 mod artifact {
     //! Exact artifact bytes bound to the lazily memoized SHA-256 of exactly
     //! those bytes.
@@ -648,8 +646,6 @@ mod artifact {
 use artifact::Artifact;
 
 mod blank;
-#[cfg(test)]
-mod durable_tests;
 mod elements;
 pub(crate) mod records;
 
@@ -1095,60 +1091,6 @@ impl Snapshot {
         })
     }
 
-    /// Prepares one independently composable move against this exact source.
-    ///
-    /// Moves whose inclusive affected position ranges do not intersect can be
-    /// joined; overlapping moves produce the common deterministic conflict
-    /// set rather than using last-writer-wins behavior.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed source/position refusal or a common composition bound
-    /// error.
-    pub(crate) fn prepare_move(
-        &self,
-        limits: CompositionLimits,
-        identifier: impl Into<String>,
-        from: Position,
-        destination: Position,
-    ) -> Result<PreparedMove> {
-        self.require_editable()?;
-        self.require_position(from)?;
-        self.require_position(destination)?;
-        let move_ = Move { from, destination };
-        let start = from.get().min(destination.get());
-        let end = from.get().max(destination.get());
-        let writes = (start..=end).map(|position| format!("slide-order/position:{position}"));
-        let inner = litchi_core::patch::SubEdit::new(
-            self.lineage(),
-            limits,
-            identifier,
-            std::iter::empty(),
-            writes,
-            move_,
-        )?;
-        Ok(PreparedMove { inner })
-    }
-
-    /// Starts a bounded composition of independently prepared moves.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed refusal when this source cannot be safely republished.
-    pub(crate) fn compose(&self, limits: CompositionLimits) -> Result<Composition> {
-        self.require_editable()?;
-        Ok(Composition {
-            source: self.clone(),
-            joined: litchi_core::patch::JoinedSubEdits::new(self.lineage(), limits),
-        })
-    }
-
-    /// Starts explicit bounded undo/redo history at this snapshot.
-    #[must_use]
-    pub(crate) fn history(&self, limits: HistoryLimits) -> History {
-        History::new(self.clone(), limits)
-    }
-
     /// Plans a dependency-checked transfer from `donor` without mutating
     /// either presentation.
     ///
@@ -1316,10 +1258,6 @@ impl Snapshot {
             return Err(Error::Refused(Refusal::SlideNotFound { position }));
         }
         Ok(())
-    }
-
-    fn lineage(&self) -> Lineage {
-        Lineage(self.shared_bytes())
     }
 
     /// Lowercase hexadecimal SHA-256 of the exact artifact, computed on first
@@ -1810,7 +1748,7 @@ pub(crate) struct ThreeWayPlan {
 }
 
 impl ThreeWayPlan {
-    fn new(left: &Patch, right: &Patch) -> Self {
+    pub(crate) fn new(left: &Patch, right: &Patch) -> Self {
         let left_effects = patch_effects(left);
         let right_effects = patch_effects(right);
         let conflicts = left_effects
@@ -3417,6 +3355,93 @@ impl Patch {
         Ok(self.after.clone())
     }
 
+    /// An exact byte patch from `before` to `after` that retains no semantic
+    /// operations (the result of a durable replay, record 0357a).
+    pub(crate) fn exact(before: Snapshot, after: Snapshot) -> Self {
+        Self {
+            before,
+            after,
+            changes: Vec::new(),
+            structural: Vec::new(),
+            visibility_changes: Vec::new(),
+            advance_changes: Vec::new(),
+            transition_visual_changes: Vec::new(),
+            text_changes: Vec::new(),
+            anchor_changes: Vec::new(),
+            media_path_changes: Vec::new(),
+            media_playback_changes: Vec::new(),
+            formatting: Vec::new(),
+            formatting_first: true,
+            structural_before: StructuralArtifact::Before,
+            structural_after: StructuralArtifact::After,
+        }
+    }
+
+    /// Whether every semantic operation of this patch is a slide move.
+    fn is_move_only(&self) -> bool {
+        self.structural
+            .iter()
+            .all(|change| matches!(change, StructuralChange::Move(_)))
+            && self.visibility_changes.is_empty()
+            && self.advance_changes.is_empty()
+            && self.transition_visual_changes.is_empty()
+            && self.text_changes.is_empty()
+            && self.anchor_changes.is_empty()
+            && self.media_path_changes.is_empty()
+            && self.media_playback_changes.is_empty()
+            && self.formatting.is_empty()
+    }
+
+    /// The slide positions a move-only patch permutes: the union of the
+    /// inclusive ranges of its moves. Positions outside it are fixed points
+    /// of every move, so two patches with disjoint sets commute.
+    fn moved_positions(&self) -> BTreeSet<usize> {
+        self.changes
+            .iter()
+            .flat_map(|change| {
+                let start = change.from.get().min(change.destination.get());
+                let end = change.from.get().max(change.destination.get());
+                start..=end
+            })
+            .collect()
+    }
+
+    /// Joins two independently prepared move patches over this patch's exact
+    /// source into one patch (record 0357a; it replaces the record-0357
+    /// `Composition` of prepared moves).
+    ///
+    /// Both patches must start from the same exact artifact and consist only
+    /// of slide moves whose permuted position sets are disjoint; the joined
+    /// patch replays `self`'s moves, then `other`'s, in one native commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Refusal::UnsupportedPatch`] for another source, a patch
+    /// with other operations, or overlapping moves, and the native commit's
+    /// error otherwise.
+    pub(crate) fn join(&self, other: &Self) -> Result<Self> {
+        if self.before.bytes() != other.before.bytes() {
+            return Err(Error::Refused(Refusal::UnsupportedPatch {
+                reason: "joined patches start from different artifacts",
+            }));
+        }
+        if !self.is_move_only() || !other.is_move_only() {
+            return Err(Error::Refused(Refusal::UnsupportedPatch {
+                reason: "only slide-move patches can be joined",
+            }));
+        }
+        if !self.moved_positions().is_disjoint(&other.moved_positions()) {
+            return Err(Error::Refused(Refusal::UnsupportedPatch {
+                reason: "joined slide moves overlap",
+            }));
+        }
+        let mut transaction = self.before.edit()?;
+        for change in self.changes.iter().chain(&other.changes) {
+            transaction.move_slide(change.from, change.destination)?;
+        }
+        Ok(transaction.commit()?.patch)
+    }
+
     /// Returns the exact-source-checked inverse patch.
     #[must_use]
     pub(crate) fn inverse(&self) -> Self {
@@ -3834,142 +3859,6 @@ impl Patch {
             forward_blobs,
             reverse_blobs,
         )
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Move {
-    from: Position,
-    destination: Position,
-}
-
-/// One independently prepared move retaining its exact source lineage.
-pub(crate) struct PreparedMove {
-    inner: litchi_core::patch::SubEdit<Lineage, Move>,
-}
-
-impl PreparedMove {
-    /// Stable caller-selected composition identifier.
-    #[must_use]
-    pub(crate) fn identifier(&self) -> &str {
-        self.inner.id()
-    }
-
-    /// Source position in the immutable base order.
-    #[must_use]
-    pub(crate) const fn from(&self) -> Position {
-        self.inner.payload().from
-    }
-
-    /// Final destination in the immutable base order.
-    #[must_use]
-    pub(crate) const fn destination(&self) -> Position {
-        self.inner.payload().destination
-    }
-}
-
-impl fmt::Debug for PreparedMove {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("PreparedMove")
-            .field("identifier", &self.identifier())
-            .field("from", &self.from())
-            .field("destination", &self.destination())
-            .finish()
-    }
-}
-
-/// Recoverable failure to join one prepared slide move.
-pub(crate) struct JoinError {
-    failure: Box<SubEditJoinFailure>,
-    rejected: Box<PreparedMove>,
-}
-
-impl JoinError {
-    /// Structured common composition refusal.
-    #[must_use]
-    pub(crate) const fn failure(&self) -> &SubEditJoinFailure {
-        &self.failure
-    }
-
-    /// Recovers the rejected prepared move.
-    #[must_use]
-    pub(crate) fn into_rejected(self) -> PreparedMove {
-        *self.rejected
-    }
-}
-
-impl fmt::Debug for JoinError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("JoinError")
-            .field("failure", &self.failure)
-            .field("rejected", &self.rejected)
-            .finish()
-    }
-}
-
-/// Bounded deterministic composition of provably disjoint slide moves.
-pub(crate) struct Composition {
-    source: Snapshot,
-    joined: litchi_core::patch::JoinedSubEdits<Lineage, Move>,
-}
-
-impl Composition {
-    /// Joins a move when its source lineage and affected position range are
-    /// compatible with every accepted move.
-    ///
-    /// # Errors
-    ///
-    /// Returns the structured common refusal and retains the rejected work.
-    pub(crate) fn join(
-        &mut self,
-        incoming: PreparedMove,
-    ) -> std::result::Result<&mut Self, JoinError> {
-        if let Err(error) = self.joined.join(incoming.inner) {
-            let (failure, rejected) = error.into_parts();
-            return Err(JoinError {
-                failure: Box::new(failure),
-                rejected: Box::new(PreparedMove { inner: rejected }),
-            });
-        }
-        Ok(self)
-    }
-
-    /// Number of accepted independently prepared moves.
-    #[must_use]
-    pub(crate) fn len(&self) -> usize {
-        self.joined.len()
-    }
-
-    /// Whether no move has been accepted.
-    #[must_use]
-    pub(crate) fn is_empty(&self) -> bool {
-        self.joined.is_empty()
-    }
-
-    /// Atomically commits every accepted move in deterministic identifier
-    /// order and returns one durable-capable patch.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if staging or whole-package publication fails.
-    pub(crate) fn commit(self) -> Result<Commit> {
-        let mut transaction = self.source.edit()?;
-        for edit in self.joined.into_sub_edits() {
-            let move_ = edit.into_payload();
-            transaction.move_slide(move_.from, move_.destination)?;
-        }
-        transaction.commit()
-    }
-}
-
-impl fmt::Debug for Composition {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("Composition")
-            .field("moves", &self.joined.len())
-            .finish_non_exhaustive()
     }
 }
 
@@ -7868,7 +7757,7 @@ mod tests {
     }
 
     #[test]
-    fn real_fixture_reorders_reopens_and_round_trips_durable_history() {
+    fn real_fixture_reorders_reopens_and_round_trips_durable_undo_redo() {
         let bytes = fixture("basic_test_ppt_file.ppt");
         let original_text = slide_texts(&bytes);
         let source = Snapshot::from_bytes(bytes).unwrap();
@@ -7899,14 +7788,10 @@ mod tests {
         let durably_restored = commit.snapshot().apply_durable(&decoded.inverse()).unwrap();
         assert_eq!(slide_texts(durably_restored.bytes()), original_text);
 
-        let mut history = source.history(HistoryLimits::new(4, 4096));
-        history
-            .record(commit.snapshot().clone(), wire.len() as u64)
-            .unwrap();
-        assert!(history.undo());
-        assert_eq!(history.current(), &source);
-        assert!(history.redo());
-        assert_eq!(history.current(), commit.snapshot());
+        // Undo and redo are the inverse and the patch applied again.
+        let undone = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+        assert_eq!(undone, source);
+        assert_eq!(commit.patch().apply(&undone).unwrap(), *commit.snapshot());
     }
 
     #[test]
@@ -7948,42 +7833,32 @@ mod tests {
     }
 
     #[test]
-    fn common_composition_joins_disjoint_moves_and_refuses_overlap() {
+    fn joined_move_patches_commute_and_overlap_is_refused() {
         let source = Snapshot::from_bytes(fixture("45543.ppt")).unwrap();
-        let limits = CompositionLimits::new(8, 32, 64, 32);
-        let first = source
-            .prepare_move(
-                limits,
-                "move-opening-pair",
-                Position::new(0),
-                Position::new(1),
-            )
-            .unwrap();
-        let second = source
-            .prepare_move(
-                limits,
-                "move-later-pair",
-                Position::new(4),
-                Position::new(5),
-            )
-            .unwrap();
-        let overlapping = source
-            .prepare_move(
-                limits,
-                "overlap-opening-pair",
-                Position::new(1),
-                Position::new(2),
-            )
-            .unwrap();
-        let mut composition = source.compose(limits).unwrap();
-        composition.join(first).unwrap().join(second).unwrap();
-        let failure = composition.join(overlapping).unwrap_err();
-        assert!(matches!(failure.failure(), SubEditJoinFailure::Overlap(_)));
-        let commit = composition.commit().unwrap();
-        assert_eq!(commit.snapshot().slide_count(), source.slide_count());
-        assert_eq!(commit.patch().changes().len(), 2);
-        let durable = commit.patch().to_durable(patch_limits()).unwrap();
-        assert_eq!(source.apply_durable(&durable).unwrap(), *commit.snapshot());
+        let moved = |from: usize, destination: usize| {
+            let mut edit = source.edit().unwrap();
+            edit.move_slide(Position::new(from), Position::new(destination))
+                .unwrap();
+            edit.commit().unwrap().patch
+        };
+        let first = moved(0, 1);
+        let second = moved(4, 5);
+        let overlapping = moved(1, 2);
+        let joined = first.join(&second).unwrap();
+        assert_eq!(joined.changes().len(), 2);
+        assert_eq!(
+            slide_texts(joined.apply(&source).unwrap().bytes()),
+            slide_texts(second.join(&first).unwrap().apply(&source).unwrap().bytes())
+        );
+        assert!(matches!(
+            joined.join(&overlapping),
+            Err(Error::Refused(Refusal::UnsupportedPatch { .. }))
+        ));
+        let durable = joined.to_durable(patch_limits()).unwrap();
+        assert_eq!(
+            source.apply_durable(&durable).unwrap(),
+            joined.apply(&source).unwrap()
+        );
     }
 
     #[test]
@@ -9253,7 +9128,7 @@ mod tests {
     }
 
     #[test]
-    fn genuine_corpus_slide_advance_reopens_reverses_merges_and_uses_history() {
+    fn genuine_corpus_slide_advance_reopens_reverses_merges_and_undoes() {
         let cases = genuine_advance_cases();
         let producer_files = cases
             .iter()
@@ -9337,14 +9212,10 @@ mod tests {
         assert_eq!(restored.slide_advance(position).unwrap(), before);
         assert_eq!(slide_texts(restored.bytes()), slide_texts(source.bytes()));
 
-        let mut history = source.history(HistoryLimits::new(4, 64 * 1024));
-        history
-            .record(commit.snapshot().clone(), wire.len() as u64)
-            .unwrap();
-        assert!(history.undo());
-        assert_eq!(history.current(), &source);
-        assert!(history.redo());
-        assert_eq!(history.current(), commit.snapshot());
+        // Undo and redo are the inverse and the patch applied again.
+        let undone = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+        assert_eq!(undone, source);
+        assert_eq!(commit.patch().apply(&undone).unwrap(), *commit.snapshot());
 
         let mut competing_edit = source.edit().unwrap();
         competing_edit

@@ -1789,6 +1789,7 @@ impl Classify for litchi_ppt::package::edit::Error {
             Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
             Self::PatchConflict => Class::of(Code::InvalidInput),
+            Self::Durable(error) => error.classify(),
             _ => Class::of(Code::InternalError),
         }
     }
