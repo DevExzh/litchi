@@ -371,4 +371,11 @@ impl<'source> Commit<'source> {
     pub fn into_patch(self) -> Patch<'source> {
         self.patch
     }
+
+    /// Consumes the commit into its replacement section and its
+    /// source-checked patch (which keeps its own copy of the replacement).
+    #[must_use]
+    pub fn into_parts(self) -> (Section, Patch<'source>) {
+        (self.patch.replacement.clone(), self.patch)
+    }
 }

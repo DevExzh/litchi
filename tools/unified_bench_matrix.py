@@ -2748,6 +2748,38 @@ def p0358():
     return out
 
 
+W5_LEGACY_OPS = {"open_get": "open", "get": "get", "set": "set", "add": "add", "batch1k": "batch",
+                 "batch256": "batch"}
+
+
+@needs("0359")
+def p0359():
+    """Record 0359 §7 (W5 DOC/XLS/RTF contract): legacy_w5_probe, one source
+    built on the wave's base (trunk) and head, run A-B-B-A pinned in
+    release; one after/before row per unified route (median of the after
+    runs over the median of the before runs)."""
+    base = RES / "0359"
+    legs: dict = {"before": {}, "after": {}}
+    paths = sorted(base.glob("probe-*-*.json"))
+    for path in paths:
+        leg = path.name.split("-")[1]
+        for r in load_json(path):
+            legs[leg].setdefault(r["scenario"], []).append(r["median_us"])
+    out = []
+    for scen, after in legs["after"].items():
+        before = legs["before"].get(scen)
+        if not before:
+            continue
+        fmt, op = scen.split("/")
+        b, a = med(before), med(after)
+        size = {"batch1k": "1k ops", "batch256": "256 ops"}.get(op, "")
+        out.append(row("0359", fmt, W5_LEGACY_OPS.get(op, op),
+                       f"File {op.replace('_', ' ')} ({fmt}, W5 head vs base)",
+                       size, b, a, [a / b], regression("0359"), f"legacy_w5_probe:{scen}:after-before",
+                       src(paths), comparison="after/before"))
+    return out
+
+
 @needs("0357a")
 def p0357a():
     """Record 0357a: record-sized scoped-family patches (1,000 retained
@@ -2845,7 +2877,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0306, p0307, p0308, p0309, p0310, p0311, p0312,
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
-           p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0357, p0357a, p0357b, p0358]
+           p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0357, p0357a, p0357b, p0358, p0359]
 
 
 

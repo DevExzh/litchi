@@ -10,7 +10,9 @@
 //! - `doc/get`: one `File::get` on an open file;
 //! - `<fmt>/set`: one `File::set` on an open file (publishes a new file);
 //! - `rtf/add`: one `File::add` of a paragraph on an open file;
-//! - `<fmt>/batch1k`: one `File::edit` with 1,000 sets.
+//! - `doc/batch256`: one `File::edit` with 256 sets (the DOC body
+//!   transaction's default operation bound);
+//! - `xls/batch1k`, `rtf/batch1k`: one `File::edit` with 1,000 sets.
 //!
 //! Output: one JSON array of `{scenario, samples, median_us, min_us}` on
 //! stdout. Run pinned, release:
@@ -133,10 +135,10 @@ mod probe {
                 .expect("set"),
             );
         });
-        probe.time("doc/batch1k", 1, || {
+        probe.time("doc/batch256", 1, || {
             let commit = file
                 .edit(|tx| {
-                    for path in &paragraphs {
+                    for path in &paragraphs[..256] {
                         tx.set(path.as_str(), props! { "bold" => true })?;
                     }
                     Ok(())
