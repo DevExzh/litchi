@@ -11,12 +11,11 @@
 
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::Position;
+use litchi_doc::Package;
 use litchi_doc::body_text::{Error, Refusal, Snapshot, TransactionLimits};
 use litchi_doc::builder::Builder;
 use litchi_doc::parts::fib::FileInformationBlock;
-use litchi_doc::tracked_revision::{
-    Limits, RevisionEditor, RevisionKind, RevisionMetadata, Snapshot as RevisionSnapshot,
-};
+use litchi_doc::tracked_revision::{Limits, RevisionKind, RevisionMetadata};
 use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting};
 use litchi_ole_common::object::{Edit as PackageEditor, Targets};
 use litchi_ole_common::property_set::{
@@ -432,46 +431,26 @@ fn signed_source_refuses_changed_ordinary_body_publication() {
 fn signed_lower_editors_refuse_changed_publication_but_allow_exact_noops() {
     let source_bytes = doc_with_dofr(2, true);
 
-    let mut direct = RevisionEditor::open(source_bytes.clone(), Limits::default())
-        .expect("direct signed editor");
-    direct
-        .add_text(
-            0,
-            "x",
-            RevisionKind::Insertion,
-            RevisionMetadata::new("Alice"),
-        )
-        .expect("stage direct edit");
-    assert!(direct.finish().is_err());
+    let package = Package::from_bytes(&source_bytes).expect("signed package");
+    let mut edit = package
+        .edit_tracked_revisions()
+        .expect("tracked signed edit");
+    edit.add_text(
+        0,
+        "x",
+        RevisionKind::Insertion,
+        RevisionMetadata::new("Alice"),
+    )
+    .expect("stage tracked edit");
+    assert!(edit.commit().is_err());
 
-    let direct_noop =
-        RevisionEditor::open(source_bytes.clone(), Limits::default()).expect("direct signed no-op");
-    assert_eq!(
-        direct_noop.finish().expect("direct exact no-op"),
-        source_bytes
-    );
-
-    let tracked = RevisionSnapshot::open(source_bytes.clone(), Limits::default())
-        .expect("tracked signed snapshot");
-    let mut transaction = tracked.edit().expect("tracked edit");
-    transaction
-        .add_text(
-            0,
-            "x",
-            RevisionKind::Insertion,
-            RevisionMetadata::new("Alice"),
-        )
-        .expect("stage tracked edit");
-    assert!(transaction.commit().is_err());
-
-    let tracked_noop =
-        RevisionSnapshot::open(source_bytes, Limits::default()).expect("tracked signed no-op");
-    let noop_commit = tracked_noop
-        .edit()
+    let noop_commit = package
+        .edit_tracked_revisions()
         .expect("tracked no-op edit")
         .commit()
         .expect("tracked exact no-op");
-    assert_eq!(noop_commit.snapshot().bytes(), tracked_noop.bytes());
+    assert!(!noop_commit.diagnostics().changed());
+    assert_eq!(noop_commit.package().to_bytes().unwrap(), source_bytes);
 }
 
 #[test]

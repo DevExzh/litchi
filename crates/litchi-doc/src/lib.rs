@@ -407,7 +407,7 @@ pub use section::{
 pub use shape::{Bounds, Kind as ShapeKind, Shape, UnknownRecord};
 pub use shape::{count_shapes, extract_drawing_shapes, extract_shape_text, extract_shapes};
 pub use table::{Cell, Row, Table};
-pub use tracked_revision::{Revision, RevisionEditor, RevisionMetadata};
+pub use tracked_revision::{Revision, RevisionMetadata};
 pub use user_defined_hyperlinks::{
     FieldCandidate, HyperlinkAssociation, MutationError, ResolutionError, UserDefinedHyperlink,
     UserDefinedHyperlinks,

@@ -35,9 +35,30 @@
 use litchi_cfb::OleFile;
 use litchi_doc::builder::Builder;
 use litchi_doc::raw::Reader;
-use litchi_doc::tracked_revision::{Limits, RevisionEditor, RevisionKind, RevisionMetadata};
+use litchi_doc::tracked_revision::{Edit, Limits, RevisionKind, RevisionMetadata};
 use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting, TextRevision};
+use litchi_doc::{EditOptions, Leniency, OpenOptions, Package};
 use std::io::Cursor;
+
+/// A tracked-revision edit of the package `bytes` under explicit limits.
+fn open_revisions(bytes: Vec<u8>, limits: Limits) -> litchi_doc::tracked_revision::Result<Edit> {
+    // The revision engine edits the exact source; a stylesheet defect the
+    // read model would repair does not block it.
+    let options = OpenOptions::default().leniency(Leniency::TolerateStylesheetDefects);
+    Package::from_bytes_with_options(&bytes, options)?
+        .edit_tracked_revisions_with_options(EditOptions::default().revision_limits(limits))
+}
+
+/// Publishing a staged edit, as the exact package bytes it produces.
+trait Finish {
+    fn finish(self) -> litchi_doc::tracked_revision::Result<Vec<u8>>;
+}
+
+impl Finish for Edit {
+    fn finish(self) -> litchi_doc::tracked_revision::Result<Vec<u8>> {
+        Ok(self.commit()?.patch().after_bytes().to_vec())
+    }
+}
 
 fn base_doc() -> Vec<u8> {
     let mut writer = Builder::new();
@@ -77,7 +98,7 @@ fn root_stream_start(bytes: &[u8], name: &str) -> (u32, u64) {
 
 #[test]
 fn lists_authors_and_mutates_insertions_and_deletions_transactionally() {
-    let mut editor = RevisionEditor::open(base_doc(), Limits::default()).unwrap();
+    let mut editor = open_revisions(base_doc(), Limits::default()).unwrap();
     assert!(editor.authors().contains(&"Existing".to_string()));
     let deletion = editor
         .revisions()
@@ -124,7 +145,7 @@ fn lists_authors_and_mutates_insertions_and_deletions_transactionally() {
 
 #[test]
 fn accepts_deletion_rejects_insertion_and_pairs_moves_by_rsid() {
-    let mut editor = RevisionEditor::open(base_doc(), Limits::default()).unwrap();
+    let mut editor = open_revisions(base_doc(), Limits::default()).unwrap();
     let deletion_index = editor
         .revisions()
         .unwrap()
@@ -156,7 +177,7 @@ fn accepts_deletion_rejects_insertion_and_pairs_moves_by_rsid() {
 
 #[test]
 fn shared_rsid_exposes_binary_insertion_and_deletion_as_a_move_pair() {
-    let mut editor = RevisionEditor::open(base_doc(), Limits::default()).unwrap();
+    let mut editor = open_revisions(base_doc(), Limits::default()).unwrap();
     let metadata = RevisionMetadata::new("Mover").with_revision_save_id(0xAABBCCDD);
     editor
         .add(0, 4, RevisionKind::MoveFrom, metadata.clone())
@@ -179,7 +200,7 @@ fn shared_rsid_exposes_binary_insertion_and_deletion_as_a_move_pair() {
 
 #[test]
 fn malformed_ranges_controls_and_failed_updates_roll_back() {
-    let mut editor = RevisionEditor::open(base_doc(), Limits::default()).unwrap();
+    let mut editor = open_revisions(base_doc(), Limits::default()).unwrap();
     let before = editor.revisions().unwrap();
     assert!(
         editor
@@ -203,7 +224,7 @@ fn malformed_ranges_controls_and_failed_updates_roll_back() {
     );
     assert!(
         editor
-            .update(0, RevisionMetadata::new("Mallory").with_reason(0x2c))
+            .replace(0, RevisionMetadata::new("Mallory").with_reason(0x2c))
             .is_err()
     );
     assert_eq!(editor.revisions().unwrap(), before);
@@ -219,7 +240,7 @@ fn bundled_word_and_libreoffice_redline_fixtures_are_strictly_gated() {
     ];
     for path in fixtures {
         let original = std::fs::read(&path).unwrap();
-        match RevisionEditor::open(original.clone(), Limits::default()) {
+        match open_revisions(original.clone(), Limits::default()) {
             Ok(editor) => {
                 let _ = editor.revisions().unwrap();
                 assert_eq!(std::fs::read(&path).unwrap(), original);
@@ -248,7 +269,7 @@ fn ordinary_tracked_revision_save_reuses_the_opened_doc_layout() {
     };
     let before = root_stream_start(&source, &table_name);
 
-    let mut editor = RevisionEditor::open(source.clone(), Limits::default())
+    let mut editor = open_revisions(source.clone(), Limits::default())
         .expect("DOC fixture should enter the tracked editor");
     editor
         .add_text(
@@ -317,7 +338,7 @@ const READABLE_FIXTURES: [&str; 35] = [
 fn every_readable_fixture_accepts_a_tracked_insertion_at_cp_zero() {
     for name in READABLE_FIXTURES {
         let source = ole_doc_fixture(name);
-        let mut editor = RevisionEditor::open(source.clone(), Limits::default())
+        let mut editor = open_revisions(source.clone(), Limits::default())
             .unwrap_or_else(|error| panic!("{name} should open: {error}"));
         let inserted = editor
             .add_text(
@@ -333,7 +354,7 @@ fn every_readable_fixture_accepts_a_tracked_insertion_at_cp_zero() {
             .unwrap_or_else(|error| panic!("{name} should publish: {error}"));
         assert_ne!(output, source, "{name}");
 
-        let reopened = RevisionEditor::open(output.clone(), Limits::default())
+        let reopened = open_revisions(output.clone(), Limits::default())
             .unwrap_or_else(|error| panic!("{name} output should reopen: {error}"));
         assert!(
             reopened.revisions().unwrap().iter().any(|revision| {
@@ -374,7 +395,7 @@ fn unreadable_fixtures_remain_refused_at_open() {
         "word6-no-table-stream.doc",
     ] {
         assert!(
-            RevisionEditor::open(ole_doc_fixture(name), Limits::default()).is_err(),
+            open_revisions(ole_doc_fixture(name), Limits::default()).is_err(),
             "{name}"
         );
     }
@@ -403,7 +424,7 @@ fn tracked_insertion_at_the_saved_caret_keeps_the_caret_before_the_new_text() {
     ] {
         let source = ole_doc_fixture(name);
         assert_eq!(saved_selection_cps(&source), recorded, "{name}");
-        let mut editor = RevisionEditor::open(source, Limits::default()).unwrap();
+        let mut editor = open_revisions(source, Limits::default()).unwrap();
         editor
             .add_text(
                 0,
@@ -439,7 +460,7 @@ fn tracked_insertions_keep_rebuilt_chpx_pages_readable() {
         "test-data/poi/test-data/document/au.edu.utas.www___data_assets_word_doc_0003_154335_International-Travel-Approval-Request-Form.doc",
     ] {
         let source = std::fs::read(root.join(path)).expect("DOC fixture should exist");
-        let mut editor = RevisionEditor::open(source, Limits::default())
+        let mut editor = open_revisions(source, Limits::default())
             .unwrap_or_else(|error| panic!("{path} should open: {error}"));
         editor
             .add_text(
@@ -450,7 +471,7 @@ fn tracked_insertions_keep_rebuilt_chpx_pages_readable() {
             )
             .unwrap_or_else(|error| panic!("{path} should accept the insertion: {error}"));
         let output = editor.finish().unwrap();
-        let reopened = RevisionEditor::open(output.clone(), Limits::default())
+        let reopened = open_revisions(output.clone(), Limits::default())
             .unwrap_or_else(|error| panic!("{path} output should reopen: {error}"));
         assert!(
             reopened.revisions().unwrap().iter().any(|revision| (
