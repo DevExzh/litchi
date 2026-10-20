@@ -2,8 +2,29 @@
 //!
 //! [`Keywords`] keeps the exact item sequence an OOXML `cp:keywords`
 //! element holds: plain text runs and structured `cp:value` children, each
-//! with an optional validated `xml:lang`. Formats that store keywords as one
-//! string use [`Keywords::joined`]; the wire spelling stays in each codec.
+//! with an optional validated `xml:lang`. The wire spelling stays in each
+//! codec.
+//!
+//! # The keyword list
+//!
+//! [`Metadata::keywords`](crate::Metadata::keywords) is a list. Formats
+//! that store keywords as one string (OOXML `cp:keywords` text, the OLE
+//! summary information, RTF `\keywords`, iWork) follow one rule, the one
+//! Office producers use:
+//!
+//! - **Reading** ([`split`], [`Keywords::list`]): the text is split at
+//!   every `;` and `,`; each piece is trimmed of whitespace and empty pieces
+//!   are dropped. An OOXML `cp:value` child is one keyword whatever it
+//!   contains.
+//! - **Writing** ([`join`], [`Keywords::from_list`]): the keywords are
+//!   joined with `, `. A keyword that the split would not give back (one
+//!   that contains `;` or `,`, has surrounding whitespace, or is empty)
+//!   cannot be stored in a plain string: [`join`] refuses it with
+//!   [`Error::Separator`], while OOXML writes it as a `cp:value` child.
+//!
+//! The OOXML codec writes an unchanged list from the source's own
+//! [`Keywords`], so its bytes survive a round trip whatever separators the
+//! producer used.
 
 use std::fmt;
 use std::str::FromStr;
@@ -18,6 +39,10 @@ pub enum Error {
     /// The value is not an `xsd:language` lexical value.
     #[error("invalid xml:lang value '{0}'")]
     InvalidLang(String),
+    /// A keyword contains a separator (`;` or `,`), has surrounding
+    /// whitespace, or is empty, so a single keyword string cannot keep it.
+    #[error("a keyword cannot be stored in a separated keyword string")]
+    Separator,
     /// The value exceeds [`MAX_TEXT_BYTES`].
     #[error("keyword text of {observed} bytes exceeds the {maximum}-byte limit")]
     Limit {
@@ -216,6 +241,51 @@ impl Keywords {
         joined
     }
 
+    /// The keyword list: text items split per [`split`], each `cp:value`
+    /// one keyword (trimmed; an empty value is dropped).
+    #[must_use]
+    pub fn list(&self) -> Vec<String> {
+        let mut list = Vec::new();
+        for item in &self.items {
+            match item {
+                Item::Text(text) => push_split(&mut list, text),
+                Item::Value(value) => {
+                    let keyword = value.text.trim();
+                    if !keyword.is_empty() {
+                        list.push(keyword.to_owned());
+                    }
+                },
+            }
+        }
+        list
+    }
+
+    /// Mixed content for a keyword list: plain keywords as text joined with
+    /// `, `, and each keyword [`split`] would not give back as a `cp:value`
+    /// child, so [`Self::list`] gives every keyword back (trimmed). Empty
+    /// keywords are dropped.
+    #[must_use]
+    pub fn from_list(list: &[String]) -> Self {
+        let mut keywords = Self::new();
+        for (index, keyword) in list
+            .iter()
+            .filter(|keyword| !keyword.trim().is_empty())
+            .enumerate()
+        {
+            if index > 0 {
+                keywords.append_text(JOINER.to_owned());
+            }
+            if is_plain(keyword) {
+                keywords.append_text(keyword.clone());
+            } else {
+                keywords
+                    .items
+                    .push(Item::Value(Value::new(keyword.clone())));
+            }
+        }
+        keywords
+    }
+
     /// Returns a direct borrow for the common plain-text form.
     #[must_use]
     pub fn plain(&self) -> Option<&str> {
@@ -239,6 +309,64 @@ impl Keywords {
             self.items.push(Item::Text(text));
         }
     }
+}
+
+/// The separators [`split`] recognizes.
+pub const SEPARATORS: [char; 2] = [';', ','];
+
+/// The separator [`join`] writes.
+pub const JOINER: &str = ", ";
+
+/// Split a keyword string into its keywords: at every `;` and `,`, each
+/// piece trimmed, empty pieces dropped.
+///
+/// ```
+/// use litchi_core::metadata::keywords::split;
+///
+/// assert_eq!(split("q4, review;strategy ;"), ["q4", "review", "strategy"]);
+/// assert!(split(" ; ").is_empty());
+/// ```
+#[must_use]
+pub fn split(text: &str) -> Vec<String> {
+    let mut list = Vec::new();
+    push_split(&mut list, text);
+    list
+}
+
+fn push_split(list: &mut Vec<String>, text: &str) {
+    list.extend(
+        text.split(SEPARATORS)
+            .map(str::trim)
+            .filter(|keyword| !keyword.is_empty())
+            .map(str::to_owned),
+    );
+}
+
+/// Whether [`split`] gives `keyword` back as one keyword.
+#[must_use]
+pub fn is_plain(keyword: &str) -> bool {
+    !keyword.is_empty() && keyword.trim() == keyword && !keyword.contains(SEPARATORS)
+}
+
+/// Join keywords into one string with `, `, the inverse of [`split`].
+///
+/// ```
+/// use litchi_core::metadata::keywords::{join, split};
+///
+/// let list = ["q4".to_owned(), "review".to_owned()];
+/// assert_eq!(join(&list).unwrap(), "q4, review");
+/// assert_eq!(split(&join(&list).unwrap()), list);
+/// assert!(join(&["a,b".to_owned()]).is_err());
+/// ```
+///
+/// # Errors
+///
+/// [`Error::Separator`] for a keyword [`split`] would not give back.
+pub fn join(list: &[String]) -> Result<String, Error> {
+    if !list.iter().all(|keyword| is_plain(keyword)) {
+        return Err(Error::Separator);
+    }
+    Ok(list.join(JOINER))
 }
 
 impl From<String> for Keywords {
@@ -290,6 +418,39 @@ mod tests {
                 maximum: MAX_TEXT_BYTES,
             })
         );
+    }
+
+    #[test]
+    fn list_splits_text_and_keeps_values_whole() {
+        let keywords = Keywords::new()
+            .text("lead")
+            .value("colour, hue")
+            .text("; a,b ;")
+            .value("  ");
+        assert_eq!(keywords.list(), ["lead", "colour, hue", "a", "b"]);
+        let list = [
+            "a".to_owned(),
+            "b; c".to_owned(),
+            " d".to_owned(),
+            String::new(),
+        ];
+        let built = Keywords::from_list(&list);
+        assert_eq!(built.list(), ["a", "b; c", "d"]);
+        assert_eq!(
+            built.items,
+            [
+                Item::Text("a, ".to_owned()),
+                Item::Value(Value::new("b; c")),
+                Item::Text(", ".to_owned()),
+                Item::Value(Value::new(" d")),
+            ]
+        );
+        assert_eq!(
+            Keywords::from_list(&["x".to_owned(), "y".to_owned()]).plain(),
+            Some("x, y")
+        );
+        assert_eq!(join(&[" d".to_owned()]), Err(Error::Separator));
+        assert_eq!(join(&[]), Ok(String::new()));
     }
 
     #[test]

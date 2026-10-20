@@ -9754,7 +9754,7 @@
         {
           "name": "set_data",
           "scope": "litchi_sheet_text",
-          "replacement": "`Workbook::set_rows` (record 0354)"
+          "replacement": "`Workbook::new(rows, options)` (record 0354)"
         },
         {
           "name": "formats",
@@ -9769,7 +9769,7 @@
         {
           "name": "set_worksheet_name",
           "scope": "litchi_sheet_text",
-          "replacement": "`Workbook::set_name` (record 0354)"
+          "replacement": "`Workbook::with_name` (record 0354)"
         },
         {
           "name": "detected_bom",
@@ -9780,6 +9780,16 @@
           "name": "config",
           "scope": "litchi_sheet_text",
           "replacement": "`Workbook::options` (record 0354)"
+        },
+        {
+          "name": "set_rows",
+          "scope": "litchi_sheet_text",
+          "replacement": "`Workbook::new(rows, options)` (record 0354)"
+        },
+        {
+          "name": "set_name",
+          "scope": "litchi_sheet_text",
+          "replacement": "`Workbook::with_name` (record 0354)"
         }
       ],
       "families": []

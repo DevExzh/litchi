@@ -48,6 +48,11 @@ pub enum Error {
     /// A value holds a NUL character, which a property list cannot carry.
     #[error("a Pages document property cannot contain a NUL character")]
     InvalidValue,
+    /// A keyword holds `;` or `,`, or surrounding whitespace, which the
+    /// one `Keywords` string cannot keep apart from its neighbours
+    /// (`litchi_core::metadata::keywords::join`).
+    #[error("a Pages keyword cannot be stored in the separated Keywords string")]
+    InvalidKeyword,
     /// The existing properties sidecar cannot be read or rewritten.
     #[error("the Pages properties sidecar cannot be edited safely")]
     InvalidSource,
@@ -111,12 +116,13 @@ impl Field {
         }
     }
 
-    fn read(self, metadata: &litchi_core::Metadata) -> Option<&str> {
+    /// The text slot of a text field; `None` for the keyword list.
+    fn slot(self, metadata: &mut litchi_core::Metadata) -> Option<&mut Option<String>> {
         match self {
-            Self::Title => metadata.title.as_deref(),
-            Self::Author => metadata.author.as_deref(),
-            Self::Keywords => metadata.keywords.as_deref(),
-            Self::Description => metadata.description.as_deref(),
+            Self::Title => Some(&mut metadata.title),
+            Self::Author => Some(&mut metadata.author),
+            Self::Keywords => None,
+            Self::Description => Some(&mut metadata.description),
         }
     }
 }
@@ -170,13 +176,35 @@ impl<'a> Edit<'a> {
         self.stage(Field::Author, value)
     }
 
-    /// Stage the keywords; `None` removes them.
+    /// Stage the keyword list; an empty list removes the `Keywords` key.
+    ///
+    /// The key holds one string: the list is joined with `, ` and read
+    /// back split at `;` and `,` (`litchi_core::metadata::keywords`). The
+    /// list the package already holds is kept as it is, so its source
+    /// separators survive.
     ///
     /// # Errors
     ///
-    /// [`Error::InvalidValue`] for a value holding NUL.
-    pub fn set_keywords(&mut self, value: Option<&str>) -> Result<&mut Self, Error> {
-        self.stage(Field::Keywords, value)
+    /// [`Error::InvalidValue`] for a keyword holding NUL, and
+    /// [`Error::InvalidKeyword`] for one the joined string cannot keep.
+    pub fn set_keywords(&mut self, keywords: &[String]) -> Result<&mut Self, Error> {
+        if keywords.iter().any(|keyword| keyword.contains('\0')) {
+            return Err(Error::InvalidValue);
+        }
+        if keywords == self.source.metadata().keywords {
+            self.changes[Field::Keywords as usize] = Change::Keep;
+            return Ok(self);
+        }
+        let value = if keywords.is_empty() {
+            None
+        } else {
+            Some(
+                litchi_core::metadata::keywords::join(keywords)
+                    .map_err(|_error| Error::InvalidKeyword)?,
+            )
+        };
+        self.changes[Field::Keywords as usize] = Change::Set(value);
+        Ok(self)
     }
 
     /// Stage the description (the `Comments` key); `None` removes it.
@@ -201,21 +229,20 @@ impl<'a> Edit<'a> {
     pub fn commit(self) -> Result<Commit, Error> {
         let current = self.source.metadata();
         let mut expected = current.clone();
-        let mut changed = false;
         for field in Field::ALL {
             if let Change::Set(value) = &self.changes[field as usize] {
-                if field.read(&current) != value.as_deref() {
-                    changed = true;
+                match field.slot(&mut expected) {
+                    Some(slot) => slot.clone_from(value),
+                    None => {
+                        expected.keywords = value
+                            .as_deref()
+                            .map(litchi_core::metadata::keywords::split)
+                            .unwrap_or_default();
+                    },
                 }
-                let slot = match field {
-                    Field::Title => &mut expected.title,
-                    Field::Author => &mut expected.author,
-                    Field::Keywords => &mut expected.keywords,
-                    Field::Description => &mut expected.description,
-                };
-                slot.clone_from(value);
             }
         }
+        let changed = expected != current;
         let source_bytes = self.source.state.source.shared_source();
         if !changed {
             return Ok(Commit {

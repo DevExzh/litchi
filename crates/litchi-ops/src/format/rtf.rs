@@ -323,7 +323,11 @@ fn metadata(document: &RtfDocument<'_>) -> Metadata {
         title: text(info.title.as_deref()),
         subject: text(info.subject.as_deref()),
         author: text(info.author.as_deref()),
-        keywords: text(info.keywords.as_deref()),
+        keywords: info
+            .keywords
+            .as_deref()
+            .map(litchi_core::metadata::keywords::split)
+            .unwrap_or_default(),
         description: text(info.document_comment.as_deref().or(info.comment.as_deref())),
         identifier: info.id.map(|value| value.to_string()),
         language: None,

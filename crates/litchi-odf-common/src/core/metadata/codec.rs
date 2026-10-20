@@ -206,8 +206,9 @@ enum KnownNamespace {
 enum MetaFieldEdit {
     /// Keep the source element, or its absence, untouched.
     Preserve,
-    /// Set the element text, inserting the element when it is absent.
-    Set(String),
+    /// Set the element texts (one element per text; `meta:keyword` takes
+    /// one per keyword), inserting the elements when they are absent.
+    Set(Vec<String>),
     /// Remove the element from the source meta.xml.
     Remove,
 }
@@ -252,9 +253,21 @@ impl MetaFieldEdit {
         if expected == current {
             Self::Preserve
         } else if let Some(value) = current {
-            Self::Set(value.to_string())
+            Self::Set(vec![value.to_string()])
         } else {
             Self::Remove
+        }
+    }
+
+    /// The edit between two keyword lists; an empty list removes every
+    /// keyword.
+    fn between_lists(expected: &[String], current: &[String]) -> Self {
+        if expected == current {
+            Self::Preserve
+        } else if current.is_empty() {
+            Self::Remove
+        } else {
+            Self::Set(current.to_vec())
         }
     }
 }
@@ -282,8 +295,8 @@ impl MetaXmlPatch {
         generator: &str,
         modification_date: String,
     ) -> Self {
-        self.generator = MetaFieldEdit::Set(generator.to_string());
-        self.modification_date = MetaFieldEdit::Set(modification_date);
+        self.generator = MetaFieldEdit::Set(vec![generator.to_string()]);
+        self.modification_date = MetaFieldEdit::Set(vec![modification_date]);
         self
     }
 
@@ -302,8 +315,7 @@ impl MetaXmlPatch {
             expected.description.as_deref(),
             current.description.as_deref(),
         );
-        self.keywords =
-            MetaFieldEdit::between(expected.keywords.as_deref(), current.keywords.as_deref());
+        self.keywords = MetaFieldEdit::between_lists(&expected.keywords, &current.keywords);
         self
     }
 
@@ -583,18 +595,21 @@ pub fn patch_meta_xml(source: &str, patch: &MetaXmlPatch) -> Result<Option<Strin
                     write_event(&mut writer, event.clone())?;
                 } else if meta_depth == Some(depth)
                     && let Some(field) = patch_field(namespace, local_name.as_ref())
-                    && !matches!(edits.edit(field), MetaFieldEdit::Preserve)
+                    && (consumed[field.index()]
+                        || !matches!(edits.edit(field), MetaFieldEdit::Preserve))
                 {
                     if consumed[field.index()] {
                         // Drop duplicate occurrences of a managed element.
                         skip_element_body(&mut reader)?;
                     } else {
                         consumed[field.index()] = true;
-                        if let MetaFieldEdit::Set(value) = edits.take(field) {
-                            write_event(&mut writer, event.clone())?;
-                            write_text(&mut writer, &value)?;
+                        if let MetaFieldEdit::Set(values) = edits.take(field) {
                             let end = skip_element_body(&mut reader)?;
-                            write_event(&mut writer, Event::End(end))?;
+                            for value in &values {
+                                write_event(&mut writer, event.clone())?;
+                                write_text(&mut writer, value)?;
+                                write_event(&mut writer, Event::End(end.clone()))?;
+                            }
                         } else {
                             skip_element_body(&mut reader)?;
                         }
@@ -625,15 +640,18 @@ pub fn patch_meta_xml(source: &str, patch: &MetaXmlPatch) -> Result<Option<Strin
                     }
                 } else if meta_depth == Some(depth)
                     && let Some(field) = patch_field(namespace, local_name.as_ref())
-                    && !matches!(edits.edit(field), MetaFieldEdit::Preserve)
+                    && (consumed[field.index()]
+                        || !matches!(edits.edit(field), MetaFieldEdit::Preserve))
                 {
                     if !consumed[field.index()] {
                         consumed[field.index()] = true;
-                        if let MetaFieldEdit::Set(value) = edits.take(field) {
+                        if let MetaFieldEdit::Set(values) = edits.take(field) {
                             let name = element_name(element)?;
-                            write_event(&mut writer, Event::Start(element.clone()))?;
-                            write_text(&mut writer, &value)?;
-                            write_event(&mut writer, Event::End(BytesEnd::new(name)))?;
+                            for value in &values {
+                                write_event(&mut writer, Event::Start(element.clone()))?;
+                                write_text(&mut writer, value)?;
+                                write_event(&mut writer, Event::End(BytesEnd::new(name.clone())))?;
+                            }
                         }
                     }
                     // Removed fields and duplicates drop the empty element.
@@ -685,10 +703,12 @@ fn write_pending_insertions(
     prefixes: &MetaNamespacePrefixes,
 ) -> Result<()> {
     for field in PATCH_INSERTION_ORDER {
-        if let MetaFieldEdit::Set(value) = edits.edit(field) {
+        if let MetaFieldEdit::Set(values) = edits.edit(field) {
             let (namespace, local_name) = field.element();
             let (name, declaration) = prefixes.qualified(namespace, local_name);
-            write_text_element(writer, &name, declaration, value)?;
+            for value in values {
+                write_text_element(writer, &name, declaration, value)?;
+            }
         }
     }
     Ok(())

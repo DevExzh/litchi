@@ -140,8 +140,7 @@ fn write_round_trips_values_that_need_quotes() {
             CellValue::Float(1.5),
         ],
     ];
-    let mut workbook = Workbook::new(Options::csv());
-    workbook.set_rows(rows.clone());
+    let workbook = Workbook::new(rows.clone(), Options::csv());
     let bytes = workbook.to_bytes().unwrap();
     let read = Workbook::from_bytes(&bytes).unwrap();
     assert_eq!(read.rows(), rows);

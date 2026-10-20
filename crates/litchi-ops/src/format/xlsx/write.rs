@@ -1760,7 +1760,7 @@ fn authored_value(value: Option<Scalar<'_>>, key: &str) -> Result<CellOperation>
             validate_text(value, key)?;
             xlsx::cell::Content::Value(xlsx::cell::Value::text(value))
         },
-        Some(Scalar::Token(_) | Scalar::Length(_) | Scalar::Color(_)) => {
+        Some(Scalar::Token(_) | Scalar::Length(_) | Scalar::Color(_) | Scalar::List(_)) => {
             return Err(invalid_property(
                 key,
                 "cell values support only text, bool, integer and finite number scalars",

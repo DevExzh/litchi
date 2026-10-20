@@ -15,9 +15,7 @@ type ExampleResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 /// A workbook over the cells a SYLK, DIF or fixed-width reader parsed.
 fn workbook_from_cells(cells: Vec<Vec<CellValue>>) -> Workbook {
-    let mut workbook = Workbook::new(delimited::Options::default());
-    workbook.set_rows(cells);
-    workbook
+    Workbook::new(cells, delimited::Options::default())
 }
 
 /// Open a SYLK (Symbolic Link) workbook.

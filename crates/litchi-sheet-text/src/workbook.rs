@@ -47,15 +47,32 @@ pub struct Workbook {
 const SHEET_NAME: &str = "Sheet1";
 
 impl Workbook {
-    /// An empty workbook that writes with `options`.
+    /// A workbook of `rows` that writes with `options`.
+    ///
+    /// ```
+    /// use litchi_core::sheet::CellValue;
+    /// use litchi_sheet_text::Workbook;
+    /// use litchi_sheet_text::delimited::Options;
+    ///
+    /// let workbook = Workbook::new(vec![vec![CellValue::Int(1)]], Options::csv()).with_name("Data");
+    /// assert_eq!((workbook.name(), workbook.to_bytes()?), ("Data", b"1".to_vec()));
+    /// # Ok::<(), litchi_sheet_text::Error>(())
+    /// ```
     #[must_use]
-    pub fn new(options: Options) -> Self {
+    pub fn new(rows: Vec<Vec<CellValue>>, options: Options) -> Self {
         Self {
-            rows: Vec::new(),
+            rows,
             options,
             name: SHEET_NAME.to_owned(),
             bom: None,
         }
+    }
+
+    /// The same workbook with its worksheet named `name`.
+    #[must_use]
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = name.into();
+        self
     }
 
     /// Open a CSV file with the default [`Options`].
@@ -132,20 +149,10 @@ impl Workbook {
         &self.name
     }
 
-    /// Rename the worksheet.
-    pub fn set_name(&mut self, name: impl Into<String>) {
-        self.name = name.into();
-    }
-
     /// The rows, zero-based.
     #[must_use]
     pub fn rows(&self) -> &[Vec<CellValue>] {
         &self.rows
-    }
-
-    /// Replace the rows.
-    pub fn set_rows(&mut self, rows: Vec<Vec<CellValue>>) {
-        self.rows = rows;
     }
 
     /// The byte-order mark the source started with, if any.

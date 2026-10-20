@@ -990,7 +990,11 @@ impl Metadata {
         litchi_core::Metadata {
             title: self.title.clone(),
             author: self.author.clone(),
-            keywords: self.keywords.clone(),
+            keywords: self
+                .keywords
+                .as_deref()
+                .map(litchi_core::metadata::keywords::split)
+                .unwrap_or_default(),
             description: self.description.clone(),
             application: Some(
                 self.application

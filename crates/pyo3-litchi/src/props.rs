@@ -96,9 +96,22 @@ fn prop_value(key: &str, value: &Bound<'_, PyAny>) -> PyResult<PropValue<'static
     if let Ok(text) = value.cast::<PyString>() {
         return Ok(PropValue::from(text.to_cow()?.into_owned()));
     }
+    // A list or tuple of str: a list value (the metadata keywords, record
+    // 0354).
+    if value.is_instance_of::<PyList>() || value.is_instance_of::<PyTuple>() {
+        let mut items = Vec::new();
+        for item in value.try_iter()? {
+            let item = item?;
+            let Ok(text) = item.cast::<PyString>() else {
+                return Err(invalid(key, "a list value holds only str").into());
+            };
+            items.push(text.to_cow()?.into_owned());
+        }
+        return Ok(PropValue::from(items));
+    }
     Err(invalid(
         key,
-        "a property value must be None, bool, int, float or str",
+        "a property value must be None, bool, int, float, str or a list of str",
     )
     .into())
 }

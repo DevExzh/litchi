@@ -43,6 +43,9 @@ pub enum ValueType {
     Length(LengthSpec),
     /// A color in a [`ColorContext`].
     Color(ColorContext),
+    /// A list of text items (the metadata keywords, record 0354). Text
+    /// coerces to itself: the format splits it at `;` and `,`.
+    List,
 }
 
 impl ValueType {
@@ -63,6 +66,7 @@ impl ValueType {
                 _ => "length",
             },
             Self::Color(_) => "color",
+            Self::List => "list",
         }
     }
 
@@ -77,7 +81,7 @@ impl ValueType {
             Self::Bool => Scalar::Bool(parse_bool(text)?),
             Self::Int => Scalar::Int(parse_integer(text)?),
             Self::Number => Scalar::Number(parse_number(text)?),
-            Self::Text | Self::Scalar => Scalar::Text(text),
+            Self::Text | Self::Scalar | Self::List => Scalar::Text(text),
             Self::Token(tokens) => Scalar::Token(tokens.parse(text)?),
             Self::Length(spec) => Scalar::Length(Length::parse_in(text, spec.context)?),
             Self::Color(context) => Scalar::Color(Color::parse(text, context)?),
@@ -127,6 +131,8 @@ pub enum Scalar<'a> {
     Length(Length),
     /// A color.
     Color(Color),
+    /// A list of text items, printed joined with `, `.
+    List(&'a [String]),
 }
 
 impl Scalar<'_> {
@@ -170,6 +176,15 @@ impl fmt::Display for ScalarDisplay<'_> {
             Scalar::Token(token) => formatter.write_str(token),
             Scalar::Length(length) => length.display(self.style).fmt(formatter),
             Scalar::Color(color) => color.fmt(formatter),
+            Scalar::List(items) => {
+                for (index, item) in items.iter().enumerate() {
+                    if index > 0 {
+                        formatter.write_str(", ")?;
+                    }
+                    formatter.write_str(item)?;
+                }
+                Ok(())
+            },
         }
     }
 }

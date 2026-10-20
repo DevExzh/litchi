@@ -2001,7 +2001,7 @@ impl<'a> Props<'a> {
                     RootKey::Title => text(metadata.and_then(|m| m.title.as_ref())),
                     RootKey::Author => text(metadata.and_then(|m| m.author.as_ref())),
                     RootKey::Subject => text(metadata.and_then(|m| m.subject.as_ref())),
-                    RootKey::Keywords => text(metadata.and_then(|m| m.keywords.as_ref())),
+                    RootKey::Keywords => metadata.and_then(|m| Value::owned_list(&m.keywords)),
                     RootKey::Description => text(metadata.and_then(|m| m.description.as_ref())),
                     RootKey::LastModifiedBy => {
                         text(metadata.and_then(|m| m.last_modified_by.as_ref()))

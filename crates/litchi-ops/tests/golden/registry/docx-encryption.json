@@ -90,7 +90,7 @@
           "get": true
         },
         "keywords": {
-          "type": "string",
+          "type": "list",
           "add": false,
           "set": true,
           "get": true

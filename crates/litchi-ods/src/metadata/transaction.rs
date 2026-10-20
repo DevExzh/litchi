@@ -212,9 +212,9 @@ impl Editor<'_, '_> {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn set_keywords(&mut self, value: impl Into<String>) -> Result<()> {
+    pub fn set_keywords(&mut self, keywords: Vec<String>) -> Result<()> {
         self.update(|metadata| {
-            metadata.keywords = Some(value.into());
+            metadata.keywords = keywords;
             Ok(())
         })
     }
@@ -224,7 +224,7 @@ impl Editor<'_, '_> {
     /// Returns an error when the operation cannot be completed.
     pub fn clear_keywords(&mut self) -> Result<()> {
         self.update(|metadata| {
-            metadata.keywords = None;
+            metadata.keywords.clear();
             Ok(())
         })
     }
