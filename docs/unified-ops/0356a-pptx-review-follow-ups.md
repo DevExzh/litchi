@@ -215,7 +215,32 @@ leaf and unified bytes (all equal). The matrix rows supersede 0356's.
 
 ## 5. Gates
 
-GATES_TABLE
+On the tree merged with trunk `7893492f9e` (merge `2764481df0`); logs in
+`.coord/w2-pptx/gate-logs/` (`gates-summary.txt`). The workspace commands
+exclude only `litchi-ods` (its purged evidence fixture, as in 0356).
+
+| gate | exit |
+|---|---:|
+| `cargo fmt --all --check` | 0 |
+| `cargo clippy -p litchi-pptx -p litchi-ops -p litchi -p litchi-py -p litchi-cli --all-targets --all-features -- -D warnings` | 0 |
+| `cargo clippy -p litchi-ops --no-default-features [--features pptx] --all-targets -- -D warnings` | 0, 0 |
+| `cargo clippy -p litchi-ops --features <all but encryption> --all-targets -- -D warnings` | 0 |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-pptx -p litchi-ops` | 0 |
+| `cargo test -p litchi-pptx --all-features` | 0 |
+| `cargo test -p litchi-ops --all-features`: `--lib`, `--doc`, 167 `--test` targets in chunks of 20 (executables deleted per chunk) | 0, 0, 0 |
+| `cargo test -p litchi --all-features`; `cargo test -p litchi-cli --all-features` | 0; 0 |
+| `tools/check_crate_boundaries.py`; `tools/non_iwork_gate.py verify` | 0; 0 |
+| `RUSTC_BOOTSTRAP=1 tools/check_api_glossary.py` (44 profiles, 433 families, 66 owners) | 0 |
+| `crates/pyo3-litchi/tests/run_tests.sh` (301 tests) | 0 |
+| `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 |
+| `python3 -m unittest tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate tools.test_unified_bench_matrix tools.test_check_api_glossary` | 0 |
+| `tools/officecli_capability_delta.py --check`; `tools/officecli_corpus.py --check` | 0; 0 |
+| `tools/unified_bench_matrix.py --check` | 0 |
+| `tools/check_feature_matrix.py` | 0 |
+| `LITCHI_BLESS=1 cargo test -p litchi-ops --test capabilities --test registry` (all features; all but `encryption`), then a clean tree | 0, 0, 0 (no golden changed) |
+
+The OfficeCLI corpus and batch-equivalence tests run in the `litchi-ops`
+chunks. Target directory after cleanup: 17 GB (limit 20 GB).
 
 ## 6. Follow-ups
 
