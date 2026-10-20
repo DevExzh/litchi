@@ -128,7 +128,7 @@ fn reference_output(bytes: &[u8], position: Position, replacement: &str) -> Vec<
     let edit = staged_edit(bytes, limits, position, replacement);
     edit.commit()
         .expect("reference body edit should commit")
-        .snapshot()
+        .package()
         .bytes()
         .to_vec()
 }
@@ -143,7 +143,7 @@ fn sequential_reference_output(bytes: &[u8], position: Position, replacements: &
     }
     edit.commit()
         .expect("reference body edit should commit")
-        .snapshot()
+        .package()
         .bytes()
         .to_vec()
 }
@@ -206,17 +206,17 @@ fn equal_byte_lineage_prepared_edits_meet_all_transaction_limits() {
         .commit()
         .expect("policy-meeting composition should commit");
     assert_transaction_policy(
-        commit.snapshot().transaction_limits(),
+        commit.package().transaction_limits(),
         strict,
         "prepared-edit composition",
     );
-    assert_public_reopens(commit.snapshot().bytes());
+    assert_public_reopens(commit.package().bytes());
     assert_eq!(
-        paragraph_text(commit.snapshot().bytes(), Position::new(0)),
+        paragraph_text(commit.package().bytes(), Position::new(0)),
         "alpha policy"
     );
     assert_eq!(
-        paragraph_text(commit.snapshot().bytes(), Position::new(2)),
+        paragraph_text(commit.package().bytes(), Position::new(2)),
         "charlie policy"
     );
 
@@ -242,13 +242,13 @@ fn equal_byte_lineage_prepared_edits_meet_all_transaction_limits() {
         .commit()
         .expect("policy-meeting transfer should commit");
     assert_transaction_policy(
-        transfer_commit.snapshot().transaction_limits(),
+        transfer_commit.package().transaction_limits(),
         strict,
         "transfer policy meet",
     );
-    assert_public_reopens(transfer_commit.snapshot().bytes());
+    assert_public_reopens(transfer_commit.package().bytes());
     assert_eq!(
-        paragraph_text(transfer_commit.snapshot().bytes(), Position::new(0)),
+        paragraph_text(transfer_commit.package().bytes(), Position::new(0)),
         "donor policy"
     );
 }
@@ -295,12 +295,12 @@ fn rejected_join_and_transfer_preserve_policy_and_retained_state() {
         .commit()
         .expect("rejected join must not poison accepted composition");
     assert_transaction_policy(
-        broad_commit.snapshot().transaction_limits(),
+        broad_commit.package().transaction_limits(),
         broad,
         "rejected composition",
     );
     assert_eq!(
-        paragraph_text(broad_commit.snapshot().bytes(), Position::new(0)),
+        paragraph_text(broad_commit.package().bytes(), Position::new(0)),
         "accepted policy"
     );
 
@@ -312,7 +312,7 @@ fn rejected_join_and_transfer_preserve_policy_and_retained_state() {
         .commit()
         .expect("recovered rejected edit should commit");
     assert_transaction_policy(
-        recovered_commit.snapshot().transaction_limits(),
+        recovered_commit.package().transaction_limits(),
         strict,
         "recovered prepared token",
     );
@@ -349,12 +349,12 @@ fn rejected_join_and_transfer_preserve_policy_and_retained_state() {
         .commit()
         .expect("rejected transfer must leave the staged edit committable");
     assert_transaction_policy(
-        edit_commit.snapshot().transaction_limits(),
+        edit_commit.package().transaction_limits(),
         broad,
         "rejected transfer commit",
     );
     assert_eq!(
-        paragraph_text(edit_commit.snapshot().bytes(), Position::new(0)),
+        paragraph_text(edit_commit.package().bytes(), Position::new(0)),
         "before rejected transfer"
     );
 }
@@ -450,17 +450,17 @@ fn forward_patch_and_three_way_merge_meet_before_after_policies() {
         .expect("equal-byte differently bounded patches should merge");
     let merged = merged.commit().expect("three-way merge should commit");
     assert_transaction_policy(
-        merged.snapshot().transaction_limits(),
+        merged.package().transaction_limits(),
         expected,
         "three-way before/after policy meet",
     );
-    assert_public_reopens(merged.snapshot().bytes());
+    assert_public_reopens(merged.package().bytes());
     assert_eq!(
-        paragraph_text(merged.snapshot().bytes(), Position::new(0)),
+        paragraph_text(merged.package().bytes(), Position::new(0)),
         "alpha left"
     );
     assert_eq!(
-        paragraph_text(merged.snapshot().bytes(), Position::new(2)),
+        paragraph_text(merged.package().bytes(), Position::new(2)),
         "charlie right"
     );
 }
@@ -522,9 +522,9 @@ fn retention_boundaries_preserve_exact_output_and_capacity() {
             let commit = edit
                 .commit()
                 .expect("retention ceiling must not refuse a supported edit");
-            let output = commit.snapshot().bytes();
+            let output = commit.package().bytes();
             assert_eq!(output, reference.as_slice(), "{relative}: {name}");
-            assert!(commit.changed());
+            assert!(commit.diagnostics().changed());
             assert_public_reopens(output);
             assert_eq!(
                 paragraph_text(output, position),
@@ -557,11 +557,8 @@ fn release_successive_noop_and_refused_edits_are_atomic() {
     let second_commit = edit
         .commit()
         .expect("released successive edit should commit");
-    assert_eq!(
-        second_commit.snapshot().bytes(),
-        second_reference.as_slice()
-    );
-    assert_public_reopens(second_commit.snapshot().bytes());
+    assert_eq!(second_commit.package().bytes(), second_reference.as_slice());
+    assert_public_reopens(second_commit.package().bytes());
     assert_ne!(first_held, None, "the first edit should exercise retention");
 
     let limited =
@@ -579,10 +576,7 @@ fn release_successive_noop_and_refused_edits_are_atomic() {
     let refused_commit = refused
         .commit()
         .expect("a refused later operation must leave the edit committable");
-    assert_eq!(
-        refused_commit.snapshot().bytes(),
-        first_reference.as_slice()
-    );
+    assert_eq!(refused_commit.package().bytes(), first_reference.as_slice());
 
     let source = snapshot(&bytes, TransactionLimits::default());
     let original = source
@@ -630,7 +624,7 @@ fn multi_generation_and_writer_producer_candidates_reopen() {
         edit.replace_paragraph(position, HANDOFF_REPLACEMENT)
             .expect("producer source replacement should stage");
         let commit = edit.commit().expect("producer source should commit");
-        let output = commit.snapshot().bytes();
+        let output = commit.package().bytes();
         assert_public_reopens(output);
         assert_eq!(
             paragraph_text(output, position),
@@ -669,8 +663,8 @@ fn patches_inverse_conflict_and_composition_preserve_handoff_results() {
         .expect("sequential right replacement");
     let sequential = sequential.commit().expect("sequential edit should commit");
     assert_eq!(
-        composed.snapshot().bytes(),
-        sequential.snapshot().bytes(),
+        composed.package().bytes(),
+        sequential.package().bytes(),
         "composition and sequential publication should agree"
     );
 
@@ -678,11 +672,11 @@ fn patches_inverse_conflict_and_composition_preserve_handoff_results() {
         .patch()
         .apply(&source)
         .expect("forward patch should apply to its exact source");
-    assert_eq!(forward, *composed.snapshot());
+    assert_eq!(forward, *composed.package());
     let inverse = composed
         .patch()
         .inverse()
-        .apply(composed.snapshot())
+        .apply(composed.package())
         .expect("inverse patch should restore its exact source");
     assert_eq!(inverse.bytes(), source.bytes());
 
@@ -717,7 +711,7 @@ fn transfer_after_a_handoff_reopens_and_checks_source_lineage() {
     edit.apply_transfer(&plan)
         .expect("transfer should invalidate the earlier staged state");
     let transferred = edit.commit().expect("transferred receiver should commit");
-    let transferred_bytes = transferred.snapshot().bytes();
+    let transferred_bytes = transferred.package().bytes();
     assert_public_reopens(transferred_bytes);
     assert_eq!(
         paragraph_text(transferred_bytes, Position::new(0)),
@@ -739,7 +733,7 @@ fn transfer_after_a_handoff_reopens_and_checks_source_lineage() {
     let expected = expected_edit
         .commit()
         .expect("expected transfer should commit");
-    assert_eq!(transferred_bytes, expected.snapshot().bytes());
+    assert_eq!(transferred_bytes, expected.package().bytes());
 
     let wrong_receiver = Snapshot::parse(&writer_document(&["wrong receiver"]))
         .expect("wrong receiver should parse");

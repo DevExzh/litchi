@@ -1525,7 +1525,7 @@ impl Snapshot {
                 "durable patch has unreferenced blobs",
             ));
         }
-        edit.commit().map(|commit| commit.snapshot)
+        edit.commit().map(Commit::into_package)
     }
 
     /// Plans an inert text transfer while proving the receiving selector and
@@ -2877,7 +2877,8 @@ impl Edit {
             self.changes,
             self.auxiliary_changed,
         );
-        Ok(Commit { snapshot, patch })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     /// Publishes a package-owned commit while transferring the validated
@@ -3046,7 +3047,8 @@ impl Edit {
                 self.auxiliary_changed,
             ))
         })?;
-        Ok(Commit { snapshot, patch })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn ensure_operation_capacity(&self) -> Result<()> {
@@ -3126,49 +3128,12 @@ impl Edit {
     }
 }
 
-/// Validated commit result for one body-text transaction.
-#[derive(Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// Validated commit result for one body-text edit: the published snapshot,
+/// its reversible exact-source patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl std::fmt::Debug for Commit {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("Commit")
-            .field("snapshot", &self.snapshot)
-            .field("patch", &self.patch)
-            .finish()
-    }
-}
-
-impl Commit {
-    /// Whether a DOC byte changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Published post-edit snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Reversible exact-source patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Splits a commit into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
-
+/// Content-free diagnostics of one body-text commit.
+pub use litchi_core::edit::Diagnostics;
 /// In-memory reversible replacement guarded by exact source bytes.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Patch {
@@ -6197,7 +6162,7 @@ mod tests {
         ));
         assert!(matches!(
             edit.commit(),
-            Ok(commit) if !commit.changed()
+            Ok(commit) if !commit.diagnostics().changed()
         ));
 
         let noop = snapshot
@@ -6205,8 +6170,8 @@ mod tests {
             .expect("protected snapshot edit")
             .commit()
             .expect("protected no-op");
-        assert!(!noop.changed());
-        assert_eq!(noop.snapshot().finish(), bytes);
+        assert!(!noop.diagnostics().changed());
+        assert_eq!(noop.package().finish(), bytes);
     }
 
     #[cfg(feature = "performance-diagnostics")]
@@ -6730,7 +6695,7 @@ mod tests {
 
         assert!(cfb_events.is_empty());
         assert_eq!(profiled, ordinary);
-        assert!(!profiled.changed());
+        assert!(!profiled.diagnostics().changed());
         assert_eq!(
             events,
             vec![
@@ -6780,10 +6745,10 @@ mod tests {
         edit.replace_paragraph(Position::new(0), "omega")
             .expect("same shape edit");
         let commit = edit.commit().expect("commit");
-        assert!(commit.changed());
+        assert!(commit.diagnostics().changed());
         assert_eq!(
             commit
-                .snapshot()
+                .package()
                 .paragraphs(Projection::All)
                 .expect("changed paragraphs")[0]
                 .text(),
@@ -6791,7 +6756,7 @@ mod tests {
         );
 
         let applied = commit.patch().apply(&source).expect("exact source applies");
-        assert_eq!(applied, *commit.snapshot());
+        assert_eq!(applied, *commit.package());
         let restored = commit
             .patch()
             .inverse()
@@ -6812,7 +6777,7 @@ mod tests {
         edit.replace_paragraph(Position::new(0), &replacement)
             .expect("large replacement");
         let commit = edit.commit().expect("changed commit");
-        assert!(commit.snapshot().bytes().len() > source.bytes().len());
+        assert!(commit.package().bytes().len() > source.bytes().len());
 
         let source_limit = crate::package::SourceLimits::builder()
             .max_input_bytes(source.bytes().len())
@@ -6830,7 +6795,7 @@ mod tests {
         ));
 
         let target_limit = crate::package::SourceLimits::builder()
-            .max_input_bytes(commit.snapshot().bytes().len())
+            .max_input_bytes(commit.package().bytes().len())
             .expect("target limit")
             .build()
             .expect("target limits");
@@ -6844,7 +6809,7 @@ mod tests {
             .apply(&bounded_source)
             .expect("target fits retained package limit");
         assert_eq!(applied.source_limits(), target_limit);
-        assert_eq!(applied.bytes(), commit.snapshot().bytes());
+        assert_eq!(applied.bytes(), commit.package().bytes());
     }
 
     #[test]
@@ -6869,8 +6834,8 @@ mod tests {
                 .expect("no-op Selsf edit")
         );
         let no_op_commit = no_op.commit().expect("no-op auxiliary commit");
-        assert!(!no_op_commit.changed());
-        assert_eq!(no_op_commit.snapshot().bytes(), source.bytes());
+        assert!(!no_op_commit.diagnostics().changed());
+        assert_eq!(no_op_commit.package().bytes(), source.bytes());
 
         let mut edit = source.edit().expect("body edit");
         assert!(
@@ -6886,10 +6851,10 @@ mod tests {
                 .expect("Dofr edit")
         );
         let commit = edit.commit().expect("auxiliary commit");
-        assert!(commit.changed());
+        assert!(commit.diagnostics().changed());
         assert!(commit.patch().has_auxiliary_changes());
         assert!(commit.patch().to_durable(patch_limits()).is_err());
-        let published = commit.snapshot();
+        let published = commit.package();
         let package =
             PackageEditor::open(published.finish(), Targets::default(), Limits::default())
                 .expect("published package");
@@ -6958,7 +6923,7 @@ mod tests {
                 .expect("second selection edit")
         );
         let stale_commit = stale.commit().expect("second edit");
-        let mut mismatched = stale_commit.snapshot().edit().expect("mismatched edit");
+        let mut mismatched = stale_commit.package().edit().expect("mismatched edit");
         let source_patch = selection
             .edit()
             .commit()
@@ -6989,7 +6954,7 @@ mod tests {
         let applied = patch
             .apply(&source)
             .expect("same-lineage application should use allocation identity");
-        assert_eq!(applied.bytes(), commit.snapshot().bytes());
+        assert_eq!(applied.bytes(), commit.package().bytes());
         assert!(source.fingerprint_cache.get().is_none());
         assert!(patch.before.fingerprint_cache.get().is_none());
         assert!(patch.after.fingerprint_cache.get().is_none());
@@ -7022,7 +6987,7 @@ mod tests {
         let applied = patch
             .apply(&reopened)
             .expect("identical independently reopened source should apply");
-        assert_eq!(applied.bytes(), commit.snapshot().bytes());
+        assert_eq!(applied.bytes(), commit.package().bytes());
 
         let mut different_limits = Limits::default();
         different_limits.max_streams = Limits::default().max_streams - 1;
@@ -7038,7 +7003,7 @@ mod tests {
                 .apply(&differently_limited)
                 .expect("byte-identical source with different limits should apply")
                 .bytes(),
-            commit.snapshot().bytes()
+            commit.package().bytes()
         );
     }
 
@@ -7084,10 +7049,10 @@ mod tests {
         let source_bytes = source.bytes_shared();
 
         let empty = source.edit().expect("empty edit").commit().expect("no-op");
-        assert!(!empty.changed());
+        assert!(!empty.diagnostics().changed());
         assert!(empty.patch().is_noop());
         assert_eq!(empty.patch().changes().len(), 0);
-        assert!(Arc::ptr_eq(&source_bytes, &empty.snapshot().bytes_shared()));
+        assert!(Arc::ptr_eq(&source_bytes, &empty.package().bytes_shared()));
         let applied = empty.patch().apply(&source).expect("no-op patch applies");
         assert!(Arc::ptr_eq(&source_bytes, &applied.bytes_shared()));
         let restored = empty
@@ -7102,11 +7067,11 @@ mod tests {
             .replace_paragraph(Position::new(0), "alpha")
             .expect("same text is accepted");
         let same_text = same_text.commit().expect("same-text no-op");
-        assert!(!same_text.changed());
+        assert!(!same_text.diagnostics().changed());
         assert_eq!(same_text.patch().changes().len(), 0);
         assert!(Arc::ptr_eq(
             &source_bytes,
-            &same_text.snapshot().bytes_shared()
+            &same_text.package().bytes_shared()
         ));
     }
 
@@ -7126,7 +7091,7 @@ mod tests {
         let commit = edit.commit().expect("empty paragraph commit");
         assert_eq!(
             commit
-                .snapshot()
+                .package()
                 .paragraphs(Projection::All)
                 .expect("changed paragraphs")[0]
                 .text(),
@@ -7136,7 +7101,7 @@ mod tests {
             commit
                 .patch()
                 .inverse()
-                .apply(commit.snapshot())
+                .apply(commit.package())
                 .expect("empty insertion inverse"),
             source
         );
@@ -7149,7 +7114,7 @@ mod tests {
         edit.replace_paragraph(Position::new(0), "formatted")
             .expect("formatted empty paragraph accepts insertion");
         let commit = edit.commit().expect("formatted empty commit");
-        let mut package = crate::raw::Reader::from_reader(Cursor::new(commit.snapshot().finish()))
+        let mut package = crate::raw::Reader::from_reader(Cursor::new(commit.package().finish()))
             .expect("formatted candidate opens");
         let document = package.document().expect("formatted candidate document");
         let paragraph = document
@@ -7188,7 +7153,7 @@ mod tests {
         ));
         let commit = edit.commit().expect("body-only commit");
         let paragraphs = commit
-            .snapshot()
+            .package()
             .paragraphs(Projection::All)
             .expect("changed ordinary paragraphs");
         assert_eq!(
@@ -7199,11 +7164,7 @@ mod tests {
             ["body", ""]
         );
         assert_eq!(
-            commit
-                .snapshot()
-                .table_cells()
-                .expect("changed table cells")[0]
-                .text(),
+            commit.package().table_cells().expect("changed table cells")[0].text(),
             ""
         );
     }
@@ -7225,7 +7186,7 @@ mod tests {
         edit.replace_paragraph(Position::new(0), "inside")
             .expect("bookmark-protected empty insertion");
         let commit = edit.commit().expect("bookmark commit");
-        let mut package = crate::raw::Reader::from_reader(Cursor::new(commit.snapshot().finish()))
+        let mut package = crate::raw::Reader::from_reader(Cursor::new(commit.package().finish()))
             .expect("bookmark candidate opens");
         let bookmark = package
             .document()
@@ -7250,10 +7211,10 @@ mod tests {
         edit.replace_paragraph(Position::new(0), "already stored")
             .expect("exact text no-op bypasses quota");
         let commit = edit.commit().expect("exact text no-op commit");
-        assert!(!commit.changed());
+        assert!(!commit.diagnostics().changed());
         assert!(Arc::ptr_eq(
             &source.bytes_shared(),
-            &commit.snapshot().bytes_shared()
+            &commit.package().bytes_shared()
         ));
     }
 
@@ -7284,7 +7245,7 @@ mod tests {
         let mut before =
             OleFile::open(Cursor::new(source.bytes())).expect("source CFB should open");
         let mut after =
-            OleFile::open(Cursor::new(commit.snapshot().bytes())).expect("changed CFB should open");
+            OleFile::open(Cursor::new(commit.package().bytes())).expect("changed CFB should open");
         let before_paths = before.list_streams();
         assert_eq!(after.list_streams(), before_paths);
         for path in before_paths {
@@ -7327,10 +7288,10 @@ mod tests {
             .expect("paragraph replacement should stage");
         let commit = edit.commit().expect("changed candidate should reopen");
         assert_eq!(
-            commit.snapshot().paragraphs(Projection::All).unwrap()[0].text(),
+            commit.package().paragraphs(Projection::All).unwrap()[0].text(),
             "alpha expanded"
         );
-        let mut public = crate::raw::Reader::from_reader(Cursor::new(commit.snapshot().finish()))
+        let mut public = crate::raw::Reader::from_reader(Cursor::new(commit.package().finish()))
             .expect("changed candidate should pass the public package gate");
         assert_eq!(
             public
@@ -7345,7 +7306,7 @@ mod tests {
             "alpha expanded"
         );
         let package = PackageEditor::open(
-            commit.snapshot().finish(),
+            commit.package().finish(),
             Targets::default(),
             Limits::default(),
         )
@@ -7375,9 +7336,9 @@ mod tests {
             Err(Error::Refused(Refusal::ParagraphNotFound))
         ));
         let commit = edit.commit().expect("changed commit");
-        assert!(commit.changed());
+        assert!(commit.diagnostics().changed());
         let paragraphs = commit
-            .snapshot()
+            .package()
             .paragraphs(Projection::All)
             .expect("changed paragraphs");
         assert_eq!(paragraphs[0].text(), "a much longer paragraph");
@@ -7432,7 +7393,7 @@ mod tests {
             .expect("bold first paragraph");
         let commit = edit.commit().expect("commit and full reopen");
         let texts = commit
-            .snapshot()
+            .package()
             .paragraphs(Projection::All)
             .expect("readback")
             .into_iter()
@@ -7440,7 +7401,7 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(texts, ["alpha expanded", "bravo", "c"]);
 
-        let mut package = crate::raw::Reader::from_reader(Cursor::new(commit.snapshot().finish()))
+        let mut package = crate::raw::Reader::from_reader(Cursor::new(commit.package().finish()))
             .expect("CFB reopens");
         let document = package.document().expect("DOC reopens");
         let paragraphs = document.paragraphs().expect("paragraphs read back");
@@ -7449,7 +7410,7 @@ mod tests {
         let restored = commit
             .patch()
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .expect("inverse applies");
         assert_eq!(restored.bytes(), source.bytes());
     }
@@ -7499,10 +7460,10 @@ mod tests {
         );
         assert_eq!(
             source.apply_durable(&decoded).expect("durable apply"),
-            *commit.snapshot()
+            *commit.package()
         );
         let semantic_inverse = commit
-            .snapshot()
+            .package()
             .apply_durable(&decoded.inverse())
             .expect("durable inverse");
         assert_eq!(
@@ -7531,17 +7492,17 @@ mod tests {
         let wire_bytes = u64::try_from(wire.len()).expect("wire length fits u64");
         let mut history = source.history(HistoryLimits::new(1, wire_bytes));
         history
-            .record(commit.snapshot().clone(), wire_bytes)
+            .record(commit.package().clone(), wire_bytes)
             .expect("record history");
         assert!(history.undo());
         assert_eq!(history.current(), &source);
         assert!(history.redo());
-        assert_eq!(history.current(), commit.snapshot());
+        assert_eq!(history.current(), commit.package());
 
         let mut too_small = source.history(HistoryLimits::new(1, wire_bytes - 1));
         assert!(
             too_small
-                .record(commit.snapshot().clone(), wire_bytes)
+                .record(commit.package().clone(), wire_bytes)
                 .is_err()
         );
         assert_eq!(too_small.current(), &source);
@@ -7613,7 +7574,7 @@ mod tests {
         let commit = edit.commit().expect("full reopen commit");
         assert_eq!(
             commit
-                .snapshot()
+                .package()
                 .story_paragraphs(Story::Header)
                 .expect("changed header")
                 .into_iter()
@@ -7623,11 +7584,11 @@ mod tests {
             "Banner"
         );
         assert_eq!(
-            commit.snapshot().table_cells().expect("changed cells")[0].text(),
+            commit.package().table_cells().expect("changed cells")[0].text(),
             "Cell expanded"
         );
         assert_eq!(
-            commit.snapshot().field_results().expect("changed fields")[0].text(),
+            commit.package().field_results().expect("changed fields")[0].text(),
             "Result"
         );
         let durable = commit
@@ -7635,7 +7596,7 @@ mod tests {
             .to_durable(patch_limits())
             .expect("durable patch");
         let replay = source.apply_durable(&durable).expect("durable replay");
-        assert_eq!(replay, *commit.snapshot());
+        assert_eq!(replay, *commit.package());
         let inverse = replay
             .apply_durable(&durable.inverse())
             .expect("durable inverse");
@@ -7659,11 +7620,11 @@ mod tests {
         assert!(merged.is_conflict_free());
         let merged = merged.commit().expect("merged commit");
         assert_eq!(
-            merged.snapshot().table_cells().expect("merged cells")[0].text(),
+            merged.package().table_cells().expect("merged cells")[0].text(),
             "Left cell"
         );
         assert_eq!(
-            merged.snapshot().field_results().expect("merged fields")[0].text(),
+            merged.package().field_results().expect("merged fields")[0].text(),
             "Right result"
         );
 
@@ -7694,7 +7655,7 @@ mod tests {
             transfer_edit
                 .commit()
                 .expect("transfer commit")
-                .snapshot()
+                .package()
                 .paragraphs(Projection::All)
                 .expect("transferred body")[0]
                 .text(),
@@ -7726,11 +7687,11 @@ mod tests {
         edit.set_embedded_display_as_icon(77, !before)
             .expect("resource metadata edit");
         let commit = edit.commit().expect("resource root commit");
-        let mut package = crate::raw::Reader::from_reader(Cursor::new(commit.snapshot().finish()))
+        let mut package = crate::raw::Reader::from_reader(Cursor::new(commit.package().finish()))
             .expect("resource CFB reopens");
         package.document().expect("resource DOC reopens");
         let changed =
-            crate::embedded_object::Snapshot::open(commit.snapshot().finish(), Limits::default())
+            crate::embedded_object::Snapshot::open(commit.package().finish(), Limits::default())
                 .expect("changed embedded owner snapshot")
                 .inventory()
                 .expect("changed embedded inventory")
@@ -7745,11 +7706,11 @@ mod tests {
             .expect("resource durable patch");
         assert_eq!(
             source.apply_durable(&durable).expect("resource replay"),
-            *commit.snapshot()
+            *commit.package()
         );
         assert_eq!(
             commit
-                .snapshot()
+                .package()
                 .apply_durable(&durable.inverse())
                 .expect("resource inverse"),
             source
@@ -7774,7 +7735,7 @@ mod tests {
         let transfer = transfer.commit().expect("transfer commit");
         assert!(
             transfer
-                .snapshot()
+                .package()
                 .embedded_objects()
                 .expect("transferred inventory")
                 .get(88)
@@ -7783,7 +7744,7 @@ mod tests {
         let exact_inverse = transfer
             .patch()
             .inverse()
-            .apply(transfer.snapshot())
+            .apply(transfer.package())
             .expect("exact in-memory inverse");
         assert_eq!(exact_inverse.bytes(), receiver.bytes());
 
@@ -7828,7 +7789,7 @@ mod tests {
         let merged = merged.commit().expect("resource/text merge");
         assert!(
             merged
-                .snapshot()
+                .package()
                 .embedded_objects()
                 .expect("merged inventory")
                 .get(88)
@@ -7836,7 +7797,7 @@ mod tests {
         );
         assert_eq!(
             merged
-                .snapshot()
+                .package()
                 .paragraphs(Projection::All)
                 .expect("merged text")[0]
                 .text(),
@@ -7846,16 +7807,16 @@ mod tests {
         let wire_bytes = u64::try_from(wire.len()).expect("wire length fits u64");
         let mut history = receiver.history(HistoryLimits::new(1, wire_bytes));
         history
-            .record(transfer.snapshot().clone(), wire_bytes)
+            .record(transfer.package().clone(), wire_bytes)
             .expect("resource history record");
         assert!(history.undo());
         assert_eq!(history.current(), &receiver);
         assert!(history.redo());
-        assert_eq!(history.current(), transfer.snapshot());
+        assert_eq!(history.current(), transfer.package());
 
         assert!(matches!(
             transfer
-                .snapshot()
+                .package()
                 .plan_embedded_transfer_from(&donor, 77, 88),
             Err(Error::Refused(Refusal::ResourceCollision {
                 storage_id: 88
@@ -7956,7 +7917,7 @@ mod tests {
         let commit = edit.commit().expect("revision commit");
         assert!(
             commit
-                .snapshot()
+                .package()
                 .revisions()
                 .expect("changed revisions")
                 .is_empty()
@@ -7974,7 +7935,7 @@ mod tests {
                 .is_empty()
         );
         let restored = commit
-            .snapshot()
+            .package()
             .apply_durable(&durable.inverse())
             .expect("revision durable inverse");
         assert_eq!(restored.revisions().expect("restored revisions").len(), 1);
@@ -8036,14 +7997,14 @@ mod tests {
                 .expect("control picture");
             assert_eq!(control.retained_render_bytes(), None);
             assert_eq!(
-                control.commit().expect("control commit").snapshot().bytes(),
-                commit.snapshot().bytes()
+                control.commit().expect("control commit").package().bytes(),
+                commit.package().bytes()
             );
             assert_eq!(
                 commit
                     .patch()
                     .inverse()
-                    .apply(commit.snapshot())
+                    .apply(commit.package())
                     .expect("inverse"),
                 receiver
             );
@@ -8073,7 +8034,7 @@ mod tests {
             edit.set_paragraph_bold(Position::new(1), true)
                 .expect("format after resource reopen");
             assert_eq!(edit.retained_render_bytes().is_some(), ceiling != 0);
-            outputs.push(edit.commit().expect("commit").snapshot().bytes().to_vec());
+            outputs.push(edit.commit().expect("commit").package().bytes().to_vec());
         }
         assert_eq!(outputs[0], outputs[1]);
     }
@@ -8099,7 +8060,7 @@ mod tests {
             let commit = edit.commit().expect("picture commit and full reopen");
             let marker = if floating { '\u{0008}' } else { '\u{0001}' };
             assert_eq!(
-                commit.snapshot().paragraphs(Projection::All).unwrap()[0].text(),
+                commit.package().paragraphs(Projection::All).unwrap()[0].text(),
                 marker.to_string()
             );
             assert_eq!(
@@ -8114,7 +8075,7 @@ mod tests {
                 commit
                     .patch()
                     .inverse()
-                    .apply(commit.snapshot())
+                    .apply(commit.package())
                     .expect("exact picture inverse"),
                 receiver
             );
@@ -8125,7 +8086,7 @@ mod tests {
             let replay = receiver
                 .apply_durable(&durable)
                 .expect("picture durable replay and reopen");
-            assert_eq!(&replay, commit.snapshot());
+            assert_eq!(&replay, commit.package());
             let durable_restored = replay
                 .apply_durable(&durable.inverse())
                 .expect("picture durable inverse and reopen");
@@ -8159,18 +8120,18 @@ mod tests {
             assert!(merged.is_conflict_free());
             let merged = merged.commit().expect("picture/text merge");
             assert_eq!(
-                merged.snapshot().paragraphs(Projection::All).unwrap()[1].text(),
+                merged.package().paragraphs(Projection::All).unwrap()[1].text(),
                 "changed"
             );
 
             let mut history = receiver.history(HistoryLimits::new(1, u64::MAX));
             history
-                .record(commit.snapshot().clone(), 1)
+                .record(commit.package().clone(), 1)
                 .expect("picture history record");
             assert!(history.undo());
             assert_eq!(history.current(), &receiver);
             assert!(history.redo());
-            assert_eq!(history.current(), commit.snapshot());
+            assert_eq!(history.current(), commit.package());
         }
     }
 
@@ -8275,7 +8236,7 @@ mod tests {
                 &empty
                     .apply_durable(&durable)
                     .expect("re-homed picture durable replay"),
-                commit.snapshot()
+                commit.package()
             );
         }
 

@@ -317,7 +317,7 @@ fn run_case(source: &[u8], args: &Args, retention: Retention) -> Result<CaseResu
     let final_retained_before_commit = edit.retained_render_bytes();
     let commit = edit.commit()?;
     let semantic_change_count = commit.patch().changes().len();
-    let output = commit.snapshot().bytes().to_vec();
+    let output = commit.package().bytes().to_vec();
     let output_capacity = output.capacity();
     black_box(output.len());
     Ok(CaseResult {
@@ -576,8 +576,8 @@ fn patch_and_refusal_gates(
     let commit = edit.commit()?;
     let patch = commit.patch().clone();
     let forward = patch.apply(&source_snapshot)?;
-    let forward_exact = forward.bytes() == commit.snapshot().bytes();
-    let inverse = patch.inverse().apply(commit.snapshot())?;
+    let forward_exact = forward.bytes() == commit.package().bytes();
+    let inverse = patch.inverse().apply(commit.package())?;
     let inverse_exact = inverse.bytes() == source_snapshot.bytes();
 
     let foreign_bytes = source_for_other_case(args.case, &args.input)?;
@@ -587,7 +587,7 @@ fn patch_and_refusal_gates(
         transaction_limits(Retention::Zero),
     )?;
     let foreign_refused = patch.apply(&foreign).is_err();
-    let stale_refused = patch.apply(commit.snapshot()).is_err();
+    let stale_refused = patch.apply(commit.package()).is_err();
     Ok((forward_exact, inverse_exact, foreign_refused, stale_refused))
 }
 
@@ -605,14 +605,14 @@ fn exact_noop_gate(
     edit.replace_paragraph(Position::new(0), original)?;
     let no_retained_token = edit.retained_render_bytes().is_none();
     let commit = edit.commit()?;
-    let exact_source = !commit.changed()
+    let exact_source = !commit.diagnostics().changed()
         && commit.patch().is_noop()
         && commit.patch().changes().len() == 0
-        && commit.snapshot().bytes() == source
+        && commit.package().bytes() == source
         && no_retained_token;
     let shares_source_allocation = Arc::ptr_eq(
         &source_snapshot.bytes_shared(),
-        &commit.snapshot().bytes_shared(),
+        &commit.package().bytes_shared(),
     );
     Ok((exact_source, shares_source_allocation))
 }
@@ -626,7 +626,7 @@ fn atomic_edit_controls(source: &[u8]) -> Result<(bool, bool), BoxError> {
     let mut one_operation = source_snapshot.edit()?;
     one_operation.replace_paragraph(Position::new(0), FIRST_TEXT)?;
     let one_operation_commit = one_operation.commit()?;
-    let one_operation_bytes = one_operation_commit.snapshot().bytes().to_vec();
+    let one_operation_bytes = one_operation_commit.package().bytes().to_vec();
     let one_operation_patch_count = one_operation_commit.patch().changes().len();
 
     let mut same_value = source_snapshot.edit()?;
@@ -637,13 +637,13 @@ fn atomic_edit_controls(source: &[u8]) -> Result<(bool, bool), BoxError> {
         same_value.retained_render_bytes() == held_before_same_value;
     let same_value_commit = same_value.commit()?;
     let same_value_snapshot = Snapshot::open(
-        same_value_commit.snapshot().bytes().to_vec(),
+        same_value_commit.package().bytes().to_vec(),
         Limits::default(),
     )?;
-    let same_value_matches_one_operation = same_value_commit.changed()
+    let same_value_matches_one_operation = same_value_commit.diagnostics().changed()
         && !same_value_commit.patch().is_noop()
         && same_value_commit.patch().changes().len() == one_operation_patch_count
-        && same_value_commit.snapshot().bytes() == one_operation_bytes
+        && same_value_commit.package().bytes() == one_operation_bytes
         && paragraph_zero_text(&same_value_snapshot)? == FIRST_TEXT;
 
     let limited = TransactionLimits::new(1, 4096, 4096)
@@ -652,7 +652,7 @@ fn atomic_edit_controls(source: &[u8]) -> Result<(bool, bool), BoxError> {
     let mut limited_control = limited_snapshot.edit()?;
     limited_control.replace_paragraph(Position::new(0), FIRST_TEXT)?;
     let limited_control_commit = limited_control.commit()?;
-    let limited_control_bytes = limited_control_commit.snapshot().bytes().to_vec();
+    let limited_control_bytes = limited_control_commit.package().bytes().to_vec();
     let limited_control_patch_count = limited_control_commit.patch().changes().len();
 
     let mut refused = limited_snapshot.edit()?;
@@ -666,13 +666,13 @@ fn atomic_edit_controls(source: &[u8]) -> Result<(bool, bool), BoxError> {
     let refusal_retention_unchanged = refused.retained_render_bytes() == held_before_refusal;
     let refusal_commit = refused.commit()?;
     let refusal_snapshot = Snapshot::open(
-        refusal_commit.snapshot().bytes().to_vec(),
+        refusal_commit.package().bytes().to_vec(),
         Limits::default(),
     )?;
-    let refusal_output_matches_one_operation = refusal_commit.changed()
+    let refusal_output_matches_one_operation = refusal_commit.diagnostics().changed()
         && !refusal_commit.patch().is_noop()
         && refusal_commit.patch().changes().len() == limited_control_patch_count
-        && refusal_commit.snapshot().bytes() == limited_control_bytes
+        && refusal_commit.package().bytes() == limited_control_bytes
         && refusal_snapshot.bytes() == limited_control_bytes
         && paragraph_zero_text(&refusal_snapshot)? == FIRST_TEXT;
     Ok((

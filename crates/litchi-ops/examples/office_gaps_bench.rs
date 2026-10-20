@@ -269,7 +269,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "doc_text_set",
             10,
             || {
-                black_box(native_once());
+                let _commit = black_box(native_once());
             },
             || {
                 black_box(unified_once());

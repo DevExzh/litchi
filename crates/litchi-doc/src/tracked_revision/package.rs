@@ -4080,11 +4080,11 @@ mod picture_group_tests {
         edit.apply_picture_transfer(&plan).unwrap();
         let commit = edit.commit().unwrap();
         assert_eq!(
-            commit.snapshot().paragraphs(Projection::All).unwrap()[0].text(),
+            commit.package().paragraphs(Projection::All).unwrap()[0].text(),
             "\u{0008}"
         );
         assert_eq!(
-            commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+            commit.patch().inverse().apply(commit.package()).unwrap(),
             receiver
         );
     }

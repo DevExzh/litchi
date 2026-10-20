@@ -63,13 +63,13 @@ fn real_multi_generation_docs_resize_and_fully_reopen() {
             .replace_paragraph(target.position(), &replacement)
             .expect("fixture length change");
         let commit = transaction.commit().expect("fixture commit");
-        let mut package = Reader::from_reader(Cursor::new(commit.snapshot().finish()))
+        let mut package = Reader::from_reader(Cursor::new(commit.package().finish()))
             .expect("edited CFB reopens");
         let document = package.document().expect("edited DOC reopens");
         assert_eq!(document.fib().version(), expected_nfib);
         assert_eq!(
             commit
-                .snapshot()
+                .package()
                 .paragraphs(Projection::All)
                 .expect("semantic readback")[target.position().get()]
             .text(),
@@ -133,7 +133,7 @@ fn real_story_field_and_table_targets_fully_reopen() {
         .set_character_property(header.target(), CharacterProperty::Italic, true)
         .expect("header direct format");
     let header_commit = header_edit.commit().expect("header commit");
-    let mut header_package = Reader::from_reader(Cursor::new(header_commit.snapshot().finish()))
+    let mut header_package = Reader::from_reader(Cursor::new(header_commit.package().finish()))
         .expect("formatted header CFB reopens");
     assert_eq!(
         header_package
@@ -159,12 +159,12 @@ fn real_story_field_and_table_targets_fully_reopen() {
         .replace_text(field.target(), &field_replacement)
         .expect("field result resize");
     let field_commit = field_edit.commit().expect("field commit");
-    let mut field_package = Reader::from_reader(Cursor::new(field_commit.snapshot().finish()))
+    let mut field_package = Reader::from_reader(Cursor::new(field_commit.package().finish()))
         .expect("field CFB reopens");
     field_package.document().expect("field DOC reopens");
     assert_eq!(
         field_commit
-            .snapshot()
+            .package()
             .field_results()
             .expect("field semantic readback")
             .into_iter()
@@ -189,7 +189,7 @@ fn real_story_field_and_table_targets_fully_reopen() {
         .replace_text(cell.target(), &cell_replacement)
         .expect("table cell resize");
     let table_commit = table_edit.commit().expect("table commit");
-    let mut table_package = Reader::from_reader(Cursor::new(table_commit.snapshot().finish()))
+    let mut table_package = Reader::from_reader(Cursor::new(table_commit.package().finish()))
         .expect("table CFB reopens");
     table_package.document().expect("table DOC reopens");
 }
@@ -240,7 +240,7 @@ fn genuine_embedded_object_transfer_closes_cfb_field_preview_and_storage() {
     edit.apply_embedded_transfer(&plan)
         .expect("real resource transfer");
     let commit = edit.commit().expect("real resource transfer commit");
-    let mut package = Reader::from_reader(Cursor::new(commit.snapshot().finish()))
+    let mut package = Reader::from_reader(Cursor::new(commit.package().finish()))
         .expect("transferred resource CFB reopens");
     assert_eq!(
         package
@@ -252,7 +252,7 @@ fn genuine_embedded_object_transfer_closes_cfb_field_preview_and_storage() {
     );
     assert!(
         commit
-            .snapshot()
+            .package()
             .embedded_objects()
             .expect("transferred real inventory")
             .get(9_001)
@@ -262,7 +262,7 @@ fn genuine_embedded_object_transfer_closes_cfb_field_preview_and_storage() {
         commit
             .patch()
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .expect("real resource exact inverse"),
         receiver
     );
@@ -365,7 +365,7 @@ fn genuine_receivers_accept_pictures_beside_main_and_header_drawings() {
             .expect("install genuine picture graph");
         let commit = edit.commit().expect("genuine picture full reopen");
 
-        let mut package = Reader::from_reader(Cursor::new(commit.snapshot().finish()))
+        let mut package = Reader::from_reader(Cursor::new(commit.package().finish()))
             .expect("picture receiver CFB reopens");
         let document = package.document().expect("picture receiver DOC reopens");
         assert_eq!(document.fib().version(), 0x0101);
@@ -381,7 +381,7 @@ fn genuine_receivers_accept_pictures_beside_main_and_header_drawings() {
             commit
                 .patch()
                 .inverse()
-                .apply(commit.snapshot())
+                .apply(commit.package())
                 .expect("genuine picture exact inverse"),
             receiver
         );
@@ -502,5 +502,5 @@ fn a_smart_tag_end_inside_the_paragraph_is_a_typed_refusal() {
         .position();
     edit.replace_paragraph(edge, "Plain")
         .expect("a tag that ends at the paragraph's edge is kept");
-    edit.commit().expect("commit");
+    let _commit = edit.commit().expect("commit");
 }

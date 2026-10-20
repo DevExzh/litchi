@@ -261,7 +261,7 @@ fn signed_dofr_noop_is_allowed_but_changed_source_is_refused() {
             .expect("signed exact no-op")
     );
     assert_eq!(
-        no_op.commit().expect("no-op commit").snapshot().bytes(),
+        no_op.commit().expect("no-op commit").package().bytes(),
         source.bytes()
     );
 
@@ -272,7 +272,7 @@ fn signed_dofr_noop_is_allowed_but_changed_source_is_refused() {
         Err(Error::Refused(Refusal::SignedSource))
     ));
     assert_eq!(
-        changed.commit().expect("refused commit").snapshot().bytes(),
+        changed.commit().expect("refused commit").package().bytes(),
         source.bytes()
     );
 }
@@ -321,7 +321,7 @@ fn reopened_identical_source_with_different_limits_accepts_dofr_patch() {
     assert!(edit.apply_dofr_patch(&patch).expect("same-source patch"));
     let committed = edit.commit().expect("reopened commit");
     let records = committed
-        .snapshot()
+        .package()
         .dofr_records()
         .expect("Dofr read")
         .expect("Dofr records");
@@ -403,7 +403,7 @@ fn duplicate_unsigned_stw_user_names_are_conservatively_signed() {
             .expect("malformed exact no-op")
     );
     assert_eq!(
-        no_op.commit().expect("no-op commit").snapshot().bytes(),
+        no_op.commit().expect("no-op commit").package().bytes(),
         source.bytes()
     );
 
@@ -581,7 +581,7 @@ fn dofr_save_reopen_and_inverse_restore_exact_source() {
     let mut edit = source.edit().expect("edit");
     assert!(edit.apply_dofr_patch(&patch).expect("apply patch"));
     let commit = edit.commit().expect("commit");
-    let reopened = Snapshot::open(commit.snapshot().finish(), Limits::default()).expect("reopen");
+    let reopened = Snapshot::open(commit.package().finish(), Limits::default()).expect("reopen");
     let reopened_records = reopened
         .dofr_records()
         .expect("reopened Dofr")

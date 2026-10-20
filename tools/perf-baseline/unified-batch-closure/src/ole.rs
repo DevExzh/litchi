@@ -41,7 +41,7 @@ fn doc(counts: &[usize]) -> Result<Vec<Case<'static>>> {
     let file = eager(bytes)?;
     fn leaf(native: &litchi_doc::Package, texts: &[String]) -> Result<litchi_doc::Package> {
         let limits = crate::limits();
-        let options = litchi_doc::EditOptions::default().with_transaction_limits(
+        let options = litchi_doc::EditOptions::default().transaction_limits(
             litchi_doc::body_text::TransactionLimits::new(
                 limits.max_operations(),
                 usize::MAX,

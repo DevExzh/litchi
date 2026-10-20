@@ -411,9 +411,6 @@ impl SourceBackedOptions {
     }
 }
 
-/// Alias retained for callers that spell the owner as a source transaction.
-pub type SourceOptions = SourceBackedOptions;
-
 /// One paragraph selected by its ordinary zero-based position.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Paragraph {
@@ -434,9 +431,6 @@ impl Paragraph {
         &self.text
     }
 }
-
-/// Descriptive name for [`Paragraph`] in the source-backed API.
-pub type SourceParagraph = Paragraph;
 
 #[derive(Clone)]
 struct SourceInner {
@@ -965,9 +959,9 @@ impl SourceSnapshot {
     }
 
     /// Starts an isolated source-backed transaction for one paragraph.
-    pub fn edit_paragraph(&self, position: Position) -> Result<Transaction> {
+    pub fn edit_paragraph(&self, position: Position) -> Result<Edit> {
         let resolved = self.resolve(position)?;
-        Ok(Transaction {
+        Ok(Edit {
             source: self.clone(),
             resolved,
             replacement: None,
@@ -975,12 +969,12 @@ impl SourceSnapshot {
     }
 
     /// Alias for [`Self::edit_paragraph`].
-    pub fn transaction(&self, position: Position) -> Result<Transaction> {
+    pub fn transaction(&self, position: Position) -> Result<Edit> {
         self.edit_paragraph(position)
     }
 
     /// Short alias for [`Self::edit_paragraph`].
-    pub fn edit(&self, position: Position) -> Result<Transaction> {
+    pub fn edit(&self, position: Position) -> Result<Edit> {
         self.edit_paragraph(position)
     }
 
@@ -1028,17 +1022,18 @@ impl SourceSnapshot {
     }
 }
 
-/// One isolated, equal-UTF-16-width paragraph replacement.
-pub struct Transaction {
+/// One staged, equal-UTF-16-width paragraph replacement. Dropping it
+/// discards it.
+pub struct Edit {
     source: SourceSnapshot,
     resolved: ResolvedParagraph,
     replacement: Option<String>,
 }
 
-impl fmt::Debug for Transaction {
+impl fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("Transaction")
+            .debug_struct("Edit")
             .field("position", &self.resolved.position)
             .field("text_units", &self.resolved.text.encode_utf16().count())
             .field("staged", &self.replacement.is_some())
@@ -1046,7 +1041,7 @@ impl fmt::Debug for Transaction {
     }
 }
 
-impl Transaction {
+impl Edit {
     /// Source text currently read for the selected paragraph.
     #[must_use]
     pub fn text(&self) -> &str {
@@ -1057,12 +1052,6 @@ impl Transaction {
     #[must_use]
     pub const fn position(&self) -> Position {
         self.resolved.position
-    }
-
-    /// Alias for [`Self::position`].
-    #[must_use]
-    pub const fn target(&self) -> Position {
-        self.position()
     }
 
     /// Stages a replacement only when UTF-16 width is unchanged.
@@ -1082,22 +1071,12 @@ impl Transaction {
         Ok(())
     }
 
-    /// Alias for [`Self::set_text`].
-    pub fn replace_paragraph(&mut self, value: impl Into<String>) -> Result<()> {
-        self.set_text(value)
-    }
-
     /// Publishes the checked same-length replacement.
     pub fn commit(self) -> Result<Commit> {
         let replacement = self
             .replacement
             .unwrap_or_else(|| self.resolved.text.clone());
         publish(self.source, self.resolved, replacement)
-    }
-
-    /// Alias emphasizing the source-backed publication boundary.
-    pub fn commit_source_backed(self) -> Result<Commit> {
-        self.commit()
     }
 }
 
@@ -1170,9 +1149,6 @@ impl Diagnostics {
     }
 }
 
-/// Alias used by the other source-backed format owners.
-pub type SourceBackedDiagnostics = Diagnostics;
-
 /// A published source-backed DOC target and its reversible patch.
 pub struct Commit {
     snapshot: SourceSnapshot,
@@ -1219,11 +1195,6 @@ impl Commit {
     /// Streams the complete validated target to a sequential sink.
     pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport> {
         self.plan.write_to(writer).map_err(Error::Overlay)
-    }
-
-    /// Alias emphasizing the forward-only stream boundary.
-    pub fn publish_to_stream<W: Write>(&self, writer: &mut W) -> Result<PublishReport> {
-        self.write_to(writer)
     }
 
     /// Publishes through the common synced sibling-temp/atomic-rename path.
@@ -1334,11 +1305,6 @@ impl Patch {
         }
     }
 }
-
-/// Compatibility aliases matching the names used by other source owners.
-pub type SourceTransaction = Transaction;
-pub type SourceBackedCommit = Commit;
-pub type SourceBackedPatch = Patch;
 
 #[derive(Clone)]
 struct Operation {

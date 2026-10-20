@@ -28225,17 +28225,17 @@ fn run_doc_owner_public_phases(
         &updated_writer_text("doc", 0, selected, 0),
     )?;
     let ordinary_commit = ordinary_edit.commit()?;
-    if !ordinary_commit.changed()
+    if !ordinary_commit.diagnostics().changed()
         || ordinary_commit.patch().is_noop()
         || ordinary_commit.patch().changes().len() != 1
     {
         return Err("DOC changed preflight did not produce one semantic change".into());
     }
-    let expected_changed = ordinary_commit.snapshot().finish();
+    let expected_changed = ordinary_commit.package().finish();
     verify_semantic_doc(&expected_changed, shape, Some(selected))?;
 
     let applied = ordinary_commit.patch().apply(&source)?;
-    if applied.bytes() != ordinary_commit.snapshot().bytes()
+    if applied.bytes() != ordinary_commit.package().bytes()
         || applied.bytes() != expected_changed.as_slice()
     {
         return Err("DOC changed patch replay differs from the expected output".into());
@@ -28257,10 +28257,10 @@ fn run_doc_owner_public_phases(
     }
 
     let no_op = source.clone().edit()?.commit()?;
-    if no_op.changed()
+    if no_op.diagnostics().changed()
         || !no_op.patch().is_noop()
         || no_op.patch().changes().len() != 0
-        || no_op.snapshot().bytes() != source.bytes()
+        || no_op.package().bytes() != source.bytes()
     {
         return Err("DOC exact no-op preflight changed the source".into());
     }
@@ -28278,9 +28278,9 @@ fn run_doc_owner_public_phases(
     let no_op_profile_commit =
         no_op_profile_edit.commit_profiled(|event| no_op_recorder.observe(event))?;
     no_op_recorder.validate(&no_op_expected)?;
-    if no_op_profile_commit.changed()
+    if no_op_profile_commit.diagnostics().changed()
         || !no_op_profile_commit.patch().is_noop()
-        || no_op_profile_commit.snapshot().bytes() != source.bytes()
+        || no_op_profile_commit.package().bytes() != source.bytes()
     {
         return Err("DOC profiled exact no-op contract changed the source".into());
     }
@@ -28334,7 +28334,7 @@ fn run_doc_owner_public_phases(
 
         let (commit, edit_phases, edit_commit_outer_ns) = profile_doc_changed_commit(edit)?;
         let output_started = Instant::now();
-        let output = commit.snapshot().finish();
+        let output = commit.package().finish();
         let output_materialization_ns = elapsed_ns(output_started.elapsed())?;
         let measured_total_ns = elapsed_ns(lifecycle_started.elapsed())?;
 
@@ -28387,7 +28387,7 @@ fn run_doc_owner_public_phases(
             workflow_with_fingerprint_demand_ns,
         ));
 
-        if !commit.changed()
+        if !commit.diagnostics().changed()
             || commit.patch().is_noop()
             || commit.patch().changes().len() != 1
             || output != expected_changed
@@ -28567,7 +28567,7 @@ fn run_semantic_doc(
             Position::new(selected),
             &updated_writer_text("doc", 0, selected, 0),
         )?;
-        edit.commit()?.snapshot().finish()
+        edit.commit()?.package().finish()
     } else {
         corpus.archive.clone()
     };
@@ -28678,9 +28678,9 @@ fn run_semantic_doc(
                     )?;
                 }
                 let commit = edit.commit()?;
-                let bytes = commit.snapshot().finish();
+                let bytes = commit.package().finish();
                 let duration = started.elapsed();
-                if commit.changed() != updated
+                if commit.diagnostics().changed() != updated
                     || commit.patch().is_noop() == updated
                     || commit.patch().changes().len() != usize::from(updated)
                     || bytes != expected_changed
@@ -28688,7 +28688,7 @@ fn run_semantic_doc(
                     return Err("semantic DOC edit/save has unexpected publication state".into());
                 }
                 let applied = commit.patch().apply(&source)?;
-                if applied.bytes() != commit.snapshot().bytes() {
+                if applied.bytes() != commit.package().bytes() {
                     return Err("semantic DOC exact patch replay differs from commit".into());
                 }
                 let restored = commit.patch().inverse().apply(&applied)?;
@@ -67264,7 +67264,7 @@ mod tests {
                 &updated_writer_text("doc", 0, selected, 0),
             )
             .unwrap();
-        let expected_target = expected_edit.commit().unwrap().snapshot().finish();
+        let expected_target = expected_edit.commit().unwrap().package().finish();
         assert_eq!(
             evidence.expected_target_fingerprint,
             doc_body_text_fnv1a(&expected_target)
