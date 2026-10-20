@@ -6,6 +6,7 @@
 mod codec;
 mod edit;
 pub(crate) mod inline;
+mod limit;
 mod model;
 mod package;
 #[allow(

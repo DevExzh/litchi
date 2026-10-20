@@ -90,9 +90,11 @@ impl Extensions {
     /// Parse direct settings extensions from a complete `w:settings` part.
     pub(crate) fn parse(xml: &[u8]) -> Result<Self> {
         if xml.len() > MAX_SETTINGS_XML_BYTES {
-            return Err(invalid(format!(
-                "settings XML exceeds {MAX_SETTINGS_XML_BYTES} bytes"
-            )));
+            return Err(Error::SettingsLimit {
+                kind: crate::settings::LimitKind::XmlBytes,
+                actual: xml.len(),
+                maximum: MAX_SETTINGS_XML_BYTES,
+            });
         }
 
         let mut reader = NsReader::from_reader(xml);
@@ -165,9 +167,11 @@ impl Extensions {
                         .checked_add(1)
                         .ok_or_else(|| invalid("settings XML nesting is too deep"))?;
                     if depth > MAX_SETTINGS_XML_DEPTH {
-                        return Err(invalid(format!(
-                            "settings XML exceeds depth {MAX_SETTINGS_XML_DEPTH}"
-                        )));
+                        return Err(Error::SettingsLimit {
+                            kind: crate::settings::LimitKind::XmlDepth,
+                            actual: depth,
+                            maximum: MAX_SETTINGS_XML_DEPTH,
+                        });
                     }
                 },
                 Event::Empty(element) => {
@@ -176,9 +180,11 @@ impl Extensions {
                         .checked_add(1)
                         .ok_or_else(|| invalid("settings XML nesting is too deep"))?;
                     if child_depth > MAX_SETTINGS_XML_DEPTH {
-                        return Err(invalid(format!(
-                            "settings XML exceeds depth {MAX_SETTINGS_XML_DEPTH}"
-                        )));
+                        return Err(Error::SettingsLimit {
+                            kind: crate::settings::LimitKind::XmlDepth,
+                            actual: child_depth,
+                            maximum: MAX_SETTINGS_XML_DEPTH,
+                        });
                     }
                     if depth == 0 {
                         validate_root(
@@ -347,9 +353,11 @@ impl Extensions {
 /// stable.
 pub(crate) fn rewrite(xml: &[u8], next: &Extensions) -> Result<Vec<u8>> {
     if xml.len() > MAX_SETTINGS_XML_BYTES {
-        return Err(invalid(format!(
-            "settings XML exceeds {MAX_SETTINGS_XML_BYTES} bytes"
-        )));
+        return Err(Error::SettingsLimit {
+            kind: crate::settings::LimitKind::XmlBytes,
+            actual: xml.len(),
+            maximum: MAX_SETTINGS_XML_BYTES,
+        });
     }
     next.validate()?;
     let current = Extensions::parse(xml)?;
@@ -438,9 +446,11 @@ pub(crate) fn rewrite(xml: &[u8], next: &Extensions) -> Result<Vec<u8>> {
             .ok_or_else(|| invalid("settings extension rewrite size overflows usize"))?;
     }
     if output_len > MAX_SETTINGS_XML_BYTES {
-        return Err(invalid(format!(
-            "settings XML exceeds {MAX_SETTINGS_XML_BYTES} bytes after extension edit"
-        )));
+        return Err(Error::SettingsLimit {
+            kind: crate::settings::LimitKind::XmlBytes,
+            actual: output_len,
+            maximum: MAX_SETTINGS_XML_BYTES,
+        });
     }
 
     let mut output = Vec::new();
@@ -571,9 +581,11 @@ fn locate_layout(xml: &[u8]) -> Result<Layout> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("settings XML nesting is too deep"))?;
                 if depth > MAX_SETTINGS_XML_DEPTH {
-                    return Err(invalid(format!(
-                        "settings XML exceeds depth {MAX_SETTINGS_XML_DEPTH}"
-                    )));
+                    return Err(Error::SettingsLimit {
+                        kind: crate::settings::LimitKind::XmlDepth,
+                        actual: depth,
+                        maximum: MAX_SETTINGS_XML_DEPTH,
+                    });
                 }
             },
             Event::Empty(element) => {
@@ -581,9 +593,11 @@ fn locate_layout(xml: &[u8]) -> Result<Layout> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("settings XML nesting is too deep"))?;
                 if child_depth > MAX_SETTINGS_XML_DEPTH {
-                    return Err(invalid(format!(
-                        "settings XML exceeds depth {MAX_SETTINGS_XML_DEPTH}"
-                    )));
+                    return Err(Error::SettingsLimit {
+                        kind: crate::settings::LimitKind::XmlDepth,
+                        actual: child_depth,
+                        maximum: MAX_SETTINGS_XML_DEPTH,
+                    });
                 }
                 if depth == 0 {
                     validate_root(
@@ -945,9 +959,11 @@ fn count_node(nodes: &mut usize) -> Result<()> {
         .checked_add(1)
         .ok_or_else(|| invalid("settings XML node counter overflow"))?;
     if *nodes > MAX_SETTINGS_XML_NODES {
-        return Err(invalid(format!(
-            "settings XML exceeds {MAX_SETTINGS_XML_NODES} nodes"
-        )));
+        return Err(Error::SettingsLimit {
+            kind: crate::settings::LimitKind::XmlNodes,
+            actual: *nodes,
+            maximum: MAX_SETTINGS_XML_NODES,
+        });
     }
     Ok(())
 }
@@ -1072,13 +1088,13 @@ fn capture_unknown(
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("settings XML nesting is too deep"))?;
-                if parent_depth
-                    .checked_add(depth)
-                    .is_none_or(|value| value > MAX_SETTINGS_XML_DEPTH)
-                {
-                    return Err(invalid(format!(
-                        "settings XML exceeds depth {MAX_SETTINGS_XML_DEPTH}"
-                    )));
+                let total = parent_depth.checked_add(depth).unwrap_or(usize::MAX);
+                if total > MAX_SETTINGS_XML_DEPTH {
+                    return Err(Error::SettingsLimit {
+                        kind: crate::settings::LimitKind::XmlDepth,
+                        actual: total,
+                        maximum: MAX_SETTINGS_XML_DEPTH,
+                    });
                 }
             },
             Event::Empty(_) => count_node(nodes)?,

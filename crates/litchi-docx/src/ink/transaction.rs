@@ -1,5 +1,6 @@
 //! Source-checked annotation authoring and reversible package publication.
 
+use crate::ink::LimitKind;
 use std::sync::Arc;
 
 use litchi_core::Position;
@@ -226,7 +227,7 @@ impl Edit {
     ) -> Result<()> {
         self.check_operation_count(self.operation_count().saturating_add(1))?;
         bound(
-            "payload bytes",
+            LimitKind::PayloadBytes,
             payload.as_bytes().len(),
             self.limits.inventory.max_payload_bytes,
         )?;
@@ -236,7 +237,7 @@ impl Edit {
             .saturating_add(style.fallback().map_or(0, |image| image.as_bytes().len()));
         let input_bytes = self.input_bytes.saturating_add(charge);
         bound(
-            "edit staged bytes",
+            LimitKind::EditStagedBytes,
             input_bytes,
             self.limits.max_staged_bytes,
         )?;
@@ -284,7 +285,7 @@ impl Edit {
             ));
         }
         bound(
-            "payload bytes",
+            LimitKind::PayloadBytes,
             payload.as_bytes().len(),
             self.limits.inventory.max_payload_bytes,
         )?;
@@ -319,7 +320,7 @@ impl Edit {
             .saturating_sub(previous_charge)
             .saturating_add(replacement_charge(&replacement));
         bound(
-            "edit staged bytes",
+            LimitKind::EditStagedBytes,
             input_bytes,
             self.limits.max_staged_bytes,
         )?;
@@ -348,7 +349,7 @@ impl Edit {
     }
 
     fn check_operation_count(&self, count: usize) -> Result<()> {
-        bound("edit operations", count, self.limits.max_operations)
+        bound(LimitKind::EditOperations, count, self.limits.max_operations)
     }
 
     /// Queue removal of one annotation at its base-snapshot position.
@@ -379,7 +380,7 @@ impl Edit {
             Ok(_) => Ok(false),
             Err(index) => {
                 bound(
-                    "edit operations",
+                    LimitKind::EditOperations,
                     self.operation_count().saturating_add(1),
                     self.limits.max_operations,
                 )?;
@@ -489,7 +490,7 @@ impl Edit {
                         .saturating_mul(2),
                 );
             bound(
-                "edit staged bytes",
+                LimitKind::EditStagedBytes,
                 staged_bytes.saturating_add(initial_charge),
                 self.limits.max_staged_bytes,
             )?;
@@ -531,7 +532,7 @@ impl Edit {
                 .saturating_add(after.bytes().len())
                 .saturating_add(graph.retained_bytes()?);
             bound(
-                "edit staged bytes",
+                LimitKind::EditStagedBytes,
                 staged_bytes,
                 self.limits.max_staged_bytes,
             )?;
@@ -748,7 +749,7 @@ impl Package {
             total = total
                 .checked_add(part.blob().len())
                 .ok_or_else(|| Error::Invalid("DOCX Ink edit source size overflow".into()))?;
-            bound("edit package bytes", total, limits.max_package_bytes)?;
+            bound(LimitKind::EditPackageBytes, total, limits.max_package_bytes)?;
         }
         let snapshot = super::package::load(package, limits.inventory)?;
         let binding = Binding::capture(package, limits.inventory)?;
@@ -837,10 +838,10 @@ fn is_annotation(
             && super::package::has_ink_root(part.blob())?))
 }
 
-fn bound(resource: &'static str, actual: usize, maximum: usize) -> Result<()> {
+fn bound(resource: LimitKind, actual: usize, maximum: usize) -> Result<()> {
     if actual > maximum {
         Err(Error::InkLimit {
-            resource,
+            kind: resource,
             actual,
             maximum,
         })

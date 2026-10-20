@@ -81,7 +81,11 @@ impl DomBudget {
             .checked_add(1)
             .ok_or_else(|| invalid("glossary XML token count overflow"))?;
         if self.tokens > MAX_DOM_TOKENS {
-            return Err(invalid("glossary XML token limit exceeded"));
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlToken,
+                actual: self.tokens,
+                maximum: MAX_DOM_TOKENS,
+            });
         }
         Ok(())
     }
@@ -92,7 +96,11 @@ impl DomBudget {
             .checked_add(1)
             .ok_or_else(|| invalid("glossary XML node count overflow"))?;
         if self.nodes > MAX_NODES {
-            return Err(invalid("glossary XML node limit exceeded"));
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlNode,
+                actual: self.nodes,
+                maximum: MAX_NODES,
+            });
         }
         self.charge(size_of::<Node>() + size_of::<NamespaceFrame>())
     }
@@ -121,7 +129,11 @@ impl DomBudget {
             .checked_add(1)
             .ok_or_else(|| invalid("glossary XML attribute count overflow"))?;
         if self.attributes > MAX_DOM_ATTRIBUTES {
-            return Err(invalid("glossary XML aggregate attribute limit exceeded"));
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlAggregateAttribute,
+                actual: self.attributes,
+                maximum: MAX_DOM_ATTRIBUTES,
+            });
         }
         self.charge(
             size_of::<Attr>()
@@ -138,7 +150,11 @@ impl DomBudget {
             .checked_add(1)
             .ok_or_else(|| invalid("glossary XML content count overflow"))?;
         if self.contents > MAX_DOM_CONTENT {
-            return Err(invalid("glossary XML content token limit exceeded"));
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlContentToken,
+                actual: self.contents,
+                maximum: MAX_DOM_CONTENT,
+            });
         }
         let owned = match content {
             Content::Node(_) => 0,
@@ -251,7 +267,11 @@ pub(in crate::glossary) fn parse_dom(xml: &[u8]) -> Result<Node> {
             Event::Start(e) => {
                 budget.node()?;
                 if stack.len() >= MAX_DEPTH {
-                    return Err(invalid("glossary XML resource limit exceeded"));
+                    return Err(crate::Error::GlossaryLimit {
+                        kind: crate::glossary::LimitKind::XmlDepth,
+                        actual: (stack.len()).saturating_add(1),
+                        maximum: MAX_DEPTH,
+                    });
                 }
                 stack.push(make(&e, d, &stack, &mut resolver, &mut budget)?);
             },
@@ -333,7 +353,11 @@ pub(in crate::glossary) fn make(
     let mut raw = Vec::new();
     for a in e.checked_attributes() {
         if raw.len() >= MAX_VALUES {
-            return Err(invalid("glossary XML attribute limit exceeded"));
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlAttribute,
+                actual: (raw.len()).saturating_add(1),
+                maximum: MAX_VALUES,
+            });
         }
         raw.try_reserve(1).map_err(|source| Error::Allocation {
             resource: "glossary XML attributes",
@@ -370,7 +394,11 @@ pub(in crate::glossary) fn make(
         .checked_add(local_bindings.len())
         .ok_or_else(|| invalid("glossary namespace binding count overflow"))?;
     if declaration_count > MAX_VALUES {
-        return Err(invalid("glossary namespace binding limit exceeded"));
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::NamespaceBinding,
+            actual: declaration_count,
+            maximum: MAX_VALUES,
+        });
     }
     let bindings = Arc::new(NamespaceFrame {
         parent,

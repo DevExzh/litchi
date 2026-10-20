@@ -122,7 +122,11 @@ pub mod raw {
         /// Returns an error if the operation cannot be completed.
         pub fn set_relationships(&mut self, relationships: Vec<Rel>) -> super::Result<()> {
             if relationships.len() > super::MAX_VALUES {
-                return Err(super::invalid("glossary relationship limit exceeded"));
+                return Err(crate::Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::Relationship,
+                    actual: relationships.len(),
+                    maximum: super::MAX_VALUES,
+                });
             }
             let mut ids = std::collections::HashSet::new();
             for relationship in &relationships {
@@ -386,7 +390,11 @@ pub(in crate::glossary) fn put_graph(package: &mut OpcPackage, value: &raw::Grap
     validate_relationship_integrity(effective_catalog, &root, value.conformance)?;
     let staged_root_xml = root.blob_arc();
     if value.parts.len() > MAX_VALUES {
-        return Err(invalid("glossary auxiliary part limit exceeded"));
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::AuxiliaryPart,
+            actual: value.parts.len(),
+            maximum: MAX_VALUES,
+        });
     }
     let mut staged = HashMap::new();
     staged
@@ -770,7 +778,11 @@ pub(in crate::glossary) fn add_relationships(
     conformance: Conformance,
 ) -> Result<()> {
     if relationships.len() > MAX_VALUES {
-        return Err(invalid("glossary relationship limit exceeded"));
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::Relationship,
+            actual: relationships.len(),
+            maximum: MAX_VALUES,
+        });
     }
     let mut ids = HashSet::new();
     for relationship in relationships {
@@ -828,7 +840,11 @@ pub(in crate::glossary) fn validate_relationship_metadata(
 
 pub(in crate::glossary) fn validate_raw_graph_metadata(graph: &raw::Graph) -> Result<()> {
     if graph.parts.len() > MAX_VALUES {
-        return Err(invalid("glossary auxiliary part limit exceeded"));
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::AuxiliaryPart,
+            actual: graph.parts.len(),
+            maximum: MAX_VALUES,
+        });
     }
     let mut relationship_count = 0usize;
     let mut metadata_bytes = 0usize;
@@ -871,13 +887,21 @@ pub(in crate::glossary) fn validate_raw_relationship_set(
     metadata_bytes: &mut usize,
 ) -> Result<()> {
     if relationships.len() > MAX_VALUES {
-        return Err(invalid("glossary relationship limit exceeded"));
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::Relationship,
+            actual: relationships.len(),
+            maximum: MAX_VALUES,
+        });
     }
     *total_count = total_count
         .checked_add(relationships.len())
         .ok_or_else(|| invalid("glossary relationship count overflow"))?;
     if *total_count > MAX_VALUES {
-        return Err(invalid("glossary graph-wide relationship limit exceeded"));
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::GraphWideRelationship,
+            actual: *total_count,
+            maximum: MAX_VALUES,
+        });
     }
     for relationship in relationships {
         validate_relationship_metadata(&relationship.id, &relationship.kind, &relationship.target)?;
@@ -1347,13 +1371,21 @@ pub(in crate::glossary) fn glossary_owned_parts(
         add_graph_metadata(&mut metadata_bytes, part.content_type())?;
         let part_relationship_count = part.rels().iter().count();
         if part_relationship_count > MAX_VALUES {
-            return Err(invalid("glossary relationship limit exceeded"));
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::Relationship,
+                actual: part_relationship_count,
+                maximum: MAX_VALUES,
+            });
         }
         relationship_count = relationship_count
             .checked_add(part_relationship_count)
             .ok_or_else(|| invalid("glossary relationship count overflow"))?;
         if relationship_count > MAX_VALUES {
-            return Err(invalid("glossary graph-wide relationship limit exceeded"));
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::GraphWideRelationship,
+                actual: relationship_count,
+                maximum: MAX_VALUES,
+            });
         }
         for relationship in part.rels().iter() {
             validate_relationship_metadata(
@@ -1405,7 +1437,11 @@ pub(in crate::glossary) fn glossary_owned_parts(
             roles.insert(target.clone(), target_role);
             if owned.insert(target.clone()) {
                 if owned.len() > MAX_VALUES + 1 {
-                    return Err(invalid("glossary owned-part limit exceeded"));
+                    return Err(crate::Error::GlossaryLimit {
+                        kind: crate::glossary::LimitKind::OwnedPart,
+                        actual: owned.len(),
+                        maximum: MAX_VALUES + 1,
+                    });
                 }
                 queue.push_back((target, target_role));
             }

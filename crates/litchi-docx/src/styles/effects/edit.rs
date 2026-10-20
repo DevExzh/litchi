@@ -23,17 +23,7 @@ pub type Error = crate::Error;
 /// diagnostics.
 pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
-/// The configured budgets of the stylesWithEffects family. It has none of
-/// its own: the package's open limits bound the part it reads.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum LimitKind {}
-
-impl std::fmt::Display for LimitKind {
-    fn fmt(&self, _formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {}
-    }
-}
+pub use super::limit::LimitKind;
 
 /// A staged stylesWithEffects change of one owner over one package snapshot.
 /// The source is never changed: [`Self::commit`] publishes a new package,

@@ -416,12 +416,12 @@ impl Docx {
         ))
     }
 
-    /// The eager owner's body block index, if a path step has read it.
+    /// The body block index of this handle's package, if a path step has read it.
     pub(crate) fn cached_body(&self) -> Option<&litchi_docx::Blocks> {
         self.0.body.get()
     }
 
-    /// Remember the eager owner's body block index; a concurrent first read
+    /// Remember the body block index; a concurrent first read
     /// keeps the index stored first (both describe the same part).
     pub(crate) fn cache_body(&self, blocks: litchi_docx::Blocks) -> &litchi_docx::Blocks {
         self.0.body.get_or_init(|| blocks)

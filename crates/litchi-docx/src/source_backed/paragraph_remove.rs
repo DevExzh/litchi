@@ -7,6 +7,5 @@
 
 pub use super::paragraph_copy::{
     Error, Limits, Refusal, RemovalCommit as Commit, RemovalEdit as Edit,
-    RemovalEffectReport as EffectReport, RemovalPatch as Patch, RemovalPublication as Publication,
-    Result, Snapshot,
+    RemovalEffectReport as EffectReport, RemovalPatch as Patch, Result, Snapshot,
 };

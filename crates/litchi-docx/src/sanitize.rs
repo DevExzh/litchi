@@ -498,7 +498,7 @@ fn scan_with_root(
 ) -> Result<(Vec<Wrapper>, EffectReport)> {
     if xml.len() > limits.max_document_bytes {
         return Err(limit(
-            "main-document XML bytes",
+            LimitKind::MainDocumentXmlBytes,
             limits.max_document_bytes,
             xml.len(),
         ));
@@ -533,7 +533,11 @@ fn scan_with_root(
                     .checked_add(1)
                     .ok_or_else(|| invalid("main-document XML depth overflows usize"))?;
                 if depth > limits.max_depth {
-                    return Err(limit("main-document XML depth", limits.max_depth, depth));
+                    return Err(limit(
+                        LimitKind::MainDocumentXmlDepth,
+                        limits.max_depth,
+                        depth,
+                    ));
                 }
                 validate_root(&namespace, &element, depth, &mut roots, expected_root)?;
                 if is_hyperlink(&namespace, element.local_name().as_ref()) {
@@ -559,7 +563,7 @@ fn scan_with_root(
                     .ok_or_else(|| invalid("main-document XML depth overflows usize"))?;
                 if child_depth > limits.max_depth {
                     return Err(limit(
-                        "main-document XML depth",
+                        LimitKind::MainDocumentXmlDepth,
                         limits.max_depth,
                         child_depth,
                     ));
@@ -835,7 +839,7 @@ fn add_element(current: usize, limits: Limits) -> Result<usize> {
         .ok_or_else(|| invalid("main-document element counter overflows usize"))?;
     if next > limits.max_elements {
         return Err(limit(
-            "main-document XML elements",
+            LimitKind::MainDocumentXmlElements,
             limits.max_elements,
             next,
         ));
@@ -846,7 +850,7 @@ fn add_element(current: usize, limits: Limits) -> Result<usize> {
 fn push_wrapper(wrappers: &mut Vec<Wrapper>, wrapper: Wrapper, limits: Limits) -> Result<()> {
     if wrappers.len() >= limits.max_external_hyperlinks {
         return Err(limit(
-            "external hyperlinks",
+            LimitKind::ExternalHyperlinks,
             limits.max_external_hyperlinks,
             wrappers.len().saturating_add(1),
         ));
@@ -935,10 +939,46 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
 
-fn limit(resource: &'static str, maximum: usize, actual: usize) -> Error {
+fn limit(resource: LimitKind, maximum: usize, actual: usize) -> Error {
     Error::ExternalHyperlinkDetachmentLimit {
-        resource,
+        kind: resource,
         maximum,
         actual,
+    }
+}
+
+/// The bounded resources of external-hyperlink detachment, carried by [`crate::Error::ExternalHyperlinkDetachmentLimit`] (record 0355a).
+///
+/// Each variant names one bounded resource; [`std::fmt::Display`] gives its
+/// human-readable name, the one the error messages print.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// External hyperlinks.
+    ExternalHyperlinks,
+    /// Main-document XML bytes.
+    MainDocumentXmlBytes,
+    /// Main-document XML depth.
+    MainDocumentXmlDepth,
+    /// Main-document XML elements.
+    MainDocumentXmlElements,
+}
+
+impl LimitKind {
+    /// The resource's human-readable name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ExternalHyperlinks => "external hyperlinks",
+            Self::MainDocumentXmlBytes => "main-document XML bytes",
+            Self::MainDocumentXmlDepth => "main-document XML depth",
+            Self::MainDocumentXmlElements => "main-document XML elements",
+        }
+    }
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
     }
 }

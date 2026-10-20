@@ -428,7 +428,7 @@ impl SourcePartSpliceFragment<'_> {
 /// fragment or an explicit replay handle. The package's physical ZIP
 /// implementation remains private to OPC.
 pub struct SourcePartSplicePlan<'package> {
-    package: &'package SourceBackedPackage,
+    package: std::borrow::Cow<'package, SourceBackedPackage>,
     target: usize,
     validation_mode: SpliceAuditMode,
     fragment: Option<Arc<Vec<u8>>>,
@@ -564,9 +564,35 @@ impl<'package> SourcePartSplicePlan<'package> {
         Ok(publication)
     }
 
+    /// An independent copy of this plan that publishes the same candidate:
+    /// a plan can be written more than once (record 0355a: the output of a
+    /// committed source-backed package is written on every save).
+    #[must_use]
+    pub fn duplicate(&self) -> Self {
+        self.clone_for_preview()
+    }
+
+    /// This plan over its own share of the source package, so it can outlive
+    /// the borrow it was prepared from (record 0355a).
+    #[must_use]
+    pub fn into_owned(self) -> SourcePartSplicePlan<'static> {
+        SourcePartSplicePlan {
+            package: std::borrow::Cow::Owned(self.package.into_owned()),
+            target: self.target,
+            validation_mode: self.validation_mode,
+            fragment: self.fragment,
+            replay: self.replay,
+            proof: self.proof,
+            limits: self.limits,
+            source_artifact: self.source_artifact,
+            fragment_memory_reservation: self.fragment_memory_reservation,
+            xml_workspace_reservation: self.xml_workspace_reservation,
+        }
+    }
+
     fn clone_for_preview(&self) -> Self {
         Self {
-            package: self.package,
+            package: self.package.clone(),
             target: self.target,
             validation_mode: self.validation_mode,
             fragment: self.fragment.as_ref().map(Arc::clone),
@@ -633,7 +659,7 @@ impl<'package> SourcePartSplicePlan<'package> {
                 "decoded splice refuses encrypted ZIP members",
             ));
         }
-        let preservation_memory = preservation_memory_requirement(self.package)?;
+        let preservation_memory = preservation_memory_requirement(&self.package)?;
         let _preservation_memory_reservation = reserve_memory(
             self.package.source.context.as_ref(),
             preservation_memory,
@@ -693,7 +719,7 @@ impl<'package> SourcePartSplicePlan<'package> {
 
         let source_snapshot = self.package.source.clone();
         let part = PartView {
-            package: self.package,
+            package: &self.package,
             index: self.target,
         };
         let proof = self.proof;
@@ -1277,7 +1303,7 @@ impl SourceBackedPackage {
             validation_mode
         };
         Ok(SourcePartSplicePlan {
-            package: self,
+            package: std::borrow::Cow::Borrowed(self),
             target,
             validation_mode,
             fragment: None,
@@ -1443,7 +1469,7 @@ impl SourceBackedPackage {
             validation_mode
         };
         Ok(SourcePartSplicePlan {
-            package: self,
+            package: std::borrow::Cow::Borrowed(self),
             target,
             validation_mode,
             fragment: Some(fragment),

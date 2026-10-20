@@ -1,0 +1,196 @@
+//! The section-layout family of a source-backed package (record 0355a):
+//! page size, margins, start and columns of one existing section.
+//!
+//! [`Package::edit_section_layout`](crate::source_backed::Package::edit_section_layout)
+//! stages an [`Edit`] whose commit returns a new source-backed package;
+//! writing it rewrites only the main-document part.
+//! [`Package::apply_section_layout`](crate::source_backed::Package::apply_section_layout)
+//! replays a [`Patch`].
+
+use std::sync::Arc;
+
+use crate::Result;
+use crate::section::layout as record;
+use crate::section::{Columns, Margins, PageSize, Selector, Start};
+use crate::source_backed::Package;
+use crate::source_backed::deferred::{Change, source_family};
+
+/// The detached main-document patch the family publishes, with the commit
+/// that made it while its retained base can still be reused.
+#[derive(Clone)]
+pub(crate) struct LayoutChange {
+    patch: record::Patch,
+    commit: Option<Arc<record::Commit>>,
+}
+
+impl Change for LayoutChange {
+    type Error = crate::Error;
+
+    fn is_noop(&self) -> bool {
+        self.patch.is_noop()
+    }
+
+    fn inverse(&self) -> Self {
+        Self {
+            patch: self.patch.inverse(),
+            commit: None,
+        }
+    }
+
+    fn publish(&self, package: &Package) -> Result<Package> {
+        let (main, target, fingerprint) = package.section_layout_target(
+            &self.patch,
+            self.commit.as_deref(),
+            "commit_section_layout",
+        )?;
+        if self.is_noop() {
+            return Ok(package.clone());
+        }
+        let base = package.clone();
+        package.deferred(move |writer| {
+            // The committed target was derived from this complete artifact.
+            if base.source_artifact_fingerprint()? != fingerprint {
+                return Err(crate::Error::SectionLayoutFingerprintConflict);
+            }
+            base.write_part_overlay(writer, &main, &target)
+        })
+    }
+}
+
+source_family!("section-layout", LayoutChange);
+
+impl From<record::Patch> for Patch {
+    /// Replay a detached section-layout record patch onto a package: it
+    /// applies to a package whose main document holds its before bytes.
+    fn from(patch: record::Patch) -> Self {
+        Self {
+            change: LayoutChange {
+                patch,
+                commit: None,
+            },
+            restore: None,
+        }
+    }
+}
+
+/// The budgets of this family, reported by
+/// [`crate::Error::SectionInventoryLimit`].
+pub use crate::section::LimitKind;
+
+/// A staged layout change of one section of a source-backed package. The
+/// source is never changed: [`Self::commit`] returns a new package, and
+/// dropping the edit discards it.
+#[derive(Clone)]
+pub struct Edit {
+    package: Package,
+    inner: record::Edit,
+}
+
+impl std::fmt::Debug for Edit {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.debug_struct("Edit").finish_non_exhaustive()
+    }
+}
+
+macro_rules! property {
+    ($get:ident, $set:ident, $clear:ident, $ty:ty, $what:literal) => {
+        #[doc = concat!("The section's ", $what, ".")]
+        ///
+        /// # Errors
+        ///
+        /// Returns an error for a value the section cannot represent.
+        pub fn $get(&mut self) -> Result<Option<$ty>> {
+            self.inner.$get()
+        }
+
+        #[doc = concat!("Set or remove the section's ", $what, ".")]
+        ///
+        /// # Errors
+        ///
+        /// Returns an error for a value Word refuses.
+        pub fn $set(&mut self, value: Option<$ty>) -> Result<&mut Self> {
+            self.inner.$set(value)?;
+            Ok(self)
+        }
+
+        #[doc = concat!("Remove the section's ", $what, ".")]
+        ///
+        /// # Errors
+        ///
+        /// Returns an error when the section cannot be rewritten.
+        pub fn $clear(&mut self) -> Result<&mut Self> {
+            self.inner.$clear()?;
+            Ok(self)
+        }
+    };
+}
+
+impl Edit {
+    /// The package the edit is staged over.
+    #[must_use]
+    pub const fn package(&self) -> &Package {
+        &self.package
+    }
+
+    property!(
+        page_size,
+        set_page_size,
+        clear_page_size,
+        PageSize,
+        "page size"
+    );
+    property!(margins, set_margins, clear_margins, Margins, "page margins");
+    property!(start, set_start, clear_start, Start, "section start");
+    property!(columns, set_columns, clear_columns, Columns, "columns");
+
+    /// Retain at most `maximum` bytes of the base inventory for the commit
+    /// (the reuse that avoids a second main-document scan).
+    #[must_use]
+    pub fn with_max_retained_base_bytes(mut self, maximum: usize) -> Self {
+        self.inner = self.inner.with_max_retained_base_bytes(maximum);
+        self
+    }
+
+    /// Commit the staged layout as a new source-backed package.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed source, protection, signature, XML or limit error
+    /// before any output.
+    pub fn commit(self) -> Result<Commit> {
+        let commit = self.inner.commit()?;
+        commit_change(
+            &self.package,
+            LayoutChange {
+                patch: commit.patch().clone(),
+                commit: Some(Arc::new(commit)),
+            },
+        )
+    }
+}
+
+impl Package {
+    /// Stage a layout change of one existing locally authored section.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::section_layout_snapshot`], or an error
+    /// for a selector that names no section.
+    pub fn edit_section_layout(&self, selector: impl Into<Selector>) -> Result<Edit> {
+        Ok(Edit {
+            package: self.clone(),
+            inner: self.section_layout_snapshot()?.edit(selector)?,
+        })
+    }
+
+    /// Replay a section-layout patch onto this package, which must hold the
+    /// patch's before state.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::SectionLayoutStaleSource`] for another
+    /// main-document state, and the errors of [`Edit::commit`].
+    pub fn apply_section_layout(&self, patch: &Patch) -> Result<Commit> {
+        apply_change(self, patch)
+    }
+}

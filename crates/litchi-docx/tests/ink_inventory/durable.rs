@@ -617,8 +617,8 @@ fn assert_limit_unchanged(
         panic!("durable replay should exceed the supplied bound ({expected_resource:?})");
     };
     match (error, expected_resource) {
-        (Error::InkLimit { resource, .. }, Some(expected)) => {
-            assert_eq!(resource, expected)
+        (Error::InkLimit { kind, .. }, Some(expected)) => {
+            assert_eq!(kind.as_str(), expected)
         },
         (Error::InkLimit { .. }, None) => {},
         (error, expected) => panic!("expected InkLimit {expected:?}, received {error}"),

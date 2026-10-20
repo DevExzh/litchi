@@ -48,6 +48,86 @@ use sha2::{Digest as _, Sha256};
 use soapberry_zip::office::StreamingArchiveWriter;
 use tempfile::tempdir;
 
+/// Record 0355a: a prepared stream plan commits to a new source-backed
+/// package, and writing that package is the publication. These helpers
+/// keep the publication-shaped assertions of this suite.
+struct Published {
+    commit: source_backed::paragraph_stream::Commit,
+}
+
+impl fmt::Debug for Published {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("Published").finish_non_exhaustive()
+    }
+}
+
+impl Published {
+    fn durable_patch(&self) -> Result<ParagraphStreamPatch, StreamError> {
+        self.commit.patch().durable()
+    }
+
+    fn candidate_artifact_length(&self) -> u64 {
+        self.durable_patch()
+            .expect("a committed forward stream patch is durable")
+            .candidate()
+            .archive
+            .len
+    }
+
+    fn write_inverse_to_stream(
+        &self,
+        current: &source_backed::Package,
+        writer: impl Write,
+    ) -> Result<(), StreamError> {
+        current
+            .apply_paragraph_stream(&self.commit.patch().inverse())?
+            .package()
+            .write_to(writer)?;
+        Ok(())
+    }
+}
+
+trait WritePlan {
+    fn write_to(self, writer: impl Write) -> Result<Published, StreamError>;
+    fn write_to_path(self, path: impl AsRef<Path>) -> Result<Published, StreamError>;
+}
+
+impl WritePlan for source_backed::tail_append_stream::ParagraphStreamPlan<'_> {
+    fn write_to(self, writer: impl Write) -> Result<Published, StreamError> {
+        let commit = self.commit()?;
+        commit.package().write_to(writer)?;
+        Ok(Published { commit })
+    }
+
+    fn write_to_path(self, path: impl AsRef<Path>) -> Result<Published, StreamError> {
+        let commit = self.commit()?;
+        commit.package().save(path)?;
+        Ok(Published { commit })
+    }
+}
+
+trait ApplyDurable {
+    fn apply_durable_to<R: AuthoredReplayResolver>(
+        &self,
+        durable: &ParagraphStreamPatch,
+        resolver: &R,
+        writer: impl Write,
+    ) -> Result<Published, StreamError>;
+}
+
+impl ApplyDurable for source_backed::Package {
+    fn apply_durable_to<R: AuthoredReplayResolver>(
+        &self,
+        durable: &ParagraphStreamPatch,
+        resolver: &R,
+        writer: impl Write,
+    ) -> Result<Published, StreamError> {
+        let commit = self.apply_tail_append_stream_patch(durable, resolver)?;
+        commit.package().write_to(writer)?;
+        Ok(Published { commit })
+    }
+}
+
 const WORD: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const STRICT_WORD: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
 const RELATIONSHIPS: &str = "http://schemas.openxmlformats.org/package/2006/relationships";
@@ -1224,7 +1304,7 @@ fn explicit_store_capacity_must_fit_selected_replay_limit_before_producer() {
     assert!(matches!(
         result,
         Err(StreamError::Replay(AuthoredReplayError::Limit {
-            resource: "replay bytes",
+            kind: source_backed::tail_append_stream::LimitKind::ReplayBytes,
             actual: 4096,
             maximum: 1024,
         }))
@@ -1459,7 +1539,7 @@ fn durable_resolver_cancellation_refuses_before_replay_reader_or_output() {
         cancellation,
     };
     let mut output = Vec::new();
-    let result = current.apply_tail_append_stream_patch(&decoded, &resolver, &mut output);
+    let result = current.apply_durable_to(&decoded, &resolver, &mut output);
     assert!(matches!(
         result,
         Err(StreamError::TailAppend(TailAppendError::Execution(
@@ -1713,7 +1793,7 @@ fn durable_forward_patch_resolves_after_reopen_and_refuses_wrong_source_or_provi
     .expect("reopened source with a different process-local version must open");
     let mut applied = Vec::new();
     reopened
-        .apply_tail_append_stream_patch(&decoded, &resolver, &mut applied)
+        .apply_durable_to(&decoded, &resolver, &mut applied)
         .expect("durable forward patch must apply after reopening");
     assert_eq!(applied, expected_candidate);
     assert_eq!(semantic_texts(&applied), vec!["seed", "reopened"]);
@@ -1725,7 +1805,7 @@ fn durable_forward_patch_resolves_after_reopen_and_refuses_wrong_source_or_provi
     );
     let mut managed_applied = Vec::new();
     managed_reopened
-        .apply_tail_append_stream_patch(&decoded, &resolver, &mut managed_applied)
+        .apply_durable_to(&decoded, &resolver, &mut managed_applied)
         .expect("managed durable forward patch must apply once to the external sink");
     assert_eq!(managed_applied, expected_candidate);
     assert_eq!(
@@ -1746,7 +1826,7 @@ fn durable_forward_patch_resolves_after_reopen_and_refuses_wrong_source_or_provi
     let mut source_mismatch_output = Vec::new();
     assert!(
         mutated_source
-            .apply_tail_append_stream_patch(&decoded, &resolver, &mut source_mismatch_output,)
+            .apply_durable_to(&decoded, &resolver, &mut source_mismatch_output,)
             .is_err()
     );
     assert!(
@@ -1764,11 +1844,8 @@ fn durable_forward_patch_resolves_after_reopen_and_refuses_wrong_source_or_provi
         handle: resolver.handle.clone(),
     };
     let mut provider_mismatch_output = Vec::new();
-    let provider_mismatch = reopened.apply_tail_append_stream_patch(
-        &decoded,
-        &wrong_resolver,
-        &mut provider_mismatch_output,
-    );
+    let provider_mismatch =
+        reopened.apply_durable_to(&decoded, &wrong_resolver, &mut provider_mismatch_output);
     assert!(matches!(
         provider_mismatch,
         Err(StreamError::Patch(PatchError::ReplayResolver(
@@ -1824,7 +1901,7 @@ fn durable_resolver_error_yields_source_mismatch_when_resolver_mutates_current()
         .expect("mutable current source must open");
     let resolver = MutatingMissingReplayResolver { source };
     let mut output = Vec::new();
-    let result = current.apply_tail_append_stream_patch(&decoded, &resolver, &mut output);
+    let result = current.apply_durable_to(&decoded, &resolver, &mut output);
     assert!(matches!(
         result,
         Err(StreamError::Opc(
@@ -2051,7 +2128,7 @@ fn path_publication_retains_durable_forward_and_inverse_authorizations() {
     .expect("durable path source must reopen");
     let mut applied = Vec::new();
     reopened_source
-        .apply_tail_append_stream_patch(&decoded, &resolver, &mut applied)
+        .apply_durable_to(&decoded, &resolver, &mut applied)
         .expect("durable path patch must apply after reopen");
     assert_eq!(applied, candidate);
     assert_eq!(semantic_texts(&applied), vec!["seed", "path durable"]);

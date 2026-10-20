@@ -4,11 +4,12 @@
 )]
 //! Layered `WordprocessingML` numbering model and XML codec.
 
-/// The located numbering part: definitions, levels and instances with their
-/// byte ranges, read and edited in place (record 0319).
 pub mod catalog;
 mod codec;
 mod edit;
+/// The located numbering part: definitions, levels and instances with their
+/// byte ranges, read and edited in place (record 0319).
+mod limit;
 mod lists;
 mod model;
 mod package;

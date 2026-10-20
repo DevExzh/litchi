@@ -10,6 +10,7 @@ use super::{
     GeneratedParagraphProducer, MeasureSource, ReplayCounters, SourceCounters, TextMode,
     build_fixture,
 };
+use crate::docx_family_publication::StreamPlanPublish as _;
 use litchi_core::ReadAt;
 use litchi_docx::source_backed;
 use litchi_docx::source_backed::tail_append_stream::{AuthoredReplayError, Error as StreamError};

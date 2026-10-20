@@ -2560,6 +2560,8 @@ W1_DOCX_OPS = {
     "set / title": ("metadata set", SINGLE, "unified/native"),
     "File::edit 1k paragraph text sets": ("batch", BATCH, "unified/native (one leaf edit)"),
     "File::batch 1k paragraph text sets": ("batch", BATCH, "unified/native (one leaf edit)"),
+    "File::batch 1k paragraph text sets (eager owner)": ("batch", BATCH,
+                                                          "unified/native (one leaf edit)"),
     "save (to_bytes) after one set": ("save", SINGLE, "unified/native"),
     "repeated save of one package (second to_bytes)": ("save", SINGLE, "unified/native"),
 }
@@ -2589,6 +2591,55 @@ def p0355():
                            b, a, [a / b], regression("0355"),
                            f"docx_w1_contract:{name}:{slug(scen)}:after-before",
                            src([base, head]), comparison="after/before"))
+    return out
+
+
+FAMILY_LINE = re.compile(r"^docx-family (.+?): median (\d+) ns, min (\d+) ns, output (\d+) bytes, sha256 ([0-9a-f]{64})$")
+
+
+@needs("0355a")
+def p0355a():
+    """Record 0355a §5: docx_w1_contract_bench at the 0355a head (the P1
+    batch coalescing; unified/leaf rows) and against the 0355 tree
+    (3e686506f3, after/before per leg), and source_family_bench (each
+    source-backed family, open → edit → commit → write, against the same
+    edit through the record-0355 stream publisher). Release, pinned, ABBA
+    (base, head, head, base)."""
+    res = RES / "0355a"
+    base, head = res / "docx-w1-contract-base.txt", res / "docx-w1-contract-head.txt"
+    out = native_lines("0355a", "docx_w1_contract", head, W1_DOCX_OPS)
+    legs: dict = {}
+    for leg, path in (("before", base), ("after", head)):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            m = NATIVE_LINE.match(line.strip())
+            if m:
+                slot = legs.setdefault(m.group(2), {"before": ([], []), "after": ([], [])})[leg]
+                slot[0].append(int(m.group(3)))
+                slot[1].append(int(m.group(4)))
+    for scen, v in legs.items():
+        if not v["before"][0] or not v["after"][0]:
+            continue
+        op = W1_DOCX_OPS.get(scen, ("set",))[0]
+        for index, name in ((0, "leaf"), (1, "unified")):
+            b, a = us(med(v["before"][index])), us(med(v["after"][index]))
+            out.append(row("0355a", "docx", op, f"{scen} ({name} leg, 0355a head vs 0355)", "",
+                           b, a, [a / b], regression("0355a"),
+                           f"docx_w1_contract:{name}:{slug(scen)}:0355a-after-before",
+                           src([base, head]), comparison="after/before"))
+    fbase, fhead = res / "source-family-base.txt", res / "source-family-head.txt"
+    fam: dict = {}
+    for leg, path in (("before", fbase), ("after", fhead)):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            m = FAMILY_LINE.match(line.strip())
+            if m:
+                fam.setdefault(m.group(1), {"before": [], "after": []})[leg].append(int(m.group(2)))
+    for scen, v in fam.items():
+        b, a = us(med(v["before"])), us(med(v["after"]))
+        ratios = [x / y for x, y in zip(v["after"], v["before"])]
+        out.append(row("0355a", "docx", "save", f"{scen} (source-backed family vs publisher)",
+                       "1,000 paragraphs + 2 MiB media", b, a, ratios, regression("0355a"),
+                       f"source_family:{slug(scen)}:after-before", src([fbase, fhead]),
+                       comparison="after/before (family commit + write_to vs publish_*_to_stream)"))
     return out
 
 
@@ -2688,7 +2739,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0306, p0307, p0308, p0309, p0310, p0311, p0312,
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
-           p0347, p0348, p0355, p0356, p0356a, p0357]
+           p0347, p0348, p0355, p0355a, p0356, p0356a, p0357]
 
 
 

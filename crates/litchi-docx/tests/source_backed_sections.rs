@@ -333,7 +333,7 @@ fn source_snapshot_applies_limits_and_rejects_a_changed_read_at() {
             .with_semantic_limits(litchi_docx::SemanticLimits::default().sections(limits.clone()))
             .section_inventory_snapshot(),
         Err(Error::SectionInventoryLimit {
-            resource: "XML events",
+            kind: litchi_docx::section::LimitKind::XmlEvents,
             ..
         })
     ));
@@ -354,7 +354,7 @@ fn source_snapshot_applies_limits_and_rejects_a_changed_read_at() {
             .with_semantic_limits(litchi_docx::SemanticLimits::default().sections(limits.clone()))
             .section_inventory_snapshot(),
         Err(Error::SectionInventoryLimit {
-            resource: "XML depth",
+            kind: litchi_docx::section::LimitKind::XmlDepth,
             ..
         })
     ));
@@ -755,22 +755,56 @@ fn source_backed_existing_section_layout_is_exact_and_cell_safe() {
         litchi_docx::section::layout::Snapshot::from_xml(stale_bytes, &Default::default()).unwrap();
     assert!(commit.patch().apply(&stale).is_err());
 
-    let mut output = Vec::new();
-    let publication = package
-        .publish_section_layout_commit_to_stream(&mut output, &commit)
-        .unwrap();
-    assert!(
-        commit
-            .snapshot()
+    // The record patch replays onto its package; the package commit reads
+    // its own change and its inverse restores the source artifact exactly.
+    let mut edit = package.edit_section_layout(0).unwrap();
+    edit.set_page_size(Some(PageSize {
+        width: Some(Emu::from_twips(11906)),
+        height: Some(Emu::from_twips(16838)),
+        orientation: Orientation::Landscape,
+    }))
+    .unwrap()
+    .set_margins(Some(Margins {
+        top: Some(Emu::from_twips(720)),
+        right: Some(Emu::from_twips(1080)),
+        bottom: Some(Emu::from_twips(720)),
+        left: Some(Emu::from_twips(1080)),
+        header: Some(Emu::from_twips(360)),
+        footer: Some(Emu::from_twips(360)),
+        gutter: None,
+    }))
+    .unwrap()
+    .set_start(Some(Start::NewPage))
+    .unwrap()
+    .set_columns(Some(Columns {
+        equal_width: true,
+        count: 2,
+        space: Some(Emu::from_twips(240)),
+        separator: true,
+        columns: Vec::new(),
+    }))
+    .unwrap();
+    let package_commit = edit.commit().unwrap();
+    assert!(package_commit.diagnostics().changed());
+    assert_eq!(
+        package_commit
+            .package()
+            .section_layout_snapshot()
+            .unwrap()
             .inventory()
-            .shares_allocation_with(publication.snapshot().inventory())
+            .sections(),
+        commit.snapshot().inventory().sections()
     );
-    assert!(
-        publication
-            .inverse_patch()
-            .apply(publication.snapshot())
-            .is_ok()
-    );
+    let mut output = Vec::new();
+    package_commit.package().write_to(&mut output).unwrap();
+    let mut replayed = Vec::new();
+    package
+        .apply_section_layout(&commit.patch().clone().into())
+        .unwrap()
+        .package()
+        .write_to(&mut replayed)
+        .unwrap();
+    assert_eq!(replayed, output);
     assert_ne!(output, source_bytes);
     assert_eq!(
         &output[payload_range(&output, UNUSED)],
@@ -799,29 +833,40 @@ fn source_backed_existing_section_layout_is_exact_and_cell_safe() {
     );
 
     let mut restored_output = Vec::new();
-    reopened
-        .publish_section_layout_inverse_to_stream(&mut restored_output, &publication)
+    package_commit
+        .package()
+        .apply_section_layout(&package_commit.patch().inverse())
+        .unwrap()
+        .package()
+        .write_to(&mut restored_output)
         .unwrap();
     assert_eq!(restored_output, original_bytes);
+    // The inverse also replays onto a reopened copy of the output.
+    let restored = reopened
+        .apply_section_layout(&package_commit.patch().inverse())
+        .unwrap();
+    assert_eq!(
+        restored
+            .package()
+            .section_layout_snapshot()
+            .unwrap()
+            .inventory()
+            .sections(),
+        source.inventory().sections()
+    );
 
-    let foreign =
-        source_backed::Package::from_read_at(Arc::new(OwnedSource::new(original_bytes.clone())))
-            .unwrap();
-    let mut refused = Vec::new();
+    // A package that does not hold the before state refuses the patch, and
+    // so does the source for the inverse.
     assert!(matches!(
-        foreign.publish_section_layout_commit_to_stream(&mut refused, &commit),
-        Err(Error::SectionLayoutForeignSource)
-    ));
-    assert!(refused.is_empty());
-
-    let stale =
-        source_backed::Package::from_read_at(Arc::new(OwnedSource::new(original_bytes))).unwrap();
-    let mut stale_output = Vec::new();
-    assert!(matches!(
-        stale.publish_section_layout_inverse_to_stream(&mut stale_output, &publication),
+        reopened.apply_section_layout(package_commit.patch()),
         Err(Error::SectionLayoutStaleSource)
     ));
-    assert!(stale_output.is_empty());
+    let stale =
+        source_backed::Package::from_read_at(Arc::new(OwnedSource::new(original_bytes))).unwrap();
+    assert!(matches!(
+        stale.apply_section_layout(&package_commit.patch().inverse()),
+        Err(Error::SectionLayoutStaleSource)
+    ));
 }
 
 #[test]
@@ -837,7 +882,8 @@ fn source_backed_section_layout_noop_mce_strict_and_limits_are_typed() {
     assert!(noop.patch().is_noop());
     let mut output = Vec::new();
     source
-        .publish_section_layout_commit_to_stream(&mut output, &noop)
+        .apply_section_layout(&noop.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     assert_eq!(output, fixture(simple.as_bytes()));
 
@@ -896,7 +942,7 @@ fn section_layout_commit_rechecks_complete_artifact_before_target_reuse() {
     );
     let source = Arc::new(StableMutableSource::new(fixture(document.as_bytes())));
     let package = source_backed::Package::from_read_at(source.clone()).unwrap();
-    let mut edit = package.section_layout_snapshot().unwrap().edit(0).unwrap();
+    let mut edit = package.edit_section_layout(0).unwrap();
     edit.set_page_size(Some(PageSize {
         width: Some(Emu::from_twips(11906)),
         height: Some(Emu::from_twips(16838)),
@@ -904,12 +950,13 @@ fn section_layout_commit_rechecks_complete_artifact_before_target_reuse() {
     }))
     .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.retained_base_bytes() > 0);
 
+    // The committed package was derived from the complete artifact; a
+    // source that changed under it refuses the write before any output.
     source.mutate_unused();
     let mut output = Vec::new();
     assert!(matches!(
-        package.publish_section_layout_commit_to_stream(&mut output, &commit),
+        commit.package().write_to(&mut output),
         Err(Error::SectionLayoutFingerprintConflict)
     ));
     assert!(output.is_empty());
@@ -922,7 +969,7 @@ fn section_layout_commit_rejects_revision_change_before_output() {
     );
     let source = Arc::new(ObservedSource::new(fixture(document.as_bytes()), false));
     let package = source_backed::Package::from_read_at(source.clone()).unwrap();
-    let mut edit = package.section_layout_snapshot().unwrap().edit(0).unwrap();
+    let mut edit = package.edit_section_layout(0).unwrap();
     edit.set_page_size(Some(PageSize {
         width: Some(Emu::from_twips(11906)),
         height: Some(Emu::from_twips(16838)),
@@ -930,12 +977,11 @@ fn section_layout_commit_rejects_revision_change_before_output() {
     }))
     .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.retained_base_bytes() > 0);
 
     source.arm_change();
     let mut output = Vec::new();
     assert!(matches!(
-        package.publish_section_layout_commit_to_stream(&mut output, &commit),
+        commit.package().write_to(&mut output),
         Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
     ));
     assert!(output.is_empty());
@@ -949,17 +995,19 @@ fn section_layout_commit_retained_fallback_and_release_are_byte_parity() {
         changed_section_layout_commit(document.as_bytes(), None);
     assert!(retained_commit.retained_base_bytes() > 0);
     let mut retained_output = Vec::new();
-    let publication = retained_package
-        .publish_section_layout_commit_to_stream(&mut retained_output, &retained_commit)
+    let committed = retained_package
+        .apply_section_layout(&retained_commit.patch().clone().into())
         .unwrap();
+    committed.package().write_to(&mut retained_output).unwrap();
     assert_ne!(retained_output, source_bytes);
 
-    let reopened =
-        source_backed::Package::from_read_at(Arc::new(OwnedSource::new(retained_output.clone())))
-            .unwrap();
     let mut restored = Vec::new();
-    reopened
-        .publish_section_layout_inverse_to_stream(&mut restored, &publication)
+    committed
+        .package()
+        .apply_section_layout(&committed.patch().inverse())
+        .unwrap()
+        .package()
+        .write_to(&mut restored)
         .unwrap();
     assert_eq!(restored, source_bytes);
 
@@ -968,7 +1016,8 @@ fn section_layout_commit_retained_fallback_and_release_are_byte_parity() {
     assert_eq!(zero_commit.retained_base_bytes(), 0);
     let mut zero_output = Vec::new();
     zero_package
-        .publish_section_layout_commit_to_stream(&mut zero_output, &zero_commit)
+        .apply_section_layout(&zero_commit.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut zero_output))
         .unwrap();
     assert_eq!(zero_output, retained_output);
 
@@ -980,7 +1029,8 @@ fn section_layout_commit_retained_fallback_and_release_are_byte_parity() {
     assert_eq!(released_commit.retained_base_bytes(), 0);
     let mut released_output = Vec::new();
     released_package
-        .publish_section_layout_commit_to_stream(&mut released_output, &released_commit)
+        .apply_section_layout(&released_commit.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut released_output))
         .unwrap();
     assert_eq!(released_output, retained_output);
 }
@@ -1002,7 +1052,8 @@ fn section_layout_noop_retention_and_release_preserve_exact_source() {
     assert_eq!(noop.retained_base_bytes(), 0);
     let mut retained_output = Vec::new();
     package
-        .publish_section_layout_commit_to_stream(&mut retained_output, &noop)
+        .apply_section_layout(&noop.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut retained_output))
         .unwrap();
     assert_eq!(retained_output, source_bytes);
 
@@ -1018,7 +1069,8 @@ fn section_layout_noop_retention_and_release_preserve_exact_source() {
     assert_eq!(released_noop.retained_base_bytes(), 0);
     let mut released_output = Vec::new();
     package
-        .publish_section_layout_commit_to_stream(&mut released_output, &released_noop)
+        .apply_section_layout(&released_noop.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut released_output))
         .unwrap();
     assert_eq!(released_output, source_bytes);
 }
@@ -1037,7 +1089,8 @@ fn section_layout_retained_malformed_source_keeps_parse_error_before_sink() {
     .unwrap();
     let mut retained_output = Vec::new();
     let retained_error = match malformed_package
-        .publish_section_layout_commit_to_stream(&mut retained_output, &retained_commit)
+        .apply_section_layout(&retained_commit.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut retained_output))
     {
         Ok(_) => panic!("malformed source unexpectedly published"),
         Err(error) => error,
@@ -1053,7 +1106,8 @@ fn section_layout_retained_malformed_source_keeps_parse_error_before_sink() {
     .unwrap();
     let mut fallback_output = Vec::new();
     let fallback_error = match malformed_package
-        .publish_section_layout_commit_to_stream(&mut fallback_output, &fallback_commit)
+        .apply_section_layout(&fallback_commit.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut fallback_output))
     {
         Ok(_) => panic!("malformed source unexpectedly published"),
         Err(error) => error,
@@ -1101,7 +1155,8 @@ fn section_layout_clear_is_lossless_and_single_property_patch_preserves_siblings
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     package
-        .publish_section_layout_commit_to_stream(&mut output, &commit)
+        .apply_section_layout(&commit.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     let reopened = OpcPackage::from_reader(io::Cursor::new(output)).unwrap();
     let main = reopened
@@ -1158,7 +1213,8 @@ fn section_layout_alias_foreign_children_and_column_comments_are_preserved() {
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     package
-        .publish_section_layout_commit_to_stream(&mut output, &commit)
+        .apply_section_layout(&commit.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     let reopened = OpcPackage::from_reader(io::Cursor::new(output)).unwrap();
     let main = reopened
@@ -1202,7 +1258,8 @@ fn section_layout_namespace_shadowing_restores_section_root_alias() {
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     package
-        .publish_section_layout_commit_to_stream(&mut output, &commit)
+        .apply_section_layout(&commit.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     let reopened = OpcPackage::from_reader(io::Cursor::new(output)).unwrap();
     let main = reopened
@@ -1251,7 +1308,8 @@ fn section_layout_default_word_namespace_rebinds_inserted_qnames() {
 
         let mut output = Vec::new();
         package
-            .publish_section_layout_commit_to_stream(&mut output, &commit)
+            .apply_section_layout(&commit.patch().clone().into())
+            .and_then(|committed| committed.package().write_to(&mut output))
             .unwrap();
         let reopened_opc = OpcPackage::from_reader(io::Cursor::new(output.clone())).unwrap();
         let main = reopened_opc
@@ -1347,7 +1405,8 @@ fn section_layout_missing_children_precede_standard_barriers_losslessly() {
         let commit = edit.commit().unwrap();
         let mut output = Vec::new();
         package
-            .publish_section_layout_commit_to_stream(&mut output, &commit)
+            .apply_section_layout(&commit.patch().clone().into())
+            .and_then(|committed| committed.package().write_to(&mut output))
             .unwrap();
 
         let main = main_xml(&output);
@@ -1424,7 +1483,8 @@ fn section_layout_local_prefix_shadowing_preserves_foreign_markup_and_reopens() 
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     package
-        .publish_section_layout_commit_to_stream(&mut output, &commit)
+        .apply_section_layout(&commit.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
 
     let main = main_xml(&output);
@@ -1540,7 +1600,8 @@ fn section_layout_complex_noop_remains_byte_exact() {
     assert!(noop.patch().is_noop());
     let mut output = Vec::new();
     package
-        .publish_section_layout_commit_to_stream(&mut output, &noop)
+        .apply_section_layout(&noop.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     assert_eq!(output, source_bytes);
 }
@@ -1558,7 +1619,8 @@ fn section_layout_signed_noop_changed_and_partial_sink_are_typed() {
     let noop = snapshot.edit(0).unwrap().commit().unwrap();
     let mut noop_output = Vec::new();
     package
-        .publish_section_layout_commit_to_stream(&mut noop_output, &noop)
+        .apply_section_layout(&noop.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut noop_output))
         .unwrap();
     assert_eq!(noop_output, signed_bytes);
 
@@ -1575,7 +1637,9 @@ fn section_layout_signed_noop_changed_and_partial_sink_are_typed() {
     let commit = edit.commit().unwrap();
     let mut changed_output = Vec::new();
     assert!(matches!(
-        package.publish_section_layout_commit_to_stream(&mut changed_output, &commit),
+        package
+            .apply_section_layout(&commit.patch().clone().into())
+            .and_then(|committed| committed.package().write_to(&mut changed_output)),
         Err(Error::Opc(
             litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
         ))
@@ -1599,14 +1663,16 @@ fn section_layout_signed_noop_changed_and_partial_sink_are_typed() {
         limit: 128,
     };
     assert!(matches!(
-        package.publish_section_layout_commit_to_stream(&mut sink, &commit),
+        package
+            .apply_section_layout(&commit.patch().clone().into())
+            .and_then(|committed| committed.package().write_to(&mut sink)),
         Err(Error::Opc(litchi_opc::OpcError::IncompleteOutput { .. }))
     ));
     assert_eq!(sink.accepted, 128);
 }
 
 #[test]
-fn section_layout_detached_patch_cannot_publish_to_source_package() {
+fn section_layout_detached_patch_replays_onto_a_matching_source_package() {
     let document = format!(
         r#"<w:document xmlns:w="{W}"><w:body><w:p><w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:pPr></w:p></w:body></w:document>"#
     );
@@ -1627,12 +1693,29 @@ fn section_layout_detached_patch_cannot_publish_to_source_package() {
         document.as_bytes(),
     ))))
     .unwrap();
-    let mut output = Vec::new();
+    // A detached record patch replays onto a package whose main document
+    // holds its before bytes (record 0355a), and refuses any other.
+    let replayed = package
+        .apply_section_layout(&commit.patch().clone().into())
+        .unwrap();
+    assert_eq!(
+        replayed
+            .package()
+            .section_layout_snapshot()
+            .unwrap()
+            .inventory()
+            .sections()[0]
+            .page_size()
+            .unwrap()
+            .orientation,
+        Orientation::Landscape
+    );
     assert!(matches!(
-        package.publish_section_layout_commit_to_stream(&mut output, &commit),
-        Err(Error::SectionLayoutAuthorizationConflict)
+        replayed
+            .package()
+            .apply_section_layout(&commit.patch().clone().into()),
+        Err(Error::SectionLayoutStaleSource)
     ));
-    assert!(output.is_empty());
 }
 
 #[test]
@@ -1649,7 +1732,7 @@ fn section_inventory_many_sections_stays_within_primary_event_budget() {
     assert!(matches!(
         litchi_docx::section::Inventory::parse(document.as_bytes(), &limits),
         Err(Error::SectionInventoryLimit {
-            resource: "XML events",
+            kind: litchi_docx::section::LimitKind::XmlEvents,
             ..
         })
     ));

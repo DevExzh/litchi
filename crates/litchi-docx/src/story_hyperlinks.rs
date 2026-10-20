@@ -508,7 +508,7 @@ impl Snapshot {
         }
         if target_urls.len() > self.limits.max_selected_relationships {
             return Err(limit(
-                "target URL selectors",
+                crate::redact::LimitKind::TargetUrlSelectors,
                 self.limits.max_selected_relationships,
                 target_urls.len(),
             ));
@@ -516,7 +516,7 @@ impl Snapshot {
         let selector_bytes = target_urls.iter().try_fold(0usize, |total, target| {
             total.checked_add(target.len()).ok_or_else(|| {
                 limit(
-                    "target URL selector bytes",
+                    crate::redact::LimitKind::TargetUrlSelectorBytes,
                     self.limits.max_selector_bytes,
                     usize::MAX,
                 )
@@ -524,7 +524,7 @@ impl Snapshot {
         })?;
         if selector_bytes > self.limits.max_selector_bytes {
             return Err(limit(
-                "target URL selector bytes",
+                crate::redact::LimitKind::TargetUrlSelectorBytes,
                 self.limits.max_selector_bytes,
                 selector_bytes,
             ));
@@ -575,7 +575,7 @@ impl Snapshot {
                 if targets.binary_search(&relationship.target_url).is_ok() {
                     if removed_relationships >= self.limits.max_selected_relationships {
                         return Err(limit(
-                            "selected story hyperlink relationships",
+                            crate::redact::LimitKind::SelectedStoryHyperlinkRelationships,
                             self.limits.max_selected_relationships,
                             removed_relationships.saturating_add(1),
                         ));
@@ -602,7 +602,7 @@ impl Snapshot {
                 ids.dedup();
                 if selections.len() >= self.limits.max_changed_stories {
                     return Err(limit(
-                        "changed story parts",
+                        crate::redact::LimitKind::ChangedStoryParts,
                         self.limits.max_changed_stories,
                         selections.len().saturating_add(1),
                     ));
@@ -632,14 +632,14 @@ impl Snapshot {
         }
         if removed_relationships > self.limits.max_selected_relationships {
             return Err(limit(
-                "selected story hyperlink relationships",
+                crate::redact::LimitKind::SelectedStoryHyperlinkRelationships,
                 self.limits.max_selected_relationships,
                 removed_relationships,
             ));
         }
         if selections.len() > self.limits.max_changed_stories {
             return Err(limit(
-                "changed story parts",
+                crate::redact::LimitKind::ChangedStoryParts,
                 self.limits.max_changed_stories,
                 selections.len(),
             ));
@@ -993,7 +993,7 @@ pub(crate) fn capture_source(package: &SourceBackedPackage, limits: Limits) -> R
         }) {
             if relationship_inventory.len() >= limits.xml.max_external_hyperlinks() {
                 return Err(limit(
-                    "external story hyperlink relationships",
+                    crate::redact::LimitKind::ExternalStoryHyperlinkRelationships,
                     limits.xml.max_external_hyperlinks(),
                     relationship_inventory.len().saturating_add(1),
                 ));
@@ -2146,9 +2146,9 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
 
-fn limit(resource: &'static str, maximum: usize, actual: usize) -> Error {
+fn limit(resource: crate::redact::LimitKind, maximum: usize, actual: usize) -> Error {
     Error::ExternalHyperlinkRedactionLimit {
-        resource,
+        kind: resource,
         maximum,
         actual,
     }
@@ -2189,16 +2189,14 @@ mod tests {
         let package = source_backed_test_package();
         reset_capture_test_counts();
         let commit = package
-            .plan_story_hyperlink_redaction(&["https://capture.invalid/"], Mode::Strict)
+            .edit_story_hyperlink_redaction(&["https://capture.invalid/"], Mode::Strict)
             .unwrap()
-            .apply()
+            .commit()
             .unwrap();
         assert_eq!(capture_test_counts(), (1, 1));
 
         let mut output = Vec::new();
-        package
-            .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
-            .unwrap();
+        commit.package().write_to(&mut output).unwrap();
         assert!(!output.is_empty());
         assert_eq!(capture_test_counts(), (1, 1));
     }

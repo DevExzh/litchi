@@ -925,3 +925,56 @@ fn main_conflicts_ignore_a_malformed_unrelated_header_and_aggregate_quota() {
             .is_err()
     );
 }
+
+/// Record 0355a: the edit's output budget is exact through `EditOptions`;
+/// one byte below refuses, and the refused edit can be retried with a
+/// smaller change.
+#[test]
+fn edit_output_limit_is_exact_one_below_retryable_and_reversible() {
+    use litchi_docx::revision::conflict::EditOptions;
+    let changed_author = "output-limit author";
+    let package = package_with_conflicts();
+    let main = PackURI::new("/word/document.xml").unwrap();
+    let story = |package: &Package| {
+        package
+            .opc_package()
+            .get_part(&main)
+            .unwrap()
+            .blob()
+            .to_vec()
+    };
+    let probe = {
+        let mut edit = package.edit_conflicts();
+        edit.set_conflict_author(0, changed_author).unwrap();
+        edit.commit().unwrap()
+    };
+    let exact_len = story(probe.package()).len();
+    let options = |maximum| {
+        EditOptions::default().limits(Limits {
+            max_output_bytes: maximum,
+            ..Limits::default()
+        })
+    };
+
+    let mut exact = package.edit_conflicts_with_options(options(exact_len));
+    exact.set_conflict_author(0, changed_author).unwrap();
+    let exact = exact.commit().unwrap();
+    assert_eq!(story(exact.package()), story(probe.package()));
+    let restored = exact
+        .package()
+        .apply_conflicts(&exact.patch().inverse())
+        .unwrap();
+    assert_eq!(story(restored.package()), story(&package));
+
+    let mut below = package.edit_conflicts_with_options(options(exact_len - 1));
+    below.set_conflict_author(0, changed_author).unwrap();
+    assert!(below.clone().commit().is_err());
+    below.set_conflict_author(0, "A").unwrap();
+    let retried = below.commit().unwrap();
+    assert!(story(retried.package()).len() < exact_len);
+    let restored = retried
+        .package()
+        .apply_conflicts(&retried.patch().inverse())
+        .unwrap();
+    assert_eq!(story(restored.package()), story(&package));
+}

@@ -1320,3 +1320,69 @@ fn package_patch_rejects_stale_story_bytes_without_partial_publication() {
         stale_source
     );
 }
+
+/// Record 0355a: the package edit's output budgets (aggregate and per
+/// story) are exact through `EditOptions`, restoring the coverage of the
+/// pre-0355 `content_control_snapshot_with_limits` route.
+#[test]
+fn package_edit_output_limits_are_exact() {
+    let payload = b"<root>output-limit</root>";
+    let main = PackURI::new("/word/document.xml").unwrap();
+    let mut package = Package::new().unwrap();
+    package = {
+        let mut edit = package.edit_custom_xml();
+        edit.add(store(payload)).unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    let source = main_xml(&binding(Some(1), None));
+    package = {
+        let mut edit = package.edit_opc();
+        edit.package_mut()
+            .get_part_mut(&main)
+            .unwrap()
+            .set_blob(source.clone());
+        edit.commit().unwrap().into_package()
+    };
+    let checksum = Checksum::compute(payload, &Limits::default()).unwrap();
+    let edited = |options: litchi_docx::content_control::EditOptions| {
+        let mut edit = package.edit_content_controls_with_options(options);
+        edit.set_checksum(&main, 0, Some(checksum.clone())).unwrap();
+        edit.commit()
+    };
+    let expected = edited(Default::default())
+        .unwrap()
+        .package()
+        .opc_package()
+        .get_part(&main)
+        .unwrap()
+        .blob()
+        .len();
+    assert!(expected > source.len());
+    let aggregate = |maximum| {
+        litchi_docx::content_control::EditOptions::default().limits(PackageLimits {
+            max_output_bytes: maximum,
+            ..PackageLimits::default()
+        })
+    };
+    assert!(edited(aggregate(expected)).is_ok());
+    assert!(edited(aggregate(expected - 1)).is_err());
+    // The same budget configured on the package applies to the plain edit.
+    let limited = package.with_semantic_limits(
+        litchi_docx::SemanticLimits::default().content_controls(PackageLimits {
+            max_output_bytes: expected - 1,
+            ..PackageLimits::default()
+        }),
+    );
+    let mut edit = limited.edit_content_controls();
+    edit.set_checksum(&main, 0, Some(checksum.clone())).unwrap();
+    assert!(edit.commit().is_err());
+    // A failed commit leaves a clone of the edit retryable under a budget
+    // that admits the change.
+    let mut retry = package.edit_content_controls_with_options(aggregate(expected - 1));
+    retry
+        .set_checksum(&main, 0, Some(checksum.clone()))
+        .unwrap();
+    assert!(retry.clone().commit().is_err());
+    retry.reset();
+    assert!(retry.commit().unwrap().patch().is_noop());
+}

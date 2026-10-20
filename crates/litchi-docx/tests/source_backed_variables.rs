@@ -243,18 +243,23 @@ fn set_remove_clear_noop_and_inverse_reopen_complete_packages() {
     let commit = edit.commit().unwrap();
     let inverse = commit.patch().inverse();
 
+    // The patch replays onto another package whose settings part holds the
+    // before state; its own unrelated member is kept.
+    let foreign_source = change_unrelated_member(&source_bytes);
     let mut foreign_output = Vec::new();
-    assert!(matches!(
-        open_source(change_unrelated_member(&source_bytes))
-            .publish_document_variables_commit_to_stream(&mut foreign_output, &commit),
-        Err(Error::DocumentVariablesConflict)
-    ));
-    assert!(foreign_output.is_empty());
+    open_source(foreign_source.clone())
+        .apply_document_variables(commit.patch())
+        .unwrap()
+        .package()
+        .write_to(&mut foreign_output)
+        .unwrap();
+    assert_eq!(
+        &foreign_output[payload_range(&foreign_output, UNUSED)],
+        &foreign_source[payload_range(&foreign_source, UNUSED)]
+    );
 
     let mut set_output = Vec::new();
-    let publication = package
-        .publish_document_variables_commit_to_stream(&mut set_output, &commit)
-        .unwrap();
+    commit.package().write_to(&mut set_output).unwrap();
     assert_eq!(
         &set_output[payload_range(&set_output, UNUSED)],
         &source_bytes[untouched]
@@ -272,32 +277,42 @@ fn set_remove_clear_noop_and_inverse_reopen_complete_packages() {
     let settings_text = std::str::from_utf8(settings.blob()).unwrap();
     assert!(settings_text.contains("<!--before--><q:zoom q:percent=\"133\"/>"));
     assert!(settings_text.contains("<x:opaque x:value=\"keep\"><![CDATA[a < b]]></x:opaque>"));
+    // The committed package reads its own change.
+    assert_eq!(
+        commit
+            .package()
+            .document_variables_snapshot()
+            .unwrap()
+            .variables()
+            .get("first"),
+        Some("updated")
+    );
 
+    // The inverse applied to the commit's package restores the exact
+    // source artifact; applied to a reopened copy of the output it rewrites
+    // the settings part back; applied to another settings state it refuses.
     let mut inverse_output = Vec::new();
-    open_source(set_output.clone())
-        .publish_document_variables_inverse_to_stream(&mut inverse_output, &publication)
+    commit
+        .package()
+        .apply_document_variables(&inverse)
+        .unwrap()
+        .package()
+        .write_to(&mut inverse_output)
         .unwrap();
     assert_eq!(inverse_output, source_bytes);
-    let mut foreign_inverse_output = Vec::new();
-    assert!(matches!(
-        open_source(change_unrelated_member(&set_output))
-            .publish_document_variables_inverse_to_stream(
-                &mut foreign_inverse_output,
-                &publication,
-            ),
-        Err(Error::DocumentVariablesConflict)
-    ));
-    assert!(foreign_inverse_output.is_empty());
-
+    let restored = open_source(set_output.clone())
+        .apply_document_variables(&inverse)
+        .unwrap();
     assert_eq!(
-        inverse.apply(commit.snapshot()).unwrap().xml_bytes(),
+        restored
+            .package()
+            .document_variables_snapshot()
+            .unwrap()
+            .xml_bytes(),
         variables_xml(W)
     );
-    let foreign_target = open_source(change_unrelated_member(&set_output))
-        .document_variables_snapshot()
-        .unwrap();
     assert!(matches!(
-        inverse.apply(&foreign_target),
+        open_source(source_bytes.clone()).apply_document_variables(&inverse),
         Err(Error::DocumentVariablesConflict)
     ));
 
@@ -307,7 +322,8 @@ fn set_remove_clear_noop_and_inverse_reopen_complete_packages() {
     let remove = remove.commit().unwrap();
     let mut removed_output = Vec::new();
     package
-        .publish_document_variables_commit_to_stream(&mut removed_output, &remove)
+        .apply_document_variables(remove.patch())
+        .and_then(|committed| committed.package().write_to(&mut removed_output))
         .unwrap();
     let reopened = Package::from_reader(io::Cursor::new(&removed_output)).unwrap();
     assert!(
@@ -324,17 +340,19 @@ fn set_remove_clear_noop_and_inverse_reopen_complete_packages() {
     let clear = clear.commit().unwrap();
     let mut cleared_output = Vec::new();
     package
-        .publish_document_variables_commit_to_stream(&mut cleared_output, &clear)
+        .apply_document_variables(clear.patch())
+        .and_then(|committed| committed.package().write_to(&mut cleared_output))
         .unwrap();
     let reopened = Package::from_reader(io::Cursor::new(&cleared_output)).unwrap();
     assert!(reopened.document_variables().unwrap().unwrap().is_empty());
 
     let package = open_source(cleared_output.clone());
     let no_op = package.edit_document_variables().unwrap().commit().unwrap();
-    assert!(!no_op.changed());
+    assert!(!no_op.diagnostics().changed());
     let mut no_op_output = Vec::new();
     package
-        .publish_document_variables_commit_to_stream(&mut no_op_output, &no_op)
+        .apply_document_variables(no_op.patch())
+        .and_then(|committed| committed.package().write_to(&mut no_op_output))
         .unwrap();
     assert_eq!(no_op_output, cleared_output);
 }
@@ -355,7 +373,8 @@ fn strict_settings_and_source_checked_patch_application_are_supported() {
     let inverse = commit.patch().inverse();
     let mut output = Vec::new();
     package
-        .publish_document_variables_commit_to_stream(&mut output, &commit)
+        .apply_document_variables(commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     let reopened = Package::from_reader(io::Cursor::new(&output)).unwrap();
     assert_eq!(
@@ -367,7 +386,14 @@ fn strict_settings_and_source_checked_patch_application_are_supported() {
         Some("yes")
     );
     assert_eq!(
-        inverse.apply(commit.snapshot()).unwrap().xml_bytes(),
+        commit
+            .package()
+            .apply_document_variables(&inverse)
+            .unwrap()
+            .package()
+            .document_variables_snapshot()
+            .unwrap()
+            .xml_bytes(),
         strict
     );
 
@@ -378,7 +404,8 @@ fn strict_settings_and_source_checked_patch_application_are_supported() {
     let mut rejected = Vec::new();
     assert!(
         open_source(foreign)
-            .publish_document_variables_commit_to_stream(&mut rejected, &commit)
+            .apply_document_variables(commit.patch())
+            .and_then(|committed| committed.package().write_to(&mut rejected))
             .is_err()
     );
     assert!(rejected.is_empty());
@@ -401,7 +428,8 @@ fn creates_first_owner_in_existing_transitional_and_strict_settings() {
         let commit = edit.commit().unwrap();
         let mut output = Vec::new();
         package
-            .publish_document_variables_commit_to_stream(&mut output, &commit)
+            .apply_document_variables(commit.patch())
+            .and_then(|committed| committed.package().write_to(&mut output))
             .unwrap();
         assert_eq!(
             &output[payload_range(&output, UNUSED)],
@@ -421,7 +449,8 @@ fn creates_first_owner_in_existing_transitional_and_strict_settings() {
         let second = second.commit().unwrap();
         let mut second_output = Vec::new();
         package
-            .publish_document_variables_commit_to_stream(&mut second_output, &second)
+            .apply_document_variables(second.patch())
+            .and_then(|committed| committed.package().write_to(&mut second_output))
             .unwrap();
         let reopened = Package::from_reader(io::Cursor::new(second_output)).unwrap();
         assert_eq!(
@@ -441,7 +470,8 @@ fn creates_first_owner_before_math_properties_without_rsids() {
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     package
-        .publish_document_variables_commit_to_stream(&mut output, &commit)
+        .apply_document_variables(commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
 
     let opc = OpcPackage::from_bytes(&output).unwrap();
@@ -518,17 +548,18 @@ fn additional_inbound_settings_owner_is_noop_safe_but_changed_refused() {
     let no_op = package.edit_document_variables().unwrap().commit().unwrap();
     let mut output = Vec::new();
     package
-        .publish_document_variables_commit_to_stream(&mut output, &no_op)
+        .apply_document_variables(no_op.patch())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     assert_eq!(output, source_bytes);
 
     let package = open_source(source_bytes);
     let mut edit = package.edit_document_variables().unwrap();
     edit.set("first", "changed").unwrap();
-    let commit = edit.commit().unwrap();
     output.clear();
+    // A refused change fails at commit, before any output.
     assert!(matches!(
-        package.publish_document_variables_commit_to_stream(&mut output, &commit),
+        edit.commit(),
         Err(Error::DocumentVariablesPreservation(_))
     ));
     assert!(output.is_empty());
@@ -551,19 +582,15 @@ fn selected_unknown_and_protected_changes_are_refused_but_noops_are_exact() {
         let no_op = package.edit_document_variables().unwrap().commit().unwrap();
         output.clear();
         package
-            .publish_document_variables_commit_to_stream(&mut output, &no_op)
+            .apply_document_variables(no_op.patch())
+            .and_then(|committed| committed.package().write_to(&mut output))
             .unwrap();
         assert_eq!(output, unknown_bytes);
         let package = open_source(unknown_bytes);
         let mut edit = package.edit_document_variables().unwrap();
         edit.set("old", "changed").unwrap();
-        let commit = edit.commit().unwrap();
         output.clear();
-        assert!(
-            package
-                .publish_document_variables_commit_to_stream(&mut output, &commit)
-                .is_err()
-        );
+        assert!(edit.commit().is_err());
         assert!(output.is_empty());
     }
 
@@ -576,19 +603,17 @@ fn selected_unknown_and_protected_changes_are_refused_but_noops_are_exact() {
         let no_op = package.edit_document_variables().unwrap().commit().unwrap();
         output.clear();
         package
-            .publish_document_variables_commit_to_stream(&mut output, &no_op)
+            .apply_document_variables(no_op.patch())
+            .and_then(|committed| committed.package().write_to(&mut output))
             .unwrap();
         assert_eq!(output, protected_bytes);
 
         let package = open_source(protected_bytes);
         let mut edit = package.edit_document_variables().unwrap();
         edit.set("old", "changed").unwrap();
-        let commit = edit.commit().unwrap();
         output.clear();
-        assert!(matches!(
-            package.publish_document_variables_commit_to_stream(&mut output, &commit),
-            Err(Error::Refused(_))
-        ));
+        // A refused change fails at commit, before any output.
+        assert!(matches!(edit.commit(), Err(Error::Refused(_))));
         assert!(output.is_empty());
     }
 
@@ -615,16 +640,17 @@ fn signed_change_source_version_limit_and_partial_sink_fail_before_or_during_out
     let no_op = package.edit_document_variables().unwrap().commit().unwrap();
     let mut output = Vec::new();
     package
-        .publish_document_variables_commit_to_stream(&mut output, &no_op)
+        .apply_document_variables(no_op.patch())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     assert_eq!(output, signed_bytes);
     let package = open_source(signed_bytes);
     let mut edit = package.edit_document_variables().unwrap();
     edit.set("first", "changed").unwrap();
-    let commit = edit.commit().unwrap();
     output.clear();
+    // A refused change fails at commit, before any output.
     assert!(matches!(
-        package.publish_document_variables_commit_to_stream(&mut output, &commit),
+        edit.commit(),
         Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
     ));
     assert!(output.is_empty());
@@ -638,7 +664,9 @@ fn signed_change_source_version_limit_and_partial_sink_fail_before_or_during_out
     versioned.change();
     output.clear();
     assert!(matches!(
-        package.publish_document_variables_commit_to_stream(&mut output, &commit),
+        package
+            .apply_document_variables(commit.patch())
+            .and_then(|committed| committed.package().write_to(&mut output)),
         Err(Error::Opc(OpcError::SourceChanged { .. }))
     ));
     assert!(output.is_empty());
@@ -667,7 +695,9 @@ fn signed_change_source_version_limit_and_partial_sink_fail_before_or_during_out
         limit: 128,
     };
     assert!(matches!(
-        package.publish_document_variables_commit_to_stream(&mut sink, &commit),
+        package
+            .apply_document_variables(commit.patch())
+            .and_then(|committed| committed.package().write_to(&mut sink)),
         Err(Error::Opc(OpcError::IncompleteOutput { .. }))
     ));
     assert_eq!(sink.accepted, 128);
@@ -684,7 +714,7 @@ fn overreporting_sink_returns_invalid_data_without_false_progress_or_panic() {
     };
 
     assert!(matches!(
-        package.publish_document_variables_commit_to_stream(&mut sink, &commit),
+        package.apply_document_variables(commit.patch()).and_then(|committed| committed.package().write_to(&mut sink)),
         Err(Error::Opc(OpcError::IoError(error)))
             if error.kind() == io::ErrorKind::InvalidData
     ));

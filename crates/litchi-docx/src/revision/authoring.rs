@@ -137,30 +137,35 @@ impl Limits {
     pub fn validate(self) -> Result<Self> {
         for (resource, value, maximum, nonzero) in [
             (
-                "source bytes",
+                LimitKind::SourceBytes,
                 self.max_source_bytes,
                 MAX_SOURCE_BYTES,
                 true,
             ),
-            ("events", self.max_events, MAX_EVENTS, true),
-            ("depth", self.max_depth, MAX_DEPTH, true),
-            ("attributes", self.max_attributes, MAX_ATTRIBUTES, true),
+            (LimitKind::Events, self.max_events, MAX_EVENTS, true),
+            (LimitKind::Depth, self.max_depth, MAX_DEPTH, true),
             (
-                "attribute bytes",
+                LimitKind::Attributes,
+                self.max_attributes,
+                MAX_ATTRIBUTES,
+                true,
+            ),
+            (
+                LimitKind::AttributeBytes,
                 self.max_attribute_bytes,
                 MAX_ATTRIBUTE_BYTES,
                 true,
             ),
-            ("changes", self.max_changes, MAX_CHANGES, false),
-            ("move ranges", self.max_ranges, MAX_RANGES, false),
+            (LimitKind::Changes, self.max_changes, MAX_CHANGES, false),
+            (LimitKind::MoveRanges, self.max_ranges, MAX_RANGES, false),
             (
-                "metadata bytes",
+                LimitKind::MetadataBytes,
                 self.max_metadata_bytes,
                 MAX_METADATA_BYTES,
                 false,
             ),
             (
-                "output bytes",
+                LimitKind::OutputBytes,
                 self.max_output_bytes,
                 MAX_OUTPUT_BYTES,
                 false,
@@ -386,7 +391,7 @@ impl Snapshot {
         let limits = limits.validate()?;
         if source.len() > limits.max_source_bytes {
             return Err(limit_error(
-                "source bytes",
+                LimitKind::SourceBytes,
                 source.len(),
                 limits.max_source_bytes,
             ));
@@ -1075,7 +1080,7 @@ fn parse(source: &[u8], limits: Limits) -> Result<Vec<Group>> {
                 .checked_add(1)
                 .ok_or_else(|| invalid("tracked revision event counter overflow"))?;
             if events > limits.max_events {
-                return Err(limit_error("events", events, limits.max_events));
+                return Err(limit_error(LimitKind::Events, events, limits.max_events));
             }
         }
         let resolver = reader.resolver().clone();
@@ -1102,7 +1107,7 @@ fn parse(source: &[u8], limits: Limits) -> Result<Vec<Group>> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("tracked revision XML depth overflow"))?;
                 if depth > limits.max_depth {
-                    return Err(limit_error("depth", depth, limits.max_depth));
+                    return Err(limit_error(LimitKind::Depth, depth, limits.max_depth));
                 }
                 validate_attributes(
                     &element,
@@ -1455,7 +1460,7 @@ fn parse(source: &[u8], limits: Limits) -> Result<Vec<Group>> {
                         }
                         if ranges.len() >= limits.max_ranges {
                             return Err(limit_error(
-                                "move ranges",
+                                LimitKind::MoveRanges,
                                 ranges.len() + 1,
                                 limits.max_ranges,
                             ));
@@ -1787,9 +1792,9 @@ fn ensure_group_slot(
     let next = groups
         .len()
         .checked_add(1)
-        .ok_or_else(|| limit_error("changes", usize::MAX, limit))?;
+        .ok_or_else(|| limit_error(LimitKind::Changes, usize::MAX, limit))?;
     if next > limit {
-        return Err(limit_error("changes", next, limit));
+        return Err(limit_error(LimitKind::Changes, next, limit));
     }
     groups
         .try_reserve(1)
@@ -2486,11 +2491,15 @@ fn validate_attributes(
             .checked_add(1)
             .ok_or_else(|| invalid("tracked revision attribute counter overflow"))?;
         if count > limits.max_attributes {
-            return Err(limit_error("attributes", count, limits.max_attributes));
+            return Err(limit_error(
+                LimitKind::Attributes,
+                count,
+                limits.max_attributes,
+            ));
         }
         if attribute.value.len() > limits.max_attribute_bytes {
             return Err(limit_error(
-                "attribute bytes",
+                LimitKind::AttributeBytes,
                 attribute.value.len(),
                 limits.max_attribute_bytes,
             ));
@@ -2671,7 +2680,7 @@ fn raw_tag_attributes(tag: &[u8], limits: Limits) -> Result<Vec<RawAttribute>> {
             .ok_or_else(|| invalid("tracked revision attribute value is unterminated"))?;
         if value.len() > limits.max_attribute_bytes {
             return Err(limit_error(
-                "attribute bytes",
+                LimitKind::AttributeBytes,
                 value.len(),
                 limits.max_attribute_bytes,
             ));
@@ -2694,7 +2703,7 @@ fn raw_tag_attributes(tag: &[u8], limits: Limits) -> Result<Vec<RawAttribute>> {
         )?;
         if output.len() > limits.max_attributes {
             return Err(limit_error(
-                "attributes",
+                LimitKind::Attributes,
                 output.len(),
                 limits.max_attributes,
             ));
@@ -2770,12 +2779,16 @@ fn collapse_xml_whitespace(value: &str) -> String {
 }
 
 fn charge_metadata(total: &mut usize, added: usize, limits: Limits) -> Result<()> {
-    *total = total
-        .checked_add(added)
-        .ok_or_else(|| limit_error("metadata bytes", usize::MAX, limits.max_metadata_bytes))?;
+    *total = total.checked_add(added).ok_or_else(|| {
+        limit_error(
+            LimitKind::MetadataBytes,
+            usize::MAX,
+            limits.max_metadata_bytes,
+        )
+    })?;
     if *total > limits.max_metadata_bytes {
         return Err(limit_error(
-            "metadata bytes",
+            LimitKind::MetadataBytes,
             *total,
             limits.max_metadata_bytes,
         ));
@@ -3075,7 +3088,7 @@ fn apply_splices(source: &[u8], splices: &mut [Splice], limit: usize) -> Result<
         .and_then(|value| value.checked_add(added))
         .ok_or_else(|| invalid("tracked revision output size overflow"))?;
     if output_len > limit {
-        return Err(limit_error("output bytes", output_len, limit));
+        return Err(limit_error(LimitKind::OutputBytes, output_len, limit));
     }
     let mut output = Vec::new();
     output
@@ -3123,9 +3136,9 @@ fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
         .ok_or_else(|| invalid("tracked revision XML offset does not fit usize"))
 }
 
-fn limit_error(resource: &'static str, actual: usize, maximum: usize) -> Error {
+fn limit_error(resource: LimitKind, actual: usize, maximum: usize) -> Error {
     Error::RevisionLimit {
-        resource,
+        kind: resource,
         actual,
         maximum,
     }
@@ -3165,7 +3178,7 @@ fn fingerprint(bytes: &[u8]) -> u64 {
 mod tests {
     use std::io::Cursor;
 
-    use super::{ChangeKind, Error, Limits, Snapshot};
+    use super::{ChangeKind, Error, LimitKind, Limits, Snapshot};
     use crate::Package;
     use crate::writer::{RevisionKind, RevisionMetadata};
 
@@ -3671,7 +3684,7 @@ mod tests {
         assert!(matches!(
             error,
             Error::RevisionLimit {
-                resource: "events",
+                kind: LimitKind::Events,
                 ..
             }
         ));
@@ -3688,7 +3701,7 @@ mod tests {
         assert!(matches!(
             error,
             Error::RevisionLimit {
-                resource: "changes",
+                kind: LimitKind::Changes,
                 ..
             }
         ));
@@ -3705,7 +3718,7 @@ mod tests {
         assert!(matches!(
             error,
             Error::RevisionLimit {
-                resource: "metadata bytes",
+                kind: LimitKind::MetadataBytes,
                 ..
             }
         ));

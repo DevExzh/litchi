@@ -702,7 +702,11 @@ impl Catalog {
             return Err(invalid(format!("building block '{name}' already exists")));
         }
         if self.entries.len() >= MAX_PARTS {
-            return Err(invalid("glossary entry limit exceeded"));
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::Entry,
+                actual: (self.entries.len()).saturating_add(1),
+                maximum: MAX_PARTS,
+            });
         }
         self.entries
             .try_reserve(1)
