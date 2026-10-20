@@ -1,8 +1,8 @@
 # 0356 — PPTX on the record 0351 API contract (wave W2)
 
 - Status: implemented on `uo2/w2-pptx`, cut from `feat/unified-ops-api`;
-  trunk merged twice (records 0352–0353, then 0354 at `5f6fb75164`), for
-  coordinator review.
+  trunk merged three times (records 0352–0353; 0354 at `5f6fb75164`; 0355
+  at `4ff05a303e`), for coordinator review.
 - Date: 2026-10-20.
 - Input: record [0351](0351-api-contract.md) §2 (rules), §3.2 (the 77 PPTX
   `Package` mutators), §4.3 (the W2 gate), §5 (performance routes); owner
@@ -52,10 +52,11 @@ checked by its own unit tests).
 | `b25006ec4f` | `opened::TextEdit` → `TextAssignment` |
 | `d68ccf0b72`, `737a27ae82`, `3e4ec2ddd1`, `9d957e89eb` | the detached snapshot transactions become families |
 | `802cb5b4eb` | glossary line W2; custom-show examples |
-| (this record's commit) | `pptx_contract_bench`, evidence, matrix parser |
+| `90458123a7` | `pptx_contract_bench`, evidence, matrix parser, this record |
 
 Merges of trunk: `b34e21ce60` (records 0352, 0353) and `842c1ca64e`
-(record 0354), both clean.
+(record 0354), clean; `9536c3fa7a` (record 0355, W1 DOCX): the §2a W1/W2
+lines and the bench-matrix parser list, both kept.
 
 ### 2.1 Errors (`56fb8814fe`)
 
@@ -277,10 +278,33 @@ runs of one binary).
 
 ## 7. Gates
 
-Logs: `.coord/w2-pptx/` (`gates-*.log`). Commands run from the worktree
+Logs: `.coord/w2-pptx/gate-logs/` (`gates-summary.txt`). Commands run from the worktree
 with `source .coord/w2-pptx/env.sh`.
 
-GATES_TABLE
+All on the tree merged with trunk `4ff05a303e` (record 0355), merge `9536c3fa7a`.
+
+| gate | exit |
+|---|---:|
+| `cargo fmt --all --check` | 0 |
+| `cargo clippy -p litchi-pptx -p litchi-ops -p litchi -p litchi-py -p litchi-cli --all-targets --all-features -- -D warnings` | 0 |
+| `cargo clippy -p litchi-ops --no-default-features [--features pptx] --all-targets -- -D warnings` | 0, 0 |
+| `cargo clippy -p litchi-ops --features <all but encryption> --all-targets -- -D warnings` | 0 |
+| `cargo clippy --workspace --all-features --all-targets --exclude litchi-ods -- -D warnings` (before the last merge) | 0 |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-pptx -p litchi-ops` | 0 |
+| `cargo test -p litchi-pptx --all-features` | 0 |
+| `cargo test -p litchi-ops --all-features`: `--lib`, `--doc`, 169 `--test` targets in chunks of 20 (executables deleted per chunk) | 0, 0, 0 |
+| `cargo test -p litchi --all-features`; `cargo test -p litchi-cli --all-features` | 0; 0 |
+| `tools/check_crate_boundaries.py`; `tools/non_iwork_gate.py verify` | 0; 0 |
+| `RUSTC_BOOTSTRAP=1 tools/check_api_glossary.py` (44 profiles, 315 families, 60 owners) | 0 |
+| `crates/pyo3-litchi/tests/run_tests.sh` (301 tests) | 0 |
+| `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 |
+| `python3 -m unittest tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate tools.test_unified_bench_matrix tools.test_check_api_glossary` | 0 |
+| `tools/officecli_capability_delta.py --check`; `tools/officecli_corpus.py --check` | 0; 0 |
+| `tools/unified_bench_matrix.py --check` | 0 |
+| `tools/check_feature_matrix.py` | 0 |
+| `LITCHI_BLESS=1 cargo test -p litchi-ops --test capabilities --test registry` (all features; all but `encryption`), then a clean tree | 0, 0, 0 (no golden changed) |
+
+The OfficeCLI corpus (`corpus_fidelity`, `pptx_corpus_parity`) and the batch-equivalence tests run in the `litchi-ops` chunks. Target directory after cleanup: 16 GB (limit 20 GB).
 
 `ods_formula_conditional_native` (litchi-ods) cannot compile on any tree
 since the 2026-10-05 purge of its evidence fixture; the workspace commands
