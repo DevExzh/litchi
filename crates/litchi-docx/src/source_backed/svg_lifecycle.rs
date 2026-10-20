@@ -24,6 +24,7 @@ use crate::drawing::source::{
 };
 use crate::error::{Error, Result};
 use crate::source_backed::StorySelector;
+use litchi_core::edit::RefusalKind;
 
 const TRANSITIONAL_RELATIONSHIP_NAMESPACE: &str = svg_blip::RELATIONSHIP_NAMESPACE;
 const MAX_GENERATED_NAME_ATTEMPTS: usize = 100_000;
@@ -1050,6 +1051,7 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
                 | SvgPictureOwnerState::Refused
         ) {
             return Err(unsafe_edit(
+                RefusalKind::UnsupportedContent,
                 "attach_svg",
                 "selected picture has a refused SVG owner state",
             ));
@@ -1137,6 +1139,7 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
                     | SvgPictureOwnerState::Refused
             ) {
                 return Err(unsafe_edit(
+                    RefusalKind::UnsupportedContent,
                     "detach_svg",
                     "selected picture has a refused SVG owner state",
                 ));
@@ -1219,6 +1222,7 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
             .any(|item| item.selector() == selector)
         {
             return Err(unsafe_edit(
+                RefusalKind::UnsupportedOperation,
                 operation,
                 "picture was already staged in this SVG batch",
             ));
@@ -1399,6 +1403,7 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
                         | SvgPictureOwnerState::Embedded
                 ) {
                     return Err(unsafe_edit(
+                        RefusalKind::UnsupportedContent,
                         "attach_svg",
                         "selected picture has an existing recognized SVG owner",
                     ));
@@ -1816,6 +1821,7 @@ impl super::Package {
     ) -> Result<Vec<SourceSvgPictureSourceView<'_>>> {
         if !matches!(story, StorySelector::Main) {
             return Err(unsafe_edit(
+                RefusalKind::UnsupportedTarget,
                 "svg_picture_sources",
                 "only the main Word story is in this lifecycle batch",
             ));
@@ -1857,6 +1863,7 @@ impl super::Package {
     pub fn svg_pictures(&self, story: StorySelector) -> Result<Vec<SourceSvgPictureView>> {
         if !matches!(story, StorySelector::Main) {
             return Err(unsafe_edit(
+                RefusalKind::UnsupportedTarget,
                 "svg_pictures",
                 "only the main Word story is in this lifecycle batch",
             ));
@@ -1929,6 +1936,7 @@ impl super::Package {
             )
         }) {
             return Err(unsafe_edit(
+                RefusalKind::UnsupportedContent,
                 "edit_svg_attachment",
                 "selected picture has a refused SVG or raster owner state",
             ));
@@ -2222,7 +2230,7 @@ fn validate_effective_candidate(
     if actual_relationships != expected_relationships
         || actual_content_types != expected_content_types
     {
-        return Err(unsafe_edit(
+        return Err(internal(
             "SVG lifecycle publication",
             "prepared candidate relationship or content-type closure differs from the staged transition",
         ));
@@ -2249,7 +2257,7 @@ fn validate_effective_candidate(
     let story_part = candidate.part(&story_uri)?;
     let story_data = story_part.data()?;
     if !same_bytes(story_data.as_bytes(), expected.story.as_bytes()) {
-        return Err(unsafe_edit(
+        return Err(internal(
             "SVG lifecycle publication",
             "prepared candidate story bytes differ from the staged source projection",
         ));
@@ -2261,7 +2269,7 @@ fn validate_effective_candidate(
         if picture.placement() != state.placement
             || picture.raster_relationship_id() != Some(state.raster_relationship_id.as_str())
         {
-            return Err(unsafe_edit(
+            return Err(internal(
                 "SVG lifecycle publication",
                 "prepared candidate does not resolve the selected raster picture",
             ));
@@ -2281,7 +2289,7 @@ fn validate_effective_candidate(
                 .target_partname()?
                 .is_equivalent_to(&state.raster_part_uri)
         {
-            return Err(unsafe_edit(
+            return Err(internal(
                 "SVG lifecycle publication",
                 "prepared candidate raster relationship changed",
             ));
@@ -2291,13 +2299,13 @@ fn validate_effective_candidate(
         if raster_part.content_type().as_str() != state.raster_content_type
             || raster_data.as_bytes() != state.raster_payload.as_bytes()
         {
-            return Err(unsafe_edit(
+            return Err(internal(
                 "SVG lifecycle publication",
                 "prepared candidate raster fallback changed",
             ));
         }
         if map_owner_state(picture.svg_owner()) != state.owner_state {
-            return Err(unsafe_edit(
+            return Err(internal(
                 "SVG lifecycle publication",
                 "prepared candidate SVG owner state differs from the staged source projection",
             ));
@@ -2305,7 +2313,7 @@ fn validate_effective_candidate(
         match (&state.svg, picture.svg_owner()) {
             (Some(svg), SvgOwnerState::Embedded(owner)) => {
                 if owner.embedded_relationship_id() != Some(svg.relationship_id.as_str()) {
-                    return Err(unsafe_edit(
+                    return Err(internal(
                         "SVG lifecycle publication",
                         "prepared candidate resolves a different SVG relationship ID",
                     ));
@@ -2321,7 +2329,7 @@ fn validate_effective_candidate(
                     || relation.reltype() != svg.relationship_type
                     || !relation.target_partname()?.is_equivalent_to(&svg.part_uri)
                 {
-                    return Err(unsafe_edit(
+                    return Err(internal(
                         "SVG lifecycle publication",
                         "prepared candidate SVG relationship changed",
                     ));
@@ -2333,7 +2341,7 @@ fn validate_effective_candidate(
                     || !svg_part.relationships().is_empty()
                     || !candidate.has_physical_member(svg.part_uri.membername())?
                 {
-                    return Err(unsafe_edit(
+                    return Err(internal(
                         "SVG lifecycle publication",
                         "prepared candidate SVG media closure changed",
                     ));
@@ -2341,13 +2349,13 @@ fn validate_effective_candidate(
             },
             (None, SvgOwnerState::None | SvgOwnerState::Opaque) => {},
             (None, _) => {
-                return Err(unsafe_edit(
+                return Err(internal(
                     "SVG lifecycle publication",
                     "prepared candidate retained a selected SVG owner",
                 ));
             },
             (Some(_), _) => {
-                return Err(unsafe_edit(
+                return Err(internal(
                     "SVG lifecycle publication",
                     "prepared candidate lost the selected embedded SVG owner",
                 ));
@@ -2383,7 +2391,7 @@ fn validate_effective_graph(
         )?;
         // Every effective Part must have a resolved content-type binding.
         if candidate.content_type(&owner)?.as_str() != part.content_type().as_str() {
-            return Err(unsafe_edit(
+            return Err(internal(
                 "SVG lifecycle publication",
                 "prepared candidate content-type binding differs from its Part catalog",
             ));
@@ -2417,7 +2425,7 @@ fn validate_effective_relationship_targets(
             if was_source_edge {
                 continue;
             }
-            return Err(unsafe_edit(
+            return Err(internal(
                 "SVG lifecycle publication",
                 "prepared candidate contains a dangling internal relationship",
             ));
@@ -2521,6 +2529,7 @@ fn expected_transition_fingerprints(
                 if !same_attachment(&Some(left.clone()), &Some(right.clone())) =>
             {
                 return Err(unsafe_edit(
+                    RefusalKind::UnsupportedOperation,
                     "SVG lifecycle publication",
                     "SVG owner replacement is not supported",
                 ));
@@ -3199,6 +3208,7 @@ fn rewrite_story_xml_batch(
                     | SvgOwnerState::Ambiguous
                     | SvgOwnerState::Refused => {
                         return Err(unsafe_edit(
+                            RefusalKind::UnsupportedContent,
                             "detach_svg",
                             "selected picture has a refused SVG owner state",
                         ));
@@ -3238,6 +3248,7 @@ fn rewrite_story_xml_batch(
                     || matches!(picture.svg_owner(), SvgOwnerState::Embedded(_))
                 {
                     return Err(unsafe_edit(
+                        RefusalKind::UnsupportedContent,
                         "attach_svg",
                         "selected picture has an existing recognized SVG owner",
                     ));
@@ -3251,6 +3262,7 @@ fn rewrite_story_xml_batch(
                     | SvgOwnerState::Ambiguous
                     | SvgOwnerState::Refused => {
                         return Err(unsafe_edit(
+                            RefusalKind::UnsupportedContent,
                             "detach_svg",
                             "selected picture has a refused SVG owner state",
                         ));
@@ -3757,7 +3769,7 @@ fn build_batch_topology_plan(
         if picture.placement() != after.placement
             || picture.raster_relationship_id() != Some(after.raster_relationship_id.as_str())
         {
-            return Err(unsafe_edit(
+            return Err(internal(
                 "SVG lifecycle publication",
                 "staged story no longer resolves the selected raster picture",
             ));
@@ -3765,7 +3777,7 @@ fn build_batch_topology_plan(
         validate_raster_projection(package, &owner, before, after)?;
         let projected_owner = map_owner_state(picture.svg_owner());
         if projected_owner != after.owner_state {
-            return Err(unsafe_edit(
+            return Err(internal(
                 "SVG lifecycle publication",
                 "staged story owner state differs from the projected batch",
             ));
@@ -3773,7 +3785,7 @@ fn build_batch_topology_plan(
         match (&before.svg, &after.svg) {
             (None, Some(svg)) => {
                 if !matches!(projected_owner, SvgPictureOwnerState::Embedded) {
-                    return Err(unsafe_edit(
+                    return Err(internal(
                         "SVG lifecycle publication",
                         "staged story does not resolve the newly attached SVG owner",
                     ));
@@ -3784,7 +3796,7 @@ fn build_batch_topology_plan(
                     .and_then(|owner| owner.embedded_relationship_id())
                     != Some(svg.relationship_id.as_str())
                 {
-                    return Err(unsafe_edit(
+                    return Err(internal(
                         "SVG lifecycle publication",
                         "staged story resolves a different SVG relationship ID",
                     ));
@@ -3794,7 +3806,7 @@ fn build_batch_topology_plan(
                     .iter()
                     .any(|reference| reference.id() == svg.relationship_id)
                 {
-                    return Err(unsafe_edit(
+                    return Err(internal(
                         "SVG lifecycle publication",
                         "staged story is missing the new SVG relationship reference",
                     ));
@@ -3830,13 +3842,14 @@ fn build_batch_topology_plan(
                     } else {
                         "staged story resolves a different SVG owner"
                     };
-                    return Err(unsafe_edit("detach_svg", reason));
+                    return Err(internal("detach_svg", reason));
                 }
                 removed_relationships.push((svg.relationship_id.clone(), svg.part_uri.clone()));
             },
             (Some(left), Some(right)) => {
                 if !same_attachment(&Some(left.clone()), &Some(right.clone())) {
                     return Err(unsafe_edit(
+                        RefusalKind::UnsupportedOperation,
                         "SVG lifecycle publication",
                         "attach/detach cannot replace an existing SVG owner",
                     ));
@@ -3847,7 +3860,7 @@ fn build_batch_topology_plan(
                     .and_then(|owner| owner.embedded_relationship_id())
                     != Some(right.relationship_id.as_str())
                 {
-                    return Err(unsafe_edit(
+                    return Err(internal(
                         "SVG lifecycle publication",
                         "staged story resolves a different existing SVG relationship ID",
                     ));
@@ -3873,7 +3886,7 @@ fn build_batch_topology_plan(
                 || (relation.reltype() != rt::IMAGE && relation.reltype() != rt::STRICT_IMAGE)
                 || !relation.target_partname()?.is_equivalent_to(&svg.part_uri)
             {
-                return Err(unsafe_edit(
+                return Err(Error::conflict(
                     "SVG lifecycle publication",
                     "existing SVG relationship closure changed",
                 ));
@@ -3881,6 +3894,7 @@ fn build_batch_topology_plan(
             let svg_part = package.part(&svg.part_uri)?;
             if !is_svg_content_type(svg_part.content_type()) || !svg_part.rels().is_empty() {
                 return Err(unsafe_edit(
+                    RefusalKind::UnsupportedOperation,
                     "SVG lifecycle publication",
                     "existing SVG media closure is not an image/svg+xml leaf",
                 ));
@@ -4014,7 +4028,7 @@ fn validate_raster_projection(
             after.raster_payload.as_bytes(),
         )
     {
-        return Err(unsafe_edit(
+        return Err(internal(
             "SVG lifecycle publication",
             "staged story changed the selected raster fallback",
         ));
@@ -4036,7 +4050,7 @@ fn validate_raster_projection(
             .target_partname()?
             .is_equivalent_to(&before.raster_part_uri)
     {
-        return Err(unsafe_edit(
+        return Err(Error::conflict(
             "SVG lifecycle publication",
             "selected raster relationship closure changed",
         ));
@@ -4049,7 +4063,7 @@ fn validate_raster_projection(
             before.raster_payload.as_bytes(),
         )
     {
-        return Err(unsafe_edit(
+        return Err(Error::conflict(
             "SVG lifecycle publication",
             "selected raster Part closure changed",
         ));
@@ -4109,10 +4123,10 @@ fn is_svg_content_type(content_type: &str) -> bool {
     content_type.eq_ignore_ascii_case("image/svg+xml")
 }
 
-fn unsafe_edit(operation: &'static str, reason: &'static str) -> Error {
-    Error::UnsafeEdit {
-        format: "DOCX",
-        operation,
-        reason,
-    }
+fn unsafe_edit(kind: RefusalKind, operation: &'static str, reason: &'static str) -> Error {
+    Error::refused(kind, operation, reason)
+}
+
+fn internal(operation: &'static str, reason: &'static str) -> Error {
+    Error::internal(operation, reason)
 }

@@ -262,19 +262,17 @@ impl Package {
         self.ensure_opc_current(operation)?;
         #[cfg(feature = "automatic-fonts")]
         if raw && self.font_embedding.is_some() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
                 operation,
-                reason: "raw OPC editing cannot honor an automatic font policy; use the managed font facade",
-            });
+                "raw OPC editing cannot honor an automatic font policy; use the managed font facade",
+            ));
         }
 
         if !raw && (self.opc.is_signed() || self.opc.requires_signature_edit_policy()) {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "changed signed content requires explicit Package::unsign before publication",
-            });
+            return Err(Error::Opc(
+                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
+            ));
         }
         let mut candidate = self.opc.clone();
         let value = edit(&mut candidate)?;

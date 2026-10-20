@@ -820,11 +820,11 @@ fn validate_removable_wrapper_attributes(
 }
 
 fn unsafe_wrapper_attribute(reason: &'static str) -> Error {
-    Error::UnsafeEdit {
-        format: "DOCX",
-        operation: "external_hyperlink_wrapper_detachment",
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "external_hyperlink_wrapper_detachment",
         reason,
-    }
+    )
 }
 
 fn is_relationships_namespace(namespace: &ResolveResult<'_>) -> bool {

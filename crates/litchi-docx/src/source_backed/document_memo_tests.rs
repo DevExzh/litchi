@@ -137,11 +137,8 @@ fn body_queries_refuse_managed_views_and_managed_views_build_no_projection() {
     let document = package.document().unwrap();
     assert_eq!(document.paragraph_count().unwrap(), 1);
     assert!(matches!(
-        document.body_blocks(),
-        Err(Error::UnsafeEdit {
-            operation: "document body blocks",
-            ..
-        })
+            document.body_blocks(),
+            Err(Error::Refused(refusal)) if refusal.operation() == "document body blocks"
     ));
     assert!(document.body_paragraph(Position::new(0)).is_err());
     let visible = package.paragraph_index_cache.visible_diagnostics();

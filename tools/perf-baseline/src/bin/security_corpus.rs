@@ -972,7 +972,7 @@ fn validate_zip(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
             let mut output = Vec::new();
             if !matches!(
                 docx.publish_document_variables_commit_to_stream(&mut output, &commit),
-                Err(litchi_docx::Error::UnsafeEdit { .. })
+                Err(litchi_docx::Error::Refused(_))
             ) || !output.is_empty()
             {
                 return Err(format!(

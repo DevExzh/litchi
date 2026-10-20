@@ -467,7 +467,7 @@ fn payload_annotation_relationship_and_dirty_state_limits_are_enforced() {
         .add_paragraph()
         .add_run_with_text("pending");
     let package = builder.package();
-    assert!(matches!(package.ink(), Err(Error::UnsafeEdit { .. })));
+    assert!(matches!(package.ink(), Err(Error::Refused(_))));
 }
 
 fn managed_source(

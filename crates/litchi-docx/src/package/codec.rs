@@ -711,11 +711,11 @@ impl Package {
     pub(super) fn ensure_opc_current(&self, operation: &'static str) -> Result<()> {
         #[cfg(feature = "encryption")]
         if self.source_encryption.mode().is_some() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
                 operation,
-                reason: "raw OPC access would expose an encrypted source as plaintext; use the managed encryption or explicit plaintext APIs",
-            });
+                "raw OPC access would expose an encrypted source as plaintext; use the managed encryption or explicit plaintext APIs",
+            ));
         }
 
         if self
@@ -723,25 +723,25 @@ impl Package {
             .as_ref()
             .is_some_and(|document| document.is_modified())
         {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
                 operation,
-                reason: "the legacy document writer has unmaterialized changes; use a managed save or to_plain_stream first",
-            });
+                "the legacy document writer has unmaterialized changes; use a managed save or to_plain_stream first",
+            ));
         }
         if self.properties.is_dirty() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
                 operation,
-                reason: "core properties have unmaterialized changes; use a managed save or to_plain_stream first",
-            });
+                "core properties have unmaterialized changes; use a managed save or to_plain_stream first",
+            ));
         }
         if self.custom_props_dirty {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
                 operation,
-                reason: "custom properties have unmaterialized changes; use a managed save or to_plain_stream first",
-            });
+                "custom properties have unmaterialized changes; use a managed save or to_plain_stream first",
+            ));
         }
 
         Ok(())

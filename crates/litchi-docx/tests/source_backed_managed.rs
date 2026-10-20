@@ -240,11 +240,8 @@ fn managed_document_read_retains_budgeted_part_data_and_supports_selective_queri
 
     let error = document.paragraphs().unwrap_err();
     assert!(matches!(
-        error,
-        Error::UnsafeEdit {
-            operation: "document paragraphs",
-            ..
-        }
+            error,
+            Error::Refused(refusal) if refusal.operation() == "document paragraphs"
     ));
     cancellation_source.cancel();
     assert!(matches!(

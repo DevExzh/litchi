@@ -61,11 +61,8 @@ fn assert_encrypted_payload(package: &Package, expected: &[u8]) {
         expected
     );
     assert!(matches!(
-        package.verify_content_control_checksums(),
-        Err(Error::UnsafeEdit {
-            operation: "verify_content_control_checksums",
-            ..
-        })
+            package.verify_content_control_checksums(),
+            Err(Error::Refused(refusal)) if refusal.operation() == "verify_content_control_checksums"
     ));
 }
 
@@ -90,11 +87,8 @@ fn encrypted_set_and_replace_reencrypt_with_current_checksums() {
 
     let mut opened = Package::open_with_password(&source_path, "initial-password").unwrap();
     assert!(matches!(
-        opened.set_custom_xml(ITEM, set_payload.to_vec()),
-        Err(Error::UnsafeEdit {
-            operation: "set_custom_xml",
-            ..
-        })
+            opened.set_custom_xml(ITEM, set_payload.to_vec()),
+            Err(Error::Refused(refusal)) if refusal.operation() == "set_custom_xml"
     ));
     assert_encrypted_payload(&opened, initial);
     assert_eq!(std::fs::read(&source_path).unwrap(), encrypted_source);
@@ -114,11 +108,8 @@ fn encrypted_set_and_replace_reencrypt_with_current_checksums() {
     let mut refused_replacement = store(replacement_payload);
     refused_replacement.content_type = "application/vnd.litchi.encrypted+xml".to_owned();
     assert!(matches!(
-        reopened.replace_custom_xml(ITEM, refused_replacement),
-        Err(Error::UnsafeEdit {
-            operation: "replace_custom_xml",
-            ..
-        })
+            reopened.replace_custom_xml(ITEM, refused_replacement),
+            Err(Error::Refused(refusal)) if refusal.operation() == "replace_custom_xml"
     ));
     assert_encrypted_payload(&reopened, set_payload);
     reopened.save_plain(&replace_plain_path).unwrap();

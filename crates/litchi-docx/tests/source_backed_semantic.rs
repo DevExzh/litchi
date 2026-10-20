@@ -625,7 +625,7 @@ fn source_document_is_send_sync_and_managed_arc_views_refuse_consistently() {
         document.blocks().unwrap_err(),
         document.elements().unwrap_err(),
     ] {
-        assert!(matches!(error, Error::UnsafeEdit { .. }));
+        assert!(matches!(error, Error::Refused(_)));
     }
     cancellation_source.cancel();
     assert!(matches!(
@@ -705,7 +705,7 @@ fn managed_source_preflight_rejects_special_events_and_extra_roots() {
             Err(error) => error,
         };
         assert!(
-            matches!(error, Error::UnsafeEdit { .. } | Error::InvalidFormat(_)),
+            matches!(error, Error::Refused(_) | Error::InvalidFormat(_)),
             "{label}: {error:?}"
         );
     }
@@ -901,10 +901,7 @@ fn managed_source_paragraph_queries_keep_their_eager_index() {
     assert_eq!(view.paragraph_text(2).unwrap(), None);
     assert_eq!(view.extract_text().unwrap(), "onetwo");
     // Arc-backed selective views stay refused on the managed route.
-    assert!(matches!(
-        view.paragraphs().unwrap_err(),
-        Error::UnsafeEdit { .. }
-    ));
+    assert!(matches!(view.paragraphs().unwrap_err(), Error::Refused(_)));
 }
 
 fn effective_xml(text: &str) -> Vec<u8> {
@@ -1038,7 +1035,7 @@ fn effective_owner_refuses_unmigrated_operations_and_foreign_candidates() {
             .unwrap();
     assert!(matches!(
         owner.with_prepared_topology(foreign),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::PatchConflict { .. })
     ));
 }
 
@@ -1152,10 +1149,10 @@ fn effective_owner_pinned_document_checks_managed_donor_cancellation() {
         .unwrap();
     let view = owner.document().unwrap();
     assert_eq!(view.paragraph_text(0).unwrap().as_deref(), Some("donor"));
-    assert!(matches!(view.body_blocks(), Err(Error::UnsafeEdit { .. })));
-    assert!(matches!(view.paragraph(0), Err(Error::UnsafeEdit { .. })));
-    assert!(matches!(view.blocks(), Err(Error::UnsafeEdit { .. })));
-    assert!(matches!(view.elements(), Err(Error::UnsafeEdit { .. })));
+    assert!(matches!(view.body_blocks(), Err(Error::Refused(_))));
+    assert!(matches!(view.paragraph(0), Err(Error::Refused(_))));
+    assert!(matches!(view.blocks(), Err(Error::Refused(_))));
+    assert!(matches!(view.elements(), Err(Error::Refused(_))));
     assert!(matches!(
         owner.document_snapshot(),
         Err(litchi_docx::document::Error::Document(Error::Opc(
@@ -1287,15 +1284,11 @@ fn retained_semantic_apply_preserves_graph_edits_and_effective_protection() {
                 .unwrap();
             assert!(matches!(
                 canonical.commit(),
-                Err(litchi_docx::document::Error::Document(
-                    Error::UnsafeEdit { .. }
-                ))
+                Err(litchi_docx::document::Error::Document(Error::Refused(_)))
             ));
             assert!(matches!(
                 owner.apply(committed.patch()),
-                Err(litchi_docx::document::Error::Document(
-                    Error::UnsafeEdit { .. }
-                ))
+                Err(litchi_docx::document::Error::Document(Error::Refused(_)))
             ));
         }
         assert_eq!(owner.document().unwrap().extract_text().unwrap(), "before");

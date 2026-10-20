@@ -276,17 +276,17 @@ impl Package {
             return Ok(());
         };
         let glyphs = {
-            let document = self.mutable_doc.as_ref().ok_or(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "embed_fonts",
-                reason: "font discovery is unavailable until the document has a complete mutable model",
-            })?;
+            let document = self.mutable_doc.as_ref().ok_or(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "embed_fonts",
+                "font discovery is unavailable until the document has a complete mutable model",
+            ))?;
             if !document.glyphs_are_complete() {
-                return Err(Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "embed_fonts",
-                    reason: "the mutable document preserves unscanned source XML; embedding could omit fonts or subset away live glyphs",
-                });
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "embed_fonts",
+                    "the mutable document preserves unscanned source XML; embedding could omit fonts or subset away live glyphs",
+                ));
             }
             document.collect_glyphs()
         };
@@ -301,11 +301,11 @@ impl Package {
             return Ok(());
         };
         if !document.glyphs_are_complete() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "embed_fonts",
-                reason: "the mutable document preserves unscanned source XML; embedding could omit fonts or subset away live glyphs",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "embed_fonts",
+                "the mutable document preserves unscanned source XML; embedding could omit fonts or subset away live glyphs",
+            ));
         }
         self.embed_fonts_with_glyphs(document.collect_glyphs(), mode)
     }
@@ -897,11 +897,11 @@ impl Package {
     /// Returns an error if the operation cannot be completed.
     pub fn set_font_embedding(&mut self, mode: litchi_fonts::embedding::Mode) -> Result<&mut Self> {
         if self.mutable_doc.is_none() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "set_font_embedding",
-                reason: "font discovery requires a complete mutable document model",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "set_font_embedding",
+                "font discovery requires a complete mutable document model",
+            ));
         }
         self.font_embedding = Some(mode);
         Ok(self)

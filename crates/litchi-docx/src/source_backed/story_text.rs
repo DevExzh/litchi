@@ -830,11 +830,11 @@ impl Snapshot {
     pub fn edit(&self) -> Result<Edit> {
         self.check_execution()?;
         if self.payload.is_managed() {
-            return Err(Error::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "source-backed story text edit",
-                reason: "managed source-backed story edits require an owned edit snapshot; use an unmanaged compatibility constructor",
-            }));
+            return Err(Error::Document(crate::Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "source-backed story text edit",
+                "managed source-backed story edits require an owned edit snapshot; use an unmanaged compatibility constructor",
+            )));
         }
         let mut base = self.clone();
         let transaction = if let Some(transaction) = self.transaction.clone() {
@@ -4413,11 +4413,11 @@ fn reject_word_dialect_attributes(
 }
 
 fn unsupported_xml(reason: &'static str) -> Error {
-    Error::Document(crate::Error::UnsafeEdit {
-        format: "DOCX",
-        operation: "source-backed story text",
+    Error::Document(crate::Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "source-backed story text",
         reason,
-    })
+    ))
 }
 
 fn check_execution_context(context: Option<&ExecutionContext>) -> Result<()> {
@@ -4771,11 +4771,11 @@ impl GlossaryBatchSnapshot {
     pub fn edit(&self) -> Result<GlossaryBatchEdit> {
         self.check_execution()?;
         if self.payload.is_managed() {
-            return Err(Error::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "source-backed glossary batch text edit",
-                reason: "managed source-backed story edits require an owned edit snapshot; use an unmanaged compatibility constructor",
-            }));
+            return Err(Error::Document(crate::Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "source-backed glossary batch text edit",
+                "managed source-backed story edits require an owned edit snapshot; use an unmanaged compatibility constructor",
+            )));
         }
         Ok(GlossaryBatchEdit {
             base: self.clone(),

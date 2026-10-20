@@ -378,7 +378,7 @@ fn source_snapshot_refuses_mce_dtd_and_entity_syntax() {
         .unwrap();
         assert!(matches!(
             package.section_inventory_snapshot(),
-            Err(Error::UnsafeEdit { .. })
+            Err(Error::Refused(_))
         ));
     }
 
@@ -492,11 +492,8 @@ fn managed_document_refuses_only_actual_mce_and_retains_part_data() {
     );
     let (_budget, package) = managed_document_fixture(encoded_use.as_bytes());
     assert!(matches!(
-        package.document(),
-        Err(Error::UnsafeEdit {
-            operation: "source-backed document read",
-            ..
-        })
+            package.document(),
+            Err(Error::Refused(refusal)) if refusal.operation() == "source-backed document read"
     ));
 }
 
@@ -845,7 +842,7 @@ fn source_backed_section_layout_noop_mce_strict_and_limits_are_typed() {
             .unwrap();
     assert!(matches!(
         mce_package.section_layout_snapshot(),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
     assert!(litchi_docx::section::layout::Snapshot::from_xml(mce.as_bytes().to_vec()).is_err());
 
@@ -1073,7 +1070,7 @@ fn section_layout_clear_is_lossless_and_single_property_patch_preserves_siblings
 
     let mut clear = source.edit(0).unwrap();
     clear.clear_page_size().unwrap();
-    assert!(matches!(clear.commit(), Err(Error::UnsafeEdit { .. })));
+    assert!(matches!(clear.commit(), Err(Error::Refused(_))));
     assert!(source.inventory().sections()[0].page_size().is_some());
 
     let mut edit = source.edit(0).unwrap();
@@ -1501,12 +1498,8 @@ fn section_layout_missing_field_with_unknown_word_child_is_typed_unsafe_edit() {
     }))
     .unwrap();
     assert!(matches!(
-        edit.commit(),
-        Err(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "edit_section_layout",
-            ..
-        })
+            edit.commit(),
+            Err(Error::Refused(refusal)) if refusal.operation() == "edit_section_layout"
     ));
 }
 

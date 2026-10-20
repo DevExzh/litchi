@@ -329,7 +329,7 @@ fn protected_malformed_active_and_over_limit_sources_fail_closed() {
     );
     assert!(matches!(
         open_source(protected).plan_external_hyperlink_detachment(),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
 
     let write_protected = fixture(
@@ -345,7 +345,7 @@ fn protected_malformed_active_and_over_limit_sources_fail_closed() {
     );
     assert!(matches!(
         open_source(write_protected).plan_external_hyperlink_detachment(),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
 
     const STRICT_W: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
@@ -365,7 +365,7 @@ fn protected_malformed_active_and_over_limit_sources_fail_closed() {
     );
     assert!(matches!(
         open_source(strict_write_protected).plan_external_hyperlink_detachment(),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
 
     let mce = format!(
@@ -375,7 +375,7 @@ fn protected_malformed_active_and_over_limit_sources_fail_closed() {
     assert!(matches!(
         open_source(fixture(mce, external_options("https://one.invalid/"),))
             .plan_external_hyperlink_detachment(),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
 
     let missing = fixture(external_document("missing"), FixtureOptions::default());
@@ -434,7 +434,7 @@ fn wrapper_scoped_namespaces_xml_attributes_and_unknown_attributes_refuse_detach
             external_options("https://one.invalid/"),
         ))
         .plan_external_hyperlink_detachment(),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
 
     let wrapper_scoped_relationship_prefix = format!(
@@ -447,7 +447,7 @@ fn wrapper_scoped_namespaces_xml_attributes_and_unknown_attributes_refuse_detach
             external_options("https://one.invalid/"),
         ))
         .plan_external_hyperlink_detachment(),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
 
     let xml_scope = format!(
@@ -457,7 +457,7 @@ fn wrapper_scoped_namespaces_xml_attributes_and_unknown_attributes_refuse_detach
     assert!(matches!(
         open_source(fixture(xml_scope, external_options("https://one.invalid/"),))
             .plan_external_hyperlink_detachment(),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
 
     let unknown = format!(
@@ -467,7 +467,7 @@ fn wrapper_scoped_namespaces_xml_attributes_and_unknown_attributes_refuse_detach
     assert!(matches!(
         open_source(fixture(unknown, external_options("https://one.invalid/"),))
             .plan_external_hyperlink_detachment(),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
 
     let known = format!(

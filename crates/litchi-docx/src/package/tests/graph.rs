@@ -1134,11 +1134,8 @@ fn raw_opc_rejects_automatic_font_embedding_policy() {
         .set_font_embedding(litchi_fonts::embedding::Mode::Subset)
         .unwrap();
     assert!(matches!(
-        opened.edit_opc(|_| Ok(())),
-        Err(Error::UnsafeEdit {
-            operation: "edit_opc",
-            ..
-        })
+            opened.edit_opc(|_| Ok(())),
+            Err(Error::Refused(refusal)) if refusal.operation() == "edit_opc"
     ));
 }
 
@@ -1163,11 +1160,8 @@ fn raw_opc_transaction_publishes_candidate_and_disables_writer() {
         b"raw edit"
     );
     assert!(matches!(
-        package.authoring_document(),
-        Err(Error::UnsafeEdit {
-            operation: "authoring_document",
-            ..
-        })
+            package.authoring_document(),
+            Err(Error::Refused(refusal)) if refusal.operation() == "authoring_document"
     ));
 }
 
@@ -1208,11 +1202,8 @@ fn raw_opc_transaction_rejects_pending_managed_state() {
         .add_paragraph_with_text("managed edit");
 
     assert!(matches!(
-        package.edit_opc(|_| Ok::<_, Error>(())),
-        Err(Error::UnsafeEdit {
-            operation: "edit_opc",
-            ..
-        })
+            package.edit_opc(|_| Ok::<_, Error>(())),
+            Err(Error::Refused(refusal)) if refusal.operation() == "edit_opc"
     ));
 }
 

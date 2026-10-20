@@ -930,11 +930,7 @@ impl Package {
         }
         require_current(&patch.before, &current, false)?;
         if !is_unsigned_signature_token(&current.signatures) {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "apply_content_control_patch",
-                reason: "changed content controls cannot preserve package signatures; call Package::unsign explicitly first",
-            });
+            return Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy));
         }
         let claim = patch.gate.claim("content-control package patch")?;
 

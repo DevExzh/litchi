@@ -477,11 +477,11 @@ impl Package {
     /// opened packages change through [`Self::edit`].
     pub(crate) fn authoring_document(&mut self) -> Result<&mut MutableDocument> {
         if self.raw_edit_committed {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "authoring_document",
-                reason: "a raw OPC edit committed; use edit_opc for further low-level changes",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "authoring_document",
+                "a raw OPC edit committed; use edit_opc for further low-level changes",
+            ));
         }
 
         // If we don't have a mutable document, try to load it from the package

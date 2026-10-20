@@ -19,11 +19,10 @@ impl Package {
         topology.check_source()?;
         let result = (|| {
             if topology.physical_source_lineage() != self.physical.source_lineage() {
-                return Err(Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "with_prepared_topology",
-                    reason: "the candidate belongs to a different physical source",
-                });
+                return Err(Error::conflict(
+                    "with_prepared_topology",
+                    "the candidate belongs to a different physical source",
+                ));
             }
             let main = topology.main_document_part()?;
             validate_document_main_content_type(main.content_type())?;
@@ -130,11 +129,11 @@ impl Package {
                 .iter()
                 .any(|operation| !operation.supports_source_backed_main_document_overlay())
             {
-                return Err(Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "apply",
-                    reason: "paragraph transfers require package-level dependency publication",
-                }
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "apply",
+                    "paragraph transfers require package-level dependency publication",
+                )
                 .into());
             }
             if patch.is_noop() {
@@ -150,11 +149,10 @@ impl Package {
                     .map_err(Error::from)?,
             };
             let changed = if let Some(target_xml) = target.source_xml() {
-                let source_xml = current.source_xml().ok_or(Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "apply",
-                    reason: "current snapshot lacks XML provenance",
-                })?;
+                let source_xml = current.source_xml().ok_or(Error::internal(
+                    "apply",
+                    "current snapshot lacks XML provenance",
+                ))?;
                 topology
                     .apply_source_xml(&source_xml, target_xml)
                     .map_err(Error::from)?

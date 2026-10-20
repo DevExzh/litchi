@@ -95,18 +95,12 @@ fn encrypted_vba_changes_are_refused_atomically() {
     let source = std::fs::read(&plain_path).unwrap();
     let mut opened = Package::open_with_password(&plain_path, PASSWORD).unwrap();
     assert!(matches!(
-        opened.set_vba(project("Added", "set")),
-        Err(Error::UnsafeEdit {
-            operation: "set_vba",
-            ..
-        })
+            opened.set_vba(project("Added", "set")),
+            Err(Error::Refused(refusal)) if refusal.operation() == "set_vba"
     ));
     assert!(matches!(
-        opened.put_vba(payload("Added", "put"), &VbaSupplementalData::new()),
-        Err(Error::UnsafeEdit {
-            operation: "put_vba",
-            ..
-        })
+            opened.put_vba(payload("Added", "put"), &VbaSupplementalData::new()),
+            Err(Error::Refused(refusal)) if refusal.operation() == "put_vba"
     ));
     assert!(opened.vba().unwrap().is_none());
     assert_eq!(std::fs::read(&plain_path).unwrap(), source);
@@ -125,11 +119,8 @@ fn encrypted_vba_changes_are_refused_atomically() {
         .unwrap()
         .blob_arc();
     assert!(matches!(
-        opened.clear_vba(),
-        Err(Error::UnsafeEdit {
-            operation: "clear_vba",
-            ..
-        })
+            opened.clear_vba(),
+            Err(Error::Refused(refusal)) if refusal.operation() == "clear_vba"
     ));
     let after = opened.vba().unwrap().unwrap();
     assert_eq!(before, after);
@@ -157,7 +148,7 @@ fn explicit_plaintext_copy_allows_vba_changes() {
     let mut encrypted = Package::open_with_password(&encrypted_path, PASSWORD).unwrap();
     assert!(matches!(
         encrypted.set_vba(project("First", "refused")),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
     encrypted.save_plain(&plaintext_path).unwrap();
 

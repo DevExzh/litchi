@@ -180,12 +180,8 @@ fn first_eager_edit(edit: &mut litchi_docx::document::Edit) {
 
 fn is_protection_refusal(error: &TransactionError) -> bool {
     matches!(
-        error,
-        TransactionError::Document(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "changed document publication",
-            reason: "document or write protection, or tracked revisions, is enabled",
-        })
+            error,
+            TransactionError::Document(Error::Refused(refusal)) if refusal.operation() == "changed document publication" && refusal.reason() == "document or write protection, or tracked revisions, is enabled"
     )
 }
 
@@ -638,23 +634,15 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
             Expect::Refused => {
                 assert!(
                     matches!(
-                        source_edit,
-                        Err(TransactionError::Document(Error::UnsafeEdit {
-                            operation: "edit",
-                            reason: "source-backed document transactions do not support markup-compatibility branch selection",
-                            ..
-                        }))
+                                            source_edit,
+                                            Err(TransactionError::Document(Error::Refused(refusal))) if refusal.operation() == "edit" && refusal.reason() == "source-backed document transactions do not support markup-compatibility branch selection"
                     ),
                     "{label}: {source_edit:?}"
                 );
                 assert!(
                     matches!(
-                        eager_edit,
-                        Err(TransactionError::Document(Error::UnsafeEdit {
-                            operation: "document_snapshot",
-                            reason: "document transactions do not support markup-compatibility branch selection",
-                            ..
-                        }))
+                                            eager_edit,
+                                            Err(TransactionError::Document(Error::Refused(refusal))) if refusal.operation() == "document_snapshot" && refusal.reason() == "document transactions do not support markup-compatibility branch selection"
                     ),
                     "{label}: {:?}",
                     eager_edit.as_ref().err()
@@ -696,12 +684,8 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
         } else {
             assert!(
                 matches!(
-                    read,
-                    Err(Error::UnsafeEdit {
-                        operation: "source-backed document read",
-                        reason: "markup-compatibility preprocessing would require an unbudgeted owned payload",
-                        ..
-                    })
+                                    read,
+                                    Err(Error::Refused(refusal)) if refusal.operation() == "source-backed document read" && refusal.reason() == "markup-compatibility preprocessing would require an unbudgeted owned payload"
                 ),
                 "{label}: {read:?}"
             );
@@ -709,11 +693,8 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
             // at the OPC seam before the admission runs.
             assert!(
                 matches!(
-                    snapshot,
-                    Err(TransactionError::Document(Error::UnsafeEdit {
-                        operation: "source-backed document read",
-                        ..
-                    }))
+                                    snapshot,
+                                    Err(TransactionError::Document(Error::Refused(refusal))) if refusal.operation() == "source-backed document read"
                 ) || (xml.contains(MCE_ESCAPED) && literal_binding_refusal(&snapshot)),
                 "{label}: {snapshot:?}"
             );
@@ -807,12 +788,8 @@ fn document_variables_follow_the_same_rule() {
         } else {
             assert!(
                 matches!(
-                    snapshot,
-                    Err(Error::UnsafeEdit {
-                        operation: "document_variables_snapshot",
-                        reason: "source-backed document-variable transactions do not support markup-compatibility branch selection",
-                        ..
-                    })
+                                    snapshot,
+                                    Err(Error::Refused(refusal)) if refusal.operation() == "document_variables_snapshot" && refusal.reason() == "source-backed document-variable transactions do not support markup-compatibility branch selection"
                 ),
                 "{label}: {:?}",
                 snapshot.as_ref().err()
@@ -844,12 +821,8 @@ fn raw_namespace_scanners_refuse_a_binding_spelled_with_references() {
         .unwrap_err();
     assert!(
         matches!(
-            error,
-            Error::UnsafeEdit {
-                operation: "external_hyperlink_redaction",
-                reason: "markup-compatibility owner syntax is outside the redaction closure",
-                ..
-            }
+                    error,
+                    Error::Refused(refusal) if refusal.operation() == "external_hyperlink_redaction" && refusal.reason() == "markup-compatibility owner syntax is outside the redaction closure"
         ),
         "{error:?}"
     );

@@ -424,7 +424,10 @@ fn durable_changed_signed_patch_requires_unsign_and_replan() {
     let durable = durable_patch(&ordinary);
     let before = members(&package_bytes(&package));
     let error = apply_durable(&mut package, &durable).unwrap_err();
-    assert!(error.to_string().contains("explicit Package::unsign"));
+    assert!(matches!(
+        error,
+        litchi_docx::Error::Opc(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    ));
     assert_eq!(members(&package_bytes(&package)), before);
 
     package.unsign();

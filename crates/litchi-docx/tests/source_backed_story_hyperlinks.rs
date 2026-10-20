@@ -916,7 +916,7 @@ fn signed_exact_noop_is_byte_exact_and_changed_plan_has_empty_output() {
     let output = Vec::<u8>::new();
     assert!(matches!(
         package.plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
     assert!(output.is_empty());
 }

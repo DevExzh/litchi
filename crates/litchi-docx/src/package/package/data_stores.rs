@@ -588,13 +588,11 @@ impl Package {
         Ok(bindings)
     }
 
-    fn refuse_signed_custom_xml_change(&self, operation: &'static str) -> Result<()> {
+    fn refuse_signed_custom_xml_change(&self, _operation: &'static str) -> Result<()> {
         if self.is_signed() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "signed Custom XML changes require explicit Package::unsign before mutation",
-            });
+            return Err(Error::Opc(
+                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
+            ));
         }
         Ok(())
     }

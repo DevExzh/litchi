@@ -413,7 +413,10 @@ fn signed_noop_is_preserved_but_changed_publication_requires_explicit_unsign() {
         .plan_task_panes(changed_panes(&package), web::Conformance::Transitional)
         .unwrap();
     let error = package.apply_task_panes_patch(&signed_patch).unwrap_err();
-    assert!(error.to_string().contains("explicit Package::unsign"));
+    assert!(matches!(
+        error,
+        litchi_docx::Error::Opc(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    ));
     assert!(package.is_signed());
     assert_eq!(members(&package_bytes(&package)), before);
 

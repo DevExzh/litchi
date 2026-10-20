@@ -950,9 +950,7 @@ fn managed_secondary_edits_refuse_and_cancellation_stops_selection() {
         .unwrap();
     assert!(matches!(
         snapshot.edit(),
-        Err(source_backed::StoryTextError::Document(
-            Error::UnsafeEdit { .. }
-        ))
+        Err(source_backed::StoryTextError::Document(Error::Refused(_)))
     ));
     cancellation.cancel();
     assert!(

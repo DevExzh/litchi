@@ -741,7 +741,7 @@ impl SourceAdmission {
 /// # Errors
 ///
 /// Returns the projection's markup-compatibility error, or
-/// [`crate::Error::UnsafeEdit`] for a part whose projection selects, unwraps
+/// [`crate::Error::Refused`] for a part whose projection selects, unwraps
 /// or hides content outside run-level alternate content.
 pub(crate) fn admit_document_source(
     raw: &[u8],
@@ -764,11 +764,11 @@ pub(crate) fn admit_document_source(
             std::borrow::Cow::Owned(_) if holds_run_alternate_content(raw) => {
                 Ok(SourceAdmission::RunAlternateContent)
             },
-            std::borrow::Cow::Owned(_) => Err(crate::Error::UnsafeEdit {
-                format: "DOCX",
+            std::borrow::Cow::Owned(_) => Err(crate::Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
                 operation,
                 reason,
-            }),
+            )),
         },
     }
 }

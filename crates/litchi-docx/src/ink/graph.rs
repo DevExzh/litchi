@@ -871,9 +871,9 @@ fn add_retained(total: &mut usize, amount: usize) -> Result<()> {
 }
 
 fn unsupported(reason: &'static str) -> Error {
-    Error::UnsafeEdit {
-        format: "DOCX",
-        operation: "remove_ink",
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "remove_ink",
         reason,
-    }
+    )
 }

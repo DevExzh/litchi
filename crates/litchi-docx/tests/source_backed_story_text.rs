@@ -254,11 +254,8 @@ fn managed_story_reads_are_bounded_and_edits_are_typed_refusals() {
     let snapshot = package.story_text_snapshot(StorySelector::Main).unwrap();
     assert_eq!(snapshot.paragraph_text(0).unwrap().as_deref(), Some("main"));
     assert!(matches!(
-        snapshot.edit(),
-        Err(source_backed::StoryTextError::Document(Error::UnsafeEdit {
-            operation: "source-backed story text edit",
-            ..
-        }))
+            snapshot.edit(),
+            Err(source_backed::StoryTextError::Document(Error::Refused(refusal))) if refusal.operation() == "source-backed story text edit"
     ));
     drop(snapshot);
     drop(package);
@@ -412,9 +409,7 @@ fn namespace_aliases_are_resolved_and_wrong_bindings_are_refused() {
     );
     assert!(matches!(
         open(&wrong).story_text_snapshot(StorySelector::Main),
-        Err(source_backed::StoryTextError::Document(
-            Error::UnsafeEdit { .. }
-        ))
+        Err(source_backed::StoryTextError::Document(Error::Refused(_)))
     ));
 }
 

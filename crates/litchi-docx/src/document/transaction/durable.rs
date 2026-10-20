@@ -343,11 +343,10 @@ impl History {
 
     pub(crate) fn ensure_can_record(&self, commit: &Commit) -> TransactionResult<()> {
         if self.current().is_managed() || commit.snapshot().is_managed() {
-            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "document.history.ensure_can_record",
-                reason: "managed history metadata has no retained reservation ledger",
-            }));
+            return Err(TransactionError::Document(crate::Error::internal(
+                "document.history.ensure_can_record",
+                "managed history metadata has no retained reservation ledger",
+            )));
         }
         let bytes = history_weight(commit)?;
         if bytes > self.limits().max_weight() {
@@ -373,11 +372,10 @@ impl History {
     /// published transition alone exceeds the configured byte budget.
     pub fn record(&mut self, commit: Commit) -> TransactionResult<Vec<Snapshot>> {
         if self.current().is_managed() || commit.snapshot().is_managed() {
-            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "document.history.record",
-                reason: "managed history metadata has no retained reservation ledger",
-            }));
+            return Err(TransactionError::Document(crate::Error::internal(
+                "document.history.record",
+                "managed history metadata has no retained reservation ledger",
+            )));
         }
         let weight = history_weight(&commit)?;
         let graph = history_graph_transition(commit.patch.operations())?;
@@ -491,11 +489,10 @@ impl Snapshot {
     /// stale artifact hashes, or failed semantic preconditions.
     pub fn apply_durable<Mode>(&self, patch: &CorePatch<Mode>) -> TransactionResult<Self> {
         if self.is_managed() {
-            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "document.apply_durable",
-                reason: "durable replay has no source-owner publication authority",
-            }));
+            return Err(TransactionError::Document(crate::Error::internal(
+                "document.apply_durable",
+                "durable replay has no source-owner publication authority",
+            )));
         }
         if patch.format() != FORMAT_NAME {
             return Err(invalid_durable("unsupported format"));
@@ -593,11 +590,10 @@ impl Edit {
         identifier: impl Into<String>,
     ) -> TransactionResult<PreparedEdit> {
         if self.base.is_managed() {
-            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "document.edit.prepare",
-                reason: "durable composition metadata has no managed owner reservation",
-            }));
+            return Err(TransactionError::Document(crate::Error::internal(
+                "document.edit.prepare",
+                "durable composition metadata has no managed owner reservation",
+            )));
         }
         let (reads, writes) = operation_effects(&self.operations, self.base.paragraph_count());
         let inner = SubEdit::new(
@@ -625,11 +621,10 @@ impl Patch {
         limits: PatchLimits,
     ) -> Result<CorePatch<Reversible>, TransactionError> {
         if self.before.is_managed() || self.after.is_managed() {
-            return Err(TransactionError::Document(crate::Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "document.patch.to_durable",
-                reason: "durable serialization has no managed owner reservation",
-            }));
+            return Err(TransactionError::Document(crate::Error::internal(
+                "document.patch.to_durable",
+                "durable serialization has no managed owner reservation",
+            )));
         }
         let forward_artifact = BlobId::of(self.before.xml_bytes()).as_hex();
         let reverse_artifact = BlobId::of(self.after.xml_bytes()).as_hex();

@@ -838,9 +838,9 @@ fn bound(resource: &'static str, actual: usize, maximum: usize) -> Result<()> {
 }
 
 fn unsupported(reason: &'static str) -> Error {
-    Error::UnsafeEdit {
-        format: "DOCX",
-        operation: "edit_ink",
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "edit_ink",
         reason,
-    }
+    )
 }
