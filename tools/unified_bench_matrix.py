@@ -2748,6 +2748,55 @@ def p0358():
     return out
 
 
+W6_SOURCE_BACKED = {
+    "ods/cells1": ("ods", "set", "SourceBackedSpreadsheet open + edit_cells (1 cell) + commit + write_to", "12k×8 cells"),
+    "ods/cells100": ("ods", "set", "SourceBackedSpreadsheet open + edit_cells (100 cells) + commit + write_to", "12k×8 cells"),
+    "ods/dde": ("ods", "set", "SourceBackedSpreadsheet open + edit_dde + commit + write_to", "12k×8 cells"),
+    "ods/sheet_metadata": ("ods", "set", "SourceBackedSpreadsheet open + edit_sheet_metadata + commit + write_to", "12k×8 cells"),
+    "odp/tail_append": ("odp", "add", "SourceBackedPresentation open + edit_tail_append + commit + write_to", "2,000 slides"),
+}
+W6_CODEGEN = ("explained residual: the same work (callgrind instructions within 0.3%); the "
+              "fat-LTO codegen-unit partition and its inlining moved with the source-backed "
+              "code added to the binary; with codegen-units=1 the ratio is {cgu1} "
+              "(results/0358a/codegen.json)")
+
+
+@needs("0358a")
+def p0358a():
+    """Record 0358a §6: the source-backed ODF families (after) against the
+    former stream routes (before), byte-identical output, and the record
+    0358 routes (0358a head vs 0358 head), both A-B-B-A pinned in release."""
+    base = RES / "0358a"
+    out = []
+    for probe, label in (("sb", "after/before"), ("w6", "after/before")):
+        legs: dict = {"before": {}, "after": {}}
+        paths = sorted(base.glob(f"{probe}-*-*.json"))
+        for path in paths:
+            leg = path.name.split("-")[1]
+            for r in load_json(path):
+                legs[leg].setdefault(r["scenario"], []).append(r["median_us"])
+        for scen, after in legs["after"].items():
+            before = legs["before"].get(scen)
+            if not before:
+                continue
+            b, a = med(before), med(after)
+            if probe == "sb":
+                fmt, op, scenario, size = W6_SOURCE_BACKED[scen]
+                scenario += ", family route vs former stream route"
+                explanation = ""
+            else:
+                fmt, op = scen.split("/")
+                scenario = f"File {op.replace('_', ' ')} ({fmt}, 0358a head vs 0358 head)"
+                size = "1k ops" if op == "batch1k" else ""
+                op = W6_ODF_OPS.get(op, op)
+                cgu1 = {"odt/set": "1.014", "fodt/open_get": "1.032"}.get(scen)
+                explanation = W6_CODEGEN.format(cgu1=cgu1) if cgu1 and a / b > 1.05 else ""
+            out.append(row("0358a", fmt, op, scenario, size, b, a, [a / b], regression("0358a"),
+                           f"{probe}:{scen}:after-before", src(paths), comparison=label,
+                           explanation=explanation))
+    return out
+
+
 @needs("0357a")
 def p0357a():
     """Record 0357a: record-sized scoped-family patches (1,000 retained
@@ -2795,7 +2844,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0306, p0307, p0308, p0309, p0310, p0311, p0312,
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
-           p0347, p0348, p0355, p0355a, p0356, p0356a, p0357, p0357a, p0358]
+           p0347, p0348, p0355, p0355a, p0356, p0356a, p0357, p0357a, p0358, p0358a]
 
 
 
