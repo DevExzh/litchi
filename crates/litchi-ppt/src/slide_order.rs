@@ -7,6 +7,17 @@
 //! new append-only PPT user edit. The same root composes checked shape text
 //! and complete PowerPoint client-anchor geometry formatting. Slide payload
 //! records and unrelated CFB streams remain exact unless selected explicitly.
+//!
+//! The editing owner (its transaction, commit and patch) is crate-private
+//! since record 0357: [`crate::Package::edit`] is the one public edit route.
+//! This module keeps public the vocabulary those verbs take, the typed
+//! [`Error`](crate::slide_order::Error)/[`Refusal`](crate::slide_order::Refusal)
+//! they return, and [`Snapshot`](crate::slide_order::Snapshot), an immutable
+//! whole-artifact read view of the slide list and its slide-level state.
+#![allow(
+    dead_code,
+    reason = "crate-private native owner of the primary edit (record 0357): its history, composition, three-way and durable-patch surfaces keep their tests until a Package-level route promotes them"
+)]
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -14,14 +25,14 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 pub use litchi_core::Position;
-pub use litchi_core::patch::{CompositionLimits, HistoryLimits, SubEditJoinFailure};
+pub(crate) use litchi_core::patch::{CompositionLimits, HistoryLimits, SubEditJoinFailure};
 
 use crate::document_structure;
 use crate::package::{Error as PackageError, OpenOptions, SourceLimits};
 use crate::raw::Reader;
 
 /// Explicit bounded undo/redo history for slide-order snapshots.
-pub type History = litchi_core::patch::History<Snapshot>;
+pub(crate) type History = litchi_core::patch::History<Snapshot>;
 
 /// Maximum automatic slide-advance delay permitted by `[MS-PPT]` 2.6.6.
 pub const MAX_SLIDE_ADVANCE_MS: u32 = 86_399_000;
@@ -476,7 +487,7 @@ pub enum DiagnosticPhase {
     /// reports this phase: the patch retains its source and target artifacts
     /// but not that intermediate, so its digest is computed at commit. Every
     /// other artifact digest is computed on demand by durable serialization
-    /// ([`Patch::to_durable`]) rather than by commit.
+    /// rather than by commit.
     IntermediateArtifactHash,
     /// The staged live-document commit was an exact structural no-op; other
     /// formatting owners may still have staged changes in the root
@@ -637,6 +648,8 @@ mod artifact {
 use artifact::Artifact;
 
 mod blank;
+#[cfg(test)]
+mod durable_tests;
 mod elements;
 pub(crate) mod records;
 
@@ -651,7 +664,8 @@ const _: () = {
     assert_send_sync::<TransferPlan>();
 };
 
-/// Immutable exact whole-package snapshot used by slide-order edits.
+/// Immutable exact whole-package read view of the slide list and its
+/// slide-level state; edits go through [`crate::Package::edit`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Snapshot {
     artifact: Artifact,
@@ -1033,7 +1047,7 @@ impl Snapshot {
 
     /// Resource bounds retained for commits and patch application.
     #[must_use]
-    pub const fn limits(&self) -> SourceLimits {
+    pub(crate) const fn limits(&self) -> SourceLimits {
         self.limits
     }
 
@@ -1057,7 +1071,7 @@ impl Snapshot {
     /// and for position-dependent reviewer history. Signed sources are
     /// admitted for exact no-op planning; changed operations return
     /// [`Refusal::Signed`] before publication.
-    pub fn edit(&self) -> Result<Transaction> {
+    pub(crate) fn edit(&self) -> Result<Transaction> {
         self.require_editable()?;
         Ok(Transaction {
             source: self.clone(),
@@ -1091,7 +1105,7 @@ impl Snapshot {
     ///
     /// Returns a typed source/position refusal or a common composition bound
     /// error.
-    pub fn prepare_move(
+    pub(crate) fn prepare_move(
         &self,
         limits: CompositionLimits,
         identifier: impl Into<String>,
@@ -1121,7 +1135,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns a typed refusal when this source cannot be safely republished.
-    pub fn compose(&self, limits: CompositionLimits) -> Result<Composition> {
+    pub(crate) fn compose(&self, limits: CompositionLimits) -> Result<Composition> {
         self.require_editable()?;
         Ok(Composition {
             source: self.clone(),
@@ -1131,7 +1145,7 @@ impl Snapshot {
 
     /// Starts explicit bounded undo/redo history at this snapshot.
     #[must_use]
-    pub fn history(&self, limits: HistoryLimits) -> History {
+    pub(crate) fn history(&self, limits: HistoryLimits) -> History {
         History::new(self.clone(), limits)
     }
 
@@ -1151,7 +1165,7 @@ impl Snapshot {
     ///
     /// Returns a typed dependency refusal, a position refusal, or a package
     /// error for malformed source records.
-    pub fn plan_transfer_from(&self, donor: &Self, slide: Position) -> Result<TransferPlan> {
+    pub(crate) fn plan_transfer_from(&self, donor: &Self, slide: Position) -> Result<TransferPlan> {
         self.require_editable()?;
         if self.has_signature || donor.has_signature {
             return Err(Error::Refused(Refusal::Signed));
@@ -1180,7 +1194,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error when either patch was not prepared from this base.
-    pub fn plan_three_way(&self, left: &Patch, right: &Patch) -> Result<ThreeWayPlan> {
+    pub(crate) fn plan_three_way(&self, left: &Patch, right: &Patch) -> Result<ThreeWayPlan> {
         if left.before() != self.bytes() || right.before() != self.bytes() {
             return Err(PackageError::InvalidFormat(
                 "PPT three-way planning requires two patches from the exact base artifact".into(),
@@ -1196,7 +1210,10 @@ impl Snapshot {
     ///
     /// Returns an error for an unsupported vocabulary, malformed selector,
     /// failed exact-artifact/order precondition, or refused move.
-    pub fn apply_durable<Mode>(&self, patch: &litchi_core::patch::Patch<Mode>) -> Result<Self> {
+    pub(crate) fn apply_durable<Mode>(
+        &self,
+        patch: &litchi_core::patch::Patch<Mode>,
+    ) -> Result<Self> {
         if patch.format() != "litchi-ppt" {
             return Err(invalid_durable_patch("unsupported durable patch format"));
         }
@@ -1319,7 +1336,7 @@ impl Snapshot {
 
 /// One semantic move staged in a transaction or durable patch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Change {
+pub(crate) struct Change {
     from: Position,
     destination: Position,
     before_order: [u8; 32],
@@ -1329,13 +1346,13 @@ pub struct Change {
 impl Change {
     /// Source position resolved against the transaction-local order.
     #[must_use]
-    pub const fn from(&self) -> Position {
+    pub(crate) const fn from(&self) -> Position {
         self.from
     }
 
     /// Final destination position for the selected slide.
     #[must_use]
-    pub const fn destination(&self) -> Position {
+    pub(crate) const fn destination(&self) -> Position {
         self.destination
     }
 
@@ -1352,7 +1369,7 @@ impl Change {
 /// One checked text replacement preserving the selected shape's formatting
 /// and modeled dependency closure.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ShapeTextChange {
+pub(crate) struct ShapeTextChange {
     target: crate::text_edit::Target,
     before: String,
     after: String,
@@ -1361,7 +1378,7 @@ pub struct ShapeTextChange {
 /// One checked speaker-notes text replacement on the slide at a source
 /// position.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NotesTextChange {
+pub(crate) struct NotesTextChange {
     slide: Position,
     before: String,
     after: String,
@@ -1370,24 +1387,25 @@ pub struct NotesTextChange {
 impl NotesTextChange {
     /// The slide whose notes changed, in the source slide order.
     #[must_use]
-    pub const fn slide(&self) -> Position {
+    pub(crate) const fn slide(&self) -> Position {
         self.slide
     }
 
     /// The notes text before the change.
     #[must_use]
-    pub fn before(&self) -> &str {
+    pub(crate) fn before(&self) -> &str {
         &self.before
     }
 
     /// The notes text after the change.
     #[must_use]
-    pub fn after(&self) -> &str {
+    pub(crate) fn after(&self) -> &str {
         &self.after
     }
 }
 
-/// One contextual shape-text replacement for [`Transaction::set_shape_texts`].
+/// One contextual shape-text replacement for
+/// [`Edit::set_shape_texts`](crate::package::edit::Edit::set_shape_texts).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShapeTextReplacement {
     target: crate::text_edit::Target,
@@ -1485,26 +1503,26 @@ fn flatten_shape_text_chunks<'a>(
 impl ShapeTextChange {
     /// Semantic source-order shape target.
     #[must_use]
-    pub const fn target(&self) -> crate::text_edit::Target {
+    pub(crate) const fn target(&self) -> crate::text_edit::Target {
         self.target
     }
 
     /// Text required before the replacement.
     #[must_use]
-    pub fn before(&self) -> &str {
+    pub(crate) fn before(&self) -> &str {
         &self.before
     }
 
     /// Replacement text.
     #[must_use]
-    pub fn after(&self) -> &str {
+    pub(crate) fn after(&self) -> &str {
         &self.after
     }
 }
 
 /// One checked shape-geometry formatting replacement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ShapeAnchorChange {
+pub(crate) struct ShapeAnchorChange {
     target: crate::text_edit::Target,
     before: crate::Anchor,
     after: crate::Anchor,
@@ -1512,7 +1530,7 @@ pub struct ShapeAnchorChange {
 
 /// One checked replacement of an inert external movie/audio path.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExternalMediaPathChange {
+pub(crate) struct ExternalMediaPathChange {
     id: u32,
     before: Option<String>,
     after: Option<String>,
@@ -1521,26 +1539,26 @@ pub struct ExternalMediaPathChange {
 impl ExternalMediaPathChange {
     /// External-object identifier retained by the replacement.
     #[must_use]
-    pub const fn id(&self) -> u32 {
+    pub(crate) const fn id(&self) -> u32 {
         self.id
     }
 
     /// Path required before the replacement.
     #[must_use]
-    pub fn before(&self) -> Option<&str> {
+    pub(crate) fn before(&self) -> Option<&str> {
         self.before.as_deref()
     }
 
     /// Replacement path, or `None` to clear it.
     #[must_use]
-    pub fn after(&self) -> Option<&str> {
+    pub(crate) fn after(&self) -> Option<&str> {
         self.after.as_deref()
     }
 }
 
 /// One checked replacement of external-media playback flags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ExternalMediaPlaybackChange {
+pub(crate) struct ExternalMediaPlaybackChange {
     id: u32,
     before: crate::external_media::Playback,
     after: crate::external_media::Playback,
@@ -1548,7 +1566,7 @@ pub struct ExternalMediaPlaybackChange {
 
 /// One fixed-width replacement of a slide's hidden flag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideVisibilityChange {
+pub(crate) struct SlideVisibilityChange {
     position: Position,
     target: Position,
     slide_id: u32,
@@ -1559,26 +1577,26 @@ pub struct SlideVisibilityChange {
 impl SlideVisibilityChange {
     /// Semantic slide position resolved against the transaction-local order.
     #[must_use]
-    pub const fn position(self) -> Position {
+    pub(crate) const fn position(self) -> Position {
         self.position
     }
 
     /// Hidden state required before the replacement.
     #[must_use]
-    pub const fn before(self) -> bool {
+    pub(crate) const fn before(self) -> bool {
         self.before
     }
 
     /// Replacement hidden state.
     #[must_use]
-    pub const fn after(self) -> bool {
+    pub(crate) const fn after(self) -> bool {
         self.after
     }
 }
 
 /// One fixed-width replacement of slide-show advance timing and flags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideAdvanceChange {
+pub(crate) struct SlideAdvanceChange {
     target: Position,
     slide_id: u32,
     before: SlideAdvance,
@@ -1588,26 +1606,26 @@ pub struct SlideAdvanceChange {
 impl SlideAdvanceChange {
     /// Semantic source-order slide target.
     #[must_use]
-    pub const fn target(self) -> Position {
+    pub(crate) const fn target(self) -> Position {
         self.target
     }
 
     /// Advance state required before replacement.
     #[must_use]
-    pub const fn before(self) -> SlideAdvance {
+    pub(crate) const fn before(self) -> SlideAdvance {
         self.before
     }
 
     /// Replacement advance state.
     #[must_use]
-    pub const fn after(self) -> SlideAdvance {
+    pub(crate) const fn after(self) -> SlideAdvance {
         self.after
     }
 }
 
 /// One fixed-width replacement of a slide's visual transition fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideTransitionVisualChange {
+pub(crate) struct SlideTransitionVisualChange {
     target: Position,
     slide_id: u32,
     before: SlideTransitionVisual,
@@ -1617,19 +1635,19 @@ pub struct SlideTransitionVisualChange {
 impl SlideTransitionVisualChange {
     /// Semantic source-order slide target.
     #[must_use]
-    pub const fn target(self) -> Position {
+    pub(crate) const fn target(self) -> Position {
         self.target
     }
 
     /// Visual transition required before replacement.
     #[must_use]
-    pub const fn before(self) -> SlideTransitionVisual {
+    pub(crate) const fn before(self) -> SlideTransitionVisual {
         self.before
     }
 
     /// Replacement visual transition.
     #[must_use]
-    pub const fn after(self) -> SlideTransitionVisual {
+    pub(crate) const fn after(self) -> SlideTransitionVisual {
         self.after
     }
 }
@@ -1637,19 +1655,19 @@ impl SlideTransitionVisualChange {
 impl ExternalMediaPlaybackChange {
     /// External-object identifier retained by the replacement.
     #[must_use]
-    pub const fn id(self) -> u32 {
+    pub(crate) const fn id(self) -> u32 {
         self.id
     }
 
     /// Playback flags required before the replacement.
     #[must_use]
-    pub const fn before(self) -> crate::external_media::Playback {
+    pub(crate) const fn before(self) -> crate::external_media::Playback {
         self.before
     }
 
     /// Replacement playback flags.
     #[must_use]
-    pub const fn after(self) -> crate::external_media::Playback {
+    pub(crate) const fn after(self) -> crate::external_media::Playback {
         self.after
     }
 }
@@ -1657,19 +1675,19 @@ impl ExternalMediaPlaybackChange {
 impl ShapeAnchorChange {
     /// Semantic source-order shape target.
     #[must_use]
-    pub const fn target(self) -> crate::text_edit::Target {
+    pub(crate) const fn target(self) -> crate::text_edit::Target {
         self.target
     }
 
     /// Anchor required before the replacement.
     #[must_use]
-    pub const fn before(self) -> crate::Anchor {
+    pub(crate) const fn before(self) -> crate::Anchor {
         self.before
     }
 
     /// Replacement anchor.
     #[must_use]
-    pub const fn after(self) -> crate::Anchor {
+    pub(crate) const fn after(self) -> crate::Anchor {
         self.after
     }
 }
@@ -1773,21 +1791,21 @@ impl TransferPlan {
 /// One deterministic semantic overlap found during non-mutating three-way
 /// planning.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ThreeWayConflict {
+pub(crate) struct ThreeWayConflict {
     target: String,
 }
 
 impl ThreeWayConflict {
     /// Stable semantic target shared by both branches.
     #[must_use]
-    pub fn target(&self) -> &str {
+    pub(crate) fn target(&self) -> &str {
         &self.target
     }
 }
 
 /// Read-only conflict result for two patches prepared from one exact base.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ThreeWayPlan {
+pub(crate) struct ThreeWayPlan {
     conflicts: Vec<ThreeWayConflict>,
 }
 
@@ -1807,13 +1825,13 @@ impl ThreeWayPlan {
 
     /// Whether the two branches have no overlapping semantic write effects.
     #[must_use]
-    pub fn is_clean(&self) -> bool {
+    pub(crate) fn is_clean(&self) -> bool {
         self.conflicts.is_empty()
     }
 
     /// Stable sorted conflict set.
     #[must_use]
-    pub fn conflicts(&self) -> &[ThreeWayConflict] {
+    pub(crate) fn conflicts(&self) -> &[ThreeWayConflict] {
         &self.conflicts
     }
 }
@@ -1835,7 +1853,7 @@ enum StructuralChange {
 
 /// Isolated failure-atomic edit over one opened presentation's slide order.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Transaction {
     source: Snapshot,
     working: Snapshot,
     document: document_structure::Transaction,
@@ -1935,13 +1953,13 @@ impl Transaction {
 
     /// Immutable source snapshot.
     #[must_use]
-    pub const fn source(&self) -> &Snapshot {
+    pub(crate) const fn source(&self) -> &Snapshot {
         &self.source
     }
 
     /// Current number of slides.
     #[must_use]
-    pub fn slide_count(&self) -> usize {
+    pub(crate) fn slide_count(&self) -> usize {
         self.document
             .slides()
             .map_or(self.source.slide_count(), |slides| slides.len())
@@ -1949,49 +1967,49 @@ impl Transaction {
 
     /// Semantic moves staged in call order.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Fixed-width slide visibility changes staged in call order.
     #[must_use]
-    pub fn slide_visibility_changes(&self) -> &[SlideVisibilityChange] {
+    pub(crate) fn slide_visibility_changes(&self) -> &[SlideVisibilityChange] {
         &self.visibility_changes
     }
 
     /// Fixed-width slide advance changes staged in call order.
     #[must_use]
-    pub fn slide_advance_changes(&self) -> &[SlideAdvanceChange] {
+    pub(crate) fn slide_advance_changes(&self) -> &[SlideAdvanceChange] {
         &self.advance_changes
     }
 
     /// Fixed-width visual transition changes staged in call order.
     #[must_use]
-    pub fn slide_transition_visual_changes(&self) -> &[SlideTransitionVisualChange] {
+    pub(crate) fn slide_transition_visual_changes(&self) -> &[SlideTransitionVisualChange] {
         &self.transition_visual_changes
     }
 
     /// Checked shape-text replacements staged in this root transaction.
     #[must_use]
-    pub fn shape_text_changes(&self) -> &[ShapeTextChange] {
+    pub(crate) fn shape_text_changes(&self) -> &[ShapeTextChange] {
         &self.text_changes
     }
 
     /// Checked shape-anchor formatting replacements staged in this root.
     #[must_use]
-    pub fn shape_anchor_changes(&self) -> &[ShapeAnchorChange] {
+    pub(crate) fn shape_anchor_changes(&self) -> &[ShapeAnchorChange] {
         &self.anchor_changes
     }
 
     /// External movie/audio path replacements staged in this root.
     #[must_use]
-    pub fn external_media_path_changes(&self) -> &[ExternalMediaPathChange] {
+    pub(crate) fn external_media_path_changes(&self) -> &[ExternalMediaPathChange] {
         &self.media_path_changes
     }
 
     /// External-media playback replacements staged in this root.
     #[must_use]
-    pub fn external_media_playback_changes(&self) -> &[ExternalMediaPlaybackChange] {
+    pub(crate) fn external_media_playback_changes(&self) -> &[ExternalMediaPlaybackChange] {
         &self.media_playback_changes
     }
 
@@ -2002,7 +2020,7 @@ impl Transaction {
     ///
     /// Returns a typed refusal when either position is absent, or a package
     /// error when the structural candidate is invalid.
-    pub fn move_slide(&mut self, from: Position, destination: Position) -> Result<()> {
+    pub(crate) fn move_slide(&mut self, from: Position, destination: Position) -> Result<()> {
         self.require_position(from)?;
         self.require_position(destination)?;
         if from == destination {
@@ -2046,7 +2064,7 @@ impl Transaction {
     /// Returns a typed refusal when the position is absent, or the slide has
     /// several or a malformed slide-show information atom, or no leading
     /// `SlideAtom` to insert one after.
-    pub fn set_slide_hidden(&mut self, position: Position, hidden: bool) -> Result<()> {
+    pub(crate) fn set_slide_hidden(&mut self, position: Position, hidden: bool) -> Result<()> {
         self.require_position(position)?;
         let selected = self.document.slides()?[position.get()];
         let source_position = self
@@ -2087,7 +2105,11 @@ impl Transaction {
     ///
     /// Returns a typed refusal for an absent, ambiguous, malformed, or newly
     /// inserted slide-show information owner.
-    pub fn set_slide_advance(&mut self, position: Position, advance: SlideAdvance) -> Result<()> {
+    pub(crate) fn set_slide_advance(
+        &mut self,
+        position: Position,
+        advance: SlideAdvance,
+    ) -> Result<()> {
         self.require_position(position)?;
         let selected = self.document.slides()?[position.get()];
         let source_position = self
@@ -2124,7 +2146,7 @@ impl Transaction {
     ///
     /// Returns a typed refusal for an absent, ambiguous, malformed, or newly
     /// inserted visual transition owner.
-    pub fn set_slide_transition_visual(
+    pub(crate) fn set_slide_transition_visual(
         &mut self,
         position: Position,
         visual: SlideTransitionVisual,
@@ -2167,7 +2189,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns a typed slide refusal or the checked shape-text owner's error.
-    pub fn set_shape_text(
+    pub(crate) fn set_shape_text(
         &mut self,
         target: crate::text_edit::Target,
         value: impl Into<String>,
@@ -2250,7 +2272,11 @@ impl Transaction {
     /// page without one body placeholder, an unrepresentable or
     /// position-dependent text change, a changed signed source, or a slide
     /// inserted by this transaction.
-    pub fn set_notes_text(&mut self, position: Position, value: impl Into<String>) -> Result<()> {
+    pub(crate) fn set_notes_text(
+        &mut self,
+        position: Position,
+        value: impl Into<String>,
+    ) -> Result<()> {
         self.require_position(position)?;
         let projected = self.document.slides()?;
         let persist_id = projected[position.get()].persist_id();
@@ -2310,7 +2336,10 @@ impl Transaction {
     /// semantic targets, missing targets, incompatible encodings, unsafe
     /// dependency closures, and package publication failures leave this
     /// transaction unchanged.
-    pub fn set_shape_texts(&mut self, replacements: &[ShapeTextReplacement]) -> Result<usize> {
+    pub(crate) fn set_shape_texts(
+        &mut self,
+        replacements: &[ShapeTextReplacement],
+    ) -> Result<usize> {
         if replacements.len() > MAX_SHAPE_TEXT_REPLACEMENTS {
             return Err(PackageError::ResourceLimit(format!(
                 "PPT shape-text batch operation count {} exceeds limit {}",
@@ -2458,7 +2487,10 @@ impl Transaction {
     /// replacement-byte limit; duplicate semantic targets, missing targets,
     /// incompatible encodings, unsafe dependency closures, signed changes,
     /// and publication failures are returned without partial state.
-    pub fn set_shape_text_chunks(&mut self, chunks: &[&[ShapeTextReplacement]]) -> Result<usize> {
+    pub(crate) fn set_shape_text_chunks(
+        &mut self,
+        chunks: &[&[ShapeTextReplacement]],
+    ) -> Result<usize> {
         let (flattened, replacement_bytes) = flatten_shape_text_chunks(chunks)?;
         if replacement_bytes > self.source.limits.max_package_bytes {
             return Err(PackageError::ResourceLimit(format!(
@@ -2480,7 +2512,7 @@ impl Transaction {
     ///
     /// Returns a typed refusal when the semantic target is missing,
     /// ambiguous, newly inserted, or lacks exactly one supported host anchor.
-    pub fn set_shape_anchor(
+    pub(crate) fn set_shape_anchor(
         &mut self,
         target: crate::text_edit::Target,
         anchor: crate::Anchor,
@@ -2536,7 +2568,7 @@ impl Transaction {
     ///
     /// Returns a typed owner-order refusal or an external-media validation or
     /// package publication error.
-    pub fn set_external_media_path(&mut self, id: u32, path: Option<String>) -> Result<()> {
+    pub(crate) fn set_external_media_path(&mut self, id: u32, path: Option<String>) -> Result<()> {
         let media = external_media_snapshot(&self.working)?;
         let object = media
             .collection()
@@ -2581,7 +2613,7 @@ impl Transaction {
     ///
     /// Returns a typed owner-order refusal or an external-media validation or
     /// package publication error.
-    pub fn set_external_media_playback(
+    pub(crate) fn set_external_media_playback(
         &mut self,
         id: u32,
         playback: crate::external_media::Playback,
@@ -2629,7 +2661,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns a typed position refusal or a structural validation error.
-    pub fn remove_slide(&mut self, position: Position) -> Result<()> {
+    pub(crate) fn remove_slide(&mut self, position: Position) -> Result<()> {
         self.require_position(position)?;
         self.require_change_allowed()?;
         let before_order = order_digest(&self.document)?;
@@ -2665,7 +2697,7 @@ impl Transaction {
     /// Returns a typed position or signed-source refusal, or a resource
     /// error when the persist, slide, drawing or shape identifier space is
     /// exhausted.
-    pub fn insert_slide(&mut self, position: Position) -> Result<()> {
+    pub(crate) fn insert_slide(&mut self, position: Position) -> Result<()> {
         self.require_change_allowed()?;
         let count = self.slide_count();
         if position.get() > count {
@@ -2716,7 +2748,11 @@ impl Transaction {
     ///
     /// Returns a typed refusal for a stale/different target or a package error
     /// when identifier allocation or structural validation fails.
-    pub fn insert_transfer(&mut self, position: Position, plan: &TransferPlan) -> Result<()> {
+    pub(crate) fn insert_transfer(
+        &mut self,
+        position: Position,
+        plan: &TransferPlan,
+    ) -> Result<()> {
         self.require_change_allowed()?;
         if plan.target_artifact != self.source.artifact_digest() {
             return Err(Error::Refused(Refusal::TransferTargetMismatch));
@@ -2788,7 +2824,7 @@ impl Transaction {
     ///
     /// Returns an error if publication, preservation checks, full reopen, or
     /// semantic readback fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         if self.source.has_signature && self.source.bytes() != self.working.bytes() {
             return Err(Error::Refused(Refusal::Signed));
         }
@@ -2930,7 +2966,10 @@ impl Transaction {
     ///
     /// Returns the same typed error as [`Self::commit`].
     #[cfg(feature = "performance-diagnostics")]
-    pub fn commit_profiled(self, mut observer: impl FnMut(DiagnosticEvent)) -> Result<Commit> {
+    pub(crate) fn commit_profiled(
+        self,
+        mut observer: impl FnMut(DiagnosticEvent),
+    ) -> Result<Commit> {
         if self.source.has_signature && self.source.bytes() != self.working.bytes() {
             return Err(Error::Refused(Refusal::Signed));
         }
@@ -3190,7 +3229,7 @@ impl Transaction {
 
 /// Successful immutable target and its reversible source-checked patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
 }
@@ -3198,26 +3237,26 @@ pub struct Commit {
 impl Commit {
     /// Published whole-package snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Reversible patch from the exact source to the committed artifact.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Splits the commit into its target and patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 }
 
 /// Reversible exact-source-checked whole-package slide-order patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct Patch {
     before: Snapshot,
     after: Snapshot,
     changes: Vec<Change>,
@@ -3290,31 +3329,31 @@ impl StructuralArtifact {
 impl Patch {
     /// Semantic moves represented by this patch.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Slide hidden-state replacements composed into this root patch.
     #[must_use]
-    pub fn slide_visibility_changes(&self) -> &[SlideVisibilityChange] {
+    pub(crate) fn slide_visibility_changes(&self) -> &[SlideVisibilityChange] {
         &self.visibility_changes
     }
 
     /// Slide advance replacements composed into this root patch.
     #[must_use]
-    pub fn slide_advance_changes(&self) -> &[SlideAdvanceChange] {
+    pub(crate) fn slide_advance_changes(&self) -> &[SlideAdvanceChange] {
         &self.advance_changes
     }
 
     /// Visual transition replacements composed into this root patch.
     #[must_use]
-    pub fn slide_transition_visual_changes(&self) -> &[SlideTransitionVisualChange] {
+    pub(crate) fn slide_transition_visual_changes(&self) -> &[SlideTransitionVisualChange] {
         &self.transition_visual_changes
     }
 
     /// Speaker-notes text replacements composed into this root patch, in
     /// operation order.
-    pub fn notes_text_changes(&self) -> impl Iterator<Item = &NotesTextChange> {
+    pub(crate) fn notes_text_changes(&self) -> impl Iterator<Item = &NotesTextChange> {
         self.formatting.iter().filter_map(|change| match change {
             FormattingChange::NotesText(change) => Some(change),
             _ => None,
@@ -3323,43 +3362,43 @@ impl Patch {
 
     /// Shape-text replacements composed into this root patch.
     #[must_use]
-    pub fn shape_text_changes(&self) -> &[ShapeTextChange] {
+    pub(crate) fn shape_text_changes(&self) -> &[ShapeTextChange] {
         &self.text_changes
     }
 
     /// Shape-anchor formatting replacements composed into this root patch.
     #[must_use]
-    pub fn shape_anchor_changes(&self) -> &[ShapeAnchorChange] {
+    pub(crate) fn shape_anchor_changes(&self) -> &[ShapeAnchorChange] {
         &self.anchor_changes
     }
 
     /// External movie/audio path replacements composed into this root patch.
     #[must_use]
-    pub fn external_media_path_changes(&self) -> &[ExternalMediaPathChange] {
+    pub(crate) fn external_media_path_changes(&self) -> &[ExternalMediaPathChange] {
         &self.media_path_changes
     }
 
     /// External-media playback replacements composed into this root patch.
     #[must_use]
-    pub fn external_media_playback_changes(&self) -> &[ExternalMediaPlaybackChange] {
+    pub(crate) fn external_media_playback_changes(&self) -> &[ExternalMediaPlaybackChange] {
         &self.media_playback_changes
     }
 
     /// Whether this patch changes no artifact bytes.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.before.bytes() == self.after.bytes()
     }
 
     /// Exact source artifact required for forward application.
     #[must_use]
-    pub fn before(&self) -> &[u8] {
+    pub(crate) fn before(&self) -> &[u8] {
         self.before.bytes()
     }
 
     /// Exact committed target artifact.
     #[must_use]
-    pub fn after(&self) -> &[u8] {
+    pub(crate) fn after(&self) -> &[u8] {
         self.after.bytes()
     }
 
@@ -3368,7 +3407,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error when `current` is not the exact source snapshot.
-    pub fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.bytes() != self.before.bytes() {
             return Err(PackageError::InvalidFormat(
                 "PPT slide-order patch source does not match its base artifact".into(),
@@ -3380,7 +3419,7 @@ impl Patch {
 
     /// Returns the exact-source-checked inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -3573,7 +3612,7 @@ impl Patch {
     ///
     /// Returns an error when caller-selected patch bounds cannot represent the
     /// semantic operations.
-    pub fn to_durable(
+    pub(crate) fn to_durable(
         &self,
         limits: litchi_core::patch::PatchLimits,
     ) -> std::result::Result<
@@ -3805,26 +3844,26 @@ struct Move {
 }
 
 /// One independently prepared move retaining its exact source lineage.
-pub struct PreparedMove {
+pub(crate) struct PreparedMove {
     inner: litchi_core::patch::SubEdit<Lineage, Move>,
 }
 
 impl PreparedMove {
     /// Stable caller-selected composition identifier.
     #[must_use]
-    pub fn identifier(&self) -> &str {
+    pub(crate) fn identifier(&self) -> &str {
         self.inner.id()
     }
 
     /// Source position in the immutable base order.
     #[must_use]
-    pub const fn from(&self) -> Position {
+    pub(crate) const fn from(&self) -> Position {
         self.inner.payload().from
     }
 
     /// Final destination in the immutable base order.
     #[must_use]
-    pub const fn destination(&self) -> Position {
+    pub(crate) const fn destination(&self) -> Position {
         self.inner.payload().destination
     }
 }
@@ -3841,7 +3880,7 @@ impl fmt::Debug for PreparedMove {
 }
 
 /// Recoverable failure to join one prepared slide move.
-pub struct JoinError {
+pub(crate) struct JoinError {
     failure: Box<SubEditJoinFailure>,
     rejected: Box<PreparedMove>,
 }
@@ -3849,13 +3888,13 @@ pub struct JoinError {
 impl JoinError {
     /// Structured common composition refusal.
     #[must_use]
-    pub const fn failure(&self) -> &SubEditJoinFailure {
+    pub(crate) const fn failure(&self) -> &SubEditJoinFailure {
         &self.failure
     }
 
     /// Recovers the rejected prepared move.
     #[must_use]
-    pub fn into_rejected(self) -> PreparedMove {
+    pub(crate) fn into_rejected(self) -> PreparedMove {
         *self.rejected
     }
 }
@@ -3871,7 +3910,7 @@ impl fmt::Debug for JoinError {
 }
 
 /// Bounded deterministic composition of provably disjoint slide moves.
-pub struct Composition {
+pub(crate) struct Composition {
     source: Snapshot,
     joined: litchi_core::patch::JoinedSubEdits<Lineage, Move>,
 }
@@ -3883,7 +3922,10 @@ impl Composition {
     /// # Errors
     ///
     /// Returns the structured common refusal and retains the rejected work.
-    pub fn join(&mut self, incoming: PreparedMove) -> std::result::Result<&mut Self, JoinError> {
+    pub(crate) fn join(
+        &mut self,
+        incoming: PreparedMove,
+    ) -> std::result::Result<&mut Self, JoinError> {
         if let Err(error) = self.joined.join(incoming.inner) {
             let (failure, rejected) = error.into_parts();
             return Err(JoinError {
@@ -3896,13 +3938,13 @@ impl Composition {
 
     /// Number of accepted independently prepared moves.
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.joined.len()
     }
 
     /// Whether no move has been accepted.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.joined.is_empty()
     }
 
@@ -3912,7 +3954,7 @@ impl Composition {
     /// # Errors
     ///
     /// Returns an error if staging or whole-package publication fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         let mut transaction = self.source.edit()?;
         for edit in self.joined.into_sub_edits() {
             let move_ = edit.into_payload();

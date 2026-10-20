@@ -645,9 +645,29 @@ impl Edit {
 
     /// Publish this edit as a new immutable package.
     pub fn commit(self) -> Result<Commit> {
+        self.commit_with(slide_order::Transaction::commit)
+    }
+
+    /// Publish this edit while reporting deterministic, content-free phase
+    /// boundaries of the native publication to `observer`.
+    ///
+    /// This is the opt-in diagnostic equivalent of [`Self::commit`]; it keeps
+    /// every validation and ownership rule of the ordinary commit.
+    #[cfg(feature = "performance-diagnostics")]
+    pub fn commit_profiled(
+        self,
+        observer: impl FnMut(slide_order::DiagnosticEvent),
+    ) -> Result<Commit> {
+        self.commit_with(|inner| inner.commit_profiled(observer))
+    }
+
+    fn commit_with(
+        self,
+        native: impl FnOnce(slide_order::Transaction) -> slide_order::Result<slide_order::Commit>,
+    ) -> Result<Commit> {
         ensure_source_version(&self.package, self.expected_source)?;
         let verified = self.inner.verified_shapes();
-        let native_commit = self.inner.commit();
+        let native_commit = native(self.inner);
         ensure_source_version(&self.package, self.expected_source)?;
         let native_commit = native_commit?;
         let operation_count = self.operation_count;

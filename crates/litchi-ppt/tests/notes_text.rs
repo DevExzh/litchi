@@ -7,7 +7,7 @@
 //! Speaker-notes text through the canonical primary edit (record 0260).
 
 use litchi_ppt::package::edit::{Error, Position};
-use litchi_ppt::slide_order::{self, Snapshot};
+use litchi_ppt::slide_order;
 use litchi_ppt::text_edit::Refusal;
 use litchi_ppt::{Builder, Package};
 use std::path::PathBuf;
@@ -117,38 +117,6 @@ fn equal_notes_text_is_an_exact_noop() {
         commit.package().to_bytes().unwrap(),
         source.to_bytes().unwrap()
     );
-}
-
-#[test]
-fn durable_notes_patch_replays_and_reverts() {
-    let source = Snapshot::from_bytes(fixture(DECK)).unwrap();
-    let mut transaction = source.edit().unwrap();
-    transaction
-        .set_notes_text(Position::new(1), "Second page notes, durable")
-        .unwrap();
-    let commit = transaction.commit().unwrap();
-    let (target, patch) = commit.into_parts();
-    let durable = patch
-        .to_durable(litchi_core::patch::PatchLimits::new(
-            litchi_core::patch::BlobLimits::new(0, 0, 0),
-            64 * 1024,
-            64,
-            8,
-            4_096,
-            32 * 1024,
-        ))
-        .unwrap();
-    let replayed = source.apply_durable(&durable).unwrap();
-    let notes = |snapshot: &Snapshot| {
-        let package = Package::from_bytes(snapshot.bytes()).unwrap();
-        state(&package)
-            .into_iter()
-            .map(|(notes, _)| notes)
-            .collect::<Vec<_>>()
-    };
-    assert_eq!(notes(&replayed), notes(&target));
-    let reverted = replayed.apply_durable(&durable.inverse()).unwrap();
-    assert_eq!(notes(&reverted), notes(&source));
 }
 
 #[test]

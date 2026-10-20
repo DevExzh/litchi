@@ -8,7 +8,6 @@
 
 use litchi_ppt::comments::{CommentChange, DateTime, NewComment};
 use litchi_ppt::package::edit::Position;
-use litchi_ppt::slide_order::Snapshot;
 use litchi_ppt::{Package, ParsedComment};
 use std::path::PathBuf;
 
@@ -167,32 +166,6 @@ fn equal_comment_change_is_an_exact_noop_and_missing_comment_is_refused() {
         edit.remove_comment(Position::new(0), Position::new(3))
             .is_err()
     );
-}
-
-#[test]
-fn durable_comment_patch_replays_and_reverts() {
-    let source = Snapshot::from_bytes(fixture(NO_COMMENTS)).unwrap();
-    let mut transaction = source.edit().unwrap();
-    transaction
-        .add_comment(Position::new(1), &new_comment("Durable"))
-        .unwrap();
-    let commit = transaction.commit().unwrap();
-    let (target, patch) = commit.into_parts();
-    let durable = patch
-        .to_durable(litchi_core::patch::PatchLimits::new(
-            litchi_core::patch::BlobLimits::new(8, 4 << 20, 8 << 20),
-            1 << 20,
-            64,
-            8,
-            4_096,
-            8 << 20,
-        ))
-        .unwrap();
-    let replayed = source.apply_durable(&durable).unwrap();
-    assert_eq!(replayed.bytes(), target.bytes());
-    let reverted = target.apply_durable(&durable.inverse()).unwrap();
-    let reverted = Package::from_bytes(reverted.bytes()).unwrap();
-    assert!(comments(&reverted, 1).is_empty());
 }
 
 #[test]

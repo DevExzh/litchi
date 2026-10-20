@@ -31792,13 +31792,13 @@ fn run_semantic_ppt(
     let selected = (linear / boxes_per_slide, linear % boxes_per_slide);
     let target = Target::new(Position::new(selected.0), Position::new(selected.1));
     let expected_changed = if case == Case::PptSemanticOneEditSave {
-        let source = Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_ppt::Package::from_bytes(&corpus.archive)?;
         let mut edit = source.edit()?;
         edit.set_shape_text(
             target,
             updated_writer_text("ppt", selected.0, selected.1, 0),
         )?;
-        edit.commit()?.snapshot().bytes().to_vec()
+        edit.commit()?.package().to_bytes()?
     } else {
         corpus.archive.clone()
     };
@@ -31880,7 +31880,9 @@ fn run_semantic_ppt(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::PptSemanticNoopEditSave | Case::PptSemanticOneEditSave => {
-                let source = Snapshot::from_bytes(corpus.archive.clone())?;
+                // Record 0357: the native slide-order owner is crate-private;
+                // the canonical primary edit drives the same publication.
+                let source = litchi_ppt::Package::from_bytes(&corpus.archive)?;
                 let updated = case == Case::PptSemanticOneEditSave;
                 let started = Instant::now();
                 let mut edit = source.edit()?;
@@ -31891,31 +31893,21 @@ fn run_semantic_ppt(
                     )?;
                 }
                 let commit = edit.commit()?;
-                let bytes = commit.snapshot().bytes().to_vec();
+                let bytes = commit.package().to_bytes()?;
                 let duration = started.elapsed();
-                if commit.patch().is_empty() == updated
-                    || commit.patch().shape_text_changes().len() != usize::from(updated)
+                if commit.patch().is_noop() == updated
+                    || commit.diagnostics().changed() != updated
+                    || commit.patch().operation_count() != usize::from(updated)
                     || bytes != expected_changed
                 {
                     return Err("semantic PPT edit/save has unexpected publication state".into());
                 }
-                if updated {
-                    let [change] = commit.patch().shape_text_changes() else {
-                        return Err("semantic PPT edit patch lacks its one shape change".into());
-                    };
-                    if change.target() != target
-                        || change.before() != writer_text("ppt", selected.0, selected.1, 0)
-                        || change.after() != updated_writer_text("ppt", selected.0, selected.1, 0)
-                    {
-                        return Err("semantic PPT shape change differs from specification".into());
-                    }
-                }
-                let applied = commit.patch().apply(&source)?;
-                if applied.bytes() != commit.snapshot().bytes() {
+                let applied = source.apply(commit.patch())?.into_package();
+                if applied.to_bytes()? != bytes {
                     return Err("semantic PPT exact patch replay differs from commit".into());
                 }
-                let restored = commit.patch().inverse().apply(&applied)?;
-                if restored.bytes() != source.bytes() {
+                let restored = applied.apply(&commit.patch().inverse())?.into_package();
+                if restored.to_bytes()? != corpus.archive {
                     return Err("semantic PPT inverse did not restore exact source bytes".into());
                 }
                 verify_semantic_ppt(&bytes, shape, updated.then_some(selected))?;
@@ -31936,7 +31928,7 @@ fn run_ppt_text_edit_one_edit_save(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
-    use litchi_ppt::text_edit::{Snapshot, Target};
+    use litchi_ppt::text_edit::Target;
 
     let shape = writer_shape(corpus)?;
     if shape == WriterShape::PayloadHeavy {
@@ -31949,54 +31941,66 @@ fn run_ppt_text_edit_one_edit_save(
     let source_text = writer_text("ppt", selected.0, selected.1, 0);
     let replacement = updated_writer_text("ppt", selected.0, selected.1, 0);
 
+    // Record 0357: the focused text owner is crate-private; the canonical
+    // primary edit's set_shape_text is the public text-edit transaction.
+    let shape_text = |package: &litchi_ppt::Package| -> Result<String, Box<dyn Error>> {
+        Ok(package
+            .presentation()?
+            .slide_at(selected.0)?
+            .ok_or("PPT text-edit selected slide is missing")?
+            .shapes()?
+            .get(selected.1)
+            .ok_or("PPT text-edit selected shape is missing")?
+            .text()?)
+    };
     let expected_changed = {
-        let source = Snapshot::from_bytes(corpus.archive.clone())?;
-        let mut edit = source.edit_text(target)?;
-        if edit.text() != source_text {
+        let source = litchi_ppt::Package::from_bytes(&corpus.archive)?;
+        if shape_text(&source)? != source_text {
             return Err("PPT text-edit source differs from writer specification".into());
         }
-        edit.set_text(replacement.clone())?;
-        edit.commit()?.snapshot().bytes().to_vec()
+        let mut edit = source.edit()?;
+        edit.set_shape_text(target, replacement.clone())?;
+        edit.commit()?.package().to_bytes()?
     };
 
     let mut elapsed = Vec::with_capacity(samples);
     let mut final_publication = None;
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        // Snapshot construction is deliberately outside the measured interval:
+        // Package construction is deliberately outside the measured interval:
         // this case attributes the public text-edit transaction itself.
-        let source = Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_ppt::Package::from_bytes(&corpus.archive)?;
         let started = Instant::now();
-        let mut edit = source.edit_text(target)?;
-        edit.set_text(replacement.clone())?;
+        let mut edit = source.edit()?;
+        edit.set_shape_text(target, replacement.clone())?;
         let commit = edit.commit()?;
         let duration = started.elapsed();
 
-        if commit.patch().is_empty()
+        if commit.patch().is_noop()
             || commit.patch().before() != corpus.archive
             || commit.patch().after() != expected_changed
-            || commit.snapshot().bytes() != expected_changed
+            || commit.package().to_bytes()? != expected_changed
         {
             return Err("PPT text-edit publication differs from specification".into());
         }
-        std::hint::black_box(commit.snapshot());
+        std::hint::black_box(commit.package());
         final_publication = Some((source, commit));
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
 
     let (source, commit) = final_publication.ok_or("PPT text-edit case produced no publication")?;
-    let applied = commit.patch().apply(&source)?;
-    if applied.bytes() != commit.snapshot().bytes() {
+    let published = commit.package().to_bytes()?;
+    let applied = source.apply(commit.patch())?.into_package();
+    if applied.to_bytes()? != published {
         return Err("PPT text-edit exact patch replay differs from commit".into());
     }
-    let restored = commit.patch().inverse().apply(&applied)?;
-    if restored.bytes() != source.bytes() {
+    let restored = applied.apply(&commit.patch().inverse())?.into_package();
+    if restored.to_bytes()? != corpus.archive {
         return Err("PPT text-edit inverse did not restore exact source bytes".into());
     }
-    let readback = commit.snapshot().edit_text(target)?;
-    if readback.target() != target || readback.text() != replacement {
+    if shape_text(commit.package())? != replacement {
         return Err("PPT text-edit public readback differs from replacement".into());
     }
-    verify_semantic_ppt(commit.snapshot().bytes(), shape, Some(selected))?;
+    verify_semantic_ppt(&published, shape, Some(selected))?;
 
     Ok(result(Case::PptTextEditOneEditSave, corpus, elapsed, None))
 }

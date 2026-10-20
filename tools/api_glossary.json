@@ -5438,21 +5438,6 @@
           "replacement": "use open_with_options(SourceBackedOptions)"
         },
         {
-          "name": "rollback",
-          "scope": "litchi_ppt::text_edit::SourceTransaction",
-          "replacement": "drop the owned transaction"
-        },
-        {
-          "name": "rollback",
-          "scope": "litchi_ppt::text_edit::Transaction",
-          "replacement": "drop the owned transaction"
-        },
-        {
-          "name": "rollback",
-          "scope": "litchi_ppt::slide_order::Transaction",
-          "replacement": "drop the owned transaction"
-        },
-        {
           "name": "from_bytes_with_limits",
           "scope": "litchi_ppt::slide_order::Snapshot",
           "replacement": "use from_bytes_with_options(OpenOptions)"
@@ -5519,6 +5504,38 @@
           "scope": "litchi_ppt::writer",
           "replacement": "the chart draft lives at litchi_ppt::builder::Chart (record 0351 §2.1 rule 7)",
           "recursive": false
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::slide_order",
+          "replacement": "drop the Edit; the native owner is crate-private and Package::edit is the public route (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::slide_order",
+          "replacement": "use Package::edit / package::edit::Edit (record 0357)",
+          "match": "suffix"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::text_edit",
+          "replacement": "drop the Edit; the native owner is crate-private and Package::edit is the public route (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::text_edit",
+          "replacement": "use Package::edit / package::edit::Edit (record 0357)",
+          "match": "suffix"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::slide_order",
+          "replacement": "use Package::edit / package::edit::Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::text_edit",
+          "replacement": "use Package::edit / package::edit::Edit (record 0357)"
         }
       ],
       "families": [
@@ -5725,21 +5742,6 @@
           "replacement": "use open_with_options(SourceBackedOptions)"
         },
         {
-          "name": "rollback",
-          "scope": "litchi_ppt::text_edit::SourceTransaction",
-          "replacement": "drop the owned transaction"
-        },
-        {
-          "name": "rollback",
-          "scope": "litchi_ppt::text_edit::Transaction",
-          "replacement": "drop the owned transaction"
-        },
-        {
-          "name": "rollback",
-          "scope": "litchi_ppt::slide_order::Transaction",
-          "replacement": "drop the owned transaction"
-        },
-        {
           "name": "from_bytes_with_limits",
           "scope": "litchi_ppt::slide_order::Snapshot",
           "replacement": "use from_bytes_with_options(OpenOptions)"
@@ -5811,6 +5813,38 @@
           "scope": "litchi_ppt::writer",
           "replacement": "the chart draft lives at litchi_ppt::builder::Chart (record 0351 §2.1 rule 7)",
           "recursive": false
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::slide_order",
+          "replacement": "drop the Edit; the native owner is crate-private and Package::edit is the public route (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::slide_order",
+          "replacement": "use Package::edit / package::edit::Edit (record 0357)",
+          "match": "suffix"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::text_edit",
+          "replacement": "drop the Edit; the native owner is crate-private and Package::edit is the public route (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::text_edit",
+          "replacement": "use Package::edit / package::edit::Edit (record 0357)",
+          "match": "suffix"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::slide_order",
+          "replacement": "use Package::edit / package::edit::Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::text_edit",
+          "replacement": "use Package::edit / package::edit::Edit (record 0357)"
         }
       ],
       "families": [
