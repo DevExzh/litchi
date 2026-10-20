@@ -363,16 +363,19 @@ impl Patch {
     ///
     /// The operations carry semantic zero-based positions, the SHA-256 of
     /// the exact artifacts they bind and a content-free order fingerprint;
-    /// native slide and persist identifiers are never serialized.
+    /// native slide and persist identifiers are never serialized. Every
+    /// primary-edit verb has a durable form; master reorders, custom
+    /// table-style edits and `fNonOutlineData` are the
+    /// `document-structure.*` operations (record 0357b), bound like slide
+    /// moves, with the custom table-style atoms as blobs.
     ///
     /// # Errors
     ///
-    /// [`Error::Durable`] when `limits` cannot hold the operations, and
+    /// [`Error::Durable`] when `limits` cannot hold the operations (a
+    /// custom table-style atom needs a blob), and
     /// [`slide_order::Refusal::UnsupportedPatch`] for a changed patch that a
     /// durable replay produced (it keeps the exact bytes, not the
-    /// operations; convert the durable patch that was replayed instead) or
-    /// one that reorders masters, edits the custom table-style atom or sets
-    /// `fNonOutlineData` (those have no durable vocabulary).
+    /// operations; convert the durable patch that was replayed instead).
     pub fn to_durable(
         &self,
         limits: litchi_core::patch::PatchLimits,
@@ -384,30 +387,31 @@ impl Patch {
                 },
             )));
         }
-        if self.inner.has_document_changes() {
-            return Err(Error::Native(slide_order::Error::Refused(
-                slide_order::Refusal::UnsupportedPatch {
-                    reason: "master order, custom table styles and fNonOutlineData have no durable form",
-                },
-            )));
-        }
         self.inner.to_durable(limits).map_err(Error::Durable)
     }
 
     /// Join an independently prepared patch over the same exact source.
     ///
-    /// Both patches must consist only of slide moves, and the slide
-    /// positions they permute must be disjoint, so the two commute. The
-    /// joined patch applies `self`'s moves, then `other`'s, and counts the
-    /// operations of both. This is the composition of independently
-    /// prepared moves (record 0357a).
+    /// The two patches must commute (records 0357a, 0357b). Each may hold
+    /// slide moves, master reorders, custom table-style edits,
+    /// `fNonOutlineData` changes and the formatting edits (shape and notes
+    /// text, anchors, slide visibility, advance and visual transition,
+    /// external media path and playback). Neither patch's slide-list
+    /// positions (moved ranges, `fNonOutlineData` slides) may meet the
+    /// other's moved positions, and no semantic target may be written by
+    /// both. The joined patch stages both patches' formatting on the
+    /// source, then `self`'s structure and `other`'s, in one commit, and
+    /// counts the operations of both.
     ///
     /// # Errors
     ///
     /// [`Error::PatchConflict`] when the patches start from different
     /// packages; [`slide_order::Refusal::UnsupportedPatch`] (kind
-    /// `UnsupportedOperation`) for a patch with other operations or for
-    /// overlapping moves.
+    /// `UnsupportedOperation`) for slide insertions or removals, element
+    /// record edits, an inverse patch with both formatting and structure,
+    /// or positions that meet a moved range; and
+    /// [`slide_order::Refusal::JoinConflict`] (kind `UnsupportedOperation`)
+    /// for a target both patches write, such as two master reorders.
     pub fn join(&self, other: &Self) -> Result<Self> {
         if self.before() != other.before() {
             return Err(Error::PatchConflict);

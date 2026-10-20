@@ -11,7 +11,11 @@
   (new), `crates/litchi-ppt/src/package/owner.rs` (the digest cache), the
   probe `crates/litchi-ppt/examples/scoped_patch_probe.rs`,
   `tools/unified_bench_matrix.py` (`p0357b`) and the 0357a annotation in
-  `results/0289/bench-matrix-curated.json`.
+  `results/0289/bench-matrix-curated.json` (§§1–4);
+  `crates/litchi-ppt/src/slide_order.rs` (durable document-structure
+  operations, join), `crates/litchi-ppt/src/package/edit.rs` (docs, the
+  removed refusal), `tests/durable_patches.rs` and
+  `tests/document_structure_edits.rs` (§§5–8).
 - `performance_claim`: measured (§3).
 
 ## 1. F1: what made the commit slower
@@ -184,3 +188,157 @@ All exit 0 on the F1 tree:
 | `python3 tools/officecli_corpus.py --check` | 0 |
 | `python3 tools/unified_bench_matrix.py --check` | 0 |
 | `python3 tools/check_feature_matrix.py` (31 builds) | 0 |
+
+## 5. Durable form for the document-structure verbs
+
+Record 0357a §7.3 added these verbs to `package::edit::Edit`:
+`move_master`, `move_master_id`, `reorder_masters`, the four
+custom-table-style verbs and `set_slide_non_outline_data`. Its
+`Patch::to_durable` refused all of them. They now have operations in the
+native `litchi-ppt` durable format (`slide_order::Patch::to_durable` /
+`Snapshot::apply_durable`). The existing operations and their payloads
+are unchanged byte for byte. The new ones are additions to the
+vocabulary, and the `slide_order` and `durable_patches` tests that pin the
+old payloads pass unchanged.
+
+The edits are structural changes (`StructuralChange::Document`), so they
+are encoded and replayed like slide moves, in the same structural segment
+and in staging order. Every operation carries the slide-list operations'
+two preconditions:
+
+- `artifact_sha256`, the exact structural artifact;
+- `order_sha256`, the content-free slide-order fingerprint at the point
+  the edit was staged.
+
+The staged change now records that fingerprint. A document edit leaves the
+slide order alone, so the same fingerprint binds the forward and the
+inverse operation. Where the change carries the state it replaces, one
+more precondition binds that state:
+
+| Verb | `op` | `target` | extra precondition | `value` |
+|---|---|---|---|---|
+| `move_master`, `move_master_id`, `reorder_masters` | `document-structure.master-order.set` | `document` | — | the permutation, as zero-based master positions |
+| `insert_custom_table_styles` | `document-structure.custom-table-styles.insert` | `document` | — | `{"placement", "record": <blob id>}` |
+| `remove_custom_table_styles` | `document-structure.custom-table-styles.remove` | `document` | `styles_sha256` (the removed atom) | `null` |
+| `replace_custom_table_styles` | `document-structure.custom-table-styles.replace` | `document` | `styles_sha256` (the replaced atom) | `<blob id>` of the new atom |
+| `move_custom_table_styles` | `document-structure.custom-table-styles.move` | `document` | `placement` (before) | the new placement |
+| `set_slide_non_outline_data` | `document-structure.slide-non-outline-data.set` | `slide:N` | `non_outline_data` (before) | the flag |
+
+Placements are `before-end-document` and `after-end-document`. An atom is
+the complete `RoundTripCustomTableStyles12Atom` record, which travels as a
+blob of the durable bundle, as slide payloads do. A bound with no blob
+room is `Error::Durable`. Master positions are zero-based; no `masterId`
+or persist identifier is serialized. Replay first checks the artifact and
+order preconditions, then stages the same `slide_order::Transaction` verb
+(the verbs' own validation and the `Signed` rule apply), and checks the
+extra precondition against the state the verb replaced. A mismatch, an
+unknown vocabulary or a malformed value is an `InvalidFormat` package
+error, as for the other durable operations. The durable inverse is the
+inverse change, bound to the target-side structural artifact.
+
+`package::edit::Patch::to_durable` no longer refuses these verbs. A
+patch replayed from a durable patch still has no operations of its own and
+is still refused with `UnsupportedPatch`.
+
+## 6. Join
+
+`package::edit::Patch::join` (native `slide_order::Patch::join`) took only
+slide-move patches. It now joins two same-source patches that commute.
+Either patch may hold any of these:
+
+- slide moves;
+- master reorders;
+- custom table-style edits;
+- `fNonOutlineData` changes;
+- the formatting edits: shape and notes text, anchors, slide visibility,
+  advance and visual transition, and external media path and playback.
+
+The joined patch first stages both patches' formatting changes by value on
+the source. A formatting change names a source slide position, and no
+structure is staged yet, so the projected position is the source position.
+It then stages `self`'s structure, then `other`'s, in one native commit.
+The commit counts the operations of both. Its patch is an ordinary commit
+patch, so it applies and inverts exactly, converts to a durable patch, and
+joins again.
+
+Refusals:
+
+- **`Refusal::JoinConflict { target }`** (new, kind `UnsupportedOperation`):
+  both patches write the same semantic target, so their order would decide
+  the result. The target is named as `plan_three_way` names it, plus
+  `slide:N/notes-text`. The cases are:
+  - two master reorders (`document/master-list`): two permutations of
+    one list do not commute;
+  - two custom table-style edits (`document/custom-table-styles`);
+  - the same slide's flag (`slide-list/position:N/non-outline-data`);
+  - the same shape's text, anchor or notes;
+  - the same slide's visibility, advance or transition;
+  - the same media path or playback.
+- **`Refusal::UnsupportedPatch`** (kind `UnsupportedOperation`):
+  - another source. The package route already returns `PatchConflict`
+    for this.
+  - positions that meet a moved range. Neither patch's slide-list
+    positions (moved ranges and `fNonOutlineData` slides) may meet the
+    other's moved positions. Otherwise a position would read a different
+    slide in the two patches. Overlapping moves are refused as before.
+  - slide insertions and removals. They shift every later position.
+  - element record edits (comments, hyperlinks, tables and the other
+    record-0323 element owners). They replace persisted records that the
+    other patch may rewrite too, and replaying them by value is not
+    modeled.
+  - an inverse patch that holds both formatting and structure. Its
+    formatting targets resolve after its structure.
+
+## 7. Tests
+
+`tests/durable_patches.rs` (17 tests; 6 new, 1 changed), all on the public
+route:
+
+- **master reorder** (`slide_master.ppt`, three masters): the operation
+  shape (no blob needed). Then `to_durable` → deterministic JSON →
+  `from_deterministic_json` → `apply_durable` on the source reproduces the
+  commit's bytes. The durable inverse restores the source projection
+  (master ids, styles atom, every slide's flag, slide texts), and the
+  durable patch is refused on another package.
+- **custom table styles** (`45543.ppt`): replace with an atom of another
+  length, move, remove, and insert into the deck that has none. Each gets
+  the same round-trip, byte and inverse checks. An atom with no blob room
+  is `Error::Durable`.
+- **`fNonOutlineData`**, and **mixed structure**: a slide move, a master
+  reorder, a style move and a flag on the moved slide, in one commit.
+  The operation order is checked, then the same round trip.
+- **joins**: a master reorder joined with a slide move and with a text set
+  (3 operations). The test checks the masters, slide order and text
+  projection, that the swapped join order gives the same result, exact
+  inverse bytes, and a durable round trip and durable inverse of the
+  joined patch. A second join test chains a style move, a master reorder,
+  a flag off the moved range and a slide move.
+- **conflicting joins**: two master reorders, a style move with a style
+  removal, the same flag twice, and the same shape's text twice. Each is
+  `JoinConflict` with its target. A flag on a slide the other patch moves
+  is `UnsupportedPatch` in both join orders.
+- **changed**: `joins_refuse_overlap_other_operations_and_other_sources`
+  now refuses a slide insertion as the "other operation", and shows that a
+  slide-visibility change off the moved range joins.
+
+`tests/document_structure_edits.rs`:
+`document_edits_compose_with_slide_moves_and_plan` now expects
+`to_durable` to succeed (three operations) and the two master reorders to
+be `JoinConflict { target: "document/master-list" }`.
+
+No performance claim is made for §5–§6. The commit path of the primary
+edit gains one slide-order fingerprint per staged document edit, which
+only these verbs pay.
+
+## 8. Gates (durable and join commit)
+
+All exit 0 on the second commit's tree: `cargo fmt --all --check`;
+clippy `-p litchi-ppt -p litchi-ops --all-targets --all-features`,
+`-p litchi-ppt --all-targets --no-default-features` and
+`-p litchi-ops --all-targets --no-default-features --features ppt`, each
+with `-D warnings`; `cargo test -p litchi-ppt --all-features` (1,570
+tests); the litchi-ops test list of §4 (1,024 tests, no re-bless);
+`cargo doc` with `-Dwarnings`; the glossary gate over all 44 profiles; the
+seven `tools` unittest modules (1,304 tests); `officecli_capability_delta.py
+--check`; `officecli_corpus.py --check`; `unified_bench_matrix.py --check`;
+and `check_feature_matrix.py` (31 builds).

@@ -381,8 +381,10 @@ and title masters reference masters by that id, so every reference keeps its
 master. Refusals are typed: `ElementNotFound` (master, custom table styles),
 `InvalidElementValue` (a non-permutation, or bytes that are not exactly one
 such atom), `UnsupportedElement` (a second atom), and `Signed`. These edits
-have no durable vocabulary, so `to_durable` refuses them with
-`UnsupportedPatch`. They do not `join`. Three-way plans report
+had no durable vocabulary, so `to_durable` refused them with
+`UnsupportedPatch`, and they did not `join`. Record
+[0357b](0357b-ppt-block-roots-and-durable-structure-edits.md) §5–§6 adds
+both. Three-way plans report
 `document/master-list`, `document/custom-table-styles` and
 `slide-list/position:N/non-outline-data`.
 
