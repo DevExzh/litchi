@@ -4,7 +4,7 @@ use crate::error::{Error, Result};
 use crate::shape::designer::TAGS_EXTENSION_URI;
 
 use super::shape::escape_xml;
-use super::slide::{MutableSlide, PreparedDesigner as PreparedSlideDesigner};
+use super::slide::{PreparedDesigner as PreparedSlideDesigner, Slide};
 
 #[cfg(feature = "automatic-fonts")]
 use litchi_fonts::{CollectGlyphs, GlyphMap};
@@ -14,20 +14,20 @@ pub const FIRST_SLIDE_ID: u32 = 256;
 
 /// Mutable presentation model for new-package authoring.
 #[derive(Debug, Clone)]
-pub struct MutablePresentation {
-    pub(crate) slides: Vec<MutableSlide>,
+pub struct Presentation {
+    pub(crate) slides: Vec<Slide>,
     pub(crate) slide_width: i64,
     pub(crate) slide_height: i64,
     pub(crate) modified: bool,
 }
 
-impl Default for MutablePresentation {
+impl Default for Presentation {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl MutablePresentation {
+impl Presentation {
     /// Create an empty 4:3 presentation model.
     #[must_use]
     pub fn new() -> Self {
@@ -42,7 +42,7 @@ impl MutablePresentation {
     fn allocate_slide_id(&self) -> Result<u32> {
         self.slides
             .iter()
-            .map(MutableSlide::slide_id)
+            .map(Slide::slide_id)
             .max()
             .map_or(Ok(FIRST_SLIDE_ID), |id| {
                 id.checked_add(1)
@@ -55,10 +55,10 @@ impl MutablePresentation {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn add_slide(&mut self) -> Result<&mut MutableSlide> {
+    pub fn add_slide(&mut self) -> Result<&mut Slide> {
         let id = self.allocate_slide_id()?;
         let index = self.slides.len();
-        self.slides.push(MutableSlide::new(id));
+        self.slides.push(Slide::new(id));
         self.modified = true;
         self.slides
             .get_mut(index)
@@ -70,7 +70,7 @@ impl MutablePresentation {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn insert_slide(&mut self, index: usize) -> Result<&mut MutableSlide> {
+    pub fn insert_slide(&mut self, index: usize) -> Result<&mut Slide> {
         if index > self.slides.len() {
             return Err(Error::SlideIndexOutOfBounds {
                 index,
@@ -78,7 +78,7 @@ impl MutablePresentation {
             });
         }
         let id = self.allocate_slide_id()?;
-        self.slides.insert(index, MutableSlide::new(id));
+        self.slides.insert(index, Slide::new(id));
         self.modified = true;
         let len = self.slides.len();
         self.slides
@@ -94,13 +94,13 @@ impl MutablePresentation {
     }
 
     /// Borrow one mutable slide by index.
-    pub fn slide_mut(&mut self, index: usize) -> Option<&mut MutableSlide> {
+    pub fn slide_mut(&mut self, index: usize) -> Option<&mut Slide> {
         self.slides.get_mut(index)
     }
 
     /// Borrow all authored slides.
     #[must_use]
-    pub fn slides(&self) -> &[MutableSlide] {
+    pub fn slides(&self) -> &[Slide] {
         &self.slides
     }
 
@@ -220,7 +220,7 @@ impl MutablePresentation {
 
     /// Whether any mutable presentation state needs publication.
     pub fn is_modified(&self) -> bool {
-        self.modified || self.slides.iter().any(MutableSlide::is_modified)
+        self.modified || self.slides.iter().any(Slide::is_modified)
     }
 
     #[cfg(test)]
@@ -324,7 +324,7 @@ impl PreparedDesigner {
 }
 
 #[cfg(feature = "automatic-fonts")]
-impl CollectGlyphs for MutablePresentation {
+impl CollectGlyphs for Presentation {
     fn collect_glyphs(&self) -> GlyphMap {
         let mut glyphs = GlyphMap::new();
         for slide in &self.slides {

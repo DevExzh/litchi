@@ -1,5 +1,20 @@
 //! Typed presentation authoring, finalized as a canonical package.
-use crate::writer::MutablePresentation;
+//!
+//! [`Builder`] owns the authoring drafts — the [`Presentation`] with its
+//! [`Slide`]s and their [`Shape`]s — and publishes them once, as an
+//! immutable [`Package`], in [`Builder::build`] (record 0351 §2.1 rule 7).
+
+pub(crate) mod presentation;
+pub(crate) mod shape;
+pub(crate) mod slide;
+
+#[cfg(test)]
+mod draft_tests;
+
+pub use presentation::{FIRST_SLIDE_ID, Presentation};
+pub use shape::{Shape, ShapeType};
+pub use slide::Slide;
+
 use crate::{Package, Result};
 
 /// A native authoring owner whose output is an immutable-editable package.
@@ -18,7 +33,7 @@ use crate::{Package, Result};
 /// ```
 pub struct Builder {
     package: Package,
-    presentation: MutablePresentation,
+    presentation: Presentation,
     embed_fonts: bool,
 }
 impl Builder {
@@ -29,7 +44,7 @@ impl Builder {
     pub fn new() -> Result<Self> {
         Ok(Self {
             package: Package::new_authoring()?,
-            presentation: MutablePresentation::new(),
+            presentation: Presentation::new(),
             embed_fonts: false,
         })
     }
@@ -38,7 +53,7 @@ impl Builder {
     ///
     /// # Errors
     /// Returns native authoring admission failures.
-    pub fn presentation(&mut self) -> Result<&mut MutablePresentation> {
+    pub fn presentation(&mut self) -> Result<&mut Presentation> {
         Ok(&mut self.presentation)
     }
 

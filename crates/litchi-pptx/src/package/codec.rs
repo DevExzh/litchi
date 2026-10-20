@@ -12,7 +12,6 @@ use super::Package;
 use crate::custom::{Host, Props};
 use crate::parts::PresentationPart;
 use crate::resources;
-use crate::writer::MutablePresentation;
 use crate::{Error, Result};
 
 const PRESENTATION_PART: &str = "/ppt/presentation.xml";
@@ -377,7 +376,7 @@ impl Package {
     /// when `embed_fonts` asks for them. On error the package is dropped.
     pub(crate) fn publish_authored(
         mut self,
-        presentation: &MutablePresentation,
+        presentation: &crate::builder::Presentation,
         embed_fonts: bool,
     ) -> Result<Self> {
         let _ = embed_fonts;
@@ -398,7 +397,10 @@ impl Package {
         Ok(self)
     }
 
-    fn materialize_presentation(&mut self, presentation: &MutablePresentation) -> Result<()> {
+    fn materialize_presentation(
+        &mut self,
+        presentation: &crate::builder::Presentation,
+    ) -> Result<()> {
         // Compile all fallible p202 payloads before changing any OPC state.
         let designer = presentation.preflight_designer()?;
         let presentation_name = pack_uri(PRESENTATION_PART)?;

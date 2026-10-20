@@ -223,9 +223,8 @@ pub use view_properties::{
     load_from_package_with_tolerance as load_view_properties_with_tolerance,
 };
 pub use writer::{
-    MutablePresentation, MutableShape, MutableSlide, StreamingPresentationLimits,
-    StreamingPresentationOptions, StreamingPresentationScratchLimits, StreamingPresentationWriter,
-    StreamingSlideWriter, TextBoxSpec,
+    StreamingPresentationLimits, StreamingPresentationOptions, StreamingPresentationScratchLimits,
+    StreamingPresentationWriter, StreamingSlideWriter, TextBoxSpec,
 };
 
 /// Immutable source-backed PPTX package ownership and primary editing.

@@ -17,7 +17,7 @@ use litchi_pptx::media_parts::{
 };
 use litchi_pptx::presentation::media::{Format as MediaFormat, Kind as AuthoringMediaKind};
 use litchi_pptx::presentation_properties::metadata::sections::{List as SectionList, Section};
-use litchi_pptx::{Error, MutablePresentation, MutableSlide, Result};
+use litchi_pptx::{Error, Result};
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
 use std::fs;
@@ -78,7 +78,9 @@ fn main() -> std::result::Result<(), Box<dyn StdError>> {
     Ok(())
 }
 
-fn build_slides(presentation: &mut MutablePresentation) -> Result<Vec<MediaAttachment>> {
+fn build_slides(
+    presentation: &mut litchi_pptx::builder::Presentation,
+) -> Result<Vec<MediaAttachment>> {
     println!("Creating Slide 1: Title Slide");
     let slide = presentation.add_slide()?;
     slide.set_title("PPTX Features Demo");
@@ -262,7 +264,7 @@ fn build_slides(presentation: &mut MutablePresentation) -> Result<Vec<MediaAttac
 }
 
 fn add_text_table(
-    slide: &mut MutableSlide,
+    slide: &mut litchi_pptx::builder::Slide,
     rows: &[&[&str]],
     x: i64,
     y: i64,

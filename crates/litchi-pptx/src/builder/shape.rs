@@ -58,7 +58,7 @@ pub enum ShapeType {
 
 /// One mutable shape in a new presentation.
 #[derive(Debug, Clone)]
-pub struct MutableShape {
+pub struct Shape {
     pub(crate) shape_id: u32,
     pub(crate) shape_type: ShapeType,
     designer_properties: Option<DrawingProperties>,
@@ -66,7 +66,7 @@ pub struct MutableShape {
     pub(crate) modified: bool,
 }
 
-impl MutableShape {
+impl Shape {
     pub(crate) fn new_text_box(
         shape_id: u32,
         text: String,
@@ -409,7 +409,7 @@ impl MutableShape {
 }
 
 #[cfg(feature = "automatic-fonts")]
-impl CollectGlyphs for MutableShape {
+impl CollectGlyphs for Shape {
     fn collect_glyphs(&self) -> GlyphMap {
         let mut glyphs = GlyphMap::new();
         let ShapeType::TextBox { text, format, .. } = &self.shape_type else {

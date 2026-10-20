@@ -4,10 +4,10 @@
 //! owner transactionally publishes custom shows and sections into the OPC
 //! presentation graph.
 
+use litchi_pptx::Package;
 use litchi_pptx::presentation_properties::metadata::custom_show::Show;
 use litchi_pptx::presentation_properties::metadata::sections::Section;
 use litchi_pptx::presentation_properties::metadata::structure;
-use litchi_pptx::{MutablePresentation, Package};
 use std::error::Error as StdError;
 
 const X: i64 = 914_400;
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
 }
 
 fn add_slides(
-    presentation: &mut MutablePresentation,
+    presentation: &mut litchi_pptx::builder::Presentation,
     titles: &[&str],
     content_prefix: &str,
     height: i64,

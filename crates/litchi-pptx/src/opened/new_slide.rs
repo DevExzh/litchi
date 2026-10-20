@@ -237,7 +237,7 @@ pub(crate) const fn takes_text(kind: PlaceholderKind) -> bool {
 /// The transitional XML of a new slide `slide_id` holding the planned
 /// placeholders (shape IDs 2, 3, …).
 pub(crate) fn slide_xml(slide_id: u32, plan: &[Planned]) -> Result<String> {
-    let mut xml = crate::writer::MutableSlide::new(slide_id).generate_slide_xml()?;
+    let mut xml = crate::builder::Slide::new(slide_id).generate_slide_xml()?;
     if plan.is_empty() {
         return Ok(xml);
     }

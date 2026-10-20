@@ -4,7 +4,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
-use super::MutablePresentation;
+use super::Presentation;
 use crate::shape::designer::{
     DrawingProperties, Limits, PROPERTIES_EXTENSION_URI, TAGS_EXTENSION_URI, Tag, Tags,
 };
@@ -23,7 +23,7 @@ fn shape_designer_properties_round_trip_for_text_and_preset_shapes() {
         .with_tags(Some(duplicate_tags.clone()), Limits::default())
         .unwrap();
 
-    let mut presentation = MutablePresentation::new();
+    let mut presentation = Presentation::new();
     let slide = presentation.add_slide().unwrap();
     slide
         .add_text_box("Designer text", 0, 0, 100, 100)
@@ -83,7 +83,7 @@ fn designer_writer_clear_paths_and_limit_changes_are_semantic_noops() {
     tags.push(Tag::new("duplicate", "first").unwrap()).unwrap();
     tags.push(Tag::new("duplicate", "second").unwrap()).unwrap();
 
-    let mut presentation = MutablePresentation::new();
+    let mut presentation = Presentation::new();
     let slide = presentation.add_slide().unwrap();
     slide
         .add_ellipse_with_designer_properties(0, 0, 100, 100, None, properties.clone())
@@ -145,7 +145,7 @@ fn slide_designer_tags_follow_reorder_duplicate_delete_and_preserve_empty() {
         .push(Tag::new("kind", "same&\"").unwrap())
         .unwrap();
 
-    let mut presentation = MutablePresentation::new();
+    let mut presentation = Presentation::new();
     presentation
         .add_slide()
         .unwrap()

@@ -8,6 +8,7 @@
 //!
 //! Run with: `cargo run --example pptx_advanced_features --features ooxml`
 
+use litchi_pptx::Package;
 use litchi_pptx::animations::{Effect, EffectInstance, Sequence, Trigger};
 use litchi_pptx::chart::{Chart, Series, Type as ChartType, encode as encode_chart};
 use litchi_pptx::presentation_properties::metadata::custom_show::{List as ShowList, Show};
@@ -15,7 +16,6 @@ use litchi_pptx::presentation_properties::metadata::handout::{Layout, Master};
 use litchi_pptx::presentation_properties::metadata::protection::Settings;
 use litchi_pptx::presentation_properties::metadata::sections::{List as SectionList, Section};
 use litchi_pptx::shape::diagram::{Builder, Graphic, Kind, Node};
-use litchi_pptx::{MutablePresentation, Package};
 use std::error::Error as StdError;
 
 const X: i64 = 914_400;
@@ -99,7 +99,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
 }
 
 fn add_summary_slide(
-    presentation: &mut MutablePresentation,
+    presentation: &mut litchi_pptx::builder::Presentation,
     title: &str,
     body: &str,
 ) -> Result<(), Box<dyn StdError>> {

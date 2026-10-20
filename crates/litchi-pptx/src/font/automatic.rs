@@ -4,13 +4,12 @@ use litchi_fonts::{CollectGlyphs, GlyphMap, Prepared};
 
 use crate::font::{self, Charset, Data, Face, Family, Font, Fonts, Pitch, PitchFamily, Style};
 use crate::package::Package;
-use crate::writer::MutablePresentation;
 use crate::{Error, Result};
 
 impl Package {
     pub(crate) fn embed_fonts_for_presentation(
         &mut self,
-        presentation: &MutablePresentation,
+        presentation: &crate::builder::Presentation,
     ) -> Result<()> {
         let mode = match self.opc.save_options().fonts {
             litchi_opc::FontEmbedding::None => return Ok(()),

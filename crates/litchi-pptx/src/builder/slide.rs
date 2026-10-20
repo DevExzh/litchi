@@ -6,21 +6,21 @@ use crate::shape::designer::{Limits as DesignerLimits, Tags};
 use crate::transition::Transition;
 use crate::{Error, Result};
 
-use super::shape::{MutableShape, escape_xml};
+use super::shape::{Shape, escape_xml};
 
 #[cfg(feature = "automatic-fonts")]
 use litchi_fonts::{CollectGlyphs, GlyphMap};
 
-/// Mutable slide state owned by [`super::MutablePresentation`].
+/// Mutable slide state owned by [`Presentation`].
 #[derive(Debug, Clone)]
 #[allow(
     clippy::module_name_repetitions,
-    reason = "`MutableSlide` is the established public API name; renaming it would break downstream crates"
+    reason = "`Slide` is the established public API name; renaming it would break downstream crates"
 )]
-pub struct MutableSlide {
+pub struct Slide {
     pub(crate) slide_id: u32,
     pub(crate) title: Option<String>,
-    pub(crate) shapes: Vec<MutableShape>,
+    pub(crate) shapes: Vec<Shape>,
     pub(crate) notes: Option<String>,
     pub(crate) transition: Option<Transition>,
     pub(crate) background: Option<SlideBackground>,
@@ -29,7 +29,7 @@ pub struct MutableSlide {
     pub(crate) modified: bool,
 }
 
-impl MutableSlide {
+impl Slide {
     pub(crate) fn new(slide_id: u32) -> Self {
         Self {
             slide_id,
@@ -188,11 +188,11 @@ impl MutableSlide {
         y: i64,
         width: i64,
         height: i64,
-    ) -> &mut MutableShape {
+    ) -> &mut Shape {
         let shape_id = u32::try_from(self.shapes.len())
             .unwrap_or(u32::MAX)
             .saturating_add(3);
-        self.shapes.push(MutableShape::new_text_box(
+        self.shapes.push(Shape::new_text_box(
             shape_id,
             text.to_string(),
             x,
@@ -229,7 +229,7 @@ impl MutableSlide {
         height: i64,
         fill_color: Option<String>,
         properties: crate::shape::designer::DrawingProperties,
-    ) -> Result<&mut MutableShape> {
+    ) -> Result<&mut Shape> {
         self.add_rectangle_with_designer_properties_and_limits(
             x,
             y,
@@ -255,7 +255,7 @@ impl MutableSlide {
         fill_color: Option<String>,
         properties: crate::shape::designer::DrawingProperties,
         limits: DesignerLimits,
-    ) -> Result<&mut MutableShape> {
+    ) -> Result<&mut Shape> {
         // Reject an invalid value before adding a shape so the operation is
         // atomic from the caller's perspective.
         crate::shape::designer::write_properties(&properties, None, limits)?;
@@ -274,11 +274,11 @@ impl MutableSlide {
         width: i64,
         height: i64,
         fill_color: Option<String>,
-    ) -> &mut MutableShape {
+    ) -> &mut Shape {
         let shape_id = u32::try_from(self.shapes.len())
             .unwrap_or(u32::MAX)
             .saturating_add(3);
-        self.shapes.push(MutableShape::new_rectangle(
+        self.shapes.push(Shape::new_rectangle(
             shape_id, x, y, width, height, fill_color,
         ));
         self.modified = true;
@@ -310,7 +310,7 @@ impl MutableSlide {
         height: i64,
         fill_color: Option<String>,
         properties: crate::shape::designer::DrawingProperties,
-    ) -> Result<&mut MutableShape> {
+    ) -> Result<&mut Shape> {
         self.add_ellipse_with_designer_properties_and_limits(
             x,
             y,
@@ -336,7 +336,7 @@ impl MutableSlide {
         fill_color: Option<String>,
         properties: crate::shape::designer::DrawingProperties,
         limits: DesignerLimits,
-    ) -> Result<&mut MutableShape> {
+    ) -> Result<&mut Shape> {
         // Reject an invalid value before adding a shape so the operation is
         // atomic from the caller's perspective.
         crate::shape::designer::write_properties(&properties, None, limits)?;
@@ -355,11 +355,11 @@ impl MutableSlide {
         width: i64,
         height: i64,
         fill_color: Option<String>,
-    ) -> &mut MutableShape {
+    ) -> &mut Shape {
         let shape_id = u32::try_from(self.shapes.len())
             .unwrap_or(u32::MAX)
             .saturating_add(3);
-        self.shapes.push(MutableShape::new_ellipse(
+        self.shapes.push(Shape::new_ellipse(
             shape_id, x, y, width, height, fill_color,
         ));
         self.modified = true;
@@ -368,7 +368,7 @@ impl MutableSlide {
 
     /// Borrow authored shapes in source order.
     #[must_use]
-    pub fn shapes(&self) -> &[MutableShape] {
+    pub fn shapes(&self) -> &[Shape] {
         &self.shapes
     }
 
@@ -380,7 +380,7 @@ impl MutableSlide {
 
     /// Whether this slide needs managed publication.
     pub fn is_modified(&self) -> bool {
-        self.modified || self.shapes.iter().any(MutableShape::is_modified)
+        self.modified || self.shapes.iter().any(Shape::is_modified)
     }
 
     #[cfg(test)]
@@ -444,7 +444,7 @@ impl MutableSlide {
         }
         if let Some(title) = &self.title {
             let title_xml =
-                MutableShape::new_text_box(2, title.clone(), 914_400, 457_200, 7_315_200, 914_400)
+                Shape::new_text_box(2, title.clone(), 914_400, 457_200, 7_315_200, 914_400)
                     .set_text_format(TextFormat::default())
                     .to_xml()?;
             xml.push_str(&title_xml);
@@ -478,7 +478,7 @@ impl MutableSlide {
         width: i64,
         height: i64,
         format: TextFormat,
-    ) -> &mut MutableShape {
+    ) -> &mut Shape {
         self.add_text_box(text, x, y, width, height)
             .set_text_format(format)
     }
@@ -502,7 +502,7 @@ pub(crate) struct PreparedDesigner {
 }
 
 #[cfg(feature = "automatic-fonts")]
-impl CollectGlyphs for MutableSlide {
+impl CollectGlyphs for Slide {
     fn collect_glyphs(&self) -> GlyphMap {
         let mut glyphs = GlyphMap::new();
         for shape in &self.shapes {

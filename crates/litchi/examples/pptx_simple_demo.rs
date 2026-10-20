@@ -2,8 +2,6 @@
 //!
 //! Run with: cargo run --example pptx_simple_demo --features ooxml
 
-use litchi_pptx::MutablePresentation;
-
 const EMU_PER_INCH: i64 = 914_400;
 const TEXT_WIDTH: i64 = 7_315_200;
 
@@ -28,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn add_title_slide(
-    presentation: &mut MutablePresentation,
+    presentation: &mut litchi_pptx::builder::Presentation,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating Slide 1: Title");
     let slide = presentation.add_slide()?;
@@ -47,7 +45,7 @@ fn add_title_slide(
 }
 
 fn add_shapes_slide(
-    presentation: &mut MutablePresentation,
+    presentation: &mut litchi_pptx::builder::Presentation,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating Slide 2: Shapes");
     let slide = presentation.add_slide()?;
