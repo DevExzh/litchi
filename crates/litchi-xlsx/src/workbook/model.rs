@@ -513,11 +513,6 @@ impl Workbook {
         self.encryption
     }
 
-    #[cfg(feature = "encryption")]
-    pub(crate) fn mark_encrypted(&mut self, mode: crate::encryption::Mode) {
-        self.encryption.mark_encrypted(mode);
-    }
-
     pub(crate) fn from_package_with_styles(
         package: OpcPackage,
         source: Option<&Workbook>,

@@ -632,8 +632,7 @@ impl Xlsx {
             XlsxOwner::Source(workbook) => self.promote_source(workbook)?,
             XlsxOwner::Eager(workbook) => workbook.clone(),
         };
-        let mut workbook = workbook;
-        workbook.unsign()?;
+        let workbook = workbook.unsign()?;
         *cached = Some(workbook.clone());
         if let Err(error) = self.0.owner.ensure_current() {
             *cached = None;

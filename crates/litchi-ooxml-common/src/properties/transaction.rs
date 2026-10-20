@@ -1114,6 +1114,17 @@ impl Patch {
         }
     }
 
+    /// What replaying this patch changes: its families, in [`Family`]
+    /// order. A patch records parts, not [`Metadata`] fields, so the fields
+    /// are empty.
+    #[must_use]
+    pub fn diagnostics(&self) -> Diagnostics {
+        Diagnostics {
+            families: self.changes.iter().map(|change| change.family).collect(),
+            fields: Box::default(),
+        }
+    }
+
     /// Check that an owning package is in this patch's before state: each
     /// family's graph selects exactly the recorded part through the
     /// recorded relationship with the recorded bytes, or (for a creation)

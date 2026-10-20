@@ -77,8 +77,11 @@ impl Package {
     /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
-    pub fn apply_data_validations(&self, patch: &Patch) -> Result<Self> {
-        patch.0.apply(self, "apply_data_validations")
+    pub fn apply_data_validations(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((
+            patch.0.apply(self, "apply_data_validations")?,
+            patch.0.clone(),
+        )))
     }
 }
 
@@ -166,6 +169,7 @@ mod tests {
             package
                 .apply_data_validations(&patch)
                 .unwrap()
+                .package()
                 .same_content(&after)
                 .unwrap()
         );
@@ -173,6 +177,7 @@ mod tests {
             after
                 .apply_data_validations(&patch.inverse())
                 .unwrap()
+                .package()
                 .same_content(&package)
                 .unwrap()
         );

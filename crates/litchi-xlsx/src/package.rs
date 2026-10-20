@@ -246,7 +246,8 @@ impl Package {
         self.opc().is_signed()
     }
 
-    /// Remove every package signature explicitly (ADR 0006).
+    /// A copy of this package with every package signature removed
+    /// explicitly (ADR 0006).
     ///
     /// Every signature relationship and signature part is removed, and the
     /// resulting unsigned graph is authorized for publication
@@ -254,15 +255,14 @@ impl Package {
     /// change to a signed package is refused with [`crate::Error::Signed`]
     /// until this is called, because the change invalidates every signature.
     /// An exact no-op keeps the signature byte for byte without it. A package
-    /// that carries no signature, and no signature-policy requirement, is left
-    /// untouched, exact source included. Clones of this package taken before
-    /// the call keep their signatures.
+    /// that carries no signature, and no signature-policy requirement, is
+    /// returned unchanged, exact source included. This package keeps its
+    /// signature.
     ///
     /// ```
     /// use litchi_xlsx::Package;
     ///
-    /// let mut package = Package::new()?;
-    /// package.unsign()?;
+    /// let package = Package::new()?.unsign()?;
     /// assert!(!package.is_signed());
     /// # Ok::<(), litchi_xlsx::Error>(())
     /// ```
@@ -271,9 +271,10 @@ impl Package {
     ///
     /// Returns the encryption-policy error for a package opened with a
     /// password, whose mutations are refused.
-    pub fn unsign(&mut self) -> Result<&mut Self> {
-        self.workbook = self.workbook.unsigned()?;
-        Ok(self)
+    pub fn unsign(&self) -> Result<Self> {
+        Ok(Self {
+            workbook: self.workbook.unsigned()?,
+        })
     }
 
     /// The opt-in repair policy this package was opened with.
@@ -729,50 +730,13 @@ impl Package {
     ///
     /// An absent custom-properties relationship and part produce the shared
     /// empty [`Props`] value. The custom-properties package graph follows
-    /// MS-OI29500 section 3.11.
+    /// MS-OI29500 section 3.11. Edit them through the metadata family
+    /// ([`crate::metadata::Edit::set_custom_props`]).
     ///
     /// Values are metadata only: this method does not evaluate formulas or
     /// execute macros, controls, VBA, links, external code, or payloads.
     pub fn custom_props(&self) -> Result<Props> {
         Ok(Props::read_for(self.opc(), Host::Excel)?)
-    }
-
-    /// Atomically publish inert typed package-level custom document properties.
-    ///
-    /// An empty collection removes the custom-properties graph. The change is
-    /// clone-staged and only replaces this package's state after the shared
-    /// OOXML owner has validated and serialized the complete graph.
-    /// Properties that serialize to the stored bytes publish nothing, so a
-    /// signed package keeps its signature; changed metadata on a signed
-    /// package is refused with [`crate::Error::Signed`] and leaves the package
-    /// unchanged (ADR 0006): call [`Self::unsign`] first.
-    pub fn put_custom_props(&mut self, props: Props) -> Result<()> {
-        self.ensure_mutation_allowed("put_custom_props")?;
-        self.stage(|package| {
-            props
-                .write_for(package, Host::Excel)
-                .map_err(crate::signature_policy::from_shared)?;
-            Ok(())
-        })
-    }
-
-    /// Atomically remove the package-level custom document properties.
-    ///
-    /// This idempotent operation rejects corrupt, external, or duplicate
-    /// graphs instead of treating them as absent. The custom-properties graph
-    /// is defined by MS-OI29500 section 3.11. Removing an absent graph keeps a
-    /// signed package's signature; removing a present one from a signed
-    /// package is refused with [`crate::Error::Signed`] (ADR 0006): call
-    /// [`Self::unsign`] first.
-    pub fn remove_custom_props(&mut self) -> Result<()> {
-        self.ensure_mutation_allowed("remove_custom_props")?;
-        self.stage(|package| {
-            Props::read_for(package, Host::Excel)?;
-            Props::new()
-                .write_for(package, Host::Excel)
-                .map_err(crate::signature_policy::from_shared)?;
-            Ok(())
-        })
     }
 
     /// Start a clone-staged transaction for worksheet slicers.
@@ -942,85 +906,46 @@ impl Package {
         self.workbook.encryption_state().mode()
     }
 
-    /// Serialize and encrypt using an explicitly selected profile.
+    /// Serialize and encrypt using an explicitly selected profile, under the
+    /// encryption limits this package was opened with.
     #[cfg(feature = "encryption")]
     pub fn to_encrypted(&self, password: &str, mode: crate::encryption::Mode) -> Result<Vec<u8>> {
-        self.to_encrypted_with_limits(password, mode, &crate::encryption::Limits::default())
-    }
-
-    /// Serialize and encrypt using an explicit encryption resource policy.
-    #[cfg(feature = "encryption")]
-    pub fn to_encrypted_with_limits(
-        &self,
-        password: &str,
-        mode: crate::encryption::Mode,
-        limits: &crate::encryption::Limits,
-    ) -> Result<Vec<u8>> {
         let plaintext = self.to_plain_bytes()?;
         Ok(crate::encryption::encrypt_with(
-            plaintext, password, mode, limits,
+            plaintext,
+            password,
+            mode,
+            &self.workbook.open_options().encryption_limits_value(),
         )?)
     }
 
     /// Serialize and encrypt using the source package's retained profile.
     #[cfg(feature = "encryption")]
     pub fn to_reencrypted(&self, password: &str) -> Result<Vec<u8>> {
-        self.to_reencrypted_with_limits(password, &crate::encryption::Limits::default())
-    }
-
-    /// Re-encrypt using the retained profile and an explicit resource policy.
-    #[cfg(feature = "encryption")]
-    pub fn to_reencrypted_with_limits(
-        &self,
-        password: &str,
-        limits: &crate::encryption::Limits,
-    ) -> Result<Vec<u8>> {
         let mode = self.workbook.retained_mode("to_reencrypted")?;
-        self.to_encrypted_with_limits(password, mode, limits)
+        self.to_encrypted(password, mode)
     }
 
     /// Atomically save with an explicitly selected encryption profile.
+    ///
+    /// The package is unchanged: its retained encryption profile stays the
+    /// one it was opened with.
     #[cfg(feature = "encryption")]
     pub fn save_encrypted(
-        &mut self,
+        &self,
         path: impl AsRef<Path>,
         password: &str,
         mode: crate::encryption::Mode,
     ) -> Result<()> {
-        self.save_encrypted_with_limits(path, password, mode, &crate::encryption::Limits::default())
-    }
-
-    /// Atomically save with explicit encryption profile and resource policy.
-    #[cfg(feature = "encryption")]
-    pub fn save_encrypted_with_limits(
-        &mut self,
-        path: impl AsRef<Path>,
-        password: &str,
-        mode: crate::encryption::Mode,
-        limits: &crate::encryption::Limits,
-    ) -> Result<()> {
-        let output = self.to_encrypted_with_limits(password, mode, limits)?;
-        writer::save_encrypted(&output, path)?;
-        self.workbook.mark_encrypted(mode);
-        Ok(())
+        let output = self.to_encrypted(password, mode)?;
+        writer::save_encrypted(&output, path)
     }
 
     /// Atomically save using the encrypted source's retained profile.
     #[cfg(feature = "encryption")]
-    pub fn save_reencrypted(&mut self, path: impl AsRef<Path>, password: &str) -> Result<()> {
-        self.save_reencrypted_with_limits(path, password, &crate::encryption::Limits::default())
-    }
-
-    /// Atomically save using the retained profile and explicit resource policy.
-    #[cfg(feature = "encryption")]
-    pub fn save_reencrypted_with_limits(
-        &mut self,
-        path: impl AsRef<Path>,
-        password: &str,
-        limits: &crate::encryption::Limits,
-    ) -> Result<()> {
+    pub fn save_reencrypted(&self, path: impl AsRef<Path>, password: &str) -> Result<()> {
         let mode = self.workbook.retained_mode("save_reencrypted")?;
-        self.save_encrypted_with_limits(path, password, mode, limits)
+        self.save_encrypted(path, password, mode)
     }
 
     /// A new package publishing `opc`, validated as a complete workbook,

@@ -1594,7 +1594,7 @@ fn resetting_style_is_distinct_from_removal_and_missing_is_a_no_op() {
 }
 
 #[test]
-fn signed_packages_refuse_edits_before_mutation() {
+fn signed_packages_refuse_changed_edits_and_keep_exact_noops() {
     let baseline = crate::Package::new().expect("baseline");
     let mut package = baseline.inner.package.clone();
     package
@@ -1608,11 +1608,30 @@ fn signed_packages_refuse_edits_before_mutation() {
         .expect("signature relationship");
     let signed = crate::Package::from_opc(package).expect("signed workbook snapshot");
 
-    assert!(matches!(signed.edit(), Err(Error::Signed)));
-    assert!(matches!(
-        signed.apply(&Patch::default()),
-        Err(Error::Signed)
-    ));
+    let source_bytes = signed.to_bytes().expect("signed bytes");
+    // Exact no-ops return the signed source (ADR 0006).
+    let noop = signed.edit().expect("edit").commit().expect("no-op");
+    assert!(noop.patch().is_noop());
+    assert_eq!(noop.package().to_bytes().expect("bytes"), source_bytes);
+    let replayed = signed.apply(&Patch::default()).expect("empty patch");
+    assert_eq!(replayed.package().to_bytes().expect("bytes"), source_bytes);
+    // A change is refused before anything is published.
+    let mut edit = signed.edit().expect("edit");
+    edit.sheet(0usize)
+        .expect("lookup")
+        .expect("worksheet")
+        .set("A1", 1)
+        .expect("stage");
+    assert!(matches!(edit.commit(), Err(Error::Signed)));
+    let mut unsigned_edit = baseline.edit().expect("edit");
+    unsigned_edit
+        .sheet(0usize)
+        .expect("lookup")
+        .expect("worksheet")
+        .set("A1", 1)
+        .expect("stage");
+    let patch = unsigned_edit.commit().expect("commit").patch().clone();
+    assert!(matches!(signed.apply(&patch), Err(Error::Signed)));
 }
 
 #[test]

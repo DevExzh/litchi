@@ -344,7 +344,6 @@ pub struct Edit {
 
 impl Edit {
     pub(crate) fn new(base: Workbook) -> Result<Self> {
-        codec::ensure_unsigned(&base)?;
         Ok(Self {
             base,
             panes: None,
@@ -1818,8 +1817,11 @@ impl Edit {
     }
 
     /// Validate and atomically publish a new immutable snapshot.
+    ///
+    /// An edit that staged nothing returns its source snapshot, a signed one
+    /// included (ADR 0006); a changed edit of a signed workbook is refused
+    /// with [`Error::Signed`].
     pub fn commit(self) -> Result<Commit> {
-        codec::ensure_unsigned(&self.base)?;
         if self.is_empty() {
             let source = self.base.clone();
             return Ok(Commit {
@@ -1831,6 +1833,7 @@ impl Edit {
                 },
             });
         }
+        codec::ensure_unsigned(&self.base)?;
         if !self.removed.is_empty() {
             return package::commit_removals(self);
         }

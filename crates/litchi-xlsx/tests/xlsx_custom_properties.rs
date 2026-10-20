@@ -2,7 +2,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, TargetMode};
 use litchi_xlsx::custom::{Host, Props, Value};
-use litchi_xlsx::{Error, Package};
+use litchi_xlsx::{Error, Package, metadata};
 
 const CUSTOM_PART: &str = "/docProps/custom.xml";
 
@@ -34,9 +34,17 @@ fn signed_package() -> Package {
     Package::from_opc(raw).expect("signed XLSX package")
 }
 
+/// Stage `props` as the custom properties (empty removes them) through the
+/// metadata family and commit.
+fn set_custom_props(package: &Package, props: Props) -> Result<Package, metadata::Error> {
+    let mut edit = package.edit_metadata()?;
+    edit.set_custom_props(props);
+    Ok(edit.commit()?.into_package())
+}
+
 #[test]
 fn custom_properties_absence_is_explicit() {
-    let mut package = Package::new().expect("create XLSX package");
+    let package = Package::new().expect("create XLSX package");
 
     assert!(
         package
@@ -44,9 +52,8 @@ fn custom_properties_absence_is_explicit() {
             .expect("read absent custom properties")
             .is_empty()
     );
-    package
-        .remove_custom_props()
-        .expect("remove absent custom properties");
+    let after = set_custom_props(&package, Props::new()).expect("remove absent custom properties");
+    assert_eq!(after.to_bytes().unwrap(), package.to_bytes().unwrap());
 }
 
 #[test]
@@ -59,9 +66,7 @@ fn custom_properties_round_trip_through_the_xlsx_facade() {
         .insert("Version", Value::I32(38))
         .expect("insert integer property");
 
-    let mut package = Package::new().expect("create XLSX package");
-    package
-        .put_custom_props(props)
+    let package = set_custom_props(&Package::new().expect("create XLSX package"), props)
         .expect("store custom properties");
     let bytes = package.to_bytes().expect("serialize XLSX package");
     let reopened = Package::from_bytes(&bytes).expect("reopen XLSX package");
@@ -84,9 +89,7 @@ fn custom_properties_are_nameable_through_the_xlsx_context() {
         .validate_for(Host::Excel)
         .expect("validate contextual Excel custom property");
 
-    let mut package = Package::new().expect("create XLSX package");
-    package
-        .put_custom_props(props)
+    let package = set_custom_props(&Package::new().expect("create XLSX package"), props)
         .expect("store contextual custom property");
     assert_eq!(
         package.custom_props().unwrap().get("approved"),
@@ -101,11 +104,9 @@ fn custom_properties_reject_reserved_non_excel_host_metadata() {
         .insert("ClassificationContentMarkingHeaderText", "Header")
         .expect("valid Word or PowerPoint metadata");
 
-    let mut package = Package::new().expect("create XLSX package");
-    assert!(matches!(
-        package.put_custom_props(props),
-        Err(Error::Common(_))
-    ));
+    let package = Package::new().expect("create XLSX package");
+    let error = set_custom_props(&package, props).expect_err("reserved host metadata");
+    assert!(!matches!(error, metadata::Error::Signed), "{error:?}");
     assert!(package.custom_props().unwrap().is_empty());
 }
 
@@ -114,9 +115,8 @@ fn removing_custom_properties_removes_the_complete_package_graph() {
     let mut props = Props::new();
     props.insert("Project", "Litchi").unwrap();
 
-    let mut package = Package::new().expect("create XLSX package");
-    package.put_custom_props(props).unwrap();
-    package.remove_custom_props().unwrap();
+    let package = set_custom_props(&Package::new().expect("create XLSX package"), props).unwrap();
+    let package = set_custom_props(&package, Props::new()).unwrap();
     assert!(package.custom_props().unwrap().is_empty());
 
     let raw = package.into_plain_opc();
@@ -172,9 +172,9 @@ fn malformed_external_and_duplicate_custom_property_graphs_map_to_common_errors(
 
 #[test]
 fn custom_property_noops_preserve_and_changes_require_explicit_unsign() {
-    let mut package = signed_package();
+    let package = signed_package();
     assert!(package.custom_props().unwrap().is_empty());
-    package.put_custom_props(Props::new()).unwrap();
+    let package = set_custom_props(&package, Props::new()).unwrap();
     assert!(package.clone().into_plain_opc().is_signed());
 
     // A change refuses the signed package and leaves it unchanged until the
@@ -186,12 +186,11 @@ fn custom_property_noops_preserve_and_changes_require_explicit_unsign() {
         props
     };
     assert!(matches!(
-        package.put_custom_props(project()),
-        Err(Error::Signed)
+        set_custom_props(&package, project()),
+        Err(metadata::Error::Signed)
     ));
     assert!(package.custom_props().unwrap().is_empty());
     assert!(package.clone().into_plain_opc().is_signed());
-    package.unsign().unwrap();
-    package.put_custom_props(project()).unwrap();
+    let package = set_custom_props(&package.unsign().unwrap(), project()).unwrap();
     assert!(!package.into_plain_opc().is_signed());
 }

@@ -65,8 +65,11 @@ impl Package {
     /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
-    pub fn apply_auto_filter(&self, patch: &Patch) -> Result<Self> {
-        patch.0.apply(self, "apply_auto_filter")
+    pub fn apply_auto_filter(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((
+            patch.0.apply(self, "apply_auto_filter")?,
+            patch.0.clone(),
+        )))
     }
 }
 
@@ -130,6 +133,7 @@ mod tests {
             package
                 .apply_auto_filter(&patch)
                 .unwrap()
+                .package()
                 .same_content(&after)
                 .unwrap()
         );

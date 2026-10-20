@@ -910,7 +910,7 @@ mod smart_tags_family {
             transaction.commit().unwrap();
             assert_eq!(package.to_bytes().unwrap(), original, "{name}");
 
-            package.unsign().unwrap();
+            package = package.unsign().unwrap();
             assert!(!package.is_signed());
             let mut transaction = package.edit_smart_tags(0_usize).unwrap();
             transaction.set(cell()).unwrap();
@@ -922,7 +922,7 @@ mod smart_tags_family {
         }
 
         let mut plain = Package::from_bytes(&signed_fixture(SIGNED[1])).unwrap();
-        plain.unsign().unwrap();
+        plain = plain.unsign().unwrap();
         let mut transaction = plain.edit_smart_tags(0_usize).unwrap();
         transaction.set(cell()).unwrap();
         transaction.commit().unwrap();
@@ -1016,7 +1016,7 @@ mod slicer_and_timeline_family {
             timelines.commit().unwrap();
             assert_eq!(package.to_bytes().unwrap(), original, "{name}");
 
-            package.unsign().unwrap();
+            package = package.unsign().unwrap();
             let mut slicers = package.edit_slicers().unwrap();
             slicers.add_cache(slicer_cache("Cache_A")).unwrap();
             slicers
@@ -1044,7 +1044,7 @@ mod slicer_and_timeline_family {
     #[test]
     fn a_signed_workbook_with_slicers_and_timelines_refuses_their_changes() {
         let mut plain = Package::from_bytes(&signed_fixture(SIGNED[0])).unwrap();
-        plain.unsign().unwrap();
+        plain = plain.unsign().unwrap();
         let worksheet = first_worksheet(&open(&plain.to_bytes().unwrap()));
         let mut slicers = plain.edit_slicers().unwrap();
         slicers.add_cache(slicer_cache("Cache_A")).unwrap();
@@ -1104,7 +1104,7 @@ mod slicer_and_timeline_family {
         timelines.commit().unwrap();
         assert_eq!(package.to_bytes().unwrap(), signed);
 
-        package.unsign().unwrap();
+        package = package.unsign().unwrap();
         let mut slicers = package.edit_slicers().unwrap();
         assert!(slicers.remove_view(&worksheet, "View_B").unwrap());
         slicers.commit().unwrap();
@@ -1119,16 +1119,21 @@ mod slicer_and_timeline_family {
 fn package_unsign_is_explicit_and_leaves_an_unsigned_package_untouched() {
     for name in SIGNED {
         let original = signed_fixture(name);
-        let mut package = litchi_xlsx::Package::from_bytes(&original).unwrap();
+        let package = litchi_xlsx::Package::from_bytes(&original).unwrap();
         assert!(package.is_signed());
         assert_eq!(package.to_bytes().unwrap(), original);
-        package.unsign().unwrap();
-        assert!(!package.is_signed());
-        let output = package.to_bytes().unwrap();
+        let stripped = package.unsign().unwrap();
+        assert!(!stripped.is_signed());
+        // The source package keeps its signature.
+        assert!(package.is_signed());
+        assert_eq!(package.to_bytes().unwrap(), original);
+        let output = stripped.to_bytes().unwrap();
         assert!(!carries_signature(&output), "{name}");
 
-        let mut unsigned = litchi_xlsx::Package::from_bytes(&output).unwrap();
-        unsigned.unsign().unwrap();
+        let unsigned = litchi_xlsx::Package::from_bytes(&output)
+            .unwrap()
+            .unsign()
+            .unwrap();
         assert_eq!(unsigned.to_bytes().unwrap(), output, "{name}");
     }
 }
@@ -1147,21 +1152,39 @@ mod shared_owners {
         props
     }
 
+    /// Stage `props` as the package's custom properties (empty removes them)
+    /// through the metadata family and commit.
+    fn set_custom_props(
+        package: &litchi_xlsx::Package,
+        props: Props,
+    ) -> Result<litchi_xlsx::Package, litchi_xlsx::metadata::Error> {
+        let mut edit = package.edit_metadata()?;
+        edit.set_custom_props(props);
+        Ok(edit.commit()?.into_package())
+    }
+
+    #[track_caller]
+    fn assert_metadata_signed<T: std::fmt::Debug>(result: Result<T, litchi_xlsx::metadata::Error>) {
+        let error = result.expect_err("a change to a signed package must be refused");
+        assert!(
+            matches!(error, litchi_xlsx::metadata::Error::Signed),
+            "{error:?}"
+        );
+    }
+
     #[test]
     fn custom_properties_refuse_a_signed_fixture_and_keep_exact_noops() {
         for name in SIGNED {
             let original = signed_fixture(name);
-            let mut package = litchi_xlsx::Package::from_bytes(&original).unwrap();
-            package.remove_custom_props().unwrap();
-            package.put_custom_props(Props::new()).unwrap();
+            let package = litchi_xlsx::Package::from_bytes(&original).unwrap();
+            let package = set_custom_props(&package, Props::new()).unwrap();
             assert_eq!(package.to_bytes().unwrap(), original, "{name}: no-ops");
 
-            assert_signed(package.put_custom_props(props()));
+            assert_metadata_signed(set_custom_props(&package, props()));
             assert!(package.is_signed());
             assert_eq!(package.to_bytes().unwrap(), original, "{name}: refusal");
 
-            package.unsign().unwrap();
-            package.put_custom_props(props()).unwrap();
+            let package = set_custom_props(&package.unsign().unwrap(), props()).unwrap();
             let output = package.to_bytes().unwrap();
             assert!(!carries_signature(&output), "{name}");
             let reopened = litchi_xlsx::Package::from_bytes(&output).unwrap();
@@ -1174,15 +1197,14 @@ mod shared_owners {
         let mut plain = unsigned_fixture(SIGNED[0]);
         props().write_for(&mut plain, Host::Excel).unwrap();
         let signed = sign(&plain);
-        let mut package = litchi_xlsx::Package::from_bytes(&signed).unwrap();
+        let package = litchi_xlsx::Package::from_bytes(&signed).unwrap();
 
-        package.put_custom_props(props()).unwrap();
+        let package = set_custom_props(&package, props()).unwrap();
         assert_eq!(package.to_bytes().unwrap(), signed, "an equal store");
-        assert_signed(package.remove_custom_props());
+        assert_metadata_signed(set_custom_props(&package, Props::new()));
         assert_eq!(package.to_bytes().unwrap(), signed, "the refusal");
 
-        package.unsign().unwrap();
-        package.remove_custom_props().unwrap();
+        let package = set_custom_props(&package.unsign().unwrap(), Props::new()).unwrap();
         assert!(package.custom_props().unwrap().is_empty());
     }
 

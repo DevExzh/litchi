@@ -2992,7 +2992,6 @@ impl Patch {
     }
 
     pub(crate) fn apply_to(&self, workbook: &Workbook) -> Result<Commit> {
-        ensure_unsigned(workbook)?;
         if let Some(authority) = &self.authority {
             authority.validate(workbook)?;
         }
@@ -3026,6 +3025,9 @@ impl Patch {
                 patch,
             });
         }
+        // An empty patch returns the source, a signed one included; a changed
+        // one refuses a signed workbook (ADR 0006).
+        ensure_unsigned(workbook)?;
         if !self.svg_final_guards.is_empty() {
             super::svg_lifecycle::validate_before_guards(workbook, &self.svg_final_guards)?;
         }

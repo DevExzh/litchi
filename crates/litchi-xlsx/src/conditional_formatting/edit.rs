@@ -310,8 +310,11 @@ impl Package {
     /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
-    pub fn apply_conditional_formats(&self, patch: &Patch) -> Result<Self> {
-        patch.0.apply(self, "apply_conditional_formats")
+    pub fn apply_conditional_formats(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((
+            patch.0.apply(self, "apply_conditional_formats")?,
+            patch.0.clone(),
+        )))
     }
 }
 
@@ -608,9 +611,15 @@ mod tests {
                 .unwrap(),
             formats
         );
-        let replayed = package.apply_conditional_formats(&patch).unwrap();
+        let replayed = package
+            .apply_conditional_formats(&patch)
+            .unwrap()
+            .into_package();
         assert!(replayed.same_content(&after).unwrap());
-        let reverted = after.apply_conditional_formats(&patch.inverse()).unwrap();
+        let reverted = after
+            .apply_conditional_formats(&patch.inverse())
+            .unwrap()
+            .into_package();
         assert!(reverted.same_content(&package).unwrap());
         assert!(after.apply_conditional_formats(&patch).is_err());
 

@@ -29,13 +29,23 @@ fn an_unsigned_copy_authorizes_an_edit_and_publishes_no_signature() {
     for name in SIGNED {
         let bytes = fixture(name);
         let workbook = Package::from_bytes(&bytes).unwrap();
+        // An exact no-op returns the signed source unchanged (ADR 0006).
+        let noop = workbook.edit().and_then(Edit::commit).unwrap();
+        assert!(!noop.diagnostics().changed(), "{name}");
+        assert_eq!(noop.package().to_bytes().unwrap(), bytes, "{name}: no-op");
+        let mut changed = workbook.edit().unwrap();
+        changed
+            .sheet(0_usize)
+            .unwrap()
+            .expect("a first worksheet")
+            .set("A1", "edited")
+            .unwrap();
         assert!(
-            matches!(workbook.edit().and_then(Edit::commit), Err(Error::Signed)),
-            "{name}: a signed workbook refuses a transaction"
+            matches!(changed.commit(), Err(Error::Signed)),
+            "{name}: a signed workbook refuses a changed transaction"
         );
 
-        let mut unsigned = workbook.clone();
-        unsigned.unsign().unwrap();
+        let unsigned = workbook.unsign().unwrap();
         // The signed snapshot is left as it was.
         assert_eq!(workbook.to_bytes().unwrap(), bytes, "{name}");
 
@@ -60,8 +70,7 @@ fn an_unsigned_copy_authorizes_an_edit_and_publishes_no_signature() {
 #[test]
 fn an_unsigned_workbook_comes_back_as_itself() {
     let workbook = Package::new().unwrap();
-    let mut unsigned = workbook.clone();
-    unsigned.unsign().unwrap();
+    let unsigned = workbook.unsign().unwrap();
     assert_eq!(unsigned.workbook_ref().len(), workbook.workbook_ref().len());
     assert_eq!(unsigned.to_bytes().unwrap(), workbook.to_bytes().unwrap());
     let mut edit = unsigned.edit().unwrap();

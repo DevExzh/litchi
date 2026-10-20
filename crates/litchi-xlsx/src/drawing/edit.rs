@@ -151,8 +151,11 @@ impl Package {
     /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
-    pub fn apply_drawings(&self, patch: &Patch) -> Result<Self> {
-        patch.0.apply(self, "apply_drawings")
+    pub fn apply_drawings(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((
+            patch.0.apply(self, "apply_drawings")?,
+            patch.0.clone(),
+        )))
     }
 }
 
@@ -630,6 +633,7 @@ mod tests {
             package
                 .apply_drawings(&patch)
                 .unwrap()
+                .package()
                 .same_content(&after)
                 .unwrap()
         );
