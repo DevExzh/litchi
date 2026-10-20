@@ -8,7 +8,7 @@ mod validation;
 mod tests;
 
 pub use model::{Conformance, Def, Id, Link, List, Parts};
-pub use validation::{conformance, link, load, present, put, remove};
+pub use validation::{conformance, link, load, present};
 mod edit;
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
@@ -56,3 +56,4 @@ fn allocation(resource: &'static str, source: std::collections::TryReserveError)
 pub fn default_xml() -> &'static str {
     DEFAULT_XML
 }
+pub(crate) use validation::{put, remove};

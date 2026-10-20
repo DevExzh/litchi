@@ -100,24 +100,35 @@ impl Edit<'_> {
         self.stage(|draft| draft.replace(graph))
     }
 
-    /// Replace the inert text of the notes slide at `index` while preserving
-    /// its XML. Returns whether anything changed.
+    /// Replace the inert text of the selected slide's notes while preserving
+    /// their XML. Returns whether anything changed.
     ///
     /// # Errors
     ///
-    /// Returns an error for an absent graph, an index out of bounds, or a
-    /// changed edit of a signed package.
-    pub fn set_text(&mut self, index: usize, text: impl AsRef<str>) -> Result<bool> {
+    /// Returns an error for an absent graph, a missing, ambiguous or
+    /// out-of-range slide, a slide without notes, or a changed edit of a
+    /// signed package.
+    pub fn set_text<'s>(
+        &mut self,
+        slide: impl Into<Selector<'s>>,
+        text: impl AsRef<str>,
+    ) -> Result<bool> {
+        let index = self.notes_index(slide.into())?;
         self.stage(|draft| draft.set_text(index, text))
     }
 
-    /// Replace the XML of the notes slide at `index` after bounded
+    /// Replace the XML of the selected slide's notes slide after bounded
     /// conformance validation. Returns whether anything changed.
     ///
     /// # Errors
     ///
     /// As [`Self::set_text`], and for malformed or nonconforming XML.
-    pub fn set_slide_xml(&mut self, index: usize, xml: Vec<u8>) -> Result<bool> {
+    pub fn set_slide_xml<'s>(
+        &mut self,
+        slide: impl Into<Selector<'s>>,
+        xml: Vec<u8>,
+    ) -> Result<bool> {
+        let index = self.notes_index(slide.into())?;
         self.stage(|draft| draft.replace_slide_xml(index, xml))
     }
 
@@ -169,6 +180,26 @@ impl Edit<'_> {
             return Ok(0);
         };
         self.staged.update(|opc| super::clear_checked(opc, &source))
+    }
+
+    /// The position, in the staged notes graph, of the selected slide's
+    /// notes slide.
+    fn notes_index(&self, slide: Selector<'_>) -> Result<usize> {
+        let owner = crate::package::resolve_slide(self.staged.opc(), slide)?;
+        let graph = self.graph()?.ok_or(Error::refused(
+            litchi_core::edit::RefusalKind::NotFound,
+            "notes",
+            "the presentation has no notes",
+        ))?;
+        graph
+            .slides()
+            .iter()
+            .position(|notes| notes.owner() == owner.as_str())
+            .ok_or(Error::refused(
+                litchi_core::edit::RefusalKind::NotFound,
+                "notes",
+                "the slide has no notes",
+            ))
     }
 
     /// Discard every staged change.

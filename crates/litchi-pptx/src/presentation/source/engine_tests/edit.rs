@@ -4,17 +4,17 @@ use std::io::Write;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::transition::{Kind as TransitionKind, Ms, Side, Speed, Transition};
+use crate::{
+    Error, MAX_SHAPE_TEXT_REPLACEMENTS, MAX_SOURCE_BACKED_SLIDE_BATCH, ShapeTextReplacement,
+    SlideOrderRefusal, SourceBackedPresentation, SourceBackedPresentationEditor, SourceLimits,
+};
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, Position, ReadAt,
     Resource, SourceVersion,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter};
-use litchi_pptx::transition::{Kind as TransitionKind, Ms, Side, Speed, Transition};
-use litchi_pptx::{
-    Error, MAX_SHAPE_TEXT_REPLACEMENTS, MAX_SOURCE_BACKED_SLIDE_BATCH, ShapeTextReplacement,
-    SlideOrderRefusal, SourceBackedPresentation, SourceBackedPresentationEditor, SourceLimits,
-};
 
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PML: &str = "http://purl.oclc.org/ooxml/presentationml/main";
@@ -459,7 +459,9 @@ fn central_without_local_offset(bytes: &[u8]) -> Vec<u8> {
     bytes
 }
 
-fn edit_commit(editor: &SourceBackedPresentationEditor) -> litchi_pptx::SourceBackedSlideCommit {
+fn edit_commit(
+    editor: &SourceBackedPresentationEditor,
+) -> crate::presentation::source::SourceBackedSlideCommit {
     let mut edit = editor.edit_slide(0).unwrap();
     assert!(edit.set_shape_text("Title", "after").unwrap());
     let commit = edit.commit();
@@ -594,7 +596,7 @@ fn changed_edit_reopens_and_changes_only_the_selected_logical_part() {
                 "only the selected shape text may differ"
             );
             assert!(
-                !litchi_pptx::shape::read(output_part.blob())
+                !crate::shape::read(output_part.blob())
                     .unwrap()
                     .is_rewritten()
             );
@@ -878,7 +880,7 @@ fn atomic_batch_is_order_independent_and_changes_two_shapes_in_one_part() {
             relationship_signatures(candidate.rels())
         );
         if part.partname().as_str() == SLIDE {
-            let scene = litchi_pptx::shape::read(candidate.blob()).unwrap();
+            let scene = crate::shape::read(candidate.blob()).unwrap();
             assert_eq!(
                 scene.shape("Title").unwrap().common().text(),
                 Some("after & <title>")
@@ -949,7 +951,7 @@ fn batch_expansion_honors_the_source_part_limit_before_allocation() {
         .unwrap();
     let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(source)),
-        litchi_pptx::OpenOptions::default().source_limits(limits),
+        crate::OpenOptions::default().source_limits(limits),
     )
     .unwrap();
     let mut edit = editor.edit_slide(0).unwrap();
@@ -1097,7 +1099,7 @@ fn mce_limits_strict_and_partial_sink_are_checked() {
                 shape_xml(PML, "before"),
                 false
             ))),
-            litchi_pptx::OpenOptions::default().source_limits(limits)
+            crate::OpenOptions::default().source_limits(limits)
         ),
         Err(Error::Opc(OpcError::Limit { .. }))
     ));
@@ -1158,7 +1160,7 @@ fn direct_transition_set_replaces_clears_and_reopens_with_one_part_overlay() {
     let package = OpcPackage::from_bytes(&output).unwrap();
     let changed_slide = package.get_part(&PackURI::new(SLIDE).unwrap()).unwrap();
     let changed_xml = std::str::from_utf8(changed_slide.blob()).unwrap();
-    let fragment = litchi_pptx::transition::write(&requested).unwrap();
+    let fragment = crate::transition::write(&requested).unwrap();
     assert_eq!(
         changed_xml,
         slide.replacen("<p:timing/>", &format!("{fragment}<p:timing/>"), 1)
@@ -1268,7 +1270,7 @@ fn source_backed_transition_alias_and_default_namespaces_are_rewritten_qname_saf
         SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(alias_source)))
             .unwrap();
     let requested = Transition::new(TransitionKind::Preset(
-        litchi_pptx::transition::Preset::new("p:literal").unwrap(),
+        crate::transition::Preset::new("p:literal").unwrap(),
     ));
     let mut alias_edit = alias_editor.edit_slide(0).unwrap();
     assert!(alias_edit.set_transition(&requested).unwrap());
@@ -1302,9 +1304,7 @@ fn source_backed_transition_alias_and_default_namespaces_are_rewritten_qname_saf
         VersionedSource::new(default_source),
     ))
     .unwrap();
-    let requested = Transition::new(TransitionKind::Morph(
-        litchi_pptx::transition::Morph::ByChar,
-    ));
+    let requested = Transition::new(TransitionKind::Morph(crate::transition::Morph::ByChar));
     let mut default_edit = default_editor.edit_slide(0).unwrap();
     assert!(default_edit.set_transition(&requested).unwrap());
     let default_commit = default_edit.commit();
@@ -1343,11 +1343,11 @@ fn source_backed_extension_transition_edit_reopens_and_preserves_opaque_package_
     let current = snapshot.transition().unwrap().unwrap();
     assert_eq!(
         current.kind(),
-        &TransitionKind::Morph(litchi_pptx::transition::Morph::ByWord)
+        &TransitionKind::Morph(crate::transition::Morph::ByWord)
     );
 
     let requested = Transition::new(TransitionKind::Preset(
-        litchi_pptx::transition::Preset::with_options("wind", true, false).unwrap(),
+        crate::transition::Preset::with_options("wind", true, false).unwrap(),
     ))
     .with_speed(Speed::Slow)
     .with_click(false)
@@ -1403,40 +1403,40 @@ fn source_backed_extension_transition_edit_reopens_and_preserves_opaque_package_
 #[test]
 fn source_backed_p14_transition_effects_edit_reopen_and_inverse() {
     let targets = [
-        TransitionKind::Conveyor(litchi_pptx::transition::LeftRight::Right),
-        TransitionKind::Doors(litchi_pptx::transition::Axis::Vertical),
-        TransitionKind::Ferris(litchi_pptx::transition::LeftRight::Left),
+        TransitionKind::Conveyor(crate::transition::LeftRight::Right),
+        TransitionKind::Doors(crate::transition::Axis::Vertical),
+        TransitionKind::Ferris(crate::transition::LeftRight::Left),
         TransitionKind::Flash,
-        TransitionKind::Flip(litchi_pptx::transition::LeftRight::Right),
-        TransitionKind::FlyThrough(litchi_pptx::transition::FlyThrough::new(
-            litchi_pptx::transition::InOut::Out,
+        TransitionKind::Flip(crate::transition::LeftRight::Right),
+        TransitionKind::FlyThrough(crate::transition::FlyThrough::new(
+            crate::transition::InOut::Out,
             true,
         )),
-        TransitionKind::Gallery(litchi_pptx::transition::LeftRight::Left),
-        TransitionKind::Glitter(litchi_pptx::transition::Glitter::new(
+        TransitionKind::Gallery(crate::transition::LeftRight::Left),
+        TransitionKind::Glitter(crate::transition::Glitter::new(
             Side::Down,
-            litchi_pptx::transition::GlitterPattern::Hexagon,
+            crate::transition::GlitterPattern::Hexagon,
         )),
         TransitionKind::Honeycomb,
         TransitionKind::Pan(Side::Up),
-        TransitionKind::Prism(litchi_pptx::transition::Prism::new(Side::Right, true, true)),
-        TransitionKind::Reveal(litchi_pptx::transition::Reveal::new(
-            litchi_pptx::transition::LeftRight::Right,
+        TransitionKind::Prism(crate::transition::Prism::new(Side::Right, true, true)),
+        TransitionKind::Reveal(crate::transition::Reveal::new(
+            crate::transition::LeftRight::Right,
             true,
         )),
-        TransitionKind::Shred(litchi_pptx::transition::Shred::new(
-            litchi_pptx::transition::ShredPattern::Rectangle,
-            litchi_pptx::transition::InOut::Out,
+        TransitionKind::Shred(crate::transition::Shred::new(
+            crate::transition::ShredPattern::Rectangle,
+            crate::transition::InOut::Out,
         )),
-        TransitionKind::Switch(litchi_pptx::transition::LeftRight::Right),
+        TransitionKind::Switch(crate::transition::LeftRight::Right),
         TransitionKind::Vortex(Side::Left),
-        TransitionKind::Warp(litchi_pptx::transition::InOut::Out),
-        TransitionKind::WheelReverse(litchi_pptx::transition::Spokes::Eight),
-        TransitionKind::Window(litchi_pptx::transition::Axis::Horizontal),
+        TransitionKind::Warp(crate::transition::InOut::Out),
+        TransitionKind::WheelReverse(crate::transition::Spokes::Eight),
+        TransitionKind::Window(crate::transition::Axis::Horizontal),
     ];
 
     for kind in targets {
-        let active = litchi_pptx::transition::write(&Transition::new(kind.clone())).unwrap();
+        let active = crate::transition::write(&Transition::new(kind.clone())).unwrap();
         let source = fixture("", slide_with_tail(PML, "before", &active), false);
         let editor =
             SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
@@ -1494,7 +1494,7 @@ fn transition_choice_edit_resolves_ancestor_namespaces_and_keeps_inactive_bindin
             .unwrap();
     let mut edit = editor.edit_slide(0).unwrap();
     edit.set_transition(&Transition::new(TransitionKind::Morph(
-        litchi_pptx::transition::Morph::ByWord,
+        crate::transition::Morph::ByWord,
     )))
     .unwrap();
     let mut output = Vec::new();
@@ -1532,7 +1532,7 @@ fn transition_choice_edit_resolves_ancestor_namespaces_and_keeps_inactive_bindin
             .unwrap()
             .unwrap()
             .kind(),
-        &TransitionKind::Morph(litchi_pptx::transition::Morph::ByWord)
+        &TransitionKind::Morph(crate::transition::Morph::ByWord)
     );
 }
 
@@ -1552,7 +1552,7 @@ fn transition_extension_prefix_collision_refuses_without_changing_source() {
     let mut edit = editor.edit_slide(0).unwrap();
     assert!(matches!(
         edit.set_transition(&Transition::new(TransitionKind::Morph(
-            litchi_pptx::transition::Morph::ByWord
+            crate::transition::Morph::ByWord
         ))),
         Err(Error::Refused(_))
     ));
@@ -1670,7 +1670,7 @@ fn source_backed_transition_semantic_noop_preserves_optional_attribute_lexical_p
     .unwrap();
     let mut edit = editor.edit_slide(0).unwrap();
     let requested = Transition::new(TransitionKind::Preset(
-        litchi_pptx::transition::Preset::without_name(),
+        crate::transition::Preset::without_name(),
     ));
     assert!(!edit.set_transition(&requested).unwrap());
     let commit = edit.commit();
@@ -1811,9 +1811,7 @@ fn direct_transition_rejects_unsafe_sources_and_supports_typed_extensions() {
         SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
             .unwrap();
     let mut edit = editor.edit_slide(0).unwrap();
-    let ripple = Transition::new(TransitionKind::Ripple(
-        litchi_pptx::transition::Ripple::Center,
-    ));
+    let ripple = Transition::new(TransitionKind::Ripple(crate::transition::Ripple::Center));
     assert!(edit.set_transition(&ripple).unwrap());
 }
 
@@ -1849,7 +1847,7 @@ fn direct_transition_rejects_malformed_dtd_limits_stale_source_and_partial_sink(
         .unwrap();
     let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(fixture("", slide, false))),
-        litchi_pptx::OpenOptions::default().source_limits(limits),
+        crate::OpenOptions::default().source_limits(limits),
     )
     .unwrap();
     let mut edit = editor.edit_slide(0).unwrap();
@@ -1989,7 +1987,7 @@ fn source_slide_order_manages_candidate_memory_before_rewrite_and_releases_it() 
     let (budget, _cancellation, context) = source_order_context_with_memory(root);
     let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(source)),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context),
     )
@@ -2021,7 +2019,7 @@ fn source_slide_order_retains_candidate_charge_through_patch_clones() {
     let (budget, _cancellation, context) = source_order_context_with_memory(3 * root);
     let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(source)),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context),
     )
@@ -2208,7 +2206,7 @@ fn source_slide_order_refuses_stale_foreign_signed_cancelled_and_partial_output(
     let (cancellation_source, context) = source_order_context();
     let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(multi_fixture(3, false))),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context),
     )
@@ -2284,7 +2282,7 @@ fn source_slide_order_rejects_limits_malformed_mce_and_invalid_owners() {
     assert!(matches!(
         SourceBackedPresentationEditor::from_read_at_with_options(
             Arc::new(VersionedSource::new(multi_fixture(3, false))),
-            litchi_pptx::OpenOptions::default().source_limits(limits)
+            crate::OpenOptions::default().source_limits(limits)
         ),
         Err(Error::Opc(OpcError::Limit { .. }))
     ));

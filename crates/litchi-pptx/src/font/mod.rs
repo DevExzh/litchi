@@ -12,7 +12,7 @@ pub use model::{
     Charset, Conformance, Data, Face, Family, Font, Fonts, Format, Key, License, Panose,
     Permission, Pitch, PitchFamily, Restrictions, Style,
 };
-pub use package::{conformance, load, put, remove};
+pub use package::{conformance, load};
 mod edit;
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
@@ -59,3 +59,4 @@ fn limit(name: &'static str) -> Error {
         },
     }
 }
+pub(crate) use package::{put, remove};

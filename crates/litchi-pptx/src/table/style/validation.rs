@@ -67,7 +67,8 @@ pub fn present(package: &OpcPackage) -> Result<bool> {
 /// Load the presentation's optional validated table-style catalog.
 ///
 /// The returned list copies the bounded part payload exactly once so it can
-/// outlive the package borrow and later move unchanged bytes through [`put`].
+/// outlive the package borrow and later move unchanged bytes through
+/// [`Edit::set`](crate::table::style::Edit::set).
 ///
 /// # Errors
 ///
@@ -100,7 +101,7 @@ pub fn load(package: &OpcPackage) -> Result<Option<List>> {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn put(package: &mut OpcPackage, list: List) -> Result<bool> {
+pub(crate) fn put(package: &mut OpcPackage, list: List) -> Result<bool> {
     let graph = inspect_graph(package)?;
     if list.conformance != graph.conformance {
         return Err(invalid(
@@ -159,7 +160,7 @@ pub fn put(package: &mut OpcPackage, list: List) -> Result<bool> {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn remove(package: &mut OpcPackage) -> Result<Option<List>> {
+pub(crate) fn remove(package: &mut OpcPackage) -> Result<Option<List>> {
     let graph = inspect_graph(package)?;
     let Some(attachment) = graph.attachment else {
         return Ok(None);

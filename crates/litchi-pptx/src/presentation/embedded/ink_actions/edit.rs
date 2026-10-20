@@ -14,6 +14,7 @@ use litchi_drawingml::ink::actions::{Edit as ProfileEdit, Profile};
 use super::transaction::Draft;
 use super::{AnchorSelector, Limits};
 use crate::part_edit::{Staged, family};
+use crate::slide::Selector;
 use crate::{Package, Result};
 
 family!("InkAction");
@@ -54,29 +55,21 @@ impl Package {
 }
 
 impl Edit<'_> {
-    /// The staged InkAction snapshot of the slide at `slide`.
+    /// The staged InkAction snapshot of the selected slide.
     ///
     /// # Errors
     ///
-    /// Returns an error for a slide position out of bounds, or a malformed or
-    /// unsupported typed action closure.
-    pub fn ink_actions(&self, slide: usize) -> Result<super::Snapshot> {
+    /// Returns an error for a missing, ambiguous or out-of-range slide, or a
+    /// malformed or unsupported typed action closure.
+    pub fn ink_actions<'s>(&self, slide: impl Into<Selector<'s>>) -> Result<super::Snapshot> {
         let opc = self.staged.opc();
-        let presentation =
-            crate::Presentation::new(crate::parts::PresentationPart::from_package(opc)?, opc);
-        let count = presentation.slide_count()?;
-        let slide_part = presentation
-            .slide(slide)?
-            .ok_or(Error::SlideIndexOutOfBounds {
-                index: slide,
-                len: count,
-            })?;
-        super::load_snapshot(opc, slide, slide_part.part().part(), &Limits::default())
+        let (index, name) = crate::package::resolve_slide_position(opc, slide.into())?;
+        super::load_snapshot(opc, index, opc.get_part(&name)?, &Limits::default())
     }
 
     fn stage(
         &mut self,
-        slide: usize,
+        slide: Selector<'_>,
         change: impl FnOnce(&mut Draft) -> Result<bool>,
     ) -> Result<bool> {
         let mut draft = self.ink_actions(slide)?.edit();
@@ -93,7 +86,7 @@ impl Edit<'_> {
     }
 
     /// Run shared action-profile mutations on the selected target of the
-    /// slide at `slide` and stage the resulting profile. Returns whether
+    /// selected slide and stage the resulting profile. Returns whether
     /// anything changed.
     ///
     /// # Errors
@@ -101,47 +94,51 @@ impl Edit<'_> {
     /// Returns an error for a missing slide or target, an invalid profile,
     /// a profile beyond the target bounds, or a changed edit of a signed
     /// package.
-    pub fn edit_profile<F>(
+    pub fn edit_profile<'s, F>(
         &mut self,
-        slide: usize,
+        slide: impl Into<Selector<'s>>,
         selector: AnchorSelector,
         edit: F,
     ) -> Result<bool>
     where
         F: FnOnce(&mut ProfileEdit) -> Result<()>,
     {
-        self.stage(slide, |draft| draft.edit_profile(selector, edit))
+        self.stage(slide.into(), |draft| draft.edit_profile(selector, edit))
     }
 
-    /// Replace the profile of the selected target on the slide at `slide`
+    /// Replace the profile of the selected target on the selected slide
     /// with an already validated shared profile. Returns whether anything
     /// changed.
     ///
     /// # Errors
     ///
     /// As [`Self::edit_profile`].
-    pub fn replace_profile(
+    pub fn replace_profile<'s>(
         &mut self,
-        slide: usize,
+        slide: impl Into<Selector<'s>>,
         selector: AnchorSelector,
         profile: Profile,
     ) -> Result<bool> {
-        self.stage(slide, |draft| draft.replace_profile(selector, profile))
+        self.stage(slide.into(), |draft| {
+            draft.replace_profile(selector, profile)
+        })
     }
 
     /// Parse bounded XML bytes and replace the profile of the selected target
-    /// on the slide at `slide`. Returns whether anything changed.
+    /// on the selected slide. Returns whether anything changed.
     ///
     /// # Errors
     ///
     /// As [`Self::edit_profile`], and for malformed profile XML.
-    pub fn replace_profile_bytes(
+    pub fn replace_profile_bytes<'s>(
         &mut self,
-        slide: usize,
+        slide: impl Into<Selector<'s>>,
         selector: AnchorSelector,
         bytes: impl AsRef<[u8]>,
     ) -> Result<bool> {
-        self.stage(slide, |draft| draft.replace_profile_bytes(selector, bytes))
+        self.stage(slide.into(), |draft| {
+            draft.replace_profile_bytes(selector, bytes)
+        })
     }
 
     /// Discard every staged change.

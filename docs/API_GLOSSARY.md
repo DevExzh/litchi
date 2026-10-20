@@ -142,7 +142,7 @@ line. A line is ✅ when the wave's gate registrations pass.
 |---|---|---|---|---|---|---|---|
 | F0 foundation | `litchi-core`, gate | ➖ | ✅ shared types | ✅ bans on clean crates | ✅ shared types, ops classification | ➖ | ✅ 0351 |
 | W1 | DOCX | ✅ (0355; `litchi_docx::Package`, `source_backed::Package`, `Document`) | ✅ (0355; 23 families registered; source-backed streaming families keep part-level commits, W1b) | ✅ (0355; banned in both `docx` profiles) | ✅ (0355; `Refused`/`PatchConflict`/`Internal`) | ✅ (0355; `SemanticLimits` on `OpenOptions`) | ✅ 0355 |
-| W2 | PPTX | ✅ `Package` (0356) | ✅ 33 registered families (0356) · 🔴 the five `SourceBacked*` stream-publishing editors (0356 gap 1) | ✅ (0252) | ✅ (0356) | ✅ (0356) | ✅ (0356) |
+| W2 | PPTX | ✅ `Package`, `source::Package` (0356, 0356a) | ✅ 46 registered families; source-backed editing on `source::Package` (`edit`, `edit_svg_images`), no public raw `OpcPackage` mutator (0356a) | ✅ (0252) | ✅ (0356) | ✅ (0356) | ✅ (0356, 0356a) |
 | W3 | PPT | ✅ | ✅ 12 scoped families publish a `Package` (0357) | ✅ banned crate-wide (0357) | ➖ (typed `slide_order`/`text_edit` refusals gain `kind()`) | ✅ `raw::Reader`/`SourceBackedPackage` `*_with_options`, `_with_limits` banned (0357) | ✅ 0357 |
 | W4 | XLSX, XLSB, `litchi-ooxml-common` | 🔴 | 🔴 | 🔴 | ➖ | 🔴 | 🔴 |
 | W5 | DOC, XLS, RTF, `litchi-ograph`, `litchi-ole-common`, `litchi-crypto` | 🔴 (DOC `raw::Package`, RTF `raw::Document`) | 🔴 | 🔴 | 🔴 (XLS, ograph) | 🔴 | 🔴 |

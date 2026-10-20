@@ -18,14 +18,14 @@ use std::path::PathBuf;
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part as _, TargetMode};
-use litchi_pptx::chart::{self, Chart, Series, Type as ChartType};
+use litchi_pptx::chart::{Chart, Series, Type as ChartType};
 use litchi_pptx::comments::{
     Author as LegacyAuthor, Comment as LegacyComment, Conformance as LegacyConformance,
 };
 use litchi_pptx::custom::Props as CustomProps;
 use litchi_pptx::font::{Data as FontData, Face, Font, Fonts, Style as FontStyle};
 use litchi_pptx::modern_comments::{self, Author as ModernAuthor, Comment as ModernComment};
-use litchi_pptx::presentation::embedded::ole::{self, Frame, Kind as OleKind};
+use litchi_pptx::presentation::embedded::ole::{Frame, Kind as OleKind};
 #[cfg(feature = "vba-inspection")]
 use litchi_pptx::presentation::embedded::vba;
 use litchi_pptx::presentation_properties::math::{BinaryBreak, Properties as MathProperties};
@@ -352,9 +352,8 @@ fn families() -> Vec<Family> {
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    package.edit_opc_in_place(|opc| {
-                        litchi_pptx::add_presentation_comment_author(
-                            opc,
+                    package.edit_comments_in_place(|edit| {
+                        edit.add_author(
                             legacy_author(1, "Reviewer"),
                             LegacyConformance::Transitional,
                         )
@@ -367,13 +366,9 @@ fn families() -> Vec<Family> {
                 },
             }),
             no_op: Some(|package| {
-                package.edit_opc_in_place(|opc| {
-                    litchi_pptx::remove_presentation_comment_author(
-                        opc,
-                        1,
-                        LegacyConformance::Transitional,
-                    )
-                    .map(drop)
+                package.edit_comments_in_place(|edit| {
+                    edit.remove_author(1, LegacyConformance::Transitional)
+                        .map(drop)
                 })
             }),
         },
@@ -382,12 +377,9 @@ fn families() -> Vec<Family> {
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    package.edit_opc_in_place(|opc| {
-                        modern_comments::add_modern_comment_author(
-                            opc,
-                            modern_author(MODERN_AUTHOR_A, "Ada"),
-                        )
-                        .map(drop)
+                    package.edit_modern_comments_in_place(|edit| {
+                        edit.add_author(modern_author(MODERN_AUTHOR_A, "Ada"))
+                            .map(drop)
                     })
                 },
                 shows: |package| {
@@ -400,8 +392,8 @@ fn families() -> Vec<Family> {
                 },
             }),
             no_op: Some(|package| {
-                package.edit_opc_in_place(|opc| {
-                    modern_comments::remove_modern_comment_author(opc, MODERN_AUTHOR_A).map(drop)
+                package.edit_modern_comments_in_place(|edit| {
+                    edit.remove_author(MODERN_AUTHOR_A).map(drop)
                 })
             }),
         },
@@ -554,9 +546,10 @@ fn families() -> Vec<Family> {
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    package.edit_opc_in_place(|opc| {
-                        let current = theme::load(opc, THEME)?;
-                        theme::add(opc, "Signed copy", &current.colors, &current.fonts).map(drop)
+                    package.edit_themes_in_place(|edit| {
+                        let current = edit.theme(THEME)?;
+                        edit.add("Signed copy", &current.colors, &current.fonts)
+                            .map(drop)
                     })
                 },
                 shows: |package| {
@@ -566,8 +559,8 @@ fn families() -> Vec<Family> {
                 },
             }),
             no_op: Some(|package| {
-                package.edit_opc_in_place(|opc| {
-                    assert!(!theme::remove_override(opc, SLIDE)?);
+                package.edit_themes_in_place(|edit| {
+                    assert!(!edit.remove_override(0_usize)?);
                     Ok(())
                 })
             }),
@@ -628,14 +621,14 @@ fn families() -> Vec<Family> {
             change: Some(Change {
                 edit: |package| {
                     package.edit_show_events_in_place(|edit| {
-                        edit.set(&slide(), &[Draft::play(Offset::ms(1), 2)])
+                        edit.set(0_usize, &[Draft::play(Offset::ms(1), 2)])
                     })
                 },
                 shows: |package| package.with_opc(|opc| Ok(events::load(opc, &slide())?.is_some())),
             }),
             no_op: Some(|package| {
                 package.edit_show_events_in_place(|edit| {
-                    assert!(edit.remove(&slide())?.is_none());
+                    assert!(edit.remove(0_usize)?.is_none());
                     Ok(())
                 })
             }),
@@ -687,10 +680,9 @@ fn families() -> Vec<Family> {
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    package.edit_opc_in_place(|opc| {
-                        ole::add(
-                            opc,
-                            SLIDE,
+                    package.edit_ole_objects_in_place(|edit| {
+                        edit.add(
+                            0_usize,
                             OleKind::Package,
                             None,
                             Some("Signed payload"),
@@ -758,7 +750,7 @@ fn families() -> Vec<Family> {
                 },
             }),
             no_op: Some(|package| {
-                package.placeholder_type_extension(&slide(), 0_usize)?;
+                package.placeholder_type_extension(0_usize, 0_usize)?;
                 let commit = package.edit_placeholder_type_extension()?.commit()?;
                 assert!(commit.patch().is_noop());
                 *package = commit.into_package();
@@ -770,7 +762,7 @@ fn families() -> Vec<Family> {
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    package.edit_opc_in_place(|opc| chart::add(opc, SLIDE, &chart()).map(drop))
+                    package.edit_charts_in_place(|edit| edit.add(0_usize, &chart()).map(drop))
                 },
                 shows: |package| {
                     package.with_opc(|opc| {
@@ -854,17 +846,15 @@ fn families() -> Vec<Family> {
         prepare: None,
         change: Some(Change {
             edit: |package| {
-                package.edit_opc_in_place(|opc| {
-                    vba::store(opc, &presentation(), b"inert project".to_vec()).map(drop)
-                })
+                package.edit_vba_in_place(|edit| edit.set(b"inert project".to_vec()).map(drop))
             },
             shows: |package| {
                 package.with_opc(|opc| Ok(vba::discover(opc, &presentation())?.is_some()))
             },
         }),
         no_op: Some(|package| {
-            package.edit_opc_in_place(|opc| {
-                assert!(!vba::remove(opc, &presentation())?);
+            package.edit_vba_in_place(|edit| {
+                assert!(!edit.remove()?);
                 Ok(())
             })
         }),
@@ -927,11 +917,12 @@ fn raw_edit_that_unsigns_explicitly_publishes_without_a_signature() {
         package
             .edit_opc_in_place(|opc| {
                 opc.unsign();
-                litchi_pptx::add_presentation_comment_author(
-                    opc,
-                    legacy_author(1, "Reviewer"),
-                    LegacyConformance::Transitional,
-                )
+                opc.add_part(Box::new(BlobPart::new(
+                    PackURI::new("/custom/raw.bin").unwrap(),
+                    "application/octet-stream".into(),
+                    vec![1, 2, 3],
+                )));
+                Ok(())
             })
             .unwrap();
         let output = package.to_bytes().unwrap();
@@ -1056,58 +1047,34 @@ fn legacy_comment_no_ops_keep_a_signed_package_exact() {
     };
     let source = signed_with(SIGNED[0], |package| {
         package
-            .edit_opc_in_place(|opc| {
-                litchi_pptx::add_presentation_comment_author(
-                    opc,
-                    legacy_author(1, "Ada"),
-                    conformance,
-                )?;
-                litchi_pptx::add_presentation_comment_author(
-                    opc,
-                    legacy_author(2, "Bob"),
-                    conformance,
-                )?;
-                litchi_pptx::add_presentation_comment(
-                    opc,
-                    SLIDE,
-                    comment(1, "first"),
-                    conformance,
-                )?;
-                litchi_pptx::add_presentation_comment(opc, SLIDE, comment(2, "second"), conformance)
+            .edit_comments_in_place(|edit| {
+                edit.add_author(legacy_author(1, "Ada"), conformance)?;
+                edit.add_author(legacy_author(2, "Bob"), conformance)?;
+                edit.add(0_usize, comment(1, "first"), conformance)?;
+                edit.add(0_usize, comment(2, "second"), conformance)
             })
             .unwrap();
     });
     let mut package = Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
 
     package
-        .edit_opc_in_place(|opc| {
-            let author = litchi_pptx::find_presentation_comment_author(opc, 1)?.unwrap();
-            litchi_pptx::update_presentation_comment_author(opc, 1, author, conformance)?;
-            litchi_pptx::reorder_presentation_comment_authors(opc, &[1, 2], conformance)?;
-            let first = litchi_pptx::find_presentation_comment(opc, SLIDE, 1, 1)?.unwrap();
-            litchi_pptx::update_presentation_comment(opc, SLIDE, 1, 1, first, conformance)?;
-            litchi_pptx::reorder_presentation_comments(opc, SLIDE, &[(1, 1), (2, 1)], conformance)
+        .edit_comments_in_place(|edit| {
+            let author = edit.author(1)?.unwrap();
+            edit.update_author(1, author, conformance)?;
+            edit.reorder_authors(&[1, 2], conformance)?;
+            let first = edit.comment(0_usize, 1, 1)?.unwrap();
+            edit.update(0_usize, 1, 1, first, conformance)?;
+            edit.reorder(0_usize, &[(1, 1), (2, 1)], conformance)
         })
         .unwrap();
     assert_eq!(package.to_bytes().unwrap(), source);
 
     let refused = [
-        package.edit_opc_in_place(|opc| {
-            litchi_pptx::reorder_presentation_comment_authors(opc, &[2, 1], conformance)
+        package.edit_comments_in_place(|edit| edit.reorder_authors(&[2, 1], conformance)),
+        package.edit_comments_in_place(|edit| {
+            edit.update(0_usize, 1, 1, comment(1, "changed"), conformance)
         }),
-        package.edit_opc_in_place(|opc| {
-            litchi_pptx::update_presentation_comment(
-                opc,
-                SLIDE,
-                1,
-                1,
-                comment(1, "changed"),
-                conformance,
-            )
-        }),
-        package.edit_opc_in_place(|opc| {
-            litchi_pptx::remove_presentation_comment(opc, SLIDE, 2, 1, conformance).map(drop)
-        }),
+        package.edit_comments_in_place(|edit| edit.remove(0_usize, 2, 1, conformance).map(drop)),
     ];
     for result in refused {
         assert!(is_refusal(&result.unwrap_err()));
@@ -1116,9 +1083,7 @@ fn legacy_comment_no_ops_keep_a_signed_package_exact() {
 
     package = package.unsign().unwrap();
     package
-        .edit_opc_in_place(|opc| {
-            litchi_pptx::reorder_presentation_comment_authors(opc, &[2, 1], conformance)
-        })
+        .edit_comments_in_place(|edit| edit.reorder_authors(&[2, 1], conformance))
         .unwrap();
     assert!(!carries_signature(&package.to_bytes().unwrap()));
 }
@@ -1129,18 +1094,11 @@ fn legacy_comment_no_ops_keep_a_signed_package_exact() {
 fn modern_comment_no_ops_keep_a_signed_package_exact() {
     let source = signed_with(SIGNED[1], |package| {
         package
-            .edit_opc_in_place(|opc| {
-                modern_comments::add_modern_comment_author(
-                    opc,
-                    modern_author(MODERN_AUTHOR_A, "Ada"),
-                )?;
-                modern_comments::add_modern_comment_author(
-                    opc,
-                    modern_author(MODERN_AUTHOR_B, "Bob"),
-                )?;
-                modern_comments::add_modern_comment(
-                    opc,
-                    &slide(),
+            .edit_modern_comments_in_place(|edit| {
+                edit.add_author(modern_author(MODERN_AUTHOR_A, "Ada"))?;
+                edit.add_author(modern_author(MODERN_AUTHOR_B, "Bob"))?;
+                edit.add(
+                    0_usize,
                     modern_comment(MODERN_COMMENT, MODERN_AUTHOR_A, "Review"),
                 )
                 .map(drop)
@@ -1151,20 +1109,11 @@ fn modern_comment_no_ops_keep_a_signed_package_exact() {
     let authors = [MODERN_AUTHOR_A.to_owned(), MODERN_AUTHOR_B.to_owned()];
 
     package
-        .edit_opc_in_place(|opc| {
-            assert!(modern_comments::update_modern_comment_author(
-                opc,
-                MODERN_AUTHOR_A,
-                |_| {}
-            )?);
-            modern_comments::reorder_modern_comment_authors(opc, &authors)?;
-            assert!(modern_comments::update_modern_comment(
-                opc,
-                &slide(),
-                MODERN_COMMENT,
-                |_| {}
-            )?);
-            modern_comments::reorder_modern_comments(opc, &slide(), &[MODERN_COMMENT.to_owned()])
+        .edit_modern_comments_in_place(|edit| {
+            assert!(edit.update_author(MODERN_AUTHOR_A, |_| {})?);
+            edit.reorder_authors(&authors)?;
+            assert!(edit.update(0_usize, MODERN_COMMENT, |_| {})?);
+            edit.reorder(0_usize, &[MODERN_COMMENT.to_owned()])
                 .map(drop)
         })
         .unwrap();
@@ -1172,18 +1121,14 @@ fn modern_comment_no_ops_keep_a_signed_package_exact() {
 
     let reversed = [MODERN_AUTHOR_B.to_owned(), MODERN_AUTHOR_A.to_owned()];
     let refused = [
-        package.edit_opc_in_place(|opc| {
-            modern_comments::reorder_modern_comment_authors(opc, &reversed).map(drop)
-        }),
-        package.edit_opc_in_place(|opc| {
-            modern_comments::update_modern_comment(opc, &slide(), MODERN_COMMENT, |comment| {
+        package.edit_modern_comments_in_place(|edit| edit.reorder_authors(&reversed).map(drop)),
+        package.edit_modern_comments_in_place(|edit| {
+            edit.update(0_usize, MODERN_COMMENT, |comment| {
                 comment.title = Some("Changed".into());
             })
             .map(drop)
         }),
-        package.edit_opc_in_place(|opc| {
-            modern_comments::remove_modern_comment_author(opc, MODERN_AUTHOR_B).map(drop)
-        }),
+        package.edit_modern_comments_in_place(|edit| edit.remove_author(MODERN_AUTHOR_B).map(drop)),
     ];
     for result in refused {
         assert!(is_refusal(&result.unwrap_err()));
@@ -1192,9 +1137,7 @@ fn modern_comment_no_ops_keep_a_signed_package_exact() {
 
     package = package.unsign().unwrap();
     package
-        .edit_opc_in_place(|opc| {
-            modern_comments::reorder_modern_comment_authors(opc, &reversed).map(drop)
-        })
+        .edit_modern_comments_in_place(|edit| edit.reorder_authors(&reversed).map(drop))
         .unwrap();
     assert!(!carries_signature(&package.to_bytes().unwrap()));
 }
@@ -1208,34 +1151,36 @@ fn modern_comment_command_no_op_keeps_a_signed_package_exact() {
             .edit_changes_info_in_place(|edit| edit.set(&changes_part()))
             .unwrap();
         package
-            .edit_opc_in_place(|opc| {
+            .edit_modern_comments_in_place(|edit| {
                 // Publish the commands in this library's own spelling first,
                 // so the no-op below reproduces the stored bytes.
-                assert!(modern_comments::update_modern_comment_changes(opc, |_| {})?);
+                assert!(edit.update_changes(|_| {})?);
                 Ok(())
             })
             .unwrap();
     });
     let mut package = Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
     package
-        .edit_opc_in_place(|opc| {
-            assert!(modern_comments::update_modern_comment_changes(opc, |_| {})?);
+        .edit_modern_comments_in_place(|edit| {
+            assert!(edit.update_changes(|_| {})?);
             Ok(())
         })
         .unwrap();
     assert_eq!(package.to_bytes().unwrap(), source);
 
-    let change = |opc: &mut OpcPackage| {
-        modern_comments::update_modern_comment_changes(opc, |commands| {
+    let change = |edit: &mut modern_comments::Edit<'_>| {
+        edit.update_changes(|commands| {
             commands[0].value.changes = vec![modern_comments::Change::Add];
         })
         .map(drop)
     };
-    assert!(is_refusal(&package.edit_opc_in_place(change).unwrap_err()));
+    assert!(is_refusal(
+        &package.edit_modern_comments_in_place(change).unwrap_err()
+    ));
     assert_eq!(package.to_bytes().unwrap(), source);
 
     package = package.unsign().unwrap();
-    package.edit_opc_in_place(change).unwrap();
+    package.edit_modern_comments_in_place(change).unwrap();
     assert!(!carries_signature(&package.to_bytes().unwrap()));
 }
 
@@ -1255,23 +1200,23 @@ fn theme_no_ops_keep_a_signed_package_exact() {
     };
     let source = signed_with(SIGNED[1], |package| {
         package
-            .edit_opc_in_place(|opc| {
-                theme::add(opc, "Signed", &colors, &fonts)?;
+            .edit_themes_in_place(|edit| {
+                edit.add("Signed", &colors, &fonts)?;
                 // Replace the schemes once while unsigned, so the theme holds
                 // them in the spelling a replacement publishes.
-                theme::put_colors(opc, AUTHORED, &colors)?;
-                theme::put_fonts(opc, AUTHORED, &fonts)?;
-                theme::put_override(opc, SLIDE, &palette_override).map(drop)
+                edit.set_colors(AUTHORED, &colors)?;
+                edit.set_fonts(AUTHORED, &fonts)?;
+                edit.set_override(0_usize, &palette_override).map(drop)
             })
             .unwrap();
     });
     let mut package = Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
 
     package
-        .edit_opc_in_place(|opc| {
-            theme::put_colors(opc, AUTHORED, &colors)?;
-            theme::put_fonts(opc, AUTHORED, &fonts)?;
-            theme::put_override(opc, SLIDE, &palette_override).map(drop)
+        .edit_themes_in_place(|edit| {
+            edit.set_colors(AUTHORED, &colors)?;
+            edit.set_fonts(AUTHORED, &fonts)?;
+            edit.set_override(0_usize, &palette_override).map(drop)
         })
         .unwrap();
     assert_eq!(package.to_bytes().unwrap(), source);
@@ -1280,12 +1225,15 @@ fn theme_no_ops_keep_a_signed_package_exact() {
         colors: None,
         fonts: Some(fonts.clone()),
     };
+    let master = in_place::master_id(
+        &package,
+        &PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap(),
+    )
+    .unwrap();
     let refused = [
-        package.edit_opc_in_place(|opc| theme::put_override(opc, SLIDE, &fonts_override).map(drop)),
-        package.edit_opc_in_place(|opc| theme::remove_override(opc, SLIDE).map(drop)),
-        package.edit_opc_in_place(|opc| {
-            theme::attach(opc, "/ppt/slideMasters/slideMaster1.xml", AUTHORED).map(drop)
-        }),
+        package.edit_themes_in_place(|edit| edit.set_override(0_usize, &fonts_override).map(drop)),
+        package.edit_themes_in_place(|edit| edit.remove_override(0_usize).map(drop)),
+        package.edit_themes_in_place(|edit| edit.attach(master, AUTHORED).map(drop)),
     ];
     for result in refused {
         assert!(is_refusal(&result.unwrap_err()));
@@ -1294,7 +1242,7 @@ fn theme_no_ops_keep_a_signed_package_exact() {
 
     package = package.unsign().unwrap();
     package
-        .edit_opc_in_place(|opc| theme::remove_override(opc, SLIDE).map(drop))
+        .edit_themes_in_place(|edit| edit.remove_override(0_usize).map(drop))
         .unwrap();
     assert!(!carries_signature(&package.to_bytes().unwrap()));
 }
@@ -1372,14 +1320,16 @@ fn generic_removal_of_signature_parts_does_not_authorize_a_change() {
         assert!(!opc.is_signed(), "{name}");
         assert!(opc.requires_signature_edit_policy(), "{name}");
 
-        let error = litchi_pptx::tag::put(&mut opc, &slide(), tag_list()).unwrap_err();
+        let package = Package::from_opc_package(opc.clone()).unwrap();
+        let mut edit = package.edit_tags().unwrap();
+        let error = edit.set(0_usize, tag_list()).unwrap_err();
         assert!(is_refusal(&error), "{name}: {error:?}");
 
         opc.unsign();
-        litchi_pptx::tag::put(&mut opc, &slide(), tag_list()).unwrap();
-        assert!(
-            !carries_signature(&PackageWriter::to_bytes(&opc).unwrap()),
-            "{name}"
-        );
+        let package = Package::from_opc_package(opc).unwrap();
+        let mut edit = package.edit_tags().unwrap();
+        edit.set(0_usize, tag_list()).unwrap();
+        let published = edit.commit().unwrap().into_package();
+        assert!(!carries_signature(&published.to_bytes().unwrap()), "{name}");
     }
 }

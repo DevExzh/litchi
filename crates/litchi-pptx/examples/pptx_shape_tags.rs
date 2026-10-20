@@ -25,8 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .part()
         .partname()
         .clone();
-    let mut graph = package.opc()?.clone();
-    let mut tags = litchi_pptx::tag::shape::load(&graph, &owner, shape.as_str())?
+    let mut tags = litchi_pptx::tag::shape::load(package.opc()?, &owner, shape.as_str())?
         .map_or_else(List::new, litchi_pptx::tag::Source::into_list);
     let outcome = match tags.set(name.as_str(), value.as_str()) {
         Ok(_) => "replaced",
@@ -36,8 +35,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         Err(error) => return Err(error.into()),
     };
-    let _ = litchi_pptx::tag::shape::put(&mut graph, &owner, shape.as_str(), tags)?;
-    let package = Package::from_opc_package(graph)?;
+    let mut edit = package.edit_shape_tags()?;
+    let _ = edit.set(0_usize, shape.as_str(), tags)?;
+    let package = edit.commit()?.into_package();
     package.save(output)?;
     println!("{outcome} shape tag");
     Ok(())

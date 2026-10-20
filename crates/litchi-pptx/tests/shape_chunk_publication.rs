@@ -10,7 +10,6 @@ use litchi_core::{OwnedSource, Position};
 use litchi_pptx::{
     Error, MAX_SHAPE_PROPERTIES_REPLACEMENTS, MAX_SHAPE_TEXT_REPLACEMENTS, Package,
     ShapePropertiesReplacement, ShapeTextReplacement, SourceBackedPresentation,
-    SourceBackedPresentationEditor,
     builder::Builder,
     opened::{Limits, Patch as OpenedPatch},
     source::{Package as SourcePackage, Patch as SourcePatch},
@@ -246,18 +245,18 @@ fn focused_source_chunks_publish_and_keep_the_patch_reversible() {
     let texts: Vec<_> = (0..3).map(|index| format!("focused-{index}")).collect();
     let replacements = text_replacements(&texts);
     let chunks: Vec<_> = replacements.chunks(CHUNK_SIZE).collect();
-    let editor =
-        SourceBackedPresentationEditor::from_read_at(Arc::new(OwnedSource::new(before.clone())))
-            .unwrap();
-    let mut edit = editor.edit_slide(0).unwrap();
-    assert_eq!(edit.set_shape_text_chunks(&chunks).unwrap(), 3);
-    let commit = edit.commit();
+    let editor = SourcePackage::from_read_at(Arc::new(OwnedSource::new(before.clone()))).unwrap();
+    let mut edit = editor.edit().unwrap();
+    assert_eq!(
+        edit.set_shape_text_chunks(Position::new(0), &chunks)
+            .unwrap(),
+        3
+    );
+    let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
-    assert!(commit.patch().inverse().apply(commit.snapshot()).is_ok());
+    assert!(commit.package().apply(&commit.patch().inverse()).is_ok());
     let mut output = Vec::new();
-    editor
-        .publish_slide_commit_to_stream(&mut output, &commit)
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
     assert_ne!(output, before);
     let reopened =
         SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(output))).unwrap();
@@ -265,22 +264,23 @@ fn focused_source_chunks_publish_and_keep_the_patch_reversible() {
     assert!(text.contains("focused-0"));
     assert!(text.contains("focused-2"));
 
-    let editor =
-        SourceBackedPresentationEditor::from_read_at(Arc::new(OwnedSource::new(before))).unwrap();
-    let mut edit = editor.edit_slide(0).unwrap();
+    let editor = SourcePackage::from_read_at(Arc::new(OwnedSource::new(before))).unwrap();
+    let mut edit = editor.edit().unwrap();
     let properties = [
         ShapePropertiesReplacement::new(Position::new(0))
             .with_text("focused-property-0")
             .with_bounds((11, 22, 333, 444)),
         ShapePropertiesReplacement::new(Position::new(1)).with_bounds((55, 66, 777, 888)),
     ];
-    assert_eq!(edit.set_shape_property_chunks(&[&properties]).unwrap(), 2);
-    let commit = edit.commit();
+    assert_eq!(
+        edit.set_shape_property_chunks(Position::new(0), &[&properties])
+            .unwrap(),
+        2
+    );
+    let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
     let mut output = Vec::new();
-    editor
-        .publish_slide_commit_to_stream(&mut output, &commit)
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
     let reopened =
         SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(output))).unwrap();
     assert!(
@@ -477,17 +477,17 @@ fn all_equal_chunks_are_exact_noops_for_eager_source_and_focused_edits() {
     assert!(patch.is_noop());
     assert_eq!(changed.to_bytes().unwrap(), before);
 
-    let editor =
-        SourceBackedPresentationEditor::from_read_at(Arc::new(OwnedSource::new(before.clone())))
-            .unwrap();
-    let mut edit = editor.edit_slide(0).unwrap();
-    assert_eq!(edit.set_shape_text_chunks(text_chunks).unwrap(), 0);
-    let commit = edit.commit();
+    let editor = SourcePackage::from_read_at(Arc::new(OwnedSource::new(before.clone()))).unwrap();
+    let mut edit = editor.edit().unwrap();
+    assert_eq!(
+        edit.set_shape_text_chunks(Position::new(0), text_chunks)
+            .unwrap(),
+        0
+    );
+    let commit = edit.commit().unwrap();
     assert!(!commit.diagnostics().changed());
     let mut output = Vec::new();
-    editor
-        .publish_slide_commit_to_stream(&mut output, &commit)
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
     assert_eq!(output, before);
 }
 
@@ -775,16 +775,19 @@ fn property_chunks_split_the_legacy_text_budget_for_eager_and_source_primary() {
 #[test]
 fn focused_source_rejects_too_many_empty_chunks_before_the_noop_shortcut() {
     let before = bytes(1);
-    let editor =
-        SourceBackedPresentationEditor::from_read_at(Arc::new(OwnedSource::new(before))).unwrap();
-    let mut edit = editor.edit_slide(0).unwrap();
+    let editor = SourcePackage::from_read_at(Arc::new(OwnedSource::new(before))).unwrap();
+    let mut edit = editor.edit().unwrap();
     let empty: &[ShapeTextReplacement<'_>] = &[];
     let chunks = vec![empty; litchi_pptx::shape::Limits::DEFAULT.shapes() + 1];
     assert!(matches!(
-        edit.set_shape_text_chunks(&chunks),
+        edit.set_shape_text_chunks(Position::new(0), &chunks),
         Err(Error::Limit { .. })
     ));
-    assert_eq!(edit.set_shape_text_chunks(&[empty]).unwrap(), 0);
+    assert_eq!(
+        edit.set_shape_text_chunks(Position::new(0), &[empty])
+            .unwrap(),
+        0
+    );
 }
 
 #[test]

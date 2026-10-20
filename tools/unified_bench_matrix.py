@@ -2679,14 +2679,13 @@ CONTRACT_0356 = {
 }
 
 
-@needs("0356")
-def p0356():
-    """Record 0356 §5: the PPTX batch routes of record 0348 re-measured after
-    the record 0351 API contract (three runs each, superseding the 0348
-    rows), and pptx_contract_bench, one source built on the base tree and on
-    the branch, run A-B-B-A three times: after/before rows per scenario
-    (median of the after runs over the median of the before runs)."""
-    base = RES / "0356"
+def pptx_contract_rows(record):
+    """The PPTX batch routes of record 0348 re-measured (three runs each,
+    superseding the earlier rows) and pptx_contract_bench, one source built
+    on the base tree and on the branch, run A-B-B-A three times: after/before
+    rows per scenario (median of the after runs over the median of the
+    before runs). Records 0356 and 0356a."""
+    base = RES / record
     out = []
     for series, glob in (("pptx_p0_final", "pptx-p0-final-bench-run*.jsonl"),
                          ("pptx_p0", "pptx-p0-bench-run*.jsonl")):
@@ -2698,7 +2697,7 @@ def p0356():
             n = int(n)
             state = f", {handle[0]} handle" if handle else ""
             label = f"{family.replace('_', ' ')} ({owner} owner{state}; one File::batch vs one leaf edit)"
-            out.append(row("0356", "pptx", "batch", label, f"{n} ops",
+            out.append(row(record, "pptx", "batch", label, f"{n} ops",
                            med(i["leaf_median_us"] for i in items),
                            med(i["unified_median_us"] for i in items), [i["ratio"] for i in items],
                            BATCH if n >= 1000 else SCALING, f"{series}:{scen}", src(paths)))
@@ -2713,8 +2712,8 @@ def p0356():
         a = med(r["median_us"] for r in a_items)
         if b is None:
             continue
-        out.append(row("0356", "pptx", op, f"{route.replace('_', ' ')} ({fixture})", "",
-                       b, a, [a / b], regression("0356"), f"pptx_contract:{scen}", srcs,
+        out.append(row(record, "pptx", op, f"{route.replace('_', ' ')} ({fixture})", "",
+                       b, a, [a / b], regression(record), f"pptx_contract:{scen}", srcs,
                        comparison=f"after/before ({leg} leg)"))
     return out
 
@@ -2745,6 +2744,19 @@ def p0357a():
     return out
 
 
+
+@needs("0356")
+def p0356():
+    """Record 0356 §5 (see pptx_contract_rows)."""
+    return pptx_contract_rows("0356")
+
+
+@needs("0356a")
+def p0356a():
+    """Record 0356a §4: the 0356 routes on the review follow-ups, against
+    trunk 184dd4d908 (record 0356 merged)."""
+    return pptx_contract_rows("0356a")
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
@@ -2753,7 +2765,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0306, p0307, p0308, p0309, p0310, p0311, p0312,
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
-           p0347, p0348, p0355, p0355a, p0356, p0357, p0357a]
+           p0347, p0348, p0355, p0355a, p0356, p0356a, p0357, p0357a]
 
 
 

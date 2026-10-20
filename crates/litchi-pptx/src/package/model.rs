@@ -943,6 +943,30 @@ pub(crate) fn resolve_slide_identity(
     }
 }
 
+/// The zero-based position and part of the selected slide (record 0356a).
+pub(crate) fn resolve_slide_position(
+    opc: &OpcPackage,
+    key: crate::slide::Selector<'_>,
+) -> Result<(usize, PackURI)> {
+    if let crate::slide::Selector::Position(position) = &key {
+        let index = position.get();
+        return Ok((index, resolve_slide(opc, key)?));
+    }
+    let name = resolve_slide(opc, key)?;
+    let presentation = Presentation::new(PresentationPart::from_package(opc)?, opc);
+    for index in 0..presentation.slide_count()? {
+        if let Some(slide) = presentation.slide(index)?
+            && *slide.part().part().partname() == name
+        {
+            return Ok((index, name));
+        }
+    }
+    Err(Error::internal(
+        "resolve_slide_position",
+        "a named slide is not in the presentation order",
+    ))
+}
+
 pub(crate) fn resolve_slide(opc: &OpcPackage, key: crate::slide::Selector<'_>) -> Result<PackURI> {
     let presentation = Presentation::new(PresentationPart::from_package(opc)?, opc);
     match key {

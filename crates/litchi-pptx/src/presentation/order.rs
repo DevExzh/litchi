@@ -5,14 +5,17 @@
 //! refuses presentations whose other known positional owners would become
 //! stale after a move.
 
+#[cfg(test)]
 use std::io::Write;
 use std::sync::Arc;
 
-use litchi_core::{
-    ExecutionContext, ExecutionError, Position, Reservation, Resource, SourceVersion,
-};
+use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource};
+#[cfg(test)]
+use litchi_core::{Position, SourceVersion};
+use litchi_opc::PackURI;
 use litchi_opc::constants::relationship_type as rt;
-use litchi_opc::{PackURI, PartData, Relationships, SourceLineage, TargetMode};
+#[cfg(test)]
+use litchi_opc::{PartData, Relationships, SourceLineage, TargetMode};
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -64,12 +67,14 @@ pub(super) fn stable_slide_key(
 }
 
 #[derive(Clone, PartialEq, Eq)]
+#[cfg(test)]
 struct SlideOrderBinding {
     id: u32,
     relationship_id: String,
 }
 
 #[derive(Clone, PartialEq, Eq)]
+#[cfg(test)]
 struct RootRelationshipBinding {
     id: String,
     kind: String,
@@ -83,6 +88,7 @@ struct RootRelationshipBinding {
 /// changed candidate is edit-owned and is retained through shared immutable
 /// bytes until publication.
 #[derive(Clone)]
+#[cfg(test)]
 enum OrderPayload {
     Original(PartData),
     Edited(Arc<Vec<u8>>),
@@ -92,7 +98,9 @@ enum OrderPayload {
     },
 }
 
+#[cfg(test)]
 impl OrderPayload {
+    #[cfg(test)]
     fn as_bytes(&self) -> &[u8] {
         match self {
             Self::Original(data) => data.as_bytes(),
@@ -100,6 +108,7 @@ impl OrderPayload {
         }
     }
 
+    #[cfg(test)]
     fn edited_bytes(&self) -> Option<Arc<Vec<u8>>> {
         match self {
             Self::Original(_) => None,
@@ -114,7 +123,8 @@ impl OrderPayload {
 /// lineage and version, presentation URI and bytes, root relationship
 /// bindings, and ordered `(p:sldId@id, p:sldId@r:id)` bindings.
 #[derive(Clone)]
-pub struct SourceBackedSlideOrderSnapshot {
+#[cfg(test)]
+pub(crate) struct SourceBackedSlideOrderSnapshot {
     presentation_uri: PackURI,
     xml: OrderPayload,
     bindings: Box<[SlideOrderBinding]>,
@@ -126,7 +136,8 @@ pub struct SourceBackedSlideOrderSnapshot {
 
 /// An isolated source-backed edit that can stage a sequence of positional
 /// moves and swaps.
-pub struct SourceBackedSlideOrderEdit {
+#[cfg(test)]
+pub(crate) struct SourceBackedSlideOrderEdit {
     source: SourceBackedSlideOrderSnapshot,
     working: OrderPayload,
     bindings: Box<[SlideOrderBinding]>,
@@ -134,13 +145,15 @@ pub struct SourceBackedSlideOrderEdit {
 
 /// A reversible exact-source presentation-order patch.
 #[derive(Clone)]
-pub struct SourceBackedSlideOrderPatch {
+#[cfg(test)]
+pub(crate) struct SourceBackedSlideOrderPatch {
     before: SourceBackedSlideOrderSnapshot,
     after: SourceBackedSlideOrderSnapshot,
 }
 
 /// A checked source-backed presentation-order edit ready for publication.
-pub struct SourceBackedSlideOrderCommit {
+#[cfg(test)]
+pub(crate) struct SourceBackedSlideOrderCommit {
     snapshot: SourceBackedSlideOrderSnapshot,
     patch: SourceBackedSlideOrderPatch,
 }
@@ -153,7 +166,8 @@ impl SourceBackedPresentationEditor {
     /// [`SourceBackedSlideOrderEdit::swap_slides`] stage against the order
     /// produced by the preceding operations. The same position is an
     /// explicit exact no-op.
-    pub fn edit_slide_order(&self) -> Result<SourceBackedSlideOrderEdit> {
+    #[cfg(test)]
+    pub(crate) fn edit_slide_order(&self) -> Result<SourceBackedSlideOrderEdit> {
         let source = capture(self)?;
         Ok(SourceBackedSlideOrderEdit {
             working: source.xml.clone(),
@@ -162,23 +176,10 @@ impl SourceBackedPresentationEditor {
         })
     }
 
-    /// Begin an order edit and stage one positional move.
-    ///
-    /// This convenience method is equivalent to [`Self::edit_slide_order`]
-    /// followed by [`SourceBackedSlideOrderEdit::move_slide`].
-    pub fn edit_slide_order_move(
-        &self,
-        from: Position,
-        to: Position,
-    ) -> Result<SourceBackedSlideOrderEdit> {
-        let mut edit = self.edit_slide_order()?;
-        edit.move_slide(from, to)?;
-        Ok(edit)
-    }
-
     /// Publish an exact-source-checked slide-order commit to a sequential
     /// stream.
-    pub fn publish_slide_order_commit_to_stream<W: Write>(
+    #[cfg(test)]
+    pub(crate) fn publish_slide_order_commit_to_stream<W: Write>(
         self,
         writer: W,
         commit: &SourceBackedSlideOrderCommit,
@@ -192,7 +193,8 @@ impl SourceBackedPresentationEditor {
     /// An effective move overlays only the existing presentation XML part.
     /// An exact no-op selects the empty overlay path, preserving every source
     /// ZIP member byte-for-byte, including signature infrastructure.
-    pub fn publish_slide_order_patch_to_stream<W: Write>(
+    #[cfg(test)]
+    pub(crate) fn publish_slide_order_patch_to_stream<W: Write>(
         self,
         writer: W,
         patch: &SourceBackedSlideOrderPatch,
@@ -220,23 +222,21 @@ impl SourceBackedPresentationEditor {
     }
 }
 
+#[cfg(test)]
 impl SourceBackedSlideOrderSnapshot {
-    /// Number of ordered slide entries.
-    #[must_use]
-    pub fn slide_count(&self) -> usize {
-        self.bindings.len()
-    }
-
     /// Whether this snapshot is exactly the same source snapshot as `other`.
     #[must_use]
-    pub fn is_exactly_same_as(&self, other: &Self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn is_exactly_same_as(&self, other: &Self) -> bool {
         self.same_source(other)
     }
 
+    #[cfg(test)]
     fn check_execution(&self) -> Result<()> {
         check_execution_context(self.context.as_ref())
     }
 
+    #[cfg(test)]
     fn same_source(&self, other: &Self) -> bool {
         self.presentation_uri == other.presentation_uri
             && self.xml.as_bytes() == other.xml.as_bytes()
@@ -247,30 +247,16 @@ impl SourceBackedSlideOrderSnapshot {
     }
 }
 
+#[cfg(test)]
 impl SourceBackedSlideOrderEdit {
-    /// Exact immutable presentation order captured at edit start.
-    #[must_use]
-    pub const fn source(&self) -> &SourceBackedSlideOrderSnapshot {
-        &self.source
-    }
-
-    fn is_changed(&self) -> bool {
-        self.source.xml.as_bytes() != self.working.as_bytes()
-    }
-
-    /// The outcome of this edit or commit.
-    #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
-        crate::diagnostics::Diagnostics::new(self.is_changed())
-    }
-
     /// Stage a positional move in the currently staged slide list.
     ///
     /// `from == to` is a successful, explicit exact no-op. Every candidate is
     /// rebuilt from the original source XML and the staged binding
     /// permutation, so cancelling a sequence restores the original bytes and
     /// lexical entry spans exactly.
-    pub fn move_slide(&mut self, from: Position, to: Position) -> Result<bool> {
+    #[cfg(test)]
+    pub(crate) fn move_slide(&mut self, from: Position, to: Position) -> Result<bool> {
         self.source.check_execution()?;
         let length = self.source.bindings.len();
         let from = from.get();
@@ -302,7 +288,8 @@ impl SourceBackedSlideOrderEdit {
     ///
     /// `left == right` is a successful, explicit exact no-op. The operation
     /// is failure-atomic and composes with preceding moves and swaps.
-    pub fn swap_slides(&mut self, left: Position, right: Position) -> Result<bool> {
+    #[cfg(test)]
+    pub(crate) fn swap_slides(&mut self, left: Position, right: Position) -> Result<bool> {
         self.source.check_execution()?;
         let length = self.source.bindings.len();
         let left = left.get();
@@ -330,7 +317,8 @@ impl SourceBackedSlideOrderEdit {
     }
 
     /// Validate and freeze this isolated edit for source-backed publication.
-    pub fn commit(self) -> Result<SourceBackedSlideOrderCommit> {
+    #[cfg(test)]
+    pub(crate) fn commit(self) -> Result<SourceBackedSlideOrderCommit> {
         self.source.check_execution()?;
         Ok(self.into_commit())
     }
@@ -340,6 +328,7 @@ impl SourceBackedSlideOrderEdit {
     /// This keeps all inter-entry trivia in its original slot while applying
     /// the currently staged binding permutation. It also avoids retaining a
     /// chain of intermediate XML buffers when a caller composes operations.
+    #[cfg(test)]
     fn stage_order(&mut self, ordered: Vec<SlideOrderBinding>) -> Result<bool> {
         self.source.check_execution()?;
         if ordered.as_slice() == self.bindings.as_ref() {
@@ -373,6 +362,7 @@ impl SourceBackedSlideOrderEdit {
         Ok(true)
     }
 
+    #[cfg(test)]
     fn into_commit(self) -> SourceBackedSlideOrderCommit {
         let snapshot = SourceBackedSlideOrderSnapshot {
             presentation_uri: self.source.presentation_uri.clone(),
@@ -391,32 +381,24 @@ impl SourceBackedSlideOrderEdit {
     }
 }
 
+#[cfg(test)]
 impl SourceBackedSlideOrderPatch {
     /// Exact immutable source required by this patch.
     #[must_use]
-    pub const fn source(&self) -> &SourceBackedSlideOrderSnapshot {
+    #[cfg(test)]
+    pub(crate) const fn source(&self) -> &SourceBackedSlideOrderSnapshot {
         &self.before
     }
 
-    /// Exact immutable target produced by this patch.
-    #[must_use]
-    pub const fn target(&self) -> &SourceBackedSlideOrderSnapshot {
-        &self.after
-    }
-
+    #[cfg(test)]
     fn is_changed(&self) -> bool {
         !self.before.same_source(&self.after)
     }
 
-    /// Whether this patch is an exact source no-op.
-    #[must_use]
-    pub fn is_noop(&self) -> bool {
-        !self.is_changed()
-    }
-
     /// Return the exact source-bound inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -424,7 +406,8 @@ impl SourceBackedSlideOrderPatch {
     }
 
     /// Apply only to the exact source captured by this patch.
-    pub fn apply(
+    #[cfg(test)]
+    pub(crate) fn apply(
         &self,
         source: &SourceBackedSlideOrderSnapshot,
     ) -> Result<SourceBackedSlideOrderSnapshot> {
@@ -443,36 +426,43 @@ impl SourceBackedSlideOrderPatch {
     }
 }
 
+#[cfg(test)]
 impl SourceBackedSlideOrderCommit {
     /// Candidate snapshot after this edit.
     #[must_use]
-    pub const fn snapshot(&self) -> &SourceBackedSlideOrderSnapshot {
+    #[cfg(test)]
+    pub(crate) const fn snapshot(&self) -> &SourceBackedSlideOrderSnapshot {
         &self.snapshot
     }
 
     /// Exact reversible patch for this edit.
     #[must_use]
-    pub const fn patch(&self) -> &SourceBackedSlideOrderPatch {
+    #[cfg(test)]
+    pub(crate) const fn patch(&self) -> &SourceBackedSlideOrderPatch {
         &self.patch
     }
 
+    #[cfg(test)]
     fn is_changed(&self) -> bool {
         self.patch.is_changed()
     }
 
     /// The outcome of this edit or commit.
     #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
         crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Exact reversible inverse patch for this edit.
     #[must_use]
-    pub fn inverse(&self) -> SourceBackedSlideOrderPatch {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> SourceBackedSlideOrderPatch {
         self.patch.inverse()
     }
 }
 
+#[cfg(test)]
 fn capture(editor: &SourceBackedPresentationEditor) -> Result<SourceBackedSlideOrderSnapshot> {
     editor.package.check_execution()?;
     let source_version = editor.package.source_version()?;
@@ -504,6 +494,7 @@ fn capture(editor: &SourceBackedPresentationEditor) -> Result<SourceBackedSlideO
     })
 }
 
+#[cfg(test)]
 fn validate_for_rewrite(snapshot: &SourceBackedSlideOrderSnapshot) -> Result<()> {
     snapshot.check_execution()?;
     reject_root_features(snapshot.xml.as_bytes(), snapshot.context.as_ref())?;
@@ -1106,6 +1097,7 @@ fn metadata_refusal(owner: MetadataOwner, detail: impl Into<String>) -> Error {
     )
 }
 
+#[cfg(test)]
 fn slide_order_bindings(
     editor: &SourceBackedPresentationEditor,
 ) -> Result<Box<[SlideOrderBinding]>> {
@@ -1125,6 +1117,7 @@ fn slide_order_bindings(
     Ok(bindings.into_boxed_slice())
 }
 
+#[cfg(test)]
 fn clone_bindings(bindings: &[SlideOrderBinding]) -> Result<Vec<SlideOrderBinding>> {
     let mut cloned = Vec::new();
     cloned
@@ -1137,6 +1130,7 @@ fn clone_bindings(bindings: &[SlideOrderBinding]) -> Result<Vec<SlideOrderBindin
     Ok(cloned)
 }
 
+#[cfg(test)]
 fn binding_refs(bindings: &[SlideOrderBinding]) -> Result<Vec<(u32, &str)>> {
     let mut refs = Vec::new();
     refs.try_reserve_exact(bindings.len())
@@ -1150,6 +1144,7 @@ fn binding_refs(bindings: &[SlideOrderBinding]) -> Result<Vec<(u32, &str)>> {
     Ok(refs)
 }
 
+#[cfg(test)]
 fn root_relationship_bindings(
     relationships: &Relationships,
 ) -> Result<Box<[RootRelationshipBinding]>> {
@@ -1478,6 +1473,7 @@ fn check_execution_context(context: Option<&ExecutionContext>) -> Result<()> {
 /// same byte length as the retained presentation root. The reservation is
 /// attached to the candidate payload and therefore follows clones of the
 /// snapshot and patch until the last retaining snapshot or patch is dropped.
+#[cfg(test)]
 fn reserve_order_output(
     snapshot: &SourceBackedSlideOrderSnapshot,
 ) -> Result<Option<Arc<Reservation>>> {

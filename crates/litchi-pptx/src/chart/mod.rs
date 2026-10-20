@@ -13,4 +13,7 @@ pub mod style;
 
 pub use codec::{encode, write_graphic_frame};
 pub use model::{Chart, Info, Series, Type};
-pub use package::{Part, add, load, related};
+pub use package::{Part, load, related};
+
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};

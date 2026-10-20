@@ -16,10 +16,10 @@ use litchi_core::{
 };
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, SourceLimits, TargetMode};
+use litchi_pptx::Package;
 use litchi_pptx::builder::Builder;
 use litchi_pptx::shape::Scene;
 use litchi_pptx::source::{Package as SourcePackage, Patch as SourcePatch};
-use litchi_pptx::{Package, SourceBackedPresentationEditor};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 const SLIDE: &str = "ppt/slides/slide1.xml";
@@ -567,15 +567,13 @@ fn source_shape_removal_keeps_unused_relationship_resources() {
 fn source_focused_slide_edit_removal_publishes() {
     let before = fixture(1, 2);
     let editor =
-        SourceBackedPresentationEditor::from_read_at(Arc::new(OwnedSource::new(before.clone())))
+        litchi_pptx::source::Package::from_read_at(Arc::new(OwnedSource::new(before.clone())))
             .unwrap();
-    let mut edit = editor.edit_slide(0).unwrap();
-    assert!(edit.remove_shape(0_usize).unwrap());
-    let commit = edit.commit_checked().unwrap();
+    let mut edit = editor.edit().unwrap();
+    assert!(edit.remove_shape(0, 0_usize).unwrap());
+    let commit = edit.commit().unwrap();
     let mut output = Vec::new();
-    editor
-        .publish_slide_commit_to_stream(&mut output, &commit)
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
     assert_eq!(source_texts(&open_source(&output)), ["slide 0 shape 1"]);
 }
 

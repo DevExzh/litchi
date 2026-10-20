@@ -368,23 +368,22 @@ fn theme_scheme_replacement_of_a_marked_theme_matches_the_unmarked_one() {
     // Base: an indented marked theme lost three indentation bytes and kept
     // the old scheme's tail (`me>`) as text inside `a:themeElements`, which
     // neither the read-back nor the publication audit refuses.
-    use litchi_pptx::shape::theme::{self, Color, Slot};
+    use litchi_pptx::shape::theme::{Color, Slot};
     let deck = text_deck();
     let (kept, _) = differential(&deck, is_xml_member, |package| {
-        package
-            .edit_opc_in_place(|opc| {
-                let name = "/ppt/theme/theme1.xml";
-                let current = theme::load(opc, name)?;
-                let colors = current
-                    .colors
-                    .clone()
-                    .with(Slot::Accent1, Color::rgb("123456").unwrap());
-                theme::put_colors(opc, name, &colors)?;
-                let fonts = current.fonts.clone();
-                theme::put_fonts(opc, name, &fonts)?;
-                Ok(format!("{:?}", theme::load(opc, name)?))
-            })
-            .unwrap()
+        let name = "/ppt/theme/theme1.xml";
+        let mut edit = package.edit_themes().unwrap();
+        let current = edit.theme(name).unwrap();
+        let colors = current
+            .colors
+            .clone()
+            .with(Slot::Accent1, Color::rgb("123456").unwrap());
+        edit.set_colors(name, &colors).unwrap();
+        let fonts = current.fonts.clone();
+        edit.set_fonts(name, &fonts).unwrap();
+        let summary = format!("{:?}", edit.theme(name).unwrap());
+        *package = edit.commit().unwrap().into_package();
+        summary
     });
     assert!(kept.contains("ppt/theme/theme1.xml"), "{kept:?}");
 }

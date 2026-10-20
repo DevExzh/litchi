@@ -2,7 +2,6 @@
 
 use std::{env, error::Error, io};
 
-use litchi_pptx::Package;
 use litchi_pptx::tag::{List, Tag};
 
 fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -24,19 +23,11 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         914_400,
     );
     let package = builder.build()?;
-    let owner = package
-        .presentation()?
-        .slide(0)?
-        .ok_or_else(|| io::Error::other("created presentation has no slide"))?
-        .part()
-        .part()
-        .partname()
-        .clone();
-    let mut graph = package.opc()?.clone();
     let mut tags = List::new();
     tags.add(Tag::new("LITCHI_VERIFY", "pptx-tag-crud-v1")?)?;
-    let _ = litchi_pptx::tag::put(&mut graph, &owner, tags)?;
-    let package = Package::from_opc_package(graph)?;
+    let mut edit = package.edit_tags()?;
+    let _ = edit.set(0_usize, tags)?;
+    let package = edit.commit()?.into_package();
     package.save(destination)?;
     Ok(())
 }
