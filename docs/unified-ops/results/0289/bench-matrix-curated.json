@@ -2690,6 +2690,12 @@
    "disposition": "follow-up"
   },
   {
+   "record": "0357",
+   "series": "ppt_elements:ppt_(comment|run)_get_v1:.*",
+   "explanation": "Record 0357 §7: unchanged from record 0323 (the same microsecond-scale reads; the after/before ratio is 0.99-1.01 on both legs, the pair ratio 1.44 and 3.1 as before). The added cost is path parsing, the resolution walk and the run read's piece construction; follow-up 0323-F12.",
+   "disposition": "follow-up"
+  },
+  {
    "record": "0324",
    "series": "doc_parts:(style_get_format|paragraph_list_format|hyperlink_get_format|section_get_format)",
    "explanation": "Record 0324 §6: the unified point reads cost a fixed 0.3-0.6 µs: the path is parsed and resolved, a node is built and every key of the element's table is projected (a style has 47 keys, a section 23), where the leaf legs return one typed struct (section_get_format's leaf leg copies one struct, 1 ns). Follow-up 7 of record 0324: a projection that formats only the requested keys, or a typed fast path for get(path).format().get(key).",
