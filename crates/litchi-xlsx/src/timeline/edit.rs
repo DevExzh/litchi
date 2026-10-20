@@ -1,0 +1,193 @@
+//! Immutable worksheet timeline edits of a [`crate::Package`] (record
+//! 0360).
+//!
+//! [`crate::Package::edit_timelines`] starts an [`Edit`] over the validated
+//! timeline graph; every operation works on a private candidate graph, so an
+//! error cannot stage a partial graph. Timeline cache references are
+//! workbook-owned, so the workbook part identity is captured once when the
+//! edit starts. [`Edit::commit`] returns a [`Commit`] holding the new
+//! package, the exact part-level [`Patch`] and the [`Diagnostics`];
+//! [`crate::Package::apply_timelines`] replays a patch onto an equal
+//! package. The source package never changes.
+//!
+//! An operation that would change a signed package is refused with
+//! [`Error::Signed`] and stages nothing (ADR 0006); an operation that changes
+//! nothing (an absent name, a reorder into the stored bytes) keeps the
+//! signature byte for byte. Remove the signature explicitly first
+//! ([`crate::Package::unsign`]) to edit a signed workbook.
+
+use super::model::{Cache, CacheDefinition, Part, View};
+use crate::Package;
+use crate::error::Result;
+use crate::part_edit::{Staged, family};
+use litchi_opc::{OpcPackage, PackURI};
+
+family!("timeline");
+
+pub use crate::opc::LimitKind;
+
+/// A staged timeline edit of one [`Package`]. Dropping it discards it.
+#[derive(Debug, Clone)]
+pub struct Edit {
+    staged: Staged,
+    workbook: PackURI,
+}
+
+impl Package {
+    /// Start a timeline edit after validating the existing timeline graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose mutations are
+    /// refused, and the validation errors of the timeline graph.
+    pub fn edit_timelines(&self) -> Result<Edit> {
+        let staged = Staged::new(self, "edit_timelines")?;
+        let workbook = staged.opc().main_document_part()?.partname().clone();
+        super::validation::graph(staged.opc(), &workbook)?;
+        Ok(Edit { staged, workbook })
+    }
+
+    /// Apply a timeline patch to a new package; this one is unchanged. An
+    /// empty patch returns this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// before state and [`Error::Signed`] for a changed patch of a signed
+    /// workbook.
+    pub fn apply_timelines(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((
+            patch.0.apply(self, "apply_timelines")?,
+            patch.0.clone(),
+        )))
+    }
+}
+
+impl Edit {
+    /// The staged OPC graph, for diagnostics only.
+    #[must_use]
+    pub fn opc(&self) -> &OpcPackage {
+        self.staged.opc()
+    }
+
+    /// Find a cache by its case-insensitive semantic name.
+    pub fn cache(&self, name: &str) -> Result<Option<Cache>> {
+        crate::slicer_cache::crud::find_timeline_cache(self.staged.opc(), name)
+    }
+
+    /// Find a worksheet timeline by its case-insensitive semantic name.
+    pub fn view(&self, worksheet: &PackURI, name: &str) -> Result<Option<View>> {
+        crate::slicer_cache::crud::find_timeline(self.staged.opc(), worksheet, name)
+    }
+
+    pub fn add_cache(&mut self, definition: CacheDefinition) -> Result<Cache> {
+        self.apply(|candidate| crate::slicer_cache::crud::add_timeline_cache(candidate, definition))
+    }
+
+    pub fn update_cache<F>(&mut self, name: &str, update: F) -> Result<bool>
+    where
+        F: FnOnce(&mut CacheDefinition),
+    {
+        self.apply(|candidate| {
+            crate::slicer_cache::crud::update_timeline_cache(candidate, name, update)
+        })
+    }
+
+    pub fn replace_cache(&mut self, name: &str, replacement: CacheDefinition) -> Result<bool> {
+        self.apply(|candidate| {
+            crate::slicer_cache::crud::replace_timeline_cache(candidate, name, replacement)
+        })
+    }
+
+    pub fn reorder_caches(&mut self, names: &[String]) -> Result<Vec<Cache>> {
+        let names = names.to_vec();
+        self.apply(|candidate| {
+            crate::slicer_cache::crud::reorder_timeline_caches(candidate, &names)
+        })
+    }
+
+    pub fn remove_cache(&mut self, name: &str) -> Result<bool> {
+        self.apply(|candidate| crate::slicer_cache::crud::remove_timeline_cache(candidate, name))
+    }
+
+    pub fn add_view(&mut self, worksheet: &PackURI, view: View) -> Result<Part> {
+        let worksheet = worksheet.clone();
+        self.apply(move |candidate| {
+            crate::slicer_cache::crud::add_timeline(candidate, &worksheet, view)
+        })
+    }
+
+    pub fn update_view<F>(&mut self, worksheet: &PackURI, name: &str, update: F) -> Result<bool>
+    where
+        F: FnOnce(&mut View),
+    {
+        let worksheet = worksheet.clone();
+        self.apply(move |candidate| {
+            crate::slicer_cache::crud::update_timeline(candidate, &worksheet, name, update)
+        })
+    }
+
+    pub fn replace_view(
+        &mut self,
+        worksheet: &PackURI,
+        name: &str,
+        replacement: View,
+    ) -> Result<bool> {
+        let worksheet = worksheet.clone();
+        self.apply(move |candidate| {
+            crate::slicer_cache::crud::replace_timeline(candidate, &worksheet, name, replacement)
+        })
+    }
+
+    pub fn reorder_views(&mut self, worksheet: &PackURI, names: &[String]) -> Result<Vec<View>> {
+        let worksheet = worksheet.clone();
+        let names = names.to_vec();
+        self.apply(move |candidate| {
+            crate::slicer_cache::crud::reorder_timelines(candidate, &worksheet, &names)
+        })
+    }
+
+    pub fn remove_view(&mut self, worksheet: &PackURI, name: &str) -> Result<bool> {
+        let worksheet = worksheet.clone();
+        self.apply(move |candidate| {
+            crate::slicer_cache::crud::remove_timeline(candidate, &worksheet, name)
+        })
+    }
+
+    /// Timeline filtering and rendering are intentionally outside this inert
+    /// package owner.
+    ///
+    /// # Errors
+    ///
+    /// Always returns [`Error::Unsupported`].
+    pub fn apply_filter(&mut self) -> Result<()> {
+        crate::timeline::unsupported_ui()
+    }
+
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.staged.reset();
+    }
+
+    /// Validate the staged timeline graph and publish it to a new package.
+    /// An unchanged edit returns the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns the graph validation errors, [`Error::Signed`] for a changed
+    /// signed package and the workbook validation errors of the staged
+    /// package.
+    pub fn commit(self) -> Result<Commit> {
+        super::validation::graph(self.staged.opc(), &self.workbook)?;
+        Ok(Commit::new(self.staged.commit()?))
+    }
+
+    fn apply<T>(&mut self, operation: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
+        let workbook = &self.workbook;
+        self.staged.update(|candidate| {
+            let value = operation(candidate)?;
+            super::validation::graph(candidate, workbook)?;
+            Ok(value)
+        })
+    }
+}

@@ -21,7 +21,10 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, Relationships, TargetMode};
+use litchi_opc::{
+    BlobPart, OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, Part, Relationships,
+    TargetMode,
+};
 
 use crate::Package;
 use crate::error::{Error, Result, invalid};
@@ -150,12 +153,63 @@ struct Delta {
     after: Option<State>,
 }
 
+/// The publication manifests of one side of a patch: the content-types view
+/// and the relationship views of the changed owners, so a replay publishes
+/// the same manifest spelling as the commit it was captured from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Manifests {
+    content_types: OwnedContentTypes,
+    relationships: Vec<OwnedRelationships>,
+}
+
+impl Manifests {
+    fn capture(package: &OpcPackage, deltas: &[Delta], after: bool, root: bool) -> Result<Self> {
+        let mut relationships = Vec::new();
+        for delta in deltas {
+            let present = if after {
+                delta.after.is_some()
+            } else {
+                delta.before.is_some()
+            };
+            if present {
+                relationships.push(package.source_relationships(&delta.name)?);
+            }
+        }
+        if root {
+            let owner = PackURI::new("/").map_err(|error| invalid(error.to_string()))?;
+            relationships.push(package.source_relationships(&owner)?);
+        }
+        Ok(Self {
+            content_types: package.source_content_types()?,
+            relationships,
+        })
+    }
+
+    /// Publish these manifest views on `package`, whose typed graph is the
+    /// one they were captured from.
+    fn restore(&self, package: &mut OpcPackage) -> Result<()> {
+        let current = package.source_content_types()?;
+        if current.bytes() != self.content_types.bytes() {
+            package.try_replace_content_types(current.bytes(), &self.content_types)?;
+        }
+        for relationships in &self.relationships {
+            let current = package.source_relationships(relationships.owner())?;
+            if current != *relationships {
+                package.try_replace_relationships(&current, relationships)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 /// The exact, reversible part-level change of one staged edit: the changed
-/// parts and, when they changed, the package-level relationships.
+/// parts and, when they changed, the package-level relationships, with the
+/// publication manifests of both sides.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct PartPatch {
     deltas: Vec<Delta>,
     root: Option<(Vec<Relationship>, Vec<Relationship>)>,
+    manifests: Option<(Manifests, Manifests)>,
 }
 
 impl PartPatch {
@@ -184,7 +238,23 @@ impl PartPatch {
                 .root
                 .as_ref()
                 .map(|(before, after)| (after.clone(), before.clone())),
+            manifests: self
+                .manifests
+                .as_ref()
+                .map(|(before, after)| (after.clone(), before.clone())),
         }
+    }
+
+    /// Attach the manifest views of both sides to a changed patch.
+    fn with_manifests(mut self, before: &OpcPackage, after: &OpcPackage) -> Result<Self> {
+        if !self.is_noop() {
+            let root = self.root.is_some();
+            self.manifests = Some((
+                Manifests::capture(before, &self.deltas, false, root)?,
+                Manifests::capture(after, &self.deltas, true, root)?,
+            ));
+        }
+        Ok(self)
     }
 
     fn root(
@@ -214,10 +284,12 @@ impl PartPatch {
                 });
             }
         }
-        Ok(Self {
+        Self {
             deltas,
             root: Self::root(before, after),
-        })
+            manifests: None,
+        }
+        .with_manifests(before, after)
     }
 
     /// Capture every part that differs between `before` and `after`.
@@ -267,10 +339,12 @@ impl PartPatch {
             }
         }
         deltas.sort_unstable_by(|left, right| left.name.as_str().cmp(right.name.as_str()));
-        Ok(Self {
+        Self {
             deltas,
             root: Self::root(before, after),
-        })
+            manifests: None,
+        }
+        .with_manifests(before, after)
     }
 
     /// Replay onto `package`, refusing a package that is not the patch's
@@ -316,6 +390,9 @@ impl PartPatch {
             }
             add_relationships(graph, after)?;
         }
+        if let Some((_, after)) = &self.manifests {
+            after.restore(&mut target)?;
+        }
         package.derive(target)
     }
 }
@@ -346,24 +423,6 @@ impl Staged {
             touched: BTreeSet::new(),
             all: false,
         })
-    }
-
-    /// Start staging without the mutation-policy check (the caller made it).
-    #[allow(dead_code, reason = "used by the package-level families")]
-    pub(crate) fn raw(package: &Package, operation: &'static str) -> Self {
-        Self {
-            operation,
-            source: package.clone(),
-            staged: None,
-            touched: BTreeSet::new(),
-            all: false,
-        }
-    }
-
-    /// The source package.
-    #[allow(dead_code, reason = "read by the package-level families")]
-    pub(crate) const fn source(&self) -> &Package {
-        &self.source
     }
 
     /// The staged OPC graph.
@@ -399,6 +458,21 @@ impl Staged {
         let value = operation(&mut candidate)?;
         self.staged = Some(candidate);
         self.all = true;
+        Ok(value)
+    }
+
+    /// Run one operation that changes at most the part `name` on a copy of
+    /// the staged graph; the copy replaces the staged graph only when the
+    /// operation succeeds. The commit compares only the touched parts.
+    pub(crate) fn update_part<T>(
+        &mut self,
+        name: &PackURI,
+        operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
+    ) -> Result<T> {
+        let mut candidate = self.opc().clone();
+        let value = operation(&mut candidate)?;
+        self.staged = Some(candidate);
+        self.touch(name);
         Ok(value)
     }
 

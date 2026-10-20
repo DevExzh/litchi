@@ -29,7 +29,7 @@ fn package_and_workbook_round_trip_managed_encryption() {
 fn encrypted_provenance_blocks_implicit_plaintext_and_mutation() {
     let source = Package::new().unwrap();
     let encrypted = source.to_encrypted(PASSWORD, Mode::Standard).unwrap();
-    let mut package = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();
+    let package = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();
 
     assert!(matches!(
         package.to_bytes(),

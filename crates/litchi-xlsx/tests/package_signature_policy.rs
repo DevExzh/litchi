@@ -907,14 +907,14 @@ mod smart_tags_family {
             assert!(!transaction.clear().unwrap());
             transaction.replace(Collection::default()).unwrap();
             assert_signed(transaction.set(cell()));
-            transaction.commit().unwrap();
+            package = transaction.commit().unwrap().into_package();
             assert_eq!(package.to_bytes().unwrap(), original, "{name}");
 
             package = package.unsign().unwrap();
             assert!(!package.is_signed());
             let mut transaction = package.edit_smart_tags(0_usize).unwrap();
             transaction.set(cell()).unwrap();
-            transaction.commit().unwrap();
+            package = transaction.commit().unwrap().into_package();
             let output = package.to_bytes().unwrap();
             assert!(!carries_signature(&output), "{name}");
             let reopened = Package::from_bytes(&output).unwrap();
@@ -925,13 +925,13 @@ mod smart_tags_family {
         plain = plain.unsign().unwrap();
         let mut transaction = plain.edit_smart_tags(0_usize).unwrap();
         transaction.set(cell()).unwrap();
-        transaction.commit().unwrap();
+        plain = transaction.commit().unwrap().into_package();
         let signed = sign(&open(&plain.to_bytes().unwrap()));
         let mut package = Package::from_bytes(&signed).unwrap();
         let mut transaction = package.edit_smart_tags(0_usize).unwrap();
         assert_signed(transaction.remove("A1"));
         assert_signed(transaction.clear());
-        transaction.commit().unwrap();
+        package = transaction.commit().unwrap().into_package();
         assert_eq!(package.to_bytes().unwrap(), signed);
     }
 }
@@ -1006,14 +1006,14 @@ mod slicer_and_timeline_family {
             // A worksheet without slicers has nothing to reorder.
             assert!(slicers.reorder_views(&worksheet, &[]).unwrap().is_empty());
             assert_signed(slicers.add_cache(slicer_cache("Cache_A")));
-            slicers.commit().unwrap();
+            package = slicers.commit().unwrap().into_package();
 
             let mut timelines = package.edit_timelines().unwrap();
             assert!(!timelines.remove_cache("Absent").unwrap());
             assert!(!timelines.remove_view(&worksheet, "Absent").unwrap());
             assert!(timelines.reorder_views(&worksheet, &[]).unwrap().is_empty());
             assert_signed(timelines.add_cache(timeline_cache("Timeline_A")));
-            timelines.commit().unwrap();
+            package = timelines.commit().unwrap().into_package();
             assert_eq!(package.to_bytes().unwrap(), original, "{name}");
 
             package = package.unsign().unwrap();
@@ -1022,13 +1022,13 @@ mod slicer_and_timeline_family {
             slicers
                 .add_view(&worksheet, Slicer::new("View", "Cache_A", 228_600))
                 .unwrap();
-            slicers.commit().unwrap();
+            package = slicers.commit().unwrap().into_package();
             let mut timelines = package.edit_timelines().unwrap();
             timelines.add_cache(timeline_cache("Timeline_A")).unwrap();
             timelines
                 .add_view(&worksheet, timeline_view("Timeline", "Timeline_A"))
                 .unwrap();
-            timelines.commit().unwrap();
+            package = timelines.commit().unwrap().into_package();
             let output = package.to_bytes().unwrap();
             assert!(!carries_signature(&output), "{name}");
             let reopened = open(&output);
@@ -1055,13 +1055,13 @@ mod slicer_and_timeline_family {
         slicers
             .add_view(&worksheet, Slicer::new("View_B", "Cache_B", 228_600))
             .unwrap();
-        slicers.commit().unwrap();
+        plain = slicers.commit().unwrap().into_package();
         let mut timelines = plain.edit_timelines().unwrap();
         timelines.add_cache(timeline_cache("Timeline_A")).unwrap();
         timelines
             .add_view(&worksheet, timeline_view("Timeline", "Timeline_A"))
             .unwrap();
-        timelines.commit().unwrap();
+        plain = timelines.commit().unwrap().into_package();
         let signed = sign(&open(&plain.to_bytes().unwrap()));
         let mut package = Package::from_bytes(&signed).unwrap();
 
@@ -1082,7 +1082,7 @@ mod slicer_and_timeline_family {
             cache.source_name = "City".into();
         }));
         assert_signed(slicers.add_view(&worksheet, Slicer::new("View_C", "Cache_A", 228_600)));
-        slicers.commit().unwrap();
+        package = slicers.commit().unwrap().into_package();
 
         let mut timelines = package.edit_timelines().unwrap();
         let order = [String::from("Timeline")];
@@ -1101,16 +1101,16 @@ mod slicer_and_timeline_family {
         assert_signed(timelines.update_cache("Timeline_A", |cache| {
             cache.source_name = "Shipped".into();
         }));
-        timelines.commit().unwrap();
+        package = timelines.commit().unwrap().into_package();
         assert_eq!(package.to_bytes().unwrap(), signed);
 
         package = package.unsign().unwrap();
         let mut slicers = package.edit_slicers().unwrap();
         assert!(slicers.remove_view(&worksheet, "View_B").unwrap());
-        slicers.commit().unwrap();
+        package = slicers.commit().unwrap().into_package();
         let mut timelines = package.edit_timelines().unwrap();
         assert!(timelines.remove_view(&worksheet, "Timeline").unwrap());
-        timelines.commit().unwrap();
+        package = timelines.commit().unwrap().into_package();
         assert!(!carries_signature(&package.to_bytes().unwrap()));
     }
 }

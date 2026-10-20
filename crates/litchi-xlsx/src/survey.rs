@@ -1828,7 +1828,7 @@ pub fn load(package: &OpcPackage) -> Result<Vec<Part>> {
 }
 
 /// Load every table-owned Survey part with an explicit resource policy.
-pub fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Vec<Part>> {
+pub(crate) fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Vec<Part>> {
     let mut values = Vec::new();
     let mut ids = HashSet::new();
     let survey_parts = package
@@ -3303,7 +3303,7 @@ impl Snapshot {
     }
 
     /// Load the Survey catalog with an explicit resource policy.
-    pub fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Self> {
+    pub(crate) fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Self> {
         let entries = Arc::from(load_with_limits(package, limits)?.into_boxed_slice());
         let incoming_relationships =
             Arc::from(incoming_relationships(package, &entries)?.into_boxed_slice());

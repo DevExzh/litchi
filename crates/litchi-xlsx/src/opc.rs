@@ -182,6 +182,7 @@ mod tests {
         let restored = after.apply_opc(&patch.inverse()).unwrap().into_package();
         assert!(restored.opc().rels().get("rIdRaw").is_none());
         assert!(restored.same_content(&package).unwrap());
+        assert_eq!(restored.to_bytes().unwrap(), package.to_bytes().unwrap());
         assert!(matches!(
             after.apply_opc(&patch),
             Err(Error::PatchConflict { .. })

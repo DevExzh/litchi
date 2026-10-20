@@ -28,11 +28,8 @@
 
 /// Inert worksheet Printer Settings parts and references.
 pub mod printer_settings;
-mod target;
 /// Deterministic minimal package resources.
 pub mod template;
-
-pub(crate) use target::Target;
 
 use std::io::{Read, Write};
 use std::path::Path;
@@ -501,55 +498,9 @@ impl Package {
         Ok(Props::read_for(self.opc(), Host::Excel)?)
     }
 
-    /// Start a clone-staged transaction for worksheet slicers.
-    ///
-    /// Dropping the returned transaction rolls back; `commit` publishes the
-    /// validated feature graph without rebuilding unrelated workbook parts.
-    /// On a signed package every changing operation is refused with
-    /// [`crate::Error::Signed`]; call [`Self::unsign`] first to edit it.
-    pub fn edit_slicers(&mut self) -> Result<crate::slicer::Transaction<'_>> {
-        self.ensure_mutation_allowed("edit_slicers")?;
-        crate::slicer::Transaction::for_package(self)
-    }
-
-    /// Start a clone-staged transaction for worksheet timelines.
-    ///
-    /// Timeline cache references are workbook-owned, so the workbook part
-    /// identity is captured once at transaction start and is not exposed by
-    /// the ordinary package facade. On a signed package every changing
-    /// operation is refused with [`crate::Error::Signed`]; call
-    /// [`Self::unsign`] first to edit it.
-    pub fn edit_timelines(&mut self) -> Result<crate::timeline::Transaction<'_>> {
-        self.ensure_mutation_allowed("edit_timelines")?;
-        let workbook = self.opc().main_document_part()?.partname().clone();
-        crate::timeline::Transaction::for_package(self, &workbook)
-    }
-
     /// Load the inert Office Add-in task-pane graph, when present.
     pub fn task_panes(&self) -> Result<Option<litchi_ooxml_common::web::Panes>> {
         crate::task_panes::load(self.opc())
-    }
-
-    /// Start a clone-staged transaction for the package-level task-pane graph.
-    ///
-    /// Existing XML conformance is retained automatically. New graphs use
-    /// Transitional `SpreadsheetML` relationships unless the explicit
-    /// [`Self::edit_task_panes_with`] entry point is selected.
-    pub fn edit_task_panes(&mut self) -> Result<crate::task_panes::Transaction<'_>> {
-        self.ensure_mutation_allowed("edit_task_panes")?;
-        let conformance = crate::task_panes::existing_conformance(self.opc())?;
-        crate::task_panes::Transaction::for_package(self, conformance)
-    }
-
-    /// Start a task-pane transaction with an explicit XML relationship
-    /// conformance. The staged graph is published only by
-    /// [`crate::task_panes::Transaction::commit`].
-    pub fn edit_task_panes_with(
-        &mut self,
-        conformance: litchi_ooxml_common::web::Conformance,
-    ) -> Result<crate::task_panes::Transaction<'_>> {
-        self.ensure_mutation_allowed("edit_task_panes_with")?;
-        crate::task_panes::Transaction::for_package(self, conformance)
     }
 
     /// Read one worksheet's inert smart-tag annotations by semantic selector.
@@ -562,31 +513,6 @@ impl Package {
             .sheet(sheet)?
             .ok_or_else(|| invalid("worksheet selector did not match a sheet"))?;
         worksheet.smart_tags()
-    }
-
-    /// Start an atomic smart-tag transaction for a semantic worksheet.
-    ///
-    /// On a signed package every operation that changes the worksheet is
-    /// refused with [`crate::Error::Signed`]; call [`Self::unsign`] first to
-    /// edit it.
-    pub fn edit_smart_tags<'a>(
-        &mut self,
-        sheet: impl Into<crate::workbook::Selector<'a>>,
-    ) -> Result<crate::smart_tags::Transaction<'_>> {
-        self.ensure_mutation_allowed("edit_smart_tags")?;
-        let worksheet = {
-            let worksheet = self
-                .workbook
-                .sheet(sheet)?
-                .ok_or_else(|| invalid("worksheet selector did not match a sheet"))?;
-            if worksheet.kind() != crate::workbook::WorksheetKind::Worksheet {
-                return Err(crate::Error::NotWorksheet {
-                    sheet: worksheet.name().to_owned(),
-                });
-            }
-            worksheet.part_uri().clone()
-        };
-        crate::smart_tags::Transaction::new(Target::Package(self), worksheet)
     }
 
     /// Serialize the package into owned bytes.
@@ -729,20 +655,6 @@ impl Package {
         let mut staged = self.opc().clone();
         let value = mutation(&mut staged)?;
         Ok((self.derive(staged)?, value))
-    }
-
-    /// Replace this snapshot with a validated publication of `staged`.
-    ///
-    /// The candidate is validated as a complete workbook before this package
-    /// changes; on failure the package is unchanged. Snapshots cloned from
-    /// this package earlier are never affected.
-    pub(crate) fn republish(&mut self, staged: OpcPackage) -> Result<()> {
-        self.workbook = Workbook::from_package_with_styles(staged, Some(&self.workbook))?;
-        Ok(())
-    }
-
-    fn ensure_mutation_allowed(&self, operation: &'static str) -> Result<()> {
-        self.workbook.ensure_mutation_allowed(operation)
     }
 }
 

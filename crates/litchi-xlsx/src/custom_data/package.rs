@@ -596,7 +596,7 @@ impl Snapshot {
     }
 
     /// Load all Custom Data storage pairs with explicit limits.
-    pub fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Self> {
+    pub(crate) fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Self> {
         let limits = validate_limits(*limits)?;
         validate_package_limits(package, limits)?;
         let entries = load_entries(package, &limits)?;

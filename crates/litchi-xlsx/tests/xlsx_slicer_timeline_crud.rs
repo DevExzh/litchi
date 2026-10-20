@@ -1,7 +1,7 @@
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use litchi_xlsx::slicer::{self, Definition, Slicer};
-use litchi_xlsx::timeline::{self, CacheDefinition, FilterType, Level, Range, State, View};
+use litchi_xlsx::timeline::{CacheDefinition, FilterType, Level, Range, State, View};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -112,7 +112,10 @@ fn slicer_cache_and_view_crud_preserves_state_extensions_and_shared_targets() {
             false,
         );
 
-    let mut edit = slicer::Transaction::new(&mut package).unwrap();
+    let mut edit = litchi_xlsx::Package::from_opc(package.clone())
+        .unwrap()
+        .edit_slicers()
+        .unwrap();
     let cache_a = edit.add_cache(slicer_cache("Cache_A", "State")).unwrap();
     let cache_b = edit.add_cache(slicer_cache("Cache_B", "City")).unwrap();
     assert_ne!(cache_a.part_name, "/xl/slicerCaches/slicerCache1.xml");
@@ -165,7 +168,7 @@ fn slicer_cache_and_view_crud_preserves_state_extensions_and_shared_targets() {
     assert!(edit.remove_cache("Cache_B").unwrap());
     assert!(edit.remove_view(&worksheet, "View_A").unwrap());
     assert!(edit.remove_cache("Cache_A").unwrap());
-    edit.commit().unwrap();
+    package = edit.commit().unwrap().into_package().into_plain_opc();
 
     let target = PackURI::new(&view_part.part_name).unwrap();
     assert!(package.get_part(&target).is_err());
@@ -185,8 +188,10 @@ fn slicer_cache_and_view_crud_preserves_state_extensions_and_shared_targets() {
 #[test]
 fn timeline_cache_and_view_crud_preserves_selection_and_reference_integrity() {
     let (mut package, worksheet) = package();
-    let workbook = PackURI::new("/xl/workbook.xml").unwrap();
-    let mut edit = timeline::Transaction::new(&mut package, &workbook).unwrap();
+    let mut edit = litchi_xlsx::Package::from_opc(package.clone())
+        .unwrap()
+        .edit_timelines()
+        .unwrap();
     let cache_a = edit
         .add_cache(timeline_cache("Timeline_A", "Date"))
         .unwrap();
@@ -244,7 +249,7 @@ fn timeline_cache_and_view_crud_preserves_selection_and_reference_integrity() {
     assert!(edit.remove_cache("Timeline_B").unwrap());
     assert!(edit.remove_view(&worksheet, "Timeline_View_A").unwrap());
     assert!(edit.remove_cache("Timeline_A").unwrap());
-    edit.commit().unwrap();
+    package = edit.commit().unwrap().into_package().into_plain_opc();
     assert!(cache_a.part_name.contains("timelineCache"));
     let workbook_xml = std::str::from_utf8(
         package
@@ -261,12 +266,15 @@ fn timeline_cache_and_view_crud_preserves_selection_and_reference_integrity() {
 #[test]
 fn removing_last_slicer_keeps_a_target_shared_by_an_unrelated_owner() {
     let (mut package, worksheet) = package();
-    let mut edit = slicer::Transaction::new(&mut package).unwrap();
+    let mut edit = litchi_xlsx::Package::from_opc(package.clone())
+        .unwrap()
+        .edit_slicers()
+        .unwrap();
     edit.add_cache(slicer_cache("Cache_A", "State")).unwrap();
     let view = edit
         .add_view(&worksheet, Slicer::new("View_A", "Cache_A", 228_600))
         .unwrap();
-    edit.commit().unwrap();
+    package = edit.commit().unwrap().into_package().into_plain_opc();
     let target = PackURI::new(&view.part_name).unwrap();
     let mut owner = BlobPart::new(
         PackURI::new("/xl/shared-slicer-owner.xml").unwrap(),
@@ -278,19 +286,25 @@ fn removing_last_slicer_keeps_a_target_shared_by_an_unrelated_owner() {
         "urn:test:shared-slicer-target",
     );
     package.add_part(Box::new(owner));
-    let mut edit = slicer::Transaction::new(&mut package).unwrap();
+    let mut edit = litchi_xlsx::Package::from_opc(package.clone())
+        .unwrap()
+        .edit_slicers()
+        .unwrap();
     assert!(edit.remove_view(&worksheet, "View_A").unwrap());
-    edit.commit().unwrap();
+    package = edit.commit().unwrap().into_package().into_plain_opc();
     assert!(package.get_part(&target).is_ok());
 }
 
 #[test]
 fn feature_transactions_rollback_and_refuse_host_behavior() {
-    let (mut package, worksheet) = package();
+    let (package, worksheet) = package();
     let workbook = PackURI::new("/xl/workbook.xml").unwrap();
     let before_workbook = package.get_part(&workbook).unwrap().blob().to_vec();
     {
-        let mut edit = slicer::Transaction::new(&mut package).unwrap();
+        let mut edit = litchi_xlsx::Package::from_opc(package.clone())
+            .unwrap()
+            .edit_slicers()
+            .unwrap();
         edit.add_cache(slicer_cache("Cache_A", "State")).unwrap();
         assert!(
             edit.add_view(&worksheet, Slicer::new("View_A", "Missing", 228_600))
@@ -306,7 +320,10 @@ fn feature_transactions_rollback_and_refuse_host_behavior() {
         before_workbook.as_slice()
     );
 
-    let mut edit = timeline::Transaction::new(&mut package, &workbook).unwrap();
+    let mut edit = litchi_xlsx::Package::from_opc(package.clone())
+        .unwrap()
+        .edit_timelines()
+        .unwrap();
     assert!(matches!(
         edit.apply_filter(),
         Err(litchi_xlsx::Error::Unsupported { .. })
