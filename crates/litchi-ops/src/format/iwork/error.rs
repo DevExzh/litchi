@@ -690,3 +690,49 @@ fn numbers_cells_code(error: &litchi_numbers::table::cells::Error) -> Code {
         _ => Code::InternalError,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::LeafError;
+    use crate::error::Code;
+
+    /// Record 0361: an iWork refusal reports its kind's code; a final-element
+    /// removal keeps `invalid_argument` (the PPTX precedent); a patch for
+    /// another base is `invalid_input`.
+    #[test]
+    fn iwork_refusals_classify_by_kind() {
+        #[cfg(feature = "pages")]
+        {
+            use litchi_pages::table::deletion::{Error, Refusal};
+            let missing = LeafError::PagesTableDeletion(Error::Refused(Refusal::TableNotFound));
+            assert_eq!(missing.code(), Code::NotFound);
+            let ambiguous =
+                LeafError::PagesTableDeletion(Error::Refused(Refusal::AmbiguousSelector));
+            assert_eq!(ambiguous.code(), Code::InvalidValue);
+            let conflict = LeafError::PagesTableDeletion(Error::PatchConflict);
+            assert_eq!(conflict.code(), Code::InvalidInput);
+            let first =
+                LeafError::PagesSectionLifecycle(litchi_pages::section::lifecycle::Error::Refused(
+                    litchi_pages::section::lifecycle::Refusal::InitialSection,
+                ));
+            assert_eq!(first.code(), Code::InvalidArgument);
+        }
+        #[cfg(feature = "keynote")]
+        {
+            use litchi_keynote::slide::delete::{Error, Refusal};
+            let last = LeafError::KeynoteDeletion(Error::Refused(Refusal::CannotDeleteFinalSlide));
+            assert_eq!(last.code(), Code::InvalidArgument);
+            let unsupported =
+                LeafError::KeynoteDeletion(Error::Refused(Refusal::UnsupportedSource));
+            assert_eq!(unsupported.code(), Code::UnsupportedCapability);
+        }
+        #[cfg(feature = "numbers")]
+        {
+            use litchi_numbers::table::cells::{Error, Refusal};
+            let locked = LeafError::NumbersCells(Error::Refused(Refusal::TableLocked {
+                path: litchi_numbers::table::cells::Path::Package,
+            }));
+            assert_eq!(locked.code(), Code::DocumentProtected);
+        }
+    }
+}

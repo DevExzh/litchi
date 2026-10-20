@@ -84,7 +84,7 @@ pub use editor::{
     TableCellTextDecorations, TableCellTextFont, TableCellTextLigatures, TableCellTextOutline,
     TableCellTextScript, TableCellTextShadow, TableCellTextStyle, TableInfo, TableSortColumnIndex,
     TableSortDirection, TableSortOrder, TableSortRowRange, TableSortRule, TableSortScope,
-    TextBoxInfo, UnverifiedTopologyEdit,
+    TextBoxInfo, UnverifiedAxisChange,
 };
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,

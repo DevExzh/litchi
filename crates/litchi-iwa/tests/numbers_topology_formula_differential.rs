@@ -10,7 +10,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use litchi_iwa::numbers::{self, UnverifiedTopologyEdit};
+use litchi_iwa::numbers::{self, UnverifiedAxisChange};
 use litchi_iwa_archive::iwa::{Archive, SnappyStream};
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_archive::{ComponentCatalog, Limits};
@@ -173,10 +173,10 @@ fn ops(body_rows: usize, body_columns: usize) -> Vec<Op> {
 fn host(source: &[u8], table: &str, op: Op) -> Result<Vec<u8>, String> {
     let mut editor = numbers::Draft::from_bytes(source).map_err(|error| error.to_string())?;
     let edit = match op {
-        Op::InsertRow(insertion) => UnverifiedTopologyEdit::InsertRow(insertion),
-        Op::InsertColumn(insertion) => UnverifiedTopologyEdit::InsertColumn(insertion),
-        Op::RemoveRow(deletion) => UnverifiedTopologyEdit::RemoveRow(deletion),
-        Op::RemoveColumn(deletion) => UnverifiedTopologyEdit::RemoveColumn(deletion),
+        Op::InsertRow(insertion) => UnverifiedAxisChange::InsertRow(insertion),
+        Op::InsertColumn(insertion) => UnverifiedAxisChange::InsertColumn(insertion),
+        Op::RemoveRow(deletion) => UnverifiedAxisChange::RemoveRow(deletion),
+        Op::RemoveColumn(deletion) => UnverifiedAxisChange::RemoveColumn(deletion),
     };
     editor
         .__edit_table_topology_unverified(TableSelector::name(table), edit)

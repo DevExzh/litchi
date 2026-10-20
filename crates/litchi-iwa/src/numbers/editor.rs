@@ -204,7 +204,7 @@ mod text_box_duplicate;
 mod topology_oracle;
 
 #[doc(hidden)]
-pub use topology_oracle::UnverifiedTopologyEdit;
+pub use topology_oracle::UnverifiedAxisChange;
 
 pub use crate::charts::Direction;
 use model::*;
