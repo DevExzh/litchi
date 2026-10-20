@@ -446,9 +446,10 @@ impl InPlace for Package {
         name: &str,
         placeholders: &[litchi_pptx::PlaceholderSpec],
     ) -> Result<litchi_pptx::AuthoredSlideLayout> {
+        let master = master_id(self, master_part_name)?;
         let package = self;
         in_place!(package, edit_master_layout, |edit| edit.add_slide_layout(
-            master_part_name,
+            master,
             kind,
             name,
             placeholders
@@ -456,9 +457,10 @@ impl InPlace for Package {
     }
 
     fn remove_slide_layout_in_place(&mut self, layout_part_name: &PackURI) -> Result<()> {
+        let layout = layout_id(self, layout_part_name)?;
         let package = self;
         in_place!(package, edit_master_layout, |edit| edit
-            .remove_slide_layout(layout_part_name))
+            .remove_slide_layout(layout))
     }
 
     fn store_placeholder_shape_in_place(
@@ -466,9 +468,10 @@ impl InPlace for Package {
         part_name: &PackURI,
         spec: &litchi_pptx::PlaceholderSpec,
     ) -> Result<()> {
+        let owner = owner(self, part_name)?;
         let package = self;
         in_place!(package, edit_master_layout, |edit| edit
-            .set_placeholder_shape(part_name, spec))
+            .set_placeholder_shape(owner, spec))
     }
 
     fn stage_cross_slide_copy_in_place(
@@ -550,4 +553,58 @@ impl InPlace for Package {
         let package = self;
         in_place!(package, edit_slide_ole_objects, |edit| operation(&mut edit))
     }
+}
+
+/// The typed ID of the slide master whose part is `part_name`.
+pub(crate) fn master_id(
+    package: &Package,
+    part_name: &PackURI,
+) -> Result<litchi_pptx::slide::MasterId> {
+    for master in package.presentation()?.slide_masters()? {
+        if master.part().part().partname() == part_name {
+            return master.id();
+        }
+    }
+    Err(litchi_pptx::Error::Invalid(format!(
+        "no slide master {part_name}"
+    )))
+}
+
+/// The typed ID of the slide layout whose part is `part_name`.
+pub(crate) fn layout_id(
+    package: &Package,
+    part_name: &PackURI,
+) -> Result<litchi_pptx::slide::LayoutId> {
+    for layout in package.presentation()?.slide_layouts()? {
+        if layout.part().part().partname() == part_name {
+            return layout.id();
+        }
+    }
+    Err(litchi_pptx::Error::Invalid(format!(
+        "no slide layout {part_name}"
+    )))
+}
+
+/// The slide, layout or master whose part is `part_name`.
+pub(crate) fn owner(
+    package: &Package,
+    part_name: &PackURI,
+) -> Result<litchi_pptx::slide::Owner<'static>> {
+    if let Ok(id) = master_id(package, part_name) {
+        return Ok(id.into());
+    }
+    if let Ok(id) = layout_id(package, part_name) {
+        return Ok(id.into());
+    }
+    let presentation = package.presentation()?;
+    for index in 0..presentation.slide_count()? {
+        if let Some(slide) = presentation.slide(index)?
+            && slide.part().part().partname() == part_name
+        {
+            return Ok(index.into());
+        }
+    }
+    Err(litchi_pptx::Error::Invalid(format!(
+        "no owner part {part_name}"
+    )))
 }

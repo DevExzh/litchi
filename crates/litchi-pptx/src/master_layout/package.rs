@@ -531,6 +531,128 @@ fn validate_master_layouts(package: &OpcPackage, master_part: &dyn Part) -> Resu
     Ok(())
 }
 
+/// The part of the slide master `id` (record 0356a).
+pub(crate) fn resolve_master(package: &OpcPackage, id: crate::slide::MasterId) -> Result<PackURI> {
+    let presentation = package.main_document_part()?;
+    let (_, relationship_id) = parse_master_id_list(presentation.blob())?
+        .into_iter()
+        .find(|(candidate, _)| *candidate == id.0)
+        .ok_or_else(|| {
+            Error::refused(
+                litchi_core::edit::RefusalKind::NotFound,
+                "resolve_master",
+                "no slide master has this ID",
+            )
+        })?;
+    internal_target(presentation, &relationship_id, "slide-master")
+}
+
+/// The part of the slide layout `id`, searched in every master in master
+/// order (record 0356a).
+pub(crate) fn resolve_layout(package: &OpcPackage, id: crate::slide::LayoutId) -> Result<PackURI> {
+    let presentation = package.main_document_part()?;
+    for (_, master_relationship) in parse_master_id_list(presentation.blob())? {
+        let master_name = internal_target(presentation, &master_relationship, "slide-master")?;
+        let master = package.get_part(&master_name)?;
+        if let Some(reference) = parse_layout_id_list(master.blob())?
+            .into_iter()
+            .find(|reference| reference.layout_id() == Some(id.0))
+        {
+            return internal_target(master, reference.relationship_id(), "slide-layout");
+        }
+    }
+    Err(Error::refused(
+        litchi_core::edit::RefusalKind::NotFound,
+        "resolve_layout",
+        "no slide layout has this ID",
+    ))
+}
+
+/// The part of a slide, slide layout or slide master (record 0356a).
+pub(crate) fn resolve_owner(
+    package: &OpcPackage,
+    owner: crate::slide::Owner<'_>,
+) -> Result<PackURI> {
+    match owner {
+        crate::slide::Owner::Slide(slide) => crate::package::resolve_slide(package, slide),
+        crate::slide::Owner::Layout(id) => resolve_layout(package, id),
+        crate::slide::Owner::Master(id) => resolve_master(package, id),
+    }
+}
+
+/// The typed ID of the slide master whose part is `part_name`, when one is.
+pub(crate) fn master_id_of(package: &OpcPackage, part_name: &PackURI) -> Result<Option<u32>> {
+    let presentation = package.main_document_part()?;
+    for (master_id, master_relationship) in parse_master_id_list(presentation.blob())? {
+        if internal_target(presentation, &master_relationship, "slide-master")? == *part_name {
+            return Ok(Some(master_id));
+        }
+    }
+    Ok(None)
+}
+
+/// The typed ID of the slide layout whose part is `part_name`, when one is.
+pub(crate) fn layout_id_of(package: &OpcPackage, part_name: &PackURI) -> Result<Option<u32>> {
+    let presentation = package.main_document_part()?;
+    for (_, master_relationship) in parse_master_id_list(presentation.blob())? {
+        let master_name = internal_target(presentation, &master_relationship, "slide-master")?;
+        let master = package.get_part(&master_name)?;
+        for reference in parse_layout_id_list(master.blob())? {
+            if internal_target(master, reference.relationship_id(), "slide-layout")? == *part_name {
+                return Ok(reference.layout_id());
+            }
+        }
+    }
+    Ok(None)
+}
+
+/// Test fixture seam: the [`Owner`](crate::slide::Owner) whose part is
+/// `part_name`.
+#[cfg(test)]
+pub(crate) fn owner_of_part(
+    package: &OpcPackage,
+    part_name: &PackURI,
+) -> Result<crate::slide::Owner<'static>> {
+    if let Some(id) = master_id_of(package, part_name)? {
+        return Ok(crate::slide::MasterId(id).into());
+    }
+    if let Some(id) = layout_id_of(package, part_name)? {
+        return Ok(crate::slide::LayoutId(id).into());
+    }
+    let presentation = crate::Presentation::new(
+        crate::parts::PresentationPart::from_package(package)?,
+        package,
+    );
+    for index in 0..presentation.slide_count()? {
+        if let Some(slide) = presentation.slide(index)?
+            && slide.part().part().partname() == part_name
+        {
+            return Ok(index.into());
+        }
+    }
+    Err(Error::refused(
+        litchi_core::edit::RefusalKind::NotFound,
+        "owner_of_part",
+        "no slide, layout or master has this part",
+    ))
+}
+
+fn internal_target(part: &dyn Part, relationship_id: &str, what: &str) -> Result<PackURI> {
+    let relationship = part.rels().get(relationship_id).ok_or_else(|| {
+        Error::Relationship(format!("missing {what} relationship '{relationship_id}'"))
+    })?;
+    if relationship.is_external() {
+        return Err(Error::Relationship(format!(
+            "{what} relationship '{relationship_id}' is external"
+        )));
+    }
+    relationship.target_partname().map_err(|error| {
+        Error::Relationship(format!(
+            "invalid {what} relationship '{relationship_id}': {error}"
+        ))
+    })
+}
+
 // ============================================================================
 // Presentation master-ID parsing and allocation
 // ============================================================================

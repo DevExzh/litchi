@@ -12,6 +12,7 @@
 use super::ThreadingInfo;
 use super::package;
 use crate::part_edit::{Staged, family};
+use crate::slide::Selector;
 use crate::{Package, Result};
 
 family!("comment threading");
@@ -52,19 +53,25 @@ impl Package {
 }
 
 impl Edit<'_> {
-    /// The staged threading extension of the legacy comment `index` by the
-    /// author `author_id` on the slide part `slide_part_name`.
+    /// The staged threading extension of the legacy comment `index` (its
+    /// `p:cm/@idx`) by the author `author_id` on the selected slide.
     ///
     /// # Errors
     ///
     /// Returns an error for malformed comment markup.
-    pub fn threading(
+    pub fn threading<'s>(
         &self,
-        slide_part_name: &str,
+        slide: impl Into<Selector<'s>>,
         author_id: u32,
         index: u32,
     ) -> Result<Option<ThreadingInfo>> {
-        package::load_threading(self.staged.opc(), slide_part_name, author_id, index)
+        let slide_part_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
+        package::load_threading(
+            self.staged.opc(),
+            slide_part_name.as_str(),
+            author_id,
+            index,
+        )
     }
 
     /// Create or replace the threading extension of one legacy comment.
@@ -74,15 +81,16 @@ impl Edit<'_> {
     ///
     /// Returns an error for a missing comment, malformed markup, or a
     /// changed edit of a signed package.
-    pub fn set(
+    pub fn set<'s>(
         &mut self,
-        slide_part_name: &str,
+        slide: impl Into<Selector<'s>>,
         author_id: u32,
         index: u32,
         value: ThreadingInfo,
     ) -> Result<Option<ThreadingInfo>> {
+        let slide_part_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         self.staged.update(move |opc| {
-            package::put_threading(opc, slide_part_name, author_id, index, value)
+            package::put_threading(opc, slide_part_name.as_str(), author_id, index, value)
         })
     }
 
@@ -93,14 +101,16 @@ impl Edit<'_> {
     ///
     /// Returns an error for malformed markup or a changed edit of a signed
     /// package.
-    pub fn remove(
+    pub fn remove<'s>(
         &mut self,
-        slide_part_name: &str,
+        slide: impl Into<Selector<'s>>,
         author_id: u32,
         index: u32,
     ) -> Result<Option<ThreadingInfo>> {
-        self.staged
-            .update(move |opc| package::remove_threading(opc, slide_part_name, author_id, index))
+        let slide_part_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
+        self.staged.update(move |opc| {
+            package::remove_threading(opc, slide_part_name.as_str(), author_id, index)
+        })
     }
 
     /// Discard every staged change.

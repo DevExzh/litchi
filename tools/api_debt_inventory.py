@@ -18,7 +18,9 @@ Build the input with, per crate (sequentially; RUSTC_BOOTSTRAP=1):
   cargo rustdoc -p <crate> --lib --all-features -- -Zunstable-options \
       --output-format json --document-hidden-items
 then run: tools/api_debt_inventory.py target/doc/litchi_docx.json ... > out.tsv
-A wave is done for a category when its crate has no rows left in it.
+A wave is done for a category when its crate has no rows left in it. A
+`Commit` that aliases `litchi_core::edit::Commit` has the triad accessors
+(record 0356 P4).
 """
 from __future__ import annotations
 
@@ -33,6 +35,8 @@ import check_api_glossary as gate  # noqa: E402
 OWNERS = {"Package", "Workbook", "Document", "Presentation", "Drawing", "Chart",
           "Spreadsheet", "Image", "Database", "Formula", "FlatDrawing",
           "FlatPresentation", "MutableDocument"}
+CORE_COMMIT = ("litchi_core", "edit", "Commit")
+CORE_COMMIT_METHODS = frozenset({"package", "into_package", "patch", "diagnostics", "into_parts"})
 DRAFT_NAMES = {"Reader", "Workbook", "Spreadsheet", "Presentation", "Document"}
 OUTPUT_PREFIXES = ("save", "to_", "write_to")
 SIGNATURE = {"sign", "sign_with", "resign", "resign_with", "unsign"}
@@ -128,6 +132,10 @@ def rows(document, crate: str):
                 yield "is_changed", text, receiver, "delete: diagnostics().changed() / patch.is_noop()"
         elif kind in ("struct", "enum", "type_alias"):
             members = methods.get(path, set())
+            if surface.foreign.get(path) == CORE_COMMIT:
+                # An alias of the shared commit (record 0356 P4): rustdoc lists
+                # its accessors in litchi-core, whose unit tests check them.
+                members = members | CORE_COMMIT_METHODS
             if name.endswith("Commit"):
                 missing = [m for m in ("package", "into_package", "patch", "diagnostics", "into_parts")
                            if m not in members]

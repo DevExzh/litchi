@@ -48,6 +48,60 @@ impl From<usize> for Selector<'_> {
     }
 }
 
+/// A slide master by its typed `p:sldMasterId/@id`, unique in the
+/// presentation (record 0356a).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct MasterId(pub u32);
+
+/// A slide layout by its typed `p:sldLayoutId/@id`, unique in the
+/// presentation across every master (record 0356a).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct LayoutId(pub u32);
+
+/// The owner of slide-scoped markup: a slide, a slide layout or a slide
+/// master (record 0356a). Families that edit markup found in all three
+/// (color maps, placeholders) take it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Owner<'a> {
+    /// A slide, by name or position.
+    Slide(Selector<'a>),
+    /// A slide layout, by its layout ID.
+    Layout(LayoutId),
+    /// A slide master, by its master ID.
+    Master(MasterId),
+}
+
+impl<'a> From<Selector<'a>> for Owner<'a> {
+    fn from(value: Selector<'a>) -> Self {
+        Self::Slide(value)
+    }
+}
+impl<'a> From<&'a str> for Owner<'a> {
+    fn from(value: &'a str) -> Self {
+        Self::Slide(value.into())
+    }
+}
+impl From<usize> for Owner<'_> {
+    fn from(value: usize) -> Self {
+        Self::Slide(value.into())
+    }
+}
+impl From<litchi_core::Position> for Owner<'_> {
+    fn from(value: litchi_core::Position) -> Self {
+        Self::Slide(value.into())
+    }
+}
+impl From<LayoutId> for Owner<'_> {
+    fn from(value: LayoutId) -> Self {
+        Self::Layout(value)
+    }
+}
+impl From<MasterId> for Owner<'_> {
+    fn from(value: MasterId) -> Self {
+        Self::Master(value)
+    }
+}
+
 /// Contextual semantic view of one slide.
 pub struct Slide<'a> {
     package: &'a OpcPackage,
@@ -545,6 +599,23 @@ impl<'a> SlideLayout<'a> {
         &self.part
     }
 
+    /// The layout's typed `p:sldLayoutId/@id`, the selector the edit
+    /// families take (record 0356a).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no master lists this layout with an ID, or for
+    /// a malformed master graph.
+    pub fn id(&self) -> Result<LayoutId> {
+        crate::master_layout::package::layout_id_of(self.package, self.part.part().partname())?
+            .map(LayoutId)
+            .ok_or(crate::Error::refused(
+                litchi_core::edit::RefusalKind::NotFound,
+                "layout_id",
+                "no slide master lists this layout with an ID",
+            ))
+    }
+
     /// Return the producer name, falling back to the OPC part name.
     ///
     /// # Errors
@@ -619,6 +690,23 @@ impl<'a> SlideMaster<'a> {
     #[must_use]
     pub fn part(&self) -> &SlideMasterPart<'a> {
         &self.part
+    }
+
+    /// The master's typed `p:sldMasterId/@id`, the selector the edit
+    /// families take (record 0356a).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the presentation does not list this master, or
+    /// for a malformed presentation part.
+    pub fn id(&self) -> Result<MasterId> {
+        crate::master_layout::package::master_id_of(self.package, self.part.part().partname())?
+            .map(MasterId)
+            .ok_or(crate::Error::refused(
+                litchi_core::edit::RefusalKind::NotFound,
+                "master_id",
+                "the presentation does not list this master",
+            ))
     }
 
     /// Return the producer name, falling back to the OPC part name.

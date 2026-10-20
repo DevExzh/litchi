@@ -4,7 +4,9 @@
 //! [`Package::edit_master_layout`] starts an [`Edit`]: [`Edit::add_slide_master`]
 //! and [`Edit::add_slide_layout`] author new owners, [`Edit::remove_slide_layout`]
 //! deletes an unreferenced layout and [`Edit::set_placeholder_shape`] creates
-//! or updates one placeholder shape. [`Edit::commit`] returns a [`Commit`]
+//! or updates one placeholder shape. Masters and layouts are selected by
+//! their typed IDs ([`MasterId`], [`LayoutId`]); placeholder owners by
+//! [`Owner`]. [`Edit::commit`] returns a [`Commit`]
 //! with the new package, the reversible [`Patch`] and the [`Diagnostics`];
 //! [`Package::apply_master_layout`] replays a patch onto an equal package.
 //! The source package never changes, an exact no-op keeps every byte, and a
@@ -18,8 +20,8 @@
 //! let package = litchi_pptx::Package::new()?;
 //! let mut edit = package.edit_master_layout()?;
 //! let master = edit.add_slide_master()?;
-//! let layout =
-//!     edit.add_slide_layout(&master.part_name, SlideLayoutKind::Blank, "Plain", &[])?;
+//! let master_id = litchi_pptx::slide::MasterId(master.master_id);
+//! let layout = edit.add_slide_layout(master_id, SlideLayoutKind::Blank, "Plain", &[])?;
 //! let after = edit.commit()?.into_package();
 //! assert!(after.opc()?.get_part(&layout.part_name).is_ok());
 //! assert!(package.opc()?.get_part(&layout.part_name).is_err());
@@ -27,10 +29,9 @@
 //! # }
 //! ```
 
-use litchi_opc::PackURI;
-
 use super::{AuthoredSlideLayout, AuthoredSlideMaster, PlaceholderSpec, SlideLayoutKind};
 use crate::part_edit::{Staged, family};
+use crate::slide::{LayoutId, MasterId, Owner};
 use crate::{Package, Result};
 
 family!("slide-master and slide-layout");
@@ -82,7 +83,7 @@ impl Edit<'_> {
         self.staged.update(super::add_slide_master)
     }
 
-    /// Author a new slide layout owned by the master `master_part_name`.
+    /// Author a new slide layout owned by the master `master`.
     ///
     /// The complete preflight (names, identities, the master's layout list
     /// and the generated XML limits) runs before the staged graph changes.
@@ -93,11 +94,12 @@ impl Edit<'_> {
     /// exhausted identifiers, or a changed edit of a signed package.
     pub fn add_slide_layout(
         &mut self,
-        master_part_name: &PackURI,
+        master: MasterId,
         kind: SlideLayoutKind,
         name: &str,
         placeholders: &[PlaceholderSpec],
     ) -> Result<AuthoredSlideLayout> {
+        let master_part_name = &super::package::resolve_master(self.staged.opc(), master)?;
         super::preflight_add_slide_layout(
             self.staged.opc(),
             master_part_name,
@@ -116,24 +118,26 @@ impl Edit<'_> {
     ///
     /// Returns an error for a missing or referenced layout, a layout no
     /// master owns, or a changed edit of a signed package.
-    pub fn remove_slide_layout(&mut self, layout_part_name: &PackURI) -> Result<()> {
+    pub fn remove_slide_layout(&mut self, layout: LayoutId) -> Result<()> {
+        let layout_part_name = &super::package::resolve_layout(self.staged.opc(), layout)?;
         self.staged
             .update(|opc| super::remove_slide_layout(opc, layout_part_name))
     }
 
-    /// Create or update one placeholder shape in the slide, master or layout
-    /// part `part_name`. A shape that already matches stages nothing.
+    /// Create or update one placeholder shape in the slide, layout or master
+    /// `owner`. A shape that already matches stages nothing.
     ///
     /// # Errors
     ///
     /// Returns an error for a missing or foreign owner part, an invalid
     /// specification, markup this route cannot edit losslessly, or a changed
     /// edit of a signed package.
-    pub fn set_placeholder_shape(
+    pub fn set_placeholder_shape<'o>(
         &mut self,
-        part_name: &PackURI,
+        owner: impl Into<Owner<'o>>,
         spec: &PlaceholderSpec,
     ) -> Result<()> {
+        let part_name = &super::package::resolve_owner(self.staged.opc(), owner.into())?;
         if super::preflight_store_placeholder_shape(self.staged.opc(), part_name, spec)? {
             return Ok(());
         }

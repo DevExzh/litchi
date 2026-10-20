@@ -628,14 +628,14 @@ fn families() -> Vec<Family> {
             change: Some(Change {
                 edit: |package| {
                     package.edit_show_events_in_place(|edit| {
-                        edit.set(&slide(), &[Draft::play(Offset::ms(1), 2)])
+                        edit.set(0_usize, &[Draft::play(Offset::ms(1), 2)])
                     })
                 },
                 shows: |package| package.with_opc(|opc| Ok(events::load(opc, &slide())?.is_some())),
             }),
             no_op: Some(|package| {
                 package.edit_show_events_in_place(|edit| {
-                    assert!(edit.remove(&slide())?.is_none());
+                    assert!(edit.remove(0_usize)?.is_none());
                     Ok(())
                 })
             }),
@@ -758,7 +758,7 @@ fn families() -> Vec<Family> {
                 },
             }),
             no_op: Some(|package| {
-                package.placeholder_type_extension(&slide(), 0_usize)?;
+                package.placeholder_type_extension(0_usize, 0_usize)?;
                 let commit = package.edit_placeholder_type_extension()?.commit()?;
                 assert!(commit.patch().is_noop());
                 *package = commit.into_package();

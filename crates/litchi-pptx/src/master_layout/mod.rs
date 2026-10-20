@@ -7,7 +7,7 @@
 mod codec;
 mod edit;
 mod model;
-mod package;
+pub(crate) mod package;
 pub mod placeholder;
 
 #[cfg(test)]
@@ -24,5 +24,5 @@ pub use package::{
     validate_master_layout_graph,
 };
 
-pub(crate) use package::preflight_add_slide_layout;
+pub(crate) use package::{preflight_add_slide_layout, resolve_owner};
 pub(crate) use placeholder::preflight_store_placeholder_shape;

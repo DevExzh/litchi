@@ -28,16 +28,26 @@ impl Package {
         name: &str,
         placeholders: &[crate::master_layout::PlaceholderSpec],
     ) -> Result<crate::master_layout::AuthoredSlideLayout> {
+        let master =
+            match crate::master_layout::package::owner_of_part(self.opc()?, master_part_name)? {
+                crate::slide::Owner::Master(id) => id,
+                _ => crate::slide::MasterId(0),
+            };
         let mut edit = self.edit_master_layout()?;
-        let value = edit.add_slide_layout(master_part_name, kind, name, placeholders)?;
+        let value = edit.add_slide_layout(master, kind, name, placeholders)?;
         let package = edit.commit()?.into_package();
         self.replace_with(package);
         Ok(value)
     }
 
     pub(crate) fn remove_slide_layout(&mut self, layout_part_name: &PackURI) -> Result<()> {
+        let layout =
+            match crate::master_layout::package::owner_of_part(self.opc()?, layout_part_name)? {
+                crate::slide::Owner::Layout(id) => id,
+                _ => crate::slide::LayoutId(0),
+            };
         let mut edit = self.edit_master_layout()?;
-        edit.remove_slide_layout(layout_part_name)?;
+        edit.remove_slide_layout(layout)?;
         let package = edit.commit()?.into_package();
         self.replace_with(package);
         Ok(())
@@ -48,8 +58,15 @@ impl Package {
         part_name: &PackURI,
         spec: &crate::master_layout::PlaceholderSpec,
     ) -> Result<()> {
+        let Ok(owner) = crate::master_layout::package::owner_of_part(self.opc()?, part_name) else {
+            // A part outside the presentation's slide, layout and master
+            // lists is only reachable through the raw graph.
+            return self.edit_opc_in_place(|opc| {
+                crate::master_layout::package::store_placeholder_shape(opc, part_name, spec)
+            });
+        };
         let mut edit = self.edit_master_layout()?;
-        edit.set_placeholder_shape(part_name, spec)?;
+        edit.set_placeholder_shape(owner, spec)?;
         let package = edit.commit()?.into_package();
         self.replace_with(package);
         Ok(())
@@ -137,5 +154,19 @@ impl Package {
         let (package, _) = staged.commit()?;
         self.replace_with(package);
         Ok(snapshot)
+    }
+}
+
+impl Package {
+    /// Test fixture seam: [`Self::placeholder_type_extension`] by owner part.
+    pub(crate) fn placeholder_type_extension_at<'a>(
+        &self,
+        owner: &PackURI,
+        key: impl Into<crate::shape::Key<'a>>,
+    ) -> Result<crate::master_layout::placeholder::Snapshot> {
+        let Ok(selected) = crate::master_layout::package::owner_of_part(self.opc()?, owner) else {
+            return crate::master_layout::placeholder::load_slot_snapshot(self.opc()?, owner, key);
+        };
+        self.placeholder_type_extension(selected, key)
     }
 }
