@@ -60,7 +60,7 @@ fn consuming_put_moves_changed_xml_and_refuses_signed_changes_until_unsigned() {
     let before = load(&package, &name).unwrap().unwrap();
     assert!(matches!(
         put(&mut package, &name, graph),
-        Err(crate::Error::Opc(
+        Err(Error::Opc(
             litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
         ))
     ));
@@ -502,6 +502,6 @@ fn source_bound_removal_rejects_a_stale_bypass_atomically() {
         .set_blob(write_text("stale source").unwrap());
 
     let error = remove_checked(&mut package, &source, &slide_name).unwrap_err();
-    assert!(matches!(error, crate::Error::Invalid(message) if message.contains("stale")));
+    assert!(matches!(error, Error::Invalid(message) if message.contains("stale")));
     assert!(package.contains_part(&notes_name));
 }

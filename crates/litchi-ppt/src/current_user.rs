@@ -96,7 +96,7 @@ impl CurrentUser {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(data: &[u8], limits: SourceLimits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(data: &[u8], limits: SourceLimits) -> Result<Self> {
         if data.len() > limits.max_input_bytes {
             return Err(Error::Limit {
                 kind: super::package::SourceLimitKind::EntryBytes,

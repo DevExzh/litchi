@@ -7,10 +7,11 @@ use super::Edit;
 use crate::{Error, Result};
 
 fn refuse(reason: &'static str) -> Error {
-    Error::UnsafeEdit {
-        operation: "set_notes_text",
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedTarget,
+        "set_notes_text",
         reason,
-    }
+    )
 }
 
 impl Edit {

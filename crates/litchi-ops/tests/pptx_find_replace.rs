@@ -7,7 +7,7 @@
 
 use litchi_core::Position;
 use litchi_ops::{BatchItem, File, OpenOptions, Props, SourceMode, props};
-use litchi_pptx::opened::{TextEdit, TextProperties, TextTarget};
+use litchi_pptx::opened::{TextAssignment, TextProperties, TextTarget};
 
 /// Slide 1: "draft one, dra" + bold "ft two", "Draft notes", and speaker
 /// notes "Speaker draft". Slide 2: a table whose first cell reads "draft".
@@ -23,7 +23,7 @@ fn fixture() -> Vec<u8> {
     let mut edit = package.edit().unwrap();
     edit.set_text_properties(
         0usize,
-        &[TextEdit::new(
+        &[TextAssignment::new(
             TextTarget::RunSpan {
                 shape: Position::new(0),
                 paragraph: Position::new(0),

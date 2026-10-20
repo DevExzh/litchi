@@ -4,6 +4,9 @@
     reason = "test fixtures and assertions panic on failure by design"
 )]
 
+mod in_place;
+use in_place::InPlace as _;
+
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI};
@@ -14,7 +17,7 @@ const P1710_NS: &str = "http://schemas.microsoft.com/office/powerpoint/2017/10/m
 const URI: &str = "{1BD7E111-0CB8-44D6-8891-C1BB2F81B7CC}";
 
 fn package_with_properties(xml: &[u8]) -> Package {
-    let mut authored = Package::new().expect("new package");
+    let authored = Package::new().expect("new package");
     let bytes = authored.to_bytes().expect("serialize package");
     let mut opc = OpcPackage::from_bytes(&bytes).expect("reopen package");
     let properties = PackURI::new("/ppt/presProps.xml").expect("properties part URI");
@@ -41,15 +44,24 @@ fn package_with_properties(xml: &[u8]) -> Package {
 #[test]
 fn package_creation_round_trip_and_owner_retention() {
     let mut package = Package::new().expect("new package");
-    assert_eq!(package.readonly_recommended().unwrap(), None);
-    assert_eq!(package.put_readonly_recommended(true).unwrap(), None);
+    assert_eq!(package.read_only_recommended().unwrap(), None);
+    assert_eq!(
+        package.put_read_only_recommended_in_place(true).unwrap(),
+        None
+    );
     assert_eq!(package.read_only_recommended().unwrap(), Some(true));
     let bytes = package.to_bytes().expect("serialize changed package");
     let mut reopened = Package::from_bytes(&bytes).expect("reopen changed package");
-    assert_eq!(reopened.readonly_recommended().unwrap(), Some(true));
-    assert_eq!(reopened.remove_read_only_recommended().unwrap(), Some(true));
-    assert_eq!(reopened.readonly_recommended().unwrap(), None);
-    assert_eq!(reopened.remove_readonly_recommended().unwrap(), None);
+    assert_eq!(reopened.read_only_recommended().unwrap(), Some(true));
+    assert_eq!(
+        reopened.remove_read_only_recommended_in_place().unwrap(),
+        Some(true)
+    );
+    assert_eq!(reopened.read_only_recommended().unwrap(), None);
+    assert_eq!(
+        reopened.remove_read_only_recommended_in_place().unwrap(),
+        None
+    );
 
     let properties = PackURI::new("/ppt/presProps.xml").unwrap();
     assert!(reopened.opc().unwrap().get_part(&properties).is_ok());
@@ -62,24 +74,23 @@ fn package_snapshot_patch_is_source_checked_and_reversible() {
     );
     let mut package = package_with_properties(xml.as_bytes());
     let snapshot = package
-        .readonly_recommended_snapshot()
+        .read_only_recommended_snapshot()
         .unwrap()
         .expect("owner snapshot");
     let original = snapshot.source_xml().to_vec();
-    let mut edit = snapshot.edit();
-    edit.set(Some(false)).unwrap();
+    let mut edit = package.edit_read_only_recommended().unwrap();
+    assert_eq!(edit.set(false).unwrap(), Some(true));
     let commit = edit.commit().unwrap();
     let inverse = commit.patch().inverse();
-    package
-        .apply_read_only_recommended_commit(commit)
-        .expect("publish commit");
-    assert_eq!(package.readonly_recommended().unwrap(), Some(false));
-    package
-        .apply_readonly_recommended_patch(&inverse)
-        .expect("publish inverse");
-    assert_eq!(package.readonly_recommended().unwrap(), Some(true));
+    package = commit.into_package();
+    assert_eq!(package.read_only_recommended().unwrap(), Some(false));
+    package = package
+        .apply_read_only_recommended(&inverse)
+        .expect("publish inverse")
+        .into_package();
+    assert_eq!(package.read_only_recommended().unwrap(), Some(true));
     let restored = package
-        .readonly_recommended_snapshot()
+        .read_only_recommended_snapshot()
         .unwrap()
         .expect("restored owner snapshot");
     assert_eq!(restored.source_xml(), original.as_slice());
@@ -88,18 +99,26 @@ fn package_snapshot_patch_is_source_checked_and_reversible() {
 #[test]
 fn exact_signed_noop_is_allowed_but_changed_edit_requires_explicit_policy() {
     let mut package = Package::new().expect("new package");
-    assert_eq!(package.put_readonly_recommended(true).unwrap(), None);
+    assert_eq!(
+        package.put_read_only_recommended_in_place(true).unwrap(),
+        None
+    );
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
             Ok(())
         })
         .expect("install inert signature origin");
     assert!(package.opc().unwrap().is_signed());
 
-    assert_eq!(package.put_readonly_recommended(true).unwrap(), Some(true));
+    assert_eq!(
+        package.put_read_only_recommended_in_place(true).unwrap(),
+        Some(true)
+    );
     assert!(package.opc().unwrap().is_signed());
-    let error = package.put_readonly_recommended(false).unwrap_err();
+    let error = package
+        .put_read_only_recommended_in_place(false)
+        .unwrap_err();
     assert!(matches!(
         error,
         Error::Opc(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
@@ -109,7 +128,7 @@ fn exact_signed_noop_is_allowed_but_changed_edit_requires_explicit_policy() {
 
 #[test]
 fn duplicate_presentation_properties_parts_are_rejected() {
-    let mut authored = Package::new().expect("new package");
+    let authored = Package::new().expect("new package");
     let bytes = authored.to_bytes().expect("serialize package");
     let mut opc = OpcPackage::from_bytes(&bytes).expect("reopen package");
     let orphan = PackURI::new("/ppt/presProps-orphan.xml").expect("orphan URI");
@@ -121,5 +140,5 @@ fn duplicate_presentation_properties_parts_are_rejected() {
     )))
     .expect("add orphan owner");
     let package = Package::from_opc_package(opc).expect("open package");
-    assert!(package.readonly_recommended().is_err());
+    assert!(package.read_only_recommended().is_err());
 }

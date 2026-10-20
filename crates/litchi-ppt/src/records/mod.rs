@@ -8,6 +8,9 @@ pub mod record;
 pub mod slide_atoms_set;
 pub mod slide_info;
 
+#[cfg(test)]
+mod limit_tests;
+
 // Re-export commonly used types
 pub use document_info::DocumentInfo;
 pub use payload::RecordPayload;

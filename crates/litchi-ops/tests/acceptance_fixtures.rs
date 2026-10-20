@@ -160,7 +160,8 @@ fn ppt_connectors() -> Vec<u8> {
 /// hyperlink, a comment, a 2x2 table and a Microsoft Graph chart on the
 /// first slide, and a second slide the links can jump to.
 fn ppt_elements() -> Vec<u8> {
-    use litchi_ppt::writer::{Chart, ChartKind, Hyperlink, SlideComment, Table};
+    use litchi_ppt::builder::{Chart, ChartKind};
+    use litchi_ppt::writer::{Hyperlink, SlideComment, Table};
     let mut writer = litchi_ppt::writer::Builder::new();
     let slide = writer.add_slide().unwrap();
     writer

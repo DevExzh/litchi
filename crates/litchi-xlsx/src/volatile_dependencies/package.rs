@@ -4,7 +4,7 @@
 //! It never contacts RTD servers, opens OLAP connections, or evaluates
 //! formulas.
 
-use litchi_core::sheet::Result;
+use crate::BoxedResult as Result;
 use litchi_opc::{OpcPackage, PackURI};
 
 use super::invalid;

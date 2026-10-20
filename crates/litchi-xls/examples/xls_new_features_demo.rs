@@ -266,9 +266,7 @@ fn round_trip_verify(path: &std::path::Path) -> Result<(), Box<dyn std::error::E
         // The WorkbookTrait lends the typed `litchi_xls::Worksheet`, so
         // the generic reads below and the typed feature accessors work on
         // the same borrowed worksheet.
-        let sheet = wb
-            .worksheet_by_index(idx)
-            .map_err(|e| -> Box<dyn std::error::Error> { e })?;
+        let sheet = wb.worksheet_by_index(idx)?;
         if let Some(dims) = sheet.dimensions() {
             println!(
                 "  Dimensions: rows {}..{}, cols {}..{}",

@@ -2005,14 +2005,73 @@
           "name": "into_snapshot",
           "scope": "litchi_pptx",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_pptx",
+          "replacement": "map each refusal by its reason: Refused(Refusal) with a RefusalKind, PatchConflict or Internal (record 0351 / 0356)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_pptx",
+          "replacement": "stage changes in a family Edit (opened) or builder::{Presentation, Slide, Shape} (fresh); no Mutable* draft types (record 0351 / 0356)",
+          "match": "prefix"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_pptx",
+          "replacement": "limits come from OpenOptions/EditOptions or a required Limits argument (record 0351 / 0356)",
+          "match": "suffix"
+        },
+        {
+          "name": "readonly_recommended",
+          "scope": "litchi_pptx",
+          "replacement": "use read_only_recommended (record 0351 / 0356)"
+        },
+        {
+          "name": "ReadonlyRecommended",
+          "scope": "litchi_pptx",
+          "replacement": "use ReadOnlyRecommended (record 0351 / 0356)"
         }
       ],
       "families": [
         "litchi_pptx::metadata",
-        "litchi_pptx::opened"
+        "litchi_pptx::opened",
+        "litchi_pptx::tag",
+        "litchi_pptx::tag::shape",
+        "litchi_pptx::font",
+        "litchi_pptx::table::style",
+        "litchi_pptx::presentation_properties::math",
+        "litchi_pptx::shape::zoom",
+        "litchi_pptx::shape::classification",
+        "litchi_pptx::shape::designer",
+        "litchi_pptx::shape::designer::properties",
+        "litchi_pptx::model3d",
+        "litchi_pptx::web",
+        "litchi_pptx::master_layout",
+        "litchi_pptx::master_layout::placeholder",
+        "litchi_pptx::notes",
+        "litchi_pptx::change_tracking",
+        "litchi_pptx::presentation::embedded::ink_actions",
+        "litchi_pptx::presentation_properties::read_only_recommended",
+        "litchi_pptx::presentation_properties::metadata::designer_tags",
+        "litchi_pptx::opc",
+        "litchi_pptx::presentation_properties::metadata::guides",
+        "litchi_pptx::presentation_properties::metadata::custom_show",
+        "litchi_pptx::presentation_properties::metadata::changes",
+        "litchi_pptx::presentation_properties::metadata::structure",
+        "litchi_pptx::presentation_properties::metadata::events",
+        "litchi_pptx::presentation_properties::metadata::tracks",
+        "litchi_pptx::presentation_properties::metadata::color_map",
+        "litchi_pptx::presentation::embedded::content_parts",
+        "litchi_pptx::presentation::embedded::controls::slide",
+        "litchi_pptx::presentation::embedded::ole::slide",
+        "litchi_pptx::comments::collaboration::presence",
+        "litchi_pptx::comments::collaboration::threading"
       ],
       "immutable_owners": [
-        "litchi_pptx::Presentation"
+        "litchi_pptx::Presentation",
+        "litchi_pptx::Package"
       ],
       "family_methods": true
     },
@@ -2576,14 +2635,73 @@
           "name": "into_snapshot",
           "scope": "litchi_pptx",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_pptx",
+          "replacement": "map each refusal by its reason: Refused(Refusal) with a RefusalKind, PatchConflict or Internal (record 0351 / 0356)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_pptx",
+          "replacement": "stage changes in a family Edit (opened) or builder::{Presentation, Slide, Shape} (fresh); no Mutable* draft types (record 0351 / 0356)",
+          "match": "prefix"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_pptx",
+          "replacement": "limits come from OpenOptions/EditOptions or a required Limits argument (record 0351 / 0356)",
+          "match": "suffix"
+        },
+        {
+          "name": "readonly_recommended",
+          "scope": "litchi_pptx",
+          "replacement": "use read_only_recommended (record 0351 / 0356)"
+        },
+        {
+          "name": "ReadonlyRecommended",
+          "scope": "litchi_pptx",
+          "replacement": "use ReadOnlyRecommended (record 0351 / 0356)"
         }
       ],
       "families": [
         "litchi_pptx::metadata",
-        "litchi_pptx::opened"
+        "litchi_pptx::opened",
+        "litchi_pptx::tag",
+        "litchi_pptx::tag::shape",
+        "litchi_pptx::font",
+        "litchi_pptx::table::style",
+        "litchi_pptx::presentation_properties::math",
+        "litchi_pptx::shape::zoom",
+        "litchi_pptx::shape::classification",
+        "litchi_pptx::shape::designer",
+        "litchi_pptx::shape::designer::properties",
+        "litchi_pptx::model3d",
+        "litchi_pptx::web",
+        "litchi_pptx::master_layout",
+        "litchi_pptx::master_layout::placeholder",
+        "litchi_pptx::notes",
+        "litchi_pptx::change_tracking",
+        "litchi_pptx::presentation::embedded::ink_actions",
+        "litchi_pptx::presentation_properties::read_only_recommended",
+        "litchi_pptx::presentation_properties::metadata::designer_tags",
+        "litchi_pptx::opc",
+        "litchi_pptx::presentation_properties::metadata::guides",
+        "litchi_pptx::presentation_properties::metadata::custom_show",
+        "litchi_pptx::presentation_properties::metadata::changes",
+        "litchi_pptx::presentation_properties::metadata::structure",
+        "litchi_pptx::presentation_properties::metadata::events",
+        "litchi_pptx::presentation_properties::metadata::tracks",
+        "litchi_pptx::presentation_properties::metadata::color_map",
+        "litchi_pptx::presentation::embedded::content_parts",
+        "litchi_pptx::presentation::embedded::controls::slide",
+        "litchi_pptx::presentation::embedded::ole::slide",
+        "litchi_pptx::comments::collaboration::presence",
+        "litchi_pptx::comments::collaboration::threading"
       ],
       "immutable_owners": [
-        "litchi_pptx::Presentation"
+        "litchi_pptx::Presentation",
+        "litchi_pptx::Package"
       ],
       "family_methods": true
     },
@@ -5653,21 +5771,6 @@
           "replacement": "use open_with_options(SourceBackedOptions)"
         },
         {
-          "name": "rollback",
-          "scope": "litchi_ppt::text_edit::SourceTransaction",
-          "replacement": "drop the owned transaction"
-        },
-        {
-          "name": "rollback",
-          "scope": "litchi_ppt::text_edit::Transaction",
-          "replacement": "drop the owned transaction"
-        },
-        {
-          "name": "rollback",
-          "scope": "litchi_ppt::slide_order::Transaction",
-          "replacement": "drop the owned transaction"
-        },
-        {
           "name": "from_bytes_with_limits",
           "scope": "litchi_ppt::slide_order::Snapshot",
           "replacement": "use from_bytes_with_options(OpenOptions)"
@@ -5687,11 +5790,614 @@
           "name": "into_snapshot",
           "scope": "litchi_ppt",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "name": "get_source_limits",
+          "scope": "litchi_ppt::OpenOptions",
+          "replacement": "use the <noun>_value() getter (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_password",
+          "scope": "litchi_ppt::OpenOptions",
+          "replacement": "use the <noun>_value() getter (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_leniency",
+          "scope": "litchi_ppt::OpenOptions",
+          "replacement": "use the <noun>_value() getter (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_max_operations",
+          "scope": "litchi_ppt::package::edit::EditOptions",
+          "replacement": "use max_operations_value() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_ppt",
+          "replacement": "limits come from OpenOptions (owners) or a required limits argument (record APIs); record 0351 §2.5 rule 3",
+          "match": "suffix"
+        },
+        {
+          "name": "presentation_with_options_and_limits",
+          "scope": "litchi_ppt::raw::Reader",
+          "replacement": "the reader keeps the limits it was opened with (record 0351 §2.5 rule 4)"
+        },
+        {
+          "name": "presentation_with_options_and_limits",
+          "scope": "litchi_ppt::SourceBackedPackage",
+          "replacement": "the package keeps the limits it was opened with (record 0351 §2.5 rule 2)"
+        },
+        {
+          "name": "from_path",
+          "scope": "litchi_ppt::SourceBackedPackage",
+          "replacement": "use open / open_with_options (record 0351 §2.5 rule 1)"
+        },
+        {
+          "name": "Chart",
+          "scope": "litchi_ppt::writer",
+          "replacement": "the chart draft lives at litchi_ppt::builder::Chart (record 0351 §2.1 rule 7)",
+          "recursive": false
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::slide_order",
+          "replacement": "drop the Edit; the native owner is crate-private and Package::edit is the public route (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::slide_order",
+          "replacement": "use Package::edit / package::edit::Edit (record 0357)",
+          "match": "suffix"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::text_edit",
+          "replacement": "drop the Edit; the native owner is crate-private and Package::edit is the public route (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::text_edit",
+          "replacement": "use Package::edit / package::edit::Edit (record 0357)",
+          "match": "suffix"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::slide_order",
+          "replacement": "use Package::edit / package::edit::Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::text_edit",
+          "replacement": "use Package::edit / package::edit::Edit (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::font",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::font",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::font",
+          "replacement": "use the family's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::font::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::broadcast",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::broadcast",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::broadcast",
+          "replacement": "use the family's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::broadcast::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "FontTransaction",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::font::Edit via Package::edit_fonts"
+        },
+        {
+          "name": "FontCommit",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::font::Commit"
+        },
+        {
+          "name": "FontPatch",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::font::Patch"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::client_anchor",
+          "replacement": "the record-level edit is crate-private; Package::edit is the route (record 0357)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::client_anchor",
+          "replacement": "use commit.diagnostics().changed()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::client_anchor",
+          "replacement": "the record-level edit is crate-private; Package::edit is the route (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::document_structure",
+          "replacement": "the record-level edit is crate-private; Package::edit is the route (record 0357)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::document_structure",
+          "replacement": "use commit.diagnostics().changed()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::document_structure",
+          "replacement": "the record-level edit is crate-private; Package::edit is the route (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::picture_bullets",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::picture_bullets",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::picture_bullets",
+          "replacement": "use the family's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::picture_bullets::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "PictureBulletTransaction",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::picture_bullets::{Edit, Commit, Patch} via Package::edit_picture_bullets (record 0357)"
+        },
+        {
+          "name": "PictureBulletCommit",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::picture_bullets::{Edit, Commit, Patch} via Package::edit_picture_bullets (record 0357)"
+        },
+        {
+          "name": "PictureBulletPatch",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::picture_bullets::{Edit, Commit, Patch} via Package::edit_picture_bullets (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::animation",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::animation",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::animation",
+          "replacement": "use the family's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::animation::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "finish",
+          "scope": "litchi_ppt::animation::Edit",
+          "replacement": "Edit::commit publishes the Package (record 0357)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::animation",
+          "replacement": "use Package::edit_animations() -> animation::Edit (record 0357)"
+        },
+        {
+          "name": "EditorLimits",
+          "scope": "litchi_ppt::animation",
+          "replacement": "Package::edit_animations() admits under the source package limits (record 0357)"
+        },
+        {
+          "name": "EditorLimits",
+          "scope": "litchi_ppt",
+          "replacement": "Package::edit_animations() admits under the source package limits (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use the family's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::document_comparison::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use Package::edit_document_comparison() -> document_comparison::Edit (record 0357)"
+        },
+        {
+          "name": "PackageCommit",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use document_comparison::Commit (record 0357)"
+        },
+        {
+          "name": "PackagePatch",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use document_comparison::Patch (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::external_media",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::external_media",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::external_media",
+          "replacement": "use Package::edit_external_media() -> external_media::Edit (record 0357)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::external_media::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use Package::edit_diagrams(slide) -> diagram::Edit (record 0357)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::diagram::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "SlideEditor",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use Package::edit_diagrams(slide) -> diagram::Edit (record 0357)"
+        },
+        {
+          "name": "SlideCommit",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use diagram::Commit (record 0357)"
+        },
+        {
+          "name": "SlidePatch",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use diagram::Patch (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::slide_sync",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::slide_sync",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::slide_sync",
+          "replacement": "use Package::edit_slide_sync(slide) -> slide_sync::Edit (record 0357)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::slide_sync::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::slide_sync",
+          "replacement": "use Package::edit_slide_sync(slide) -> slide_sync::Edit (record 0357)"
+        },
+        {
+          "name": "ChangeSet",
+          "scope": "litchi_ppt::slide_sync",
+          "replacement": "use slide_sync::Patch (record 0357)"
+        },
+        {
+          "name": "SlideSyncEditor",
+          "scope": "litchi_ppt",
+          "replacement": "use Package::edit_slide_sync(slide) -> slide_sync::Edit (record 0357)"
+        },
+        {
+          "name": "SlideSyncCommit",
+          "scope": "litchi_ppt",
+          "replacement": "use slide_sync::Commit (record 0357)"
+        },
+        {
+          "name": "SlideSyncChange",
+          "scope": "litchi_ppt",
+          "replacement": "use slide_sync::Change (record 0357)"
+        },
+        {
+          "name": "SlideSyncChangeSet",
+          "scope": "litchi_ppt",
+          "replacement": "use slide_sync::Patch (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::client_data",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::client_data",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::client_data",
+          "replacement": "use Package::edit_client_data(target) -> client_data::Edit (record 0357)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::client_data::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "ChangeSet",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "use the family Patch (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "ChangeSet",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use the family Patch (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::master_layout",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::master_layout",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "ChangeSet",
+          "scope": "litchi_ppt::master_layout",
+          "replacement": "use the family Patch (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "use Package::edit_master_metadata(kind, position) -> master::metadata::Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use Package::edit_master_metadata(kind, position) -> master::metadata::Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::master_layout",
+          "replacement": "use Package::edit_master_layout(kind, position) -> master_layout::Edit (record 0357)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "use Package::edit_master_metadata(kind, position) -> master::metadata::Edit (record 0357)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use master::metadata::Edit::set_template_name / clear_template_name (record 0357)"
+        },
+        {
+          "name": "Commit",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use master::metadata::Commit (record 0357)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::master::metadata::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::master_layout::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "finish",
+          "scope": "litchi_ppt::master_layout::Edit",
+          "replacement": "use Edit::commit"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt",
+          "replacement": "PPT crate-wide: drop the Edit / diagnostics().changed() / family Edit (record 0357)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt",
+          "replacement": "PPT crate-wide: drop the Edit / diagnostics().changed() / family Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt",
+          "replacement": "PPT crate-wide: drop the Edit / diagnostics().changed() / family Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt",
+          "replacement": "use the family's Edit (record 0357)",
+          "match": "suffix"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt",
+          "replacement": "Package::edit_objects() and litchi_ppt::embedded::object::Edit"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "Package::edit_objects() and embedded::object::Edit"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::embedded::storage",
+          "replacement": "embedded::storage::Draft (Storage::draft)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "drop the Edit"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "Commit::diagnostics().changed()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "embedded::object::Edit"
+        },
+        {
+          "name": "finish",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "embedded::object::Edit::commit"
+        },
+        {
+          "name": "PackageEditor",
+          "scope": "litchi_ppt::chart",
+          "replacement": "chart::GraphPackage (Graph::draft_package)"
+        },
+        {
+          "name": "finish",
+          "scope": "litchi_ppt::chart",
+          "replacement": "chart::GraphPackage::into_bytes"
+        },
+        {
+          "name": "Snapshot",
+          "scope": "litchi_ppt::chart",
+          "replacement": "chart::View (GraphPackage::view)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt",
+          "replacement": "a package-level scoped family Edit or a value Draft",
+          "match": "suffix"
+        },
+        {
+          "name": "edit_package",
+          "scope": "litchi_ppt::chart",
+          "replacement": "Graph::draft_package"
+        },
+        {
+          "name": "into_package_editor",
+          "scope": "litchi_ppt::chart",
+          "replacement": "Graph::into_draft_package"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::embedded::object::Edit",
+          "replacement": "Edit::objects"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::embedded::storage::Draft",
+          "replacement": "Draft::view"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::chart::GraphPackage",
+          "replacement": "GraphPackage::view"
         }
       ],
       "families": [
         "litchi_ppt::package::edit",
-        "litchi_ppt::package::metadata"
+        "litchi_ppt::package::metadata",
+        "litchi_ppt::font",
+        "litchi_ppt::broadcast",
+        "litchi_ppt::picture_bullets",
+        "litchi_ppt::animation",
+        "litchi_ppt::document_comparison",
+        "litchi_ppt::external_media",
+        "litchi_ppt::diagram",
+        "litchi_ppt::slide_sync",
+        "litchi_ppt::client_data",
+        "litchi_ppt::master::metadata",
+        "litchi_ppt::master_layout",
+        "litchi_ppt::embedded::object"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
@@ -5893,21 +6599,6 @@
           "replacement": "use open_with_options(SourceBackedOptions)"
         },
         {
-          "name": "rollback",
-          "scope": "litchi_ppt::text_edit::SourceTransaction",
-          "replacement": "drop the owned transaction"
-        },
-        {
-          "name": "rollback",
-          "scope": "litchi_ppt::text_edit::Transaction",
-          "replacement": "drop the owned transaction"
-        },
-        {
-          "name": "rollback",
-          "scope": "litchi_ppt::slide_order::Transaction",
-          "replacement": "drop the owned transaction"
-        },
-        {
           "name": "from_bytes_with_limits",
           "scope": "litchi_ppt::slide_order::Snapshot",
           "replacement": "use from_bytes_with_options(OpenOptions)"
@@ -5932,11 +6623,614 @@
           "name": "into_snapshot",
           "scope": "litchi_ppt",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "name": "get_source_limits",
+          "scope": "litchi_ppt::OpenOptions",
+          "replacement": "use the <noun>_value() getter (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_password",
+          "scope": "litchi_ppt::OpenOptions",
+          "replacement": "use the <noun>_value() getter (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_leniency",
+          "scope": "litchi_ppt::OpenOptions",
+          "replacement": "use the <noun>_value() getter (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_max_operations",
+          "scope": "litchi_ppt::package::edit::EditOptions",
+          "replacement": "use max_operations_value() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_ppt",
+          "replacement": "limits come from OpenOptions (owners) or a required limits argument (record APIs); record 0351 §2.5 rule 3",
+          "match": "suffix"
+        },
+        {
+          "name": "presentation_with_options_and_limits",
+          "scope": "litchi_ppt::raw::Reader",
+          "replacement": "the reader keeps the limits it was opened with (record 0351 §2.5 rule 4)"
+        },
+        {
+          "name": "presentation_with_options_and_limits",
+          "scope": "litchi_ppt::SourceBackedPackage",
+          "replacement": "the package keeps the limits it was opened with (record 0351 §2.5 rule 2)"
+        },
+        {
+          "name": "from_path",
+          "scope": "litchi_ppt::SourceBackedPackage",
+          "replacement": "use open / open_with_options (record 0351 §2.5 rule 1)"
+        },
+        {
+          "name": "Chart",
+          "scope": "litchi_ppt::writer",
+          "replacement": "the chart draft lives at litchi_ppt::builder::Chart (record 0351 §2.1 rule 7)",
+          "recursive": false
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::slide_order",
+          "replacement": "drop the Edit; the native owner is crate-private and Package::edit is the public route (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::slide_order",
+          "replacement": "use Package::edit / package::edit::Edit (record 0357)",
+          "match": "suffix"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::text_edit",
+          "replacement": "drop the Edit; the native owner is crate-private and Package::edit is the public route (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::text_edit",
+          "replacement": "use Package::edit / package::edit::Edit (record 0357)",
+          "match": "suffix"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::slide_order",
+          "replacement": "use Package::edit / package::edit::Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::text_edit",
+          "replacement": "use Package::edit / package::edit::Edit (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::font",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::font",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::font",
+          "replacement": "use the family's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::font::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::broadcast",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::broadcast",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::broadcast",
+          "replacement": "use the family's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::broadcast::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "FontTransaction",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::font::Edit via Package::edit_fonts"
+        },
+        {
+          "name": "FontCommit",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::font::Commit"
+        },
+        {
+          "name": "FontPatch",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::font::Patch"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::client_anchor",
+          "replacement": "the record-level edit is crate-private; Package::edit is the route (record 0357)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::client_anchor",
+          "replacement": "use commit.diagnostics().changed()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::client_anchor",
+          "replacement": "the record-level edit is crate-private; Package::edit is the route (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::document_structure",
+          "replacement": "the record-level edit is crate-private; Package::edit is the route (record 0357)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::document_structure",
+          "replacement": "use commit.diagnostics().changed()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::document_structure",
+          "replacement": "the record-level edit is crate-private; Package::edit is the route (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::picture_bullets",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::picture_bullets",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::picture_bullets",
+          "replacement": "use the family's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::picture_bullets::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "PictureBulletTransaction",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::picture_bullets::{Edit, Commit, Patch} via Package::edit_picture_bullets (record 0357)"
+        },
+        {
+          "name": "PictureBulletCommit",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::picture_bullets::{Edit, Commit, Patch} via Package::edit_picture_bullets (record 0357)"
+        },
+        {
+          "name": "PictureBulletPatch",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::picture_bullets::{Edit, Commit, Patch} via Package::edit_picture_bullets (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::animation",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::animation",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::animation",
+          "replacement": "use the family's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::animation::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "finish",
+          "scope": "litchi_ppt::animation::Edit",
+          "replacement": "Edit::commit publishes the Package (record 0357)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::animation",
+          "replacement": "use Package::edit_animations() -> animation::Edit (record 0357)"
+        },
+        {
+          "name": "EditorLimits",
+          "scope": "litchi_ppt::animation",
+          "replacement": "Package::edit_animations() admits under the source package limits (record 0357)"
+        },
+        {
+          "name": "EditorLimits",
+          "scope": "litchi_ppt",
+          "replacement": "Package::edit_animations() admits under the source package limits (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use the family's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::document_comparison::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use Package::edit_document_comparison() -> document_comparison::Edit (record 0357)"
+        },
+        {
+          "name": "PackageCommit",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use document_comparison::Commit (record 0357)"
+        },
+        {
+          "name": "PackagePatch",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use document_comparison::Patch (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::external_media",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::external_media",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::external_media",
+          "replacement": "use Package::edit_external_media() -> external_media::Edit (record 0357)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::external_media::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use Package::edit_diagrams(slide) -> diagram::Edit (record 0357)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::diagram::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "SlideEditor",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use Package::edit_diagrams(slide) -> diagram::Edit (record 0357)"
+        },
+        {
+          "name": "SlideCommit",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use diagram::Commit (record 0357)"
+        },
+        {
+          "name": "SlidePatch",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use diagram::Patch (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::slide_sync",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::slide_sync",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::slide_sync",
+          "replacement": "use Package::edit_slide_sync(slide) -> slide_sync::Edit (record 0357)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::slide_sync::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::slide_sync",
+          "replacement": "use Package::edit_slide_sync(slide) -> slide_sync::Edit (record 0357)"
+        },
+        {
+          "name": "ChangeSet",
+          "scope": "litchi_ppt::slide_sync",
+          "replacement": "use slide_sync::Patch (record 0357)"
+        },
+        {
+          "name": "SlideSyncEditor",
+          "scope": "litchi_ppt",
+          "replacement": "use Package::edit_slide_sync(slide) -> slide_sync::Edit (record 0357)"
+        },
+        {
+          "name": "SlideSyncCommit",
+          "scope": "litchi_ppt",
+          "replacement": "use slide_sync::Commit (record 0357)"
+        },
+        {
+          "name": "SlideSyncChange",
+          "scope": "litchi_ppt",
+          "replacement": "use slide_sync::Change (record 0357)"
+        },
+        {
+          "name": "SlideSyncChangeSet",
+          "scope": "litchi_ppt",
+          "replacement": "use slide_sync::Patch (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::client_data",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::client_data",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::client_data",
+          "replacement": "use Package::edit_client_data(target) -> client_data::Edit (record 0357)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::client_data::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "ChangeSet",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "use the family Patch (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "ChangeSet",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use the family Patch (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::master_layout",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::master_layout",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "ChangeSet",
+          "scope": "litchi_ppt::master_layout",
+          "replacement": "use the family Patch (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "use Package::edit_master_metadata(kind, position) -> master::metadata::Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use Package::edit_master_metadata(kind, position) -> master::metadata::Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::master_layout",
+          "replacement": "use Package::edit_master_layout(kind, position) -> master_layout::Edit (record 0357)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "use Package::edit_master_metadata(kind, position) -> master::metadata::Edit (record 0357)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use master::metadata::Edit::set_template_name / clear_template_name (record 0357)"
+        },
+        {
+          "name": "Commit",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use master::metadata::Commit (record 0357)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::master::metadata::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::master_layout::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "finish",
+          "scope": "litchi_ppt::master_layout::Edit",
+          "replacement": "use Edit::commit"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt",
+          "replacement": "PPT crate-wide: drop the Edit / diagnostics().changed() / family Edit (record 0357)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt",
+          "replacement": "PPT crate-wide: drop the Edit / diagnostics().changed() / family Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt",
+          "replacement": "PPT crate-wide: drop the Edit / diagnostics().changed() / family Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt",
+          "replacement": "use the family's Edit (record 0357)",
+          "match": "suffix"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt",
+          "replacement": "Package::edit_objects() and litchi_ppt::embedded::object::Edit"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "Package::edit_objects() and embedded::object::Edit"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::embedded::storage",
+          "replacement": "embedded::storage::Draft (Storage::draft)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "drop the Edit"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "Commit::diagnostics().changed()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "embedded::object::Edit"
+        },
+        {
+          "name": "finish",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "embedded::object::Edit::commit"
+        },
+        {
+          "name": "PackageEditor",
+          "scope": "litchi_ppt::chart",
+          "replacement": "chart::GraphPackage (Graph::draft_package)"
+        },
+        {
+          "name": "finish",
+          "scope": "litchi_ppt::chart",
+          "replacement": "chart::GraphPackage::into_bytes"
+        },
+        {
+          "name": "Snapshot",
+          "scope": "litchi_ppt::chart",
+          "replacement": "chart::View (GraphPackage::view)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt",
+          "replacement": "a package-level scoped family Edit or a value Draft",
+          "match": "suffix"
+        },
+        {
+          "name": "edit_package",
+          "scope": "litchi_ppt::chart",
+          "replacement": "Graph::draft_package"
+        },
+        {
+          "name": "into_package_editor",
+          "scope": "litchi_ppt::chart",
+          "replacement": "Graph::into_draft_package"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::embedded::object::Edit",
+          "replacement": "Edit::objects"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::embedded::storage::Draft",
+          "replacement": "Draft::view"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::chart::GraphPackage",
+          "replacement": "GraphPackage::view"
         }
       ],
       "families": [
         "litchi_ppt::package::edit",
-        "litchi_ppt::package::metadata"
+        "litchi_ppt::package::metadata",
+        "litchi_ppt::font",
+        "litchi_ppt::broadcast",
+        "litchi_ppt::picture_bullets",
+        "litchi_ppt::animation",
+        "litchi_ppt::document_comparison",
+        "litchi_ppt::external_media",
+        "litchi_ppt::diagram",
+        "litchi_ppt::slide_sync",
+        "litchi_ppt::client_data",
+        "litchi_ppt::master::metadata",
+        "litchi_ppt::master_layout",
+        "litchi_ppt::embedded::object"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",

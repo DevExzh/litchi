@@ -6,7 +6,7 @@ use litchi_opc::{OpcPackage, PackURI};
 
 use super::codec;
 use super::model::Part as ChangesPart;
-use super::transaction::{Commit, Patch, Snapshot};
+use super::transaction::{Change, Prepared, Snapshot};
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
@@ -31,7 +31,7 @@ pub fn load(package: &OpcPackage) -> Result<Option<ChangesPart>> {
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store(package: &mut OpcPackage, value: &ChangesPart) -> Result<()> {
+pub(crate) fn store(package: &mut OpcPackage, value: &ChangesPart) -> Result<()> {
     refuse_signed_change(package)?;
     let mut candidate = package.clone();
     codec::store(&mut candidate, value)?;
@@ -84,7 +84,7 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     patch.apply(package)
 }
 
@@ -104,7 +104,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
     clippy::needless_pass_by_value,
     reason = "public API consumes the commit to signal it has been applied"
 )]
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }
 
@@ -120,7 +120,7 @@ pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn remove(package: &mut OpcPackage) -> Result<Option<ChangesPart>> {
+pub(crate) fn remove(package: &mut OpcPackage) -> Result<Option<ChangesPart>> {
     let mut candidate = package.clone();
     let Some(value) = codec::load(&candidate)? else {
         return Ok(None);

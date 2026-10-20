@@ -228,10 +228,11 @@ pub(super) fn map_error(error: Error) -> Error {
 }
 
 fn unsafe_edit(reason: &'static str) -> Error {
-    Error::UnsafeEdit {
-        operation: "insert_slide",
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "insert_slide",
         reason,
-    }
+    )
 }
 
 fn registered_layout(
@@ -303,7 +304,7 @@ fn insertion_workspace_bound(
     }
     // Hash tables reserve spare buckets and the XML scanners retain one event
     // at a time. Doubling the measured strings/entries covers those capacities
-    // while the fixed workspace covers the MutableSlide and root splice.
+    // while the fixed workspace covers the crate::builder::Slide and root splice.
     bytes = bytes
         .checked_mul(2)
         .ok_or_else(|| limit("source-backed primary insertion reservation", usize::MAX))?;

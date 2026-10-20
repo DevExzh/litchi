@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(error) => return Err(error.into()),
     };
     let _ = litchi_pptx::tag::shape::put(&mut graph, &owner, shape.as_str(), tags)?;
-    let mut package = Package::from_opc_package(graph)?;
+    let package = Package::from_opc_package(graph)?;
     package.save(output)?;
     println!("{outcome} shape tag");
     Ok(())

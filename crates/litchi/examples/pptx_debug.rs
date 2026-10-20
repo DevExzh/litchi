@@ -58,7 +58,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     package.save("pptx_debug_typed.pptx")?;
     println!("wrote pptx_debug_typed.pptx");
     Ok(())

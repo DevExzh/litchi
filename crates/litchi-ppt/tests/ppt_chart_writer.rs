@@ -6,8 +6,9 @@
 
 use std::io::Cursor;
 
+use litchi_ppt::builder::{Chart, ChartKind};
 use litchi_ppt::raw::Reader;
-use litchi_ppt::writer::{Builder, Chart, ChartKind, Hyperlink, Table, WriteError};
+use litchi_ppt::writer::{Builder, Hyperlink, Table, WriteError};
 
 fn chart(kind: ChartKind) -> Chart {
     let mut chart = Chart::new(kind);

@@ -379,10 +379,11 @@ fn managed_shape_removal_admission_keeps_prior_stage_and_releases_on_drop() {
     const MEMORY: u64 = 16 * 1024 * 1024;
     let before = fixture(1, 3);
     let (budget, _cancellation, context) = managed_context(MEMORY);
-    let source = SourcePackage::from_read_at_with_execution_context(
+    let source = SourcePackage::from_read_at_with_options(
         Arc::new(OwnedSource::new(before.clone())),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = source.edit().unwrap();
@@ -409,10 +410,11 @@ fn managed_shape_removal_cancellation_leaves_edit_unpublished_and_releases_on_dr
     const MEMORY: u64 = 16 * 1024 * 1024;
     let before = fixture(1, 2);
     let (budget, cancellation, context) = managed_context(MEMORY);
-    let source = SourcePackage::from_read_at_with_execution_context(
+    let source = SourcePackage::from_read_at_with_options(
         Arc::new(OwnedSource::new(before)),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = source.edit().unwrap();

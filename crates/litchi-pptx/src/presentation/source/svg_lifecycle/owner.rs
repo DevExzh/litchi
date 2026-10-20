@@ -628,16 +628,18 @@ pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
                         .iter()
                         .any(|frame| matches!(frame.kind, Kind::ShapeTree | Kind::Group))
                 {
-                    return Err(Error::UnsafeEdit {
-                        operation: "source-backed picture inventory",
-                        reason: "picture ownership inside an MCE branch is ambiguous",
-                    });
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "source-backed picture inventory",
+                        "picture ownership inside an MCE branch is ambiguous",
+                    ));
                 }
                 if kind == Kind::Mce && selected_context && !opaque_ancestor {
-                    return Err(Error::UnsafeEdit {
-                        operation: "source-backed picture inventory",
-                        reason: "picture markup compatibility is unsupported by the SVG owner",
-                    });
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "source-backed picture inventory",
+                        "picture markup compatibility is unsupported by the SVG owner",
+                    ));
                 }
                 if selected_context
                     && frames
@@ -811,16 +813,18 @@ pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
                         .iter()
                         .any(|frame| matches!(frame.kind, Kind::ShapeTree | Kind::Group))
                 {
-                    return Err(Error::UnsafeEdit {
-                        operation: "source-backed picture inventory",
-                        reason: "picture ownership inside an MCE branch is ambiguous",
-                    });
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "source-backed picture inventory",
+                        "picture ownership inside an MCE branch is ambiguous",
+                    ));
                 }
                 if kind == Kind::Mce && selected_context && !opaque_ancestor {
-                    return Err(Error::UnsafeEdit {
-                        operation: "source-backed picture inventory",
-                        reason: "picture markup compatibility is unsupported by the SVG owner",
-                    });
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "source-backed picture inventory",
+                        "picture markup compatibility is unsupported by the SVG owner",
+                    ));
                 }
                 if selected_context
                     && frames

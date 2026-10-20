@@ -2,7 +2,7 @@ use crate::engine::{EvalCtx, evaluate_expression, to_bool, to_text};
 use crate::parser::Expr;
 use litchi_core::sheet::{CellValue, Result};
 
-pub(crate) async fn eval_valuetotext(
+pub(crate) fn eval_valuetotext(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -12,9 +12,9 @@ pub(crate) async fn eval_valuetotext(
             "VALUETOTEXT expects 1 or 2 arguments (value, [format])".to_string(),
         ));
     }
-    let value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let value = evaluate_expression(ctx, current_sheet, &args[0])?;
     let format = if args.len() == 2 {
-        let f_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let f_val = evaluate_expression(ctx, current_sheet, &args[1])?;
         match crate::engine::to_number(&f_val) {
             Some(n) => n.trunc() as i32,
             None => 0,
@@ -41,7 +41,7 @@ pub(crate) async fn eval_valuetotext(
     }
 }
 
-pub(crate) async fn eval_arraytotext(
+pub(crate) fn eval_arraytotext(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -53,7 +53,7 @@ pub(crate) async fn eval_arraytotext(
     }
 
     let format = if args.len() == 2 {
-        let f_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let f_val = evaluate_expression(ctx, current_sheet, &args[1])?;
         match crate::engine::to_number(&f_val) {
             Some(n) => n.trunc() as i32,
             None => 0,
@@ -66,8 +66,7 @@ pub(crate) async fn eval_arraytotext(
     crate::engine::for_each_value_in_expr(ctx, current_sheet, &args[0], |v| {
         values.push(v.clone());
         Ok(())
-    })
-    .await?;
+    })?;
 
     if format == 0 {
         let text_values: Vec<String> = values.iter().map(to_text).collect();
@@ -90,7 +89,7 @@ pub(crate) async fn eval_arraytotext(
     }
 }
 
-pub(crate) async fn eval_textbefore(
+pub(crate) fn eval_textbefore(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -100,37 +99,35 @@ pub(crate) async fn eval_textbefore(
             "TEXTBEFORE expects 2 to 6 arguments".to_string(),
         ));
     }
-    let text = to_text(&evaluate_expression(ctx, current_sheet, &args[0]).await?);
-    let delimiter = to_text(&evaluate_expression(ctx, current_sheet, &args[1]).await?);
+    let text = to_text(&evaluate_expression(ctx, current_sheet, &args[0])?);
+    let delimiter = to_text(&evaluate_expression(ctx, current_sheet, &args[1])?);
     if delimiter.is_empty() {
         return Ok(CellValue::Error("#VALUE!".to_string()));
     }
 
     let instance_num = if args.len() >= 3 {
-        crate::engine::to_number(&evaluate_expression(ctx, current_sheet, &args[2]).await?)
-            .unwrap_or(1.0) as i32
+        crate::engine::to_number(&evaluate_expression(ctx, current_sheet, &args[2])?).unwrap_or(1.0)
+            as i32
     } else {
         1
     };
 
     let match_mode = if args.len() >= 4 {
-        crate::engine::to_number(&evaluate_expression(ctx, current_sheet, &args[3]).await?)
-            .unwrap_or(0.0) as i32
+        crate::engine::to_number(&evaluate_expression(ctx, current_sheet, &args[3])?).unwrap_or(0.0)
+            as i32
     } else {
         0
     };
 
     let _match_end = if args.len() >= 5 {
-        crate::engine::to_number(&evaluate_expression(ctx, current_sheet, &args[4]).await?)
-            .unwrap_or(0.0) as i32
+        crate::engine::to_number(&evaluate_expression(ctx, current_sheet, &args[4])?).unwrap_or(0.0)
+            as i32
     } else {
         0
     };
 
     let _if_not_found = if args.len() >= 6 {
-        Some(to_text(
-            &evaluate_expression(ctx, current_sheet, &args[5]).await?,
-        ))
+        Some(to_text(&evaluate_expression(ctx, current_sheet, &args[5])?))
     } else {
         None
     };
@@ -175,7 +172,7 @@ pub(crate) async fn eval_textbefore(
     Ok(CellValue::String(text[..idx].to_string()))
 }
 
-pub(crate) async fn eval_textafter(
+pub(crate) fn eval_textafter(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -185,22 +182,22 @@ pub(crate) async fn eval_textafter(
             "TEXTAFTER expects 2 to 6 arguments".to_string(),
         ));
     }
-    let text = to_text(&evaluate_expression(ctx, current_sheet, &args[0]).await?);
-    let delimiter = to_text(&evaluate_expression(ctx, current_sheet, &args[1]).await?);
+    let text = to_text(&evaluate_expression(ctx, current_sheet, &args[0])?);
+    let delimiter = to_text(&evaluate_expression(ctx, current_sheet, &args[1])?);
     if delimiter.is_empty() {
         return Ok(CellValue::Error("#VALUE!".to_string()));
     }
 
     let instance_num = if args.len() >= 3 {
-        crate::engine::to_number(&evaluate_expression(ctx, current_sheet, &args[2]).await?)
-            .unwrap_or(1.0) as i32
+        crate::engine::to_number(&evaluate_expression(ctx, current_sheet, &args[2])?).unwrap_or(1.0)
+            as i32
     } else {
         1
     };
 
     let match_mode = if args.len() >= 4 {
-        crate::engine::to_number(&evaluate_expression(ctx, current_sheet, &args[3]).await?)
-            .unwrap_or(0.0) as i32
+        crate::engine::to_number(&evaluate_expression(ctx, current_sheet, &args[3])?).unwrap_or(0.0)
+            as i32
     } else {
         0
     };
@@ -245,7 +242,7 @@ pub(crate) async fn eval_textafter(
     Ok(CellValue::String(text[idx + delimiter.len()..].to_string()))
 }
 
-pub(crate) async fn eval_textsplit(
+pub(crate) fn eval_textsplit(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -256,7 +253,7 @@ pub(crate) async fn eval_textsplit(
         ));
     }
 
-    let text = to_text(&evaluate_expression(ctx, current_sheet, &args[0]).await?);
+    let text = to_text(&evaluate_expression(ctx, current_sheet, &args[0])?);
 
     // Delimiters can be a single value or an array of values
     let mut col_delimiters = Vec::new();
@@ -266,8 +263,7 @@ pub(crate) async fn eval_textsplit(
             col_delimiters.push(s);
         }
         Ok(())
-    })
-    .await?;
+    })?;
 
     let mut row_delimiters = Vec::new();
     if args.len() >= 3 {
@@ -277,18 +273,17 @@ pub(crate) async fn eval_textsplit(
                 row_delimiters.push(s);
             }
             Ok(())
-        })
-        .await?;
+        })?;
     }
 
     let ignore_empty = if args.len() >= 4 {
-        to_bool(&evaluate_expression(ctx, current_sheet, &args[3]).await?)
+        to_bool(&evaluate_expression(ctx, current_sheet, &args[3])?)
     } else {
         false
     };
 
     let match_mode = if args.len() >= 5 {
-        match crate::engine::to_number(&evaluate_expression(ctx, current_sheet, &args[4]).await?) {
+        match crate::engine::to_number(&evaluate_expression(ctx, current_sheet, &args[4])?) {
             Some(n) => n.trunc() as i32,
             None => 0,
         }
@@ -346,48 +341,48 @@ mod tests {
         Expr::Literal(CellValue::String(s.to_string()))
     }
 
-    #[tokio::test]
-    async fn test_eval_valuetotext_default() {
+    #[test]
+    fn test_eval_valuetotext_default() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello")];
-        let result = eval_valuetotext(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_valuetotext(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("hello".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_valuetotext_strict() {
+    #[test]
+    fn test_eval_valuetotext_strict() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Format 1 = strict, adds quotes around strings
         let args = vec![str_expr("hello"), Expr::Literal(CellValue::Int(1))];
-        let result = eval_valuetotext(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_valuetotext(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("\"hello\"".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_valuetotext_bool() {
+    #[test]
+    fn test_eval_valuetotext_bool() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![Expr::Literal(CellValue::Bool(true))];
-        let result = eval_valuetotext(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_valuetotext(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("TRUE".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_valuetotext_wrong_args() {
+    #[test]
+    fn test_eval_valuetotext_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args: Vec<Expr> = vec![];
-        let result = eval_valuetotext(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_valuetotext(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 1 or 2")),
             _ => panic!("Expected Error, got {:?}", result),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_arraytotext_default() {
+    #[test]
+    fn test_eval_arraytotext_default() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Set up a range with values
@@ -402,12 +397,12 @@ mod tests {
             end_col: 2,
         });
         let args = vec![range];
-        let result = eval_arraytotext(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_arraytotext(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("1, 2, 3".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_arraytotext_array_format() {
+    #[test]
+    fn test_eval_arraytotext_array_format() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         engine.set_cell("Sheet1", 0, 0, CellValue::String("a".to_string()));
@@ -420,21 +415,21 @@ mod tests {
             end_col: 1,
         });
         let args = vec![range, Expr::Literal(CellValue::Int(1))];
-        let result = eval_arraytotext(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_arraytotext(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("{\"a\", 1}".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_textbefore() {
+    #[test]
+    fn test_eval_textbefore() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello-world-test"), str_expr("-")];
-        let result = eval_textbefore(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_textbefore(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("hello".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_textbefore_instance() {
+    #[test]
+    fn test_eval_textbefore_instance() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Get text before 2nd hyphen
@@ -443,30 +438,30 @@ mod tests {
             str_expr("-"),
             Expr::Literal(CellValue::Int(2)),
         ];
-        let result = eval_textbefore(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_textbefore(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("hello-world".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_textbefore_not_found() {
+    #[test]
+    fn test_eval_textbefore_not_found() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello"), str_expr("-")];
-        let result = eval_textbefore(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_textbefore(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Error("#N/A".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_textafter() {
+    #[test]
+    fn test_eval_textafter() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello-world-test"), str_expr("-")];
-        let result = eval_textafter(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_textafter(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("world-test".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_textafter_instance() {
+    #[test]
+    fn test_eval_textafter_instance() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Get text after 2nd hyphen
@@ -475,26 +470,26 @@ mod tests {
             str_expr("-"),
             Expr::Literal(CellValue::Int(2)),
         ];
-        let result = eval_textafter(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_textafter(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("test".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_textsplit() {
+    #[test]
+    fn test_eval_textsplit() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("a,b,c"), str_expr(",")];
-        let result = eval_textsplit(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_textsplit(ctx, "Sheet1", &args).unwrap();
         // Returns first part since no dynamic array support
         assert_eq!(result, CellValue::String("a".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_textsplit_empty_delim() {
+    #[test]
+    fn test_eval_textsplit_empty_delim() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("abc"), str_expr("")];
-        let result = eval_textsplit(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_textsplit(ctx, "Sheet1", &args).unwrap();
         // Empty delimiter returns original text
         assert_eq!(result, CellValue::String("abc".to_string()));
     }

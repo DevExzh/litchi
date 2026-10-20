@@ -6,7 +6,7 @@ use litchi_opc::constants::content_type as ct;
 use litchi_opc::{OpcPackage, PackURI};
 
 use super::model::Guides;
-use super::transaction::{Commit, Patch, Snapshot};
+use super::transaction::{Change, Prepared, Snapshot};
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
@@ -46,7 +46,7 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Snapshot> {
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store(package: &mut OpcPackage, value: &Guides) -> Result<()> {
+pub(crate) fn store(package: &mut OpcPackage, value: &Guides) -> Result<()> {
     let source = load_snapshot(package)?;
     let mut edit = source.edit();
     edit.replace(value.clone())?;
@@ -66,7 +66,7 @@ pub fn store(package: &mut OpcPackage, value: &Guides) -> Result<()> {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn remove(package: &mut OpcPackage) -> Result<Guides> {
+pub(crate) fn remove(package: &mut OpcPackage) -> Result<Guides> {
     let source = load_snapshot(package)?;
     let previous = source.guides().clone();
     let mut edit = source.edit();
@@ -87,7 +87,7 @@ pub fn remove(package: &mut OpcPackage) -> Result<Guides> {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     let current = load_snapshot(package)?;
     if !current.same_source(patch.before()) {
         return Err(invalid("extended-guide source is stale"));
@@ -132,7 +132,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }
 

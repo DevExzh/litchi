@@ -36,13 +36,13 @@
 //! [`Xlsx`] implements [`WorkbookTrait`] directly, so the workbook view that
 //! S6 adds delegates to it by a `match`, with no boxed workbook. Its
 //! worksheets and cells are the statically dispatched
-//! [`crate::view::sheet`] types; only the trait's error type is boxed, and
-//! its errors are boxed [`crate::Error`] values.
+//! [`crate::view::sheet`] types, and its errors are typed [`crate::Error`]
+//! values.
 
 use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
 
-use litchi_core::sheet::{Result as SheetResult, WorkbookTrait};
+use litchi_core::sheet::WorkbookTrait;
 use litchi_core::{FileFormat, Metadata};
 use litchi_opc::{OpcPackage, SourceBackedPackage};
 use litchi_xlsx as xlsx;
@@ -96,7 +96,7 @@ pub(crate) use spec::{CELL_WRITE_TABLE, COLUMN_WRITE_TABLE, ROW_WRITE_TABLE};
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
 
 pub use selection::{SelectedCell, SelectedCellView, SelectedWorksheet, WorksheetSelector};
-use sheet::{Sheet, boxed};
+use sheet::Sheet;
 
 /// An opened Excel OOXML workbook.
 ///
@@ -706,20 +706,17 @@ impl std::fmt::Debug for Xlsx {
 }
 
 impl WorkbookTrait for Xlsx {
+    type Error = Error;
     type Worksheet<'a> = crate::view::sheet::Worksheet<'a>;
     type Worksheets<'a> = crate::view::sheet::Worksheets<'a>;
 
-    fn active_worksheet(&self) -> SheetResult<Self::Worksheet<'_>> {
-        let sheet = self
-            .0
-            .owner
-            .finish(|| {
-                self.0.owner.active().ok_or_else(|| {
-                    Error::new(Code::NotFound, "XLSX workbook has no active worksheet")
-                        .with_format(FileFormat::Xlsx)
-                })
+    fn active_worksheet(&self) -> Result<Self::Worksheet<'_>> {
+        let sheet = self.0.owner.finish(|| {
+            self.0.owner.active().ok_or_else(|| {
+                Error::new(Code::NotFound, "XLSX workbook has no active worksheet")
+                    .with_format(FileFormat::Xlsx)
             })
-            .map_err(boxed)?;
+        })?;
         Ok(crate::view::sheet::Worksheet::xlsx(sheet))
     }
 
@@ -727,24 +724,18 @@ impl WorkbookTrait for Xlsx {
         self.names()
     }
 
-    fn worksheet_by_name(&self, name: &str) -> SheetResult<Self::Worksheet<'_>> {
-        let sheet = self
-            .0
-            .owner
-            .finish(|| {
-                self.0.owner.select(name)?.ok_or_else(|| {
-                    Error::new(Code::NotFound, "XLSX worksheet was not found")
-                        .with_format(FileFormat::Xlsx)
-                })
+    fn worksheet_by_name(&self, name: &str) -> Result<Self::Worksheet<'_>> {
+        let sheet = self.0.owner.finish(|| {
+            self.0.owner.select(name)?.ok_or_else(|| {
+                Error::new(Code::NotFound, "XLSX worksheet was not found")
+                    .with_format(FileFormat::Xlsx)
             })
-            .map_err(boxed)?;
+        })?;
         Ok(crate::view::sheet::Worksheet::xlsx(sheet))
     }
 
-    fn worksheet_by_index(&self, index: usize) -> SheetResult<Self::Worksheet<'_>> {
-        Ok(crate::view::sheet::Worksheet::xlsx(
-            self.sheet_at(index).map_err(boxed)?,
-        ))
+    fn worksheet_by_index(&self, index: usize) -> Result<Self::Worksheet<'_>> {
+        Ok(crate::view::sheet::Worksheet::xlsx(self.sheet_at(index)?))
     }
 
     fn worksheets(&self) -> Self::Worksheets<'_> {
@@ -780,7 +771,7 @@ pub(crate) struct Worksheets<'a> {
 }
 
 impl Iterator for Worksheets<'_> {
-    type Item = SheetResult<Sheet>;
+    type Item = Result<Sheet>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.done {
@@ -803,7 +794,7 @@ impl Iterator for Worksheets<'_> {
             },
             Err(error) => {
                 self.done = true;
-                Some(Err(boxed(error)))
+                Some(Err(error))
             },
         }
     }

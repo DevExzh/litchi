@@ -28,7 +28,7 @@ fn text_box_package(texts: &[&str]) -> Result<Package> {
         let offset = i64::try_from(index).map_err(|_| Error::Invalid("offset".into()))?;
         slide.add_text_box(text, 10, 20 + offset * 500, 300, 400);
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     Package::from_reader(std::io::Cursor::new(package.to_bytes()?))
 }
 

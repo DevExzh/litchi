@@ -5,7 +5,7 @@ use std::io::{BufReader, Read, Write};
 use std::path::Path;
 
 use litchi_core::BomKind;
-use litchi_core::sheet::{CellValue, Result as SheetResult, WorkbookTrait};
+use litchi_core::sheet::{CellValue, WorkbookTrait};
 
 use crate::delimited::{self, Options};
 use crate::error::{Error, Result};
@@ -187,10 +187,11 @@ impl Workbook {
 }
 
 impl WorkbookTrait for Workbook {
+    type Error = Error;
     type Worksheet<'a> = Worksheet<'a>;
     type Worksheets<'a> = Worksheets<'a>;
 
-    fn active_worksheet(&self) -> SheetResult<Worksheet<'_>> {
+    fn active_worksheet(&self) -> Result<Worksheet<'_>> {
         Ok(self.worksheet())
     }
 
@@ -198,18 +199,18 @@ impl WorkbookTrait for Workbook {
         std::slice::from_ref(&self.name)
     }
 
-    fn worksheet_by_name(&self, name: &str) -> SheetResult<Worksheet<'_>> {
+    fn worksheet_by_name(&self, name: &str) -> Result<Worksheet<'_>> {
         if name == self.name {
             self.active_worksheet()
         } else {
-            Err(Error::MissingWorksheet.into())
+            Err(Error::MissingWorksheet)
         }
     }
 
-    fn worksheet_by_index(&self, index: usize) -> SheetResult<Worksheet<'_>> {
+    fn worksheet_by_index(&self, index: usize) -> Result<Worksheet<'_>> {
         match index {
             0 => self.active_worksheet(),
-            _ => Err(Error::MissingWorksheet.into()),
+            _ => Err(Error::MissingWorksheet),
         }
     }
 

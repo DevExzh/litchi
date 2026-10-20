@@ -20,6 +20,20 @@
 //! 2.9.78) is edited in place in the live `DocumentContainer`'s
 //! `SlideListWithTextContainer` body the reference selects, under the same
 //! rules, by the root transaction's batch publisher.
+//!
+//! The editing owners are crate-private since record 0357: the public text
+//! edits are the [`crate::Package::edit`] verbs (`set_shape_text`,
+//! `set_shape_texts`, `set_notes_text`, `set_run_format`, …), which drive
+//! this module. It keeps public the vocabulary those verbs take
+//! ([`Target`](crate::text_edit::Target),
+//! [`RunFormat`](crate::text_edit::RunFormat)), the read views
+//! ([`TextRuns`](crate::text_edit::TextRuns) and the source-backed
+//! [`SourceSnapshot`](crate::text_edit::SourceSnapshot) reader) and the typed
+//! [`Error`](crate::text_edit::Error)/[`Refusal`](crate::text_edit::Refusal).
+#![allow(
+    dead_code,
+    reason = "crate-private native text owners (record 0357): the whole-artifact and source-backed transactions keep their tests until a Package-level route promotes them"
+)]
 
 use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 use std::fmt;
@@ -173,6 +187,32 @@ impl fmt::Display for Refusal {
     }
 }
 
+impl Refusal {
+    /// The shared refusal class of this reason (record 0351 §2.4 rule 2);
+    /// unified callers classify by this kind alone.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+
+        match self {
+            Self::SlideNotFound { .. } | Self::ShapeNotFound => RefusalKind::NotFound,
+            Self::AmbiguousShape
+            | Self::NoAnchor
+            | Self::AmbiguousAnchor
+            | Self::NoTextbox
+            | Self::AmbiguousTextbox
+            | Self::NoTextAtom
+            | Self::MultipleTextAtoms
+            | Self::NoNotesPage => RefusalKind::UnsupportedTarget,
+            Self::UnsupportedSource
+            | Self::IncompatibleEncoding
+            | Self::DependencyClosure
+            | Self::LengthChange
+            | Self::UnsupportedDependency => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
 /// Error returned by the focused text-edit transaction.
 #[derive(Debug)]
 pub enum Error {
@@ -222,7 +262,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Immutable whole-package snapshot used by [`Transaction`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Snapshot {
+pub(crate) struct Snapshot {
     bytes: Arc<[u8]>,
 }
 
@@ -232,7 +272,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error when the complete package cannot be opened.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
+    pub(crate) fn parse(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes(bytes.to_vec())
     }
 
@@ -241,7 +281,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error when the complete package cannot be opened.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let _ = presentation(&bytes)?;
         Ok(Self {
             bytes: Arc::from(bytes.into_boxed_slice()),
@@ -255,7 +295,7 @@ impl Snapshot {
 
     /// Exact bytes of the complete source or committed package artifact.
     #[must_use]
-    pub fn bytes(&self) -> &[u8] {
+    pub(crate) fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
@@ -265,7 +305,7 @@ impl Snapshot {
     ///
     /// Returns a typed refusal when the target cannot be resolved to one safe
     /// text atom.
-    pub fn edit_text(&self, target: Target) -> Result<Transaction> {
+    pub(crate) fn edit_text(&self, target: Target) -> Result<Transaction> {
         self.edit_text_in(target, None)
     }
 
@@ -313,7 +353,10 @@ impl Snapshot {
     ///
     /// Returns an error when the patch vocabulary is unsupported, a
     /// precondition conflicts, or the requested text edit is refused.
-    pub fn apply_durable<Mode>(&self, patch: &litchi_core::patch::Patch<Mode>) -> Result<Self> {
+    pub(crate) fn apply_durable<Mode>(
+        &self,
+        patch: &litchi_core::patch::Patch<Mode>,
+    ) -> Result<Self> {
         if patch.format() != "litchi-ppt" || !patch.blobs().is_empty() {
             return Err(invalid_durable_patch("unsupported format or blob bundle"));
         }
@@ -550,7 +593,7 @@ impl SourceSnapshot {
     ///
     /// The returned transaction admits only an equal encoded-length
     /// replacement. There is no fallback to the ordinary full-record editor.
-    pub fn edit_text(&self, target: Target) -> Result<SourceTransaction> {
+    pub(crate) fn edit_text(&self, target: Target) -> Result<SourceTransaction> {
         let resolved = self.resolve_source_text(target)?;
         Ok(SourceTransaction {
             source: self.clone(),
@@ -563,8 +606,8 @@ impl SourceSnapshot {
     ///
     /// The returned text is owned, so the source-backed selector does not
     /// expose a source lifetime or any physical CFB identity. Resolution uses
-    /// the same bounded positional path and refusal checks as
-    /// [`Self::edit_text`].
+    /// the bounded positional path and refusal checks of the source-backed
+    /// text owner.
     pub fn read_text(&self, target: Target) -> Result<String> {
         Ok(self.resolve_source_text(target)?.text)
     }
@@ -609,7 +652,7 @@ impl SourceSnapshot {
 /// One isolated equal-length text replacement staged against a positional
 /// PPT source.
 #[derive(Clone)]
-pub struct SourceTransaction {
+pub(crate) struct SourceTransaction {
     source: SourceSnapshot,
     resolved: SourceResolved,
     replacement: Option<String>,
@@ -629,13 +672,13 @@ impl fmt::Debug for SourceTransaction {
 impl SourceTransaction {
     /// Exact semantic text currently read from the selected atom.
     #[must_use]
-    pub fn text(&self) -> &str {
+    pub(crate) fn text(&self) -> &str {
         &self.resolved.text
     }
 
     /// Selected semantic slide/shape position.
     #[must_use]
-    pub const fn target(&self) -> Target {
+    pub(crate) const fn target(&self) -> Target {
         self.resolved.target
     }
 
@@ -643,7 +686,7 @@ impl SourceTransaction {
     ///
     /// Failed validation leaves the transaction unchanged. The ordinary
     /// source-owning editor remains separate and is not used as a fallback.
-    pub fn set_text(&mut self, value: impl Into<String>) -> Result<()> {
+    pub(crate) fn set_text(&mut self, value: impl Into<String>) -> Result<()> {
         let candidate = value.into();
         let encoded_length = encoded_replacement_len(&candidate, self.resolved.kind)?;
         if encoded_length != self.resolved.payload.len() {
@@ -655,7 +698,7 @@ impl SourceTransaction {
 
     /// Publishes the bounded source-backed splice after complete candidate
     /// CFB reopen and selected-slide semantic readback.
-    pub fn commit(self) -> Result<SourceBackedCommit> {
+    pub(crate) fn commit(self) -> Result<SourceBackedCommit> {
         let replacement = self
             .replacement
             .unwrap_or_else(|| self.resolved.text.clone());
@@ -665,7 +708,7 @@ impl SourceTransaction {
 
 /// Content-free diagnostics for one source-backed PPT text publication.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SourceBackedDiagnostics {
+pub(crate) struct SourceBackedDiagnostics {
     target: Target,
     changed_spans: usize,
     replacement_bytes: u64,
@@ -679,55 +722,55 @@ pub struct SourceBackedDiagnostics {
 impl SourceBackedDiagnostics {
     /// Semantic selector used by the operation.
     #[must_use]
-    pub const fn target(self) -> Target {
+    pub(crate) const fn target(self) -> Target {
         self.target
     }
 
     /// Number of physical CFB spans changed by the splice.
     #[must_use]
-    pub const fn changed_spans(self) -> usize {
+    pub(crate) const fn changed_spans(self) -> usize {
         self.changed_spans
     }
 
     /// Replacement bytes submitted to the CFB splice planner.
     #[must_use]
-    pub const fn replacement_bytes(self) -> u64 {
+    pub(crate) const fn replacement_bytes(self) -> u64 {
         self.replacement_bytes
     }
 
     /// Complete source CFB length.
     #[must_use]
-    pub const fn source_bytes(self) -> u64 {
+    pub(crate) const fn source_bytes(self) -> u64 {
         self.source_bytes
     }
 
     /// Exact source artifact fingerprint.
     #[must_use]
-    pub const fn source_fingerprint(self) -> ArtifactFingerprint {
+    pub(crate) const fn source_fingerprint(self) -> ArtifactFingerprint {
         self.source_fingerprint
     }
 
     /// Exact composed target artifact fingerprint.
     #[must_use]
-    pub const fn target_fingerprint(self) -> ArtifactFingerprint {
+    pub(crate) const fn target_fingerprint(self) -> ArtifactFingerprint {
         self.target_fingerprint
     }
 
     /// Source version checked before planning.
     #[must_use]
-    pub const fn source_version(self) -> SourceVersion {
+    pub(crate) const fn source_version(self) -> SourceVersion {
         self.source_version
     }
 
     /// Composed target version exposed by the positional overlay.
     #[must_use]
-    pub const fn target_version(self) -> SourceVersion {
+    pub(crate) const fn target_version(self) -> SourceVersion {
         self.target_version
     }
 }
 
 /// A published source-backed PPT target and its reusable overlay plan.
-pub struct SourceBackedCommit {
+pub(crate) struct SourceBackedCommit {
     snapshot: SourceSnapshot,
     patch: SourceBackedPatch,
     plan: ValidatedOverlayPlan,
@@ -748,53 +791,53 @@ impl fmt::Debug for SourceBackedCommit {
 impl SourceBackedCommit {
     /// Reopened target source snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &SourceSnapshot {
+    pub(crate) const fn snapshot(&self) -> &SourceSnapshot {
         &self.snapshot
     }
 
     /// Exact-source reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &SourceBackedPatch {
+    pub(crate) const fn patch(&self) -> &SourceBackedPatch {
         &self.patch
     }
 
     /// Common validated CFB overlay plan.
     #[must_use]
-    pub const fn plan(&self) -> &ValidatedOverlayPlan {
+    pub(crate) const fn plan(&self) -> &ValidatedOverlayPlan {
         &self.plan
     }
 
     /// Content-free publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> SourceBackedDiagnostics {
+    pub(crate) const fn diagnostics(&self) -> SourceBackedDiagnostics {
         self.diagnostics
     }
 
     /// Whether the selected replacement is an exact byte no-op.
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.plan.is_noop()
     }
 
     /// Streams the complete validated target to a sequential sink.
-    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport> {
+    pub(crate) fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport> {
         self.plan.write_to(writer).map_err(Error::Source)
     }
 
     /// Alias emphasizing the forward-only publication boundary.
-    pub fn publish_to_stream<W: Write>(&self, writer: &mut W) -> Result<PublishReport> {
+    pub(crate) fn publish_to_stream<W: Write>(&self, writer: &mut W) -> Result<PublishReport> {
         self.write_to(writer)
     }
 
     /// Publishes through the common synced sibling-temp/atomic-rename path.
-    pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result<PublishReport> {
+    pub(crate) fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result<PublishReport> {
         self.plan.save(path).map_err(Error::Source)
     }
 
     /// Publishes through the common sibling-temp/atomic-rename path at a
     /// caller-chosen [`Durability`](litchi_core::Durability); see
     /// [`litchi_cfb::ValidatedOverlayPlan::save_with_durability`].
-    pub fn save_with_durability<P: AsRef<std::path::Path>>(
+    pub(crate) fn save_with_durability<P: AsRef<std::path::Path>>(
         &self,
         path: P,
         durability: litchi_core::Durability,
@@ -807,7 +850,7 @@ impl SourceBackedCommit {
 
 /// A source-checked reversible equal-length PPT text splice.
 #[derive(Clone)]
-pub struct SourceBackedPatch {
+pub(crate) struct SourceBackedPatch {
     before: SourceSnapshot,
     after: SourceSnapshot,
     operation: Option<SourceOperation>,
@@ -827,37 +870,37 @@ impl fmt::Debug for SourceBackedPatch {
 impl SourceBackedPatch {
     /// Exact source snapshot required for forward application.
     #[must_use]
-    pub const fn source(&self) -> &SourceSnapshot {
+    pub(crate) const fn source(&self) -> &SourceSnapshot {
         &self.before
     }
 
     /// Exact target snapshot produced by forward application.
     #[must_use]
-    pub const fn target(&self) -> &SourceSnapshot {
+    pub(crate) const fn target(&self) -> &SourceSnapshot {
         &self.after
     }
 
     /// Exact source artifact fingerprint required for forward application.
     #[must_use]
-    pub fn source_fingerprint(&self) -> ArtifactFingerprint {
+    pub(crate) fn source_fingerprint(&self) -> ArtifactFingerprint {
         self.before.fingerprint()
     }
 
     /// Exact target artifact fingerprint produced by forward application.
     #[must_use]
-    pub fn target_fingerprint(&self) -> ArtifactFingerprint {
+    pub(crate) fn target_fingerprint(&self) -> ArtifactFingerprint {
         self.after.fingerprint()
     }
 
     /// Whether the patch changes no bytes.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.operation.is_none()
     }
 
     /// Applies only to the exact source version and fingerprint captured by
     /// this patch. The candidate is reopened and semantically read back again.
-    pub fn apply(&self, current: &SourceSnapshot) -> Result<SourceSnapshot> {
+    pub(crate) fn apply(&self, current: &SourceSnapshot) -> Result<SourceSnapshot> {
         if current.source_version() != self.before.source_version() {
             return Err(Error::Source(OverlayError::SourceChanged {
                 expected: self.before.source_version(),
@@ -886,7 +929,7 @@ impl SourceBackedPatch {
 
     /// Returns the exact-source-checked inverse operation.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -1888,7 +1931,7 @@ fn invalid_durable_patch(message: &str) -> Error {
 
 /// One isolated text replacement staged against an immutable package.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Transaction {
     source: Snapshot,
     resolved: Resolved,
     replacement: Option<String>,
@@ -1897,13 +1940,13 @@ pub struct Transaction {
 impl Transaction {
     /// The exact text currently stored in the selected shape.
     #[must_use]
-    pub fn text(&self) -> &str {
+    pub(crate) fn text(&self) -> &str {
         &self.resolved.text
     }
 
     /// The selected semantic target.
     #[must_use]
-    pub const fn target(&self) -> Target {
+    pub(crate) const fn target(&self) -> Target {
         self.resolved.target
     }
 
@@ -1914,7 +1957,7 @@ impl Transaction {
     ///
     /// Returns a typed refusal when the replacement has an incompatible
     /// encoding or when its changed length has unmodeled dependent ranges.
-    pub fn set_text(&mut self, value: impl Into<String>) -> Result<()> {
+    pub(crate) fn set_text(&mut self, value: impl Into<String>) -> Result<()> {
         let candidate = value.into();
         let encoded = encode_replacement(&candidate, self.resolved.kind)?;
         check_replacement(
@@ -1935,7 +1978,7 @@ impl Transaction {
     ///
     /// Returns an error if package publication or source-checked readback
     /// fails, or a typed refusal for an unsafe replacement.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         self.commit_verified().map(|(commit, _)| commit)
     }
 
@@ -2020,7 +2063,7 @@ impl Transaction {
 
 /// A published snapshot and its reversible source-checked patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     replaced_slide_persist_id: Option<u32>,
@@ -2029,19 +2072,19 @@ pub struct Commit {
 impl Commit {
     /// The immutable committed package.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// The source-checked patch that produced this snapshot.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consumes the commit into its snapshot and patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 
@@ -2145,7 +2188,7 @@ impl RootPublication {
 
 /// A reversible in-memory patch authorized by exact package bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct Patch {
     before: Snapshot,
     after: Snapshot,
     change: Option<Change>,
@@ -2162,19 +2205,19 @@ impl Patch {
 
     /// Exact source bytes required for forward application.
     #[must_use]
-    pub fn before(&self) -> &[u8] {
+    pub(crate) fn before(&self) -> &[u8] {
         self.before.bytes()
     }
 
     /// Exact target bytes produced by forward application.
     #[must_use]
-    pub fn after(&self) -> &[u8] {
+    pub(crate) fn after(&self) -> &[u8] {
         self.after.bytes()
     }
 
     /// Whether the patch changes no bytes.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.before.bytes() == self.after.bytes()
     }
 
@@ -2183,7 +2226,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if `current` is not that exact source artifact.
-    pub fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.bytes() != self.before.bytes() {
             return Err(PackageError::InvalidFormat(
                 "PPT shape-text patch source does not match its base artifact".into(),
@@ -2195,7 +2238,7 @@ impl Patch {
 
     /// Returns the exact-source-checked inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self::new(
             self.after.clone(),
             self.before.clone(),
@@ -2214,7 +2257,7 @@ impl Patch {
     ///
     /// Returns an error when caller-selected wire limits cannot represent the
     /// operation or its authored text.
-    pub fn to_durable(
+    pub(crate) fn to_durable(
         &self,
         limits: litchi_core::patch::PatchLimits,
     ) -> std::result::Result<
@@ -2346,8 +2389,7 @@ fn presentation_with_options(
     bytes: &[u8],
     options: crate::package::OpenOptions<'_>,
 ) -> PackageResult<Presentation> {
-    let mut package =
-        Reader::from_reader_with_limits(Cursor::new(bytes), options.get_source_limits())?;
+    let mut package = Reader::from_reader_with_options(Cursor::new(bytes), options)?;
     package.presentation_with_options(options)
 }
 

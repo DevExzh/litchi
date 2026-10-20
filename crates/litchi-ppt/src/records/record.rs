@@ -104,7 +104,7 @@ impl Record {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(
+    pub(crate) fn parse_with_limits(
         data: &[u8],
         offset: usize,
         limits: SourceLimits,
@@ -474,7 +474,7 @@ impl Record {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn versioned_binary_tag_records_with_limits(
+    pub(crate) fn versioned_binary_tag_records_with_limits(
         &self,
         version: u8,
         limits: SourceLimits,

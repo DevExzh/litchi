@@ -116,7 +116,8 @@ Removed from per-cell or per-operation paths (all in this change):
 | `litchi-eval` `evaluate_expression` operands | `Box::pin` per operand of every operator | none for literal and reference operands |
 | `litchi-xlsb` eager workbook lookups | a full worksheet clone per lookup and a cell clone per read | an `Arc` clone and a borrow |
 
-Kept, with the reason:
+Kept, with the reason (items 1 and 2 are resolved by
+[0353a](0353a-sheet-errors-and-sync-engine.md), where F1 and F2 landed):
 
 1. **The trait's error type, `Box<dyn Error + Send + Sync>`**
    (`litchi_core::sheet::Result`). It allocates only on a failure, never on

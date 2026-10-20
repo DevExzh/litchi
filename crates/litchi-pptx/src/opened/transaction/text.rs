@@ -145,10 +145,11 @@ impl Edit {
                         .iter()
                         .find(|note| note.owner() == selected_slide.part_name.as_str())
                 }) else {
-                    return Err(Error::UnsafeEdit {
-                        operation: "notes_text_structure",
-                        reason: "the slide has no notes page",
-                    });
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedTarget,
+                        "notes_text_structure",
+                        "the slide has no notes page",
+                    ));
                 };
                 let part_name = PackURI::new(note.part())
                     .map_err(|_error| invalid("opened-presentation notes part name is invalid"))?;

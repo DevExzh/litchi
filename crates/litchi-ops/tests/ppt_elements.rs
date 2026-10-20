@@ -535,7 +535,7 @@ fn theme_reads_the_round_trip_theme_like_pptx() {
 
 /// A deck with a bar and a pie Microsoft Graph chart.
 fn chart_deck() -> Vec<u8> {
-    use litchi_ppt::writer::{Chart, ChartKind};
+    use litchi_ppt::builder::{Chart, ChartKind};
     let mut writer = litchi_ppt::writer::Builder::new();
     let slide = writer.add_slide().unwrap();
     for kind in [ChartKind::Bar, ChartKind::Pie] {

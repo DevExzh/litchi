@@ -274,7 +274,7 @@ impl SpeakerNotes {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn programmable_tags_with_limits(
+    pub(crate) fn programmable_tags_with_limits(
         &self,
         limits: crate::ProgTagLimits,
     ) -> Result<Option<crate::ProgTags>> {

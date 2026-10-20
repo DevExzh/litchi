@@ -8,7 +8,7 @@ use litchi_core::sheet::{CellValue, Result};
 
 const MAX_FIXED_DECIMALS: i32 = 30;
 
-pub(crate) async fn eval_fixed(
+pub(crate) fn eval_fixed(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -19,14 +19,14 @@ pub(crate) async fn eval_fixed(
         ));
     }
 
-    let number_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let number_val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let number = match to_number(&number_val) {
         Some(n) => n,
         None => return Ok(CellValue::Error("FIXED number is not numeric".to_string())),
     };
 
     let decimals = if args.len() >= 2 {
-        let dec_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let dec_val = evaluate_expression(ctx, current_sheet, &args[1])?;
         match to_number(&dec_val) {
             Some(n) => n.trunc() as i32,
             None => {
@@ -41,7 +41,7 @@ pub(crate) async fn eval_fixed(
     let decimals = decimals.clamp(-MAX_FIXED_DECIMALS, MAX_FIXED_DECIMALS);
 
     let no_commas = if args.len() == 3 {
-        let flag_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+        let flag_val = evaluate_expression(ctx, current_sheet, &args[2])?;
         to_bool(&flag_val)
     } else {
         false
@@ -53,7 +53,7 @@ pub(crate) async fn eval_fixed(
     Ok(CellValue::String(formatted))
 }
 
-pub(crate) async fn eval_dollar(
+pub(crate) fn eval_dollar(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -64,14 +64,14 @@ pub(crate) async fn eval_dollar(
         ));
     }
 
-    let number_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let number_val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let number = match to_number(&number_val) {
         Some(n) => n,
         None => return Ok(CellValue::Error("DOLLAR number is not numeric".to_string())),
     };
 
     let decimals = if args.len() == 2 {
-        let dec_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let dec_val = evaluate_expression(ctx, current_sheet, &args[1])?;
         match to_number(&dec_val) {
             Some(n) => n.trunc() as i32,
             None => {
@@ -91,27 +91,23 @@ pub(crate) async fn eval_dollar(
     Ok(CellValue::String(text))
 }
 
-pub(crate) async fn eval_usdollar(
+pub(crate) fn eval_usdollar(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    eval_legacy_currency(ctx, current_sheet, args, "$", 2, "USDOLLAR").await
+    eval_legacy_currency(ctx, current_sheet, args, "$", 2, "USDOLLAR")
 }
 
-pub(crate) async fn eval_yen(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
-    eval_legacy_currency(ctx, current_sheet, args, "¥", 0, "YEN").await
+pub(crate) fn eval_yen(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
+    eval_legacy_currency(ctx, current_sheet, args, "¥", 0, "YEN")
 }
 
 /// Shared implementation for the legacy East Asian currency functions
 /// USDOLLAR and YEN (ECMA-376 §18.17.7.352 / §18.17.7.372). Unlike DOLLAR,
 /// negative values use the parenthesized accounting convention, e.g.
 /// `($1,234.57)`; the symbol and the default decimals differ per function.
-async fn eval_legacy_currency(
+fn eval_legacy_currency(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -125,7 +121,7 @@ async fn eval_legacy_currency(
         )));
     }
 
-    let number_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let number_val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let number = match to_number(&number_val) {
         Some(n) => n,
         None => {
@@ -136,7 +132,7 @@ async fn eval_legacy_currency(
     };
 
     let decimals = if args.len() == 2 {
-        let dec_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let dec_val = evaluate_expression(ctx, current_sheet, &args[1])?;
         match to_number(&dec_val) {
             Some(n) => n.trunc() as i32,
             None => {
@@ -161,19 +157,15 @@ async fn eval_legacy_currency(
     Ok(CellValue::String(text))
 }
 
-pub(crate) async fn eval_text(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_text(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 2 {
         return Ok(CellValue::Error(
             "TEXT expects 2 arguments (value, format_text)".to_string(),
         ));
     }
 
-    let value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let format_expr = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let value = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let format_expr = evaluate_expression(ctx, current_sheet, &args[1])?;
     let format_text = to_text(&format_expr);
     if format_text.is_empty() {
         return Ok(CellValue::Error(
@@ -603,26 +595,26 @@ mod tests {
         Expr::Literal(CellValue::String(s.to_string()))
     }
 
-    #[tokio::test]
-    async fn test_eval_fixed_default() {
+    #[test]
+    fn test_eval_fixed_default() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(1234.567)];
-        let result = eval_fixed(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_fixed(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("1,234.57".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_fixed_custom_decimals() {
+    #[test]
+    fn test_eval_fixed_custom_decimals() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(1234.567), Expr::Literal(CellValue::Int(1))];
-        let result = eval_fixed(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_fixed(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("1,234.6".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_fixed_no_commas() {
+    #[test]
+    fn test_eval_fixed_no_commas() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![
@@ -630,205 +622,205 @@ mod tests {
             Expr::Literal(CellValue::Int(2)),
             Expr::Literal(CellValue::Bool(true)),
         ];
-        let result = eval_fixed(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_fixed(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("1234.57".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_fixed_negative() {
+    #[test]
+    fn test_eval_fixed_negative() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(-1234.5)];
-        let result = eval_fixed(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_fixed(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("-1,234.50".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_fixed_wrong_args() {
+    #[test]
+    fn test_eval_fixed_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args: Vec<Expr> = vec![];
-        let result = eval_fixed(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_fixed(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 1 to 3")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_dollar_default() {
+    #[test]
+    fn test_eval_dollar_default() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(1234.567)];
-        let result = eval_dollar(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dollar(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("$1,234.57".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_dollar_custom_decimals() {
+    #[test]
+    fn test_eval_dollar_custom_decimals() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(1234.567), Expr::Literal(CellValue::Int(0))];
-        let result = eval_dollar(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dollar(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("$1,235".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_dollar_negative() {
+    #[test]
+    fn test_eval_dollar_negative() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(-1234.5)];
-        let result = eval_dollar(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dollar(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("-$1,234.50".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_dollar_wrong_args() {
+    #[test]
+    fn test_eval_dollar_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args: Vec<Expr> = vec![];
-        let result = eval_dollar(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dollar(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 1 or 2")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_usdollar_default() {
+    #[test]
+    fn test_eval_usdollar_default() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(1234.567)];
-        let result = eval_usdollar(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_usdollar(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("$1,234.57".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_usdollar_negative_parenthesized() {
+    #[test]
+    fn test_eval_usdollar_negative_parenthesized() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(-1234.567), Expr::Literal(CellValue::Int(2))];
-        let result = eval_usdollar(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_usdollar(ctx, "Sheet1", &args).unwrap();
         // ECMA-376 USDOLLAR uses the accounting-style parenthesized negative.
         assert_eq!(result, CellValue::String("($1,234.57)".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_usdollar_negative_decimals_round_left() {
+    #[test]
+    fn test_eval_usdollar_negative_decimals_round_left() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(1234.567), Expr::Literal(CellValue::Int(-2))];
-        let result = eval_usdollar(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_usdollar(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("$1,200".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_usdollar_non_numeric() {
+    #[test]
+    fn test_eval_usdollar_non_numeric() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("abc")];
-        let result = eval_usdollar(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_usdollar(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("not numeric")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_yen_default_zero_decimals() {
+    #[test]
+    fn test_eval_yen_default_zero_decimals() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(1234.567)];
-        let result = eval_yen(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_yen(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("¥1,235".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_yen_custom_decimals() {
+    #[test]
+    fn test_eval_yen_custom_decimals() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(1234.567), Expr::Literal(CellValue::Int(2))];
-        let result = eval_yen(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_yen(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("¥1,234.57".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_yen_negative_parenthesized() {
+    #[test]
+    fn test_eval_yen_negative_parenthesized() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(-1234.567)];
-        let result = eval_yen(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_yen(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("(¥1,235)".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_yen_wrong_args() {
+    #[test]
+    fn test_eval_yen_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args: Vec<Expr> = vec![];
-        let result = eval_yen(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_yen(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 1 or 2")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_text_number_simple() {
+    #[test]
+    fn test_eval_text_number_simple() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(1234.5), str_expr("0.00")];
-        let result = eval_text(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_text(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("1234.50".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_text_number_integer() {
+    #[test]
+    fn test_eval_text_number_integer() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(1234.5), str_expr("0")];
-        let result = eval_text(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_text(ctx, "Sheet1", &args).unwrap();
         // "0" format truncates to integer
         assert_eq!(result, CellValue::String("1234".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_text_string() {
+    #[test]
+    fn test_eval_text_string() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello"), str_expr("@")];
-        let result = eval_text(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_text(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("hello".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_text_string_with_prefix() {
+    #[test]
+    fn test_eval_text_string_with_prefix() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Simple format patterns without 4th section just return string as-is
         let args = vec![str_expr("hello"), str_expr("@")];
-        let result = eval_text(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_text(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("hello".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_text_empty_format() {
+    #[test]
+    fn test_eval_text_empty_format() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(123.0), str_expr("")];
-        let result = eval_text(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_text(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("must not be empty")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_text_wrong_args() {
+    #[test]
+    fn test_eval_text_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(123.0)];
-        let result = eval_text(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_text(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 2 arguments")),
             _ => panic!("Expected Error"),

@@ -32,7 +32,7 @@ fn master_text_style_inventories_are_exposed_by_the_owner_part() {
 }
 
 fn package_with_master_xml() -> Package {
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     package.to_bytes().unwrap();
     let package_bytes = package.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&package_bytes).unwrap();

@@ -31,7 +31,7 @@ pub mod validation {
 
     use super::model::Connections;
     use super::package;
-    use litchi_core::sheet::Result;
+    use crate::BoxedResult as Result;
 
     pub fn connections(value: &Connections) -> Result<()> {
         value.to_xml(false).map(|_| ())

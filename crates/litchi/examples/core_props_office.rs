@@ -60,7 +60,7 @@ fn create_pptx(directory: &Path) -> Result<()> {
     let package = builder.build()?;
     let mut graph = package.opc()?.clone();
     let _ = properties::write(&mut graph, &smoke_props("PPTX"))?;
-    let mut package = pptx::Package::from_opc_package(graph)?;
+    let package = pptx::Package::from_opc_package(graph)?;
     package.save(&authored)?;
 
     let package = pptx::Package::open(&authored)?;
@@ -69,7 +69,7 @@ fn create_pptx(directory: &Path) -> Result<()> {
     }
     let mut graph = package.opc()?.clone();
     let _ = properties::clear(&mut graph)?;
-    let mut package = pptx::Package::from_opc_package(graph)?;
+    let package = pptx::Package::from_opc_package(graph)?;
     package.save(&cleared)?;
     Ok(())
 }

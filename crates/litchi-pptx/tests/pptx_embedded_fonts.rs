@@ -61,7 +61,7 @@ fn presentation_embedded_fonts_validate_font_relationships() {
 }
 
 fn package_with_embedded_font() -> Package {
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
     let font_name = PackURI::new("/ppt/fonts/example.odttf").unwrap();
 
@@ -85,7 +85,7 @@ fn package_with_embedded_font() -> Package {
     Package::from_opc_package(opc).unwrap()
 }
 
-fn edit_package(mut package: Package, edit: impl FnOnce(&mut OpcPackage)) -> Package {
+fn edit_package(package: Package, edit: impl FnOnce(&mut OpcPackage)) -> Package {
     let bytes = package.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
     edit(&mut opc);

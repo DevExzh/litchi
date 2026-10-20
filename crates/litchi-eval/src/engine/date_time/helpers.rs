@@ -6,12 +6,12 @@ use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime, NaiveTime, Timelike, 
 
 pub(crate) const SECONDS_PER_DAY: f64 = 86_400.0;
 
-pub(super) async fn number_arg(
+pub(super) fn number_arg(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     expr: &Expr,
 ) -> Result<Option<f64>> {
-    let v = evaluate_expression(ctx, current_sheet, expr).await?;
+    let v = evaluate_expression(ctx, current_sheet, expr)?;
     Ok(to_number(&v))
 }
 
@@ -174,12 +174,12 @@ pub(super) fn add_months(date: NaiveDate, months: i32) -> Option<NaiveDate> {
     result
 }
 
-pub(super) async fn collect_holiday_dates(
+pub(super) fn collect_holiday_dates(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     expr: &Expr,
 ) -> Result<Vec<NaiveDate>> {
-    let range = flatten_range_expr(ctx, current_sheet, expr).await?;
+    let range = flatten_range_expr(ctx, current_sheet, expr)?;
     let mut out = Vec::new();
     for v in &range.values {
         if let Some(n) = to_number(v)

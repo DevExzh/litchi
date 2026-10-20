@@ -3,7 +3,8 @@
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{OpcPackage, PackURI};
 
-use super::{Commit, Patch, Snapshot};
+use super::Snapshot;
+use super::transaction::{Change, Prepared};
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
@@ -13,7 +14,7 @@ pub(crate) fn load(package: &OpcPackage, owner: &PackURI) -> Result<Snapshot> {
     Snapshot::from_source(part.partname().clone(), part.blob().to_vec())
 }
 
-pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     let (snapshot, patch) = commit.into_parts();
     if patch.after() != snapshot.state() {
         return Err(Error::Invalid(
@@ -23,14 +24,11 @@ pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<S
     apply_patch(package, &patch)
 }
 
-pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     let part = package.get_part(&patch.owner)?;
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
     if part.blob() != patch.source {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_change_tracking_patch",
-            reason: "the selected slide no longer matches the patch source",
-        });
+        return Err(Error::PatchConflict);
     }
     let snapshot = Snapshot::from_source(patch.owner.clone(), patch.target.clone())?;
     if snapshot.state() != patch.after() {
@@ -43,10 +41,7 @@ pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Sna
         let mutable_part = package.get_part_mut(&patch.owner)?;
         crate::parts::validate_content_type(mutable_part, ct::PML_SLIDE)?;
         if mutable_part.blob() != patch.source {
-            return Err(Error::UnsafeEdit {
-                operation: "apply_change_tracking_patch",
-                reason: "the selected slide changed during patch validation",
-            });
+            return Err(Error::PatchConflict);
         }
         mutable_part.set_blob(patch.target.clone());
         settle_unsigned_change(package)?;

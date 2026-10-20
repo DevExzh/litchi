@@ -198,7 +198,7 @@ fn the_eager_editor_removes_the_section_entry_too() {
     let package = litchi_pptx::Package::from_reader(std::io::Cursor::new(SECTIONS)).unwrap();
     let mut edit = package.edit().unwrap();
     edit.remove_slide(3_usize).unwrap();
-    let (mut updated, _) = edit.commit().unwrap().into_parts();
+    let (updated, _) = edit.commit().unwrap().into_parts();
     assert_eq!(
         sections(&updated.to_bytes().unwrap()),
         [vec![401, 377, 366], vec![403, 404, 309]]

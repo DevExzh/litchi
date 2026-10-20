@@ -2,7 +2,7 @@
 
 use super::codec::bounded;
 use super::{codec, invalid};
-use litchi_core::sheet::Result;
+use crate::BoxedResult as Result;
 use std::collections::{HashMap, HashSet};
 
 // XML namespaces and package limits are kept with the typed owner so every layer

@@ -70,7 +70,7 @@ fn durable_forward_and_inverse_preserve_exact_metadata() {
         )
         .unwrap();
     let patch = Patch::capture(&source, &direct, main.clone(), Limits::default()).unwrap();
-    let patch = Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
+    let patch = Patch::from_bytes(&patch.to_bytes().unwrap(), Limits::default()).unwrap();
     let mut replayed = source.clone();
     apply(&mut replayed, &patch, true).unwrap();
     assert_eq!(
@@ -165,7 +165,7 @@ fn add(source: &OpcPackage, id: &str) -> OpcPackage {
 }
 fn durable(source: &OpcPackage, target: &OpcPackage) -> Patch {
     let patch = Patch::capture(source, target, main(), Limits::default()).unwrap();
-    Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap()
+    Patch::from_bytes(&patch.to_bytes().unwrap(), Limits::default()).unwrap()
 }
 #[test]
 fn disjoint_metadata_keys_join_deterministically_and_invert_exactly() {
@@ -178,7 +178,7 @@ fn disjoint_metadata_keys_join_deterministically_and_invert_exactly() {
         joined.to_bytes().unwrap(),
         right.join(&left).unwrap().to_bytes().unwrap()
     );
-    let joined = Patch::from_bytes(&joined.to_bytes().unwrap()).unwrap();
+    let joined = Patch::from_bytes(&joined.to_bytes().unwrap(), Limits::default()).unwrap();
     let mut result = source.clone();
     apply(&mut result, &joined, true).unwrap();
     assert!(
@@ -199,7 +199,8 @@ fn disjoint_metadata_keys_join_deterministically_and_invert_exactly() {
     );
     let published = PackageWriter::to_bytes(&result).unwrap();
     let mut result = OpcPackage::from_bytes(&published).unwrap();
-    let inverse = Patch::from_bytes(&joined.inverse().to_bytes().unwrap()).unwrap();
+    let inverse =
+        Patch::from_bytes(&joined.inverse().to_bytes().unwrap(), Limits::default()).unwrap();
     apply(&mut result, &inverse, true).unwrap();
     assert_eq!(
         result.source_content_types().unwrap().bytes(),
@@ -311,25 +312,28 @@ fn metadata_wire_is_framed_before_allocation_and_old_versions_are_refused() {
     let patch = durable(&source, &add(&source, "rIdPatch"));
     let bytes = patch.to_bytes().unwrap();
     for end in 0..bytes.len() {
-        assert!(Patch::from_bytes(&bytes[..end]).is_err(), "prefix {end}");
+        assert!(
+            Patch::from_bytes(&bytes[..end], Limits::default()).is_err(),
+            "prefix {end}"
+        );
     }
     let mut old = bytes.clone();
     old[..8].copy_from_slice(b"LPTX0002");
-    assert!(Patch::from_bytes(&old).is_err());
+    assert!(Patch::from_bytes(&old, Limits::default()).is_err());
     let metadata_start = bytes.len() - patch.metadata.encoded_len().unwrap();
     let mut stripped = bytes[..metadata_start].to_vec();
     stripped.extend_from_slice(&0u32.to_le_bytes());
-    assert!(Patch::from_bytes(&stripped).is_err());
+    assert!(Patch::from_bytes(&stripped, Limits::default()).is_err());
     let mut forged = bytes.clone();
     forged[metadata_start..metadata_start + 4].copy_from_slice(&u32::MAX.to_le_bytes());
     let generous = Limits::new(usize::MAX, bytes.len(), 1024, 1, bytes.len(), bytes.len()).unwrap();
-    assert!(Patch::from_bytes_with_limits(&forged, generous).is_err());
+    assert!(Patch::from_bytes(&forged, generous).is_err());
     let mut trailing = bytes.clone();
     trailing.push(0);
-    assert!(Patch::from_bytes(&trailing).is_err());
+    assert!(Patch::from_bytes(&trailing, Limits::default()).is_err());
     let exact = Limits::new(4096, bytes.len(), 1024, 1, bytes.len(), bytes.len()).unwrap();
     assert_eq!(
-        Patch::from_bytes_with_limits(&bytes, exact)
+        Patch::from_bytes(&bytes, exact)
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -397,11 +401,12 @@ fn root_three_way_merges_disjoint_ids_and_inverts_after_durable_decode() {
             .to_bytes()
             .unwrap()
     );
-    let merged = Patch::from_bytes(&merged.to_bytes().unwrap()).unwrap();
+    let merged = Patch::from_bytes(&merged.to_bytes().unwrap(), Limits::default()).unwrap();
     let mut target = source.clone();
     apply(&mut target, &merged, true).unwrap();
     assert!(target.rels().get("left").is_some() && target.rels().get("right").is_some());
-    let inverse = Patch::from_bytes(&merged.inverse().to_bytes().unwrap()).unwrap();
+    let inverse =
+        Patch::from_bytes(&merged.inverse().to_bytes().unwrap(), Limits::default()).unwrap();
     apply(&mut target, &inverse, true).unwrap();
     assert_eq!(
         PackageWriter::to_bytes(&source).unwrap(),
@@ -440,7 +445,7 @@ fn root_three_way_resolution_keeps_graph_and_exact_metadata_together() {
             (Resolution::Right, &right_target),
         ] {
             let patch = plan.resolve(0, resolution).unwrap().finish().unwrap();
-            let patch = Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
+            let patch = Patch::from_bytes(&patch.to_bytes().unwrap(), Limits::default()).unwrap();
             let mut target = source.clone();
             apply(&mut target, &patch, true).unwrap();
             assert_eq!(
@@ -449,7 +454,8 @@ fn root_three_way_resolution_keeps_graph_and_exact_metadata_together() {
             );
             apply(
                 &mut target,
-                &Patch::from_bytes(&patch.inverse().to_bytes().unwrap()).unwrap(),
+                &Patch::from_bytes(&patch.inverse().to_bytes().unwrap(), Limits::default())
+                    .unwrap(),
                 true,
             )
             .unwrap();
@@ -478,7 +484,7 @@ fn root_resolution_retains_independent_part_metadata() {
         .unwrap()
         .finish()
         .unwrap();
-    let selected = Patch::from_bytes(&selected.to_bytes().unwrap()).unwrap();
+    let selected = Patch::from_bytes(&selected.to_bytes().unwrap(), Limits::default()).unwrap();
     let mut target = source.clone();
     apply(&mut target, &selected, true).unwrap();
     assert_eq!(
@@ -492,7 +498,7 @@ fn root_resolution_retains_independent_part_metadata() {
     );
     apply(
         &mut target,
-        &Patch::from_bytes(&selected.inverse().to_bytes().unwrap()).unwrap(),
+        &Patch::from_bytes(&selected.inverse().to_bytes().unwrap(), Limits::default()).unwrap(),
         true,
     )
     .unwrap();
@@ -531,7 +537,7 @@ fn root_and_payload_conflicts_resolve_independently_in_stable_order() {
     let mut target = source.clone();
     apply(
         &mut target,
-        &Patch::from_bytes(&selected.to_bytes().unwrap()).unwrap(),
+        &Patch::from_bytes(&selected.to_bytes().unwrap(), Limits::default()).unwrap(),
         true,
     )
     .unwrap();
@@ -679,14 +685,15 @@ fn part_three_way_selects_payload_graph_and_metadata_as_one_candidate() {
             (Resolution::Right, &right),
         ] {
             let patch = plan.resolve(0, resolution).unwrap().finish().unwrap();
-            let patch = Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
+            let patch = Patch::from_bytes(&patch.to_bytes().unwrap(), Limits::default()).unwrap();
             let mut result = source.clone();
             apply(&mut result, &patch, true).unwrap();
             assert_eq!(
                 PackageWriter::to_bytes(expected).unwrap(),
                 PackageWriter::to_bytes(&result).unwrap()
             );
-            let inverse = Patch::from_bytes(&patch.inverse().to_bytes().unwrap()).unwrap();
+            let inverse =
+                Patch::from_bytes(&patch.inverse().to_bytes().unwrap(), Limits::default()).unwrap();
             apply(&mut result, &inverse, true).unwrap();
             assert_eq!(
                 PackageWriter::to_bytes(&source).unwrap(),
@@ -715,7 +722,7 @@ fn resolving_a_part_preserves_other_owners_and_content_type_edits() {
     let mut result = source.clone();
     apply(
         &mut result,
-        &Patch::from_bytes(&selected.to_bytes().unwrap()).unwrap(),
+        &Patch::from_bytes(&selected.to_bytes().unwrap(), Limits::default()).unwrap(),
         true,
     )
     .unwrap();
@@ -740,7 +747,7 @@ fn resolving_a_part_preserves_other_owners_and_content_type_edits() {
     );
     apply(
         &mut result,
-        &Patch::from_bytes(&selected.inverse().to_bytes().unwrap()).unwrap(),
+        &Patch::from_bytes(&selected.inverse().to_bytes().unwrap(), Limits::default()).unwrap(),
         true,
     )
     .unwrap();
@@ -776,7 +783,7 @@ fn root_and_part_metadata_choices_share_exact_combined_admission() {
     let mut result = source.clone();
     apply(
         &mut result,
-        &Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap(),
+        &Patch::from_bytes(&patch.to_bytes().unwrap(), Limits::default()).unwrap(),
         true,
     )
     .unwrap();
@@ -787,7 +794,7 @@ fn root_and_part_metadata_choices_share_exact_combined_admission() {
     );
     apply(
         &mut result,
-        &Patch::from_bytes(&patch.inverse().to_bytes().unwrap()).unwrap(),
+        &Patch::from_bytes(&patch.inverse().to_bytes().unwrap(), Limits::default()).unwrap(),
         true,
     )
     .unwrap();

@@ -391,16 +391,21 @@ mod source_pptx_path {
             .unwrap()
             .relationship_id()
             .to_owned();
-        package
-            .edit_opc(|opc| {
-                let presentation =
-                    opc.get_part_mut(&litchi_opc::PackURI::new("/ppt/presentation.xml").unwrap())?;
-                presentation
-                    .rels_mut()
-                    .retarget(&second, "../docProps/core.xml".to_owned())?;
-                Ok(())
-            })
-            .unwrap();
+        {
+            let mut opc_edit = package.edit_opc().unwrap();
+            opc_edit
+                .update(|opc| {
+                    let presentation = opc.get_part_mut(
+                        &litchi_opc::PackURI::new("/ppt/presentation.xml").unwrap(),
+                    )?;
+                    presentation
+                        .rels_mut()
+                        .retarget(&second, "../docProps/core.xml".to_owned())?;
+                    Ok(())
+                })
+                .unwrap();
+            package = opc_edit.commit().unwrap().into_package();
+        }
         let output = tempfile::Builder::new().suffix(".pptx").tempfile().unwrap();
         package.save(output.path()).unwrap();
         let bytes = std::fs::read(output.path()).unwrap();
@@ -571,13 +576,17 @@ mod source_pptx_path {
             0,
         )
         .unwrap();
-        let presentation =
-            litchi_pptx::SourceBackedPresentation::from_path_with_limits_and_execution_context(
-                temporary.path(),
-                litchi_pptx::SourceLimits::default(),
-                litchi_core::ExecutionContext::new(budget, cancellation, limits),
-            )
-            .unwrap();
+        let presentation = litchi_pptx::SourceBackedPresentation::open_with_options(
+            temporary.path(),
+            litchi_pptx::OpenOptions::default()
+                .source_limits(litchi_pptx::SourceLimits::default())
+                .execution_context(litchi_core::ExecutionContext::new(
+                    budget,
+                    cancellation,
+                    limits,
+                )),
+        )
+        .unwrap();
         let file = File::Pptx(Pptx::from_source(presentation, &OpenOptions::new()));
         assert!(file.metadata().unwrap().is_some());
 

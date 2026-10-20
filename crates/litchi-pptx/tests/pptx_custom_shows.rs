@@ -51,7 +51,7 @@ fn presentation_structure_owner_validates_slide_relationships() {
 }
 
 fn package_with_custom_shows() -> OpcPackage {
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     let bytes = package.to_bytes().unwrap();
     let mut package = OpcPackage::from_vec(bytes).unwrap();
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();

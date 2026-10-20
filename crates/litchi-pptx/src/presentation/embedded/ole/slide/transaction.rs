@@ -147,7 +147,7 @@ impl Snapshot {
     }
 
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Draft {
         let parts: HashMap<PackURI, &PartSource> = self
             .parts
             .iter()
@@ -168,7 +168,7 @@ impl Snapshot {
                 }),
             })
             .collect();
-        Edit {
+        Draft {
             source: self.clone(),
             working,
         }
@@ -193,12 +193,12 @@ struct Working {
 
 /// Failure-atomic editor over one slide-owned OLE object collection.
 #[derive(Debug, Clone)]
-pub struct Edit {
+pub struct Draft {
     source: Snapshot,
     working: Vec<Working>,
 }
 
-impl Edit {
+impl Draft {
     #[must_use]
     pub fn source(&self) -> &Snapshot {
         &self.source
@@ -458,13 +458,13 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Prepared> {
         if !self.is_changed() {
-            let patch = Patch {
+            let patch = Change {
                 before: self.source.clone(),
                 after: self.source.clone(),
             };
-            return Ok(Commit {
+            return Ok(Prepared {
                 snapshot: self.source,
                 patch,
             });
@@ -479,11 +479,11 @@ impl Edit {
             build.parts,
             self.source.package_part_names.as_ref().clone(),
         )?;
-        let patch = Patch {
+        let patch = Change {
             before: self.source,
             after: snapshot.clone(),
         };
-        Ok(Commit { snapshot, patch })
+        Ok(Prepared { snapshot, patch })
     }
 
     fn normalize_indices(&mut self) {
@@ -503,93 +503,76 @@ impl Edit {
 
 /// A successful detached OLE edit and its reversible source-checked patch.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Prepared {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: Snapshot,
-    patch: Patch,
+    patch: Change,
 }
 
-impl Commit {
+impl Prepared {
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    #[cfg(test)]
+    pub(crate) fn patch(&self) -> &Change {
         &self.patch
     }
 
+    #[cfg(test)]
     fn is_changed(&self) -> bool {
         !self.patch.is_noop()
     }
 
     /// The outcome of this edit or commit.
     #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
         crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     #[must_use]
-    pub fn into_patch(self) -> Patch {
+    pub(crate) fn into_patch(self) -> Change {
         self.patch
     }
 }
 
 /// Reversible, source-checked replacement of one slide-owned OLE graph.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub(crate) struct Change {
     before: Snapshot,
     after: Snapshot,
 }
 
-impl Patch {
+impl Change {
     #[must_use]
-    pub fn before(&self) -> &Snapshot {
+    pub(crate) fn before(&self) -> &Snapshot {
         &self.before
     }
 
     #[must_use]
-    pub fn after(&self) -> &Snapshot {
+    pub(crate) fn after(&self) -> &Snapshot {
         &self.after
     }
 
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     #[must_use]
-    pub fn expected_revision(&self) -> Revision {
-        self.before.revision
-    }
-
-    #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
         }
-    }
-
-    /// A change to a signed package is refused with
-    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-    /// (ADR 0006) before anything is mutated: remove the signature explicitly
-    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
-    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
-    /// no-op keeps the signature.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        super::package::apply_patch(package, self)
-    }
-
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn undo(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        self.inverse().apply(package)
     }
 }
 
@@ -842,7 +825,7 @@ fn build_after(source: &Snapshot, working: &[Working]) -> Result<Build> {
         .collect();
     for (index, _) in source.objects.iter().enumerate() {
         if !kept.contains(&index) {
-            edits.push(codec::Edit {
+            edits.push(codec::Draft {
                 range: document.frames[index].frame.clone(),
                 replacement: Vec::new(),
             });
@@ -863,7 +846,7 @@ fn add_object_edits(
     located: &Located,
     before: &Object,
     after: &Object,
-    edits: &mut Vec<codec::Edit>,
+    edits: &mut Vec<codec::Draft>,
 ) -> Result<()> {
     if before.name != after.name
         && let Some(edit) = codec::attribute_edit(

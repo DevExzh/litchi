@@ -127,7 +127,7 @@ fn validate(change: &Change<'_>, max_text_bytes: usize) -> Result<()> {
         ..*properties
     };
     if !check.is_empty() {
-        super::validate(&super::TextEdit::new(
+        super::validate(&super::TextAssignment::new(
             super::TextTarget::Shape {
                 shape: Position::new(0),
             },
@@ -228,10 +228,11 @@ fn change_body(body: &[u8], change: &Change<'_>) -> Result<Vec<u8>> {
                 .get(paragraph)
                 .ok_or_else(|| out_of_bounds(paragraph, paragraphs.len()))?;
             if paragraphs.len() == 1 {
-                return Err(Error::UnsafeEdit {
-                    operation: "remove_paragraph",
-                    reason: "a text body keeps at least one paragraph",
-                });
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "remove_paragraph",
+                    "a text body keeps at least one paragraph",
+                ));
             }
             splices.replace(target.span.clone(), Vec::new());
         },
@@ -336,10 +337,11 @@ pub(crate) fn stage_text_structure(
     validate(change, max_text_bytes)?;
     let original = crate::shape::Scene::read(xml)?;
     if original.is_rewritten() {
-        return Err(Error::UnsafeEdit {
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
             operation,
-            reason: "text structure edits do not support markup-compatibility branch selection",
-        });
+            "text structure edits do not support markup-compatibility branch selection",
+        ));
     }
     let shape = original.at(body.shape().get())?;
     let span = shape.common().span()?.range(xml.len())?;
@@ -348,10 +350,11 @@ pub(crate) fn stage_text_structure(
     let replacement = match body {
         TextBody::Cell { row, column, .. } => {
             if !is_table {
-                return Err(Error::UnsafeEdit {
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedTarget,
                     operation,
-                    reason: "a table cell body requires a table graphic frame",
-                });
+                    "a table cell body requires a table graphic frame",
+                ));
             }
             rewrite_cell_frame(element, row.get(), column.get(), |cell| {
                 let node = root(cell)?;
@@ -359,10 +362,11 @@ pub(crate) fn stage_text_structure(
                     return Err(invalid("an empty a:tc has no text body"));
                 }
                 let kids = children(cell, &node)?;
-                let text = child(cell, &kids, b"txBody").ok_or(Error::UnsafeEdit {
+                let text = child(cell, &kids, b"txBody").ok_or(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedTarget,
                     operation,
-                    reason: "the table cell has no text body",
-                })?;
+                    "the table cell has no text body",
+                ))?;
                 let rewritten = change_body(&cell[text.span.clone()], change)?;
                 let mut splices = Splices::new();
                 splices.replace(text.span.clone(), rewritten);
@@ -371,17 +375,19 @@ pub(crate) fn stage_text_structure(
         },
         TextBody::Shape { .. } | TextBody::Notes { .. } => {
             if is_table {
-                return Err(Error::UnsafeEdit {
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedTarget,
                     operation,
-                    reason: "a table frame's text lives in its cells",
-                });
+                    "a table frame's text lives in its cells",
+                ));
             }
             let node = root(element)?;
             let kids = children(element, &node)?;
-            let text = child(element, &kids, b"txBody").ok_or(Error::UnsafeEdit {
+            let text = child(element, &kids, b"txBody").ok_or(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
                 operation,
-                reason: "the shape has no text body",
-            })?;
+                "the shape has no text body",
+            ))?;
             let rewritten = change_body(&element[text.span.clone()], change)?;
             let mut splices = Splices::new();
             splices.replace(text.span.clone(), rewritten);

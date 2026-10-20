@@ -124,7 +124,7 @@ fn effective_transition(
 fn package_with_transition_fragments(fragments: &[(&str, &str, &str)]) -> OpcPackage {
     let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     builder.presentation().unwrap().add_slide().unwrap();
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     let bytes = package.to_bytes().unwrap();
     let mut package = OpcPackage::from_vec(bytes).unwrap();
     for (part_name, end_tag, fragment) in fragments {

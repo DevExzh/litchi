@@ -7,8 +7,8 @@
 use litchi_ppt::animation::AnimationInfo;
 use litchi_ppt::writer::{Builder, Hyperlink};
 use litchi_ppt::{
-    Interaction, InteractionAction, InteractionJump, InteractionLimits, InteractionLinkTarget,
-    InteractionTrigger, raw::Reader,
+    Interaction, InteractionAction, InteractionJump, InteractionLinkTarget, InteractionTrigger,
+    raw::Reader,
 };
 use std::io::Cursor;
 
@@ -128,16 +128,6 @@ fn failed_replacement_is_atomic_and_trigger_removal_is_precise() {
     writer
         .set_last_shape_interaction(slide, existing.clone())
         .unwrap();
-
-    let too_small = InteractionLimits {
-        max_record_bytes: 31,
-        ..InteractionLimits::default()
-    };
-    assert!(
-        writer
-            .set_last_shape_interaction_with_limits(slide, existing.clone(), too_small)
-            .is_err()
-    );
 
     let mut dangling = Interaction::new(
         InteractionTrigger::Click,

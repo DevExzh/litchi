@@ -31,7 +31,7 @@ use crate::{Code, Error, Props, Result};
 use litchi_core::FileFormat;
 use litchi_core::Position;
 use litchi_core::selector::{Path, Predicate};
-use litchi_pptx::opened::{TextEdit, TextTarget};
+use litchi_pptx::opened::{TextAssignment, TextTarget};
 use litchi_pptx::shape::owned::{Handle, Scene};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -1259,7 +1259,10 @@ fn stage_batch(
                 item.plan.format.as_ref().ok_or_else(|| {
                     Error::new(Code::InternalError, "PPTX format batch lost a plan")
                 })?;
-            edits.push(TextEdit::new(format.target, format.values.properties()));
+            edits.push(TextAssignment::new(
+                format.target,
+                format.values.properties(),
+            ));
         }
         // One native call per slide: the chunks keep the per-call limits
         // and share one scene read and publication.
@@ -1394,7 +1397,10 @@ fn stage_notes(
             .format
             .as_ref()
             .ok_or_else(|| Error::new(Code::InternalError, "PPTX notes batch lost a plan"))?;
-        edits.push(TextEdit::new(format.target, format.values.properties()));
+        edits.push(TextAssignment::new(
+            format.target,
+            format.values.properties(),
+        ));
     }
     let mut chunks = Vec::new();
     chunks
@@ -1441,14 +1447,20 @@ fn stage_one(edit: &mut NativeEdit, plan: &Plan) -> Result<()> {
                 "PPTX notes formatting joined a source-backed run",
             ));
         };
-        let edits = [TextEdit::new(format.target, format.values.properties())];
+        let edits = [TextAssignment::new(
+            format.target,
+            format.values.properties(),
+        )];
         return edit
             .set_notes_text_properties(plan.target.slide, &edits)
             .map(|_| ())
             .map_err(native_error);
     }
     if let Some(format) = &plan.format {
-        let edits = [TextEdit::new(format.target, format.values.properties())];
+        let edits = [TextAssignment::new(
+            format.target,
+            format.values.properties(),
+        )];
         return match edit {
             NativeEdit::Source(edit) => edit
                 .set_text_properties(Position::new(plan.target.slide), &edits)

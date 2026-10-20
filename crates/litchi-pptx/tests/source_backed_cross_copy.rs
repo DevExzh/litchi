@@ -517,15 +517,17 @@ fn source_backed_cross_copy_chart_cancellation_is_fallible() -> TestResult {
     );
     let (cancellation, token) = CancellationSource::pair();
     let context = ExecutionContext::new(budget, token, single_execution_limits()?);
-    let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
+    let source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(source_bytes)),
-        SourceLimits::default(),
-        context.clone(),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context.clone()),
     )?;
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(destination_bytes)),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )?;
     cancellation.cancel();
     assert!(editor.plan_cross_slide_copy(&source, 0, 1, 1).is_err());
@@ -542,10 +544,11 @@ fn source_backed_cross_copy_chart_limits_fail_before_materialization() -> TestRe
     let (_cancellation, token) = CancellationSource::pair();
     let context = ExecutionContext::new(budget, token, single_execution_limits()?);
     assert!(
-        SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
+        SourceBackedPresentation::from_read_at_with_options(
             Arc::new(OwnedSource::new(source_bytes)),
-            SourceLimits::default(),
-            context,
+            litchi_pptx::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .execution_context(context)
         )
         .is_err()
     );
@@ -947,7 +950,7 @@ fn authored_package(slide_titles: &[&str]) -> TestResult<Vec<u8>> {
             slide.add_text_box(&format!("body:{title}"), 10, 20, 300, 400);
         }
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     package.to_bytes()
 }
 
@@ -1700,9 +1703,9 @@ fn source_backed_cross_copy_refuses_limits_and_cancellation_before_output() -> T
         .map_err(|error| Error::Invalid(error.to_string()))?
         .build()?;
     assert!(
-        SourceBackedPresentation::from_read_at_with_limits(
+        SourceBackedPresentation::from_read_at_with_options(
             Arc::new(OwnedSource::new(source_bytes.clone())),
-            too_small,
+            litchi_pptx::OpenOptions::default().source_limits(too_small)
         )
         .is_err()
     );
@@ -1720,15 +1723,17 @@ fn source_backed_cross_copy_refuses_limits_and_cancellation_before_output() -> T
     )
     .map_err(|error| Error::Invalid(error.to_string()))?;
     let context = ExecutionContext::new(budget, cancellation, execution_limits);
-    let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
+    let source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(source_bytes)),
-        SourceLimits::default(),
-        context.clone(),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context.clone()),
     )?;
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(destination_bytes)),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )?;
     cancellation_source.cancel();
     assert!(editor.plan_cross_slide_copy(&source, 0, 1, 1).is_err());
@@ -1752,15 +1757,17 @@ fn source_backed_cross_copy_preserves_typed_cancellation_during_output() -> Test
     )
     .map_err(|error| Error::Invalid(error.to_string()))?;
     let context = ExecutionContext::new(budget, cancellation, execution_limits);
-    let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
+    let source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(source_bytes)),
-        SourceLimits::default(),
-        context.clone(),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context.clone()),
     )?;
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(destination_bytes)),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )?;
     let plan = editor.plan_cross_slide_copy(&source, 0, 1, 1)?;
     let mut writer = CancellingWriter::new(cancellation_source);
@@ -1834,17 +1841,18 @@ fn source_backed_cross_copy_managed_memory_reservation_is_exact_and_bounded() ->
     let (measure_cancel, measure_token) = CancellationSource::pair();
     let measure_context =
         ExecutionContext::new(measure_budget.clone(), measure_token, execution_limits);
-    let measured_source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
+    let measured_source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(source_bytes.clone())),
-        SourceLimits::default(),
-        measure_context.clone(),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(measure_context.clone()),
     )?;
-    let measured_editor =
-        SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
-            Arc::new(OwnedSource::new(destination_bytes.clone())),
-            SourceLimits::default(),
-            measure_context,
-        )?;
+    let measured_editor = SourceBackedPresentationEditor::from_read_at_with_options(
+        Arc::new(OwnedSource::new(destination_bytes.clone())),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(measure_context),
+    )?;
     let measured_plan = measured_editor.plan_cross_slide_copy(&measured_source, 0, 1, 1)?;
     let base_memory = measure_budget.used(Resource::Memory);
     drop(measured_plan);
@@ -1871,17 +1879,18 @@ fn source_backed_cross_copy_managed_memory_reservation_is_exact_and_bounded() ->
         );
         let (_cancel_source, token) = CancellationSource::pair();
         let context = ExecutionContext::new(budget, token, execution_limits);
-        let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
+        let source = SourceBackedPresentation::from_read_at_with_options(
             Arc::new(OwnedSource::new(source_bytes.clone())),
-            SourceLimits::default(),
-            context.clone(),
+            litchi_pptx::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .execution_context(context.clone()),
         )?;
-        let editor =
-            SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
-                Arc::new(OwnedSource::new(destination_bytes.clone())),
-                SourceLimits::default(),
-                context,
-            )?;
+        let editor = SourceBackedPresentationEditor::from_read_at_with_options(
+            Arc::new(OwnedSource::new(destination_bytes.clone())),
+            litchi_pptx::OpenOptions::default()
+                .source_limits(SourceLimits::default())
+                .execution_context(context),
+        )?;
         let plan = match editor.plan_cross_slide_copy(&source, 0, 1, 1) {
             Ok(plan) => plan,
             Err(error) => return Ok((Vec::new(), Some(error))),
@@ -2856,17 +2865,18 @@ fn source_backed_cross_copy_reserves_before_reading_picture_media() -> TestResul
     let (measure_cancel, measure_token) = CancellationSource::pair();
     let measure_context =
         ExecutionContext::new(measure_budget.clone(), measure_token, execution_limits);
-    let measured_source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
+    let measured_source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(source_bytes.clone())),
-        SourceLimits::default(),
-        measure_context.clone(),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(measure_context.clone()),
     )?;
-    let measured_editor =
-        SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
-            Arc::new(OwnedSource::new(destination_bytes.clone())),
-            SourceLimits::default(),
-            measure_context,
-        )?;
+    let measured_editor = SourceBackedPresentationEditor::from_read_at_with_options(
+        Arc::new(OwnedSource::new(destination_bytes.clone())),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(measure_context),
+    )?;
     let baseline = measure_budget.used(Resource::Memory);
     drop(measured_editor);
     drop(measured_source);
@@ -2898,15 +2908,17 @@ fn source_backed_cross_copy_reserves_before_reading_picture_media() -> TestResul
     );
     let (_cancel, token) = CancellationSource::pair();
     let context = ExecutionContext::new(budget, token, execution_limits);
-    let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
+    let source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(source_adapter),
-        SourceLimits::default(),
-        context.clone(),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context.clone()),
     )?;
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(destination_bytes)),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )?;
     let error = match editor.plan_cross_slide_copy(&source, 0, 1, 1) {
         Ok(_) => panic!("operation reservation must fail before image payload read"),
@@ -3598,17 +3610,18 @@ fn source_backed_cross_copy_aggregates_image_reservation_before_payload_reads() 
         measure_token,
         single_execution_limits()?,
     );
-    let measured_source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
+    let measured_source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(source_bytes.clone())),
-        SourceLimits::default(),
-        measure_context.clone(),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(measure_context.clone()),
     )?;
-    let measured_editor =
-        SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
-            Arc::new(OwnedSource::new(destination_bytes.clone())),
-            SourceLimits::default(),
-            measure_context,
-        )?;
+    let measured_editor = SourceBackedPresentationEditor::from_read_at_with_options(
+        Arc::new(OwnedSource::new(destination_bytes.clone())),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(measure_context),
+    )?;
     let baseline = measure_budget.used(Resource::Memory);
     drop(measured_editor);
     drop(measured_source);
@@ -3636,15 +3649,17 @@ fn source_backed_cross_copy_aggregates_image_reservation_before_payload_reads() 
     );
     let (_cancel, token) = CancellationSource::pair();
     let context = ExecutionContext::new(budget, token, single_execution_limits()?);
-    let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
+    let source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(source),
-        SourceLimits::default(),
-        context.clone(),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context.clone()),
     )?;
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(destination_bytes)),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )?;
     let error = match editor.plan_cross_slide_copy(&source, 0, 1, 1) {
         Ok(_) => panic!("aggregate image reservation must fail before payload reads"),
@@ -3684,15 +3699,17 @@ fn source_backed_cross_copy_preserves_media_read_errors() -> TestResult {
     );
     let (_cancel, token) = CancellationSource::pair();
     let context = ExecutionContext::new(budget, token, single_execution_limits()?);
-    let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
+    let source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(source),
-        SourceLimits::default(),
-        context.clone(),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context.clone()),
     )?;
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(destination_fixture()?)),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )?;
     armed.store(true, std::sync::atomic::Ordering::SeqCst);
     let error = match editor.plan_cross_slide_copy(&source, 0, 1, 1) {
@@ -4144,15 +4161,17 @@ fn source_backed_cross_copy_observes_post_entry_planning_cancellation() -> TestR
         Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
     );
     let context = ExecutionContext::new(budget, cancellation, single_execution_limits()?);
-    let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
+    let source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(source_adapter),
-        SourceLimits::default(),
-        context.clone(),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context.clone()),
     )?;
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(destination_bytes)),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )?;
     assert_eq!(triggered.load(std::sync::atomic::Ordering::SeqCst), 0);
     armed.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -5298,10 +5317,11 @@ fn source_backed_cross_copy_lazily_copies_shared_payload_on_writer_memory_refusa
             let overlaps = Arc::new(std::sync::atomic::AtomicUsize::new(0));
             let provider =
                 MultiRangeCountingSource::new(source_bytes.clone(), vec![range], overlaps.clone());
-            let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
+            let source = SourceBackedPresentation::from_read_at_with_options(
                 Arc::new(provider),
-                SourceLimits::default(),
-                context,
+                litchi_pptx::OpenOptions::default()
+                    .source_limits(SourceLimits::default())
+                    .execution_context(context),
             )?;
             let destination_budget = Budget::root(
                 "cross-copy-lazy-fallback-destination",
@@ -5320,12 +5340,12 @@ fn source_backed_cross_copy_lazily_copies_shared_payload_on_writer_memory_refusa
                 destination_token,
                 single_execution_limits()?,
             );
-            let editor =
-                SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
-                    Arc::new(OwnedSource::new(destination.clone())),
-                    SourceLimits::default(),
-                    destination_context,
-                )?;
+            let editor = SourceBackedPresentationEditor::from_read_at_with_options(
+                Arc::new(OwnedSource::new(destination.clone())),
+                litchi_pptx::OpenOptions::default()
+                    .source_limits(SourceLimits::default())
+                    .execution_context(destination_context),
+            )?;
             let plan = editor.plan_cross_slide_copy(&source, 0, 1, 1)?;
             let before = overlaps.load(std::sync::atomic::Ordering::SeqCst);
             let filler = budget

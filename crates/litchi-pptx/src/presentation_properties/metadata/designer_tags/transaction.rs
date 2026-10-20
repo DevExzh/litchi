@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+#[cfg(test)]
 use litchi_opc::OpcPackage;
 
 use super::codec;
@@ -14,22 +15,15 @@ pub type Revision = u64;
 
 /// An isolated edit that owns its source snapshot.
 #[derive(Debug)]
-pub struct Edit {
+pub(crate) struct Draft {
     original: Snapshot,
     desired: Option<Tags>,
 }
 
-impl Edit {
+impl Draft {
     pub(crate) fn new(original: Snapshot) -> Self {
         let desired = original.occurrences.first().cloned();
         Self { original, desired }
-    }
-
-    /// Borrow the optional staged tag list.
-    #[inline]
-    #[must_use]
-    pub fn tags(&self) -> Option<&Tags> {
-        self.desired.as_ref()
     }
 
     /// Replace or create the tag list after bounded validation.
@@ -37,7 +31,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set(&mut self, value: Tags) -> Result<bool> {
+    pub(crate) fn set(&mut self, value: Tags) -> Result<bool> {
         validate_tags(&value, self.original.limits)?;
         if self.desired.as_ref() == Some(&value) {
             return Ok(false);
@@ -48,34 +42,12 @@ impl Edit {
 
     /// Remove the singular tag-list extension.
     #[inline]
-    pub fn remove(&mut self) -> bool {
+    pub(crate) fn remove(&mut self) -> bool {
         self.desired.take().is_some()
-    }
-
-    /// Apply a checked mutation to a cloned present tag list.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn update(&mut self, edit: impl FnOnce(&mut Tags) -> Result<()>) -> Result<()> {
-        let mut candidate = self
-            .desired
-            .clone()
-            .ok_or_else(|| Error::Invalid("Designer tag list is absent".into()))?;
-        edit(&mut candidate)?;
-        validate_tags(&candidate, self.original.limits)?;
-        self.desired = Some(candidate);
-        Ok(())
     }
 
     fn is_changed(&self) -> bool {
         self.original.occurrences.first() != self.desired.as_ref()
-    }
-
-    /// The outcome of this edit or commit.
-    #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
-        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Consume the edit into a candidate-reparsed reversible commit.
@@ -83,13 +55,12 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Prepared> {
         if !self.is_changed() {
             let before = self.original;
             let after = before.duplicate();
-            return Ok(Commit {
-                patch: Patch { before, after },
-                changed: false,
+            return Ok(Prepared {
+                patch: Change { before, after },
             });
         }
         if let Some(value) = &self.desired {
@@ -121,115 +92,60 @@ impl Edit {
             located,
             self.original.limits,
         )?;
-        Ok(Commit {
-            patch: Patch {
+        Ok(Prepared {
+            patch: Change {
                 before: self.original,
                 after,
             },
-            changed: true,
         })
     }
 }
 
 /// A successful candidate-reparsed edit and its reversible patch.
 #[derive(Debug)]
-pub struct Commit {
-    patch: Patch,
-    changed: bool,
+pub(crate) struct Prepared {
+    patch: Change,
 }
 
-impl Commit {
-    fn is_changed(&self) -> bool {
-        self.changed
-    }
-
-    /// The outcome of this edit or commit.
-    #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
-        crate::diagnostics::Diagnostics::new(self.is_changed())
-    }
-
-    /// Borrow the candidate-reparsed result snapshot.
-    #[inline]
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.patch.after
-    }
-
+impl Prepared {
     /// Borrow the reversible source-checked patch.
     #[inline]
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &Change {
         &self.patch
     }
 
     /// Consume the commit into its reversible patch.
     #[inline]
     #[must_use]
-    pub fn into_patch(self) -> Patch {
+    #[cfg(test)]
+    pub(crate) fn into_patch(self) -> Change {
         self.patch
-    }
-
-    /// Publish this commit atomically.
-    ///
-    /// A change to a signed package is refused with
-    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-    /// (ADR 0006) before anything is mutated: remove the signature explicitly
-    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
-    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
-    /// no-op keeps the signature.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    #[inline]
-    pub fn apply(self, package: &mut OpcPackage) -> Result<Snapshot> {
-        super::apply_commit(package, self)
     }
 }
 
 /// A reversible replacement bound to one exact stable slide-ID host.
 #[derive(Debug)]
-pub struct Patch {
+pub(crate) struct Change {
     pub(crate) before: Snapshot,
     pub(crate) after: Snapshot,
 }
 
-impl Patch {
-    /// Borrow the required selected-host state.
-    #[inline]
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
-    }
-
-    /// Borrow the candidate selected-host state.
-    #[inline]
-    #[must_use]
-    pub fn after(&self) -> &Snapshot {
-        &self.after
-    }
-
+impl Change {
     fn is_changed(&self) -> bool {
         !self.before.same_selected_source(&self.after)
     }
 
     /// Whether this patch leaves its source unchanged.
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         !self.is_changed()
-    }
-
-    /// Return the required selected-host revision.
-    #[inline]
-    #[must_use]
-    pub const fn expected_revision(&self) -> Revision {
-        self.before.revision
     }
 
     /// Build the exact inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.duplicate(),
             after: self.before.duplicate(),
@@ -249,7 +165,8 @@ impl Patch {
     ///
     /// Returns an error if the operation fails.
     #[inline]
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
+    #[cfg(test)]
+    pub(crate) fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
         super::apply_patch(package, self)
     }
 }

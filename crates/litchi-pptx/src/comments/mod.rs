@@ -14,12 +14,9 @@ pub use codec::{
     parse_slide_comments_with_tolerance, write_comment_authors, write_slide_comments,
 };
 pub use collaboration::{
-    AuthorPresenceCommit, AuthorPresenceEdit, AuthorPresencePatch, AuthorPresenceSnapshot,
-    CommentThreadingCommit, CommentThreadingEdit, CommentThreadingPatch, CommentThreadingSnapshot,
-    ParentComment, PresenceInfo, Revision as CollaborationRevision, ThreadingInfo,
-    apply_presence_commit, apply_presence_patch, apply_threading_commit, apply_threading_patch,
-    load_presence, load_presence_snapshot, load_threading, load_threading_snapshot, put_presence,
-    put_threading, remove_presence, remove_threading,
+    AuthorPresenceSnapshot, CommentThreadingSnapshot, ParentComment, PresenceInfo,
+    Revision as CollaborationRevision, ThreadingInfo, load_presence, load_presence_snapshot,
+    load_threading, load_threading_snapshot,
 };
 pub use model::{Author, Comment, Comments, Conformance, List};
 pub(crate) use package::reattribute_presentation_comment;

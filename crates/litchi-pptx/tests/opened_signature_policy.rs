@@ -39,7 +39,7 @@ fn carries_signature(bytes: &[u8]) -> bool {
 fn changed_commit_on_a_signed_package_is_refused() {
     for name in SIGNED {
         let bytes = fixture(name);
-        let mut package = Package::from_reader(std::io::Cursor::new(bytes.clone())).unwrap();
+        let package = Package::from_reader(std::io::Cursor::new(bytes.clone())).unwrap();
         assert!(package.opc().unwrap().is_signed(), "{name}");
         let mut transaction = package.edit().unwrap();
         transaction
@@ -74,7 +74,7 @@ fn exact_noop_commit_keeps_the_signature_bytes() {
 fn explicit_unsign_authorizes_a_changed_commit() {
     for name in SIGNED {
         let mut package = Package::from_reader(std::io::Cursor::new(fixture(name))).unwrap();
-        package.unsign().unwrap();
+        package = package.unsign().unwrap();
         assert!(!package.opc().unwrap().is_signed(), "{name}");
         let mut transaction = package.edit().unwrap();
         transaction
@@ -97,10 +97,10 @@ fn explicit_unsign_authorizes_a_changed_commit() {
 fn unsigning_an_unsigned_package_changes_nothing() {
     let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     builder.presentation().unwrap().add_slide().unwrap();
-    let mut authored = builder.build().unwrap();
+    let authored = builder.build().unwrap();
     let bytes = authored.to_bytes().unwrap();
     let mut package = Package::from_reader(std::io::Cursor::new(bytes.clone())).unwrap();
-    package.unsign().unwrap();
+    package = package.unsign().unwrap();
     assert!(!package.opc().unwrap().is_signed());
     let commit = package.edit().unwrap().commit().unwrap();
     assert!(!commit.diagnostics().changed());
@@ -110,7 +110,7 @@ fn unsigning_an_unsigned_package_changes_nothing() {
 #[test]
 fn insertion_refuses_signed_sources_before_layout_resolution() {
     for name in SIGNED {
-        let mut source = Package::from_reader(std::io::Cursor::new(fixture(name))).unwrap();
+        let source = Package::from_reader(std::io::Cursor::new(fixture(name))).unwrap();
         let before = source.to_bytes().unwrap();
         let mut edit = source.edit().unwrap();
         assert!(matches!(

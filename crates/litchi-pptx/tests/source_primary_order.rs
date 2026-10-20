@@ -38,7 +38,7 @@ fn fixture() -> Vec<u8> {
                 .add_text_box(text, 0, 0, 914_400, 914_400);
         }
     }
-    let mut authored = builder.build().unwrap();
+    let authored = builder.build().unwrap();
     authored.to_bytes().unwrap()
 }
 
@@ -386,10 +386,11 @@ fn order_edit_refuses_when_only_the_source_root_fits_memory() {
     let bytes = fixture();
     let root = presentation_root_len(&bytes);
     let (budget, _cancellation, context) = managed_context(root);
-    let source = Package::from_read_at_with_execution_context(
+    let source = Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     assert_eq!(budget.used(Resource::Memory), root);
@@ -412,10 +413,11 @@ fn cancelled_order_edit_releases_its_root_reservation() {
     let bytes = fixture();
     let root = presentation_root_len(&bytes);
     let (budget, cancellation, context) = managed_context(16 * 1024 * 1024);
-    let source = Package::from_read_at_with_execution_context(
+    let source = Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     assert_eq!(budget.used(Resource::Memory), root);
@@ -441,10 +443,11 @@ fn order_patch_and_inverse_clones_retain_root_until_the_last_drop() {
     let bytes = fixture();
     let root = presentation_root_len(&bytes);
     let (budget, _cancellation, context) = managed_context(16 * 1024 * 1024);
-    let source = Package::from_read_at_with_execution_context(
+    let source = Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = source.edit().unwrap();

@@ -126,10 +126,11 @@ fn without(xml: &[u8], spans: &[Range<usize>]) -> Result<Vec<u8>> {
 }
 
 fn refusal(reason: &'static str) -> Error {
-    Error::UnsafeEdit {
-        operation: "remove_shape",
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "remove_shape",
         reason,
-    }
+    )
 }
 
 /// Remove one top-level shape from a slide whose markup compatibility is

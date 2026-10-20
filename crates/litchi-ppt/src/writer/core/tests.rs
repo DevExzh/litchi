@@ -937,3 +937,70 @@ fn test_slide_persist_tracking() {
     assert_eq!(idx1, 0);
     assert_eq!(idx2, 1);
 }
+
+#[test]
+fn shape_interaction_setters_enforce_explicit_limits_atomically() {
+    use crate::{
+        Interaction, InteractionAction, InteractionLimits, InteractionLinkTarget,
+        InteractionTrigger, TextInteraction, TextInteractionLimits, TextRange,
+    };
+
+    let mut writer = Builder::new();
+    let slide = writer.add_slide().unwrap();
+    writer
+        .add_textbox(slide, 10, 10, 240, 40, "Atomic interaction")
+        .unwrap();
+    let existing = Interaction::new(
+        InteractionTrigger::Click,
+        InteractionAction::Macro,
+        InteractionLinkTarget::Nil,
+    )
+    .with_macro_name("Existing")
+    .unwrap();
+    writer
+        .set_last_shape_interaction(slide, existing.clone())
+        .unwrap();
+    let too_small = InteractionLimits {
+        max_record_bytes: 31,
+        ..InteractionLimits::default()
+    };
+    assert!(
+        writer
+            .set_last_shape_interaction_with_limits(slide, existing, too_small)
+            .is_err()
+    );
+
+    let first = TextInteraction::new(
+        TextRange::new(0, 2).unwrap(),
+        Interaction::new(
+            InteractionTrigger::Click,
+            InteractionAction::NoAction,
+            InteractionLinkTarget::Nil,
+        ),
+    )
+    .unwrap();
+    writer
+        .set_last_shape_text_interaction(slide, first)
+        .unwrap();
+    let second = TextInteraction::new(
+        TextRange::new(3, 5).unwrap(),
+        Interaction::new(
+            InteractionTrigger::MouseOver,
+            InteractionAction::Ole,
+            InteractionLinkTarget::Nil,
+        ),
+    )
+    .unwrap();
+    assert!(
+        writer
+            .set_last_shape_text_interaction_with_limits(
+                slide,
+                second,
+                TextInteractionLimits {
+                    max_interactions: 1,
+                    ..TextInteractionLimits::default()
+                },
+            )
+            .is_err()
+    );
+}

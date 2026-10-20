@@ -1,6 +1,6 @@
 //! Reversible source-checked patches for workbook Custom XML Maps.
 
-use litchi_core::sheet::Result;
+use crate::BoxedResult as Result;
 use litchi_opc::OpcPackage;
 
 use super::invalid;

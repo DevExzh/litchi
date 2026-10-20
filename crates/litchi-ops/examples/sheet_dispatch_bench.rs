@@ -25,6 +25,10 @@
 //! * `cell_value/<format>`: `Worksheet::cell_value(row, column)` for every
 //!   cell.
 //! * `cells/<format>`: one pass of `Worksheet::cells()`.
+//! * `recalculate_heavy/<format>`: `File::recalculate` of a formula-heavy
+//!   sheet of `rows / 8` rows: running `SUM`s over growing ranges, a
+//!   conditional with a division or a `MAX` over them and an `AVERAGE` plus `COUNT`
+//!   over every row so far (record 0353a).
 
 use std::future::Future;
 use std::time::Instant;
@@ -56,6 +60,20 @@ fn median(samples: &mut [f64]) -> f64 {
     }
 }
 
+/// Measure `leg` as scenario `name`, unless `SHEET_DISPATCH_ONLY` names
+/// another scenario (for instruction-count profiling of one scenario).
+fn record(
+    out: &mut serde_json::Map<String, Value>,
+    name: String,
+    samples: usize,
+    leg: impl FnMut(),
+) {
+    if std::env::var("SHEET_DISPATCH_ONLY").is_ok_and(|only| only != name) {
+        return;
+    }
+    out.insert(name, measure(samples, leg));
+}
+
 fn measure(samples: usize, mut leg: impl FnMut()) -> Value {
     leg();
     let mut times = Vec::with_capacity(samples);
@@ -85,6 +103,23 @@ fn workbook(format: FileFormat, count: u32) -> File {
             "{row},=A{row}*2+1,\"=IF(B{row}>10,B{row},0)\",=SUM(A{row}:C{row})\n"
         ));
     }
+    import(format, &source)
+}
+
+/// A formula-heavy sheet: running totals over growing ranges, a nested
+/// conditional over them and an average over every row so far, so each
+/// formula reads many cells and references other formulas.
+fn heavy_workbook(format: FileFormat, count: u32) -> File {
+    let mut source = String::new();
+    for row in 1..=count {
+        source.push_str(&format!(
+            "{row},=SUM(A1:A{row}),\"=IF(B{row}>A{row}*A{row}/4,B{row}/A{row},MAX(A1:B{row}))\",=AVERAGE(A1:C{row})+COUNT(B1:B{row})\n"
+        ));
+    }
+    import(format, &source)
+}
+
+fn import(format: FileFormat, source: &str) -> File {
     let sheet = if format == FileFormat::Xlsx {
         "/Sheet1"
     } else {
@@ -115,65 +150,62 @@ fn scenarios(
     let report = file.recalculate(&options).expect("recalculate");
     assert_eq!(report.formulas().len(), (count * 3) as usize, "{report:?}");
     assert_eq!(report.unsupported(), 0, "{report:?}");
-    out.insert(
-        format!("recalculate/{tag}"),
-        measure(samples, || {
-            let report = file.recalculate(&options).expect("recalculate");
-            std::hint::black_box(report);
-        }),
+    record(out, format!("recalculate/{tag}"), samples, || {
+        let report = file.recalculate(&options).expect("recalculate");
+        std::hint::black_box(report);
+    });
+    let heavy_rows = (count / 8).max(1);
+    let heavy = heavy_workbook(format, heavy_rows);
+    let report = heavy.recalculate(&options).expect("recalculate");
+    assert_eq!(
+        report.formulas().len(),
+        (heavy_rows * 3) as usize,
+        "{report:?}"
     );
+    assert_eq!(report.unsupported(), 0, "{report:?}");
+    record(out, format!("recalculate_heavy/{tag}"), samples, || {
+        let report = heavy.recalculate(&options).expect("recalculate");
+        std::hint::black_box(report);
+    });
     // XLS addresses the generic traits zero-based, XLSX and XLSB one-based.
     let base = u32::from(format != FileFormat::Xls);
     let (first, last) = (base, count - 1 + base);
     let view = file.workbook().expect("workbook view");
     let name = WorkbookTrait::worksheet_names(&view)[0].clone();
-    out.insert(
-        format!("evaluate/{tag}"),
-        measure(samples, || {
-            let evaluator = litchi_eval::FormulaEvaluator::new(&view);
-            for row in first..=last {
-                for column in base + 1..base + 4 {
-                    let value =
-                        block_on(evaluator.evaluate_cell(&name, row, column)).expect("value");
-                    std::hint::black_box(value);
-                }
+    record(out, format!("evaluate/{tag}"), samples, || {
+        let evaluator = litchi_eval::FormulaEvaluator::new(&view);
+        for row in first..=last {
+            for column in base + 1..base + 4 {
+                let value = block_on(evaluator.evaluate_cell(&name, row, column)).expect("value");
+                std::hint::black_box(value);
             }
-        }),
-    );
+        }
+    });
     let sheet = WorkbookTrait::worksheet_by_index(&view, 0).expect("first sheet");
-    out.insert(
-        format!("cell/{tag}"),
-        measure(samples, || {
-            for row in first..=last {
-                for column in base..base + 4 {
-                    let cell = sheet.cell(row, column).expect("cell");
-                    std::hint::black_box(cell.value());
-                }
+    record(out, format!("cell/{tag}"), samples, || {
+        for row in first..=last {
+            for column in base..base + 4 {
+                let cell = sheet.cell(row, column).expect("cell");
+                std::hint::black_box(cell.value());
             }
-        }),
-    );
-    out.insert(
-        format!("cell_value/{tag}"),
-        measure(samples, || {
-            for row in first..=last {
-                for column in base..base + 4 {
-                    let value = sheet.cell_value(row, column).expect("cell value");
-                    std::hint::black_box(&value);
-                }
+        }
+    });
+    record(out, format!("cell_value/{tag}"), samples, || {
+        for row in first..=last {
+            for column in base..base + 4 {
+                let value = sheet.cell_value(row, column).expect("cell value");
+                std::hint::black_box(&value);
             }
-        }),
-    );
-    out.insert(
-        format!("cells/{tag}"),
-        measure(samples, || {
-            let mut seen = 0usize;
-            for cell in sheet.cells() {
-                std::hint::black_box(cell.expect("cell").value());
-                seen += 1;
-            }
-            assert!(seen >= count as usize * 4, "{seen}");
-        }),
-    );
+        }
+    });
+    record(out, format!("cells/{tag}"), samples, || {
+        let mut seen = 0usize;
+        for cell in sheet.cells() {
+            std::hint::black_box(cell.expect("cell").value());
+            seen += 1;
+        }
+        assert!(seen >= count as usize * 4, "{seen}");
+    });
 }
 
 fn main() {

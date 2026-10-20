@@ -1,25 +1,27 @@
 //! Bounded, inert `PresentationML` notes-slide and notes-master package graphs.
 
 mod codec;
+mod edit;
 mod model;
 mod package;
 mod transaction;
 mod validation;
 
-pub use crate::diagnostics::Diagnostics;
 pub use codec::{master_xml, write_text, write_text_with};
 pub(crate) use codec::{
     rewrite_text, root_conformance, root_conformance_from_processed, scan_xml,
     validate_resource_xml,
 };
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub use model::{Conformance, Graph, Link, Master, Slide, Theme};
 pub(crate) use package::{
-    SlideRootMemo, SlideRootProof, apply_commit, apply_patch, clear_checked, load, load_snapshot,
+    SlideRootMemo, SlideRootProof, apply_commit, clear_checked, load, load_snapshot,
     load_snapshot_with_slide_root_proofs, remove_checked,
 };
 #[cfg(test)]
 pub(crate) use package::{clear, put, remove, with_refused_slide_root_reservation};
-pub use transaction::{Commit, Edit, Patch, Revision, Snapshot};
+pub(crate) use transaction::Draft;
+pub use transaction::{Revision, Snapshot};
 pub(crate) use validation::validate_id;
 
 pub(crate) const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
@@ -62,23 +64,23 @@ pub(crate) fn own_blob(blob: &[u8], resource: &'static str) -> crate::Result<Vec
     Ok(owned)
 }
 
-pub(crate) fn xml_error(error: impl std::fmt::Display) -> crate::Error {
-    crate::Error::Xml(error.to_string())
+pub(crate) fn xml_error(error: impl std::fmt::Display) -> Error {
+    Error::Xml(error.to_string())
 }
 
-pub(crate) fn invalid(message: impl Into<String>) -> crate::Error {
-    crate::Error::Invalid(message.into())
+pub(crate) fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
 
 pub(crate) fn allocation(
     resource: &'static str,
     source: std::collections::TryReserveError,
-) -> crate::Error {
-    crate::Error::Allocation { resource, source }
+) -> Error {
+    Error::Allocation { resource, source }
 }
 
-pub(crate) fn limit(resource: &'static str, limit: usize) -> crate::Error {
-    crate::Error::Limit { resource, limit }
+pub(crate) fn limit(resource: &'static str, limit: usize) -> Error {
+    Error::Limit { resource, limit }
 }
 
 /// The namespace a resolved XML name is bound to as a string.

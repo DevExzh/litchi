@@ -14,7 +14,7 @@ mod model;
 )]
 mod p202;
 mod package;
-mod properties;
+pub mod properties;
 mod transaction;
 mod validation;
 
@@ -22,14 +22,15 @@ mod validation;
 mod tests;
 
 pub use model::{DrawingProperties, Limits, Opaque, Snapshot, Tag, Tags};
-pub use properties::{PropertiesCommit, PropertiesEdit, PropertiesSnapshot};
-pub use transaction::Editor;
 
 pub(crate) use p202::{read_tags_with_prefix, write_properties, write_tags};
 
 #[cfg(test)]
 pub(crate) use p202::{read_properties, read_tags};
 pub(crate) use package::{load, put, remove};
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+
 pub(crate) use properties::load_properties_with_limits;
 #[allow(
     unused_imports,

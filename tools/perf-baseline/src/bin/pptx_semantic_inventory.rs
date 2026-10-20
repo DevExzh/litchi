@@ -325,10 +325,10 @@ fn image_target(target: &SourceImageTarget) -> AnyResult<ImageTargetInventory> {
 
 fn image_inventory_error(error: &litchi_pptx::Error) -> AnyResult<ImageInventoryError> {
     let (kind, operation, reason) = match error {
-        litchi_pptx::Error::UnsafeEdit { operation, reason } => (
-            "unsafe_edit",
-            Some((*operation).to_owned()),
-            Some((*reason).to_owned()),
+        litchi_pptx::Error::Refused(refusal) => (
+            "refused",
+            Some(refusal.operation().to_owned()),
+            Some(refusal.reason().to_owned()),
         ),
         litchi_pptx::Error::MarkupCompatibility(_) => ("markup_compatibility", None, None),
         litchi_pptx::Error::Limit { .. } => ("limit", None, None),
@@ -569,9 +569,9 @@ fn main() -> AnyResult<()> {
     let source_sha256 = sha256_hex(&input_bytes);
 
     let limits = inventory_read_limits()?;
-    let source = SourceBackedPresentation::from_read_at_with_limits(
+    let source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(input_bytes.clone())),
-        limits,
+        litchi_pptx::OpenOptions::default().source_limits(limits),
     )?;
     let source_backed = collect_source_backed(&source)?;
     let eager = collect_eager(input_bytes, limits)?;

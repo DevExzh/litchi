@@ -3,7 +3,7 @@
 
 use litchi_core::Position;
 use litchi_drawingml::text::body::RunKind;
-use litchi_pptx::opened::{TextEdit, TextProperties, TextTarget};
+use litchi_pptx::opened::{TextAssignment, TextProperties, TextTarget};
 
 use super::{Commit, Editable, Pptx};
 use crate::Result;
@@ -135,13 +135,13 @@ pub(crate) fn refresh(
         return Ok((None, summary));
     }
     runs.sort_by_key(|run| run.slide);
-    let mut groups: Vec<(usize, Vec<TextEdit<'_>>)> = Vec::new();
+    let mut groups: Vec<(usize, Vec<TextAssignment<'_>>)> = Vec::new();
     for run in &runs {
         if groups.last().is_none_or(|(slide, _)| *slide != run.slide) {
             groups.push((run.slide, Vec::new()));
         }
         if let Some((_, edits)) = groups.last_mut() {
-            edits.push(TextEdit::new(
+            edits.push(TextAssignment::new(
                 run.target,
                 TextProperties::default().with_text(&run.text),
             ));

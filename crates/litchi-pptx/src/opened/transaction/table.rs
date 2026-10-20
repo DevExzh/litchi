@@ -263,10 +263,11 @@ impl Edit {
         let xml = owner.blob();
         let scene = crate::shape::Scene::read(xml)?;
         if scene.is_rewritten() {
-            return Err(crate::Error::UnsafeEdit {
-                operation: "set_table_properties",
-                reason: "table edits do not select markup-compatibility branches",
-            });
+            return Err(crate::Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "set_table_properties",
+                "table edits do not select markup-compatibility branches",
+            ));
         }
         let target_shape = scene.shape(key)?;
         let crate::shape::Shape::Table(_) = target_shape else {
@@ -358,10 +359,11 @@ impl Edit {
         let xml = owner.blob();
         let scene = crate::shape::Scene::read(xml)?;
         if scene.is_rewritten() {
-            return Err(crate::Error::UnsafeEdit {
-                operation: "table_column",
-                reason: "table column edits do not select markup-compatibility branches",
-            });
+            return Err(crate::Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "table_column",
+                "table column edits do not select markup-compatibility branches",
+            ));
         }
         let shape = scene.shape(key)?;
         let crate::shape::Shape::Table(_) = shape else {

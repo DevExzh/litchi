@@ -285,7 +285,7 @@ fn the_eager_editor_removes_owned_parts_too() {
     let package = litchi_pptx::Package::from_reader(std::io::Cursor::new(COMMENTS)).unwrap();
     let mut edit = package.edit().unwrap();
     edit.remove_slide(0_usize).unwrap();
-    let (mut updated, patch) = edit.commit().unwrap().into_parts();
+    let (updated, patch) = edit.commit().unwrap().into_parts();
     let output = updated.to_bytes().unwrap();
     let names = member_names(&output);
     for part in [
@@ -297,7 +297,7 @@ fn the_eager_editor_removes_owned_parts_too() {
         assert!(!names.iter().any(|name| name == part), "{part} stayed");
     }
     assert!(names.iter().any(|name| name == "ppt/commentAuthors.xml"));
-    let mut restored = updated.apply(&patch.inverse()).unwrap();
+    let restored = updated.apply(&patch.inverse()).unwrap();
     let restored_names = member_names(&restored.to_bytes().unwrap());
     assert!(
         restored_names

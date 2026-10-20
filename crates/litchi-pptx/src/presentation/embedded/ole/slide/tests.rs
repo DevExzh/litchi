@@ -5,8 +5,8 @@
 )]
 
 use super::super::model::{Frame, Kind, Mode, Target};
+use super::package::apply_patch;
 use super::{Definition, Snapshot};
-use crate::presentation::embedded::ole::slide::apply_patch;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Part};

@@ -1133,10 +1133,15 @@ fn ppt_text_edit_errors_are_classified() {
         Code::NotFound,
     );
     assert_code(TextError::Refused(Refusal::ShapeNotFound), Code::NotFound);
-    // Wildcard refusal arm, the leaf's protected-container refusal included.
+    // Classified by kind: the protected-container refusal is unsupported
+    // content, a shape without a textbox an unsupported target.
     assert_code(
         TextError::Refused(Refusal::UnsupportedSource),
         Code::UnsupportedCapability,
+    );
+    assert_code(
+        TextError::Refused(Refusal::NoTextbox),
+        Code::UnsupportedType,
     );
     assert_code(
         TextError::Package(litchi_ppt::Error::PasswordRequired),
@@ -1580,7 +1585,7 @@ fn ppt_primary_edit_errors_preserve_policy_codes_and_typed_sources() {
                 ),
             },
         )),
-        Code::InvalidArgument,
+        Code::InvalidValue,
     );
 
     assert_code(

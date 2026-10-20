@@ -247,7 +247,7 @@
 //! `shape/classification/codec.rs`), change tracking
 //! (`change_tracking/codec.rs`), the source-bound metadata layouts
 //! (`comments/collaboration/codec.rs`, `presentation_properties/
-//! {readonly_recommended, package.rs root-dialect probe}`,
+//! {read_only_recommended, package.rs root-dialect probe}`,
 //! `presentation_properties/metadata/{guides, events, custom_show,
 //! structure layout}`, `modern_comments/wire/*`), the transition and
 //! animation-template validators used by edits

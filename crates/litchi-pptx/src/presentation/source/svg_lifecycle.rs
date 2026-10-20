@@ -273,10 +273,11 @@ impl<'a> SourceBackedSvgAttachmentEdit<'a> {
         requested_part_uri: Option<&PackURI>,
     ) -> Result<(String, PackURI)> {
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
-                operation: "attach_svg",
-                reason: "SVG lifecycle edits support one atomic attach or detach",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "attach_svg",
+                "SVG lifecycle edits support one atomic attach or detach",
+            ));
         }
         if self.svg.is_some() {
             return Err(Error::Relationship(
@@ -355,10 +356,11 @@ impl<'a> SourceBackedSvgAttachmentEdit<'a> {
     /// Detach the selected SVG while retaining the raster fallback.
     pub fn detach(&mut self) -> Result<bool> {
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
-                operation: "detach_svg",
-                reason: "SVG lifecycle edits support one atomic attach or detach",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "detach_svg",
+                "SVG lifecycle edits support one atomic attach or detach",
+            ));
         }
         let Some(svg) = self.svg.as_ref() else {
             self.operation_used = true;
@@ -1500,10 +1502,11 @@ fn build_attachment_topology_plan(
             }
         },
         (Some(_), Some(_)) => {
-            return Err(Error::UnsafeEdit {
-                operation: "SVG lifecycle publication",
-                reason: "attach/detach transactions cannot replace an existing SVG; use edit_svg_image",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "SVG lifecycle publication",
+                "attach/detach transactions cannot replace an existing SVG; use edit_svg_image",
+            ));
         },
         (None, None) => {},
     }

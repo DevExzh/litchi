@@ -81,6 +81,7 @@ pub mod builder;
 pub mod change_tracking;
 pub mod chart;
 pub mod comments;
+pub mod cross_slide_copy;
 pub mod custom;
 pub mod diagnostics;
 mod error;
@@ -98,14 +99,18 @@ pub mod master_layout;
 pub mod metadata;
 pub(crate) mod namespace;
 pub mod notes;
+pub mod opc;
 mod open_options;
 pub mod opened;
 pub mod package;
+pub(crate) mod part_edit;
 pub mod parts;
 pub mod presentation;
 pub mod presentation_properties;
 pub mod shape;
 pub mod slide;
+pub mod slide_copy;
+pub mod slide_removal;
 mod source_limits;
 pub mod table;
 pub mod tag;
@@ -130,12 +135,8 @@ pub use animations::*;
 pub use backgrounds::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
 pub use chart::{Chart, Info as ChartInfo, Series as ChartSeries, Type as ChartType};
 pub use comments::collaboration::{
-    AuthorPresenceCommit, AuthorPresenceEdit, AuthorPresencePatch, AuthorPresenceSnapshot,
-    CommentThreadingCommit, CommentThreadingEdit, CommentThreadingPatch, CommentThreadingSnapshot,
-    ParentComment, PresenceInfo, ThreadingInfo, apply_presence_commit, apply_presence_patch,
-    apply_threading_commit, apply_threading_patch, load_presence, load_presence_snapshot,
-    load_threading, load_threading_snapshot, put_presence, put_threading, remove_presence,
-    remove_threading,
+    AuthorPresenceSnapshot, CommentThreadingSnapshot, ParentComment, PresenceInfo, ThreadingInfo,
+    load_presence, load_presence_snapshot, load_threading, load_threading_snapshot,
 };
 pub use comments::{
     Author, Comment, Comments, Conformance, List, add_presentation_comment,
@@ -172,12 +173,8 @@ pub use litchi_ooxml_common::package_encryption::{
 pub use litchi_opc::{SourceLimitKind, SourceLimits};
 pub use master_layout::{
     AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID,
-    PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderKind, PlaceholderSignaturePolicy, PlaceholderSpec,
-    PlaceholderTypeExtension, PlaceholderTypeExtensionCommit, PlaceholderTypeExtensionEdit,
-    PlaceholderTypeExtensionLimits, PlaceholderTypeExtensionPatch,
-    PlaceholderTypeExtensionSlotCommit, PlaceholderTypeExtensionSlotEdit,
-    PlaceholderTypeExtensionSlotPatch, PlaceholderTypeExtensionSlotSnapshot,
-    PlaceholderTypeExtensionSnapshot, SlideLayoutKind,
+    PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderKind, PlaceholderSpec, PlaceholderTypeExtension,
+    SlideLayoutKind,
 };
 pub use media_parts::{
     Bookmark, Data, ExtensionList, Fade, Picture, Poster, Resource, Transform, Trim,
@@ -186,9 +183,8 @@ pub use media_parts::{
 pub use modern_comments::*;
 pub use open_options::{OpenOptions, OpenPolicy};
 pub use opened::{
-    CrossSlideCopyPatch, CrossSlideCopyPlan, MAX_SHAPE_PROPERTIES_REPLACEMENTS,
-    MAX_SHAPE_TEXT_REPLACEMENTS, ShapePropertiesReplacement, ShapeTextReplacement, SlideCopyPart,
-    SlideCopyPlan, SlideRemovalPatch, SlideRemovalPlan,
+    MAX_SHAPE_PROPERTIES_REPLACEMENTS, MAX_SHAPE_TEXT_REPLACEMENTS, ShapePropertiesReplacement,
+    ShapeTextReplacement,
 };
 pub use package::Package;
 pub use presentation::embedded::ink_actions;
@@ -215,7 +211,6 @@ pub use presentation_properties::{
 pub use slide::{Slide, SlideLayout, SlideMaster};
 pub use validation::{
     PptxValidationError, PptxValidationLimits, validate_source, validate_source_backed,
-    validate_source_backed_with_limits, validate_source_with_limits,
 };
 pub use view_properties::{
     CommonSlideView, CommonView, GridSpacing, Guide, GuideOrientation, NormalView, OutlineSlide,
@@ -224,9 +219,8 @@ pub use view_properties::{
     load_from_package_with_tolerance as load_view_properties_with_tolerance,
 };
 pub use writer::{
-    MutablePresentation, MutableShape, MutableSlide, StreamingPresentationLimits,
-    StreamingPresentationOptions, StreamingPresentationScratchLimits, StreamingPresentationWriter,
-    StreamingSlideWriter, TextBoxSpec,
+    StreamingPresentationLimits, StreamingPresentationOptions, StreamingPresentationScratchLimits,
+    StreamingPresentationWriter, StreamingSlideWriter, TextBoxSpec,
 };
 
 /// Immutable source-backed PPTX package ownership and primary editing.

@@ -156,7 +156,7 @@ fn paragraph_removal_keeps_the_last_paragraph() -> Result<()> {
     let mut edit = after.edit()?;
     assert!(matches!(
         edit.remove_paragraph(0usize, SHAPE, at(0)),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
     assert!(matches!(
         edit.remove_paragraph(0usize, SHAPE, at(3)),
@@ -388,7 +388,7 @@ fn source_edits_compose_text_structure_and_refuse_notes() -> Result<()> {
             at(0),
             TextProperties::default()
         ),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
     let (target, patch) = edit.commit()?.into_parts();
     assert!(!patch.is_noop());

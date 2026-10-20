@@ -1070,15 +1070,16 @@ struct EditedDeck {
 
 impl EditedDeck {
     fn new() -> Self {
-        use litchi_ppt::text_edit::{Position, Snapshot, Target};
+        use litchi_ppt::package::edit::{Position, Target};
 
         let deck = Deck::new(2);
-        let mut edit = Snapshot::from_bytes(deck.bytes.clone())
+        let mut edit = litchi_ppt::Package::from_bytes(&deck.bytes)
             .unwrap()
-            .edit_text(Target::new(Position::new(1), Position::new(0)))
+            .edit()
             .unwrap();
-        edit.set_text("edited").unwrap();
-        let bytes = edit.commit().unwrap().snapshot().bytes().to_vec();
+        edit.set_shape_text(Target::new(Position::new(1), Position::new(0)), "edited")
+            .unwrap();
+        let bytes = edit.commit().unwrap().package().to_bytes().unwrap();
         let directories = record_headers(&bytes, 0x1772);
         let user_edits = record_headers(&bytes, 0x0FF5);
         assert_eq!((directories.len(), user_edits.len()), (2, 2));
@@ -1305,12 +1306,6 @@ fn cyclic_user_edit_chain_is_fatal_by_default_and_cut_when_opted_in() {
     let native =
         litchi_ppt::slide_order::Snapshot::from_bytes_with_options(bytes.clone(), options).unwrap();
     assert_eq!(native.leniency(), Leniency::TolerateUserEditChainDefects);
-    assert!(matches!(
-        native.edit(),
-        Err(litchi_ppt::slide_order::Error::Refused(
-            litchi_ppt::slide_order::Refusal::RepairedUserEditChain
-        ))
-    ));
     let canonical = litchi_ppt::Package::from_bytes_with_options(&bytes, options).unwrap();
     assert!(matches!(
         canonical.edit(),

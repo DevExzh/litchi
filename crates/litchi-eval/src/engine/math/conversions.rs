@@ -10,7 +10,7 @@ use super::helpers::{
 use crate::engine::{EvalCtx, evaluate_expression, to_number, to_text};
 use crate::parser::Expr;
 
-pub(crate) async fn eval_bin2dec(
+pub(crate) fn eval_bin2dec(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -18,7 +18,7 @@ pub(crate) async fn eval_bin2dec(
     if args.len() != 1 {
         return Ok(CellValue::Error("BIN2DEC expects 1 argument".to_string()));
     }
-    let number_value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let number_value = evaluate_expression(ctx, current_sheet, &args[0])?;
     if let CellValue::Error(_) = number_value {
         return Ok(number_value);
     }
@@ -33,7 +33,7 @@ pub(crate) async fn eval_bin2dec(
     Ok(CellValue::Int(value))
 }
 
-pub(crate) async fn eval_bin2hex(
+pub(crate) fn eval_bin2hex(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -43,12 +43,12 @@ pub(crate) async fn eval_bin2hex(
             "BIN2HEX expects 1 or 2 arguments".to_string(),
         ));
     }
-    let number_value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let number_value = evaluate_expression(ctx, current_sheet, &args[0])?;
     if let CellValue::Error(_) = number_value {
         return Ok(number_value);
     }
     let places = if args.len() == 2 {
-        let places_value = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let places_value = evaluate_expression(ctx, current_sheet, &args[1])?;
         if let CellValue::Error(_) = places_value {
             return Ok(places_value);
         }
@@ -76,7 +76,7 @@ pub(crate) async fn eval_bin2hex(
     Ok(CellValue::String(result))
 }
 
-pub(crate) async fn eval_bin2oct(
+pub(crate) fn eval_bin2oct(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -86,12 +86,12 @@ pub(crate) async fn eval_bin2oct(
             "BIN2OCT expects 1 or 2 arguments".to_string(),
         ));
     }
-    let number_value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let number_value = evaluate_expression(ctx, current_sheet, &args[0])?;
     if let CellValue::Error(_) = number_value {
         return Ok(number_value);
     }
     let places = if args.len() == 2 {
-        let places_value = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let places_value = evaluate_expression(ctx, current_sheet, &args[1])?;
         if let CellValue::Error(_) = places_value {
             return Ok(places_value);
         }
@@ -119,7 +119,7 @@ pub(crate) async fn eval_bin2oct(
     Ok(CellValue::String(result))
 }
 
-pub(crate) async fn eval_dec2bin(
+pub(crate) fn eval_dec2bin(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -129,7 +129,7 @@ pub(crate) async fn eval_dec2bin(
             "DEC2BIN expects 1 or 2 arguments".to_string(),
         ));
     }
-    let number_value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let number_value = evaluate_expression(ctx, current_sheet, &args[0])?;
     if let CellValue::Error(_) = number_value {
         return Ok(number_value);
     }
@@ -138,7 +138,7 @@ pub(crate) async fn eval_dec2bin(
         Err(err) => return Ok(err),
     };
     let places = if args.len() == 2 {
-        let places_value = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let places_value = evaluate_expression(ctx, current_sheet, &args[1])?;
         if let CellValue::Error(_) = places_value {
             return Ok(places_value);
         }
@@ -162,7 +162,7 @@ pub(crate) async fn eval_dec2bin(
 
 const DECIMAL_MAX_VALUE: u128 = (1u128 << 53) - 1;
 
-pub(crate) async fn eval_decimal(
+pub(crate) fn eval_decimal(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -173,7 +173,7 @@ pub(crate) async fn eval_decimal(
         ));
     }
 
-    let text_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let text_val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let raw_text = to_text(&text_val);
     let text = raw_text.trim();
     if text.is_empty() {
@@ -187,7 +187,7 @@ pub(crate) async fn eval_decimal(
         ));
     }
 
-    let radix_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let radix_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let radix_num = match to_number(&radix_val) {
         Some(n) => n,
         None => {
@@ -239,18 +239,14 @@ pub(crate) async fn eval_decimal(
     Ok(CellValue::Int(value as i64))
 }
 
-pub(crate) async fn eval_base(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_base(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() < 2 || args.len() > 3 {
         return Ok(CellValue::Error(
             "BASE expects 2 or 3 arguments (number, radix, [min_length])".to_string(),
         ));
     }
 
-    let number_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let number_val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let number_num = match to_number(&number_val) {
         Some(n) => n,
         None => {
@@ -272,7 +268,7 @@ pub(crate) async fn eval_base(
     }
     let number = number_int as u128;
 
-    let radix_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let radix_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let radix_num = match to_number(&radix_val) {
         Some(n) => n,
         None => {
@@ -295,7 +291,7 @@ pub(crate) async fn eval_base(
     let radix = radix_int as u32;
 
     let min_length = if args.len() == 3 {
-        let len_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+        let len_val = evaluate_expression(ctx, current_sheet, &args[2])?;
         let len_num = match to_number(&len_val) {
             Some(n) => n,
             None => {
@@ -366,7 +362,7 @@ fn digit_to_char(value: u32) -> char {
     }
 }
 
-pub(crate) async fn eval_dec2oct(
+pub(crate) fn eval_dec2oct(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -376,7 +372,7 @@ pub(crate) async fn eval_dec2oct(
             "DEC2OCT expects 1 or 2 arguments".to_string(),
         ));
     }
-    let number_value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let number_value = evaluate_expression(ctx, current_sheet, &args[0])?;
     if let CellValue::Error(_) = number_value {
         return Ok(number_value);
     }
@@ -385,7 +381,7 @@ pub(crate) async fn eval_dec2oct(
         Err(err) => return Ok(err),
     };
     let places = if args.len() == 2 {
-        let places_value = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let places_value = evaluate_expression(ctx, current_sheet, &args[1])?;
         if let CellValue::Error(_) = places_value {
             return Ok(places_value);
         }
@@ -407,7 +403,7 @@ pub(crate) async fn eval_dec2oct(
     Ok(CellValue::String(result))
 }
 
-pub(crate) async fn eval_dec2hex(
+pub(crate) fn eval_dec2hex(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -417,7 +413,7 @@ pub(crate) async fn eval_dec2hex(
             "DEC2HEX expects 1 or 2 arguments".to_string(),
         ));
     }
-    let number_value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let number_value = evaluate_expression(ctx, current_sheet, &args[0])?;
     if let CellValue::Error(_) = number_value {
         return Ok(number_value);
     }
@@ -426,7 +422,7 @@ pub(crate) async fn eval_dec2hex(
         Err(err) => return Ok(err),
     };
     let places = if args.len() == 2 {
-        let places_value = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let places_value = evaluate_expression(ctx, current_sheet, &args[1])?;
         if let CellValue::Error(_) = places_value {
             return Ok(places_value);
         }
@@ -448,7 +444,7 @@ pub(crate) async fn eval_dec2hex(
     Ok(CellValue::String(result))
 }
 
-pub(crate) async fn eval_hex2dec(
+pub(crate) fn eval_hex2dec(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -456,7 +452,7 @@ pub(crate) async fn eval_hex2dec(
     if args.len() != 1 {
         return Ok(CellValue::Error("HEX2DEC expects 1 argument".to_string()));
     }
-    let number_value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let number_value = evaluate_expression(ctx, current_sheet, &args[0])?;
     if let CellValue::Error(_) = number_value {
         return Ok(number_value);
     }
@@ -471,7 +467,7 @@ pub(crate) async fn eval_hex2dec(
     Ok(CellValue::Int(value))
 }
 
-pub(crate) async fn eval_hex2bin(
+pub(crate) fn eval_hex2bin(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -481,7 +477,7 @@ pub(crate) async fn eval_hex2bin(
             "HEX2BIN expects 1 or 2 arguments".to_string(),
         ));
     }
-    let number_value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let number_value = evaluate_expression(ctx, current_sheet, &args[0])?;
     if let CellValue::Error(_) = number_value {
         return Ok(number_value);
     }
@@ -497,7 +493,7 @@ pub(crate) async fn eval_hex2bin(
         return Ok(err);
     }
     let places = if args.len() == 2 {
-        let places_value = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let places_value = evaluate_expression(ctx, current_sheet, &args[1])?;
         if let CellValue::Error(_) = places_value {
             return Ok(places_value);
         }
@@ -519,7 +515,7 @@ pub(crate) async fn eval_hex2bin(
     Ok(CellValue::String(result))
 }
 
-pub(crate) async fn eval_hex2oct(
+pub(crate) fn eval_hex2oct(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -529,7 +525,7 @@ pub(crate) async fn eval_hex2oct(
             "HEX2OCT expects 1 or 2 arguments".to_string(),
         ));
     }
-    let number_value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let number_value = evaluate_expression(ctx, current_sheet, &args[0])?;
     if let CellValue::Error(_) = number_value {
         return Ok(number_value);
     }
@@ -545,7 +541,7 @@ pub(crate) async fn eval_hex2oct(
         return Ok(err);
     }
     let places = if args.len() == 2 {
-        let places_value = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let places_value = evaluate_expression(ctx, current_sheet, &args[1])?;
         if let CellValue::Error(_) = places_value {
             return Ok(places_value);
         }
@@ -567,7 +563,7 @@ pub(crate) async fn eval_hex2oct(
     Ok(CellValue::String(result))
 }
 
-pub(crate) async fn eval_oct2dec(
+pub(crate) fn eval_oct2dec(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -575,7 +571,7 @@ pub(crate) async fn eval_oct2dec(
     if args.len() != 1 {
         return Ok(CellValue::Error("OCT2DEC expects 1 argument".to_string()));
     }
-    let number_value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let number_value = evaluate_expression(ctx, current_sheet, &args[0])?;
     if let CellValue::Error(_) = number_value {
         return Ok(number_value);
     }
@@ -590,7 +586,7 @@ pub(crate) async fn eval_oct2dec(
     Ok(CellValue::Int(value))
 }
 
-pub(crate) async fn eval_oct2bin(
+pub(crate) fn eval_oct2bin(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -600,7 +596,7 @@ pub(crate) async fn eval_oct2bin(
             "OCT2BIN expects 1 or 2 arguments".to_string(),
         ));
     }
-    let number_value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let number_value = evaluate_expression(ctx, current_sheet, &args[0])?;
     if let CellValue::Error(_) = number_value {
         return Ok(number_value);
     }
@@ -616,7 +612,7 @@ pub(crate) async fn eval_oct2bin(
         return Ok(err);
     }
     let places = if args.len() == 2 {
-        let places_value = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let places_value = evaluate_expression(ctx, current_sheet, &args[1])?;
         if let CellValue::Error(_) = places_value {
             return Ok(places_value);
         }
@@ -638,7 +634,7 @@ pub(crate) async fn eval_oct2bin(
     Ok(CellValue::String(result))
 }
 
-pub(crate) async fn eval_oct2hex(
+pub(crate) fn eval_oct2hex(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -648,7 +644,7 @@ pub(crate) async fn eval_oct2hex(
             "OCT2HEX expects 1 or 2 arguments".to_string(),
         ));
     }
-    let number_value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let number_value = evaluate_expression(ctx, current_sheet, &args[0])?;
     if let CellValue::Error(_) = number_value {
         return Ok(number_value);
     }
@@ -664,7 +660,7 @@ pub(crate) async fn eval_oct2hex(
         return Ok(err);
     }
     let places = if args.len() == 2 {
-        let places_value = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let places_value = evaluate_expression(ctx, current_sheet, &args[1])?;
         if let CellValue::Error(_) = places_value {
             return Ok(places_value);
         }
@@ -702,115 +698,115 @@ mod tests {
         Expr::Literal(CellValue::String(s.to_string()))
     }
 
-    #[tokio::test]
-    async fn test_eval_bin2dec() {
+    #[test]
+    fn test_eval_bin2dec() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("1010")];
-        let result = eval_bin2dec(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_bin2dec(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(10));
     }
 
-    #[tokio::test]
-    async fn test_eval_bin2hex() {
+    #[test]
+    fn test_eval_bin2hex() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("1111")];
-        let result = eval_bin2hex(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_bin2hex(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("F".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_dec2bin() {
+    #[test]
+    fn test_eval_dec2bin() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(10.0)];
-        let result = eval_dec2bin(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dec2bin(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("1010".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_dec2hex() {
+    #[test]
+    fn test_eval_dec2hex() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(255.0)];
-        let result = eval_dec2hex(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dec2hex(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("FF".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_hex2dec() {
+    #[test]
+    fn test_eval_hex2dec() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("FF")];
-        let result = eval_hex2dec(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_hex2dec(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(255));
     }
 
-    #[tokio::test]
-    async fn test_eval_hex2bin() {
+    #[test]
+    fn test_eval_hex2bin() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("F")];
-        let result = eval_hex2bin(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_hex2bin(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("1111".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_dec2oct() {
+    #[test]
+    fn test_eval_dec2oct() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(64.0)];
-        let result = eval_dec2oct(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dec2oct(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("100".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_oct2dec() {
+    #[test]
+    fn test_eval_oct2dec() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("100")];
-        let result = eval_oct2dec(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_oct2dec(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(64));
     }
 
-    #[tokio::test]
-    async fn test_eval_base() {
+    #[test]
+    fn test_eval_base() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // BASE(255, 16) = "FF"
         let args = vec![num_expr(255.0), num_expr(16.0)];
-        let result = eval_base(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_base(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("FF".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_base_with_min_length() {
+    #[test]
+    fn test_eval_base_with_min_length() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // BASE(255, 16, 4) = "00FF"
         let args = vec![num_expr(255.0), num_expr(16.0), num_expr(4.0)];
-        let result = eval_base(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_base(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("00FF".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_decimal() {
+    #[test]
+    fn test_eval_decimal() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // DECIMAL("FF", 16) = 255
         let args = vec![str_expr("FF"), num_expr(16.0)];
-        let result = eval_decimal(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_decimal(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(255));
     }
 
-    #[tokio::test]
-    async fn test_eval_decimal_binary() {
+    #[test]
+    fn test_eval_decimal_binary() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // DECIMAL("1010", 2) = 10
         let args = vec![str_expr("1010"), num_expr(2.0)];
-        let result = eval_decimal(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_decimal(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(10));
     }
 }

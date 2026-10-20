@@ -7,7 +7,6 @@
 //! Blank-slide insertion through the canonical primary edit (record 0260).
 
 use litchi_ppt::package::edit::Position;
-use litchi_ppt::slide_order::Snapshot;
 use litchi_ppt::{Builder, Package};
 use std::path::PathBuf;
 
@@ -67,7 +66,12 @@ fn blank_slides_insert_at_every_position_of_powerpoint_decks() {
             );
             assert_eq!(source.to_bytes().unwrap(), source_bytes);
             assert_eq!(
-                source.apply(commit.patch()).unwrap().to_bytes().unwrap(),
+                source
+                    .apply(commit.patch())
+                    .unwrap()
+                    .into_package()
+                    .to_bytes()
+                    .unwrap(),
                 published
             );
             assert_eq!(
@@ -75,6 +79,7 @@ fn blank_slides_insert_at_every_position_of_powerpoint_decks() {
                     .package()
                     .apply(&commit.patch().inverse())
                     .unwrap()
+                    .into_package()
                     .to_bytes()
                     .unwrap(),
                 source_bytes
@@ -132,27 +137,6 @@ fn insertion_composes_with_moves_and_text_in_one_edit() {
     expected[0][0] = "Retitled".to_owned();
     expected.insert(0, Vec::new());
     assert_eq!(texts(commit.package()), expected);
-}
-
-#[test]
-fn durable_insertion_replays_and_reverts() {
-    let source = Snapshot::from_bytes(fixture("ole/ppt/SampleShow.ppt")).unwrap();
-    let mut transaction = source.edit().unwrap();
-    transaction.insert_slide(Position::new(1)).unwrap();
-    let (after, patch) = transaction.commit().unwrap().into_parts();
-    let limits = litchi_core::patch::PatchLimits::new(
-        litchi_core::patch::BlobLimits::new(4, 1024 * 1024, 4 * 1024 * 1024),
-        64 * 1024,
-        64,
-        8,
-        4_096,
-        32 * 1024,
-    );
-    let durable = patch.to_durable(limits).unwrap();
-    let replayed = source.apply_durable(&durable).unwrap();
-    assert_eq!(replayed.bytes(), after.bytes());
-    let reverted = replayed.apply_durable(&durable.inverse()).unwrap();
-    assert_eq!(reverted.slide_count(), source.slide_count());
 }
 
 #[test]
