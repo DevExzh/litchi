@@ -385,7 +385,7 @@ pub mod animation;
 pub mod transition;
 
 // Re-export transition types for ergonomic read access
-pub use animation::{EditorLimits, LegacyShapeAnimation, Scope, Timeline};
+pub use animation::{LegacyShapeAnimation, Scope, Timeline};
 pub use transition::{
     AdvanceMode, SoundAction, TransitionDirection, TransitionInfo, TransitionSpeed, TransitionType,
 };
