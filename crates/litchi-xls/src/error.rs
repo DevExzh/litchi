@@ -83,6 +83,9 @@ pub enum Error {
         /// Static explanation of the mismatch.
         reason: &'static str,
     },
+    /// A changed write of a signed workbook (record 0351 §2.3 rule 5); remove
+    /// the signature explicitly before editing.
+    Signed,
     /// A broken internal invariant of an edit route (for example a readback
     /// that disagrees with the staged change); never caused by the request.
     Internal(&'static str),
@@ -237,6 +240,7 @@ impl fmt::Display for Error {
                 write!(f, "XLS {operation} patch conflict: {reason}")
             },
             Error::Internal(reason) => write!(f, "XLS edit invariant failed: {reason}"),
+            Error::Signed => f.write_str("changed XLS writes require explicit signature removal"),
             Error::StagedChangeLimit { observed, maximum } => write!(
                 f,
                 "XLS staged change limit exceeded: {observed} > {maximum}"

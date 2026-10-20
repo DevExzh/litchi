@@ -1654,6 +1654,7 @@ impl Classify for litchi_xls::Error {
             Self::Refused(refusal) => refusal.classify(),
             Self::PatchConflict { .. } => Class::of(Code::InvalidInput),
             Self::Internal(_) => Class::of(Code::InternalError),
+            Self::Signed => Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION),
             Self::UnsupportedEncryption(_)
             | Self::UnsupportedFeature(_)
             | Self::SourceBoundWorksheetMutation { .. } => Class::of(Code::UnsupportedCapability),

@@ -167,9 +167,18 @@ impl Snapshot {
     }
 
     /// Starts a detached bounded visibility edit.
+    /// A codec-level edit of this bare snapshot; its commit opens the result
+    /// with the default package policy. Package callers use
+    /// [`crate::Package::edit_sheet_visibility`].
+    #[cfg(test)]
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
+        self.edit_based(None)
+    }
+
+    fn edit_based(&self, base: crate::scoped::Base) -> Edit {
         Edit {
+            base,
             source: self.clone(),
             changes: Vec::new(),
         }
@@ -288,6 +297,7 @@ struct Change {
 /// Detached, bounded and failure-atomic worksheet visibility transaction.
 #[derive(Clone)]
 pub struct Edit {
+    base: crate::scoped::Base,
     source: Snapshot,
     changes: Vec<Change>,
 }
@@ -376,13 +386,26 @@ impl Edit {
     ///
     /// Returns a final-visible-sheet, stale-field, CFB, complete-reopen, or
     /// semantic-closure error without publishing partial bytes.
+    /// Validate the staged changes and publish them as a new package.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same refusals as the staging verbs, a patch conflict for
+    /// a stale owner, or [`Error::Signed`] for a changed signed workbook.
     pub fn commit(self) -> Result<Commit> {
+        let base = self.base.clone();
+        let record = self.commit_record()?;
+        let package = crate::scoped::publish(base, record.patch.before(), record.patch.after())?;
+        Ok(Commit::new(package, record.patch, record.diagnostics))
+    }
+
+    pub(crate) fn commit_record(self) -> Result<RecordCommit> {
         if self.changes.is_empty() {
             let patch = Patch::new(
                 Arc::clone(&self.source.inner.bytes),
                 Arc::clone(&self.source.inner.bytes),
             );
-            return Ok(Commit {
+            return Ok(RecordCommit {
                 snapshot: self.source,
                 patch,
                 diagnostics: Diagnostics::default(),
@@ -446,7 +469,7 @@ impl Edit {
             Arc::clone(&self.source.inner.bytes),
             Arc::clone(&snapshot.inner.bytes),
         );
-        Ok(Commit {
+        Ok(RecordCommit {
             snapshot,
             patch,
             diagnostics: Diagnostics {
@@ -591,6 +614,12 @@ pub struct Diagnostics {
 }
 
 impl Diagnostics {
+    /// Whether the commit changed the package.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.touched_streams > 0
+    }
+
     /// Number of distinct changed worksheet owners.
     #[must_use]
     pub const fn changed_worksheets(self) -> usize {
@@ -604,48 +633,80 @@ impl Diagnostics {
     }
 }
 
-/// Successful complete-package visibility publication.
+/// A published worksheet-visibility edit: the new package, its exact
+/// reversible artifact patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<crate::Package, Patch, Diagnostics>;
+
+/// The visibility family has no caller-selected limit dimension: an edit
+/// changes at most [`MAX_VISIBILITY_CHANGES`] owners and the republished
+/// package is admitted under the source package's limits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {}
+
+/// The record-level result of a visibility edit, before publication.
 #[derive(Clone)]
-pub struct Commit {
+pub(crate) struct RecordCommit {
+    #[cfg_attr(not(test), allow(dead_code, reason = "the record-level tests read it"))]
     snapshot: Snapshot,
     patch: Patch,
     diagnostics: Diagnostics,
 }
 
-impl Commit {
-    /// Reopened target snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+#[cfg(test)]
+#[allow(dead_code, reason = "not every record-level test reads every part")]
+impl RecordCommit {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
-    /// Exact-source reversible artifact patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
-    /// Content-free publication diagnostics.
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
+    pub(crate) const fn diagnostics(&self) -> Diagnostics {
         self.diagnostics
-    }
-
-    /// Splits this publication into its components.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch, Diagnostics) {
-        (self.snapshot, self.patch, self.diagnostics)
     }
 }
 
-impl fmt::Debug for Commit {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("Commit")
-            .field("snapshot", &self.snapshot)
-            .field("patch", &self.patch)
-            .field("diagnostics", &self.diagnostics)
-            .finish()
+impl crate::Package {
+    /// The worksheet visibility read view of this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package is not a supported BIFF8 workbook.
+    pub fn sheet_visibility(&self) -> Result<Snapshot> {
+        let (_, bytes) = crate::scoped::capture(self)?;
+        Snapshot::from_bytes(bytes)
+    }
+
+    /// Start a worksheet-visibility edit of this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an encrypted, protected or unsupported workbook.
+    pub fn edit_sheet_visibility(&self) -> Result<Edit> {
+        let (base, bytes) = crate::scoped::capture(self)?;
+        Ok(Snapshot::from_bytes(bytes)?.edit_based(base))
+    }
+
+    /// Replay a worksheet-visibility patch onto the exact package it was
+    /// made from.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// source, or [`Error::Signed`] for a changed signed workbook.
+    pub fn apply_sheet_visibility(&self, patch: &Patch) -> Result<Commit> {
+        let before = crate::scoped::replay_source(self, patch.before(), "edit sheet visibility")?;
+        let source = Snapshot::from_bytes(before)?;
+        let target = patch.apply(&source)?;
+        let package = crate::scoped::publish(Some(self.clone()), patch.before(), target.bytes())?;
+        let diagnostics = Diagnostics {
+            changed_worksheets: 0,
+            touched_streams: usize::from(!patch.is_noop()),
+        };
+        Ok(Commit::new(package, patch.clone(), diagnostics))
     }
 }
 
@@ -1548,7 +1609,7 @@ mod tests {
             let mut edit = source.edit();
             edit.set_visibility(Selector::Position(Position::new(target)), visibility)
                 .unwrap();
-            let commit = edit.commit().unwrap();
+            let commit = edit.commit_record().unwrap();
             let mut rerendered = PackageEditor::open(
                 source.bytes().to_vec(),
                 Targets::default(),
@@ -1615,7 +1676,7 @@ mod tests {
         let mut transaction = source.edit();
         transaction.hide("sHeEt1".into()).unwrap();
         transaction.very_hide(2usize.into()).unwrap();
-        let commit = transaction.commit().unwrap();
+        let commit = transaction.commit_record().unwrap();
         assert_eq!(commit.diagnostics().changed_worksheets(), 2);
         assert_eq!(commit.diagnostics().touched_streams(), 1);
         assert_eq!(
@@ -1650,7 +1711,7 @@ mod tests {
 
         let mut unhide = commit.snapshot().edit();
         unhide.unhide("SHEET1".into()).unwrap();
-        let unhidden = unhide.commit().unwrap();
+        let unhidden = unhide.commit_record().unwrap();
         assert_eq!(
             unhidden
                 .snapshot()
@@ -1841,7 +1902,7 @@ mod tests {
         let mut transaction = source.edit();
         transaction.hide(0usize.into()).unwrap();
         transaction.hide(1usize.into()).unwrap();
-        assert!(transaction.commit().is_err());
+        assert!(transaction.commit_record().is_err());
         assert_eq!(
             source
                 .worksheets()
@@ -1863,7 +1924,7 @@ mod tests {
                 )
             }))
             .unwrap();
-        let commit = transaction.commit().unwrap();
+        let commit = transaction.commit_record().unwrap();
         assert_eq!(
             commit.diagnostics().changed_worksheets(),
             MAX_VISIBILITY_CHANGES
@@ -1880,7 +1941,7 @@ mod tests {
                 }))
                 .is_err()
         );
-        let noop = refused.commit().unwrap();
+        let noop = refused.commit_record().unwrap();
         assert!(noop.patch().is_noop());
         assert_eq!(noop.snapshot().bytes(), source.bytes());
     }
@@ -1890,7 +1951,7 @@ mod tests {
         let source = Snapshot::from_bytes(package(3)).unwrap();
         let mut transaction = source.edit();
         transaction.hide(2usize.into()).unwrap();
-        let commit = transaction.commit().unwrap();
+        let commit = transaction.commit_record().unwrap();
         let wire = commit.patch().to_bytes().unwrap();
         let durable = Patch::from_bytes(&wire).unwrap();
         assert!(durable.apply(commit.snapshot()).is_err());

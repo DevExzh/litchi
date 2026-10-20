@@ -17,6 +17,6 @@ pub use model::{
     VerticalAlignment, Visibility,
 };
 pub use transaction::{
-    Commit, Diagnostics, Edit, Operation, Patch, Snapshot, SourceBackedCommit,
+    Commit, Diagnostics, Edit, LimitKind, Operation, Patch, Snapshot, SourceBackedCommit,
     SourceBackedDiagnostics, Update, Value, Worksheet,
 };

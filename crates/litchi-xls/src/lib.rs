@@ -112,6 +112,7 @@ mod cell;
 )]
 pub mod cell_values;
 /// Lossless, source-backed BIFF8 worksheet visibility transactions.
+mod scoped;
 pub mod sheet_visibility;
 /// Finite physical source limits shared by the eager XLS owners.
 pub mod source_limits;

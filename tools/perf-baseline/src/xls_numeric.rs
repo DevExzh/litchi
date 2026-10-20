@@ -328,10 +328,10 @@ pub(crate) fn build_rk_mulrk_corpus() -> Result<Corpus, Box<dyn std::error::Erro
         .and_then(|bytes| bytes.checked_add(b"litchi-xls-rk-mulrk-opaque-metadata-v1".len()))
         .ok_or("XLS RK/MulRK corpus payload size overflow")?;
 
-    let snapshot = litchi_xls::cell_values::Snapshot::from_bytes(clone_bytes(
-        &archive,
-        "XLS RK/MulRK corpus snapshot",
-    )?, litchi_ole_common::object::Limits::default())?;
+    let snapshot = litchi_xls::cell_values::Snapshot::from_bytes(
+        clone_bytes(&archive, "XLS RK/MulRK corpus snapshot")?,
+        litchi_ole_common::object::Limits::default(),
+    )?;
     let sheet = snapshot
         .worksheet(litchi_xls::cell_values::Selector::Name("Packed"))?
         .ok_or("XLS RK/MulRK corpus lost Packed worksheet")?;
@@ -978,7 +978,10 @@ fn verify_noop_and_security(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use litchi_xls::cell_values::{Snapshot, Value};
 
-    let source = Snapshot::from_bytes(clone_bytes(&corpus.archive, "XLS numeric no-op source")?, litchi_ole_common::object::Limits::default())?;
+    let source = Snapshot::from_bytes(
+        clone_bytes(&corpus.archive, "XLS numeric no-op source")?,
+        litchi_ole_common::object::Limits::default(),
+    )?;
     let noop = commit_source_backed_transaction(source.edit(), implementation)?;
     if !noop.is_noop() || noop.snapshot().bytes() != source.bytes() {
         return Err("XLS numeric source-backed no-op changed source identity".into());
@@ -1107,7 +1110,10 @@ fn verify_security_refusal(
             require_encrypted_marker(bytes)?;
         },
     }
-    let snapshot = match Snapshot::from_bytes(clone_bytes(bytes, "XLS security fixture")?, litchi_ole_common::object::Limits::default()) {
+    let snapshot = match Snapshot::from_bytes(
+        clone_bytes(bytes, "XLS security fixture")?,
+        litchi_ole_common::object::Limits::default(),
+    ) {
         Ok(snapshot) => {
             if !matches!(expectation, SecurityFixtureExpectation::Open) {
                 return Err(format!("XLS {label} fixture unexpectedly opened").into());
@@ -1350,7 +1356,10 @@ fn verify_output(
     use litchi_xls::cell_values::{Snapshot, Storage, Value};
 
     super::verify_xls_untouched_streams(&corpus.archive, output, source_backed)?;
-    let snapshot = Snapshot::from_bytes(clone_bytes(output, "XLS numeric output reopen")?, litchi_ole_common::object::Limits::default())?;
+    let snapshot = Snapshot::from_bytes(
+        clone_bytes(output, "XLS numeric output reopen")?,
+        litchi_ole_common::object::Limits::default(),
+    )?;
     for edit in edits {
         let sheet = snapshot
             .worksheet(edit.selector)?
@@ -1467,7 +1476,10 @@ fn verify_partial_publication(
 fn verify_real_producer(implementation: Implementation) -> Result<(), Box<dyn std::error::Error>> {
     use litchi_xls::cell_values::{Selector, Snapshot, Storage, Value};
 
-    let source = Snapshot::from_bytes(clone_bytes(REAL_PRODUCER, "XLS real-producer source")?, litchi_ole_common::object::Limits::default())?;
+    let source = Snapshot::from_bytes(
+        clone_bytes(REAL_PRODUCER, "XLS real-producer source")?,
+        litchi_ole_common::object::Limits::default(),
+    )?;
     let mut selected = None;
     for sheet in source.worksheets() {
         for cell in sheet.cells() {
@@ -1528,10 +1540,10 @@ fn prepare_expected(
     implementation: Implementation,
     family: Family,
 ) -> Result<Expected, Box<dyn std::error::Error>> {
-    let source = litchi_xls::cell_values::Snapshot::from_bytes(clone_bytes(
-        &corpus.archive,
-        "XLS numeric expected source",
-    )?, litchi_ole_common::object::Limits::default())?;
+    let source = litchi_xls::cell_values::Snapshot::from_bytes(
+        clone_bytes(&corpus.archive, "XLS numeric expected source")?,
+        litchi_ole_common::object::Limits::default(),
+    )?;
     let edits = edits_for(&source, family)?;
     verify_noop_and_security(corpus, family, implementation, &edits)?;
     let publication = prepare(source.clone(), implementation, family, &edits)?;
@@ -1669,7 +1681,10 @@ pub(crate) fn run(
 
     for iteration in 0..super::iteration_count(warmup_iterations, samples)? {
         let (owned, source_metrics) = read_owned(&corpus.archive)?;
-        let snapshot = litchi_xls::cell_values::Snapshot::from_bytes(owned, litchi_ole_common::object::Limits::default())?;
+        let snapshot = litchi_xls::cell_values::Snapshot::from_bytes(
+            owned,
+            litchi_ole_common::object::Limits::default(),
+        )?;
         let mut sink = CountingSink::bounded(maximum, MAX_WRITE);
         sink.reserve_budget()?;
 

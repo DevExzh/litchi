@@ -16088,10 +16088,15 @@ fn verify_ppt_picture_limit_gates(
         parsed.open_stream(&["Pictures"])?
     };
     let pictures_range = ppt_picture_payload_range(archive, &pictures_payload)?;
-    let mut eager =
-        litchi_ppt::raw::Reader::from_reader_with_options(Cursor::new(archive.to_vec()), litchi_ppt::OpenOptions::new().source_limits(exact))?;
+    let mut eager = litchi_ppt::raw::Reader::from_reader_with_options(
+        Cursor::new(archive.to_vec()),
+        litchi_ppt::OpenOptions::new().source_limits(exact),
+    )?;
     eager.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(exact))?;
-    let source = litchi_ppt::SourceBackedPackage::from_read_at_with_options(Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())), litchi_ppt::OpenOptions::new().source_limits(exact))?;
+    let source = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+        Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())),
+        litchi_ppt::OpenOptions::new().source_limits(exact),
+    )?;
     source.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(exact))?;
 
     let package_under = ppt_source_limits_with(
@@ -16103,12 +16108,18 @@ fn verify_ppt_picture_limit_gates(
         exact.max_entry_bytes(),
         exact.max_aggregate_bytes(),
     )?;
-    if litchi_ppt::raw::Reader::from_reader_with_options(Cursor::new(archive.to_vec()), litchi_ppt::OpenOptions::new().source_limits(package_under))
+    if litchi_ppt::raw::Reader::from_reader_with_options(
+        Cursor::new(archive.to_vec()),
+        litchi_ppt::OpenOptions::new().source_limits(package_under),
+    )
     .is_ok()
     {
         return Err("PPT eager package limit accepted one byte under package size".into());
     }
-    if litchi_ppt::SourceBackedPackage::from_read_at_with_options(Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())), litchi_ppt::OpenOptions::new().source_limits(package_under))
+    if litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+        Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())),
+        litchi_ppt::OpenOptions::new().source_limits(package_under),
+    )
     .is_ok()
     {
         return Err("PPT source-backed package limit accepted one byte under package size".into());
@@ -16123,18 +16134,29 @@ fn verify_ppt_picture_limit_gates(
             .ok_or("PPT Pictures fixture is empty")?,
         exact.max_aggregate_bytes(),
     )?;
-    let mut eager =
-        litchi_ppt::raw::Reader::from_reader_with_options(Cursor::new(archive.to_vec()), litchi_ppt::OpenOptions::new().source_limits(exact))?;
-    if eager.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(pictures_under)).is_ok() {
+    let mut eager = litchi_ppt::raw::Reader::from_reader_with_options(
+        Cursor::new(archive.to_vec()),
+        litchi_ppt::OpenOptions::new().source_limits(exact),
+    )?;
+    if eager
+        .presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(pictures_under))
+        .is_ok()
+    {
         return Err("PPT eager Pictures limit accepted one byte under stream size".into());
     }
     let source = Arc::new(InstrumentedSource::new(
         archive.to_vec(),
         vec![pictures_range],
     ));
-    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(source.clone(), litchi_ppt::OpenOptions::new().source_limits(exact))?;
+    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+        source.clone(),
+        litchi_ppt::OpenOptions::new().source_limits(exact),
+    )?;
     source.reset();
-    if package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(pictures_under)).is_ok() {
+    if package
+        .presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(pictures_under))
+        .is_ok()
+    {
         return Err("PPT source-backed Pictures limit accepted one byte under stream size".into());
     }
     let snapshot = source.snapshot();
@@ -16208,8 +16230,13 @@ fn time_ppt_pictures_eager(
     let cursor = Cursor::new(archive);
     if phase == "presentation_open_no_image_query" {
         let started = Instant::now();
-        let mut package = litchi_ppt::raw::Reader::from_reader_with_options(cursor, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
-        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let mut package = litchi_ppt::raw::Reader::from_reader_with_options(
+            cursor,
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
+        let presentation = package.presentation_with_options(
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
         std::hint::black_box(&presentation);
         let duration = started.elapsed();
         if !presentation.has_pictures() {
@@ -16220,8 +16247,13 @@ fn time_ppt_pictures_eager(
 
     if phase == "fresh_open_plus_cold_all_images_query" {
         let started = Instant::now();
-        let mut package = litchi_ppt::raw::Reader::from_reader_with_options(cursor, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
-        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let mut package = litchi_ppt::raw::Reader::from_reader_with_options(
+            cursor,
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
+        let presentation = package.presentation_with_options(
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
         let images = presentation.images()?;
         std::hint::black_box(&images);
         let duration = started.elapsed();
@@ -16229,8 +16261,12 @@ fn time_ppt_pictures_eager(
         return Ok(duration);
     }
 
-    let mut package = litchi_ppt::raw::Reader::from_reader_with_options(cursor, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
-    let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+    let mut package = litchi_ppt::raw::Reader::from_reader_with_options(
+        cursor,
+        litchi_ppt::OpenOptions::new().source_limits(source_limits),
+    )?;
+    let presentation = package
+        .presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
     if cached_repeat {
         let first = presentation.images()?;
         verify_ppt_picture_images(&first)?;
@@ -16251,9 +16287,13 @@ fn time_ppt_pictures_source_backed(
 ) -> Result<Duration, Box<dyn Error>> {
     if phase == "presentation_open_no_image_query" {
         let started = Instant::now();
-        let package =
-            litchi_ppt::SourceBackedPackage::from_read_at_with_options(source, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
-        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+            source,
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
+        let presentation = package.presentation_with_options(
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
         std::hint::black_box(&presentation);
         let duration = started.elapsed();
         if !presentation.has_pictures() {
@@ -16264,9 +16304,13 @@ fn time_ppt_pictures_source_backed(
 
     if phase == "fresh_open_plus_cold_all_images_query" {
         let started = Instant::now();
-        let package =
-            litchi_ppt::SourceBackedPackage::from_read_at_with_options(source, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
-        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+            source,
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
+        let presentation = package.presentation_with_options(
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
         let images = presentation.images()?;
         std::hint::black_box(&images);
         let duration = started.elapsed();
@@ -16274,8 +16318,12 @@ fn time_ppt_pictures_source_backed(
         return Ok(duration);
     }
 
-    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(source, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
-    let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+        source,
+        litchi_ppt::OpenOptions::new().source_limits(source_limits),
+    )?;
+    let presentation = package
+        .presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
     if cached_repeat {
         let first = presentation.images()?;
         verify_ppt_picture_images(&first)?;
@@ -16301,17 +16349,25 @@ fn collect_ppt_pictures_source_evidence(
     ));
 
     if phase == "presentation_open_no_image_query" {
-        let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(source.clone(), litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
-        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+            source.clone(),
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
+        let presentation = package.presentation_with_options(
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
         if !presentation.has_pictures() {
             return Err("PPT source-backed evidence open lost Pictures descriptor".into());
         }
         return Ok(source.snapshot());
     }
 
-    let package =
-        litchi_ppt::SourceBackedPackage::from_read_at_with_options(source.clone(), litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
-    let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+        source.clone(),
+        litchi_ppt::OpenOptions::new().source_limits(source_limits),
+    )?;
+    let presentation = package
+        .presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
     if phase != "fresh_open_plus_cold_all_images_query" {
         source.reset();
     }
@@ -29902,7 +29958,7 @@ impl XlsVisibilityPublication {
     ) -> Result<Option<litchi_cfb::PublishReport>, Box<dyn Error>> {
         match self {
             Self::Eager { commit, .. } => {
-                for chunk in commit.snapshot().bytes().chunks(64 * 1024) {
+                for chunk in commit.package().to_bytes()?.chunks(64 * 1024) {
                     writer.write_all(chunk)?;
                 }
                 writer.flush()?;
@@ -29936,7 +29992,7 @@ impl XlsVisibilityPublication {
                     source_bytes: *source_bytes,
                     source_workbook_bytes: *source_workbook_bytes,
                     target_workbook_bytes: u64::try_from(
-                        commit.snapshot().workbook_stream().len(),
+                        commit.package().sheet_visibility()?.workbook_stream().len(),
                     )?,
                     splice_count: None,
                     replacement_bytes: None,
@@ -29979,7 +30035,8 @@ fn prepare_xls_visibility_publication(
 ) -> Result<XlsVisibilityPublication, Box<dyn Error>> {
     let source_bytes = u64::try_from(source.bytes().len())?;
     let source_workbook_bytes = u64::try_from(source.workbook_stream().len())?;
-    let mut transaction = source.edit();
+    let mut transaction =
+        litchi_xls::Package::from_bytes(source.bytes())?.edit_sheet_visibility()?;
     stage_xls_visibility_updates(&mut transaction, update_count)?;
     if source_backed {
         Ok(XlsVisibilityPublication::SourceBacked(
@@ -30113,11 +30170,12 @@ fn verify_xls_visibility_output(
 fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>> {
     use litchi_xls::SheetVisibility;
 
-    let snapshot = litchi_xls::sheet_visibility::Snapshot::from_bytes(source.to_vec())?;
+    let package = litchi_xls::Package::from_bytes(source)?;
+    let snapshot = package.sheet_visibility()?;
     if snapshot.worksheet_count() != XLS_VISIBILITY_SHEET_COUNT {
         return Err("XLS visibility source worksheet count differs from specification".into());
     }
-    let noop = snapshot.edit().commit_source_backed()?;
+    let noop = package.edit_sheet_visibility()?.commit_source_backed()?;
     if !noop.is_noop() || noop.diagnostics().changed_worksheets() != 0 {
         return Err("XLS visibility source-backed no-op was not exact".into());
     }
@@ -30127,7 +30185,7 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
         return Err("XLS visibility source-backed no-op changed source bytes".into());
     }
 
-    let mut capped = snapshot.edit();
+    let mut capped = package.edit_sheet_visibility()?;
     stage_xls_visibility_updates(&mut capped, XLS_VISIBILITY_BATCH_COUNT)?;
     let capped = capped.commit_source_backed()?;
     if capped.diagnostics().changed_worksheets() != XLS_VISIBILITY_BATCH_COUNT
@@ -30169,7 +30227,7 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
         XLS_VISIBILITY_BATCH_COUNT,
     )?;
 
-    let mut over_cap = snapshot.edit();
+    let mut over_cap = package.edit_sheet_visibility()?;
     if over_cap
         .set_visibility_batch(
             (1..=XLS_VISIBILITY_BATCH_COUNT + 1)
@@ -30203,9 +30261,8 @@ fn verify_xls_visibility_prepared(
     match prepared {
         XlsVisibilityPublication::Eager { commit, .. } => {
             let applied = commit.patch().apply(source)?;
-            if applied.bytes() != commit.snapshot().bytes()
-                || commit.patch().apply(commit.snapshot()).is_ok()
-            {
+            let published = commit.package().sheet_visibility()?;
+            if applied.bytes() != published.bytes() || commit.patch().apply(&published).is_ok() {
                 return Err("XLS visibility eager patch did not enforce exact source".into());
             }
             let restored = commit.patch().inverse().apply(&applied)?;
@@ -30421,7 +30478,7 @@ impl XlsCommentsPublication {
     ) -> Result<Option<litchi_cfb::PublishReport>, Box<dyn Error>> {
         match self {
             Self::Eager { commit, .. } => {
-                for chunk in commit.snapshot().bytes().chunks(64 * 1024) {
+                for chunk in commit.package().to_bytes()?.chunks(64 * 1024) {
                     writer.write_all(chunk)?;
                 }
                 writer.flush()?;
@@ -30455,7 +30512,7 @@ impl XlsCommentsPublication {
                     source_bytes: *source_bytes,
                     source_workbook_bytes: *source_workbook_bytes,
                     target_workbook_bytes: u64::try_from(
-                        commit.snapshot().workbook_stream().len(),
+                        commit.package().comments()?.workbook_stream().len(),
                     )?,
                     splice_count: None,
                     replacement_bytes: None,
@@ -30498,7 +30555,7 @@ fn prepare_xls_comments_publication(
 ) -> Result<XlsCommentsPublication, Box<dyn Error>> {
     let source_bytes = u64::try_from(source.bytes().len())?;
     let source_workbook_bytes = u64::try_from(source.workbook_stream().len())?;
-    let mut edit = source.edit();
+    let mut edit = litchi_xls::Package::from_bytes(source.bytes())?.edit_comments()?;
     stage_xls_comment_updates(&mut edit, update_count)?;
     if source_backed {
         Ok(XlsCommentsPublication::SourceBacked(
@@ -30687,8 +30744,8 @@ fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>
     use litchi_xls::cell_values::{Reference, Selector};
     use litchi_xls::comments::Value;
 
-    let snapshot = litchi_xls::comments::Snapshot::from_bytes(source.to_vec())?;
-    let mut rejected = snapshot.edit();
+    litchi_xls::comments::Snapshot::from_bytes(source.to_vec())?;
+    let mut rejected = litchi_xls::Package::from_bytes(source)?.edit_comments()?;
     rejected.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1)?,
@@ -30698,7 +30755,7 @@ fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>
         return Err("XLS source-backed comment edit accepted a length change".into());
     }
 
-    let mut rejected_width = snapshot.edit();
+    let mut rejected_width = litchi_xls::Package::from_bytes(source)?.edit_comments()?;
     rejected_width.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1)?,
@@ -30708,16 +30765,16 @@ fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>
         return Err("XLS source-backed comment edit accepted an encoding-width change".into());
     }
 
-    let mut fallback = snapshot.edit();
+    let mut fallback = litchi_xls::Package::from_bytes(source)?.edit_comments()?;
     fallback.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1)?,
         Value::new("Target 000", "comment target 000!")?,
     )?;
     let fallback = fallback.commit()?;
-    verify_xls_untouched_streams(source, fallback.snapshot().bytes(), false)?;
+    verify_xls_untouched_streams(source, fallback.patch().after(), false)?;
+    let fallback = fallback.package().comments()?;
     let changed = fallback
-        .snapshot()
         .worksheet(Selector::Position(Position::new(0)))?
         .ok_or("XLS eager fallback lost its worksheet")?
         .comment(Reference::new(0, 1)?)?
@@ -30733,7 +30790,7 @@ fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>
     let mut protected_bytes = Cursor::new(Vec::new());
     protected_builder.build()?.write_to(&mut protected_bytes)?;
     let protected = litchi_xls::comments::Snapshot::from_bytes(protected_bytes.into_inner())?;
-    let mut edit = protected.edit();
+    let mut edit = litchi_xls::Package::from_bytes(protected.bytes())?.edit_comments()?;
     if edit
         .replace(
             Selector::Position(Position::new(0)),
@@ -30755,9 +30812,8 @@ fn verify_xls_comments_prepared(
     match prepared {
         XlsCommentsPublication::Eager { commit, .. } => {
             let applied = commit.patch().apply(source)?;
-            if applied.bytes() != commit.snapshot().bytes()
-                || commit.patch().apply(commit.snapshot()).is_ok()
-            {
+            let published = commit.package().comments()?;
+            if applied.bytes() != published.bytes() || commit.patch().apply(&published).is_ok() {
                 return Err("XLS comment eager patch did not enforce its exact source".into());
             }
             let restored = commit.patch().inverse().apply(&applied)?;
@@ -30932,7 +30988,8 @@ fn verify_semantic_xls(
     let (sheet_count, rows, columns) = shape
         .xls_dimensions()
         .ok_or("payload-heavy XLS corpus is excluded from semantic verification")?;
-    let snapshot = Snapshot::from_bytes(bytes.to_vec(), litchi_ole_common::object::Limits::default())?;
+    let snapshot =
+        Snapshot::from_bytes(bytes.to_vec(), litchi_ole_common::object::Limits::default())?;
     if snapshot.worksheet_count() != sheet_count {
         return Err("semantic XLS worksheet count differs from writer specification".into());
     }
@@ -30978,7 +31035,10 @@ fn run_semantic_xls(
     let reference = Reference::new(selected.1 as u32, selected.2 as u32)?;
     let replacement = xls_expected_value(shape, selected.0, selected.1, selected.2)? + 0.5;
     let expected_changed = if case == Case::XlsSemanticOneEditSave {
-        let source = Snapshot::from_bytes(corpus.archive.clone(), litchi_ole_common::object::Limits::default())?;
+        let source = Snapshot::from_bytes(
+            corpus.archive.clone(),
+            litchi_ole_common::object::Limits::default(),
+        )?;
         let mut edit = source.edit();
         edit.set_number(selected.0.into(), reference, replacement)?;
         edit.commit()?.snapshot().bytes().to_vec()
@@ -31083,7 +31143,10 @@ fn run_semantic_xls(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::XlsSemanticNoopEditSave | Case::XlsSemanticOneEditSave => {
-                let source = Snapshot::from_bytes(corpus.archive.clone(), litchi_ole_common::object::Limits::default())?;
+                let source = Snapshot::from_bytes(
+                    corpus.archive.clone(),
+                    litchi_ole_common::object::Limits::default(),
+                )?;
                 let updated = case == Case::XlsSemanticOneEditSave;
                 let started = Instant::now();
                 let mut edit = source.edit();
@@ -34259,7 +34322,12 @@ fn run_xls_validation_report(
         corpus,
         warmup_iterations,
         samples,
-        |source| Ok(litchi_xls::validation::validate_source(source, litchi_xls::validation::XlsValidationLimits::default())?),
+        |source| {
+            Ok(litchi_xls::validation::validate_source(
+                source,
+                litchi_xls::validation::XlsValidationLimits::default(),
+            )?)
+        },
     )
 }
 

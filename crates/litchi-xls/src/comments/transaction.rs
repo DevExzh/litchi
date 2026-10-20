@@ -220,14 +220,22 @@ impl Snapshot {
         }))
     }
 
+    /// A codec-level edit of this bare snapshot; its commit opens the
+    /// result with the default package policy. Package callers use
+    /// [`crate::Package::edit_comments`].
+    #[cfg(test)]
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
+        self.edit_based(None)
+    }
+
+    fn edit_based(&self, base: crate::scoped::Base) -> Edit {
         Edit {
+            base,
             source: self.clone(),
             changes: Vec::new(),
         }
     }
-
     fn resolve_sheet(&self, selector: Selector<'_>) -> Result<Option<usize>> {
         match selector {
             Selector::Position(position) => Ok(self
@@ -323,6 +331,7 @@ struct Change {
 /// Detached, failure-atomic replacement of existing BIFF8 comments.
 #[derive(Clone)]
 pub struct Edit {
+    base: crate::scoped::Base,
     source: Snapshot,
     changes: Vec<Change>,
 }
@@ -506,6 +515,13 @@ impl Edit {
     /// Returns a stale-source, BIFF splice, package, complete-reopen, or
     /// semantic-readback error without publishing a partial result.
     pub fn commit(self) -> Result<Commit> {
+        let base = self.base.clone();
+        let record = self.commit_record()?;
+        let package = crate::scoped::publish(base, record.patch.before(), record.patch.after())?;
+        Ok(Commit::new(package, record.patch, record.diagnostics))
+    }
+
+    pub(crate) fn commit_record(self) -> Result<RecordCommit> {
         let effective: Vec<_> = self
             .changes
             .iter()
@@ -517,7 +533,7 @@ impl Edit {
                 Arc::clone(&self.source.inner.bytes),
                 Vec::new(),
             );
-            return Ok(Commit {
+            return Ok(RecordCommit {
                 snapshot: self.source,
                 patch,
                 diagnostics: Diagnostics::default(),
@@ -598,7 +614,7 @@ impl Edit {
             Arc::clone(&snapshot.inner.bytes),
             operations,
         );
-        Ok(Commit {
+        Ok(RecordCommit {
             snapshot,
             patch,
             diagnostics: Diagnostics {
@@ -921,6 +937,19 @@ pub struct Diagnostics {
 }
 
 impl Diagnostics {
+    /// Whether the commit changed the package.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.touched_streams > 0
+    }
+
+    fn applied(patch: &Patch) -> Self {
+        Self {
+            touched_streams: usize::from(!patch.is_noop()),
+            ..Self::default()
+        }
+    }
+
     #[must_use]
     pub const fn changed_comments(self) -> usize {
         self.changed_comments
@@ -932,36 +961,80 @@ impl Diagnostics {
     }
 }
 
-/// Successful immutable XLS comment publication.
-#[derive(Clone, Debug)]
-pub struct Commit {
+/// A published comment edit: the new package, its exact reversible artifact
+/// patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<crate::Package, Patch, Diagnostics>;
+
+/// The comment family has no caller-selected limit dimension: the republished
+/// package is admitted under the source package's limits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {}
+
+/// The record-level result of a comment edit, before publication.
+#[derive(Clone)]
+pub(crate) struct RecordCommit {
+    #[cfg_attr(not(test), allow(dead_code, reason = "the record-level tests read it"))]
     snapshot: Snapshot,
     patch: Patch,
     diagnostics: Diagnostics,
 }
 
-impl Commit {
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+#[cfg(test)]
+#[allow(dead_code, reason = "not every record-level test reads every part")]
+impl RecordCommit {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
+    pub(crate) const fn diagnostics(&self) -> Diagnostics {
         self.diagnostics
-    }
-
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch, Diagnostics) {
-        (self.snapshot, self.patch, self.diagnostics)
     }
 }
 
+impl crate::Package {
+    /// The comment read view of this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package is not a supported BIFF8 workbook.
+    pub fn comments(&self) -> Result<Snapshot> {
+        let (_, bytes) = crate::scoped::capture(self)?;
+        Snapshot::from_bytes(bytes)
+    }
+
+    /// Start a comment edit of this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an encrypted, protected or unsupported workbook.
+    pub fn edit_comments(&self) -> Result<Edit> {
+        let (base, bytes) = crate::scoped::capture(self)?;
+        Ok(Snapshot::from_bytes(bytes)?.edit_based(base))
+    }
+
+    /// Replay a comment patch onto the exact package it was made from.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// source, or [`Error::Signed`] for a changed signed workbook.
+    pub fn apply_comments(&self, patch: &Patch) -> Result<Commit> {
+        let before = crate::scoped::replay_source(self, patch.before(), "edit comments")?;
+        let source = Snapshot::from_bytes(before)?;
+        let target = patch.apply(&source)?;
+        let package = crate::scoped::publish(Some(self.clone()), patch.before(), target.bytes())?;
+        Ok(Commit::new(
+            package,
+            patch.clone(),
+            Diagnostics::applied(patch),
+        ))
+    }
+}
 /// Content-free evidence for a same-length source-backed comment publication.
 ///
 /// The diagnostics intentionally retain only counts, lengths, and opaque CFB
