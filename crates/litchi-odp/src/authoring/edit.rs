@@ -1417,9 +1417,11 @@ impl Edit {
             audit::Limits::default(),
         )
         .map(|_report| ())
-        .map_err(|error| {
-            Error::Unsupported(format!(
-                "ODP foreign blank-slide transfer refuses unaudited donor XML: {error}"
+        .map_err(|_error| {
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odp.authoring.edit",
+                "ODP foreign blank-slide transfer refuses unaudited donor XML",
             ))
         })?;
         if source_presentation.settings()?.is_some()
@@ -1434,18 +1436,22 @@ impl Edit {
             invalid_error("ODP foreign blank-slide transfer donor page metadata is missing")
         })?;
         let source_name = source_page.name.as_deref().ok_or_else(|| {
-            Error::Unsupported(
-                "ODP foreign blank-slide transfer donor requires draw:name".to_string(),
-            )
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odp.authoring.edit",
+                "ODP foreign blank-slide transfer donor requires draw:name",
+            ))
         })?;
-        let source_content =
-            crate::codec::content_source::ContentSource::parse(source_presentation.content_xml())?
-                .ok_or_else(|| {
-                    Error::Unsupported(
-                "ODP foreign blank-slide transfer requires retained donor content fragments"
-                    .to_string(),
-            )
-                })?;
+        let source_content = crate::codec::content_source::ContentSource::parse(
+            source_presentation.content_xml(),
+        )?
+        .ok_or_else(|| {
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odp.authoring.edit",
+                "ODP foreign blank-slide transfer requires retained donor content fragments",
+            ))
+        })?;
         let donor_page = source_content.page(source_index).ok_or_else(|| {
             invalid_error("ODP foreign blank-slide transfer donor page is outside content coverage")
         })?;
@@ -3585,21 +3591,19 @@ impl Edit {
                 .is_some_and(|draft| !draft.operations.is_empty())
     }
 
-    fn check_no_slide_order_change(&self, operation: &str) -> Result<()> {
+    fn check_no_slide_order_change(&self, _operation: &str) -> Result<()> {
         if self.slide_order_changed {
-            return unsupported(format!(
-                "ODP {operation} operation cannot be staged after a slide move"
-            ));
+            return unsupported("ODP operation cannot be staged after a slide move");
         }
         if self.dependency_free_slide_copy_changed {
-            return unsupported(format!(
-                "ODP {operation} operation cannot be staged after a dependency-free blank-slide copy"
-            ));
+            return unsupported(
+                "ODP operation cannot be staged after a dependency-free blank-slide copy",
+            );
         }
         if self.dependency_free_slide_removal_changed {
-            return unsupported(format!(
-                "ODP {operation} operation cannot be staged after a dependency-free blank-slide removal"
-            ));
+            return unsupported(
+                "ODP operation cannot be staged after a dependency-free blank-slide removal",
+            );
         }
         Ok(())
     }
@@ -4790,8 +4794,10 @@ fn validate_compact_xml_parts_against(
         let audit_payload = payload.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&payload);
         let _report =
             audit::verify(audit_payload, limits).map_err(|audit_error| match audit_error {
-                audit::Error::NotCompact(_) => Error::Unsupported(format!(
-                    "ODP XML part '{path}' is not compact: {audit_error}"
+                audit::Error::NotCompact(_) => Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.edit",
+                    "ODP XML part is not compact",
                 )),
                 audit::Error::Limit { .. }
                 | audit::Error::Encoding { .. }
@@ -4821,8 +4827,12 @@ fn invalid_error(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
 
-fn unsupported<T>(message: impl Into<String>) -> Result<T> {
-    Err(Error::Unsupported(message.into()))
+fn unsupported<T>(reason: &'static str) -> Result<T> {
+    Err(Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "odp.authoring.edit",
+        reason,
+    )))
 }
 
 #[cfg(test)]

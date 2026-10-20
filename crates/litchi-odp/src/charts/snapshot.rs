@@ -318,8 +318,10 @@ pub(super) fn validate_compact_package(package: &OwnedPackage) -> Result<()> {
         )
         .map_err(|source| invalid_error(format!("invalid ODP chart XML audit limits: {source}")))?;
         let _report = audit::verify(&payload, limits).map_err(|source| match source {
-            audit::Error::NotCompact(_) => Error::Unsupported(format!(
-                "ODP chart XML part '{path}' is not compact: {source}"
+            audit::Error::NotCompact(_) => Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odp.charts.snapshot",
+                "ODP chart XML part is not compact",
             )),
             audit::Error::Limit { .. }
             | audit::Error::Encoding { .. }

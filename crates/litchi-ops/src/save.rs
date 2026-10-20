@@ -243,7 +243,7 @@ impl File {
             feature = "ods",
             feature = "odt",
             feature = "odp",
-            feature = "odf-objects",
+            odf_objects,
             feature = "iwork-adapter"
         )))]
         {
@@ -266,7 +266,7 @@ impl File {
             feature = "ods",
             feature = "odt",
             feature = "odp",
-            feature = "odf-objects",
+            odf_objects,
             feature = "iwork-adapter"
         ))]
         {
@@ -281,7 +281,7 @@ impl File {
                 Self::Rtf(_) => {},
                 #[cfg(feature = "odt")]
                 Self::Odt(_) | Self::Oth(_) | Self::Odm(_) => {},
-                #[cfg(feature = "odf-objects")]
+                #[cfg(odf_objects)]
                 Self::Odg(_) | Self::Odc(_) | Self::Odi(_) | Self::Odb(_) | Self::Odf(_) => {},
                 #[cfg(feature = "iwork-adapter")]
                 Self::Pages(_) | Self::Keynote(_) | Self::Numbers(_) => {},
@@ -325,7 +325,7 @@ impl File {
                 Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => {
                     handle.save_to(&destination, options)?
                 },
-                #[cfg(feature = "odf-objects")]
+                #[cfg(odf_objects)]
                 Self::Odg(handle)
                 | Self::Odc(handle)
                 | Self::Odi(handle)
@@ -375,7 +375,7 @@ impl File {
     feature = "ods",
     feature = "odt",
     feature = "odp",
-    feature = "odf-objects",
+    odf_objects,
     feature = "iwork-adapter"
 ))]
 fn origin_path(file: &File, format: Option<FileFormat>) -> Result<PathBuf> {
@@ -386,7 +386,7 @@ fn origin_path(file: &File, format: Option<FileFormat>) -> Result<PathBuf> {
             .map(|origin| origin.as_ref().to_path_buf())
             .ok_or_else(|| file_required(format));
     }
-    #[cfg(feature = "odf-objects")]
+    #[cfg(odf_objects)]
     if let Some(handle) = file.odf_tree() {
         return handle
             .origin()
@@ -486,7 +486,7 @@ fn origin_path(file: &File, format: Option<FileFormat>) -> Result<PathBuf> {
     feature = "ods",
     feature = "odt",
     feature = "odp",
-    feature = "odf-objects",
+    odf_objects,
     feature = "iwork-adapter"
 ))]
 fn file_required(format: Option<FileFormat>) -> Error {
@@ -682,7 +682,7 @@ fn validate_xls_destination(destination: &Path) -> Result<()> {
     feature = "ods",
     feature = "odt",
     feature = "odp",
-    feature = "odf-objects",
+    odf_objects,
     feature = "iwork-adapter"
 ))]
 fn same_format(path: &Path, format: FileFormat) -> Result<()> {
@@ -714,7 +714,7 @@ fn same_format(path: &Path, format: FileFormat) -> Result<()> {
     feature = "ods",
     feature = "odt",
     feature = "odp",
-    feature = "odf-objects",
+    odf_objects,
     feature = "iwork-adapter"
 ))]
 fn format_of_extension(extension: &str) -> Option<FileFormat> {

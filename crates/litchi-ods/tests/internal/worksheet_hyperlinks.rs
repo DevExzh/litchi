@@ -455,20 +455,20 @@ fn flat_transaction_rejects_new_unsafe_public_link_without_staging() -> litchi_c
 fn source_edit_refuses_linked_row_without_publication() -> litchi_core::Result<()> {
     let source = package(LINK_CONTENT)?;
     let owner = SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(source.clone())))?;
-    let before = owner.cell_snapshot()?;
-    let original_content = before.content_xml().to_string();
+    let original_content = owner.content_xml()?.to_string();
     let mut edit = owner.edit_cells()?;
     let error = edit
         .set_cell("Data", 0, 1, text_cell("changed"))
         .unwrap_err();
     assert!(error.to_string().contains("hyperlinks"));
     assert_eq!(edit.changed_cells(), 0);
-    assert!(edit.is_no_op());
-    assert_eq!(edit.before().content_xml(), original_content.as_str());
+    assert!(edit.is_noop());
+    assert_eq!(owner.content_xml()?, original_content.as_str());
 
     let commit = edit.commit()?;
     let mut output = Vec::new();
     let report = commit
+        .package()
         .write_to(&mut output)
         .expect("no-op source-backed commit should publish successfully");
     assert!(report.is_no_op());

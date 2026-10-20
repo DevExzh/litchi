@@ -376,18 +376,22 @@ fn serialize_cached_cell_fragment(cell: &CachedCell) -> Result<String> {
 
 fn verify_authored_xml(xml: &str, max_bytes: usize) -> Result<()> {
     if xml.contains("> <") {
-        return Err(Error::Unsupported(
-            "authored ODP chart XML contains inter-element spacing".to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odp.charts.codec",
+            "authored ODP chart XML contains inter-element spacing",
+        )));
     }
     let limits = audit::Limits::new(
         max_bytes, MAX_DEPTH, 1_000_000, 250_000, max_bytes, max_bytes,
     )
     .map_err(|source| invalid_error(format!("invalid ODP chart XML audit limits: {source}")))?;
     let _report = audit::verify(xml.as_bytes(), limits).map_err(|source| match source {
-        audit::Error::NotCompact(_) => {
-            Error::Unsupported(format!("authored ODP chart XML is not compact: {source}"))
-        },
+        audit::Error::NotCompact(_) => Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odp.charts.codec",
+            "authored ODP chart XML is not compact",
+        )),
         audit::Error::Limit { .. }
         | audit::Error::Encoding { .. }
         | audit::Error::Malformed { .. }

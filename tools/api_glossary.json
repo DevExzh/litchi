@@ -8845,17 +8845,117 @@
           "scope": "litchi_ods",
           "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
           "recursive": false
+        },
+        {
+          "name": "SourceCellEdit",
+          "scope": "litchi_ods",
+          "replacement": "SourceBackedSpreadsheet::edit_cells() returns source_backed::cells::Edit; commit() publishes a SourceBackedSpreadsheet with cells::Patch and cells::Diagnostics (record 0358a)"
+        },
+        {
+          "name": "SourceCellCommit",
+          "scope": "litchi_ods",
+          "replacement": "SourceBackedSpreadsheet::edit_cells() returns source_backed::cells::Edit; commit() publishes a SourceBackedSpreadsheet with cells::Patch and cells::Diagnostics (record 0358a)"
+        },
+        {
+          "name": "SourceCellPatch",
+          "scope": "litchi_ods",
+          "replacement": "SourceBackedSpreadsheet::edit_cells() returns source_backed::cells::Edit; commit() publishes a SourceBackedSpreadsheet with cells::Patch and cells::Diagnostics (record 0358a)"
+        },
+        {
+          "name": "SourceCellSnapshot",
+          "scope": "litchi_ods",
+          "replacement": "SourceBackedSpreadsheet::edit_cells() returns source_backed::cells::Edit; commit() publishes a SourceBackedSpreadsheet with cells::Patch and cells::Diagnostics (record 0358a)"
+        },
+        {
+          "name": "SourceCellPublicationReport",
+          "scope": "litchi_ods",
+          "replacement": "SourceBackedSpreadsheet::edit_cells() returns source_backed::cells::Edit; commit() publishes a SourceBackedSpreadsheet with cells::Patch and cells::Diagnostics (record 0358a)"
+        },
+        {
+          "name": "SourceMetadataEdit",
+          "scope": "litchi_ods",
+          "replacement": "SourceBackedSpreadsheet::edit_sheet_metadata() returns source_backed::sheet_metadata::Edit; commit() publishes a SourceBackedSpreadsheet (record 0358a)"
+        },
+        {
+          "name": "SourceMetadataCommit",
+          "scope": "litchi_ods",
+          "replacement": "SourceBackedSpreadsheet::edit_sheet_metadata() returns source_backed::sheet_metadata::Edit; commit() publishes a SourceBackedSpreadsheet (record 0358a)"
+        },
+        {
+          "name": "SourceMetadataPatch",
+          "scope": "litchi_ods",
+          "replacement": "SourceBackedSpreadsheet::edit_sheet_metadata() returns source_backed::sheet_metadata::Edit; commit() publishes a SourceBackedSpreadsheet (record 0358a)"
+        },
+        {
+          "name": "SourceMetadataSnapshot",
+          "scope": "litchi_ods",
+          "replacement": "SourceBackedSpreadsheet::edit_sheet_metadata() returns source_backed::sheet_metadata::Edit; commit() publishes a SourceBackedSpreadsheet (record 0358a)"
+        },
+        {
+          "name": "SourceEdit",
+          "scope": "litchi_ods::dde",
+          "replacement": "SourceBackedSpreadsheet::edit_dde() returns source_backed::dde::Edit; commit() publishes a SourceBackedSpreadsheet (record 0358a)"
+        },
+        {
+          "name": "SourceCommit",
+          "scope": "litchi_ods::dde",
+          "replacement": "SourceBackedSpreadsheet::edit_dde() returns source_backed::dde::Edit; commit() publishes a SourceBackedSpreadsheet (record 0358a)"
+        },
+        {
+          "name": "SourcePatch",
+          "scope": "litchi_ods::dde",
+          "replacement": "SourceBackedSpreadsheet::edit_dde() returns source_backed::dde::Edit; commit() publishes a SourceBackedSpreadsheet (record 0358a)"
+        },
+        {
+          "name": "SourceSnapshot",
+          "scope": "litchi_ods::dde",
+          "replacement": "SourceBackedSpreadsheet::edit_dde() returns source_backed::dde::Edit; commit() publishes a SourceBackedSpreadsheet (record 0358a)"
+        },
+        {
+          "name": "apply_dde_patch",
+          "scope": "litchi_ods::SourceBackedSpreadsheet",
+          "replacement": "use SourceBackedSpreadsheet::apply_dde (record 0358a)"
+        },
+        {
+          "name": "apply_sheet_metadata_patch",
+          "scope": "litchi_ods::SourceBackedSpreadsheet",
+          "replacement": "use SourceBackedSpreadsheet::apply_sheet_metadata (record 0358a)"
+        },
+        {
+          "name": "begin_cell_edit",
+          "scope": "litchi_ods::SourceBackedSpreadsheet",
+          "replacement": "use SourceBackedSpreadsheet::edit_cells (record 0358a)"
+        },
+        {
+          "name": "cell_snapshot",
+          "scope": "litchi_ods::SourceBackedSpreadsheet",
+          "replacement": "read the spreadsheet itself; edit_cells() starts the edit (record 0358a)"
+        },
+        {
+          "name": "write_to_default",
+          "scope": "litchi_ods",
+          "replacement": "commit to a SourceBackedSpreadsheet and call write_to (record 0358a)"
+        },
+        {
+          "name": "Publication",
+          "scope": "litchi_ods::source_backed",
+          "replacement": "a family Commit holds the new SourceBackedSpreadsheet, its Patch and Diagnostics (record 0358a)",
+          "match": "suffix"
         }
       ],
       "families": [
         "litchi_ods::document",
         "litchi_ods::metadata",
-        "litchi_ods::flat"
+        "litchi_ods::flat",
+        "litchi_ods::source_backed::cells",
+        "litchi_ods::source_backed::dde",
+        "litchi_ods::source_backed::sheet_metadata"
       ],
       "immutable_owners": [
         "litchi_ods::Package",
         "litchi_ods::Workbook",
-        "litchi_ods::flat::Workbook"
+        "litchi_ods::flat::Workbook",
+        "litchi_ods::SourceBackedSpreadsheet"
       ],
       "family_methods": true
     },
@@ -9276,17 +9376,39 @@
           "scope": "litchi_odp",
           "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
           "recursive": false
+        },
+        {
+          "name": "PublicationPlan",
+          "scope": "litchi_odp::tail_append",
+          "replacement": "Edit::prepare() returns tail_append::Plan; Plan::commit() publishes a SourceBackedPresentation (record 0358a)"
+        },
+        {
+          "name": "plan",
+          "scope": "litchi_odp::tail_append::Edit",
+          "replacement": "use Edit::prepare() or Edit::commit() (record 0358a)"
+        },
+        {
+          "name": "from_read_at",
+          "scope": "litchi_odp::tail_append::Edit",
+          "replacement": "open a SourceBackedPresentation and call edit_tail_append (record 0358a)"
+        },
+        {
+          "name": "with_limits",
+          "scope": "litchi_odp::tail_append::Edit",
+          "replacement": "use Edit::set_limits (record 0358a)"
         }
       ],
       "families": [
         "litchi_odp::edit",
         "litchi_odp::metadata",
-        "litchi_odp::flat"
+        "litchi_odp::flat",
+        "litchi_odp::tail_append"
       ],
       "immutable_owners": [
         "litchi_odp::Package",
         "litchi_odp::Presentation",
-        "litchi_odp::flat::Presentation"
+        "litchi_odp::flat::Presentation",
+        "litchi_odp::SourceBackedPresentation"
       ],
       "family_methods": true
     },

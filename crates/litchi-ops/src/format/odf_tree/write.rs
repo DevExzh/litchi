@@ -113,7 +113,10 @@ pub(crate) fn refusal(code: Code, message: impl Into<std::borrow::Cow<'static, s
 /// A leaf staging refusal: the caller's request, not the file, is at fault.
 /// A refusal the leaf names unsupported stays a capability gap.
 pub(crate) fn staging_error(error: litchi_core::Error, format: FileFormat) -> Error {
-    let code = if matches!(error, litchi_core::Error::Unsupported(_)) {
+    let code = if matches!(
+        error,
+        litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_)
+    ) {
         Code::UnsupportedCapability
     } else {
         Code::InvalidValue

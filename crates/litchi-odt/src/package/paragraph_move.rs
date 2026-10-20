@@ -411,8 +411,10 @@ fn invalid_error(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
 
-fn unsupported<T>(what: &str) -> Result<T> {
-    Err(Error::Unsupported(format!(
-        "ODT exact plain paragraph move refuses {what}"
+fn unsupported<T>(_what: &str) -> Result<T> {
+    Err(Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "odt.package.paragraph_move",
+        "ODT exact plain paragraph move refuses this source",
     )))
 }

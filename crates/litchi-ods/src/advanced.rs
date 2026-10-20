@@ -4187,9 +4187,11 @@ pub(crate) fn replace_extended_style_graph(
 ) -> Result<Vec<u8>> {
     selector.validate()?;
     if !selector.owner.is_mutable() {
-        return Err(Error::Unsupported(
-            "ODS common data styles are read-only".to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "ods.advanced",
+            "ODS common data styles are read-only",
+        )));
     }
     graph.validate()?;
     if graph.number_styles.is_empty() && graph.data_styles.is_empty() {
@@ -4229,10 +4231,11 @@ pub(crate) fn replace_extended_style_graph(
         let entry = catalog.lookup(node_selector)?;
         require_number_body_match(entry.entry(), style)?;
         let crate::data_style::Entry::Number(existing) = entry.entry() else {
-            return Err(Error::Unsupported(
-                "ODS selected number-style body is outside the typed replacement envelope"
-                    .to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.advanced",
+                "ODS selected number-style body is outside the typed replacement envelope",
+            )));
         };
         // A semantically identical typed node is an exact source no-op.  In
         // particular, do not canonicalize its prefix, quote style, entity
@@ -4261,10 +4264,11 @@ pub(crate) fn replace_extended_style_graph(
         let entry = catalog.lookup(node_selector)?;
         require_data_body_match(entry.entry(), style)?;
         let crate::data_style::Entry::Existing(existing) = entry.entry() else {
-            return Err(Error::Unsupported(
-                "ODS selected data-style body is outside the typed replacement envelope"
-                    .to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.advanced",
+                "ODS selected data-style body is outside the typed replacement envelope",
+            )));
         };
         if existing.value != *style {
             let range = entry.range();
@@ -4364,14 +4368,18 @@ fn require_number_body_match(
     replacement: &crate::data_style::Number,
 ) -> Result<()> {
     let crate::data_style::Entry::Number(existing) = entry else {
-        return Err(Error::Unsupported(
-            "ODS selected number-style body is outside the typed replacement envelope".to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "ods.advanced",
+            "ODS selected number-style body is outside the typed replacement envelope",
+        )));
     };
     if number_body_kind(&existing.value) != number_body_kind(replacement) {
-        return Err(Error::Unsupported(
-            "ODS number-style replacement would change its actual body family".to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "ods.advanced",
+            "ODS number-style replacement would change its actual body family",
+        )));
     }
     Ok(())
 }
@@ -4381,14 +4389,18 @@ fn require_data_body_match(
     replacement: &crate::data_style::Data,
 ) -> Result<()> {
     let crate::data_style::Entry::Existing(existing) = entry else {
-        return Err(Error::Unsupported(
-            "ODS selected data-style body is outside the typed replacement envelope".to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "ods.advanced",
+            "ODS selected data-style body is outside the typed replacement envelope",
+        )));
     };
     if data_body_kind(&existing.value) != data_body_kind(replacement) {
-        return Err(Error::Unsupported(
-            "ODS data-style replacement would change its actual body family".to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "ods.advanced",
+            "ODS data-style replacement would change its actual body family",
+        )));
     }
     Ok(())
 }
@@ -4441,9 +4453,11 @@ pub(crate) fn patch_data_style(
     selector.validate()?;
     patch.validate()?;
     if !selector.owner.is_mutable() {
-        return Err(Error::Unsupported(
-            "ODS common data styles are read-only".to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "ods.advanced",
+            "ODS common data styles are read-only",
+        )));
     }
     let package = Archive::from_bytes(copy_package_bytes(
         source,
@@ -5777,10 +5791,11 @@ fn style_node_kind_name(kind: StyleNodeKind) -> &'static str {
     }
 }
 
-fn refuse_style_replacement<T>(reason: impl Into<String>) -> Result<T> {
-    Err(Error::Unsupported(format!(
-        "ODS automatic style replacement refuses unsupported source {}",
-        reason.into()
+fn refuse_style_replacement<T>(_reason: impl Into<String>) -> Result<T> {
+    Err(Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "ods.advanced",
+        "ODS automatic style replacement refuses unsupported source",
     )))
 }
 

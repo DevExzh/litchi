@@ -3921,6 +3921,15 @@ fn known_operation(operation: &str) -> bool {
             | "form.edit"
             | "form.bindings"
             | "form.rich"
+            // The package routes of the former part families (record 0358a).
+            | "content-validation.edit"
+            | "content-validation.patch"
+            | "database-range.edit"
+            | "scenario.edit"
+            | "table-template.edit"
+            | "dde.edit"
+            | "sheet-metadata.edit"
+            | "settings.set"
     )
 }
 

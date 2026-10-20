@@ -484,8 +484,8 @@ fn generic_content_publication_keeps_signature_fallback_and_refuses_manifest_siz
         .expect_err("manifest:size edit unexpectedly succeeded");
     assert!(matches!(
         error,
-        Error::Unsupported(message)
-            if message == "ODF unencrypted manifest:size metadata cannot be preserved by the package writer"
+        Error::Refused(refusal)
+            if refusal.reason() == "ODF unencrypted manifest:size metadata cannot be preserved by the package writer"
     ));
     assert_eq!(sized_document.to_bytes(), sized);
     assert_eq!(sized_document.text(), "before");
