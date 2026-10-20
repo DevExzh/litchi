@@ -1505,7 +1505,7 @@ impl Classify for litchi_doc::Error {
     }
 }
 
-#[cfg(feature = "doc")]
+#[cfg(any(feature = "doc", feature = "ppt"))]
 impl Classify for litchi_core::patch::PatchError {
     fn classify(&self) -> Class {
         use litchi_core::patch::PatchError;

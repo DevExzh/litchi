@@ -2668,6 +2668,32 @@ def p0356():
     return out
 
 
+@needs("0357a")
+def p0357a():
+    """Record 0357a: record-sized scoped-family patches (1,000 retained
+    single-op external-media commits, after vs before) and the restored
+    source-backed text splice (after vs before on the primary edit; the
+    splice itself has no before leg)."""
+    out = []
+    path = RES / "0357a" / "summary.json"
+    s = load_json(path)
+    for key, op, label in (("commit_median_us", "set", "scoped commit (external media path)"),
+                           ("apply_median_us", "set", "scoped patch apply"),
+                           ("inverse_apply_median_us", "set", "scoped patch inverse apply")):
+        b, a = s["before"][key], s["after"][key]
+        out.append(row("0357a", "ppt", op, f"{label}, after vs before", "1,000 patches",
+                       b, a, [a / b], regression("0357a"),
+                       f"scoped_patch:{slug(label)}:after-before", src([path]),
+                       comparison="after/before"))
+    path = RES / "0357a" / "text" / "summary.json"
+    p = load_json(path)["probe"]
+    b, a = p["before/primary"]["total_us"], p["after/primary"]["total_us"]
+    out.append(row("0357a", "ppt", "set", "open + set_shape_text + commit + write_to, after vs before",
+                   "1,000 shapes", b, a, [a / b], regression("0357a"),
+                   "text_splice:primary:after-before", src([path]), comparison="after/before"))
+    return out
+
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
@@ -2676,7 +2702,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0306, p0307, p0308, p0309, p0310, p0311, p0312,
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
-           p0347, p0348, p0355, p0356, p0357]
+           p0347, p0348, p0355, p0356, p0357, p0357a]
 
 
 

@@ -407,3 +407,10 @@ perf-baseline `cargo check --locked --all-targets`. After `937ef82791`, the
 litchi-ops PPT tests (`--lib`, `crud_matrix`, `ppt_unified_read`,
 `ppt_unified_write`, `ppt_elements`) pass: 988 tests, no re-bless. The
 litchi-ops `error::` tests pass: 62.
+
+## Follow-ups
+
+- 0357a-F1: a changed scoped commit hashes its target once (about 21 µs on
+  the 54 KiB probe deck, +10.7% over the whole-package patch); computing the
+  target digest lazily, on the first `apply` of the inverse, would remove it
+  from the commit path. The bench matrix lists the row as a follow-up.

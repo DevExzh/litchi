@@ -57,6 +57,7 @@ ppt	query (early stop)	ppt_read_bench unified_first, new vs baseline build		afte
 ppt	set	notes set (basic_test)	15360 bytes	unified/native	before	175.91	187.55	µs	1.070	1.054–1.070	1.10 (single-op write)	meets	0260	parsed:0260-ppt-paired.json	
 ppt	set	notes set (basic_test)	15360 bytes	unified/native	after	175.99	187.50	µs	1.076	1.052–1.076	1.10 (single-op write)	meets	0260	parsed:0260-ppt-paired.json	
 ppt	set	notes set (basic_test)	15360 bytes	unified/native	after (4096 bound)	174.38	185.18	µs	1.066		1.10 (single-op write)	meets	0264	parsed:0264-ppt-scale.json	
+ppt	set	open + set_shape_text + commit + write_to, after vs before	1,000 shapes	after/before		579.10	579.70	µs	1.001		1.05 (no regression above 5%, record 0357a)	meets	0357a	parsed:0357a/text/summary.json	
 ppt	set	outline body set (41246-1)	275456 bytes	unified/native	before	1638.8	1665.5	µs	1.023	1.013–1.023	1.10 (single-op write)	meets	0260	parsed:0260-ppt-paired.json	
 ppt	set	outline body set (41246-1)	275456 bytes	unified/native	after	1376.5	1389.6	µs	1.016	1.010–1.016	1.10 (single-op write)	meets	0260	parsed:0260-ppt-paired.json	
 ppt	set	outline body set (41246-1)	275456 bytes	unified/native	after (4096 bound)	1375.5	1397.2	µs	1.013		1.10 (single-op write)	meets	0264	parsed:0264-ppt-scale.json	
@@ -66,6 +67,9 @@ ppt	set	outline title set (SampleShow)	125440 bytes	unified/native	after (4096 b
 ppt	set	paragraph set (basic_test)	15360 bytes	unified/native	before	281.90	295.54	µs	1.055	1.044–1.055	1.10 (single-op write)	meets	0260	parsed:0260-ppt-paired.json	
 ppt	set	paragraph set (basic_test)	15360 bytes	unified/native	after	236.45	247.36	µs	1.062	1.042–1.062	1.10 (single-op write)	meets	0260	parsed:0260-ppt-paired.json	
 ppt	set	paragraph set (basic_test)	15360 bytes	unified/native	after (4096 bound)	232.57	245.46	µs	1.057		1.10 (single-op write)	meets	0264	parsed:0264-ppt-scale.json	
+ppt	set	scoped commit (external media path), after vs before	1,000 patches	after/before		195.94	216.98	µs	1.107		1.05 (no regression above 5%, record 0357a)	miss	0357a	parsed:0357a/summary.json	Record 0357a §5: the record-sized patch costs one SHA-256 of the 54,784-byte target per changed commit (about 21 µs of 217 µs), the minimum an exact, source-checked inverse needs; in exchange a retained patch is 15,360 instead of 98,304 bytes and the 1k-patch run's peak RSS falls from 110,910 to 19,758 KiB. Follow-up 0357a-F1: compute the target digest lazily on first apply of the inverse.
+ppt	set	scoped patch apply, after vs before	1,000 patches	after/before		23.03	20.54	µs	0.892		1.05 (no regression above 5%, record 0357a)	meets	0357a	parsed:0357a/summary.json	
+ppt	set	scoped patch inverse apply, after vs before	1,000 patches	after/before		19.09	18.36	µs	0.962		1.05 (no regression above 5%, record 0357a)	meets	0357a	parsed:0357a/summary.json	
 ppt	set	shape text set, cold owner	1 shapes	unified/native	before	126.63	135.37	µs	1.058		1.10 (single-op write)	meets	0260	parsed:0260-ppt-paired.json	
 ppt	set	shape text set, cold owner	1 shapes	unified/native	after	119.62	125.79	µs	1.052		1.10 (single-op write)	meets	0260	parsed:0260-ppt-paired.json	
 ppt	set	shape text set, cold owner	1 shapes	unified/native	after (4096 bound)	108.60	113.97	µs	1.050		1.10 (single-op write)	meets	0264	parsed:0264-ppt-scale.json	
