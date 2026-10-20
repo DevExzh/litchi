@@ -105,20 +105,21 @@ impl Editor {
         lifecycle::open_records(Arc::from(bytes))
     }
 
-    /// Opens a transactional editor over an OLE-backed `PowerPoint` package.
+    /// Opens a transactional editor over an OLE-backed `PowerPoint` package
+    /// that may carry a digital-signature component, so a scoped family can
+    /// stage and read over a signed deck.
+    /// [`Self::finish`] still refuses a changed publication of a signed
+    /// source; encryption and rights-management components stay refused.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub(crate) fn open(bytes: Vec<u8>, collection: Collection) -> Result<Self> {
-        lifecycle::open(Arc::from(bytes), collection)
+    pub(crate) fn open_admitting_signature(bytes: Vec<u8>, collection: Collection) -> Result<Self> {
+        lifecycle::open::open_admitting_signature(Arc::from(bytes), collection)
     }
 
     /// [`Self::open_records`] over a package that may carry a
-    /// digital-signature component, so a scoped family can stage and read
-    /// over a signed deck. [`Self::finish`] still refuses a changed
-    /// publication of a signed source; encryption and rights-management
-    /// components stay refused.
+    /// digital-signature component (see [`Self::open_admitting_signature`]).
     ///
     /// # Errors
     ///

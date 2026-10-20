@@ -70,10 +70,6 @@ pub(crate) fn inspect_live_mapping_at(
     Ok(result)
 }
 
-pub(crate) fn open(bytes: Arc<[u8]>, collection: Collection) -> Result<Editor> {
-    open_with_limit(bytes, collection, usize::MAX, false)
-}
-
 /// Open over a package that may be signed; the editor records the signature
 /// and `finish` refuses a changed publication.
 pub(crate) fn open_admitting_signature(bytes: Arc<[u8]>, collection: Collection) -> Result<Editor> {
@@ -81,12 +77,8 @@ pub(crate) fn open_admitting_signature(bytes: Arc<[u8]>, collection: Collection)
 }
 
 /// The empty collection of a records-only editor.
-pub(crate) fn no_objects() -> Collection {
-    Collection {
-        id_seed: 1,
-        objects: Vec::new(),
-        unknown_records: Vec::new(),
-    }
+pub(crate) const fn no_objects() -> Collection {
+    Collection::empty()
 }
 
 fn open_with_limit(

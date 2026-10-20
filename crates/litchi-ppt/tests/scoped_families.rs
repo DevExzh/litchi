@@ -575,11 +575,168 @@ fn embedded_object_edits_publish_replay_and_invert_exactly() {
     );
     assert_eq!(edit.objects().objects.len(), ids.len());
     assert!(!edit.commit().unwrap().diagnostics().changed());
+}
 
-    // A presentation without an external-object list has no target.
+fn embedded_object(id: u32) -> object::ExternalObject {
+    object::ExternalObject::Object(object::Definition {
+        kind: object::ContainerKind::Embedded(object::EmbedPreferences {
+            color_follow: object::ColorFollow::EntireScheme,
+            cannot_lock_server: false,
+            dimension_policy: object::DimensionPolicy::Send,
+            is_word_table: false,
+            unused: 0,
+        }),
+        object: object::Metadata {
+            draw_aspect: object::DrawAspect::Content,
+            object_type: object::ObjectType::Embedded,
+            id,
+            subtype: object::ObjectSubtype::Default,
+            persist_id: 1, // Reassigned by the edit.
+            unused: [0; 4],
+        },
+        menu_name: None,
+        program_id: Some("Package".into()),
+        clipboard_name: None,
+        metafile: None,
+    })
+}
+
+/// A deck without an `ExObjListContainer` (a new package and a Builder deck)
+/// edits an empty list; the first committed object creates the container,
+/// and the patch replays and inverts exactly.
+#[test]
+fn embedded_objects_are_added_to_a_deck_without_an_object_list() {
+    for source in [Package::new().unwrap(), built()] {
+        let source_bytes = source.to_bytes().unwrap();
+        assert_eq!(source.presentation().unwrap().ole_objects().unwrap(), None);
+
+        // Nothing staged, or an add that is removed again: an exact no-op.
+        let edit = source.edit_objects().unwrap();
+        assert!(edit.objects().objects.is_empty());
+        assert_eq!(edit.objects().id_seed, 1);
+        let no_op = edit.commit().unwrap();
+        assert!(!no_op.diagnostics().changed());
+        assert!(no_op.patch().is_noop());
+        assert_eq!(no_op.package().to_bytes().unwrap(), source_bytes);
+        let mut edit = source.edit_objects().unwrap();
+        edit.add(embedded_object(1), object_storage(b"x")).unwrap();
+        edit.remove(1).unwrap();
+        assert!(!edit.commit().unwrap().diagnostics().changed());
+
+        let storage = object_storage(b"first OLE2 storage");
+        let mut edit = source.edit_objects().unwrap();
+        let persist_id = edit.add(embedded_object(1), storage.clone()).unwrap();
+        edit.add(embedded_object(2), object_storage(b"second"))
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        assert!(commit.diagnostics().changed());
+
+        // The read view and a reopened package both see the new list.
+        let reopened = Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
+        for package in [commit.package(), &reopened] {
+            let presentation = package.presentation().unwrap();
+            let objects = presentation.ole_objects().unwrap().unwrap();
+            assert_eq!(objects.id_seed, 2);
+            assert_eq!(object_ids(package), [1, 2]);
+            assert_eq!(objects.objects[0].persist_id(), persist_id);
+            assert_eq!(
+                presentation.ole_storage(persist_id).unwrap(),
+                Some(storage.clone())
+            );
+            assert_eq!(slide_texts(package), slide_texts(&source));
+            let edit = package.edit_objects().unwrap();
+            assert_eq!(edit.objects(), &objects);
+        }
+
+        let replayed = source.apply_objects(commit.patch()).unwrap();
+        assert_eq!(
+            replayed.package().to_bytes().unwrap(),
+            commit.package().to_bytes().unwrap()
+        );
+        let restored = commit
+            .package()
+            .apply_objects(&commit.patch().inverse())
+            .unwrap();
+        assert_eq!(restored.package().to_bytes().unwrap(), source_bytes);
+        assert_eq!(
+            restored
+                .package()
+                .presentation()
+                .unwrap()
+                .ole_objects()
+                .unwrap(),
+            None
+        );
+    }
+}
+
+/// `source` with a digital-signature storage added (`_xmlsignatures`), the
+/// shape a signed deck has.
+fn signed(source: &Package) -> Package {
+    use litchi_cfb::{OleFile, OleWriter};
+    use std::io::Cursor;
+
+    let bytes = source.to_bytes().unwrap();
+    let mut source_file = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut writer = OleWriter::new();
+    for stream_path in source_file.list_streams() {
+        let refs = stream_path.iter().map(String::as_str).collect::<Vec<_>>();
+        let data = source_file.open_stream(&refs).unwrap();
+        writer.create_stream(&refs, &data).unwrap();
+    }
+    writer
+        .create_stream(&["_xmlsignatures", "origin.sigs"], b"signature")
+        .unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    Package::from_bytes(&output.into_inner()).unwrap()
+}
+
+/// The signed-package rule every family shares: the edit opens, an exact
+/// no-op commit keeps the signed bytes, and a changed commit is `Signed`.
+macro_rules! assert_signed_rule {
+    ($package:expr, $edit:expr, $change:expr, $signed:pat) => {{
+        let package: &Package = $package;
+        let bytes = package.to_bytes().unwrap();
+        let no_op = $edit(package).commit().unwrap();
+        assert!(!no_op.diagnostics().changed());
+        assert!(no_op.patch().is_noop());
+        assert_eq!(no_op.package().to_bytes().unwrap(), bytes);
+        let mut edit = $edit(package);
+        $change(&mut edit);
+        assert!(matches!(edit.commit(), Err($signed)));
+        assert_eq!(package.to_bytes().unwrap(), bytes);
+    }};
+}
+
+#[test]
+fn a_signed_deck_admits_object_edits_and_refuses_only_a_changed_commit() {
+    let embedded =
+        Package::from_bytes(&fixture("poi/test-data/slideshow/ppt_with_embeded.ppt")).unwrap();
+    let source = signed(&embedded);
+    let ids = object_ids(&source);
+    // A reorder back to the source order is an exact no-op too.
+    let mut edit = source.edit_objects().unwrap();
+    edit.reorder(&ids).unwrap();
     assert_eq!(
-        refusal_kind(built().edit_objects()),
-        RefusalKind::UnsupportedTarget
+        edit.commit().unwrap().package().to_bytes().unwrap(),
+        source.to_bytes().unwrap()
+    );
+    assert_signed_rule!(
+        &source,
+        |package: &Package| package.edit_objects().unwrap(),
+        |edit: &mut object::Edit| edit.reorder(&[6, 5, 4, 3, 2, 1]).unwrap(),
+        object::Error::Signed
+    );
+    // A signed deck without an object list: adding the first object would
+    // invalidate the signature.
+    assert_signed_rule!(
+        &signed(&built()),
+        |package: &Package| package.edit_objects().unwrap(),
+        |edit: &mut object::Edit| {
+            edit.add(embedded_object(1), object_storage(b"x")).unwrap();
+        },
+        object::Error::Signed
     );
 }
 
