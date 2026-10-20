@@ -304,9 +304,7 @@ fn source_snapshot_applies_limits_and_rejects_a_changed_read_at() {
     };
     assert!(matches!(
         package
-            .with_semantic_limits(
-                litchi_docx::SemanticLimits::default().sections(limits.clone())
-            )
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().sections(limits.clone()))
             .section_inventory_snapshot(),
         Err(Error::SectionInventoryLimit { .. })
     ));
@@ -332,9 +330,7 @@ fn source_snapshot_applies_limits_and_rejects_a_changed_read_at() {
     };
     assert!(matches!(
         event_limited
-            .with_semantic_limits(
-                litchi_docx::SemanticLimits::default().sections(limits.clone())
-            )
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().sections(limits.clone()))
             .section_inventory_snapshot(),
         Err(Error::SectionInventoryLimit {
             resource: "XML events",
@@ -355,9 +351,7 @@ fn source_snapshot_applies_limits_and_rejects_a_changed_read_at() {
     };
     assert!(matches!(
         depth_limited
-            .with_semantic_limits(
-                litchi_docx::SemanticLimits::default().sections(limits.clone())
-            )
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().sections(limits.clone()))
             .section_inventory_snapshot(),
         Err(Error::SectionInventoryLimit {
             resource: "XML depth",

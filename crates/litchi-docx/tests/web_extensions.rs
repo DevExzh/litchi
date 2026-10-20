@@ -552,9 +552,7 @@ fn public_limits_and_malformed_namespace_or_attribute_fixtures_refuse_atomically
     read_limits.xml_bytes = 1;
     let limited = Package::from_reader(Cursor::new(valid_bytes.clone())).unwrap();
     let error = limited
-        .with_semantic_limits(
-            litchi_docx::SemanticLimits::default().task_panes(read_limits),
-        )
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().task_panes(read_limits))
         .task_panes()
         .unwrap_err();
     assert!(error.to_string().contains("XML") || error.to_string().contains("xml"));
@@ -564,9 +562,7 @@ fn public_limits_and_malformed_namespace_or_attribute_fixtures_refuse_atomically
     let plan_remove_limited = Package::from_reader(Cursor::new(valid_bytes.clone())).unwrap();
     let before_plan_remove = members(&package_bytes(&plan_remove_limited));
     let error = plan_remove_limited
-        .with_semantic_limits(
-            litchi_docx::SemanticLimits::default().task_panes(remove_limits),
-        )
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().task_panes(remove_limits))
         .plan_remove_task_panes()
         .expect_err("part-deletion limit should reject task-pane removal planning");
     assert!(error.to_string().contains("deletion"));

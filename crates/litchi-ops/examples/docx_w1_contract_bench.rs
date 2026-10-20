@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     use std::time::Instant;
 
     use litchi_core::{FileFormat, Position};
-    use litchi_ops::{NewNode, create, open_bytes, props};
+    use litchi_ops::{BatchItem, BatchMode, NewNode, Props, create, open_bytes, props};
 
     const ROUNDS: usize = 31;
     const WARMUP: usize = 5;
@@ -156,7 +156,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     pair(
-        "batch 1k paragraph text sets",
+        "File::edit 1k paragraph text sets",
         Box::new(|| {
             let mut edit = package.edit()?;
             for index in 0..PARAGRAPHS {
@@ -175,6 +175,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Ok(())
             })?);
+            Ok(())
+        }),
+    )?;
+
+    let items: Vec<BatchItem<'static>> = (1..=PARAGRAPHS)
+        .map(|index| {
+            let mut item = BatchItem::new("set");
+            item.path = Some(format!("/body/p[{index}]").into());
+            item.props = Some(Props::new().with("text", "batched"));
+            item
+        })
+        .collect();
+    pair(
+        "File::batch 1k paragraph text sets",
+        Box::new(|| {
+            let mut edit = package.edit()?;
+            for index in 0..PARAGRAPHS {
+                edit.replace_paragraph_text(Position::new(index), "batched")?;
+            }
+            black_box(edit.commit()?.into_package());
+            Ok(())
+        }),
+        Box::new(|| {
+            black_box(unified.batch(items.clone(), BatchMode::Atomic)?);
             Ok(())
         }),
     )?;
