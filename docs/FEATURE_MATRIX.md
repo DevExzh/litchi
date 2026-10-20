@@ -88,7 +88,7 @@ candidate-reopened, local to the selected component, invalidate the three canoni
 and provide exact source-bound apply/inverse patches. This remains visibility metadata, not
 cell/formula, filter/pivot, sorting, or row/column topology support.
 
-The Pages raw-ID `PagesEditor` hidden-axis route and the shared Numbers/Keynote adapter remain
+The Pages raw-ID `litchi_iwa::pages::Editor` hidden-axis route and the shared Numbers/Keynote adapter remain
 migration-host compatibility until creation parity and native mutation gates pass. Focused Pages
 graph, codec, identity/COW, and concurrency tests cover the E1 source/self-round-trip contract. The
 checked-in [`body-table-visible.pages`](../test-data/iwork/pages/body-table-visible.pages) fixture
@@ -147,7 +147,7 @@ producer parity, native byte parity, or package-wide performance.
 
 The eight scalar owners and the bounded Custom registry owner do not retire every compatibility path: generic
 source-built or cross-format `DataFormat` mutation remains host-owned. The
-dedicated raw-ID `NumbersEditor` routes for Number, Percentage, Currency,
+dedicated raw-ID `litchi_iwa::numbers::Editor` routes for Number, Percentage, Currency,
 Scientific, Fraction, Date & Time, Duration, and Custom are retired, and there is no dedicated
 host Text route. Generic source-built/cross-format
 `DataFormat::Custom`, `DataFormat::DateTime`, and `DataFormat::Duration`, the
@@ -328,7 +328,7 @@ give the authoritative status and limitations for each concrete format.
 | Drawing, media, and embedded objects | Typed support varies by format; opaque preservation is not semantic rendering | `litchi-drawingml`, `litchi-odraw`, `litchi-ograph`, format matrices |
 | Formula and equation conversion/evaluation | Shared formula/equation infrastructure with intentionally incomplete host semantics | `litchi-formula`, `litchi-eval`, ODF/XLS/XLSB/XLSX matrices |
 | VBA and macro-enabled packages | Bounded codepage-aware project/module metadata and preservation; VBA is never compiled, interpreted, or executed | `litchi-vba`, OOXML matrices |
-| Conversion and interchange | Markdown, images, RTF, CSV/TSV, and conversion APIs beyond each native format surface are separate from the detailed matrices unless a matrix explicitly includes them | `litchi-markdown`, `litchi-imgconv`, `litchi-rtf`, `litchi-pages`, `litchi-keynote`, `litchi-numbers`, `litchi-sheet` |
+| Conversion and interchange | Markdown, images, RTF, CSV/TSV, and conversion APIs beyond each native format surface are separate from the detailed matrices unless a matrix explicitly includes them. The text workbooks (CSV/TSV/PRN, SYLK, DIF, fixed width) are the `litchi-sheet-text` leaf, re-exported as `litchi::sheet::text` by the facade's `sheet-text` feature; they are not claimed formats and `litchi::open` does not read them. `File::import` tokenizes CSV/TSV with the same crate (record 0354) | `litchi-markdown`, `litchi-imgconv`, `litchi-rtf`, `litchi-pages`, `litchi-keynote`, `litchi-numbers`, `litchi-sheet`, `litchi-sheet-text` |
 
 ## Shared specification map
 
@@ -392,4 +392,4 @@ verification is integrity-oriented and does not establish certificate trust.
 - VBA project codec: `crates/litchi-vba/`
 - OpenDocument shared models: `crates/litchi-odf/`, `crates/litchi-odf-common/`, and `crates/litchi-odf-formula/`
 - iWork format owners and shared IWA layers: `crates/litchi-pages/`, `crates/litchi-keynote/`, `crates/litchi-numbers/`, and `crates/litchi-iwa-*/`
-- Unified facades and conversion APIs: `crates/litchi/`, `crates/litchi-core/`, `crates/litchi-formula/`, `crates/litchi-eval/`, `crates/litchi-markdown/`, and `crates/litchi-sheet/`
+- Unified facades and conversion APIs: `crates/litchi/`, `crates/litchi-core/`, `crates/litchi-formula/`, `crates/litchi-eval/`, `crates/litchi-markdown/`, `crates/litchi-sheet/`, and `crates/litchi-sheet-text/`

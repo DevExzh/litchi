@@ -47,7 +47,7 @@ use litchi_numbers::formula::Expression;
 use litchi_numbers::table::cells::{Change, Edit, Input};
 use litchi_numbers::table::merge::Region;
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
-use litchi_numbers::table::{CellPosition, CellRange};
+use litchi_numbers::table::{Area, At};
 use litchi_numbers::{Package, SheetSelector, TableSelector};
 
 use super::tree::{count, text};
@@ -714,7 +714,7 @@ pub(crate) struct Cells {
     axis_items: std::sync::OnceLock<Box<[super::tree::Item]>>,
     /// The table's cell comments, read on the first cell item (record
     /// 0318): `(position, text)` in row-major order.
-    comments: std::sync::OnceLock<Box<[(CellPosition, String)]>>,
+    comments: std::sync::OnceLock<Box<[(At, String)]>>,
 }
 
 impl Cells {
@@ -741,7 +741,7 @@ impl Cells {
     /// The comment text of the cell at `position`, if any. A table whose
     /// comment list is empty costs one model and list decode; a comment
     /// graph the leaf cannot read lists no comment.
-    fn comment(&self, package: &Package, position: CellPosition) -> Option<&str> {
+    fn comment(&self, package: &Package, position: At) -> Option<&str> {
         let comments = self.comments.get_or_init(|| {
             package
                 .table_cell_comments(
@@ -971,7 +971,7 @@ impl Cells {
             return None;
         }
         let table = Self::package(file).and_then(|package| self.table(package))?;
-        let wanted = CellPosition::new(row, column);
+        let wanted = At::new(row, column);
         // The leaf keeps a table's stored cells sorted by position, without
         // duplicates (its own lookups binary-search them).
         let (mut low, mut high) = (0_usize, table.cell_count());
@@ -1002,8 +1002,8 @@ pub(crate) struct Address {
 }
 
 impl Address {
-    const fn position(self) -> CellPosition {
-        CellPosition::new(self.row, self.column)
+    const fn position(self) -> At {
+        At::new(self.row, self.column)
     }
 }
 
@@ -1089,7 +1089,7 @@ pub(crate) enum CellWrite {
 }
 
 impl CellWrite {
-    pub(crate) fn change(&self, position: CellPosition) -> Change {
+    pub(crate) fn change(&self, position: At) -> Change {
         match self {
             Self::Value(Some(input)) => Change::set(position, input.clone()),
             Self::Value(None) => Change::clear(position),
@@ -1231,7 +1231,7 @@ struct Staged {
     cells: BTreeMap<(usize, usize), Vec<Change>>,
     formats: Vec<(Address, DisplayFormat)>,
     /// Cell character properties, per table (record 0309).
-    text_styles: BTreeMap<(usize, usize), Vec<(CellPosition, CharacterProperties)>>,
+    text_styles: BTreeMap<(usize, usize), Vec<(At, CharacterProperties)>>,
     /// Cell comments, in call order; `None` clears (record 0318).
     comments: Vec<(Address, Option<String>)>,
 }
@@ -1782,13 +1782,13 @@ fn parse_region(range: &str) -> Result<Region> {
         )
         .with_property("ref".to_owned())
     };
-    let range = CellRange::from_a1(range).map_err(|_| invalid())?;
+    let range = Area::from_a1(range).map_err(|_| invalid())?;
     let start = range.start();
     let end = range.end();
     Region::new(
         start.row(),
         start.column(),
-        // `CellRange` is half-open: its end is exclusive.
+        // `Area` is half-open: its end is exclusive.
         end.row().saturating_sub(start.row()),
         end.column().saturating_sub(start.column()),
     )

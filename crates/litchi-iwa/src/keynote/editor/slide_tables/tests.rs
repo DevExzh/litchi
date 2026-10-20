@@ -1,5 +1,5 @@
 use super::*;
-use crate::keynote::KeynoteDocumentBuilder;
+use crate::keynote;
 use crate::numbers::cell::CellValue;
 use litchi_iwa_common::table::cell::BorderSide;
 use litchi_iwa_common::table::cell::conditional_highlight::{
@@ -29,7 +29,7 @@ use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSet
 // Raw-ID header access remains only as compatibility coverage inside the
 // host's cfg(test) module. Production callers use litchi-keynote's checked
 // slide/table selectors and package transactions.
-impl KeynoteEditor {
+impl Editor {
     fn slide_table_header_settings(
         &self,
         slide_index: usize,
@@ -52,16 +52,12 @@ impl KeynoteEditor {
             model_object_id,
             settings,
         )?;
-        *self = KeynoteEditor::from_package(staged)?;
+        *self = Editor::from_package(staged)?;
         Ok(())
     }
 }
 
-fn focused_table_index(
-    editor: &KeynoteEditor,
-    slide_index: usize,
-    model_object_id: u64,
-) -> Result<usize> {
+fn focused_table_index(editor: &Editor, slide_index: usize, model_object_id: u64) -> Result<usize> {
     let tables = editor.slide_tables(slide_index)?;
     let mut table_index = None;
     for (index, table) in tables.iter().enumerate() {
@@ -81,14 +77,14 @@ fn focused_table_index(
     })
 }
 
-fn focused_table_package(editor: &KeynoteEditor) -> Result<litchi_keynote::Package> {
+fn focused_table_package(editor: &Editor) -> Result<litchi_keynote::Package> {
     litchi_keynote::Package::from_bytes(&editor.to_bytes()?).map_err(|error| {
         Error::InvalidFormat(format!("focused Keynote table source failed: {error}"))
     })
 }
 
 fn set_focused_table_name(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     model_object_id: u64,
     before_name: &str,
@@ -130,7 +126,7 @@ fn set_focused_table_name(
     commit.package().write_to(&mut bytes).map_err(|error| {
         Error::InvalidFormat(format!("focused Keynote name write failed: {error}"))
     })?;
-    *editor = KeynoteEditor::from_bytes(&bytes)?;
+    *editor = Editor::from_bytes(&bytes)?;
     let package = focused_table_package(editor)?;
     let focused_name = package
         .slide_table_name(
@@ -145,7 +141,7 @@ fn set_focused_table_name(
 }
 
 fn focused_table_title_settings(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     model_object_id: u64,
 ) -> Result<TableTitleSettings> {
@@ -161,7 +157,7 @@ fn focused_table_title_settings(
 }
 
 fn set_focused_table_title_settings(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     model_object_id: u64,
     settings: TableTitleSettings,
@@ -187,12 +183,12 @@ fn set_focused_table_title_settings(
     commit.package().write_to(&mut bytes).map_err(|error| {
         Error::InvalidFormat(format!("focused Keynote title write failed: {error}"))
     })?;
-    *editor = KeynoteEditor::from_bytes(&bytes)?;
+    *editor = Editor::from_bytes(&bytes)?;
     Ok(())
 }
 
 fn assert_focused_table_dimension_rejected(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     model_object_id: u64,
     dimension: Dimension,
@@ -230,7 +226,7 @@ fn table_geometry() -> (DrawablePoint, DrawableSize) {
 
 #[test]
 fn source_built_table_has_no_conditional_highlighting_and_clear_is_idempotent() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Conditional", 2, 2, position, size)
@@ -246,7 +242,7 @@ fn source_built_table_has_no_conditional_highlighting_and_clear_is_idempotent() 
         .clear_slide_table_cell_conditional_highlighting(0, table.model_object_id, 1, 1)
         .unwrap();
     assert!(
-        KeynoteEditor::from_bytes(&editor.to_bytes().unwrap())
+        Editor::from_bytes(&editor.to_bytes().unwrap())
             .unwrap()
             .slide_table_cell_conditional_highlighting(0, table.model_object_id, 1, 1)
             .unwrap()
@@ -256,7 +252,7 @@ fn source_built_table_has_no_conditional_highlighting_and_clear_is_idempotent() 
 
 #[test]
 fn source_built_table_creates_and_replaces_conditional_highlighting() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Conditional", 2, 2, position, size)
@@ -308,7 +304,7 @@ fn source_built_table_creates_and_replaces_conditional_highlighting() {
 
 #[test]
 fn source_built_table_roundtrips_cell_border_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Borders", 3, 3, position, size)
@@ -323,7 +319,7 @@ fn source_built_table_roundtrips_cell_border_crud() {
         .set_slide_table_cell_border(0, table.model_object_id, 2, 1, BorderSide::Top, stroke)
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_borders(0, table.model_object_id, 2, 1)
@@ -345,7 +341,7 @@ fn source_built_table_roundtrips_cell_border_crud() {
 
 #[test]
 fn source_built_table_roundtrips_cell_fill_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Fills", 3, 3, position, size)
@@ -361,7 +357,7 @@ fn source_built_table_roundtrips_cell_fill_crud() {
         .set_slide_table_cell_fill(0, table.model_object_id, 1, 1, &fill)
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_fill(0, table.model_object_id, 1, 1)
@@ -383,7 +379,7 @@ fn source_built_table_roundtrips_cell_fill_crud() {
 
 #[test]
 fn source_built_table_roundtrips_cell_layout_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Layout", 3, 3, position, size)
@@ -391,17 +387,17 @@ fn source_built_table_roundtrips_cell_layout_crud() {
     let inherited = editor
         .slide_table_cell_layout(0, table.model_object_id, 1, 1)
         .unwrap();
-    let layout = KeynoteTableCellLayout::default()
-        .with_text_wrap(KeynoteTableCellTextWrap::Wrapped)
-        .with_vertical_alignment(KeynoteTableCellVerticalAlignment::Middle)
-        .with_insets(KeynoteTableCellInsets::uniform(
-            KeynoteTableCellInset::from_points(7.0).unwrap(),
+    let layout = TableCellLayout::default()
+        .with_text_wrap(TableCellTextWrap::Wrapped)
+        .with_vertical_alignment(TableCellVerticalAlignment::Middle)
+        .with_insets(TableCellInsets::uniform(
+            TableCellInset::from_points(7.0).unwrap(),
         ));
     editor
         .set_slide_table_cell_layout(0, table.model_object_id, 1, 1, layout)
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_layout(0, table.model_object_id, 1, 1)
@@ -423,7 +419,7 @@ fn source_built_table_roundtrips_cell_layout_crud() {
 
 #[test]
 fn source_built_table_roundtrips_number_data_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Formats", 3, 3, position, size)
@@ -447,7 +443,7 @@ fn source_built_table_roundtrips_number_data_format_crud() {
         .set_slide_table_cell_data_format(0, table.model_object_id, 1, 1, data_format.clone())
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
@@ -467,7 +463,7 @@ fn source_built_table_roundtrips_number_data_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_percentage_data_format() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Percentages", 3, 3, position, size)
@@ -490,7 +486,7 @@ fn source_built_table_roundtrips_percentage_data_format() {
         .set_slide_table_cell_percentage_format(0, table.model_object_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
@@ -516,7 +512,7 @@ fn source_built_table_roundtrips_percentage_data_format() {
 
 #[test]
 fn source_built_table_roundtrips_currency_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Currencies", 3, 3, position, size)
@@ -541,7 +537,7 @@ fn source_built_table_roundtrips_currency_format_crud() {
         .set_slide_table_cell_currency_format(0, table.model_object_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_currency_format(0, table.model_object_id, 1, 1)
@@ -563,7 +559,7 @@ fn source_built_table_roundtrips_currency_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_scientific_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Scientific", 3, 3, position, size)
@@ -582,7 +578,7 @@ fn source_built_table_roundtrips_scientific_format_crud() {
         .set_slide_table_cell_scientific_format(0, table.model_object_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_scientific_format(0, table.model_object_id, 1, 1)
@@ -604,7 +600,7 @@ fn source_built_table_roundtrips_scientific_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_fraction_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Fractions", 3, 3, position, size)
@@ -623,7 +619,7 @@ fn source_built_table_roundtrips_fraction_format_crud() {
         .set_slide_table_cell_fraction_format(0, table.model_object_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_fraction_format(0, table.model_object_id, 1, 1)
@@ -645,7 +641,7 @@ fn source_built_table_roundtrips_fraction_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_numeral_system_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Numeral Systems", 3, 3, position, size)
@@ -669,7 +665,7 @@ fn source_built_table_roundtrips_numeral_system_format_crud() {
         .set_slide_table_cell_numeral_system_format(0, table.model_object_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_numeral_system_format(0, table.model_object_id, 1, 1)
@@ -691,7 +687,7 @@ fn source_built_table_roundtrips_numeral_system_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_date_time_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Dates", 3, 3, position, size)
@@ -710,7 +706,7 @@ fn source_built_table_roundtrips_date_time_format_crud() {
         .set_slide_table_cell_date_time_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_date_time_format(0, table.model_object_id, 1, 1)
@@ -732,7 +728,7 @@ fn source_built_table_roundtrips_date_time_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_duration_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Durations", 3, 3, position, size)
@@ -752,7 +748,7 @@ fn source_built_table_roundtrips_duration_format_crud() {
         .set_slide_table_cell_duration_format(0, table.model_object_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_duration_format(0, table.model_object_id, 1, 1)
@@ -774,7 +770,7 @@ fn source_built_table_roundtrips_duration_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_checkbox_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Checkboxes", 3, 3, position, size)
@@ -783,7 +779,7 @@ fn source_built_table_roundtrips_checkbox_format_crud() {
         .set_slide_table_cell_checkbox_format(0, table.model_object_id, 1, 1, Checkbox)
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_checkbox_format(0, table.model_object_id, 1, 1)
@@ -795,7 +791,7 @@ fn source_built_table_roundtrips_checkbox_format_crud() {
             .slide_table(0, table.model_object_id)
             .unwrap()
             .get_cell(1, 1),
-        Some(&KeynoteTableCellValue::Boolean(false))
+        Some(&TableCellValue::Boolean(false))
     );
     assert!(
         reopened
@@ -812,7 +808,7 @@ fn source_built_table_roundtrips_checkbox_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_star_rating_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Ratings", 3, 3, position, size)
@@ -821,7 +817,7 @@ fn source_built_table_roundtrips_star_rating_format_crud() {
         .set_slide_table_cell_star_rating_format(0, table.model_object_id, 1, 1, StarRating)
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_star_rating_format(0, table.model_object_id, 1, 1)
@@ -850,7 +846,7 @@ fn source_built_table_roundtrips_star_rating_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_slider_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Sliders", 3, 3, position, size)
@@ -861,7 +857,7 @@ fn source_built_table_roundtrips_slider_format_crud() {
         .set_slide_table_cell_slider_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_slider_format(0, table.model_object_id, 1, 1)
@@ -890,7 +886,7 @@ fn source_built_table_roundtrips_slider_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_stepper_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Steppers", 3, 3, position, size)
@@ -901,7 +897,7 @@ fn source_built_table_roundtrips_stepper_format_crud() {
         .set_slide_table_cell_stepper_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_stepper_format(0, table.model_object_id, 1, 1)
@@ -930,7 +926,7 @@ fn source_built_table_roundtrips_stepper_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_text_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Text", 3, 3, position, size)
@@ -941,14 +937,14 @@ fn source_built_table_roundtrips_text_format_crud() {
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Text("00123".to_owned()),
+            TableCellValue::Text("00123".to_owned()),
         )
         .unwrap();
     editor
         .set_slide_table_cell_text_format(0, table.model_object_id, 1, 1)
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_text_format(0, table.model_object_id, 1, 1)
@@ -960,7 +956,7 @@ fn source_built_table_roundtrips_text_format_crud() {
             .slide_table(0, table.model_object_id)
             .unwrap()
             .get_cell(1, 1),
-        Some(&KeynoteTableCellValue::Text("00123".to_owned()))
+        Some(&TableCellValue::Text("00123".to_owned()))
     );
     assert!(
         reopened
@@ -977,7 +973,7 @@ fn source_built_table_roundtrips_text_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_custom_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Custom Numbers", 3, 3, position, size)
@@ -999,7 +995,7 @@ fn source_built_table_roundtrips_custom_format_crud() {
         .set_slide_table_cell_custom_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_custom_format(0, table.model_object_id, 1, 1)
@@ -1021,7 +1017,7 @@ fn source_built_table_roundtrips_custom_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_pop_up_menu_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Menus", 3, 3, position, size)
@@ -1031,7 +1027,7 @@ fn source_built_table_roundtrips_pop_up_menu_format_crud() {
         .set_slide_table_cell_pop_up_menu_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_pop_up_menu_format(0, table.model_object_id, 1, 1)
@@ -1043,7 +1039,7 @@ fn source_built_table_roundtrips_pop_up_menu_format_crud() {
             .slide_table(0, table.model_object_id)
             .unwrap()
             .get_cell(1, 1),
-        Some(&KeynoteTableCellValue::Text("Draft".to_owned()))
+        Some(&TableCellValue::Text("Draft".to_owned()))
     );
     assert!(
         reopened
@@ -1060,14 +1056,14 @@ fn source_built_table_roundtrips_pop_up_menu_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_full_crud() {
-    let editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let editor = keynote::Builder::new().build().unwrap();
     assert!(editor.slide_tables(0).unwrap().is_empty());
     let mut package = editor.into_package();
     let engine = package.remove_entry("Index/CalculationEngine.iwa").unwrap();
     package
         .insert_entry("Index/CalculationEngine-81.iwa", engine)
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Forecast", 3, 3, position, size)
@@ -1081,12 +1077,8 @@ fn source_built_table_roundtrips_full_crud() {
                 0,
                 table.model_object_id,
                 [
-                    KeynoteTableCellUpdate::new(
-                        0,
-                        0,
-                        KeynoteTableCellValue::Text("Region".to_owned()),
-                    ),
-                    KeynoteTableCellUpdate::new(
+                    TableCellUpdate::new(0, 0, TableCellValue::Text("Region".to_owned()),),
+                    TableCellUpdate::new(
                         1,
                         1,
                         CellValue::number(42.5).expect("finite cell number"),
@@ -1103,8 +1095,8 @@ fn source_built_table_roundtrips_full_crud() {
                 0,
                 table.model_object_id,
                 [
-                    KeynoteTableCellUpdate::new(2, 0, KeynoteTableCellValue::Boolean(true),),
-                    KeynoteTableCellUpdate::clear(2, 0),
+                    TableCellUpdate::new(2, 0, TableCellValue::Boolean(true),),
+                    TableCellUpdate::clear(2, 0),
                 ],
             )
             .is_err()
@@ -1156,7 +1148,7 @@ fn source_built_table_roundtrips_full_crud() {
     let laid_out_geometry = replacement;
 
     let bytes = editor.to_bytes().unwrap();
-    let mut reopened = KeynoteEditor::from_bytes(&bytes).unwrap();
+    let mut reopened = Editor::from_bytes(&bytes).unwrap();
     let materialized = reopened.slide_table(0, table.model_object_id).unwrap();
     assert_eq!(
         materialized.info.name,
@@ -1176,7 +1168,7 @@ fn source_built_table_roundtrips_full_crud() {
     );
     assert_eq!(
         materialized.get_cell(0, 0),
-        Some(&KeynoteTableCellValue::Text("Region".to_owned()))
+        Some(&TableCellValue::Text("Region".to_owned()))
     );
     assert_eq!(
         materialized.get_cell(1, 1),
@@ -1191,19 +1183,19 @@ fn source_built_table_roundtrips_full_crud() {
             .slide_table(0, table.model_object_id)
             .unwrap()
             .get_cell(1, 1)
-            .is_none_or(KeynoteTableCellValue::is_empty)
+            .is_none_or(TableCellValue::is_empty)
     );
     let removed = reopened
         .remove_slide_table(0, table.drawable_object_id)
         .unwrap();
     assert_eq!(removed.table.model_object_id, table.model_object_id);
     assert!(reopened.slide_tables(0).unwrap().is_empty());
-    assert!(KeynoteEditor::from_bytes(&reopened.to_bytes().unwrap()).is_ok());
+    assert!(Editor::from_bytes(&reopened.to_bytes().unwrap()).is_ok());
 }
 
 #[test]
 fn source_built_table_duplication_clones_formula_storage_and_geometry() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let source = editor
         .add_slide_table(0, "Budget", 3, 2, position, size)
@@ -1213,17 +1205,9 @@ fn source_built_table_duplication_clones_formula_storage_and_geometry() {
             0,
             source.model_object_id,
             [
-                KeynoteTableCellUpdate::new(
-                    0,
-                    0,
-                    KeynoteTableCellValue::Text("Category".to_owned()),
-                ),
-                KeynoteTableCellUpdate::new(1, 0, KeynoteTableCellValue::Text("Travel".to_owned())),
-                KeynoteTableCellUpdate::new(
-                    1,
-                    1,
-                    CellValue::number(125.0).expect("finite cell number"),
-                ),
+                TableCellUpdate::new(0, 0, TableCellValue::Text("Category".to_owned())),
+                TableCellUpdate::new(1, 0, TableCellValue::Text("Travel".to_owned())),
+                TableCellUpdate::new(1, 1, CellValue::number(125.0).expect("finite cell number")),
             ],
         )
         .unwrap();
@@ -1262,7 +1246,7 @@ fn source_built_table_duplication_clones_formula_storage_and_geometry() {
             .slide_table(copied.slide_index, copied.model_object_id)
             .unwrap()
             .get_cell(1, 0),
-        Some(&KeynoteTableCellValue::Text("Travel".to_owned()))
+        Some(&TableCellValue::Text("Travel".to_owned()))
     );
     assert_eq!(
         editor
@@ -1278,7 +1262,7 @@ fn source_built_table_duplication_clones_formula_storage_and_geometry() {
             copied.model_object_id,
             1,
             0,
-            KeynoteTableCellValue::Text("Lodging".to_owned()),
+            TableCellValue::Text("Lodging".to_owned()),
         )
         .unwrap();
     assert_eq!(
@@ -1286,7 +1270,7 @@ fn source_built_table_duplication_clones_formula_storage_and_geometry() {
             .slide_table(source.slide_index, source.model_object_id)
             .unwrap()
             .get_cell(1, 0),
-        Some(&KeynoteTableCellValue::Text("Travel".to_owned()))
+        Some(&TableCellValue::Text("Travel".to_owned()))
     );
     assert_eq!(
         editor
@@ -1296,7 +1280,7 @@ fn source_built_table_duplication_clones_formula_storage_and_geometry() {
         "Budget copy 2"
     );
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.slide_tables(0).unwrap().len(), 3);
     reopened
         .remove_slide_table(copied.slide_index, copied.drawable_object_id)
@@ -1307,19 +1291,19 @@ fn source_built_table_duplication_clones_formula_storage_and_geometry() {
             .slide_table(source.slide_index, source.model_object_id)
             .unwrap()
             .get_cell(1, 0),
-        Some(&KeynoteTableCellValue::Text("Travel".to_owned()))
+        Some(&TableCellValue::Text("Travel".to_owned()))
     );
 }
 
 #[test]
 fn source_built_table_roundtrips_formula_crud_transactionally() {
-    let editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let editor = keynote::Builder::new().build().unwrap();
     let mut package = editor.into_package();
     let engine = package.remove_entry("Index/CalculationEngine.iwa").unwrap();
     package
         .insert_entry("Index/CalculationEngine-82.iwa", engine)
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Formula", 3, 2, position, size)
@@ -1341,7 +1325,7 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
         )
         .unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_formula(0, table.model_object_id, 2, 1)
@@ -1410,7 +1394,7 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
 
 #[test]
 fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Topology", 4, 4, position, size)
@@ -1424,7 +1408,7 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
             model_id,
             1,
             1,
-            KeynoteTableCellValue::Text("shift me".to_owned()),
+            TableCellValue::Text("shift me".to_owned()),
         )
         .unwrap();
     editor
@@ -1456,17 +1440,17 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
     editor
         .insert_slide_table_column(0, model_id, ColumnInsertion::body(1))
         .unwrap();
-    let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let shifted = reopened.slide_table(0, model_id).unwrap();
     assert_eq!((shifted.info.rows, shifted.info.columns), (5, 5));
     assert_ne!(shifted.info.geometry.size, baseline_geometry.size);
     assert_eq!(
         shifted.get_cell(1, 1),
-        Some(&KeynoteTableCellValue::Text("shift me".to_owned()))
+        Some(&TableCellValue::Text("shift me".to_owned()))
     );
     assert_eq!(
         shifted.get_cell(3, 3),
-        Some(&KeynoteTableCellValue::Formula("=B2".to_owned()))
+        Some(&TableCellValue::Formula("=B2".to_owned()))
     );
     editor
         .remove_slide_table_column(0, model_id, ColumnDeletion::body(1))
@@ -1496,7 +1480,7 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
 
 #[test]
 fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Footer aggregate", 4, 3, position, size)
@@ -1533,7 +1517,7 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
     package
         .insert_entry("Index/CalculationEngine-42-2.iwa", engine)
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let baseline = editor.to_bytes().unwrap();
 
     editor
@@ -1554,7 +1538,7 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
 
 #[test]
 fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Fixed sections", 4, 4, position, size)
@@ -1602,31 +1586,13 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     editor
-        .set_slide_table_cell(
-            0,
-            model_id,
-            0,
-            0,
-            KeynoteTableCellValue::Text("Header".to_owned()),
-        )
+        .set_slide_table_cell(0, model_id, 0, 0, TableCellValue::Text("Header".to_owned()))
         .unwrap();
     editor
-        .set_slide_table_cell(
-            0,
-            model_id,
-            1,
-            1,
-            KeynoteTableCellValue::Text("Body".to_owned()),
-        )
+        .set_slide_table_cell(0, model_id, 1, 1, TableCellValue::Text("Body".to_owned()))
         .unwrap();
     editor
-        .set_slide_table_cell(
-            0,
-            model_id,
-            3,
-            2,
-            KeynoteTableCellValue::Text("Footer".to_owned()),
-        )
+        .set_slide_table_cell(0, model_id, 3, 2, TableCellValue::Text("Footer".to_owned()))
         .unwrap();
     editor
         .remove_slide_table_row(0, model_id, RowDeletion::header(0))
@@ -1645,17 +1611,17 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
     assert_eq!((table.info.rows, table.info.columns), (2, 3));
     assert_eq!(
         table.get_cell(0, 0),
-        Some(&KeynoteTableCellValue::Text("Body".to_owned()))
+        Some(&TableCellValue::Text("Body".to_owned()))
     );
     assert!(!table.iter_cells().any(|(_, value)| matches!(
         value,
-        KeynoteTableCellValue::Text(text) if text == "Header" || text == "Footer"
+        TableCellValue::Text(text) if text == "Header" || text == "Footer"
     )));
 }
 
 #[test]
 fn source_built_table_roundtrips_title_settings_transactionally() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Forecast", 2, 2, position, size)
@@ -1668,7 +1634,7 @@ fn source_built_table_roundtrips_title_settings_transactionally() {
     );
     set_focused_table_title_settings(&mut editor, 0, table.model_object_id, visible).unwrap();
 
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         focused_table_title_settings(&reopened, 0, table.model_object_id).unwrap(),
         visible
@@ -1705,7 +1671,7 @@ fn source_built_table_roundtrips_title_settings_transactionally() {
 
 #[test]
 fn tables_on_multiple_slides_remain_isolated() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let layout = editor
         .slide_layouts()
         .unwrap()
@@ -1728,7 +1694,7 @@ fn tables_on_multiple_slides_remain_isolated() {
 
 #[test]
 fn source_built_tables_list_in_z_order_and_roundtrip_through_catalog() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     editor
         .add_slide_table(0, "First", 2, 2, position, size)
@@ -1752,7 +1718,7 @@ fn source_built_tables_list_in_z_order_and_roundtrip_through_catalog() {
     // immutable package snapshot on reopen; no table identity or z-order is
     // inferred from the generated model's allocation order.
     let source = editor.to_bytes().unwrap();
-    let reopened = KeynoteEditor::from_bytes(&source).unwrap();
+    let reopened = Editor::from_bytes(&source).unwrap();
     let reread = reopened.slide_tables(0).unwrap();
     assert_eq!(reread.len(), listed.len());
     for (before, after) in listed.iter().zip(reread) {

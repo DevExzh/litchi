@@ -25,7 +25,7 @@ const AUDIO_DUPLICATE_OFFSET: f32 = 30.0;
 
 /// One audio-only media control anchored to the Pages body text flow.
 #[derive(Debug, Clone, PartialEq)]
-pub struct PagesAudioInfo {
+pub struct AudioInfo {
     pub drawable_object_id: u64,
     /// UTF-16 index of the object-replacement character in the body text.
     pub anchor_character_index: u32,
@@ -42,14 +42,14 @@ pub struct PagesAudioInfo {
 /// Result of removing one body-anchored Pages audio clip and its private graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedPagesAudio {
-    pub audio: PagesAudioInfo,
+    pub audio: AudioInfo,
     /// Assets culled because the removed clip held their final package reference.
     pub removed_data_identifiers: Vec<MediaAssetId>,
 }
 
-impl PagesEditor {
+impl Editor {
     /// List audio-only media controls anchored to the body in text-flow order.
-    pub fn body_audio(&self) -> Result<Vec<PagesAudioInfo>> {
+    pub fn body_audio(&self) -> Result<Vec<AudioInfo>> {
         body_audio_infos(self)
     }
 
@@ -65,7 +65,7 @@ impl PagesEditor {
         preferred_filename: &str,
         data: &[u8],
         options: PagesAudioOptions,
-    ) -> Result<PagesAudioInfo> {
+    ) -> Result<AudioInfo> {
         let (geometry, duration_seconds) = audio_creation_values(options)?;
         let root = pages_document_root_facts(self.package())?;
         let style_id = audio_style_id(self.package(), &root)?;
@@ -288,7 +288,7 @@ impl PagesEditor {
         &mut self,
         source_drawable_object_id: u64,
         anchor_character_index: usize,
-    ) -> Result<PagesAudioInfo> {
+    ) -> Result<AudioInfo> {
         let source = body_audio_graph(self, source_drawable_object_id)?;
         let mut staged = self.package().clone();
         let first_identifier = next_object_identifier(&staged)?;
@@ -542,7 +542,7 @@ mod tests {
         reason = "exercises the legacy raw-ID Pages drawable-comment API; retained for migration-host compatibility"
     )]
     fn scratch_document_supports_audio_crud_without_a_source_package() {
-        let mut editor = PagesEditor::create_with_text("Audio notes").unwrap();
+        let mut editor = Editor::create_with_text("Audio notes").unwrap();
         let anchor = "Audio notes".encode_utf16().count();
         assert!(editor.body_audio().unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
@@ -560,7 +560,7 @@ mod tests {
         );
         assert!(editor.body_movies().unwrap().is_empty());
 
-        let roundtripped = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let roundtripped = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             roundtripped.body_audio().unwrap(),
             std::slice::from_ref(&created)
@@ -635,12 +635,12 @@ mod tests {
         assert_eq!(editor.body_text().unwrap(), "Audio notes");
         assert!(editor.body_audio().unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
     fn scratch_document_supports_native_audio_duplication() {
-        let mut editor = PagesEditor::create_with_text("Audio notes").unwrap();
+        let mut editor = Editor::create_with_text("Audio notes").unwrap();
         let source = editor
             .add_body_audio(
                 "Audio notes".encode_utf16().count(),
@@ -715,7 +715,7 @@ mod tests {
             REPLACEMENT_AUDIO
         );
 
-        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.body_audio().unwrap().len(), 2);
         assert_eq!(
             reopened
@@ -740,7 +740,7 @@ mod tests {
         );
         assert!(editor.body_audio().unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
@@ -750,7 +750,7 @@ mod tests {
                 .join("../../test-data/iwork/pages/audio-playback-native.pages"),
         )
         .expect("native Pages audio fixture");
-        let mut editor = PagesEditor::from_bytes(&source).expect("native Pages fixture");
+        let mut editor = Editor::from_bytes(&source).expect("native Pages fixture");
         let audio = editor
             .body_audio()
             .expect("native body audio")
@@ -796,7 +796,7 @@ mod tests {
 
     #[test]
     fn invalid_audio_creation_and_cross_type_edits_are_transactional() {
-        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let mut editor = Editor::create_with_text("Body").unwrap();
         let baseline = editor.to_bytes().unwrap();
         assert!(editor.duplicate_body_audio(999, 0).is_err());
         assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -854,7 +854,7 @@ mod tests {
 
     #[test]
     fn removing_earlier_audio_shifts_and_preserves_later_attachments() {
-        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let mut editor = Editor::create_with_text("Body").unwrap();
         let first = editor
             .add_body_audio(4, "first.aiff", AUDIO, options())
             .unwrap();
@@ -872,6 +872,6 @@ mod tests {
             editor.extract_media(second.audio_data_identifier).unwrap(),
             REPLACEMENT_AUDIO
         );
-        PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 }

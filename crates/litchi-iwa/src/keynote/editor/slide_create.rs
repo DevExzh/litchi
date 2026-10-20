@@ -14,33 +14,29 @@ use wire::{clear_user_guides, insert_slide_node, materialize_slide_object, prepa
 
 const SLIDE_MESSAGE_TYPE: u32 = 5;
 
-impl KeynoteEditor {
+impl Editor {
     /// List the slide layouts stored by the presentation theme.
-    pub fn slide_layouts(&self) -> Result<Vec<KeynoteSlideLayoutInfo>> {
+    pub fn slide_layouts(&self) -> Result<Vec<SlideLayoutInfo>> {
         let graph = ObjectGraph::read(self.package())?;
         let layout_graph = read_layout_graph(&graph)?;
         LayoutCatalog::read(&graph, &layout_graph.theme).map(LayoutCatalog::into_infos)
     }
 
     /// Return the theme's default slide layout.
-    pub fn default_slide_layout(&self) -> Result<KeynoteSlideLayoutId> {
+    pub fn default_slide_layout(&self) -> Result<SlideLayoutId> {
         let graph = ObjectGraph::read(self.package())?;
         let layout_graph = read_layout_graph(&graph)?;
         LayoutCatalog::read(&graph, &layout_graph.theme)?.default_layout()
     }
 
     /// Append a fresh, empty slide using a theme layout.
-    pub fn add_slide(&mut self, layout: KeynoteSlideLayoutId) -> Result<KeynoteSlideInfo> {
+    pub fn add_slide(&mut self, layout: SlideLayoutId) -> Result<SlideInfo> {
         let index = self.slides()?.len();
         self.insert_slide(index, layout)
     }
 
     /// Insert a fresh, empty slide using a theme layout.
-    pub fn insert_slide(
-        &mut self,
-        index: usize,
-        layout: KeynoteSlideLayoutId,
-    ) -> Result<KeynoteSlideInfo> {
+    pub fn insert_slide(&mut self, index: usize, layout: SlideLayoutId) -> Result<SlideInfo> {
         let slides = self.slides()?;
         if index > slides.len() {
             return Err(Error::ParseError(format!(
@@ -195,7 +191,7 @@ impl KeynoteEditor {
         }
         set_package_last_object_identifier(&mut staged, next_identifier - 1)?;
 
-        let preview = KeynoteEditor::from_package(staged.clone())?;
+        let preview = Editor::from_package(staged.clone())?;
         let mut text_storage_ids = preview
             .slide_text_storages(index)?
             .into_iter()
@@ -219,7 +215,7 @@ impl KeynoteEditor {
         }
         text.set_text(crate::text::native_storage_id(new_note_storage_id)?, "")?;
         let staged = text.into_package();
-        let verified = KeynoteEditor::from_package(staged)?;
+        let verified = Editor::from_package(staged)?;
         let created = verified.slides()?.get(index).cloned().ok_or_else(|| {
             Error::InvalidFormat(
                 "Created Keynote slide is missing from its insertion point".to_owned(),

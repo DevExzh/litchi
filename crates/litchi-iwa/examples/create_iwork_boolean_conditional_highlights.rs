@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
-use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
+use litchi_iwa::keynote::{self};
+use litchi_iwa::numbers::{self};
+use litchi_iwa::pages::{self};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
 use litchi_iwa_common::table::cell::conditional_highlight::{Condition, Rule, Style};
 use litchi_numbers::cell::Value as CellValue;
@@ -36,7 +36,7 @@ fn boolean_rules() -> Result<[Rule; 2], Box<dyn std::error::Error>> {
 }
 
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_name("Booleans")
         .table_dimensions(2, 3)
         .build()?;
@@ -64,7 +64,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     }
     editor.save(output)?;
 
-    let reopened = NumbersEditor::open(output)?;
+    let reopened = numbers::Editor::open(output)?;
     for (column, rule) in [TRUE_COLUMN, FALSE_COLUMN].into_iter().zip(&rules) {
         assert_eq!(
             reopened.cell_conditional_highlight_rules(table_id, BOOLEAN_ROW, column)?,
@@ -75,7 +75,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn set_numbers_cell(
-    editor: &mut NumbersEditor,
+    editor: &mut numbers::Editor,
     row: usize,
     column: usize,
     value: CellValue,
@@ -87,7 +87,7 @@ fn set_numbers_cell(
 }
 
 fn set_numbers_cells(
-    editor: &mut NumbersEditor,
+    editor: &mut numbers::Editor,
     updates: impl IntoIterator<Item = litchi_numbers::cell::Update>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let changes = updates
@@ -104,14 +104,14 @@ fn set_numbers_cells(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    *editor = NumbersEditor::from_bytes(&bytes)?;
+    *editor = numbers::Editor::from_bytes(&bytes)?;
     Ok(())
 }
 
 fn numbers_cell_change(
     update: litchi_numbers::cell::Update,
 ) -> Result<litchi_numbers::table::cells::Change, Box<dyn std::error::Error>> {
-    let position = litchi_numbers::CellPosition::try_from_usize(update.row, update.column)?;
+    let position = litchi_numbers::At::try_from_usize(update.row, update.column)?;
     let change = match update.value {
         CellValue::Empty => litchi_numbers::table::cells::Change::clear(position),
         CellValue::Text(value) => litchi_numbers::table::cells::Change::set(
@@ -142,7 +142,7 @@ fn numbers_cell_change(
 }
 
 fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Boolean conditional highlighting created from scratch.\n")
         .body_table("Booleans", 2, 3)
         .build()?;
@@ -165,7 +165,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     }
     editor.save(output)?;
 
-    let reopened = PagesEditor::open(output)?;
+    let reopened = pages::Editor::open(output)?;
     for (column, rule) in [TRUE_COLUMN, FALSE_COLUMN].into_iter().zip(&rules) {
         assert_eq!(
             reopened.table_cell_conditional_highlight_rules(table_id, BOOLEAN_ROW, column)?,
@@ -176,7 +176,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = KeynoteDocumentBuilder::new()
+    let mut editor = keynote::Builder::new()
         .title("Boolean conditional highlighting")
         .build()?;
     let table = editor.add_slide_table(
@@ -216,7 +216,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     }
     editor.save(output)?;
 
-    let reopened = KeynoteEditor::open(output)?;
+    let reopened = keynote::Editor::open(output)?;
     for (column, rule) in [TRUE_COLUMN, FALSE_COLUMN].into_iter().zip(&rules) {
         assert_eq!(
             reopened.slide_table_cell_conditional_highlight_rules(

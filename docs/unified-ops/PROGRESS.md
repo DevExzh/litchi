@@ -902,6 +902,12 @@ Work packages, in waves of up to four agents:
 - Every other memo item is confirmed (1–13, 21, 25, 27, 28, 30).
 - Plan: an inventory and contract design (record 0351) first, then foundational changes, then per-crate migrations.
 
+## API-debt program (record 0350), merges
+- Merged `api-contract` (0351): the normative contract (immutable `Package`, one Edit/Commit/Patch/Diagnostics shape, `Refused(Refusal)` replacing `UnsafeEdit`, limits through `OpenOptions`/`EditOptions`), foundation `litchi_core::edit::{Commit, Diagnostics, Refusal, RefusalKind}`, gate rule kinds `immutable_owners`/`family_methods`/prefix-suffix bans, the debt inventory (642 package mutators, 309 commit types, 444 `*_with_limits`, 29 `rollback`) and waves W1–W8. Coordinator decision: a patch conflict is `invalid_input` in every format; `SourceChanged` stays `io_error`.
+- Merged `iwork-names` (0352): iWork `CellPosition`/`CellRange` → `At`/`Area`; `litchi-iwa` `{pages,keynote,numbers}::Builder` and 168 unprefixed per-format names; Keynote native IDs are documented plain API. Follow-ups for W7: 18 deprecated raw-ID host items, root `IWork*` prefixes, the broken iWork public-API tool test.
+- Merged `sheet-dispatch` (0353): the `litchi-core::sheet` traits use associated types; boxed iterator traits deleted; per-cell boxing gone from the evaluate path; ABBA 0.36–0.98 on all 15 scenarios. 0353a (concrete sheet error type, synchronous formula engine without boxed futures) is in progress.
+- Merged `sheet-text-meta` (0354): `litchi::sheet::text` → crate `litchi-sheet-text` (facade feature `sheet-text`), `File::import` shares its tokenizer (parse 0.88–0.90×); `Metadata.keywords: Vec<String>` in every format, arrays in JSON/CLI/Python, unchanged lists keep source bytes.
+
 ## Coordinator status (2026-10-19): code work for the definition of done complete
 The third audit (`.coord/r9/dod-audit-2026-10-19-final.md`, outside the repository) listed three code items: PPTX batch budget (0348), the 34 DOCX chart rows (deferred-P1, owner memo 30) and docs hygiene. All three are done, and the workspace-wide gate now passes on trunk. What remains is the owner's:
 - the 30 decisions in [0331](0331-owner-decision-memo.md); items 12, 27, 28 and 29 decide definition-of-done verdicts;

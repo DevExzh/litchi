@@ -7,7 +7,7 @@ use crate::charts::series_symbol::{
 };
 use crate::charts::{ChartSeriesSymbol, Index};
 
-impl KeynoteEditor {
+impl Editor {
     pub fn slide_chart_series_symbols(
         &self,
         slide_index: usize,
@@ -56,7 +56,7 @@ impl KeynoteEditor {
 }
 
 fn slide_chart_series_symbols(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Vec<Option<ChartSeriesSymbol>>> {
@@ -79,7 +79,7 @@ fn slide_chart_series_symbols(
 }
 
 fn set_slide_chart_series_symbols(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     symbols: &[Option<ChartSeriesSymbol>],
@@ -105,7 +105,7 @@ fn set_slide_chart_series_symbols(
         series_count,
         symbols,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_series_symbols(slide_index, drawable_object_id)? != symbols {
         return Err(Error::InvalidFormat(
             "Keynote chart data-symbol update failed validation".to_owned(),

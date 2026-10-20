@@ -378,7 +378,13 @@ pub(crate) fn admit(props: &Metadata) -> Result<()> {
         props.version.as_deref(),
         props.language.as_deref(),
     ];
-    let keywords = props.keywords.as_ref().map_or(0, String::len);
+    // The keywords as one `cp:keywords` text: joined with `, `.
+    let keywords = props
+        .keywords
+        .iter()
+        .map(String::len)
+        .sum::<usize>()
+        .saturating_add(props.keywords.len().saturating_sub(1).saturating_mul(2));
     let observed = texts
         .into_iter()
         .flatten()

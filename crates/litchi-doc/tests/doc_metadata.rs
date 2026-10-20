@@ -28,7 +28,7 @@ fn metadata() -> Metadata {
         title: Some("Quarterly report".to_owned()),
         author: Some("Ada Lovelace".to_owned()),
         subject: Some("Revenue".to_owned()),
-        keywords: Some("q3; revenue".to_owned()),
+        keywords: vec!["q3".to_owned(), "revenue".to_owned()],
         description: Some("Draft for review".to_owned()),
         company: Some("Litchi Project".to_owned()),
         created: Some(time("2026-10-05T09:30:00Z").into()),

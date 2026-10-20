@@ -14,7 +14,7 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    CellPosition, Package, Error as PackageError,
+    At, Package, Error as PackageError,
     SheetSelector, TableSelector,
     cell::data_format::FixedDecimalPlaces,
     cell::data_format::percentage::{
@@ -47,8 +47,8 @@ const NATIVE_NUMBERS: &[u8] = include_bytes!("../../../../test-data/iwork/number
 // It is retained as the wrong-family refusal oracle; the deterministic
 // test-only fixture below supplies a real Percentage cell for the success
 // lifecycle.
-const NATIVE_POSITION: CellPosition = CellPosition::new(2, 1);
-const PERCENTAGE_POSITION: CellPosition = CellPosition::new(0, 0);
+const NATIVE_POSITION: At = At::new(2, 1);
+const PERCENTAGE_POSITION: At = At::new(0, 0);
 
 fuzz_target!(|data: &[u8]| {
     match Package::from_bytes_with_options(data, options()) {
@@ -131,7 +131,7 @@ fn exercise_wrong_family(package: &Package) {
     assert_eq!(package_bytes(package), source_bytes);
 }
 
-fn exercise_package(package: &Package, data: &[u8], position: CellPosition) {
+fn exercise_package(package: &Package, data: &[u8], position: At) {
     exercise_selector_reads(package, data);
     exercise_selector_errors(package, position);
 
@@ -164,7 +164,7 @@ fn exercise_package(package: &Package, data: &[u8], position: CellPosition) {
 }
 
 fn exercise_selector_reads(package: &Package, data: &[u8]) {
-    let position = CellPosition::new(
+    let position = At::new(
         u32::from(control(data, 4) % 8),
         u32::from(control(data, 5) % 8),
     );
@@ -185,7 +185,7 @@ fn exercise_selector_reads(package: &Package, data: &[u8]) {
     }
 }
 
-fn exercise_selector_errors(package: &Package, position: CellPosition) {
+fn exercise_selector_errors(package: &Package, position: At) {
     let sheet_count = package.workbook_ref().sheets().len();
     if let Err(error) = package.table_cell_percentage_format(
         SheetSelector::index(sheet_count),
@@ -211,7 +211,7 @@ fn exercise_selector_errors(package: &Package, position: CellPosition) {
     if let Err(error) = package.table_cell_percentage_format(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(u32::MAX, u32::MAX),
+        At::new(u32::MAX, u32::MAX),
     ) {
         observe_error(error);
     }
@@ -222,7 +222,7 @@ fn exercise_transaction(
     source_bytes: &[u8],
     before: Option<Percentage>,
     requested: Percentage,
-    position: CellPosition,
+    position: At,
     data: &[u8],
 ) {
     let edit = match package.edit_table_cell_percentage_format(

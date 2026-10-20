@@ -1,10 +1,10 @@
 use std::env;
 
 use litchi_iwa::numbers::{
-    FormulaAxisReference, FormulaBinaryOperator, FormulaCellReference, FormulaExpression,
-    FormulaPivotCategoryReference, FormulaUuid, NumbersEditor,
+    self, FormulaAxisReference, FormulaBinaryOperator, FormulaCellReference, FormulaExpression,
+    FormulaPivotCategoryReference, FormulaUuid,
 };
-use litchi_numbers::{CellPosition, Workbook, cell::FiniteF64};
+use litchi_numbers::{At, Workbook, cell::FiniteF64};
 
 fn parse_address(address: &str) -> Result<FormulaCellReference, String> {
     let mut input = address;
@@ -227,7 +227,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let row = arguments[3].parse::<usize>()?;
     let column = arguments[4].parse::<usize>()?;
     let function = &arguments[5];
-    let mut editor = NumbersEditor::open(input)?;
+    let mut editor = numbers::Editor::open(input)?;
     let tables = editor.tables()?;
     let table_ids = tables.iter().map(|table| table.id()).collect::<Vec<_>>();
     let table = tables
@@ -261,7 +261,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .flat_map(|sheet| sheet.tables())
         .find(|table| table.name() == table_name)
         .and_then(|table| {
-            CellPosition::try_from_usize(row, column)
+            At::try_from_usize(row, column)
                 .ok()
                 .and_then(|position| table.get(position))
         });

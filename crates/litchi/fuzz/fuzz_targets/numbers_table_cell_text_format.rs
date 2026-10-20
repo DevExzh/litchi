@@ -13,7 +13,7 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    CellPosition, Package, Error as PackageError,
+    At, Package, Error as PackageError,
     SheetSelector, TableSelector,
     cell::data_format::{Text, text::transaction::Error as TextError},
 };
@@ -38,8 +38,8 @@ const PRIVATE_TABLE: &str = "__litchi_private_text_format_table_2d73__";
 const PRIVATE_INPUT: &[u8] = b"__litchi_private_text_format_input_2d73__";
 const NATIVE_NUMBERS: &[u8] = include_bytes!("../../../../test-data/iwork/numbers/basic.numbers");
 
-const TEXT_POSITION: CellPosition = CellPosition::new(0, 0);
-const NATIVE_NUMBER_POSITION: CellPosition = CellPosition::new(2, 1);
+const TEXT_POSITION: At = At::new(0, 0);
+const NATIVE_NUMBER_POSITION: At = At::new(2, 1);
 
 fuzz_target!(|data: &[u8]| {
     match Package::from_bytes_with_options(data, options()) {
@@ -179,7 +179,7 @@ fn native_package() -> &'static Package {
     })
 }
 
-fn exercise_package(package: &Package, data: &[u8], position: CellPosition) {
+fn exercise_package(package: &Package, data: &[u8], position: At) {
     exercise_selector_reads(package, data, position);
     exercise_selector_errors(package, position);
 
@@ -200,8 +200,8 @@ fn exercise_package(package: &Package, data: &[u8], position: CellPosition) {
     assert_eq!(package_bytes(package), source_bytes);
 }
 
-fn exercise_selector_reads(package: &Package, data: &[u8], position: CellPosition) {
-    let random_position = CellPosition::new(
+fn exercise_selector_reads(package: &Package, data: &[u8], position: At) {
+    let random_position = At::new(
         u32::from(control(data, 4) % 8),
         u32::from(control(data, 5) % 8),
     );
@@ -223,7 +223,7 @@ fn exercise_selector_reads(package: &Package, data: &[u8], position: CellPositio
     }
 }
 
-fn exercise_selector_errors(package: &Package, position: CellPosition) {
+fn exercise_selector_errors(package: &Package, position: At) {
     let sheet_count = package.workbook_ref().sheets().len();
     if let Err(error) = package.table_cell_text_format(
         SheetSelector::index(sheet_count),
@@ -249,7 +249,7 @@ fn exercise_selector_errors(package: &Package, position: CellPosition) {
     if let Err(error) = package.table_cell_text_format(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(u32::MAX, u32::MAX),
+        At::new(u32::MAX, u32::MAX),
     ) {
         observe_error(error);
     }
@@ -260,7 +260,7 @@ fn exercise_transaction(
     source_bytes: &[u8],
     before: Option<Text>,
     data: &[u8],
-    position: CellPosition,
+    position: At,
 ) {
     let edit = match package.edit_table_cell_text_format(0usize, 0usize, position) {
         Ok(edit) => edit,
@@ -360,7 +360,7 @@ fn exercise_transaction(
     black_box((patch.before(), patch.after(), patch.path()));
 }
 
-fn exercise_wrong_family(package: &Package, position: CellPosition) {
+fn exercise_wrong_family(package: &Package, position: At) {
     let source_bytes = package_bytes(package);
     let read = package.table_cell_text_format(0usize, 0usize, position);
     assert!(

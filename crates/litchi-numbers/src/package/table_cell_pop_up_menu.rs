@@ -42,7 +42,7 @@ use crate::{
         CellControl, Checkbox, Currency, CurrencyStyle, Fraction, Number, NumeralSystem,
         Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper,
     },
-    table::CellPosition,
+    table::At,
 };
 
 const LIST_FORMAT: i32 = 2;
@@ -61,7 +61,7 @@ pub enum Path {
         /// Zero-based table position within the sheet.
         table: usize,
         /// Zero-based semantic cell coordinate.
-        position: CellPosition,
+        position: At,
     },
 }
 
@@ -390,7 +390,7 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
     ) -> Result<Option<PopUpMenu>, Error> {
         let target = resolve_cell(self, sheet, table, position)?;
         read_popup(self, target)
@@ -401,7 +401,7 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
     ) -> Result<Edit<'_>, Error> {
         let target = resolve_cell(self, sheet, table, position)?;
         let before = read_popup(self, target)?;
@@ -496,7 +496,7 @@ impl Package {
 pub(super) struct CellTarget {
     pub(super) sheet_position: usize,
     pub(super) table_position: usize,
-    pub(super) position: CellPosition,
+    pub(super) position: At,
     pub(super) model_identifier: u64,
     pub(super) component_index: usize,
     pub(super) object_index: usize,
@@ -2266,7 +2266,7 @@ pub(super) fn resolve_cell<'sheet, 'table>(
     source: &Package,
     sheet: impl Into<SheetSelector<'sheet>>,
     table: impl Into<TableSelector<'table>>,
-    position: CellPosition,
+    position: At,
 ) -> Result<CellTarget, Error> {
     let sheet_selector = sheet.into();
     let selected_sheet = source

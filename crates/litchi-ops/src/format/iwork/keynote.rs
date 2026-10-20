@@ -1008,9 +1008,7 @@ pub(crate) fn build_table(
             .leaf([slide, DRAWABLE, row as usize, drawable])
             .done();
         for column in 0..columns {
-            let value = table.get(litchi_keynote::slide::table::cells::CellPosition::new(
-                row, column,
-            ));
+            let value = table.get(litchi_keynote::slide::table::cells::At::new(row, column));
             let shown = value.map(ToString::to_string);
             tree.push(row_item, Kind::Cell)
                 .prop("text", text(shown.as_deref()))

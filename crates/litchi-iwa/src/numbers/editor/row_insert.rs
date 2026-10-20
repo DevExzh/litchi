@@ -12,7 +12,7 @@ use table_headers::set_attached_table_header_settings;
 use table_sort::validate_table_sort_order_for_topology;
 use table_topology::{category_grouping_is_enabled, filter_has_row_state};
 
-impl NumbersEditor {
+impl Editor {
     /// Insert one blank row at a section-relative position in a table.
     ///
     /// Stored cells, row metadata, stable row UIDs, header/footer counts, and
@@ -30,7 +30,7 @@ impl NumbersEditor {
         let source_built = !self.package.source_is_exact();
         let mut staged = self.package.clone();
         let new_rows = insert_attached_table_row(&mut staged, table_id, insertion)?;
-        let verified = NumbersEditor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
+        let verified = Editor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         let table = verified
             .tables()?
             .into_iter()

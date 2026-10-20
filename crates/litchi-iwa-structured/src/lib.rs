@@ -1153,7 +1153,7 @@ mod tests {
             .unwrap_or_else(|error| panic!("row header should be valid: {error:?}"));
         builder
             .push(litchi_numbers::Cell::new(
-                litchi_numbers::CellPosition::new(0, 0),
+                litchi_numbers::At::new(0, 0),
                 Value::Text("Cell".to_owned()),
             ))
             .unwrap_or_else(|error| panic!("cell should be valid: {error:?}"));

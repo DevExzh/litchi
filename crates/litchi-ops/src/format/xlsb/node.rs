@@ -1159,7 +1159,7 @@ fn workbook_value(
         WorkbookKey::Title => metadata.title.as_ref().map(|value| text(value)),
         WorkbookKey::Author => metadata.author.as_ref().map(|value| text(value)),
         WorkbookKey::Subject => metadata.subject.as_ref().map(|value| text(value)),
-        WorkbookKey::Keywords => metadata.keywords.as_ref().map(|value| text(value)),
+        WorkbookKey::Keywords => Value::owned_list(&metadata.keywords),
         WorkbookKey::Description => metadata.description.as_ref().map(|value| text(value)),
         WorkbookKey::Category => metadata.category.as_ref().map(|value| text(value)),
         WorkbookKey::LastModifiedBy => metadata.last_modified_by.as_ref().map(|value| text(value)),

@@ -7,7 +7,7 @@ use crate::charts::pie_labels::{
 };
 use crate::charts::{ChartPieWedgeIndex, LabelVisibility};
 
-impl PagesEditor {
+impl Editor {
     /// Read label visibility for every pie or donut wedge in chart-series order.
     pub fn body_chart_pie_label_visibilities(
         &self,
@@ -59,7 +59,7 @@ impl PagesEditor {
 }
 
 fn body_chart_pie_label_visibilities(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
 ) -> Result<Vec<LabelVisibility>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
@@ -80,7 +80,7 @@ fn body_chart_pie_label_visibilities(
 }
 
 fn set_body_chart_pie_label_visibilities(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     visibilities: &[LabelVisibility],
 ) -> Result<()> {
@@ -117,7 +117,7 @@ fn set_body_chart_pie_label_visibilities(
         "Pages",
         &expected,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_pie_label_visibilities(drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Pages chart pie label-visibility update failed validation".to_owned(),

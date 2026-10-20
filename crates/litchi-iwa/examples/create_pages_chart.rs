@@ -19,7 +19,7 @@ use litchi_iwa::charts::{
     ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Kind, LabelAffixes, MajorStepCount,
     MinorStepCount, NegativeStyle, NumberFormat, Scale, Steps, Visibility,
 };
-use litchi_iwa::pages::PagesDocumentBuilder;
+use litchi_iwa::pages;
 use litchi_iwa::shapes::{
     Appearance, BlurRadius, DrawablePoint, DrawableSize, Drop, Offset, Pattern, RgbColorSpace,
     RgbaColor, ShapeFill, Stroke, Width,
@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let body = "Quarterly Results";
-    let mut editor = PagesDocumentBuilder::new().body_text(body).build()?;
+    let mut editor = pages::Builder::new().body_text(body).build()?;
     let data = ChartData::new(
         vec!["North".to_owned(), "South".to_owned()],
         vec!["Q1".to_owned(), "Q2".to_owned(), "Q3".to_owned()],

@@ -1,7 +1,7 @@
 use super::{TextCommentBody, TextCommentReplyBody, TextPosition, TextRange};
-use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use crate::numbers::{NumbersDocumentBuilder, NumbersEditor};
-use crate::pages::PagesEditor;
+use crate::keynote::{self};
+use crate::numbers::{self};
+use crate::pages;
 use crate::shapes::{DrawablePoint, DrawableSize};
 
 const TEXT: &str = "Alpha 😀 Beta Gamma";
@@ -31,7 +31,7 @@ fn reply_body(value: &str) -> TextCommentReplyBody {
 
 #[test]
 fn text_comment_crud_round_trips_and_restores_pages_exactly() {
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, TEXT, POSITION, SIZE).unwrap();
     let baseline = pages.to_bytes().unwrap();
 
@@ -85,7 +85,7 @@ fn text_comment_crud_round_trips_and_restores_pages_exactly() {
     assert_eq!(updated_reply.author(), reply.author());
     assert_eq!(updated_reply.storage_uuid(), reply.storage_uuid());
 
-    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     let updated = pages
         .update_text_box_comment(
             text_box.drawable_object_id,
@@ -149,12 +149,8 @@ fn text_comment_crud_round_trips_and_restores_pages_exactly() {
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn scratch_text_comments_work_in_numbers_and_keynote() {
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(sheet_id, TEXT, POSITION, SIZE)
@@ -176,7 +172,7 @@ fn scratch_text_comments_work_in_numbers_and_keynote() {
             reply_body("Numbers reply"),
         )
         .unwrap();
-    let mut numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     let stored_numbers_comment = numbers
         .sheet_text_box_comments(sheet_id, numbers_box.drawable_object_id)
         .unwrap();
@@ -210,7 +206,7 @@ fn scratch_text_comments_work_in_numbers_and_keynote() {
         .unwrap();
     assert_eq!(numbers.to_bytes().unwrap(), numbers_baseline);
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote.add_slide_text_box(0, TEXT, POSITION, SIZE).unwrap();
     let keynote_baseline = keynote.to_bytes().unwrap();
     let keynote_comment = keynote
@@ -229,7 +225,7 @@ fn scratch_text_comments_work_in_numbers_and_keynote() {
             reply_body("Keynote reply"),
         )
         .unwrap();
-    let mut keynote = KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     let stored_keynote_comment = keynote
         .slide_text_box_comments(0, keynote_box.drawable_object_id)
         .unwrap();
@@ -258,7 +254,7 @@ fn scratch_text_comments_work_in_numbers_and_keynote() {
 
 #[test]
 fn highlights_and_comments_are_classified_independently() {
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, "Alpha Beta", POSITION, SIZE).unwrap();
     let baseline = pages.to_bytes().unwrap();
     let highlight = pages
@@ -299,7 +295,7 @@ fn highlights_and_comments_are_classified_independently() {
 
 #[test]
 fn invalid_comment_ranges_are_rejected_transactionally() {
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, "A😀B", POSITION, SIZE).unwrap();
     let before = pages.to_bytes().unwrap();
     assert!(
@@ -316,7 +312,7 @@ fn invalid_comment_ranges_are_rejected_transactionally() {
 
 #[test]
 fn replacing_commented_text_reclaims_the_annotation_graph() {
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, TEXT, POSITION, SIZE).unwrap();
     let baseline = pages.to_bytes().unwrap();
     pages

@@ -5,10 +5,10 @@ use litchi_pages::table::sort::{Order, RowRange};
 use litchi_pages::{BodyTableSelector, Package as PagesPackage};
 
 /// Rows targeted by a persisted Pages table sort configuration.
-pub type PagesTableSortRowRange = RowRange;
+pub type TableSortRowRange = RowRange;
 
 fn focused_table_sort_source(
-    editor: &PagesEditor,
+    editor: &Editor,
     model_object_id: u64,
 ) -> Result<(PagesPackage, BodyTableSelector<'static>)> {
     let table_index = editor
@@ -25,14 +25,14 @@ fn focused_table_sort_source(
     Ok((package, BodyTableSelector::index(table_index)))
 }
 
-fn focused_table_sort_order(editor: &PagesEditor, model_object_id: u64) -> Result<Option<Order>> {
+fn focused_table_sort_order(editor: &Editor, model_object_id: u64) -> Result<Option<Order>> {
     let (package, selector) = focused_table_sort_source(editor, model_object_id)?;
     package
         .body_table_sort_order(selector)
         .map_err(|error| Error::InvalidFormat(format!("Pages table sort: {error}")))
 }
 
-impl PagesEditor {
+impl Editor {
     /// Execute a body table's configured full-table sort order.
     ///
     /// Persisted sort configuration is read through the selector-first
@@ -72,7 +72,7 @@ impl PagesEditor {
     pub fn apply_table_sort_order_to_rows(
         &mut self,
         model_object_id: u64,
-        rows: PagesTableSortRowRange,
+        rows: TableSortRowRange,
     ) -> Result<bool> {
         self.require_body_table(model_object_id)?;
         let order = focused_table_sort_order(self, model_object_id)?.ok_or_else(|| {

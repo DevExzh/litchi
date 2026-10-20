@@ -567,8 +567,8 @@ class Workbook:
 
 #: A value of a node view's ``format`` dict: the JSON types the node view
 #: writes. Lengths and colours are text, as OfficeCLI writes them ("2.54cm",
-#: "11pt", "#1F4E79").
-_FormatValue = Union[bool, int, float, str, None]
+#: "11pt", "#1F4E79"). The metadata ``keywords`` are a list of str.
+_FormatValue = Union[bool, int, float, str, List[str], None]
 
 class _NodeView(TypedDict):
     """A node view: OfficeCLI's ``DocumentNode`` shape (stub-only type).
@@ -663,7 +663,8 @@ class _Metadata(TypedDict, total=False):
     title: str
     subject: str
     author: str
-    keywords: str
+    keywords: List[str]
+    """One entry per keyword; absent when there are none."""
     description: str
     identifier: str
     language: str
@@ -695,8 +696,9 @@ class _Metadata(TypedDict, total=False):
 
 #: A property value a write verb takes: None clears the property; bool,
 #: int and float stay typed; text is coerced through the key's value type
-#: ("12pt", "#1F4E79", "accent1+lumMod75").
-_PropValue = Union[bool, int, float, str, None]
+#: ("12pt", "#1F4E79", "accent1+lumMod75"). The metadata ``keywords`` take
+#: a list of str, or text separated by ";" or ",".
+_PropValue = Union[bool, int, float, str, List[str], None]
 
 #: Properties a write verb takes: a dict (dotted keys are fine) or
 #: OfficeCLI's list of "key=value" strings.

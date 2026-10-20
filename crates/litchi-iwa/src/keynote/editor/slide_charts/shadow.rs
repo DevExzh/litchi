@@ -6,7 +6,7 @@ use crate::charts::shadow::{
     chart_shadow as read_native_chart_shadow, set_chart_shadow as set_native_chart_shadow,
 };
 
-impl KeynoteEditor {
+impl Editor {
     /// Read the native shadow scope and drop-shadow appearance of one chart.
     pub fn slide_chart_shadow(
         &self,
@@ -28,7 +28,7 @@ impl KeynoteEditor {
 }
 
 fn slide_chart_shadow(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<ChartShadow> {
@@ -42,7 +42,7 @@ fn slide_chart_shadow(
 }
 
 fn set_slide_chart_shadow(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     shadow: ChartShadow,
@@ -59,7 +59,7 @@ fn set_slide_chart_shadow(
         "Keynote",
         shadow,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_shadow(slide_index, drawable_object_id)? != shadow {
         return Err(Error::InvalidFormat(
             "Keynote chart shadow update failed validation".to_owned(),

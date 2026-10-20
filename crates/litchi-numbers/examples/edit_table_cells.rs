@@ -19,7 +19,7 @@ use litchi_numbers::{
     Package, SheetSelector, TableSelector,
     cell::Value,
     table::{
-        CellPosition,
+        At,
         cells::{Change, Input, Storage},
     },
 };
@@ -59,7 +59,7 @@ enum Expected {
 
 struct RequestedChange {
     change: Change,
-    position: CellPosition,
+    position: At,
     expected: Expected,
 }
 
@@ -158,7 +158,7 @@ fn parse_changes(
         match operation.as_str() {
             "set" => {
                 let address = required_text(arguments, "missing A1 address after set")?;
-                let position = CellPosition::from_a1(&address)
+                let position = At::from_a1(&address)
                     .map_err(|error| invalid_input(format!("invalid A1 address: {error}")))?;
                 let input = parse_input(arguments)?;
                 requested.push(RequestedChange {
@@ -169,7 +169,7 @@ fn parse_changes(
             },
             "clear" => {
                 let address = required_text(arguments, "missing A1 address after clear")?;
-                let position = CellPosition::from_a1(&address)
+                let position = At::from_a1(&address)
                     .map_err(|error| invalid_input(format!("invalid A1 address: {error}")))?;
                 requested.push(RequestedChange {
                     change: Change::clear(position),

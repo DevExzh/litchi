@@ -7,7 +7,7 @@ use crate::charts::axis_bounds::{
     set_chart_value_axis_bounds as set_native_chart_value_axis_bounds,
 };
 
-impl PagesEditor {
+impl Editor {
     /// Read the manual minimum and maximum of a native body chart's value axis.
     ///
     /// Missing endpoints use Pages' automatic scale calculation.
@@ -28,7 +28,7 @@ impl PagesEditor {
     }
 }
 
-fn body_chart_value_axis_bounds(editor: &PagesEditor, drawable_object_id: u64) -> Result<Bounds> {
+fn body_chart_value_axis_bounds(editor: &Editor, drawable_object_id: u64) -> Result<Bounds> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_value_axis_bounds(
         editor.package(),
@@ -39,7 +39,7 @@ fn body_chart_value_axis_bounds(editor: &PagesEditor, drawable_object_id: u64) -
 }
 
 fn set_body_chart_value_axis_bounds(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     bounds: Bounds,
 ) -> Result<()> {
@@ -52,7 +52,7 @@ fn set_body_chart_value_axis_bounds(
         "Pages",
         bounds,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_value_axis_bounds(drawable_object_id)? != bounds {
         return Err(Error::InvalidFormat(
             "Pages chart value-axis bounds update failed validation".to_owned(),

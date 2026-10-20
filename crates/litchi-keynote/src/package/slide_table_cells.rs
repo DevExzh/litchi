@@ -14,7 +14,7 @@ use std::fmt::Write as _;
 
 use litchi_core::Position;
 use litchi_iwa_common::formula::render::FormulaRenderBudget;
-use litchi_iwa_common::table::coordinate::CellPosition;
+use litchi_iwa_common::table::coordinate::At;
 use litchi_iwa_common::table::model::{Cell, Dimensions};
 use litchi_iwa_common::table::read::{
     CellComment, Comment, CommentAuthor, CommentReply, TableRead,
@@ -1295,10 +1295,7 @@ impl CellValueSink<ReadBudget<'_>> for KeynoteCellSink<'_, '_> {
             &mut resolver,
         )?;
         self.table
-            .push(Cell::new(
-                CellPosition::new(cell.row(), cell.column()),
-                value,
-            ))
+            .push(Cell::new(At::new(cell.row(), cell.column()), value))
             .map_err(|error| map_common_table_error(error.into_parts().0))?;
         if let Some(comment) = comment {
             budget.budget.allocations(1).map_err(map_core_error)?;
@@ -1312,7 +1309,7 @@ impl CellValueSink<ReadBudget<'_>> for KeynoteCellSink<'_, '_> {
                     amount: self.comments.len().saturating_add(1),
                 })?;
             self.comments.push(CellComment::new(
-                CellPosition::new(cell.row(), cell.column()),
+                At::new(cell.row(), cell.column()),
                 comment,
             ));
         }

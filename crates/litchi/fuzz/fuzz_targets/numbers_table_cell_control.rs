@@ -12,7 +12,7 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    CellPosition, Package, SheetSelector,
+    At, Package, SheetSelector,
     TableSelector,
     cell::data_format::control::transaction::Patch,
     cell::data_format::control::{CellControl, DisplayFormat, Range, Slider, Stepper},
@@ -109,7 +109,7 @@ fn split_component_package() -> Option<&'static Package> {
 fn exercise_package(package: &Package, data: &[u8]) {
     let sheet = SheetSelector::index(0);
     let table = TableSelector::index(0);
-    let position = CellPosition::new(read_u16(data, 0) as u32 % 8, read_u16(data, 2) as u32 % 8);
+    let position = At::new(read_u16(data, 0) as u32 % 8, read_u16(data, 2) as u32 % 8);
     let source_bytes = package_bytes(package);
     let before = match package.table_cell_control_format(sheet, table, position) {
         Ok(value) => value,
@@ -130,7 +130,7 @@ fn exercise_package(package: &Package, data: &[u8]) {
 fn exercise_set(
     package: &Package,
     data: &[u8],
-    position: CellPosition,
+    position: At,
     before: Option<CellControl>,
     source_bytes: Vec<u8>,
     desired: CellControl,
@@ -289,7 +289,7 @@ fn exercise_reopened_replay(
     source_bytes: &[u8],
     target_bytes: &[u8],
     patch: &Patch,
-    position: CellPosition,
+    position: At,
     touched_components: usize,
 ) {
     let source = Package::from_bytes_with_options(source_bytes, options())
@@ -334,11 +334,11 @@ fn exercise_split_component_source(data: &[u8]) {
         return;
     };
     let positions = [
-        CellPosition::new(0, 0),
-        CellPosition::new(1, 0),
-        CellPosition::new(2, 0),
-        CellPosition::new(3, 0),
-        CellPosition::new(4, 0),
+        At::new(0, 0),
+        At::new(1, 0),
+        At::new(2, 0),
+        At::new(3, 0),
+        At::new(4, 0),
     ];
     let mut observed = Vec::new();
     for (index, position) in positions.into_iter().enumerate() {
@@ -369,14 +369,14 @@ fn exercise_split_component_source(data: &[u8]) {
 fn exercise_split_popup_lifecycle(package: &Package, data: &[u8]) {
     let sheet = SheetSelector::index(0);
     let table = TableSelector::index(0);
-    let popup_position = CellPosition::new(4, 0);
+    let popup_position = At::new(4, 0);
     let desired = control(4, data);
     if let Ok(Some(before)) = package.table_cell_control_format(sheet, table, popup_position) {
         exercise_split_write(package, popup_position, before, desired.clone(), data);
     }
 
-    let create_position = CellPosition::new(0, 1);
-    let sibling_position = CellPosition::new(1, 1);
+    let create_position = At::new(0, 1);
+    let sibling_position = At::new(1, 1);
     let source_bytes = package_bytes(package);
     let created = package
         .edit_table_cell_control_format(sheet, table, create_position)
@@ -498,7 +498,7 @@ fn exercise_split_popup_lifecycle(package: &Package, data: &[u8]) {
 /// into this fuzz boundary.
 fn exercise_split_write(
     package: &Package,
-    position: CellPosition,
+    position: At,
     before: CellControl,
     desired: CellControl,
     data: &[u8],
@@ -628,7 +628,7 @@ fn exercise_split_write(
 /// if this particular source has no equal pair, the scan is still bounded.
 fn exercise_split_shared_refcount(
     package: &Package,
-    observed: &[(CellPosition, CellControl)],
+    observed: &[(At, CellControl)],
     data: &[u8],
 ) {
     let Some((first, value)) = observed.iter().find_map(|(position, value)| {
@@ -770,7 +770,7 @@ fn exercise_split_component_limits() {
 fn exercise_split_component_window(package: &Package, data: &[u8]) {
     for row in 0..8 {
         for column in 0..8 {
-            let position = CellPosition::new(row, column);
+            let position = At::new(row, column);
             let Ok(before) = package.table_cell_control_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
@@ -854,7 +854,7 @@ fn exercise_constructors(data: &[u8]) {
 }
 
 fn exercise_selector_errors(package: &Package, data: &[u8]) {
-    let position = CellPosition::new(read_u16(data, 0) as u32, read_u16(data, 2) as u32);
+    let position = At::new(read_u16(data, 0) as u32, read_u16(data, 2) as u32);
     observe_redacted(
         package.table_cell_control_format(
             SheetSelector::name(PRIVATE_SHEET),

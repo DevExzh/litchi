@@ -3,7 +3,7 @@
 use super::*;
 use litchi_iwa_common::table::axis::HiddenAxes;
 
-impl KeynoteEditor {
+impl Editor {
     /// Read the canonical user-hidden rows and columns of a slide table.
     pub fn slide_table_hidden_axes(
         &self,
@@ -42,13 +42,13 @@ impl KeynoteEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{DrawablePoint, DrawableSize};
     use litchi_iwa_common::table::axis::AxisIndex;
 
     #[test]
     fn scratch_slide_table_roundtrips_hidden_axes_transactionally() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let table = editor
             .add_slide_table(
                 0,
@@ -73,7 +73,7 @@ mod tests {
                 .unwrap(),
             hidden
         );
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_table_hidden_axes(0, table.model_object_id)

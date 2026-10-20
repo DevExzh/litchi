@@ -591,7 +591,7 @@ fn document<'a>(metadata: &Metadata, index: usize) -> Option<NodeValue<'a>> {
         D_TITLE => text(&metadata.title),
         D_AUTHOR => text(&metadata.author),
         D_SUBJECT => text(&metadata.subject),
-        D_KEYWORDS => text(&metadata.keywords),
+        D_KEYWORDS => NodeValue::owned_list(&metadata.keywords),
         D_DESCRIPTION => text(&metadata.description),
         D_CATEGORY => text(&metadata.category),
         D_LAST_MODIFIED_BY => text(&metadata.last_modified_by),

@@ -7,7 +7,7 @@ use crate::charts::axis_number_format::{
 };
 use crate::charts::{Axis, NumberFormat};
 
-impl NumbersEditor {
+impl Editor {
     /// Read the decimal-number format of one native sheet-chart axis.
     pub fn sheet_chart_axis_number_format(
         &self,
@@ -31,7 +31,7 @@ impl NumbersEditor {
 }
 
 fn sheet_chart_axis_number_format(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -47,7 +47,7 @@ fn sheet_chart_axis_number_format(
 }
 
 fn set_sheet_chart_axis_number_format(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -63,7 +63,7 @@ fn set_sheet_chart_axis_number_format(
         axis,
         format,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_axis_number_format(sheet_id, drawable_object_id, axis)? != format {
         return Err(Error::InvalidFormat(
             "Numbers chart axis number-format update failed validation".to_owned(),
@@ -77,12 +77,12 @@ fn set_sheet_chart_axis_number_format(
 mod tests {
     use super::*;
     use crate::charts::{ChartData, DecimalPlaces, Kind, NegativeStyle};
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_spreadsheet_supports_axis_number_format_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
             .add_sheet_chart(
@@ -116,7 +116,7 @@ mod tests {
                 expected,
             )
             .unwrap();
-        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_axis_number_format(sheet_id, chart.drawable_object_id, Axis::Value,)

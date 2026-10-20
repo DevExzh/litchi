@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::keynote::KeynoteEditor;
+use litchi_iwa::keynote;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = KeynoteEditor::open(input)?;
+    let mut editor = keynote::Editor::open(input)?;
     let mut geometry = editor.slide_text_box_geometry(slide_index, drawable_id)?;
     geometry.position = Some(DrawablePoint { x, y });
     geometry.size = Some(DrawableSize { width, height });

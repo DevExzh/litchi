@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersSheetMovieOptions};
+use litchi_iwa::numbers::{self};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
 const MOVIE_DURATION: Duration = Duration::from_secs(8);
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let movie = fs::read(&movie_path)?;
     let poster = fs::read(&poster_path)?;
 
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .sheet_name("Original Size Movie")
         .build()?;
     let sheet_id = editor.sheets()?[0].id();
@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &movie,
         poster_filename,
         &poster,
-        NumbersSheetMovieOptions::new(MOVIE_POSITION, DISPLAYED_MOVIE_SIZE, MOVIE_DURATION)
+        numbers::SheetMovieOptions::new(MOVIE_POSITION, DISPLAYED_MOVIE_SIZE, MOVIE_DURATION)
             .with_natural_size(ORIGINAL_MOVIE_SIZE),
     )?;
     editor.restore_sheet_movie_original_size(sheet_id, created.drawable_object_id)?;

@@ -7,7 +7,7 @@ use crate::charts::axis_label_affixes::{
 };
 use crate::charts::{Axis, LabelAffixes};
 
-impl PagesEditor {
+impl Editor {
     /// Read the prefix and suffix applied to one body-chart axis' labels.
     pub fn body_chart_axis_label_affixes(
         &self,
@@ -29,7 +29,7 @@ impl PagesEditor {
 }
 
 fn body_chart_axis_label_affixes(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
     axis: Axis,
 ) -> Result<LabelAffixes> {
@@ -44,7 +44,7 @@ fn body_chart_axis_label_affixes(
 }
 
 fn set_body_chart_axis_label_affixes(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     axis: Axis,
     affixes: LabelAffixes,
@@ -59,7 +59,7 @@ fn set_body_chart_axis_label_affixes(
         axis,
         &affixes,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_axis_label_affixes(drawable_object_id, axis)? != affixes {
         return Err(Error::InvalidFormat(
             "Pages chart axis label-affix update failed validation".to_owned(),
@@ -73,13 +73,13 @@ fn set_body_chart_axis_label_affixes(
 mod tests {
     use super::*;
     use crate::charts::{ChartData, Kind};
-    use crate::pages::PagesDocumentBuilder;
+    use crate::pages;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_document_supports_axis_label_affix_crud() {
         let body = "Axis affixes";
-        let mut editor = PagesDocumentBuilder::new().body_text(body).build().unwrap();
+        let mut editor = pages::Builder::new().body_text(body).build().unwrap();
         let chart = editor
             .add_body_chart(
                 body.encode_utf16().count(),
@@ -107,7 +107,7 @@ mod tests {
                 expected.clone(),
             )
             .unwrap();
-        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_chart_axis_label_affixes(chart.drawable_object_id, Axis::Value)

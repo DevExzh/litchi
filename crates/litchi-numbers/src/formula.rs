@@ -853,7 +853,7 @@ fn validate_cell(reference: CellReference, dimensions: Dimensions) -> Result<(),
             });
         };
         Err(CellError::OutOfBounds {
-            position: crate::table::CellPosition::new(row, column),
+            position: crate::table::At::new(row, column),
             dimensions,
         })
     } else {

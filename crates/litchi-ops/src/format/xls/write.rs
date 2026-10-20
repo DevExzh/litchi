@@ -620,7 +620,9 @@ fn native_scalar(value: Scalar<'_>) -> Result<NativeValue> {
         },
         Scalar::Number(value) if valid_number(value) => Ok(NativeValue::Number(value)),
         Scalar::Number(_) => Err(invalid_scalar()),
-        Scalar::Token(_) | Scalar::Length(_) | Scalar::Color(_) => Err(invalid_scalar()),
+        Scalar::Token(_) | Scalar::Length(_) | Scalar::Color(_) | Scalar::List(_) => {
+            Err(invalid_scalar())
+        },
     }
 }
 

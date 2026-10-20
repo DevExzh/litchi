@@ -1,7 +1,7 @@
 use super::{
     TextNumberAttachmentKind, TextNumberAttachmentSettings, TextNumberAttachmentText, TextPosition,
 };
-use crate::pages::PagesEditor;
+use crate::pages;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::comment::DrawableId;
 use litchi_iwa_text::number_attachment::raw::object_id as native_object_id;
@@ -21,7 +21,7 @@ fn settings(kind: TextNumberAttachmentKind) -> TextNumberAttachmentSettings {
 
 #[test]
 fn scratch_pages_insert_update_remove_is_byte_exact() {
-    let mut pages = PagesEditor::create_with_text(PREFIX).unwrap();
+    let mut pages = pages::Editor::create_with_text(PREFIX).unwrap();
     let baseline = pages.to_bytes().unwrap();
     let position = TextPosition::from_utf16_index(PREFIX.encode_utf16().count()).unwrap();
     let created = pages
@@ -33,7 +33,7 @@ fn scratch_pages_insert_update_remove_is_byte_exact() {
         std::slice::from_ref(&created)
     );
 
-    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     let updated_settings = settings(TextNumberAttachmentKind::PageCount)
         .with_string_equivalent(TextNumberAttachmentText::new("").unwrap());
     let updated = pages
@@ -53,7 +53,7 @@ fn scratch_pages_insert_update_remove_is_byte_exact() {
 
 #[test]
 fn invalid_positions_and_text_replacement_are_transactional() {
-    let mut pages = PagesEditor::create_with_text("A😀B").unwrap();
+    let mut pages = pages::Editor::create_with_text("A😀B").unwrap();
     let baseline = pages.to_bytes().unwrap();
     assert!(
         pages
@@ -86,7 +86,7 @@ fn invalid_positions_and_text_replacement_are_transactional() {
 
 #[test]
 fn pages_header_footer_ownership_is_enforced() {
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let package = PagesPackage::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     let header = (PagesPackage::header_footers)(&package).unwrap()[0].selector();
     let mut edit = package.edit_header_footer_text(header).unwrap();
@@ -94,7 +94,7 @@ fn pages_header_footer_ownership_is_enforced() {
     let commit = edit.commit().unwrap();
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes).unwrap();
-    pages = PagesEditor::from_bytes(&bytes).unwrap();
+    pages = pages::Editor::from_bytes(&bytes).unwrap();
     let attachment = pages
         .insert_header_footer_number_attachment(
             header,
@@ -130,7 +130,7 @@ fn pages_header_footer_ownership_is_enforced() {
 fn scratch_pages_text_box_number_attachments_round_trip() {
     let position = TextPosition::from_utf16_index(PREFIX.encode_utf16().count()).unwrap();
 
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let body_attachment = pages
         .insert_body_number_attachment(
             TextPosition::from_utf16_index(4).unwrap(),
@@ -146,7 +146,7 @@ fn scratch_pages_text_box_number_attachments_round_trip() {
             settings(TextNumberAttachmentKind::PageNumber),
         )
         .unwrap();
-    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages.body_number_attachments().unwrap().as_slice(),
         std::slice::from_ref(&body_attachment)

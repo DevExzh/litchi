@@ -1892,9 +1892,21 @@ fn metadata_value(fields: &MetadataFields, property: MetadataProperty) -> Semant
         MetadataProperty::Author => fields.author(),
         MetadataProperty::Subject => fields.subject(),
         MetadataProperty::Description => fields.description(),
-        MetadataProperty::Keywords => fields.keywords(),
+        // The semantic plan carries text; keywords travel as their joined
+        // `, ` form and are split back at `;` and `,` when applied.
+        MetadataProperty::Keywords => {
+            let keywords = fields.keywords();
+            return SemanticValue::Text((!keywords.is_empty()).then(|| keywords.join(", ")));
+        },
     };
     text(value)
+}
+
+/// The keyword list a semantic text value names.
+fn keyword_list(value: Option<&String>) -> Vec<String> {
+    value
+        .map(|value| litchi_core::metadata::keywords::split(value))
+        .unwrap_or_default()
 }
 
 fn text(value: Option<&str>) -> SemanticValue {
@@ -1918,7 +1930,7 @@ fn apply_flat_operation(
                 MetadataProperty::Author => edit.set_author(value.clone()),
                 MetadataProperty::Subject => edit.set_subject(value.clone()),
                 MetadataProperty::Description => edit.set_description(value.clone()),
-                MetadataProperty::Keywords => edit.set_keywords(value.clone()),
+                MetadataProperty::Keywords => edit.set_keywords(keyword_list(value.as_ref())),
             }
         },
         OperationKey::Styles => Err(invalid("ODI flat plan contains a package style operation")),
@@ -1942,7 +1954,7 @@ fn apply_package_operation(edit: &mut Edit<'_>, operation: &SemanticOperation) -
                 MetadataProperty::Author => edit.set_author(value.clone()),
                 MetadataProperty::Subject => edit.set_subject(value.clone()),
                 MetadataProperty::Description => edit.set_description(value.clone()),
-                MetadataProperty::Keywords => edit.set_keywords(value.clone()),
+                MetadataProperty::Keywords => edit.set_keywords(keyword_list(value.as_ref())),
             }
         },
         OperationKey::Styles => {

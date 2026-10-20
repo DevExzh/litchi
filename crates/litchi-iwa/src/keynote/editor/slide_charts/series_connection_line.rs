@@ -7,7 +7,7 @@ use crate::charts::series_connection_line::{
 };
 use crate::charts::{ChartSeriesConnectionLine, Index};
 
-impl KeynoteEditor {
+impl Editor {
     /// Read connection geometry in native series order.
     pub fn slide_chart_series_connection_lines(
         &self,
@@ -63,7 +63,7 @@ impl KeynoteEditor {
 }
 
 fn read(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Vec<ChartSeriesConnectionLine>> {
@@ -86,7 +86,7 @@ fn read(
 }
 
 fn set(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     values: &[ChartSeriesConnectionLine],
@@ -112,7 +112,7 @@ fn set(
         count,
         values,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_series_connection_lines(slide_index, drawable_object_id)? != values {
         return Err(Error::InvalidFormat(
             "Keynote chart series connection-line update failed validation".to_owned(),

@@ -182,7 +182,10 @@ fn malformed_fields_and_nested_properties_are_refused() {
         ("xml", "[]"),
         ("props", "true"),
         ("props", r#"{"text":{}}"#),
-        ("props", r#"{"text":[]}"#),
+        // An array value is a list of strings (record 0354); anything else
+        // inside it is refused.
+        ("props", r#"{"text":[1]}"#),
+        ("props", r#"{"text":["a",[]]}"#),
         ("props", r#"["missing-equals"]"#),
         ("props", r#"["=missing-key"]"#),
         ("props", "[42]"),
@@ -193,6 +196,23 @@ fn malformed_fields_and_nested_properties_are_refused() {
             "{input}"
         );
     }
+}
+
+#[test]
+fn an_array_of_strings_is_a_list_value() {
+    let item: BatchItem<'_> = serde_json::from_str(
+        r#"{"command":"set","path":"/","props":{"keywords":["a","b"],"none":[]}}"#,
+    )
+    .expect("decode");
+    let props = item.props.expect("props");
+    assert_eq!(
+        props.get("keywords"),
+        Some(&PropValue::from(vec!["a", "b"]))
+    );
+    assert_eq!(
+        props.get("none"),
+        Some(&PropValue::from(Vec::<String>::new()))
+    );
 }
 
 #[test]

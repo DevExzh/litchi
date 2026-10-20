@@ -14,7 +14,7 @@ use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsce, tsd, tsk, tsp, tst};
-use litchi_numbers::CellPosition;
+use litchi_numbers::At;
 use litchi_numbers::cell::data_format::pop_up_menu::{InitialSelection, PopUpMenu};
 use litchi_numbers::{Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::{BncCell, CellDataFormatKind};
@@ -797,7 +797,7 @@ fn assert_popup_read_rejects(source: &[u8], label: &str) -> TestResult {
         Ok(package) => match package.table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         ) {
             Err(_) => Ok(()),
             Ok(_) => Err(io::Error::other(format!(
@@ -818,7 +818,7 @@ fn assert_changed_edit_rejects_atomically(source: &[u8], label: &str) -> TestRes
     let edit = match package.edit_table_cell_pop_up_menu_format(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     ) {
         Err(_) => {
             assert_eq!(package.exact_bytes(), before);
@@ -843,7 +843,7 @@ fn assert_reset_rejects_atomically(source: &[u8], label: &str) -> TestResult {
     let edit = match package.edit_table_cell_pop_up_menu_format(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     ) {
         Err(_) => {
             assert_eq!(package.exact_bytes(), before);
@@ -1370,7 +1370,7 @@ fn shared_popup_read_noop_replace_inverse_apply_and_locality() -> TestResult {
         package.table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         Some(expected.clone())
     );
@@ -1378,7 +1378,7 @@ fn shared_popup_read_noop_replace_inverse_apply_and_locality() -> TestResult {
         package.table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::name("Pop-Up Menus"),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?,
         Some(expected.clone())
     );
@@ -1387,7 +1387,7 @@ fn shared_popup_read_noop_replace_inverse_apply_and_locality() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(expected.clone())
         .commit()?;
@@ -1401,7 +1401,7 @@ fn shared_popup_read_noop_replace_inverse_apply_and_locality() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(replacement.clone())
         .commit()?;
@@ -1414,7 +1414,7 @@ fn shared_popup_read_noop_replace_inverse_apply_and_locality() -> TestResult {
         commit.package().table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         Some(replacement)
     );
@@ -1425,7 +1425,7 @@ fn shared_popup_read_noop_replace_inverse_apply_and_locality() -> TestResult {
         commit.package().table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?,
         Some(expected)
     );
@@ -1469,7 +1469,7 @@ fn popup_create_reuses_shared_model_and_final_reset_culls() -> TestResult {
         package.table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         None
     );
@@ -1478,7 +1478,7 @@ fn popup_create_reuses_shared_model_and_final_reset_culls() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(menu.clone())
         .commit()?;
@@ -1503,7 +1503,7 @@ fn popup_create_reuses_shared_model_and_final_reset_culls() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?
         .set(menu.clone())
         .commit()?;
@@ -1518,7 +1518,7 @@ fn popup_create_reuses_shared_model_and_final_reset_culls() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(blank)
         .commit()?;
@@ -1532,7 +1532,7 @@ fn popup_create_reuses_shared_model_and_final_reset_culls() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .reset()
         .commit()?;
@@ -1549,7 +1549,7 @@ fn popup_create_reuses_shared_model_and_final_reset_culls() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?
         .reset()
         .commit()?;
@@ -1595,7 +1595,7 @@ fn popup_allocator_respects_metadata_ambiguous_identifiers() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(popup(&["Reserved", "Safe"], InitialSelection::FirstItem)?)
         .commit()?;
@@ -1614,7 +1614,7 @@ fn popup_selector_conflict_and_non_popup_cells_are_typed_and_atomic() -> TestRes
     let edit = package.edit_table_cell_pop_up_menu_format(
         SheetSelector::name("Pop-Up Menu Sheet"),
         TableSelector::name("Pop-Up Menus"),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     )?;
     let commit = edit.set(menu).commit()?;
     assert!(
@@ -1627,7 +1627,7 @@ fn popup_selector_conflict_and_non_popup_cells_are_typed_and_atomic() -> TestRes
             .table_cell_pop_up_menu_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(99, 0),
+                At::new(99, 0),
             )
             .is_err()
     );
@@ -1638,7 +1638,7 @@ fn popup_selector_conflict_and_non_popup_cells_are_typed_and_atomic() -> TestRes
         non_popup.table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(1, 0),
+            At::new(1, 0),
         )?,
         None
     );
@@ -1648,7 +1648,7 @@ fn popup_selector_conflict_and_non_popup_cells_are_typed_and_atomic() -> TestRes
             .edit_table_cell_pop_up_menu_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(1, 0),
+                At::new(1, 0),
             )?
             .set(popup(&["One", "Two"], InitialSelection::FirstItem)?)
             .commit()
@@ -1731,7 +1731,7 @@ fn popup_missing_metadata_and_tight_ingress_fail_before_publication() -> TestRes
             .edit_table_cell_pop_up_menu_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(0, 0),
+                At::new(0, 0),
             )?
             .set(menu)
             .commit()
@@ -1772,7 +1772,7 @@ fn popup_unknown_metadata_and_payload_bytes_survive_rewrite() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(menu)
         .commit()?;
@@ -1812,7 +1812,7 @@ fn popup_unknown_overlong_and_group_bytes_are_preserved_when_ingress_admits_them
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(popup(&["Opaque", "Future"], InitialSelection::Blank)?)
         .commit();
@@ -1881,7 +1881,7 @@ fn popup_public_physical_and_semantic_limits_fail_before_publication() -> TestRe
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(menu.clone())
         .commit()?;
@@ -1906,7 +1906,7 @@ fn popup_public_physical_and_semantic_limits_fail_before_publication() -> TestRe
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(menu.clone())
         .commit()?;
@@ -1931,7 +1931,7 @@ fn popup_public_physical_and_semantic_limits_fail_before_publication() -> TestRe
     let output_edit = output_limited.edit_table_cell_pop_up_menu_format(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     )?;
     assert!(output_edit.set(menu.clone()).commit().is_err());
     assert_eq!(output_limited.exact_bytes(), before);
@@ -1958,7 +1958,7 @@ fn popup_public_physical_and_semantic_limits_fail_before_publication() -> TestRe
         let edit = package.edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         );
         if let Ok(edit) = edit {
             assert!(edit.set(menu).commit().is_err());
@@ -2014,7 +2014,7 @@ fn popup_orphan_matching_model_missing_or_versioned_uuid_is_not_reused() -> Test
             .edit_table_cell_pop_up_menu_format(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(0, 0),
+                At::new(0, 0),
             )?
             .set(menu)
             .commit();
@@ -2102,7 +2102,7 @@ fn popup_effective_locator_uses_explicit_locator_and_inverse() -> TestResult {
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(replacement.clone())
         .commit()?;
@@ -2110,7 +2110,7 @@ fn popup_effective_locator_uses_explicit_locator_and_inverse() -> TestResult {
         commit.package().table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?,
         Some(replacement)
     );
@@ -2141,7 +2141,7 @@ fn popup_replacement_preserves_unselected_document_objects_exactly() -> TestResu
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )?
         .set(replacement)
         .commit()?

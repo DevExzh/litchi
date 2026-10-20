@@ -27,7 +27,7 @@ pub(super) struct BodyChartGraph {
     pub(super) component_id: u64,
     pub(super) chart_count: usize,
     pub(super) chart_position: usize,
-    pub(super) info: PagesBodyChartInfo,
+    pub(super) info: BodyChartInfo,
     pub(super) object_ids: Vec<u64>,
     pub(super) private_preset_id: Option<u64>,
 }
@@ -40,7 +40,7 @@ pub(super) struct BodyChartArchiveGroup {
     pub(super) uuid_object_ids: Vec<u64>,
 }
 
-pub(super) fn body_chart_infos(editor: &PagesEditor) -> Result<Vec<PagesBodyChartInfo>> {
+pub(super) fn body_chart_infos(editor: &Editor) -> Result<Vec<BodyChartInfo>> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
         editor.body_storage_id.get(),
@@ -91,10 +91,7 @@ pub(super) fn body_chart_infos(editor: &PagesEditor) -> Result<Vec<PagesBodyChar
     Ok(charts)
 }
 
-pub(super) fn body_chart_graph(
-    editor: &PagesEditor,
-    drawable_object_id: u64,
-) -> Result<BodyChartGraph> {
+pub(super) fn body_chart_graph(editor: &Editor, drawable_object_id: u64) -> Result<BodyChartGraph> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
         editor.body_storage_id.get(),
@@ -562,7 +559,7 @@ pub(super) fn body_chart_graph(
         component_id,
         chart_count,
         chart_position,
-        info: PagesBodyChartInfo {
+        info: BodyChartInfo {
             anchor_character_index: *anchor_character_index,
             drawable_object_id,
             kind: Kind::from_native(

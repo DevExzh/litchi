@@ -6,8 +6,9 @@
 //! commits once: the leaf splices only the touched `office:meta` children
 //! (or adds a `meta.xml` to a package without one) and never stamps a date.
 //! `title`, `subject`, `description`, `author` (`meta:initial-creator`),
-//! `lastModifiedBy` (`dc:creator`), `language` and `keywords` take text;
-//! `null` removes the element. The other root-metadata keys of the OLE and
+//! `lastModifiedBy` (`dc:creator`) and `language` take text; `keywords`
+//! takes a list (one `meta:keyword` per keyword) or text split at `;` and
+//! `,` (record 0354); `null` removes the element. The other root-metadata keys of the OLE and
 //! OOXML formats are a typed `unsupported_capability`; an unknown key is
 //! `unsupported_property`.
 
@@ -128,6 +129,19 @@ pub(crate) fn stage<P: Owner>(
     for (key, value) in props.iter() {
         let name = key.as_str();
         let field = field(name, format)?;
+        if field == Field::Keywords {
+            let keywords = crate::props::keyword_list(value).ok_or_else(|| {
+                Error::new(
+                    Code::InvalidValue,
+                    "the keywords take a list, or text separated by ';' or ','",
+                )
+                .with_format(format)
+                .with_property(name.to_owned())
+            })?;
+            edit.set_keywords(&keywords)
+                .map_err(|error| staging(error, format).with_property(name.to_owned()))?;
+            continue;
+        }
         let value = match value {
             PropValue::Null => None,
             other => Some(other.as_text().ok_or_else(|| {
@@ -182,12 +196,15 @@ pub(crate) fn stage_created<P: Owner>(
         (Field::Author, &metadata.author),
         (Field::LastModifiedBy, &metadata.last_modified_by),
         (Field::Language, &metadata.language),
-        (Field::Keywords, &metadata.keywords),
     ] {
         if let Some(value) = value {
             edit.set(field, Some(value))
                 .map_err(|error| staging(error, format))?;
         }
+    }
+    if !metadata.keywords.is_empty() {
+        edit.set_keywords(&metadata.keywords)
+            .map_err(|error| staging(error, format))?;
     }
     Ok(())
 }

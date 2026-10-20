@@ -102,8 +102,9 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
     `WorkbookView`;
   - `litchi_xls::Error` for the eager XLS reader;
   - `litchi_xlsb::package::PackageError` for the eager XLSB workbook;
-  - the new `litchi_core::sheet::Error` for the calc grid, the text
-    workbooks and the examples.
+  - `litchi_sheet_text::Error` for the text workbooks (record 0354's leaf
+    crate, merged during this change);
+  - the new `litchi_core::sheet::Error` for the calc grid and the examples.
 
   A caller of the format handles gets the typed `litchi_ops::Error` with
   its code, format and leaf. Nothing is flattened, as goal constraint 4
@@ -118,7 +119,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
   - `litchi_ops::Error` (by `Code`, with the code's own static summary);
   - `litchi_xls::Error`;
   - the XLSB `PackageError` (every variant listed, nothing caught by a
-    wildcard).
+    wildcard);
+  - `litchi_sheet_text::Error` (every variant listed).
 
   The engine's own errors are static refusals:
   - an unindexed sheet;
@@ -148,19 +150,17 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 ### 2.3 Boxed results kept outside the sheet traits
 
-Two modules used `litchi_core::sheet::Result` as a general boxed result,
-not as a trait result:
-
-- `litchi-xlsx`: the connections, pivot, XML-map, threaded-comment,
-  sparkline and volatile-dependency reads (19 files);
-- the facade text readers (`sheet::text::{formats::*, parser,
-  TextWorkbook::{open, from_reader, from_bytes, write_to}}`).
-
-They keep their public signatures through a local alias with the same
+`litchi-xlsx` used `litchi_core::sheet::Result` as a general boxed result,
+not as a trait result: its connections, pivot, XML-map, threaded-comment,
+sparkline and volatile-dependency reads (19 files). They keep their public
+signatures through a local alias with the same
 `Box<dyn Error + Send + Sync>` type. These are format APIs with their own
-waves: W4 for `litchi-xlsx`, and the `sheet::text` move (0354). Neither is
-a sheet-trait or per-cell path. The trait implementations of
-`TextWorkbook`/`TextWorksheet` use `sheet::Error`.
+wave (W4), not a sheet-trait or per-cell path.
+
+The facade text readers had the same problem while this change was in
+progress. Record 0354 then moved them into `litchi-sheet-text` with a
+typed `Error`; the trunk merge resolved them onto that crate, whose trait
+`impl`s now name `Error = litchi_sheet_text::Error`.
 
 ## 3. `Box<dyn …>` inventory after 0353a
 
@@ -171,7 +171,7 @@ a sheet-trait or per-cell path. The trait implementations of
 | `view::sheet::Worksheets` ODS refusal | `Option<litchi_ops::Error>` (was a boxed error) |
 | `litchi_eval::{Fetch, FetchFuture, FetchError}` | kept: the public, caller-owned async transport, one future per distinct URL per evaluator, outside the evaluation core |
 | `&dyn DispatchCtx`, `&dyn Fetch` | borrowed vtable references, no allocation |
-| `litchi-xlsx` and facade text reader results (§2.3) | kept, outside the sheet traits; W4 / 0354 |
+| `litchi-xlsx` module results (§2.3) | kept, outside the sheet traits; W4 |
 
 ## 4. Measurements
 
@@ -274,10 +274,12 @@ and [`results/0353/abba-0353a-vs-trunk.json`](results/0353/abba-0353a-vs-trunk.j
 
 ## 5. Coordination
 
-- **`crates/litchi/src/sheet/text`**, still owned by the move in 0354.
-  The trait `impl`s use `sheet::Error`. The readers keep their boxed public
-  results through a local alias (§2.3). `INVALID_COORDINATE` and
-  `NO_SUCH_SHEET` are new private constants. No item moved.
+- **`litchi-sheet-text`** (record 0354, merged from trunk during this
+  change). Its `Workbook`/`Worksheet` trait `impl`s gain `type Error =
+  Error`; the `.into()` boxing of `MissingWorksheet` and `RowOutOfRange`
+  is dropped; and `error.rs` gains the `From<Error> for
+  litchi_core::sheet::Error` classification. The old
+  `crates/litchi/src/sheet/text` edits are superseded by the move.
 - **`litchi-xlsx`.** One `pub(crate) type BoxedResult<T>` in `lib.rs`
   replaces 19 imports of the old alias. Public signatures are unchanged.
 - **`litchi-xls` and `litchi-xlsb`.** Each gains a `From<Error> for
@@ -287,5 +289,5 @@ and [`results/0353/abba-0353a-vs-trunk.json`](results/0353/abba-0353a-vs-trunk.j
 ## 6. Follow-ups
 
 - **F3**: §4.3.
-- **W4 / 0354**: replace the boxed results kept in `litchi-xlsx` and the
-  text readers (§2.3) with typed module errors.
+- **W4**: replace the boxed results kept in `litchi-xlsx` (§2.3) with
+  typed module errors.

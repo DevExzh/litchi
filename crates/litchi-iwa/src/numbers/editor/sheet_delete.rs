@@ -14,7 +14,7 @@ struct SheetContents {
 }
 
 impl SheetContents {
-    fn direct_object_ids(&self, editor: &NumbersEditor) -> Result<HashSet<u64>> {
+    fn direct_object_ids(&self, editor: &Editor) -> Result<HashSet<u64>> {
         let mut identifiers = HashSet::new();
         for &identifier in self
             .charts
@@ -44,7 +44,7 @@ impl SheetContents {
     }
 }
 
-impl NumbersEditor {
+impl Editor {
     /// Remove a sheet and every supported object graph owned exclusively by it.
     ///
     /// Tables, charts, media, shapes, and text boxes are deleted through their
@@ -55,7 +55,7 @@ impl NumbersEditor {
     pub fn remove_sheet(
         &mut self,
         selector: litchi_numbers::SheetSelector<'_>,
-    ) -> Result<NumbersSheetInfo> {
+    ) -> Result<SheetInfo> {
         let sheet_id = super::selectors::sheet_id(self, selector)?;
         let sheets = self.sheets()?;
         if sheets.len() <= 1 {
@@ -89,7 +89,7 @@ impl NumbersEditor {
     }
 }
 
-fn sheet_contents(editor: &NumbersEditor, sheet_id: u64) -> Result<SheetContents> {
+fn sheet_contents(editor: &Editor, sheet_id: u64) -> Result<SheetContents> {
     let (_, _, sheet) = numbers_sheet(editor.package(), sheet_id)?;
     let contents = SheetContents {
         charts: editor
@@ -160,7 +160,7 @@ fn sheet_contents(editor: &NumbersEditor, sheet_id: u64) -> Result<SheetContents
 }
 
 fn delete_sheet_contents(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     contents: SheetContents,
 ) -> Result<()> {
@@ -195,7 +195,7 @@ fn delete_sheet_contents(
     Ok(())
 }
 
-fn detach_empty_sheet(editor: &mut NumbersEditor, sheet_id: u64) -> Result<()> {
+fn detach_empty_sheet(editor: &mut Editor, sheet_id: u64) -> Result<()> {
     let locations = object_locations(editor.package())?;
     let archive_name = locations
         .get(&sheet_id)
@@ -240,10 +240,7 @@ mod tests {
 
     use super::*;
     use crate::charts::{ChartData, Kind};
-    use crate::numbers::{
-        NumbersDocumentBuilder, NumbersSheetAudioOptions, NumbersSheetImageOptions,
-        NumbersSheetMovieOptions,
-    };
+    use crate::numbers::{self, SheetAudioOptions, SheetImageOptions, SheetMovieOptions};
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 180.0 };
@@ -266,7 +263,7 @@ mod tests {
 
     #[test]
     fn source_built_sheet_deletion_reclaims_every_supported_private_graph() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let baseline_ids = object_ids(editor.package());
         let baseline_entries = editor
             .package()
@@ -288,7 +285,7 @@ mod tests {
                 sheet.object_id,
                 "logo.png",
                 IMAGE,
-                NumbersSheetImageOptions::new(POSITION, SIZE),
+                SheetImageOptions::new(POSITION, SIZE),
             )
             .unwrap();
         editor
@@ -296,7 +293,7 @@ mod tests {
                 sheet.object_id,
                 "audio.aiff",
                 AUDIO,
-                NumbersSheetAudioOptions::new(POSITION, Duration::from_secs(1)),
+                SheetAudioOptions::new(POSITION, Duration::from_secs(1)),
             )
             .unwrap();
         editor
@@ -306,7 +303,7 @@ mod tests {
                 MOVIE,
                 "poster.png",
                 POSTER,
-                NumbersSheetMovieOptions::new(POSITION, SIZE, Duration::from_secs(1)),
+                SheetMovieOptions::new(POSITION, SIZE, Duration::from_secs(1)),
             )
             .unwrap();
         editor
@@ -340,12 +337,12 @@ mod tests {
         assert_eq!(editor.sheets().unwrap().len(), 1);
         assert_eq!(editor.tables().unwrap().len(), 1);
         assert!(editor.media_assets().unwrap().is_empty());
-        NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
     fn sheet_deletion_is_transactional_for_the_final_and_missing_sheet() {
-        let mut editor = NumbersEditor::create().unwrap();
+        let mut editor = Editor::create().unwrap();
         let baseline = editor.to_bytes().unwrap();
         let only_sheet = editor.sheets().unwrap()[0].object_id;
 

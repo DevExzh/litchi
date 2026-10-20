@@ -1351,5 +1351,41 @@ class ErrorClassTests(WriteAssertions):
         self.assertFalse(file.signed or file.locked)
 
 
+class MetadataKeywordsTests(WriteAssertions):
+    """The keywords are a list (record 0354): ``metadata()`` and the root
+    node's ``format`` give a list of str; a set takes a list, or text split
+    at ";" and ","."""
+
+    FORMATS = ("docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "odt", "ods", "odp")
+
+    def test_list_and_text_round_trip_in_every_format(self):
+        for name in self.FORMATS:
+            with self.subTest(format=name):
+                source = L.create(name)
+                listed = source.set("/metadata", {"keywords": ["q4", "review", "a b"]})
+                reopened = self.assertReopens(listed)
+                self.assertEqual(reopened.metadata()["keywords"], ["q4", "review", "a b"])
+                texted = listed.set("/metadata", {"keywords": "x; y,z"})
+                self.assertEqual(
+                    L.open_bytes(texted.to_bytes()).metadata()["keywords"], ["x", "y", "z"]
+                )
+                cleared = texted.set("/metadata", {"keywords": None})
+                self.assertNotIn("keywords", L.open_bytes(cleared.to_bytes()).metadata() or {})
+
+    def test_root_node_format_is_a_list(self):
+        for name in ("docx", "xlsx", "pptx"):
+            with self.subTest(format=name):
+                file = L.create(name).set("/metadata", {"keywords": ("plan", "review")})
+                self.assertEqual(file.get("/", 0)["format"]["keywords"], ["plan", "review"])
+
+    def test_a_list_holds_only_str(self):
+        file = L.create("docx")
+        self.assertError(
+            raised(lambda: file.set("/metadata", {"keywords": ["a", 1]})),
+            L.PropertyError,
+            "invalid_value",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

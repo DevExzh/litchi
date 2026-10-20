@@ -872,17 +872,24 @@ pub(crate) fn render_metadata(metadata: &litchi_core::Metadata) -> Result<String
     let mut output = String::from(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?><office:document-meta xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:meta=\"urn:oasis:names:tc:opendocument:xmlns:meta:1.0\"><office:meta>",
     );
-    for (tag, optional_text) in [
+    let leading = [
         ("dc:title", metadata.title.as_deref()),
         ("dc:subject", metadata.subject.as_deref()),
         ("dc:creator", metadata.author.as_deref()),
         ("dc:description", metadata.description.as_deref()),
         ("dc:identifier", metadata.identifier.as_deref()),
         ("dc:language", metadata.language.as_deref()),
-        ("meta:keyword", metadata.keywords.as_deref()),
+    ];
+    // One `meta:keyword` per keyword.
+    let keywords = metadata
+        .keywords
+        .iter()
+        .map(|keyword| ("meta:keyword", Some(keyword.as_str())));
+    let trailing = [
         ("meta:generator", metadata.application.as_deref()),
         ("meta:category", metadata.category.as_deref()),
-    ] {
+    ];
+    for (tag, optional_text) in leading.into_iter().chain(keywords).chain(trailing) {
         if let Some(text) = optional_text {
             output.push('<');
             output.push_str(tag);

@@ -55,19 +55,25 @@ fn metadata_edits_round_trip_and_invert() -> TestResult {
     let mut edit = package.edit_metadata();
     edit.set_title(Some("Quarterly report"))?
         .set_author(Some("Ryker"))?
-        .set_keywords(Some("finance, q3"))?
+        .set_keywords(&["finance".to_owned(), "q3".to_owned()])?
         .set_description(Some("Draft"))?;
     let commit = edit.commit()?;
     assert!(commit.diagnostics().changed());
     let metadata = commit.package().metadata();
     assert_eq!(metadata.title.as_deref(), Some("Quarterly report"));
     assert_eq!(metadata.author.as_deref(), Some("Ryker"));
-    assert_eq!(metadata.keywords.as_deref(), Some("finance, q3"));
+    assert_eq!(metadata.keywords, ["finance", "q3"]);
     assert_eq!(metadata.description.as_deref(), Some("Draft"));
     // Only the properties member changed: the text still reads back.
     assert_eq!(commit.package().text()?, package.text()?);
     let reopened = Package::from_bytes(&commit.package().to_bytes()?)?;
     assert_eq!(reopened.metadata(), metadata);
+    // A keyword the one `Keywords` string cannot keep is refused.
+    let mut refused = package.edit_metadata();
+    assert!(matches!(
+        refused.set_keywords(&["a, b".to_owned()]),
+        Err(MetadataError::InvalidKeyword)
+    ));
 
     let restored = commit.package().apply_metadata(&commit.patch().inverse())?;
     assert_eq!(restored.to_bytes()?, original);

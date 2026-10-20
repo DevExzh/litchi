@@ -1,6 +1,6 @@
 //! Create a Keynote presentation without an input document or template.
 
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(3)
         .unwrap_or_else(|| "Built with litchi-iwa".to_owned());
 
-    KeynoteDocumentBuilder::new()
+    keynote::Builder::new()
         .title(title)
         .subtitle(subtitle)
         .build()?

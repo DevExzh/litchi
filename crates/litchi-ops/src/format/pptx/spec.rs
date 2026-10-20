@@ -529,7 +529,7 @@ props! {
         Title = "title": ValueType::Text,
         Author = "author": ValueType::Text,
         Subject = "subject": ValueType::Text,
-        Keywords = "keywords": ValueType::Text,
+        Keywords = "keywords": ValueType::List,
         Description = "description": ValueType::Text,
         LastModifiedBy = "lastModifiedBy": ValueType::Text,
         RevisionNumber = "revisionNumber": ValueType::Text,

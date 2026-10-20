@@ -1,11 +1,11 @@
 //! Date & Time smart-field CRUD for Numbers text boxes.
 
-use super::{IWorkTextEditor, NumbersEditor, numbers_text_box_graph};
+use super::{Editor, IWorkTextEditor, numbers_text_box_graph};
 use crate::Result;
 use crate::text::{TextDateTimeField, TextDateTimeFieldId, TextPosition, TextRange};
 use litchi_iwa_text::date_time::{DisplayText, Settings};
 
-impl NumbersEditor {
+impl Editor {
     /// Read every native Date & Time field in one Numbers text box.
     pub fn sheet_text_box_date_time_fields(
         &self,

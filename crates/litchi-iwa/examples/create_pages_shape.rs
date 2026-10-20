@@ -2,7 +2,7 @@
 
 use std::{env, fs, path::Path};
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages;
 use litchi_iwa::shapes::{
     Appearance, BlurRadius, DrawablePoint, DrawableSize, Drop, Offset, RgbColorSpace, RgbaColor,
     Shadow, ShapeFill, ShapeImageFillTechnique,
@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let body = "Pages shape created entirely by litchi-iwa";
-    let mut editor = PagesEditor::create_with_text(body)?;
+    let mut editor = pages::Editor::create_with_text(body)?;
     let created = editor.add_body_shape_with_fill(
         body.encode_utf16().count(),
         &text,

@@ -1,7 +1,7 @@
 //! Create and physically sort a plain-text Pages table without an input document.
 use std::env;
 
-use litchi_iwa::pages::{PagesCellValue, PagesDocumentBuilder, PagesTableCellUpdate};
+use litchi_iwa::pages::{self};
 use litchi_pages::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 use litchi_pages::table::sort::{ColumnIndex, Direction, Order, Rule};
 use litchi_pages::{BodyTableSelector, Package};
@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
         .nth(1)
         .ok_or("usage: create_pages_sorted_table <output.pages>")?;
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Cities sorted by name\n")
         .body_table("Cities", 5, 2)
         .build()?;
@@ -25,20 +25,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .commit()?;
     let mut header_bytes = Vec::new();
     header_commit.package().write_to(&mut header_bytes)?;
-    editor = litchi_iwa::pages::PagesEditor::from_bytes(&header_bytes)?;
+    editor = litchi_iwa::pages::Editor::from_bytes(&header_bytes)?;
     editor.set_table_cells(
         table_id,
         [
-            PagesTableCellUpdate::new(0, 0, PagesCellValue::Text("Name".to_owned())),
-            PagesTableCellUpdate::new(0, 1, PagesCellValue::Text("Marker".to_owned())),
-            PagesTableCellUpdate::new(1, 0, PagesCellValue::Text("zebra".to_owned())),
-            PagesTableCellUpdate::new(1, 1, PagesCellValue::Text("last".to_owned())),
-            PagesTableCellUpdate::new(2, 0, PagesCellValue::Text("apple".to_owned())),
-            PagesTableCellUpdate::new(2, 1, PagesCellValue::Text("first apple".to_owned())),
-            PagesTableCellUpdate::new(3, 0, PagesCellValue::Text("banana".to_owned())),
-            PagesTableCellUpdate::new(3, 1, PagesCellValue::Text("middle".to_owned())),
-            PagesTableCellUpdate::new(4, 0, PagesCellValue::Text("apple".to_owned())),
-            PagesTableCellUpdate::new(4, 1, PagesCellValue::Text("second apple".to_owned())),
+            pages::TableCellUpdate::new(0, 0, pages::CellValue::Text("Name".to_owned())),
+            pages::TableCellUpdate::new(0, 1, pages::CellValue::Text("Marker".to_owned())),
+            pages::TableCellUpdate::new(1, 0, pages::CellValue::Text("zebra".to_owned())),
+            pages::TableCellUpdate::new(1, 1, pages::CellValue::Text("last".to_owned())),
+            pages::TableCellUpdate::new(2, 0, pages::CellValue::Text("apple".to_owned())),
+            pages::TableCellUpdate::new(2, 1, pages::CellValue::Text("first apple".to_owned())),
+            pages::TableCellUpdate::new(3, 0, pages::CellValue::Text("banana".to_owned())),
+            pages::TableCellUpdate::new(3, 1, pages::CellValue::Text("middle".to_owned())),
+            pages::TableCellUpdate::new(4, 0, pages::CellValue::Text("apple".to_owned())),
+            pages::TableCellUpdate::new(4, 1, pages::CellValue::Text("second apple".to_owned())),
         ],
     )?;
     editor.set_table_cell_comment(table_id, 1, 1, "Zebra comment follows its sorted row")?;
@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .commit()?;
     let mut sort_bytes = Vec::new();
     sort_commit.package().write_to(&mut sort_bytes)?;
-    editor = litchi_iwa::pages::PagesEditor::from_bytes(&sort_bytes)?;
+    editor = litchi_iwa::pages::Editor::from_bytes(&sort_bytes)?;
     if !editor.apply_table_sort_order(table_id)? {
         return Err("expected the source table to be reordered".into());
     }

@@ -246,6 +246,10 @@ pub enum PropValue<'a> {
     Length(Length),
     /// A colour.
     Color(Color),
+    /// A list of text items (a JSON array of strings, a Python list): the
+    /// metadata `keywords` (record 0354). A list key also takes text, which
+    /// the format splits at `;` and `,`.
+    List(Cow<'a, [String]>),
 }
 
 impl fmt::Debug for PropValue<'_> {
@@ -277,7 +281,7 @@ impl PropValue<'_> {
     }
 
     /// The name of the value's kind, for messages: `null`, `bool`, `int`,
-    /// `number`, `text`, `length` or `color`.
+    /// `number`, `text`, `length`, `color` or `list`.
     #[must_use]
     pub const fn kind(&self) -> &'static str {
         match self {
@@ -291,6 +295,7 @@ impl PropValue<'_> {
             Self::Text(_) => "text",
             Self::Length(_) => "length",
             Self::Color(_) => "color",
+            Self::List(_) => "list",
         }
     }
 
@@ -308,6 +313,7 @@ impl PropValue<'_> {
             Self::Text(text) => PropValue::Text(Cow::Borrowed(text)),
             Self::Length(value) => PropValue::Length(*value),
             Self::Color(value) => PropValue::Color(*value),
+            Self::List(items) => PropValue::List(Cow::Borrowed(items)),
         }
     }
 
@@ -325,6 +331,7 @@ impl PropValue<'_> {
             Self::Text(text) => PropValue::Text(Cow::Owned(text.into_owned())),
             Self::Length(value) => PropValue::Length(value),
             Self::Color(value) => PropValue::Color(value),
+            Self::List(items) => PropValue::List(Cow::Owned(items.into_owned())),
         }
     }
 }
@@ -346,7 +353,44 @@ impl fmt::Display for PropValue<'_> {
             Self::Text(text) => formatter.write_str(text),
             Self::Length(value) => value.fmt(formatter),
             Self::Color(value) => value.fmt(formatter),
+            Self::List(items) => Scalar::List(items).fmt(formatter),
         }
+    }
+}
+
+/// The keyword list a `keywords` assignment names (record 0354): a list's
+/// items (whitespace-only items dropped), text split at `;` and `,`
+/// (`litchi_core::metadata::keywords::split`), and the empty list for
+/// `null`. `None` for any other kind of value.
+#[cfg_attr(
+    not(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "ppt",
+        feature = "pptx",
+        feature = "xls",
+        feature = "xlsx",
+        feature = "xlsb",
+        feature = "odt",
+        feature = "ods",
+        feature = "odp",
+        feature = "odi",
+        feature = "pages"
+    )),
+    allow(dead_code, reason = "only the metadata adapters read keyword lists")
+)]
+pub(crate) fn keyword_list(value: &PropValue<'_>) -> Option<Vec<String>> {
+    match value {
+        PropValue::Null => Some(Vec::new()),
+        PropValue::Text(text) => Some(litchi_core::metadata::keywords::split(text)),
+        PropValue::List(items) => Some(
+            items
+                .iter()
+                .filter(|item| !item.trim().is_empty())
+                .cloned()
+                .collect(),
+        ),
+        _ => None,
     }
 }
 
@@ -454,8 +498,16 @@ impl<'a> PropValue<'a> {
                 Self::WideUnsigned(value) => i64::try_from(*value)
                     .map(|value| Some(Scalar::Int(value)))
                     .map_err(|_| PropCoercionError::UnsupportedScalar),
-                Self::Length(_) | Self::Color(_) => Err(PropCoercionError::UnsupportedScalar),
+                Self::Length(_) | Self::Color(_) | Self::List(_) => {
+                    Err(PropCoercionError::UnsupportedScalar)
+                },
             };
+        }
+        // Only a list key takes a list, and a list key takes text too.
+        match (self, ty) {
+            (Self::List(items), ValueType::List) => return Ok(Some(Scalar::List(items))),
+            (Self::List(_), _) => return Err(PropCoercionError::UnsupportedScalar),
+            _ => {},
         }
         // A typed length is the value its text reads as; take it without the
         // text whenever that read is certain to succeed, so registry
@@ -492,6 +544,7 @@ impl<'a> PropValue<'a> {
                     Self::Color(value) => {
                         write!(scratch, "{}", Scalar::Color(*value).display(None))
                     },
+                    Self::List(_) => unreachable!("List returned above"),
                 };
                 if rendered.is_err() {
                     return Err(PropCoercionError::RenderedValueTooLong);
@@ -652,6 +705,33 @@ impl<'a> From<Cow<'a, str>> for PropValue<'a> {
 impl<'a, 'b> From<&'a Cow<'b, str>> for PropValue<'a> {
     fn from(text: &'a Cow<'b, str>) -> Self {
         Self::Text(Cow::Borrowed(text.as_ref()))
+    }
+}
+
+/// A list of text items, such as the metadata keywords.
+///
+/// ```
+/// use litchi_ops::props::PropValue;
+///
+/// let keywords = PropValue::from(vec!["q4".to_owned(), "review".to_owned()]);
+/// assert_eq!(keywords.kind(), "list");
+/// assert_eq!(keywords.to_string(), "q4, review");
+/// ```
+impl From<Vec<String>> for PropValue<'_> {
+    fn from(items: Vec<String>) -> Self {
+        Self::List(Cow::Owned(items))
+    }
+}
+
+impl From<Vec<&str>> for PropValue<'_> {
+    fn from(items: Vec<&str>) -> Self {
+        Self::List(Cow::Owned(items.into_iter().map(str::to_owned).collect()))
+    }
+}
+
+impl<'a> From<&'a [String]> for PropValue<'a> {
+    fn from(items: &'a [String]) -> Self {
+        Self::List(Cow::Borrowed(items))
     }
 }
 
@@ -1139,7 +1219,20 @@ impl<'de> Visitor<'de> for ValueVisitor {
     type Value = PropValue<'de>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("a property value: a string, number, boolean or null")
+        formatter.write_str("a property value: a string, number, boolean, array of strings or null")
+    }
+
+    /// An array of strings: a [`PropValue::List`] (the metadata keywords,
+    /// record 0354).
+    fn visit_seq<A: SeqAccess<'de>>(
+        self,
+        mut seq: A,
+    ) -> std::result::Result<Self::Value, A::Error> {
+        let mut items = Vec::with_capacity(seq.size_hint().unwrap_or(0).min(64));
+        while let Some(Text(item)) = seq.next_element::<Text<'de>>()? {
+            items.push(item.into_owned());
+        }
+        Ok(PropValue::List(Cow::Owned(items)))
     }
 
     fn visit_bool<E: de::Error>(self, value: bool) -> std::result::Result<Self::Value, E> {
@@ -1222,6 +1315,7 @@ impl Serialize for PropValue<'_> {
             Self::Number(value) => serializer.serialize_f64(*value),
             Self::Text(text) => serializer.serialize_str(text),
             Self::Length(_) | Self::Color(_) => serializer.collect_str(self),
+            Self::List(items) => serializer.collect_seq(items.iter()),
         }
     }
 }
@@ -1229,9 +1323,10 @@ impl Serialize for PropValue<'_> {
 /// OfficeCLI's batch `props`: an object of `key: value`, or an array of
 /// `"key=value"` strings (split at the first `=`, keys and values borrowed
 /// from the input where it lends them). A `null` value is
-/// [`PropValue::Null`]; an empty key, an array entry without `=`, and a
-/// value that is an array or object are refused (OfficeCLI skips the first
-/// two silently).
+/// [`PropValue::Null`] and an array of strings a [`PropValue::List`]; an
+/// empty key, an array entry without `=`, and a value that is an object or
+/// an array holding anything but strings are refused (OfficeCLI skips the
+/// first two silently).
 impl<'de> Deserialize<'de> for Props<'de> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         deserializer.deserialize_any(PropsVisitor)

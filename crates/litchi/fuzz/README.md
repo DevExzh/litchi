@@ -261,7 +261,7 @@ automatic/no-op reads, creation, Some-to-Some replacement, model reuse across
 two cells, reset and final model cull, exact-source patch application and
 conflicts, inverse restoration, candidate readback, and redacted selector or
 ingress errors. Commands use only `SheetSelector`, `TableSelector`, and
-`CellPosition`; native IDs, BNC bytes, archive names, and generated types do
+`At`; native IDs, BNC bytes, archive names, and generated types do
 not cross the fuzz target boundary. The checked-in seeds under
 `corpus/numbers_table_cell_pop_up_menu/` are command recipes, not native
 package bytes.
@@ -274,7 +274,7 @@ selectors, typed coordinate failures, exact-source patch application and
 conflicts, inverse byte restoration, candidate semantic readback, checked
 constructor limits, bounded package/semantic ingress limits, and redacted
 malformed-input errors. Only `SheetSelector`, `TableSelector`,
-`CellPosition`, and archive-free `Number` values cross the public facade;
+`At`, and archive-free `Number` values cross the public facade;
 native identifiers, generated messages, and wire payloads never enter the
 harness. The deterministic command recipes under
 `corpus/numbers_table_cell_number_format/` are not native package fixtures.
@@ -288,7 +288,7 @@ family atomically; if a Percentage-bearing source is supplied later, the same
 public harness exercises automatic/no-op, checked precision, clear/reset,
 exact-source patch application, stale and inverse conflicts, candidate
 readback, and changed-versus-no-op diagnostics. It uses only
-`SheetSelector`, `TableSelector`, `CellPosition`, and archive-free
+`SheetSelector`, `TableSelector`, `At`, and archive-free
 `Percentage` values at the facade boundary. The command recipes under
 `corpus/numbers_table_cell_percentage_format/` are small inputs, not native
 package bytes.
@@ -340,7 +340,7 @@ diagnostics. It also checks bounded ingress and semantic limits plus exact
 source atomicity on rejected operations. The converted fixture is intentionally
 exercised as an exact no-op so its `0x81` marker remains byte-preserving; the
 transaction boundary uses only archive-free `Text`, `SheetSelector`,
-`TableSelector`, and `CellPosition` values, with no raw IDs. Recipes under
+`TableSelector`, and `At` values, with no raw IDs. Recipes under
 `corpus/numbers_table_cell_text_format/` are compact command bytes rather than
 native package copies.
 
@@ -353,7 +353,7 @@ pattern boundaries, no-op/set/clear/reset, exact-source patch application,
 stale and inverse conflicts, candidate readback, locked and malformed graph
 refusal, source-byte atomicity, and bounded ingress, semantic, transaction,
 and output limits. Only archive-free `DateTime`, selectors, and
-`CellPosition` values cross the package API; native IDs, generated messages,
+`At` values cross the package API; native IDs, generated messages,
 and wire payloads stay below the fixture/adapter boundary. Recipes under
 `corpus/numbers_table_cell_date_time_format/` are compact command bytes, not
 native package copies.
@@ -405,7 +405,7 @@ source restoration; malformed, missing-root, stale-ordinal, selector, and
 limit paths must remain source-atomic. The target does not embed an
 unverified native reply artifact: command seeds are deliberately small, and a
 valid reply-bearing package can be supplied as a fuzz input when available.
-The target uses only `SheetSelector`, `TableSelector`, `CellPosition`, and
+The target uses only `SheetSelector`, `TableSelector`, `At`, and
 `CommentReplyIndex`; native IDs, comment-storage payloads, archive names, and
 generated types do not cross the fuzz boundary.
 The same bounded input also reaches the explicit compatibility root/reply

@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_iwa::pages::PagesDocumentBuilder;
+use litchi_iwa::keynote::{self};
+use litchi_iwa::numbers;
+use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::table::lock::State as LegacyTableLockState;
 use litchi_numbers::table::lock::State as NumbersLockState;
@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(&output)?;
 
     let numbers_path = output.join("table-lock.numbers");
-    let numbers = NumbersDocumentBuilder::new()
+    let numbers = numbers::Builder::new()
         .table_name("Locked Table")
         .table_dimensions(4, 3)
         .build()?;
@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         NumbersLockState::Locked
     );
     let pages_path = output.join("table-lock.pages");
-    let pages = PagesDocumentBuilder::new()
+    let pages = pages::Builder::new()
         .body_text("Created from scratch with litchi-iwa.\n")
         .body_table("Locked Table", 4, 3)
         .build()?;
@@ -59,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let keynote_path = output.join("table-lock.key");
-    let mut keynote = KeynoteDocumentBuilder::new()
+    let mut keynote = keynote::Builder::new()
         .title("Locked native table")
         .build()?;
     keynote.add_slide_table(
@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let locked_keynote = lock.commit()?;
     let mut keynote_bytes = Vec::new();
     locked_keynote.package().write_to(&mut keynote_bytes)?;
-    keynote = KeynoteEditor::from_bytes(&keynote_bytes)?;
+    keynote = keynote::Editor::from_bytes(&keynote_bytes)?;
     keynote.save(&keynote_path)?;
     assert_eq!(
         litchi_keynote::Package::open(&keynote_path)?.slide_table_lock_state(

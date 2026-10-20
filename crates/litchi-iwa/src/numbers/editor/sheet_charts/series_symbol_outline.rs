@@ -9,7 +9,7 @@ use crate::charts::series_symbol_outline::{
 };
 use crate::charts::{ChartSeriesStroke, Index};
 
-impl NumbersEditor {
+impl Editor {
     pub fn sheet_chart_series_symbol_outlines(
         &self,
         sheet_id: u64,
@@ -77,7 +77,7 @@ impl NumbersEditor {
             count,
             series.zero_based(),
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_series_symbol_outline(sheet_id, drawable_object_id, series)?
             != inherited
         {
@@ -91,7 +91,7 @@ impl NumbersEditor {
 }
 
 fn read(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Vec<Option<ChartSeriesStroke>>> {
@@ -107,7 +107,7 @@ fn read(
 }
 
 fn set(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     outlines: &[Option<ChartSeriesStroke>],
@@ -126,7 +126,7 @@ fn set(
         series_count(&graph, drawable_object_id)?,
         outlines,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_series_symbol_outlines(sheet_id, drawable_object_id)? != outlines {
         return Err(Error::InvalidFormat(
             "Numbers chart data-symbol outline update failed validation".to_owned(),

@@ -7,7 +7,7 @@ use crate::charts::axis_scale::{
     set_chart_value_axis_scale as set_native_chart_value_axis_scale,
 };
 
-impl NumbersEditor {
+impl Editor {
     /// Read the primary value-axis scale of one native sheet chart.
     pub fn sheet_chart_value_axis_scale(
         &self,
@@ -29,7 +29,7 @@ impl NumbersEditor {
 }
 
 fn sheet_chart_value_axis_scale(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Scale> {
@@ -43,7 +43,7 @@ fn sheet_chart_value_axis_scale(
 }
 
 fn set_sheet_chart_value_axis_scale(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     scale: Scale,
@@ -57,7 +57,7 @@ fn set_sheet_chart_value_axis_scale(
         "Numbers",
         scale,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_value_axis_scale(sheet_id, drawable_object_id)? != scale {
         return Err(Error::InvalidFormat(
             "Numbers chart value-axis scale update failed validation".to_owned(),

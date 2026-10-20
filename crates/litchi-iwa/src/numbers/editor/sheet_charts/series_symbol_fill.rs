@@ -11,7 +11,7 @@ use crate::charts::series_symbol_fill::{
 use crate::charts::{ChartSeriesSymbolFill, Index};
 use crate::shapes::{RgbaColor, ShapeImageFill, ShapeImageFillTechnique};
 
-impl NumbersEditor {
+impl Editor {
     pub fn sheet_chart_series_symbol_fills(
         &self,
         sheet_id: u64,
@@ -79,7 +79,7 @@ impl NumbersEditor {
             count,
             series.zero_based(),
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_series_symbol_fill(sheet_id, drawable_object_id, series)?
             != inherited
         {
@@ -124,7 +124,7 @@ impl NumbersEditor {
             fill_size,
             tint,
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_series_symbol_fill(sheet_id, drawable_object_id, series)?
             != ChartSeriesSymbolFill::Custom(crate::shapes::ShapeFill::Image(image.clone()))
         {
@@ -138,7 +138,7 @@ impl NumbersEditor {
 }
 
 fn read(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Vec<ChartSeriesSymbolFill>> {
@@ -154,7 +154,7 @@ fn read(
 }
 
 fn set(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     fills: &[ChartSeriesSymbolFill],
@@ -173,7 +173,7 @@ fn set(
         series_count(&graph, drawable_object_id)?,
         fills,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_series_symbol_fills(sheet_id, drawable_object_id)? != fills {
         return Err(Error::InvalidFormat(
             "Numbers chart data-symbol fill update failed validation".to_owned(),

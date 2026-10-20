@@ -8,7 +8,7 @@ use crate::charts::series_value_label_affixes::{
 };
 use crate::charts::{Index, LabelAffixes};
 
-impl NumbersEditor {
+impl Editor {
     /// Read every series' value-label affixes in native series order.
     pub fn sheet_chart_series_value_label_affixes(
         &self,
@@ -65,7 +65,7 @@ impl NumbersEditor {
 }
 
 fn sheet_chart_series_value_label_affixes(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Vec<LabelAffixes>> {
@@ -88,7 +88,7 @@ fn sheet_chart_series_value_label_affixes(
 }
 
 fn set_sheet_chart_series_value_label_affixes(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     affixes: &[LabelAffixes],
@@ -128,7 +128,7 @@ fn set_sheet_chart_series_value_label_affixes(
         graph.info.kind,
         &expected,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_series_value_label_affixes(sheet_id, drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Numbers chart series value-label affix update failed validation".to_owned(),

@@ -60,6 +60,18 @@ impl Edit {
         Ok(self)
     }
 
+    /// Stage the keyword list, one `meta:keyword` element per keyword; an
+    /// empty list removes every keyword.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Core`] for text XML cannot carry.
+    pub fn set_keywords(&mut self, keywords: &[String]) -> Result<&mut Self, Error> {
+        self.inner.set_metadata_keywords(keywords)?;
+        self.fields += 1;
+        Ok(self)
+    }
+
     /// Publish the staged properties as one new package.
     ///
     /// A package without `meta.xml` gains one declaring the content's

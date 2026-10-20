@@ -4,9 +4,9 @@ use std::env;
 use std::path::Path;
 
 use litchi_iwa::charts::{ChartData, Kind};
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_iwa::pages::PagesDocumentBuilder;
+use litchi_iwa::keynote;
+use litchi_iwa::numbers;
+use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::chart3d::BarShape;
 
@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = Path::new(&output);
     std::fs::create_dir_all(output)?;
 
-    let mut numbers = NumbersDocumentBuilder::new()
+    let mut numbers = numbers::Builder::new()
         .sheet_name("3D Bar Shape CRUD")
         .build()?;
     let sheet_id = numbers
@@ -47,7 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     numbers.save(output.join("chart-bar-shape.numbers"))?;
 
     let body = "3D Bar Shape CRUD";
-    let mut pages = PagesDocumentBuilder::new().body_text(body).build()?;
+    let mut pages = pages::Builder::new().body_text(body).build()?;
     let chart = pages.add_body_chart(
         body.encode_utf16().count(),
         Kind::Column3d,
@@ -65,9 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     pages.save(output.join("chart-bar-shape.pages"))?;
 
-    let mut keynote = KeynoteDocumentBuilder::new()
-        .title("3D Bar Shape CRUD")
-        .build()?;
+    let mut keynote = keynote::Builder::new().title("3D Bar Shape CRUD").build()?;
     let chart = keynote.add_slide_chart(
         0,
         Kind::Bar3d,

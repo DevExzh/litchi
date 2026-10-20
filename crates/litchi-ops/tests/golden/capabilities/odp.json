@@ -193,7 +193,7 @@
           "get": true
         },
         "keywords": {
-          "type": "string",
+          "type": "list",
           "add": false,
           "set": false,
           "get": true

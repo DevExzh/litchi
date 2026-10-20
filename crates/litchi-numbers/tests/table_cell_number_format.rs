@@ -2,7 +2,7 @@
 //!
 //! The shared fixture models a rooted table, tile, format list, and metadata
 //! registry.  The public tests intentionally select a sheet, table, and
-//! [`CellPosition`] and never expose the native graph outside fixture helpers.
+//! [`At`] and never expose the native graph outside fixture helpers.
 
 use std::{fmt::Debug, io, path::PathBuf, sync::Arc, thread};
 
@@ -15,7 +15,7 @@ use litchi_numbers::cell::data_format::number::transaction::{
 use litchi_numbers::cell::data_format::number::{
     DecimalPlaces, NegativeStyle, Number, ThousandsSeparator,
 };
-use litchi_numbers::{CellPosition, Package, SheetSelector, TableSelector};
+use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::BncCell;
 use prost::Message as _;
 
@@ -57,12 +57,12 @@ fn fixed_number(
     )
 }
 
-fn selected_position() -> CellPosition {
-    CellPosition::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
+fn selected_position() -> At {
+    At::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
 }
 
-fn sibling_position() -> CellPosition {
-    CellPosition::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
+fn sibling_position() -> At {
+    At::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
 }
 
 fn read_format_list(source: &[u8]) -> TestResult<Vec<u8>> {
@@ -992,7 +992,7 @@ fn native_fixture_read_is_selector_equivalent() -> TestResult {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/numbers/basic.numbers");
     let package = Package::open(path)?;
-    let position = CellPosition::new(2, 1);
+    let position = At::new(2, 1);
     let by_index = package.table_cell_number_format(0usize, 0usize, position)?;
     let by_name = package.table_cell_number_format(
         SheetSelector::name("Sheet 1"),

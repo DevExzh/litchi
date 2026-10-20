@@ -1,13 +1,13 @@
 //! Source-built Numbers sheet/table duplication regressions.
 //!
 //! These cases exercise the migration host with packages produced by
-//! `NumbersDocumentBuilder`, rather than Apple-authored exact sources.  A
+//! `numbers::Builder`, rather than Apple-authored exact sources.  A
 //! populated sheet copy must keep that provenance while it clones each table;
 //! the second table therefore also covers the repeated clone/move path.
 
 use std::{collections::HashSet, io};
 
-use litchi_iwa::numbers::{FormulaExpression, NumbersDocumentBuilder, NumbersEditor};
+use litchi_iwa::numbers::{self, FormulaExpression};
 use litchi_numbers::{SheetSelector, TableSelector, Workbook, cell::Value};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -28,7 +28,7 @@ fn stored_value(
         .ok_or_else(|| io::Error::other(format!("missing {table_name:?} cell {address}")).into())
 }
 
-fn table_ids(editor: &NumbersEditor) -> TestResult<HashSet<u64>> {
+fn table_ids(editor: &numbers::Editor) -> TestResult<HashSet<u64>> {
     Ok(editor
         .tables()?
         .into_iter()
@@ -38,7 +38,7 @@ fn table_ids(editor: &NumbersEditor) -> TestResult<HashSet<u64>> {
 
 #[test]
 fn source_built_duplicate_table_preserves_content_and_clones_storage() -> TestResult {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .sheet_name("Source")
         .table_name("Original")
         .table_dimensions(4, 4)
@@ -73,7 +73,7 @@ fn source_built_duplicate_table_preserves_content_and_clones_storage() -> TestRe
         source_value
     );
 
-    let reopened = NumbersEditor::from_bytes(&changed_bytes)?;
+    let reopened = numbers::Editor::from_bytes(&changed_bytes)?;
     let reopened_bytes = reopened.to_bytes()?;
     assert_eq!(
         stored_value(&reopened_bytes, 0, "Original", "B1")?,
@@ -89,7 +89,7 @@ fn source_built_duplicate_table_preserves_content_and_clones_storage() -> TestRe
 #[test]
 fn source_built_multi_table_sheet_duplicate_keeps_each_table_and_storage_independent() -> TestResult
 {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .sheet_name("Source")
         .table_name("Alpha")
         .table_dimensions(4, 4)
@@ -150,7 +150,7 @@ fn source_built_multi_table_sheet_duplicate_keeps_each_table_and_storage_indepen
         "duplicating Alpha must not alias the duplicated Beta storage"
     );
 
-    let reopened = NumbersEditor::from_bytes(&changed_bytes)?;
+    let reopened = numbers::Editor::from_bytes(&changed_bytes)?;
     let reopened_bytes = reopened.to_bytes()?;
     assert_eq!(
         stored_value(&reopened_bytes, 0, "Alpha", "B1")?,
@@ -166,7 +166,7 @@ fn source_built_multi_table_sheet_duplicate_keeps_each_table_and_storage_indepen
 
 #[test]
 fn source_built_sheet_duplicate_invalid_selector_is_transactional() -> TestResult {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .sheet_name("Source")
         .table_name("Alpha")
         .table_dimensions(2, 2)
@@ -179,7 +179,7 @@ fn source_built_sheet_duplicate_invalid_selector_is_transactional() -> TestResul
 
 #[test]
 fn source_built_sheet_duplicate_scopes_same_named_clone_to_source_sheet() -> TestResult {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .sheet_name("Source")
         .table_name("Alpha")
         .table_dimensions(4, 4)

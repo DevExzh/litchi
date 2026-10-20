@@ -531,7 +531,7 @@ fn detach(scalar: Scalar<'_>) -> Option<Scalar<'static>> {
         Scalar::Token(token) => Scalar::Token(token),
         Scalar::Length(length) => Scalar::Length(length),
         Scalar::Color(color) => Scalar::Color(color),
-        Scalar::Text(_) => return None,
+        Scalar::Text(_) | Scalar::List(_) => return None,
     })
 }
 
@@ -620,6 +620,19 @@ impl Compiled {
         let Some(actual) = actual else {
             return self.op == Op::Ne;
         };
+        // A list (the keyword list, record 0354) holds when one of its
+        // items does; `!=` when none equals; `exists` when it has an item.
+        if let Scalar::List(items) = actual {
+            return match self.op {
+                Op::Exists => !items.is_empty(),
+                Op::Ne => !items
+                    .iter()
+                    .any(|value| self.equals(literal, &Scalar::Text(value))),
+                _ => items
+                    .iter()
+                    .any(|value| self.eval(literal, Some(Scalar::Text(value)))),
+            };
+        }
         match self.op {
             Op::Eq => self.equals(literal, &actual),
             Op::Ne => !self.equals(literal, &actual),
