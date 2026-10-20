@@ -462,7 +462,7 @@ mod limit_tests {
     #[test]
     fn open_options_redact_credentials_and_track_explicit_limits() {
         let options = OpenOptions::new().password("secret");
-        assert_eq!(options.get_password(), Some("secret"));
+        assert_eq!(options.password_value(), Some("secret"));
         assert!(!format!("{options:?}").contains("secret"));
         assert!(!options.has_explicit_source_limits());
 
@@ -472,7 +472,7 @@ mod limit_tests {
             .build()
             .unwrap();
         let options = options.source_limits(limits);
-        assert_eq!(options.get_source_limits(), limits);
+        assert_eq!(options.source_limits_value(), limits);
         assert!(options.has_explicit_source_limits());
     }
 
@@ -535,7 +535,7 @@ impl<'a> OpenOptions<'a> {
 
     /// Return the selected physical source limits.
     #[must_use]
-    pub const fn get_source_limits(&self) -> SourceLimits {
+    pub const fn source_limits_value(&self) -> SourceLimits {
         self.source_limits
     }
 
@@ -552,7 +552,7 @@ impl<'a> OpenOptions<'a> {
 
     /// Return the password when one was supplied.
     #[must_use]
-    pub const fn get_password(&self) -> Option<&'a str> {
+    pub const fn password_value(&self) -> Option<&'a str> {
         self.password
     }
 
@@ -565,7 +565,7 @@ impl<'a> OpenOptions<'a> {
 
     /// Return the selected repair policy.
     #[must_use]
-    pub const fn get_leniency(&self) -> crate::leniency::Leniency {
+    pub const fn leniency_value(&self) -> crate::leniency::Leniency {
         self.leniency
     }
 }

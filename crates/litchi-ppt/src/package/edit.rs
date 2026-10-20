@@ -89,7 +89,7 @@ impl EditOptions {
 
     /// Return the selected operation budget.
     #[must_use]
-    pub const fn get_max_operations(self) -> usize {
+    pub const fn max_operations_value(&self) -> usize {
         self.max_operations
     }
 }

@@ -5472,6 +5472,26 @@
           "name": "into_snapshot",
           "scope": "litchi_ppt",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "name": "get_source_limits",
+          "scope": "litchi_ppt::OpenOptions",
+          "replacement": "use the <noun>_value() getter (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_password",
+          "scope": "litchi_ppt::OpenOptions",
+          "replacement": "use the <noun>_value() getter (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_leniency",
+          "scope": "litchi_ppt::OpenOptions",
+          "replacement": "use the <noun>_value() getter (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_max_operations",
+          "scope": "litchi_ppt::package::edit::EditOptions",
+          "replacement": "use max_operations_value() (record 0351 §2.5 rule 6)"
         }
       ],
       "families": [
@@ -5717,6 +5737,26 @@
           "name": "into_snapshot",
           "scope": "litchi_ppt",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "name": "get_source_limits",
+          "scope": "litchi_ppt::OpenOptions",
+          "replacement": "use the <noun>_value() getter (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_password",
+          "scope": "litchi_ppt::OpenOptions",
+          "replacement": "use the <noun>_value() getter (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_leniency",
+          "scope": "litchi_ppt::OpenOptions",
+          "replacement": "use the <noun>_value() getter (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "get_max_operations",
+          "scope": "litchi_ppt::package::edit::EditOptions",
+          "replacement": "use max_operations_value() (record 0351 §2.5 rule 6)"
         }
       ],
       "families": [

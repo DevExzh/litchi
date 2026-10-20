@@ -282,7 +282,7 @@ fn operation_limits_are_finite_and_failed_operations_can_be_retried() {
     let options = EditOptions::new()
         .max_operations(2)
         .expect("finite operation limit");
-    assert_eq!(options.get_max_operations(), 2);
+    assert_eq!(options.max_operations_value(), 2);
     let source = package();
     let mut edit = source
         .edit_with_options(options)

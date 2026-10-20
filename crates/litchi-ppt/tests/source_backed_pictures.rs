@@ -562,10 +562,10 @@ fn open_options_uses_the_checked_source_policy_and_getters() {
         .source_limits(limits)
         .password("secret")
         .leniency(Leniency::TolerateUserEditChainDefects);
-    assert_eq!(options.get_source_limits(), limits);
-    assert_eq!(options.get_password(), Some("secret"));
+    assert_eq!(options.source_limits_value(), limits);
+    assert_eq!(options.password_value(), Some("secret"));
     assert_eq!(
-        options.get_leniency(),
+        options.leniency_value(),
         Leniency::TolerateUserEditChainDefects
     );
 }

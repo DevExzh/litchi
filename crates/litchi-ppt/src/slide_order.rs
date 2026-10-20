@@ -663,7 +663,7 @@ impl Snapshot {
     /// so a canonical package edit cannot silently fall back to strict while
     /// processing a caller-selected source.
     pub fn from_bytes_with_options(bytes: Vec<u8>, options: OpenOptions<'_>) -> Result<Self> {
-        let limits = options.get_source_limits();
+        let limits = options.source_limits_value();
         if bytes.len() > limits.max_package_bytes {
             return Err(PackageError::Limit {
                 kind: crate::SourceLimitKind::InputBytes,
@@ -738,7 +738,7 @@ impl Snapshot {
             document,
             document_persist_id,
             limits,
-            leniency: options.get_leniency(),
+            leniency: options.leniency_value(),
             chain_repaired,
             has_review_history,
             has_signature,

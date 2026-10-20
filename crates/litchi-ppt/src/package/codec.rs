@@ -186,7 +186,7 @@ impl<R: Read + Seek> Reader<R> {
     pub fn presentation_with_options(&mut self, options: OpenOptions<'_>) -> Result<Presentation> {
         let source_limits = if options.has_explicit_source_limits() {
             self.source_limits
-                .constrained_by(options.get_source_limits())
+                .constrained_by(options.source_limits_value())
         } else {
             self.source_limits
         };
@@ -218,7 +218,7 @@ impl<R: Read + Seek> Reader<R> {
     ) -> Result<Presentation> {
         let source_limits = limits.constrained_by(self.source_limits);
         let source_limits = if options.has_explicit_source_limits() {
-            source_limits.constrained_by(options.get_source_limits())
+            source_limits.constrained_by(options.source_limits_value())
         } else {
             source_limits
         };

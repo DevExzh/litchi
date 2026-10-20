@@ -92,7 +92,7 @@ impl Package {
 
     /// Open a package from a copied byte slice under explicit policies.
     pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions<'_>) -> Result<Self> {
-        let maximum = options.get_source_limits().max_input_bytes();
+        let maximum = options.source_limits_value().max_input_bytes();
         if bytes.len() > maximum {
             return Err(Error::Limit {
                 kind: super::SourceLimitKind::InputBytes,
@@ -125,7 +125,7 @@ impl Package {
         reader: &mut R,
         options: OpenOptions<'_>,
     ) -> Result<Self> {
-        let maximum = options.get_source_limits().max_input_bytes();
+        let maximum = options.source_limits_value().max_input_bytes();
         let mut bytes = Vec::new();
         let mut buffer = [0_u8; 64 * 1024];
         loop {
@@ -193,7 +193,7 @@ impl Package {
         options: OpenOptions<'_>,
     ) -> Result<Self> {
         let source_package =
-            SourceBackedPackage::from_read_at_with_limits(source, options.get_source_limits())?;
+            SourceBackedPackage::from_read_at_with_limits(source, options.source_limits_value())?;
         Self::from_source(source_package, options)
     }
 
@@ -203,7 +203,7 @@ impl Package {
     /// second container parse or a byte copy.
     pub fn from_ole_file(ole: OleFile<Cursor<Vec<u8>>>, options: OpenOptions<'_>) -> Result<Self> {
         let mut reader =
-            crate::raw::Reader::from_ole_file_with_limits(ole, options.get_source_limits())?;
+            crate::raw::Reader::from_ole_file_with_limits(ole, options.source_limits_value())?;
         let presentation = reader.presentation_with_options(options)?;
         let shared = seal_ole_file(reader.into_ole_file())?;
         Ok(Self::from_parts(shared, presentation, options))
@@ -219,7 +219,7 @@ impl Package {
         options: OpenOptions<'_>,
     ) -> Result<std::result::Result<Self, OleFile<Cursor<Vec<u8>>>>> {
         let mut reader =
-            crate::raw::Reader::from_ole_file_with_limits(ole, options.get_source_limits())?;
+            crate::raw::Reader::from_ole_file_with_limits(ole, options.source_limits_value())?;
         let presentation = match reader.presentation_with_options(options) {
             Ok(presentation) => presentation,
             Err(Error::PasswordRequired) => return Ok(Err(reader.into_ole_file())),
@@ -242,7 +242,7 @@ impl Package {
         let shared = source.shared_ole_file_arc();
         let presentation = source.presentation_with_options(options)?;
         let limits = presentation.source_limits();
-        let leniency = options.get_leniency();
+        let leniency = options.leniency_value();
         shared.source_version()?;
         Ok(Self {
             inner: Arc::new(PackageInner {
@@ -264,7 +264,7 @@ impl Package {
     fn from_owned_bytes(bytes: Vec<u8>, options: OpenOptions<'_>) -> Result<Self> {
         let mut reader = crate::raw::Reader::from_reader_with_limits(
             Cursor::new(bytes),
-            options.get_source_limits(),
+            options.source_limits_value(),
         )?;
         let presentation = reader.presentation_with_options(options)?;
         let shared = seal_ole_file(reader.into_ole_file())?;
@@ -282,7 +282,7 @@ impl Package {
                 shared,
                 presentation,
                 source_limits,
-                leniency: options.get_leniency(),
+                leniency: options.leniency_value(),
             }),
         }
     }

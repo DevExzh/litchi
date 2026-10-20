@@ -2347,7 +2347,7 @@ fn presentation_with_options(
     options: crate::package::OpenOptions<'_>,
 ) -> PackageResult<Presentation> {
     let mut package =
-        Reader::from_reader_with_limits(Cursor::new(bytes), options.get_source_limits())?;
+        Reader::from_reader_with_limits(Cursor::new(bytes), options.source_limits_value())?;
     package.presentation_with_options(options)
 }
 
