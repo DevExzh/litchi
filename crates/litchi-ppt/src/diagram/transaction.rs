@@ -117,7 +117,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(
+    pub(crate) fn parse_with_limits(
         build_list: impl AsRef<[u8]>,
         drawing: impl AsRef<[u8]>,
         limits: EditLimits,

@@ -104,7 +104,10 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: ClientDataLimits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(
+        bytes: impl AsRef<[u8]>,
+        limits: ClientDataLimits,
+    ) -> Result<Self> {
         let input = bytes.as_ref();
         let value = ClientData::parse_with_limits(input, limits)?;
         let encoded = value.to_bytes_with_limits(limits)?;
@@ -138,7 +141,7 @@ impl Snapshot {
         clippy::needless_pass_by_value,
         reason = "the capture API takes ownership of the semantic value by convention, matching `from_client_data`"
     )]
-    pub fn from_client_data_with_limits(
+    pub(crate) fn from_client_data_with_limits(
         value: ClientData,
         limits: ClientDataLimits,
     ) -> Result<Self> {

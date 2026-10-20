@@ -1402,7 +1402,7 @@ impl Builder {
     ///
     /// Returns an error if the operation fails.
     #[cfg(feature = "fonts")]
-    pub fn set_prepared_font_with_limits(
+    pub(crate) fn set_prepared_font_with_limits(
         &mut self,
         scope: FontScope,
         index: u16,

@@ -19,9 +19,9 @@ impl Transaction {
         if let Some(opened) = self.opened_source() {
             return Ok(opened.clone());
         }
-        let mut reader = crate::raw::Reader::from_reader_with_limits(
+        let mut reader = crate::raw::Reader::from_reader_with_options(
             Cursor::new(self.working.bytes()),
-            self.working.limits,
+            self.working.open_options(),
         )?;
         Ok(reader.presentation_with_options(self.working.open_options())?)
     }

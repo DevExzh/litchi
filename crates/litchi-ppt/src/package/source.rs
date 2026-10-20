@@ -27,6 +27,7 @@ use std::sync::Arc;
 pub struct SourceBackedPackage {
     shared: Arc<SharedOleFile>,
     source_limits: SourceLimits,
+    leniency: crate::leniency::Leniency,
 }
 
 impl std::fmt::Debug for SourceBackedPackage {
@@ -42,17 +43,20 @@ impl std::fmt::Debug for SourceBackedPackage {
 impl SourceBackedPackage {
     /// Open a positional source with the default finite PPT limits.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, SourceLimits::default())
+        Self::from_read_at_with_options(source, OpenOptions::default())
     }
 
-    /// Open a positional source with explicit finite PPT limits.
+    /// Open a positional source under explicit open options.
     ///
-    /// The CFB index is validated before this method returns.  Stream payloads
-    /// are not read by the package constructor.
-    pub fn from_read_at_with_limits(
+    /// The package keeps the options' source limits and leniency; every
+    /// presentation it builds inherits them. The CFB index is validated
+    /// before this method returns. Stream payloads are not read by the
+    /// package constructor.
+    pub fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
-        source_limits: SourceLimits,
+        options: OpenOptions<'_>,
     ) -> Result<Self> {
+        let source_limits = options.source_limits_value();
         let cfb_limit = source_limits
             .max_package_bytes
             .min(usize::try_from(SharedOleFileLimits::MAX_INPUT_BYTES).unwrap_or(usize::MAX));
@@ -102,6 +106,7 @@ impl SourceBackedPackage {
         Ok(Self {
             shared: Arc::new(shared),
             source_limits,
+            leniency: options.leniency_value(),
         })
     }
 
@@ -113,15 +118,16 @@ impl SourceBackedPackage {
     /// inputs. A recognized PPT owner still receives the normal typed resource
     /// error when it exceeds the default package ceiling.
     pub fn from_shared_if_powerpoint(shared: SharedOleFile) -> Result<Option<Self>> {
-        Self::from_shared_if_powerpoint_with_limits(shared, SourceLimits::default())
+        Self::from_shared_if_powerpoint_with_options(shared, OpenOptions::default())
     }
 
-    /// Adopt an already validated positional CFB owner under an explicit
-    /// source profile when it contains native PowerPoint streams.
-    pub fn from_shared_if_powerpoint_with_limits(
+    /// Adopt an already validated positional CFB owner under explicit open
+    /// options when it contains native PowerPoint streams.
+    pub fn from_shared_if_powerpoint_with_options(
         shared: SharedOleFile,
-        source_limits: SourceLimits,
+        options: OpenOptions<'_>,
     ) -> Result<Option<Self>> {
+        let source_limits = options.source_limits_value();
         shared.source_version()?;
         if !shared_is_powerpoint(&shared) {
             return Ok(None);
@@ -143,22 +149,20 @@ impl SourceBackedPackage {
         Ok(Some(Self {
             shared: Arc::new(shared),
             source_limits,
+            leniency: options.leniency_value(),
         }))
     }
 
     /// Open a filesystem-backed PPT without slurping the complete artifact.
     #[cfg(any(unix, windows))]
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path_with_limits(path, SourceLimits::default())
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Self::open_with_options(path, OpenOptions::default())
     }
 
-    /// Open a filesystem-backed PPT with explicit finite limits.
+    /// Open a filesystem-backed PPT under explicit open options.
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(
-        path: impl AsRef<Path>,
-        source_limits: SourceLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits(Arc::new(FileSource::open(path)?), source_limits)
+    pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions<'_>) -> Result<Self> {
+        Self::from_read_at_with_options(Arc::new(FileSource::open(path)?), options)
     }
 
     /// Source version captured by the validated CFB index.
@@ -195,42 +199,32 @@ impl SourceBackedPackage {
         self.source_limits
     }
 
-    /// Build a presentation using the default password options.
+    /// Leniency inherited by [`Self::presentation`].
+    #[must_use]
+    pub const fn leniency(&self) -> crate::leniency::Leniency {
+        self.leniency
+    }
+
+    /// Build a presentation under the package's own options and no password.
     ///
     /// Required native streams are materialized and parsed using the same
     /// semantic pipeline as [`crate::raw::Reader::presentation`]. `Pictures` is
     /// only represented by its validated descriptor.
     pub fn presentation(&self) -> Result<Presentation> {
-        self.presentation_with_options(OpenOptions::default())
+        self.presentation_with_options(OpenOptions::default().leniency(self.leniency))
     }
 
-    /// Build a presentation with password-to-open options.
+    /// Build a presentation with per-call open options, such as the password
+    /// of an encrypted presentation.
+    ///
+    /// Explicit source limits in `options` can only tighten the package's
+    /// own; the options' leniency replaces the package's for this call.
     pub fn presentation_with_options(&self, options: OpenOptions<'_>) -> Result<Presentation> {
         let source_limits = if options.has_explicit_source_limits() {
             self.source_limits
                 .constrained_by(options.source_limits_value())
         } else {
             self.source_limits
-        };
-        Presentation::from_shared_with_options(Arc::clone(&self.shared), options, source_limits)
-    }
-
-    /// Build a presentation with stricter record limits.
-    pub fn presentation_with_limits(&self, limits: SourceLimits) -> Result<Presentation> {
-        self.presentation_with_options_and_limits(OpenOptions::default(), limits)
-    }
-
-    /// Build a presentation with password options and stricter limits.
-    pub fn presentation_with_options_and_limits(
-        &self,
-        options: OpenOptions<'_>,
-        limits: SourceLimits,
-    ) -> Result<Presentation> {
-        let source_limits = limits.constrained_by(self.source_limits);
-        let source_limits = if options.has_explicit_source_limits() {
-            source_limits.constrained_by(options.source_limits_value())
-        } else {
-            source_limits
         };
         Presentation::from_shared_with_options(Arc::clone(&self.shared), options, source_limits)
     }
@@ -252,7 +246,13 @@ impl SourceBackedPackage {
     /// Returns an error when the package is signed, encrypted or DRM
     /// protected, when its source changed, or when it exceeds the limits.
     pub fn text_edit_snapshot(&self) -> crate::text_edit::Result<crate::text_edit::SourceSnapshot> {
-        self.text_edit_snapshot_with_limits(self.source_limits)
+        crate::text_edit::SourceSnapshot::from_shared(
+            Arc::clone(&self.shared),
+            crate::text_edit::SourceBackedOptions {
+                source_limits: self.source_limits,
+                ..crate::text_edit::SourceBackedOptions::default()
+            },
+        )
     }
 
     /// Borrow the validated compound-file view this package reads from.
@@ -274,27 +274,6 @@ impl SourceBackedPackage {
     #[must_use]
     pub fn shared_ole_file_arc(&self) -> Arc<SharedOleFile> {
         Arc::clone(&self.shared)
-    }
-
-    /// Builds the source-backed text editor under stricter record limits.
-    ///
-    /// `limits` is constrained by this package's own limits, as
-    /// [`Self::presentation_with_limits`] constrains them.
-    ///
-    /// # Errors
-    ///
-    /// Returns the errors of [`Self::text_edit_snapshot`].
-    pub fn text_edit_snapshot_with_limits(
-        &self,
-        limits: SourceLimits,
-    ) -> crate::text_edit::Result<crate::text_edit::SourceSnapshot> {
-        crate::text_edit::SourceSnapshot::from_shared(
-            Arc::clone(&self.shared),
-            crate::text_edit::SourceBackedOptions {
-                source_limits: limits.constrained_by(self.source_limits),
-                ..crate::text_edit::SourceBackedOptions::default()
-            },
-        )
     }
 }
 

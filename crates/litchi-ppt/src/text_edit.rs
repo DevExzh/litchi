@@ -2346,8 +2346,7 @@ fn presentation_with_options(
     bytes: &[u8],
     options: crate::package::OpenOptions<'_>,
 ) -> PackageResult<Presentation> {
-    let mut package =
-        Reader::from_reader_with_limits(Cursor::new(bytes), options.source_limits_value())?;
+    let mut package = Reader::from_reader_with_options(Cursor::new(bytes), options)?;
     package.presentation_with_options(options)
 }
 

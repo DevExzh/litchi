@@ -16089,13 +16089,10 @@ fn verify_ppt_picture_limit_gates(
     };
     let pictures_range = ppt_picture_payload_range(archive, &pictures_payload)?;
     let mut eager =
-        litchi_ppt::raw::Reader::from_reader_with_limits(Cursor::new(archive.to_vec()), exact)?;
-    eager.presentation_with_limits(exact)?;
-    let source = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(
-        Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())),
-        exact,
-    )?;
-    source.presentation_with_limits(exact)?;
+        litchi_ppt::raw::Reader::from_reader_with_options(Cursor::new(archive.to_vec()), litchi_ppt::OpenOptions::new().source_limits(exact))?;
+    eager.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(exact))?;
+    let source = litchi_ppt::SourceBackedPackage::from_read_at_with_options(Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())), litchi_ppt::OpenOptions::new().source_limits(exact))?;
+    source.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(exact))?;
 
     let package_under = ppt_source_limits_with(
         exact,
@@ -16106,18 +16103,12 @@ fn verify_ppt_picture_limit_gates(
         exact.max_entry_bytes(),
         exact.max_aggregate_bytes(),
     )?;
-    if litchi_ppt::raw::Reader::from_reader_with_limits(
-        Cursor::new(archive.to_vec()),
-        package_under,
-    )
+    if litchi_ppt::raw::Reader::from_reader_with_options(Cursor::new(archive.to_vec()), litchi_ppt::OpenOptions::new().source_limits(package_under))
     .is_ok()
     {
         return Err("PPT eager package limit accepted one byte under package size".into());
     }
-    if litchi_ppt::SourceBackedPackage::from_read_at_with_limits(
-        Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())),
-        package_under,
-    )
+    if litchi_ppt::SourceBackedPackage::from_read_at_with_options(Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())), litchi_ppt::OpenOptions::new().source_limits(package_under))
     .is_ok()
     {
         return Err("PPT source-backed package limit accepted one byte under package size".into());
@@ -16133,17 +16124,17 @@ fn verify_ppt_picture_limit_gates(
         exact.max_aggregate_bytes(),
     )?;
     let mut eager =
-        litchi_ppt::raw::Reader::from_reader_with_limits(Cursor::new(archive.to_vec()), exact)?;
-    if eager.presentation_with_limits(pictures_under).is_ok() {
+        litchi_ppt::raw::Reader::from_reader_with_options(Cursor::new(archive.to_vec()), litchi_ppt::OpenOptions::new().source_limits(exact))?;
+    if eager.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(pictures_under)).is_ok() {
         return Err("PPT eager Pictures limit accepted one byte under stream size".into());
     }
     let source = Arc::new(InstrumentedSource::new(
         archive.to_vec(),
         vec![pictures_range],
     ));
-    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source.clone(), exact)?;
+    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(source.clone(), litchi_ppt::OpenOptions::new().source_limits(exact))?;
     source.reset();
-    if package.presentation_with_limits(pictures_under).is_ok() {
+    if package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(pictures_under)).is_ok() {
         return Err("PPT source-backed Pictures limit accepted one byte under stream size".into());
     }
     let snapshot = source.snapshot();
@@ -16217,8 +16208,8 @@ fn time_ppt_pictures_eager(
     let cursor = Cursor::new(archive);
     if phase == "presentation_open_no_image_query" {
         let started = Instant::now();
-        let mut package = litchi_ppt::raw::Reader::from_reader_with_limits(cursor, source_limits)?;
-        let presentation = package.presentation_with_limits(source_limits)?;
+        let mut package = litchi_ppt::raw::Reader::from_reader_with_options(cursor, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
         std::hint::black_box(&presentation);
         let duration = started.elapsed();
         if !presentation.has_pictures() {
@@ -16229,8 +16220,8 @@ fn time_ppt_pictures_eager(
 
     if phase == "fresh_open_plus_cold_all_images_query" {
         let started = Instant::now();
-        let mut package = litchi_ppt::raw::Reader::from_reader_with_limits(cursor, source_limits)?;
-        let presentation = package.presentation_with_limits(source_limits)?;
+        let mut package = litchi_ppt::raw::Reader::from_reader_with_options(cursor, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
         let images = presentation.images()?;
         std::hint::black_box(&images);
         let duration = started.elapsed();
@@ -16238,8 +16229,8 @@ fn time_ppt_pictures_eager(
         return Ok(duration);
     }
 
-    let mut package = litchi_ppt::raw::Reader::from_reader_with_limits(cursor, source_limits)?;
-    let presentation = package.presentation_with_limits(source_limits)?;
+    let mut package = litchi_ppt::raw::Reader::from_reader_with_options(cursor, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+    let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
     if cached_repeat {
         let first = presentation.images()?;
         verify_ppt_picture_images(&first)?;
@@ -16261,8 +16252,8 @@ fn time_ppt_pictures_source_backed(
     if phase == "presentation_open_no_image_query" {
         let started = Instant::now();
         let package =
-            litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source, source_limits)?;
-        let presentation = package.presentation_with_limits(source_limits)?;
+            litchi_ppt::SourceBackedPackage::from_read_at_with_options(source, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
         std::hint::black_box(&presentation);
         let duration = started.elapsed();
         if !presentation.has_pictures() {
@@ -16274,8 +16265,8 @@ fn time_ppt_pictures_source_backed(
     if phase == "fresh_open_plus_cold_all_images_query" {
         let started = Instant::now();
         let package =
-            litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source, source_limits)?;
-        let presentation = package.presentation_with_limits(source_limits)?;
+            litchi_ppt::SourceBackedPackage::from_read_at_with_options(source, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
         let images = presentation.images()?;
         std::hint::black_box(&images);
         let duration = started.elapsed();
@@ -16283,8 +16274,8 @@ fn time_ppt_pictures_source_backed(
         return Ok(duration);
     }
 
-    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source, source_limits)?;
-    let presentation = package.presentation_with_limits(source_limits)?;
+    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(source, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+    let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
     if cached_repeat {
         let first = presentation.images()?;
         verify_ppt_picture_images(&first)?;
@@ -16310,11 +16301,8 @@ fn collect_ppt_pictures_source_evidence(
     ));
 
     if phase == "presentation_open_no_image_query" {
-        let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(
-            source.clone(),
-            source_limits,
-        )?;
-        let presentation = package.presentation_with_limits(source_limits)?;
+        let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(source.clone(), litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
         if !presentation.has_pictures() {
             return Err("PPT source-backed evidence open lost Pictures descriptor".into());
         }
@@ -16322,8 +16310,8 @@ fn collect_ppt_pictures_source_evidence(
     }
 
     let package =
-        litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source.clone(), source_limits)?;
-    let presentation = package.presentation_with_limits(source_limits)?;
+        litchi_ppt::SourceBackedPackage::from_read_at_with_options(source.clone(), litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+    let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
     if phase != "fresh_open_plus_cold_all_images_query" {
         source.reset();
     }

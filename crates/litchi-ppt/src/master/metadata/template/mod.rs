@@ -35,19 +35,6 @@ impl Snapshot {
         Self::from_inner(metadata::Snapshot::from_record(Context::Main, root)?)
     }
 
-    /// Validate and capture one main-master record under explicit limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn from_record_with_limits(root: Record, limits: Limits) -> Result<Self> {
-        Self::from_inner(metadata::Snapshot::from_record_with_limits(
-            Context::Main,
-            root,
-            limits,
-        )?)
-    }
-
     /// Parse one complete main-master record.
     ///
     /// # Errors
@@ -55,19 +42,6 @@ impl Snapshot {
     /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(bytes: &[u8]) -> Result<Self> {
         Self::from_inner(metadata::Snapshot::parse(Context::Main, bytes)?)
-    }
-
-    /// Parse one complete main-master record under explicit limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
-        Self::from_inner(metadata::Snapshot::parse_with_limits(
-            Context::Main,
-            bytes,
-            limits,
-        )?)
     }
 
     fn from_inner(inner: metadata::Snapshot) -> Result<Self> {

@@ -192,8 +192,7 @@ impl Package {
         source: Arc<dyn ReadAt>,
         options: OpenOptions<'_>,
     ) -> Result<Self> {
-        let source_package =
-            SourceBackedPackage::from_read_at_with_limits(source, options.source_limits_value())?;
+        let source_package = SourceBackedPackage::from_read_at_with_options(source, options)?;
         Self::from_source(source_package, options)
     }
 
@@ -202,8 +201,7 @@ impl Package {
     /// The parsed CFB index moves into the retained shared owner without a
     /// second container parse or a byte copy.
     pub fn from_ole_file(ole: OleFile<Cursor<Vec<u8>>>, options: OpenOptions<'_>) -> Result<Self> {
-        let mut reader =
-            crate::raw::Reader::from_ole_file_with_limits(ole, options.source_limits_value())?;
+        let mut reader = crate::raw::Reader::from_ole_file_with_options(ole, options)?;
         let presentation = reader.presentation_with_options(options)?;
         let shared = seal_ole_file(reader.into_ole_file())?;
         Ok(Self::from_parts(shared, presentation, options))
@@ -218,8 +216,7 @@ impl Package {
         ole: OleFile<Cursor<Vec<u8>>>,
         options: OpenOptions<'_>,
     ) -> Result<std::result::Result<Self, OleFile<Cursor<Vec<u8>>>>> {
-        let mut reader =
-            crate::raw::Reader::from_ole_file_with_limits(ole, options.source_limits_value())?;
+        let mut reader = crate::raw::Reader::from_ole_file_with_options(ole, options)?;
         let presentation = match reader.presentation_with_options(options) {
             Ok(presentation) => presentation,
             Err(Error::PasswordRequired) => return Ok(Err(reader.into_ole_file())),
@@ -262,10 +259,7 @@ impl Package {
     }
 
     fn from_owned_bytes(bytes: Vec<u8>, options: OpenOptions<'_>) -> Result<Self> {
-        let mut reader = crate::raw::Reader::from_reader_with_limits(
-            Cursor::new(bytes),
-            options.source_limits_value(),
-        )?;
+        let mut reader = crate::raw::Reader::from_reader_with_options(Cursor::new(bytes), options)?;
         let presentation = reader.presentation_with_options(options)?;
         let shared = seal_ole_file(reader.into_ole_file())?;
         Ok(Self::from_parts(shared, presentation, options))

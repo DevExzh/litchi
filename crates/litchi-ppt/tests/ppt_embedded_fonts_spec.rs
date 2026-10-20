@@ -145,29 +145,6 @@ fn malformed_font_names_and_entity_lengths_are_rejected() {
 }
 
 #[test]
-fn source_limits_reject_oversize_font_records_before_materialization() {
-    let bytes = collection(RT_FONT_COLLECTION, &[0; 128]);
-    let limits = SourceLimits::builder()
-        .max_entry_bytes(bytes.len())
-        .unwrap()
-        .max_record_bytes(64)
-        .unwrap()
-        .max_record_payload_bytes(56)
-        .unwrap()
-        .max_aggregate_payload_bytes(56)
-        .unwrap()
-        .build()
-        .unwrap();
-    assert!(matches!(
-        Record::parse_with_limits(&bytes, 0, limits),
-        Err(Error::Limit {
-            kind: SourceLimitKind::RecordBytes | SourceLimitKind::RecordPayloadBytes,
-            ..
-        })
-    ));
-}
-
-#[test]
 fn source_limits_checked_builder_preserves_profiles_and_accepts_boundaries() {
     let defaults = SourceLimits::default();
     assert_eq!(
@@ -325,53 +302,6 @@ fn source_limits_checked_builder_preserves_profiles_and_accepts_boundaries() {
         boundaries.max_aggregate_payload_bytes(),
         SourceLimits::MAX_AGGREGATE_PAYLOAD_BYTES
     );
-}
-
-fn nested_record(depth: usize) -> Vec<u8> {
-    let mut value = record(0, 0, RT_FONT_ENTITY_ATOM, &[]);
-    for _ in 0..depth {
-        value = collection(RT_FONT_COLLECTION, &value);
-    }
-    value
-}
-
-#[test]
-fn source_limits_bound_record_events_and_depth() {
-    let event_bytes = collection(
-        RT_FONT_COLLECTION,
-        &[
-            record(0, 0, RT_FONT_ENTITY_ATOM, &[]),
-            record(0, 1, RT_FONT_ENTITY_ATOM, &[]),
-        ]
-        .concat(),
-    );
-    let event_limits = SourceLimits::builder()
-        .max_events(1)
-        .unwrap()
-        .build()
-        .unwrap();
-    assert!(matches!(
-        Record::parse_with_limits(&event_bytes, 0, event_limits),
-        Err(Error::Limit {
-            kind: SourceLimitKind::Events,
-            observed,
-            maximum: maximum @ 1,
-        }) if observed > maximum
-    ));
-
-    let depth_limits = SourceLimits::builder()
-        .max_depth(1)
-        .unwrap()
-        .build()
-        .unwrap();
-    assert!(matches!(
-        Record::parse_with_limits(&nested_record(3), 0, depth_limits),
-        Err(Error::Limit {
-            kind: SourceLimitKind::Depth,
-            observed,
-            maximum: maximum @ 1,
-        }) if observed > maximum
-    ));
 }
 
 #[cfg(feature = "fonts")]

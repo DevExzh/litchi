@@ -5492,6 +5492,27 @@
           "name": "get_max_operations",
           "scope": "litchi_ppt::package::edit::EditOptions",
           "replacement": "use max_operations_value() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_ppt",
+          "replacement": "limits come from OpenOptions (owners) or a required limits argument (record APIs); record 0351 §2.5 rule 3",
+          "match": "suffix"
+        },
+        {
+          "name": "presentation_with_options_and_limits",
+          "scope": "litchi_ppt::raw::Reader",
+          "replacement": "the reader keeps the limits it was opened with (record 0351 §2.5 rule 4)"
+        },
+        {
+          "name": "presentation_with_options_and_limits",
+          "scope": "litchi_ppt::SourceBackedPackage",
+          "replacement": "the package keeps the limits it was opened with (record 0351 §2.5 rule 2)"
+        },
+        {
+          "name": "from_path",
+          "scope": "litchi_ppt::SourceBackedPackage",
+          "replacement": "use open / open_with_options (record 0351 §2.5 rule 1)"
         }
       ],
       "families": [
@@ -5757,6 +5778,27 @@
           "name": "get_max_operations",
           "scope": "litchi_ppt::package::edit::EditOptions",
           "replacement": "use max_operations_value() (record 0351 §2.5 rule 6)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_ppt",
+          "replacement": "limits come from OpenOptions (owners) or a required limits argument (record APIs); record 0351 §2.5 rule 3",
+          "match": "suffix"
+        },
+        {
+          "name": "presentation_with_options_and_limits",
+          "scope": "litchi_ppt::raw::Reader",
+          "replacement": "the reader keeps the limits it was opened with (record 0351 §2.5 rule 4)"
+        },
+        {
+          "name": "presentation_with_options_and_limits",
+          "scope": "litchi_ppt::SourceBackedPackage",
+          "replacement": "the package keeps the limits it was opened with (record 0351 §2.5 rule 2)"
+        },
+        {
+          "name": "from_path",
+          "scope": "litchi_ppt::SourceBackedPackage",
+          "replacement": "use open / open_with_options (record 0351 §2.5 rule 1)"
         }
       ],
       "families": [

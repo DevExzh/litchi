@@ -152,7 +152,7 @@ fn rejects_malformed_build_list_and_limit_overflow() {
     let valid = build_list(&[build(1, 42, BuildType::AsOneObject)]);
     assert!(parse_bytes(&valid[..valid.len() - 1], &bytes).is_err());
     assert!(
-        parse_bytes_with_limits(
+        codec::parse_bytes_with_limits(
             &valid,
             &bytes,
             Limits {

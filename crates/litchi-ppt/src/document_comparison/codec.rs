@@ -170,7 +170,7 @@ impl DiffTree10 {
     /// Returns an error if `max_records` is zero, or if the container header,
     /// reviewer-name atom, or any nested `Diff10` record is malformed or
     /// truncated.
-    pub fn parse_with_limits(
+    pub(crate) fn parse_with_limits(
         record: &Record,
         max_depth: usize,
         max_records: usize,

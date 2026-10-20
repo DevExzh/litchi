@@ -50,7 +50,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the record header or payload is malformed or exceeds `limits`.
-    pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
         let record = bytes.as_ref();
         let anchor = Anchor::parse_with_limits(record, limits)?;
         Ok(Self::from_parts(Arc::from(record), anchor, limits))

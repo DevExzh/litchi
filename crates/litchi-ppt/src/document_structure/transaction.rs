@@ -184,7 +184,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
         let validated_limits = limits.validate()?;
         let input = bytes.as_ref();
         if input.len() > validated_limits.max_bytes {
@@ -227,7 +227,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn from_record_with_limits(mut root: Record, limits: Limits) -> Result<Self> {
+    pub(crate) fn from_record_with_limits(mut root: Record, limits: Limits) -> Result<Self> {
         let validated_limits = limits.validate()?;
         codec::synchronize(&mut root)?;
         let bytes = codec::encode_document(&root)?;

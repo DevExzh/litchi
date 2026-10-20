@@ -672,7 +672,7 @@ impl Snapshot {
             }
             .into());
         }
-        let mut package = Reader::from_reader_with_limits(Cursor::new(bytes.as_slice()), limits)?;
+        let mut package = Reader::from_reader_with_options(Cursor::new(bytes.as_slice()), options)?;
         let has_signature = package.contains_signature_component()?;
         let presentation = package.presentation_with_options(options)?;
         let directory = presentation.slide_directory();
@@ -4950,7 +4950,7 @@ fn persisted_record(snapshot: &Snapshot, persist_id: u32) -> Result<Vec<u8>> {
 /// same source limits and leniency policy captured by the snapshot.
 fn persisted_record_readonly(snapshot: &Snapshot, persist_id: u32) -> Result<Vec<u8>> {
     let mut package =
-        Reader::from_reader_with_limits(Cursor::new(snapshot.bytes()), snapshot.limits)?;
+        Reader::from_reader_with_options(Cursor::new(snapshot.bytes()), snapshot.open_options())?;
     let presentation = package.presentation_with_options(snapshot.open_options())?;
     let factory = crate::slide::SlideFactory::new_shared_with_limits(
         &presentation.inner.powerpoint_document,
@@ -5943,7 +5943,7 @@ struct PictureInventory {
 
 fn picture_inventory(snapshot: &Snapshot) -> Result<PictureInventory> {
     let mut package =
-        Reader::from_reader_with_limits(Cursor::new(snapshot.bytes()), snapshot.limits)?;
+        Reader::from_reader_with_options(Cursor::new(snapshot.bytes()), snapshot.open_options())?;
     let presentation = package.presentation_with_options(snapshot.open_options())?;
     let slots = presentation
         .image_store()?

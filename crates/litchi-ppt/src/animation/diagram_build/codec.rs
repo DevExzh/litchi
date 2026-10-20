@@ -224,7 +224,7 @@ impl Container {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
         if bytes.len() > limits.max_record_bytes {
             return Err(Error::InvalidFormat(
                 "DiagramBuild exceeds the configured record-size limit".to_string(),

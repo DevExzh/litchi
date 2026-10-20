@@ -415,7 +415,7 @@ impl Presentation {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn main_master_programmable_tags_with_limits(
+    pub(crate) fn main_master_programmable_tags_with_limits(
         &self,
         limits: crate::ProgTagLimits,
     ) -> Result<Vec<crate::ProgTags>> {
@@ -951,7 +951,7 @@ impl Presentation {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn fonts_with_limits(
+    pub(crate) fn fonts_with_limits(
         &self,
         mut limits: crate::font::Limits,
     ) -> Result<crate::font::FontCollections> {
@@ -1790,7 +1790,7 @@ impl Presentation {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn programmable_tags_with_limits(
+    pub(crate) fn programmable_tags_with_limits(
         &self,
         limits: crate::ProgTagLimits,
     ) -> Result<Option<crate::ProgTags>> {
@@ -1802,7 +1802,7 @@ impl Presentation {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn shape_programmable_tags_with_limits(
+    pub(crate) fn shape_programmable_tags_with_limits(
         &self,
         limits: crate::ShapeProgrammableTagLimits,
     ) -> Result<Vec<crate::PresentationShapeProgrammableTagsEntry>> {
@@ -1833,7 +1833,7 @@ impl Presentation {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn shape_flags_with_limits(
+    pub(crate) fn shape_flags_with_limits(
         &self,
         limits: crate::ShapeFlagLimits,
     ) -> Result<Vec<crate::PresentationShapeFlagEntry>> {
@@ -1864,7 +1864,7 @@ impl Presentation {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn placeholder_atoms_with_limits(
+    pub(crate) fn placeholder_atoms_with_limits(
         &self,
         limits: crate::PlaceholderLimits,
     ) -> Result<Vec<crate::PresentationPlaceholderEntry>> {

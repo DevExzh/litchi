@@ -114,7 +114,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
         Self::from_bytes_with_limits(bytes.as_ref().to_vec(), limits)
     }
 
@@ -132,7 +132,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+    pub(crate) fn from_bytes_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         let validated = validation::parse_source(&bytes, limits)?;
         let shared_bytes: Arc<[u8]> = Arc::from(bytes.into_boxed_slice());
         let revision = Revision::from_bytes(&shared_bytes);

@@ -54,7 +54,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+    pub(crate) fn from_bytes_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         if bytes.len() > MAX_PACKAGE_BYTES {
             return Err(Error::InvalidFormat(
                 "PowerPoint package exceeds the bounded package byte limit".into(),

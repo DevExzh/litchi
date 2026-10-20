@@ -177,7 +177,7 @@ impl Snapshot {
         clippy::needless_pass_by_value,
         reason = "taking the record by value is the established public API; the snapshot stores a normalized re-parse, so the argument is only borrowed internally"
     )]
-    pub fn from_record_with_limits(root: Record, limits: Limits) -> Result<Self> {
+    pub(crate) fn from_record_with_limits(root: Record, limits: Limits) -> Result<Self> {
         let validated = limits.validate()?;
         validation::validate_document(&root, validated)?;
         let bytes = codec::encode_document(&root)?;
@@ -215,7 +215,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
         let snapshot = Self::from_record_with_limits(
             {
                 let (record, consumed) = Record::parse_strict(bytes, 0)?;

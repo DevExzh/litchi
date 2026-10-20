@@ -21,7 +21,7 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
-pub use codec::{parse, parse_bytes, parse_bytes_with_limits, parse_with_limits};
+pub use codec::{parse, parse_bytes};
 pub use model::{
     Build, Diagram, EditLimits, Id, Inventory, Limits, Payload, PayloadKind, ShapeRef,
 };

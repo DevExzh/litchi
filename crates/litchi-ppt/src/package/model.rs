@@ -850,6 +850,8 @@ pub struct Reader<R: Read + Seek = File> {
     pub(super) ole: OleFile<R>,
     /// Limits inherited by [`Reader::presentation`](super::Reader::presentation).
     pub(super) source_limits: SourceLimits,
+    /// Leniency inherited by [`Reader::presentation`](super::Reader::presentation).
+    pub(super) leniency: crate::leniency::Leniency,
 }
 
 // `From<Error> for litchi_core::Error` lives here (not in the umbrella) so

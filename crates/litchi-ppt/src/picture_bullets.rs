@@ -199,7 +199,7 @@ impl PictureBullet {
     ///
     /// Returns an error if the bullet exceeds `limits` or its OfficeArt
     /// record is malformed.
-    pub fn to_record_with_limits(&self, limits: PictureBulletLimits) -> Result<Record> {
+    pub(crate) fn to_record_with_limits(&self, limits: PictureBulletLimits) -> Result<Record> {
         limits.validate()?;
         validate_bullet_index(self.index, limits)?;
         validate_officeart_record(
@@ -262,7 +262,7 @@ impl PictureBulletCollection {
     ///
     /// Returns an error if the input cannot be read, is malformed, or exceeds
     /// `limits`.
-    pub fn parse_with_limits(record: &Record, limits: PictureBulletLimits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(record: &Record, limits: PictureBulletLimits) -> Result<Self> {
         limits.validate()?;
         if record.record_type != RecordType::BlipCollection9
             || record.version != 0x0f
@@ -337,7 +337,7 @@ impl PictureBulletCollection {
     ///
     /// Returns an error if the input is malformed or more than one owner is
     /// present.
-    pub fn parse_from_with_limits(
+    pub(crate) fn parse_from_with_limits(
         root: &Record,
         limits: PictureBulletLimits,
     ) -> Result<Option<Self>> {
@@ -375,7 +375,7 @@ impl PictureBulletCollection {
     ///
     /// Returns an error if the collection cannot be represented by the
     /// `BlipCollection9Container` grammar.
-    pub fn to_record_with_limits(&self, limits: PictureBulletLimits) -> Result<Record> {
+    pub(crate) fn to_record_with_limits(&self, limits: PictureBulletLimits) -> Result<Record> {
         limits.validate()?;
         if self.bullets.len() > limits.max_bullets {
             return Err(Error::ResourceLimit(
@@ -444,7 +444,7 @@ impl PictureBulletCollection {
     /// # Errors
     ///
     /// Returns an error if validation or bounded serialization fails.
-    pub fn to_bytes_with_limits(&self, limits: PictureBulletLimits) -> Result<Vec<u8>> {
+    pub(crate) fn to_bytes_with_limits(&self, limits: PictureBulletLimits) -> Result<Vec<u8>> {
         let record = self.to_record_with_limits(limits)?;
         let maximum = limits
             .max_collection_bytes
@@ -663,14 +663,18 @@ fn collect_source_picture_bullet_references(
 ) -> Result<Vec<u16>> {
     let mut references = collect_picture_bullet_references(document, limits)?;
     validate_admitted_picture_bullet_references(&references, collection)?;
-    let mut package = crate::raw::Reader::from_reader(std::io::Cursor::new(source.bytes()))?;
-    let presentation = package.presentation_with_limits(limits.records)?;
+    let mut package = crate::raw::Reader::from_reader_with_options(
+        std::io::Cursor::new(source.bytes()),
+        crate::OpenOptions::new()
+            .source_limits(limits.records.constrained_by(SourceLimits::default())),
+    )?;
+    let presentation = package.presentation()?;
     let shape_limits = crate::ShapeProgrammableTagLimits {
         max_style_payload_bytes: limits.max_collection_bytes,
         max_style_runs: limits.max_references,
         ..crate::ShapeProgrammableTagLimits::default()
     };
-    use crate::odraw::ShapeExt;
+    use crate::odraw::ShapeLimitsExt as _;
     for record in presentation
         .inner
         .parser
@@ -1017,7 +1021,10 @@ impl PictureBulletSnapshot {
     }
 
     /// Snapshot a borrowed CFB source under explicit limits.
-    pub fn parse_with_limits(bytes: &[u8], limits: PictureBulletPackageLimits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(
+        bytes: &[u8],
+        limits: PictureBulletPackageLimits,
+    ) -> Result<Self> {
         validate_picture_bullet_source_len(bytes.len(), limits)?;
         // Admit the borrowed bytes first. The owned CFB copy is retained only
         // after the live owner, record tree, and picture-bullet limits pass,
@@ -1041,7 +1048,7 @@ impl PictureBulletSnapshot {
     }
 
     /// Snapshot an owned CFB source under explicit limits.
-    pub fn from_bytes_with_limits(
+    pub(crate) fn from_bytes_with_limits(
         bytes: Vec<u8>,
         limits: PictureBulletPackageLimits,
     ) -> Result<Self> {
@@ -1576,24 +1583,16 @@ fn preflight_picture_bullet_publication(
 
 /// Read the live picture-bullet collection from a cursor-backed package.
 impl<R: std::io::Read + std::io::Seek> crate::raw::Reader<R> {
-    /// Read the live picture-bullet collection under explicit limits.
-    pub fn picture_bullets_with_limits(
-        &mut self,
-        limits: PictureBulletLimits,
-    ) -> Result<Option<PictureBulletCollection>> {
-        self.presentation()?.picture_bullets_with_limits(limits)
-    }
-
-    /// Read the live picture-bullet collection with default limits.
+    /// Read the live picture-bullet collection under the reader's limits.
     pub fn picture_bullets(&mut self) -> Result<Option<PictureBulletCollection>> {
-        self.picture_bullets_with_limits(PictureBulletLimits::default())
+        self.presentation()?.picture_bullets()
     }
 }
 
 /// Read the live picture-bullet collection from a positional package.
 impl crate::SourceBackedPackage {
     /// Read the live picture-bullet collection under explicit limits.
-    pub fn picture_bullets_with_limits(
+    pub(crate) fn picture_bullets_with_limits(
         &self,
         limits: PictureBulletLimits,
     ) -> Result<Option<PictureBulletCollection>> {
@@ -1614,7 +1613,7 @@ impl crate::Presentation {
     }
 
     /// Read the live picture-bullet collection under explicit limits.
-    pub fn picture_bullets_with_limits(
+    pub(crate) fn picture_bullets_with_limits(
         &self,
         mut limits: PictureBulletLimits,
     ) -> Result<Option<PictureBulletCollection>> {

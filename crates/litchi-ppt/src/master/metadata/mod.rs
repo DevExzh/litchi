@@ -39,17 +39,6 @@ impl Snapshot {
         Self::from_inner(master_layout::Snapshot::from_record(context, root)?)
     }
 
-    /// Validate and capture one contextual master under explicit tree limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn from_record_with_limits(context: Context, root: Record, limits: Limits) -> Result<Self> {
-        Self::from_inner(master_layout::Snapshot::from_record_with_limits(
-            context, root, limits,
-        )?)
-    }
-
     /// Parse one complete contextual master record.
     ///
     /// # Errors
@@ -57,17 +46,6 @@ impl Snapshot {
     /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(context: Context, bytes: &[u8]) -> Result<Self> {
         Self::from_inner(master_layout::Snapshot::parse(context, bytes)?)
-    }
-
-    /// Parse one complete contextual master under explicit tree limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(context: Context, bytes: &[u8], limits: Limits) -> Result<Self> {
-        Self::from_inner(master_layout::Snapshot::parse_with_limits(
-            context, bytes, limits,
-        )?)
     }
 
     fn from_inner(inner: master_layout::Snapshot) -> Result<Self> {
