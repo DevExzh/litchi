@@ -3,7 +3,7 @@
 use super::*;
 use crate::drawable_order::{DrawableLayerMove, move_drawable_layer, validate_unique_drawables};
 
-impl NumbersEditor {
+impl Editor {
     /// List one sheet's drawable identifiers from the back-most to the front-most layer.
     pub fn sheet_drawable_order(&self, sheet_id: u64) -> Result<Vec<u64>> {
         let (_, _, sheet) = numbers_sheet(&self.package, sheet_id)?;
@@ -81,7 +81,7 @@ impl NumbersEditor {
 mod tests {
     use super::*;
     use crate::DrawableLayerMove;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     const OVERLAP_POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 180.0 };
@@ -92,7 +92,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_drawable_order_crud() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Layered")
             .table_name("Data")
             .build()
@@ -131,7 +131,7 @@ mod tests {
             .set_sheet_drawable_order(sheet_id, &reversed)
             .unwrap();
         assert_eq!(editor.sheet_drawable_order(sheet_id).unwrap(), reversed);
-        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.sheet_drawable_order(sheet_id).unwrap(), reversed);
 
         let bytes = editor.to_bytes().unwrap();
@@ -154,7 +154,7 @@ mod tests {
         );
     }
 
-    fn append_rectangle(editor: &mut NumbersEditor, sheet_id: u64, text: &str) -> u64 {
+    fn append_rectangle(editor: &mut Editor, sheet_id: u64, text: &str) -> u64 {
         editor
             .add_sheet_rectangle(sheet_id, text, OVERLAP_POSITION, OVERLAP_SIZE)
             .unwrap()

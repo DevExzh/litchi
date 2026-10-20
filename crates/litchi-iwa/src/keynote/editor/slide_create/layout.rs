@@ -23,7 +23,7 @@ pub(in crate::keynote::editor) struct ResolvedLayout {
 }
 
 pub(in crate::keynote::editor) struct LayoutCatalog {
-    infos: Vec<KeynoteSlideLayoutInfo>,
+    infos: Vec<SlideLayoutInfo>,
     by_template_slide: HashMap<u64, usize>,
 }
 
@@ -44,7 +44,7 @@ impl LayoutCatalog {
                     reference.identifier
                 )));
             }
-            let id = KeynoteSlideLayoutId::new(reference.identifier).ok_or_else(|| {
+            let id = SlideLayoutId::new(reference.identifier).ok_or_else(|| {
                 Error::InvalidFormat(
                     "Keynote theme contains a null layout node reference".to_owned(),
                 )
@@ -63,7 +63,7 @@ impl LayoutCatalog {
             let is_default = id.as_u64() == default.as_u64();
             found_default |= is_default;
             let index = infos.len();
-            infos.push(KeynoteSlideLayoutInfo {
+            infos.push(SlideLayoutInfo {
                 id,
                 name,
                 is_default,
@@ -90,7 +90,7 @@ impl LayoutCatalog {
     pub(in crate::keynote::editor) fn current(
         &self,
         template_slide_id: u64,
-    ) -> Result<KeynoteSlideLayoutInfo> {
+    ) -> Result<SlideLayoutInfo> {
         self.by_template_slide
             .get(&template_slide_id)
             .map(|index| self.infos[*index].clone())
@@ -101,7 +101,7 @@ impl LayoutCatalog {
             })
     }
 
-    pub(in crate::keynote::editor) fn default_layout(&self) -> Result<KeynoteSlideLayoutId> {
+    pub(in crate::keynote::editor) fn default_layout(&self) -> Result<SlideLayoutId> {
         self.infos
             .iter()
             .find(|layout| layout.is_default)
@@ -111,7 +111,7 @@ impl LayoutCatalog {
             })
     }
 
-    pub(super) fn into_infos(self) -> Vec<KeynoteSlideLayoutInfo> {
+    pub(super) fn into_infos(self) -> Vec<SlideLayoutInfo> {
         self.infos
     }
 }
@@ -132,7 +132,7 @@ pub(in crate::keynote::editor) fn read_layout_graph(graph: &ObjectGraph) -> Resu
     })
 }
 
-pub(super) fn default_layout_node_id(theme: &kn::ThemeArchive) -> Result<KeynoteSlideLayoutId> {
+pub(super) fn default_layout_node_id(theme: &kn::ThemeArchive) -> Result<SlideLayoutId> {
     let reference = theme
         .default_template_slide_node_reference
         .as_ref()
@@ -140,7 +140,7 @@ pub(super) fn default_layout_node_id(theme: &kn::ThemeArchive) -> Result<Keynote
         .ok_or_else(|| {
             Error::InvalidFormat("Keynote theme has no default slide layout".to_owned())
         })?;
-    KeynoteSlideLayoutId::new(reference.identifier).ok_or_else(|| {
+    SlideLayoutId::new(reference.identifier).ok_or_else(|| {
         Error::InvalidFormat("Keynote theme default layout node reference is null".to_owned())
     })
 }

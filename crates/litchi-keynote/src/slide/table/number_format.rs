@@ -15,12 +15,12 @@ use std::fmt::Write as _;
 /// table's declared extent before it inspects any cell storage.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct CellPosition {
+pub struct At {
     row: u32,
     column: u32,
 }
 
-impl CellPosition {
+impl At {
     /// Constructs a compact zero-based coordinate.
     #[must_use]
     pub const fn new(row: u32, column: u32) -> Self {
@@ -28,12 +28,10 @@ impl CellPosition {
     }
 
     /// Converts platform-sized coordinates without truncation.
-    pub fn try_from_usize(row: usize, column: usize) -> Result<Self, CellPositionError> {
+    pub fn try_from_usize(row: usize, column: usize) -> Result<Self, AtError> {
         Ok(Self::new(
-            u32::try_from(row)
-                .map_err(|_| CellPositionError::CoordinateOverflow { row, column })?,
-            u32::try_from(column)
-                .map_err(|_| CellPositionError::CoordinateOverflow { row, column })?,
+            u32::try_from(row).map_err(|_| AtError::CoordinateOverflow { row, column })?,
+            u32::try_from(column).map_err(|_| AtError::CoordinateOverflow { row, column })?,
         ))
     }
 
@@ -41,10 +39,10 @@ impl CellPosition {
     ///
     /// Relative and absolute markers ($B$2, $B2, and B$2) are accepted.
     /// Parsing is allocation-free.
-    pub fn from_a1(address: &str) -> Result<Self, CellPositionError> {
+    pub fn from_a1(address: &str) -> Result<Self, AtError> {
         let bytes = address.as_bytes();
         if bytes.is_empty() {
-            return Err(CellPositionError::InvalidAddress);
+            return Err(AtError::InvalidAddress);
         }
         let mut cursor = 0usize;
         if bytes[cursor] == b'$' {
@@ -58,14 +56,14 @@ impl CellPosition {
             one_based_column = one_based_column
                 .checked_mul(26)
                 .and_then(|value| value.checked_add(digit))
-                .ok_or(CellPositionError::CoordinateOverflow {
+                .ok_or(AtError::CoordinateOverflow {
                     row: 0,
                     column: usize::MAX,
                 })?;
             cursor += 1;
         }
         if cursor == column_start || one_based_column == 0 {
-            return Err(CellPositionError::InvalidAddress);
+            return Err(AtError::InvalidAddress);
         }
         if cursor < bytes.len() && bytes[cursor] == b'$' {
             cursor += 1;
@@ -76,27 +74,24 @@ impl CellPosition {
             one_based_row = one_based_row
                 .checked_mul(10)
                 .and_then(|value| value.checked_add(u64::from(bytes[cursor] - b'0')))
-                .ok_or(CellPositionError::CoordinateOverflow {
+                .ok_or(AtError::CoordinateOverflow {
                     row: usize::MAX,
                     column: 0,
                 })?;
             cursor += 1;
         }
         if cursor == row_start || one_based_row == 0 || cursor != bytes.len() {
-            return Err(CellPositionError::InvalidAddress);
+            return Err(AtError::InvalidAddress);
         }
-        let row = u32::try_from(one_based_row - 1).map_err(|_| {
-            CellPositionError::CoordinateOverflow {
-                row: usize::MAX,
-                column: 0,
-            }
+        let row = u32::try_from(one_based_row - 1).map_err(|_| AtError::CoordinateOverflow {
+            row: usize::MAX,
+            column: 0,
         })?;
-        let column = u32::try_from(one_based_column - 1).map_err(|_| {
-            CellPositionError::CoordinateOverflow {
+        let column =
+            u32::try_from(one_based_column - 1).map_err(|_| AtError::CoordinateOverflow {
                 row: 0,
                 column: usize::MAX,
-            }
-        })?;
+            })?;
         Ok(Self::new(row, column))
     }
 
@@ -113,7 +108,7 @@ impl CellPosition {
     }
 }
 
-impl fmt::Display for CellPosition {
+impl fmt::Display for At {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut column = u64::from(self.column) + 1;
         let mut labels = [0u8; 7];
@@ -132,14 +127,14 @@ impl fmt::Display for CellPosition {
 
 /// Checked coordinate-construction failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CellPositionError {
+pub enum AtError {
     /// A platform-sized coordinate does not fit in the compact form.
     CoordinateOverflow { row: usize, column: usize },
     /// The address is not a complete A1 coordinate.
     InvalidAddress,
 }
 
-impl fmt::Display for CellPositionError {
+impl fmt::Display for AtError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::CoordinateOverflow { .. } => formatter.write_str("cell coordinate overflows u32"),
@@ -148,7 +143,7 @@ impl fmt::Display for CellPositionError {
     }
 }
 
-impl std::error::Error for CellPositionError {}
+impl std::error::Error for AtError {}
 
 /// Failure from a checked Number-format value constructor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

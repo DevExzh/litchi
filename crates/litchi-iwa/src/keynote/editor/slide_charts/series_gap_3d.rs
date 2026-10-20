@@ -7,7 +7,7 @@ use crate::charts::series_gap_3d::{
     set_chart_3d_series_gap as set_native_chart_3d_series_gap,
 };
 
-impl KeynoteEditor {
+impl Editor {
     /// Read one 3D line/area chart's `Between Series` gap.
     pub fn slide_chart_3d_series_gap(
         &self,
@@ -51,7 +51,7 @@ impl KeynoteEditor {
             graph.info.kind,
             gap,
         )?;
-        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_3d_series_gap(slide_index, drawable_object_id)? != gap {
             return Err(Error::InvalidFormat(
                 "Keynote chart 3D series-gap update failed validation".to_owned(),
@@ -65,12 +65,12 @@ impl KeynoteEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_presentation_supports_3d_series_gap_crud() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let chart = editor
             .add_slide_chart(
                 0,
@@ -87,7 +87,7 @@ mod tests {
         editor
             .set_slide_chart_3d_series_gap(0, chart.drawable_object_id, gap)
             .unwrap();
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_chart_3d_series_gap(0, chart.drawable_object_id)

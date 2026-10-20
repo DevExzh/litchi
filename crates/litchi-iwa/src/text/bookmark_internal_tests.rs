@@ -1,5 +1,5 @@
 use crate::archive::RawMessage;
-use crate::pages::PagesEditor;
+use crate::pages;
 use crate::protobuf::tswp;
 use crate::wire::{
     append_length_delimited_field, parse_wire_fields, patch_varint_field,
@@ -16,7 +16,7 @@ use prost::Message;
 const BOOKMARK_TABLE_FIELD: u32 = 15;
 
 fn fixture() -> (super::super::IWorkTextEditor, TextStorageId) {
-    let pages = PagesEditor::create_with_text("Alpha Beta").unwrap();
+    let pages = pages::Editor::create_with_text("Alpha Beta").unwrap();
     let storage_id = pages.body_storage().unwrap().id;
     (
         super::super::IWorkTextEditor::from_package(pages.into_package()),

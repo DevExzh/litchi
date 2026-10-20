@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote;
 use litchi_keynote::{
     Package, SlideSelector,
     slide::placeholder::{Kind, State},
@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .ok_or("usage: create_keynote_slide_numbers <output.key>")?,
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new()
+    let mut keynote = keynote::Builder::new()
         .title("Native slide numbers")
         .subtitle("Created entirely by litchi-iwa")
         .slide_number_visible(true)

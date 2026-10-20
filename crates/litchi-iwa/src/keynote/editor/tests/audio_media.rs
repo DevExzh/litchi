@@ -24,7 +24,7 @@ mod cases {
     use prost::Message as _;
 
     use super::super::*;
-    use crate::keynote::{KeynoteBuildSettings, KeynoteDocumentBuilder, KeynoteEditor};
+    use crate::keynote::{self, BuildSettings, Editor};
     use crate::shapes::DrawablePoint;
 
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsource-built-audio";
@@ -237,7 +237,7 @@ mod cases {
     }
 
     fn native_audio_graph(
-        editor: &KeynoteEditor,
+        editor: &Editor,
         drawable_object_id: u64,
     ) -> TestResult<NativeAudioGraph> {
         let slides = editor.slides()?;
@@ -279,17 +279,17 @@ mod cases {
         })
     }
 
-    fn focused_audio_package(editor: &KeynoteEditor) -> TestResult<Package> {
+    fn focused_audio_package(editor: &Editor) -> TestResult<Package> {
         Ok(Package::from_bytes(&editor.to_bytes()?)?)
     }
 
-    fn replace_with_focused_package(editor: &mut KeynoteEditor, package: &Package) -> TestResult {
+    fn replace_with_focused_package(editor: &mut Editor, package: &Package) -> TestResult {
         let bytes = package_bytes(package)?;
-        *editor = KeynoteEditor::from_bytes(&bytes)?;
+        *editor = Editor::from_bytes(&bytes)?;
         Ok(())
     }
 
-    fn audio_snapshot(editor: &KeynoteEditor, movie_position: usize) -> TestResult<AudioSnapshot> {
+    fn audio_snapshot(editor: &Editor, movie_position: usize) -> TestResult<AudioSnapshot> {
         let package = focused_audio_package(editor)?;
         let slide = package
             .show()?
@@ -337,7 +337,7 @@ mod cases {
         })
     }
 
-    fn audio_positions(editor: &KeynoteEditor) -> TestResult<Vec<usize>> {
+    fn audio_positions(editor: &Editor) -> TestResult<Vec<usize>> {
         let package = focused_audio_package(editor)?;
         Ok(package
             .show()?
@@ -351,14 +351,14 @@ mod cases {
             .collect())
     }
 
-    fn audio_snapshots(editor: &KeynoteEditor) -> TestResult<Vec<AudioSnapshot>> {
+    fn audio_snapshots(editor: &Editor) -> TestResult<Vec<AudioSnapshot>> {
         audio_positions(editor)?
             .into_iter()
             .map(|position| audio_snapshot(editor, position))
             .collect()
     }
 
-    fn audio_data_ids(editor: &KeynoteEditor) -> TestResult<Vec<u64>> {
+    fn audio_data_ids(editor: &Editor) -> TestResult<Vec<u64>> {
         if audio_positions(editor)?.is_empty() {
             return Ok(Vec::new());
         }
@@ -378,7 +378,7 @@ mod cases {
     }
 
     fn add_audio(
-        editor: &mut KeynoteEditor,
+        editor: &mut Editor,
         preferred_filename: &str,
         data: &[u8],
         options: SlideAudioOptions,
@@ -395,7 +395,7 @@ mod cases {
     }
 
     fn set_audio_properties(
-        editor: &mut KeynoteEditor,
+        editor: &mut Editor,
         movie_position: usize,
         properties: MediaProperties,
     ) -> TestResult {
@@ -411,7 +411,7 @@ mod cases {
     }
 
     fn set_audio_playback(
-        editor: &mut KeynoteEditor,
+        editor: &mut Editor,
         movie_position: usize,
         playback: MediaPlaybackSettings,
     ) -> TestResult {
@@ -427,7 +427,7 @@ mod cases {
     }
 
     fn set_audio_position(
-        editor: &mut KeynoteEditor,
+        editor: &mut Editor,
         movie_position: usize,
         position: DrawablePoint,
     ) -> TestResult {
@@ -445,11 +445,7 @@ mod cases {
         replace_with_focused_package(editor, commit.package())
     }
 
-    fn replace_audio_data(
-        editor: &mut KeynoteEditor,
-        movie_position: usize,
-        data: &[u8],
-    ) -> TestResult {
+    fn replace_audio_data(editor: &mut Editor, movie_position: usize, data: &[u8]) -> TestResult {
         let package = focused_audio_package(editor)?;
         let commit = package
             .edit_slide_media_data(
@@ -462,10 +458,7 @@ mod cases {
         replace_with_focused_package(editor, commit.package())
     }
 
-    fn duplicate_audio(
-        editor: &mut KeynoteEditor,
-        movie_position: usize,
-    ) -> TestResult<AudioSnapshot> {
+    fn duplicate_audio(editor: &mut Editor, movie_position: usize) -> TestResult<AudioSnapshot> {
         let package = focused_audio_package(editor)?;
         let commit = package.duplicate_slide_audio(
             SlideSelector::index(0),
@@ -480,7 +473,7 @@ mod cases {
     }
 
     fn remove_audio(
-        editor: &mut KeynoteEditor,
+        editor: &mut Editor,
         movie_position: usize,
     ) -> TestResult<(Vec<u64>, Vec<Vec<u8>>)> {
         let before_data_ids = audio_data_ids(editor)?;
@@ -512,7 +505,7 @@ mod cases {
         ))
     }
 
-    fn audio_count(editor: &KeynoteEditor) -> TestResult<usize> {
+    fn audio_count(editor: &Editor) -> TestResult<usize> {
         Ok(focused_audio_package(editor)?
             .show()?
             .slides()
@@ -524,7 +517,7 @@ mod cases {
 
     #[test]
     fn source_built_audio_properties_project_through_focused_updates() -> TestResult {
-        let mut seed = KeynoteDocumentBuilder::new()
+        let mut seed = keynote::Builder::new()
             .title("Audio properties projection")
             .build()?;
         let created = add_audio(
@@ -535,7 +528,7 @@ mod cases {
         )?;
         let baseline = audio_snapshot(&seed, 0)?;
         assert_eq!(created, baseline);
-        let mut editor = KeynoteEditor::from_bytes(&seed.to_bytes()?)?;
+        let mut editor = Editor::from_bytes(&seed.to_bytes()?)?;
         let focused_before = focused_audio_package(&editor)?
             .slide_media_properties(SlideSelector::index(0), MovieSelector::index(0))?;
         assert_eq!(baseline.properties, focused_before);
@@ -574,7 +567,7 @@ mod cases {
 
     #[test]
     fn scratch_presentation_supports_slide_audio_crud() -> TestResult {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Scratch audio")
             .subtitle("No embedded package")
             .build()?;
@@ -600,10 +593,10 @@ mod cases {
             builds[0].drawable_object_id,
             created.native.drawable_object_id
         );
-        assert_eq!(builds[0].settings, KeynoteBuildSettings::audio_start());
+        assert_eq!(builds[0].settings, BuildSettings::audio_start());
         assert_eq!(builds[0].chunks.len(), 1);
 
-        let roundtripped = KeynoteEditor::from_bytes(&editor.to_bytes()?)?;
+        let roundtripped = Editor::from_bytes(&editor.to_bytes()?)?;
         assert_eq!(audio_snapshot(&roundtripped, 0)?, created);
 
         let changed_playback = MediaPlaybackSettings {
@@ -665,13 +658,13 @@ mod cases {
         );
         assert!(audio_data_ids(&editor)?.is_empty());
         assert_eq!(native_asset_count(&editor.to_bytes()?)?, 0);
-        KeynoteEditor::from_bytes(&editor.to_bytes()?)?;
+        Editor::from_bytes(&editor.to_bytes()?)?;
         Ok(())
     }
 
     #[test]
     fn scratch_presentation_supports_native_audio_duplication() -> TestResult {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Scratch audio")
             .subtitle("No embedded package")
             .build()?;
@@ -723,10 +716,7 @@ mod cases {
             .filter(|build| build.drawable_object_id == duplicate.native.drawable_object_id)
             .collect::<Vec<_>>();
         assert_eq!(duplicate_builds.len(), 1);
-        assert_eq!(
-            duplicate_builds[0].settings,
-            KeynoteBuildSettings::audio_start()
-        );
+        assert_eq!(duplicate_builds[0].settings, BuildSettings::audio_start());
         assert_eq!(duplicate_builds[0].chunks.len(), 1);
 
         let moved_duplicate = DrawablePoint { x: 320.0, y: 240.0 };
@@ -747,7 +737,7 @@ mod cases {
             source.native.data_identifier
         );
 
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes()?)?;
+        let reopened = Editor::from_bytes(&editor.to_bytes()?)?;
         assert_eq!(audio_count(&reopened)?, 2);
         assert_eq!(
             audio_snapshot(&reopened, 0)?.native.data_identifier,
@@ -790,13 +780,13 @@ mod cases {
         );
         assert!(audio_data_ids(&editor)?.is_empty());
         assert_eq!(native_asset_count(&editor.to_bytes()?)?, 0);
-        KeynoteEditor::from_bytes(&editor.to_bytes()?)?;
+        Editor::from_bytes(&editor.to_bytes()?)?;
         Ok(())
     }
 
     #[test]
     fn invalid_slide_audio_creation_and_cross_type_edits_are_transactional() -> TestResult {
-        let mut editor = KeynoteDocumentBuilder::new().build()?;
+        let mut editor = keynote::Builder::new().build()?;
         let baseline = editor.to_bytes()?;
         assert!(
             focused_audio_package(&editor)?

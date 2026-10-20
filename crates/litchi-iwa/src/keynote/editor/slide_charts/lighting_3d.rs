@@ -7,7 +7,7 @@ use crate::charts::lighting_3d::{
     set_chart_3d_lighting_style as set_native_chart_3d_lighting_style,
 };
 
-impl KeynoteEditor {
+impl Editor {
     /// Read one slide chart's native Lighting Style choice.
     pub fn slide_chart_3d_lighting_style(
         &self,
@@ -51,7 +51,7 @@ impl KeynoteEditor {
             graph.info.kind,
             style,
         )?;
-        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_3d_lighting_style(slide_index, drawable_object_id)? != style {
             return Err(Error::InvalidFormat(
                 "Keynote chart 3D lighting-style update failed validation".to_owned(),
@@ -65,12 +65,12 @@ impl KeynoteEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_presentation_supports_3d_lighting_style_crud() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let chart = editor
             .add_slide_chart(
                 0,
@@ -93,7 +93,7 @@ mod tests {
         let duplicate = editor
             .duplicate_slide_chart(0, chart_selector(&editor, &chart))
             .unwrap();
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_chart_3d_lighting_style(0, chart.drawable_object_id)

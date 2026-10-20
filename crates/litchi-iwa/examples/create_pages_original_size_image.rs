@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::Path;
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages;
 use litchi_iwa_common::comment::DrawableId;
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_pages::image::Options as ImageOptions;
@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let image_filename = filename(&image_path)?;
     let image = fs::read(&image_path)?;
 
-    let mut editor = PagesEditor::create_with_text(BODY_TEXT)?;
+    let mut editor = pages::Editor::create_with_text(BODY_TEXT)?;
     let created = editor.add_body_image(
         BODY_TEXT.encode_utf16().count(),
         image_filename,

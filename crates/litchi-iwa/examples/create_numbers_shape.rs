@@ -2,7 +2,7 @@
 
 use std::{env, fs, path::Path};
 
-use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::numbers;
 use litchi_iwa::shapes::{
     Appearance, BlurRadius, Contact, DrawablePoint, DrawableSize, Offset, Perspective,
     RgbColorSpace, RgbaColor, Shadow, ShapeFill, ShapeImageFillTechnique,
@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .sheet_name("Scratch Shape")
         .table_name("Scratch Table")
         .build()?;

@@ -28,7 +28,7 @@ use crate::charts::{
     ChartLegendStroke,
 };
 
-impl KeynoteEditor {
+impl Editor {
     /// Read the exact automatic or explicit native legend frame.
     pub fn slide_chart_legend_frame(
         &self,
@@ -63,7 +63,7 @@ impl KeynoteEditor {
             "Keynote",
             frame,
         )?;
-        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_legend_frame(slide_index, drawable_object_id)? != frame {
             return Err(Error::InvalidFormat(
                 "Keynote chart legend-frame update failed validation".to_owned(),
@@ -107,7 +107,7 @@ impl KeynoteEditor {
             "Keynote",
             fill,
         )?;
-        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_legend_fill(slide_index, drawable_object_id)? != *fill {
             return Err(Error::InvalidFormat(
                 "Keynote chart legend-fill update failed validation".to_owned(),
@@ -151,7 +151,7 @@ impl KeynoteEditor {
             "Keynote",
             font,
         )?;
-        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_legend_font(slide_index, drawable_object_id)? != *font {
             return Err(Error::InvalidFormat(
                 "Keynote chart legend font update failed validation".to_owned(),
@@ -195,7 +195,7 @@ impl KeynoteEditor {
             "Keynote",
             size,
         )?;
-        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_legend_font_size(slide_index, drawable_object_id)? != size {
             return Err(Error::InvalidFormat(
                 "Keynote chart legend font-size update failed validation".to_owned(),
@@ -239,7 +239,7 @@ impl KeynoteEditor {
             "Keynote",
             stroke,
         )?;
-        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_legend_stroke(slide_index, drawable_object_id)? != stroke {
             return Err(Error::InvalidFormat(
                 "Keynote chart legend-stroke update failed validation".to_owned(),
@@ -283,7 +283,7 @@ impl KeynoteEditor {
             "Keynote",
             shadow,
         )?;
-        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_legend_shadow(slide_index, drawable_object_id)? != shadow {
             return Err(Error::InvalidFormat(
                 "Keynote chart legend-shadow update failed validation".to_owned(),

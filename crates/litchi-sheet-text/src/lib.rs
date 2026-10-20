@@ -55,7 +55,7 @@ pub use limits::{
     SemanticLimitsBuilder, SourceLimitKind, SourceLimits, SourceLimitsBuilder,
 };
 pub use workbook::Workbook;
-pub use worksheet::{Cell, Worksheet};
+pub use worksheet::{Cell, Cells, Rows, Worksheet, Worksheets};
 
 #[cfg(test)]
 mod tests;

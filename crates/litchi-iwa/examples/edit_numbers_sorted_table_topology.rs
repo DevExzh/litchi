@@ -2,10 +2,7 @@
 
 use std::path::PathBuf;
 
-use litchi_iwa::numbers::{
-    NumbersEditor, NumbersTableSortColumnIndex, NumbersTableSortDirection, NumbersTableSortOrder,
-    NumbersTableSortRule,
-};
+use litchi_iwa::numbers::{self};
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 use litchi_numbers::{Package, SheetSelector, TableSelector};
 
@@ -20,12 +17,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let deleted = PathBuf::from(arguments.next().ok_or(
         "usage: edit_numbers_sorted_table_topology <source.numbers> <inserted.numbers> <deleted.numbers>",
     )?);
-    let expected = NumbersTableSortOrder::new([NumbersTableSortRule::new(
-        NumbersTableSortColumnIndex::new(1)?,
-        NumbersTableSortDirection::Ascending,
+    let expected = numbers::TableSortOrder::new([numbers::TableSortRule::new(
+        numbers::TableSortColumnIndex::new(1)?,
+        numbers::TableSortDirection::Ascending,
     )])?;
 
-    let mut editor = NumbersEditor::open(&source)?;
+    let mut editor = numbers::Editor::open(&source)?;
     let table = TableSelector::index(0);
     let package = Package::from_bytes(&editor.to_bytes()?)?;
     assert_eq!(
@@ -41,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     editor.save(inserted)?;
 
-    let mut editor = NumbersEditor::open(source)?;
+    let mut editor = numbers::Editor::open(source)?;
     let table = TableSelector::index(0);
     let package = Package::from_bytes(&editor.to_bytes()?)?;
     let body_sort_column = 1usize

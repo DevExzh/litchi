@@ -98,7 +98,7 @@ impl AudioObjectIds {
 pub(super) struct BodyAudioGraph {
     pub(super) archive_name: String,
     pub(super) attachment_id: u64,
-    pub(super) info: PagesAudioInfo,
+    pub(super) info: AudioInfo,
     pub(super) geometry: DrawableGeometry,
     pub(super) object_ids: Vec<u64>,
     pub(super) uuid_object_ids: Vec<u64>,
@@ -154,7 +154,7 @@ pub(super) fn audio_style_id(package: &IWorkPackage, root: &PagesDocumentRootFac
         .ok_or_else(|| Error::InvalidFormat("Pages theme has no media style preset".to_owned()))
 }
 
-pub(super) fn body_audio_infos(editor: &PagesEditor) -> Result<Vec<PagesAudioInfo>> {
+pub(super) fn body_audio_infos(editor: &Editor) -> Result<Vec<AudioInfo>> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
         editor.body_storage_id.get(),
@@ -244,15 +244,12 @@ fn audio_is_discoverable(source: &[u8], drawable_object_id: u64) -> Result<bool>
     Ok(flags.audio_only() == Some(true) && flags.is_live_video() != Some(true))
 }
 
-pub(super) fn body_audio_graph(
-    editor: &PagesEditor,
-    drawable_object_id: u64,
-) -> Result<BodyAudioGraph> {
+pub(super) fn body_audio_graph(editor: &Editor, drawable_object_id: u64) -> Result<BodyAudioGraph> {
     body_audio_graph_with_validation(editor, drawable_object_id, AudioGraphValidation::Spatial)
 }
 
 pub(super) fn body_audio_playback_target(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
 ) -> Result<BodyAudioPlaybackTarget> {
     let graph = body_audio_graph_with_validation(
@@ -267,7 +264,7 @@ pub(super) fn body_audio_playback_target(
 }
 
 fn body_audio_graph_with_validation(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
     validation: AudioGraphValidation,
 ) -> Result<BodyAudioGraph> {
@@ -505,7 +502,7 @@ fn body_audio_graph_with_validation(
 }
 
 fn validate_drawable_z_order(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
     z_order_id: Option<u64>,
 ) -> Result<()> {
@@ -528,7 +525,7 @@ fn audio_info(
     archive_name: &str,
     identifier: u64,
     anchor_character_index: u32,
-) -> Result<PagesAudioInfo> {
+) -> Result<AudioInfo> {
     let audio: tsd::MovieArchive =
         decode_typed_package_object(package, identifier, AUDIO_MESSAGE_TYPE, "TSD.MovieArchive")?;
     if audio.audio_only != Some(true) || audio.is_live_video == Some(true) {
@@ -553,7 +550,7 @@ fn audio_info(
         .position
         .ok_or_else(|| Error::InvalidFormat(format!("Pages audio {identifier} has no position")))?;
     let playback = movie_playback_settings(package, archive_name, identifier, "Pages audio")?;
-    Ok(PagesAudioInfo {
+    Ok(AudioInfo {
         drawable_object_id: identifier,
         anchor_character_index,
         audio_data_identifier,

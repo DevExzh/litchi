@@ -9,8 +9,8 @@ use litchi_pages::{BodyChartSelector, Package as FocusedPagesPackage};
 
 /// Populate the public Pages chart listing with one checked focused traversal.
 pub(super) fn fill_focused_chart_arrangements(
-    editor: &PagesEditor,
-    charts: &mut [PagesBodyChartInfo],
+    editor: &Editor,
+    charts: &mut [BodyChartInfo],
     chart_positions: &[usize],
 ) -> Result<()> {
     if charts.is_empty() && chart_positions.is_empty() {
@@ -40,7 +40,7 @@ pub(super) fn fill_focused_chart_arrangements(
 }
 
 pub(super) fn focused_chart_arrangement_at(
-    editor: &PagesEditor,
+    editor: &Editor,
     chart_count: usize,
     chart_position: usize,
 ) -> Result<ChartArrangement> {
@@ -54,7 +54,7 @@ pub(super) fn focused_chart_arrangement_at(
         .map_err(map_focused_chart_arrangement_error)
 }
 
-fn focused_chart_arrangement_package(editor: &PagesEditor) -> Result<FocusedPagesPackage> {
+fn focused_chart_arrangement_package(editor: &Editor) -> Result<FocusedPagesPackage> {
     let bytes = editor.to_bytes()?;
     FocusedPagesPackage::from_bytes(&bytes).map_err(|error| {
         Error::InvalidFormat(format!(
@@ -73,13 +73,13 @@ fn map_focused_chart_arrangement_error(error: litchi_pages::chart::arrangement::
 mod tests {
     use super::*;
     use crate::charts::{ChartData, Kind};
-    use crate::pages::PagesDocumentBuilder;
+    use crate::pages;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_document_supports_focused_chart_arrangement_selector_crud() {
         let body = "Chart arrangement";
-        let mut editor = PagesDocumentBuilder::new().body_text(body).build().unwrap();
+        let mut editor = pages::Builder::new().body_text(body).build().unwrap();
         let chart = editor
             .add_body_chart(
                 body.encode_utf16().count(),
@@ -158,7 +158,7 @@ mod tests {
 
     #[test]
     fn focused_chart_arrangement_edit_reopens_and_inverts_exactly() {
-        let mut editor = PagesDocumentBuilder::new()
+        let mut editor = pages::Builder::new()
             .body_text("Chart arrangement")
             .build()
             .unwrap();
@@ -187,7 +187,7 @@ mod tests {
             .unwrap();
         let mut changed_bytes = Vec::new();
         changed.package().write_to(&mut changed_bytes).unwrap();
-        let reopened = PagesEditor::from_bytes(&changed_bytes).unwrap();
+        let reopened = Editor::from_bytes(&changed_bytes).unwrap();
         assert_eq!(reopened.body_charts().unwrap()[0].arrangement, replacement);
 
         let restored = changed
@@ -204,7 +204,7 @@ mod tests {
         const CHART_COUNT: usize = 32;
         const TARGET_POSITION: usize = 17;
 
-        let mut editor = PagesDocumentBuilder::new()
+        let mut editor = pages::Builder::new()
             .body_text("Chart arrangement")
             .build()
             .unwrap();
@@ -254,7 +254,7 @@ mod tests {
             .unwrap();
         let mut changed_bytes = Vec::new();
         changed.package().write_to(&mut changed_bytes).unwrap();
-        let reopened = PagesEditor::from_bytes(&changed_bytes).unwrap();
+        let reopened = Editor::from_bytes(&changed_bytes).unwrap();
         let mut expected_listing = baseline_listing;
         expected_listing[TARGET_POSITION].arrangement = replacement;
         assert_eq!(reopened.body_charts().unwrap(), expected_listing);
@@ -269,7 +269,7 @@ mod tests {
     }
 
     fn set_focused_arrangement(
-        editor: &mut PagesEditor,
+        editor: &mut Editor,
         chart_position: usize,
         arrangement: ChartArrangement,
     ) {
@@ -282,7 +282,7 @@ mod tests {
             .unwrap();
         let mut bytes = Vec::new();
         commit.package().write_to(&mut bytes).unwrap();
-        *editor = PagesEditor::from_bytes(&bytes).unwrap();
+        *editor = Editor::from_bytes(&bytes).unwrap();
     }
 
     fn data() -> ChartData {

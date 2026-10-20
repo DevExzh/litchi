@@ -33,33 +33,28 @@
 pub mod creation;
 pub mod editor;
 
-pub use creation::KeynoteDocumentBuilder;
+pub use creation::Builder;
 pub use editor::Effect;
 pub use editor::{
-    BuildAcceleration, BuildStart, KeynoteBuildChunkInfo, KeynoteBuildCustomParameters,
-    KeynoteBuildInfo, KeynoteBuildSettings, KeynoteBuildTimingCurve, KeynoteEditor,
-    KeynoteEmphasisAction, KeynoteFlipDirection, KeynoteHorizontalBuildDirection,
-    KeynoteJiggleIntensity, KeynoteKeyboardBuild, KeynoteKeyboardDirection, KeynoteMotionPath,
-    KeynoteMotionPathNode, KeynoteMotionPathNodeType, KeynoteMotionPathPoint, KeynoteMotionSubpath,
-    KeynoteMoveAction, KeynoteObjectBuildEffect, KeynoteOpacityAction, KeynoteRotationAction,
-    KeynoteRotationDirection, KeynoteScaleAction, KeynoteSlideChartInfo, KeynoteSlideImageInfo,
-    KeynoteSlideImageKind, KeynoteSlideInfo, KeynoteSlideLayoutId, KeynoteSlideLayoutInfo,
-    KeynoteSlideShapeInfo, KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteSlideTextInfo,
-    KeynoteSlideTextRole, KeynoteSwooshDirection, KeynoteTableCellParagraphList,
-    KeynoteTableCellParagraphListBullet, KeynoteTableCellParagraphListBulletGeometry,
-    KeynoteTableCellParagraphListIndentation, KeynoteTableCellParagraphListLabelColor,
-    KeynoteTableCellParagraphListLevel, KeynoteTableCellParagraphListLevelPlacement,
-    KeynoteTableCellParagraphListNumberFormat, KeynoteTableCellParagraphListNumberScale,
-    KeynoteTableCellParagraphListNumberTiering, KeynoteTableCellParagraphListNumbering,
-    KeynoteTableCellParagraphListPlacement, KeynoteTableCellParagraphTabStops,
-    KeynoteTableCellTextBackground, KeynoteTableCellTextBaselineShift,
-    KeynoteTableCellTextCapitalization, KeynoteTableCellTextCharacterSpacing,
-    KeynoteTableCellTextColor, KeynoteTableCellTextDecorations, KeynoteTableCellTextFont,
-    KeynoteTableCellTextLigatures, KeynoteTableCellTextOutline, KeynoteTableCellTextScript,
-    KeynoteTableCellTextShadow, KeynoteTableCellTextStyle, KeynoteTableCellUpdate,
-    KeynoteTableCellValue, KeynoteTableDimension, KeynoteTableDimensionSize, KeynoteTablePoints,
-    MovieKind, RemovedKeynoteSlideChart, RemovedKeynoteSlideImage, RemovedKeynoteSlideShape,
-    RemovedKeynoteSlideTable, RemovedKeynoteTextBox,
+    BuildAcceleration, BuildChunkInfo, BuildCustomParameters, BuildInfo, BuildSettings, BuildStart,
+    BuildTimingCurve, Editor, EmphasisAction, FlipDirection, HorizontalBuildDirection,
+    JiggleIntensity, KeyboardBuild, KeyboardDirection, MotionPath, MotionPathNode,
+    MotionPathNodeType, MotionPathPoint, MotionSubpath, MoveAction, MovieKind, ObjectBuildEffect,
+    OpacityAction, RemovedKeynoteSlideChart, RemovedKeynoteSlideImage, RemovedKeynoteSlideShape,
+    RemovedKeynoteSlideTable, RemovedKeynoteTextBox, RotationAction, RotationDirection,
+    ScaleAction, SlideChartInfo, SlideImageInfo, SlideImageKind, SlideInfo, SlideLayoutId,
+    SlideLayoutInfo, SlideShapeInfo, SlideTable, SlideTableInfo, SlideTextInfo, SlideTextRole,
+    SwooshDirection, TableCellParagraphList, TableCellParagraphListBullet,
+    TableCellParagraphListBulletGeometry, TableCellParagraphListIndentation,
+    TableCellParagraphListLabelColor, TableCellParagraphListLevel,
+    TableCellParagraphListLevelPlacement, TableCellParagraphListNumberFormat,
+    TableCellParagraphListNumberScale, TableCellParagraphListNumberTiering,
+    TableCellParagraphListNumbering, TableCellParagraphListPlacement, TableCellParagraphTabStops,
+    TableCellTextBackground, TableCellTextBaselineShift, TableCellTextCapitalization,
+    TableCellTextCharacterSpacing, TableCellTextColor, TableCellTextDecorations, TableCellTextFont,
+    TableCellTextLigatures, TableCellTextOutline, TableCellTextScript, TableCellTextShadow,
+    TableCellTextStyle, TableCellUpdate, TableCellValue, TableDimension, TableDimensionSize,
+    TablePoints,
 };
 pub use litchi_keynote::build::{AnimationType, Build};
 pub use litchi_keynote::show::{Mode, Settings, Show, Size};

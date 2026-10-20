@@ -86,7 +86,7 @@ pub(super) fn decode_unique_table_model<'a>(
 
 /// Resolve a model identifier only when it is a validated body-owned table.
 pub(super) fn validate_body_table(
-    editor: &PagesEditor,
+    editor: &Editor,
     model_object_id: u64,
 ) -> Result<PagesTableGraph> {
     body_table_graphs(editor)?
@@ -99,7 +99,7 @@ pub(super) fn validate_body_table(
         })
 }
 
-impl PagesEditor {
+impl Editor {
     /// Require a reachable body table before any table operation.
     pub(super) fn require_body_table(&self, model_object_id: u64) -> Result<PagesTableGraph> {
         validate_body_table(self, model_object_id)

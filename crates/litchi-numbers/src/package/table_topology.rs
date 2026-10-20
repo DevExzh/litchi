@@ -69,7 +69,7 @@ use super::structure::{
     metadata::Transition, references,
 };
 use crate::selector::{SheetSelector, TableSelector};
-use crate::table::CellPosition;
+use crate::table::At;
 use crate::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 
 structure::structural_family!("table-topology");
@@ -740,7 +740,7 @@ fn cells_on_axis(
     columns: u32,
     row_axis: bool,
     index: u32,
-) -> Result<Vec<CellPosition>, Error> {
+) -> Result<Vec<At>, Error> {
     let (tiles, size) = tiles(store)?;
     let mut output = Vec::new();
     for (key, tile) in tiles {
@@ -769,7 +769,7 @@ fn cells_on_axis(
                     output
                         .try_reserve(1)
                         .map_err(|_error| Error::Allocation { amount: 1 })?;
-                    output.push(CellPosition::new(global, column));
+                    output.push(At::new(global, column));
                 }
             }
         }
@@ -819,7 +819,7 @@ fn clear_axis(
     source: &Package,
     sheet: usize,
     table: usize,
-    cells: &[CellPosition],
+    cells: &[At],
 ) -> Result<Package, Error> {
     let cell_error = |error| Error::CellClear { error };
     let mut edit = source
@@ -1334,7 +1334,7 @@ fn table_cells(
     package: &Package,
     sheet: usize,
     table: usize,
-) -> Result<Vec<(CellPosition, crate::cell::Value)>, Error> {
+) -> Result<Vec<(At, crate::cell::Value)>, Error> {
     let table = package
         .workbook_ref()
         .sheets()
@@ -1463,10 +1463,10 @@ fn verify(
         expected
             .try_reserve(1)
             .map_err(|_error| Error::Allocation { amount: 1 })?;
-        expected.push((CellPosition::new(row, column), value));
+        expected.push((At::new(row, column), value));
     }
     let mut actual = table_cells(candidate, sheet, table)?;
-    let key = |cell: &(CellPosition, crate::cell::Value)| (cell.0.row(), cell.0.column());
+    let key = |cell: &(At, crate::cell::Value)| (cell.0.row(), cell.0.column());
     expected.sort_by_key(key);
     actual.sort_by_key(key);
     // A formula's text follows the shifted coordinates: only its presence is
@@ -1583,10 +1583,10 @@ mod tests {
     use crate::package::structure::Working;
     use crate::table::cells::Input;
     use crate::table::topology::RowDeletion;
-    use crate::{CellPosition, Package};
+    use crate::{At, Package};
 
     /// The stored BNC cell at `position` of the first table.
-    fn stored(package: &Package, position: CellPosition) -> BncCell {
+    fn stored(package: &Package, position: At) -> BncCell {
         let working = Working::new(package).expect("working set");
         let target = locate(&working, 0, 0).expect("table");
         let (_, model) = message(&working, target.model, &[6_001]).expect("model");
@@ -1623,7 +1623,7 @@ mod tests {
             .set_formula_a1("E3", Expression::parse("B2+B3").expect("formula"))
             .expect("formula");
         let package = edit.commit().expect("cells").into_package();
-        let before = stored(&package, CellPosition::new(2, 4));
+        let before = stored(&package, At::new(2, 4));
         assert!(matches!(
             before.cached_scalar(),
             Ok(Some(CachedScalar::Number(_)))
@@ -1635,7 +1635,7 @@ mod tests {
             .expect("row")
             .commit()
             .expect("commit");
-        let after = stored(removed.package(), CellPosition::new(1, 4));
+        let after = stored(removed.package(), At::new(1, 4));
         assert!(matches!(
             after.cached_scalar(),
             Ok(Some(CachedScalar::Unsupported(8)))

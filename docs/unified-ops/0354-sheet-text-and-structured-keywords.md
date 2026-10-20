@@ -41,7 +41,7 @@ and `facade-sheet-text` glossary profiles ban each old name.
 |---|---|
 | `TextWorkbook::{open, from_path_with_config, from_reader, from_bytes}` | `Workbook::{open, open_with_options, from_reader, from_reader_with_options, from_bytes, from_bytes_with_options}` |
 | `TextWorkbook::{config, worksheet_name, set_worksheet_name, set_data, detected_bom, write_to}` | `Workbook::{options, name, rows, bom, worksheet, write_to, to_bytes}`, built with `Workbook::new(rows, options).with_name(..)`; the workbook has no `&mut self` method (record 0351 §2.1) |
-| `TextWorksheet`, `TextCell`, `TextWorksheetIterator`, `TextRowIterator`, `TextCellIterator` | `Worksheet<'a>` (borrows the rows; the old one copied every row per `active_worksheet` call), `Cell`; the iterators are private (reached through the sheet traits) |
+| `TextWorksheet`, `TextCell`, `TextWorksheetIterator`, `TextRowIterator`, `TextCellIterator` | `Worksheet<'a>` (borrows the rows; the old one copied every row per `active_worksheet` call), `Cell`, `Worksheets`, `Cells`, `Rows`: the associated types of record 0353's statically dispatched sheet traits (no `Box<dyn>`; ported in the merge of trunk `482f0a18eb`) |
 | `TextConfig`, `formats::DelimitedConfig` | one `delimited::Options` (`csv`, `tsv`, `prn`, `pipe`; infallible consuming setters) over a `delimited::Dialect` |
 | `TextParser` | `delimited::Tokenizer` |
 | `formats::{read,write}_{delimited,sylk,dif,fixed_width}`, `{Sylk,Dif,FixedWidth}Config`, `{Sylk,Dif,FixedWidth}Parser` | `{delimited,sylk,dif,fixed_width}::{read, write, Options}` |

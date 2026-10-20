@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
-use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
+use litchi_iwa::keynote::{self};
+use litchi_iwa::numbers::{self};
+use litchi_iwa::pages::{self};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 use litchi_numbers::{
@@ -33,14 +33,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let hidden = HiddenAxes::new([AxisIndex::row(HIDDEN_ROW), AxisIndex::column(HIDDEN_COLUMN)])?;
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_name("Hidden Axes")
         .table_dimensions(TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
     set_numbers_cells(&mut editor, table_cells())?;
     editor.set_table_hidden_axes(TableSelector::index(0), &hidden)?;
     editor.save(output)?;
-    if NumbersEditor::open(output)?.table_hidden_axes(TableSelector::index(0))? != hidden {
+    if numbers::Editor::open(output)?.table_hidden_axes(TableSelector::index(0))? != hidden {
         return Err("Numbers hidden axes failed reopen validation".into());
     }
     Ok(())
@@ -48,7 +48,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 
 fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let hidden = HiddenAxes::new([AxisIndex::row(HIDDEN_ROW), AxisIndex::column(HIDDEN_COLUMN)])?;
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Hidden table axes created by litchi-iwa\n")
         .body_table("Hidden Axes", TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
@@ -61,7 +61,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    editor = PagesEditor::from_bytes(&bytes)?;
+    editor = pages::Editor::from_bytes(&bytes)?;
     editor.save(output)?;
     let reopened = PagesPackage::from_bytes(&std::fs::read(output)?)?;
     if reopened.body_table_hidden_axes(BodyTableSelector::index(0))? != hidden {
@@ -72,9 +72,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 
 fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let hidden = HiddenAxes::new([AxisIndex::row(HIDDEN_ROW), AxisIndex::column(HIDDEN_COLUMN)])?;
-    let mut editor = KeynoteDocumentBuilder::new()
-        .title("Hidden table axes")
-        .build()?;
+    let mut editor = keynote::Builder::new().title("Hidden table axes").build()?;
     let table = editor.add_slide_table(
         0,
         "Hidden Axes",
@@ -89,7 +87,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_table_cells(0, table.model_object_id, table_cells())?;
     editor.set_slide_table_hidden_axes(0, table.model_object_id, &hidden)?;
     editor.save(output)?;
-    if KeynoteEditor::open(output)?.slide_table_hidden_axes(0, table.model_object_id)? != hidden {
+    if keynote::Editor::open(output)?.slide_table_hidden_axes(0, table.model_object_id)? != hidden {
         return Err("Keynote hidden axes failed reopen validation".into());
     }
     Ok(())
@@ -113,7 +111,7 @@ fn table_cells() -> [TableCellUpdate; 12] {
 }
 
 fn set_numbers_cells(
-    editor: &mut NumbersEditor,
+    editor: &mut numbers::Editor,
     updates: impl IntoIterator<Item = litchi_numbers::cell::Update>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let changes = updates
@@ -130,14 +128,14 @@ fn set_numbers_cells(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    *editor = NumbersEditor::from_bytes(&bytes)?;
+    *editor = numbers::Editor::from_bytes(&bytes)?;
     Ok(())
 }
 
 fn numbers_cell_change(
     update: litchi_numbers::cell::Update,
 ) -> Result<litchi_numbers::table::cells::Change, Box<dyn std::error::Error>> {
-    let position = litchi_numbers::CellPosition::try_from_usize(update.row, update.column)?;
+    let position = litchi_numbers::At::try_from_usize(update.row, update.column)?;
     let change = match update.value {
         CellValue::Empty => litchi_numbers::table::cells::Change::clear(position),
         CellValue::Text(value) => litchi_numbers::table::cells::Change::set(

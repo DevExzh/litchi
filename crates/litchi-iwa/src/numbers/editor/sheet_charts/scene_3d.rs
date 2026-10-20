@@ -7,7 +7,7 @@ use crate::charts::scene_3d::{
     set_chart_3d_rotation as set_native_chart_3d_rotation,
 };
 
-impl NumbersEditor {
+impl Editor {
     /// Read the X/Y orientation of one sheet chart's native 3D scene.
     pub fn sheet_chart_3d_rotation(
         &self,
@@ -50,7 +50,7 @@ impl NumbersEditor {
             "Numbers",
             rotation,
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_3d_rotation(sheet_id, drawable_object_id)? != rotation {
             return Err(Error::InvalidFormat(
                 "Numbers chart 3D rotation update failed validation".to_owned(),
@@ -73,12 +73,12 @@ fn require_3d_scene(kind: Kind, drawable_object_id: u64) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_spreadsheet_supports_3d_chart_rotation_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
             .add_sheet_chart(

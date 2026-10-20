@@ -1,6 +1,6 @@
 use std::env;
 
-use litchi_iwa::numbers::NumbersEditor;
+use litchi_iwa::numbers;
 use litchi_numbers::{TableSelector, Workbook};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -11,7 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
     let table_index = arguments[2].parse::<usize>()?;
-    let mut editor = NumbersEditor::open(&arguments[0])?;
+    let mut editor = numbers::Editor::open(&arguments[0])?;
     let source = editor
         .tables()?
         .into_iter()

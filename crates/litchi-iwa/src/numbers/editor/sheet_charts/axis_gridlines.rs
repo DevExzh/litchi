@@ -15,7 +15,7 @@ use crate::charts::{ChartAxisGridline, ChartAxisGridlineStroke};
 use litchi_iwa_common::chart::axis::Axis;
 use litchi_iwa_common::chart::axis::style::Visibility;
 
-impl NumbersEditor {
+impl Editor {
     /// Read whether Numbers shows major gridlines for one native sheet-chart axis.
     pub fn sheet_chart_axis_major_gridlines_visible(
         &self,
@@ -109,7 +109,7 @@ impl NumbersEditor {
             gridline,
             stroke,
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_axis_gridline_stroke(
             sheet_id,
             drawable_object_id,
@@ -127,7 +127,7 @@ impl NumbersEditor {
 }
 
 fn sheet_chart_axis_major_gridlines_visible(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -143,7 +143,7 @@ fn sheet_chart_axis_major_gridlines_visible(
 }
 
 fn set_sheet_chart_axis_major_gridlines_visible(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -159,7 +159,7 @@ fn set_sheet_chart_axis_major_gridlines_visible(
         axis,
         visible,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_axis_major_gridlines_visible(sheet_id, drawable_object_id, axis)?
         != visible
     {
@@ -172,7 +172,7 @@ fn set_sheet_chart_axis_major_gridlines_visible(
 }
 
 fn sheet_chart_axis_minor_gridlines_visible(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -188,7 +188,7 @@ fn sheet_chart_axis_minor_gridlines_visible(
 }
 
 fn set_sheet_chart_axis_minor_gridlines_visible(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -204,7 +204,7 @@ fn set_sheet_chart_axis_minor_gridlines_visible(
         axis,
         visible,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_axis_minor_gridlines_visible(sheet_id, drawable_object_id, axis)?
         != visible
     {
@@ -220,14 +220,14 @@ fn set_sheet_chart_axis_minor_gridlines_visible(
 mod tests {
     use super::*;
     use crate::charts::{ChartData, Kind};
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::{
         DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Stroke, Width,
     };
 
     #[test]
     fn scratch_spreadsheet_supports_axis_gridline_stroke_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
             .add_sheet_chart(

@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
 
-use litchi_core::sheet::WorkbookTrait;
+use litchi_core::sheet::{WorkbookTrait, Worksheet as _};
 use litchi_xls::raw::Reader;
 use litchi_xls::writer::{Builder, WorkbookWindowOptions};
 
@@ -96,9 +96,11 @@ fn workbook_trait_follows_active_window_worksheet() {
     let mut bytes = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut bytes).unwrap();
     let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
-    let workbook_trait: &dyn WorkbookTrait = &workbook;
-    assert_eq!(workbook_trait.active_sheet_index(), 2);
-    assert_eq!(workbook_trait.active_worksheet().unwrap().name(), "Three");
+    assert_eq!(WorkbookTrait::active_sheet_index(&workbook), 2);
+    assert_eq!(
+        WorkbookTrait::active_worksheet(&workbook).unwrap().name(),
+        "Three"
+    );
 }
 
 #[test]
@@ -109,11 +111,8 @@ fn workbook_trait_sheet_lookup_is_case_insensitive() {
     let mut bytes = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut bytes).unwrap();
     let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
-    let workbook_trait: &dyn WorkbookTrait = &workbook;
-
     assert_eq!(
-        workbook_trait
-            .worksheet_by_name("mixedcase")
+        WorkbookTrait::worksheet_by_name(&workbook, "mixedcase")
             .unwrap()
             .name(),
         "MixedCase"

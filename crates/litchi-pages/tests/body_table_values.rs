@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use litchi_iwa_common::table::cell::value::Value as Read;
-use litchi_iwa_common::table::coordinate::CellPosition;
+use litchi_iwa_common::table::coordinate::At;
 use litchi_pages::table::values::{Error, Value};
 use litchi_pages::{BodyTableSelector, Package};
 
@@ -47,7 +47,7 @@ fn corpus_body_tables_take_values_or_refuse_typed() -> TestResult {
                 let reopened = Package::from_bytes(&bytes(commit.package())?)?;
                 let read = reopened.body_table_cells(BodyTableSelector::index(0))?;
                 assert_eq!(
-                    read.table().get(CellPosition::new(rows - 1, columns - 1)),
+                    read.table().get(At::new(rows - 1, columns - 1)),
                     Some(&Read::Text("written".into())),
                     "{}",
                     path.display()
@@ -64,7 +64,7 @@ fn corpus_body_tables_take_values_or_refuse_typed() -> TestResult {
                 let cleared = clear.commit()?.into_package();
                 let read = cleared.body_table_cells(BodyTableSelector::index(0))?;
                 assert!(!matches!(
-                    read.table().get(CellPosition::new(rows - 1, columns - 1)),
+                    read.table().get(At::new(rows - 1, columns - 1)),
                     Some(Read::Text(_))
                 ));
                 written += 1;

@@ -14,7 +14,7 @@ use std::mem::size_of;
 use std::num::NonZeroU64;
 
 use litchi_iwa_common::formula::render::FormulaRenderBudget;
-use litchi_iwa_common::table::coordinate::CellPosition;
+use litchi_iwa_common::table::coordinate::At;
 use litchi_iwa_common::table::model::{Cell as TableCell, Dimensions};
 use litchi_iwa_common::table::read::{
     CellComment, Comment, CommentAuthor, CommentReply, TableRead,
@@ -1176,10 +1176,7 @@ impl CellValueSink<PagesCellReadBudget> for PagesCellSink<'_, '_, '_> {
             .charge_payload_work(1)
             .map_err(map_lock_error)?;
         self.table
-            .push(TableCell::new(
-                CellPosition::new(cell.row(), cell.column()),
-                value,
-            ))
+            .push(TableCell::new(At::new(cell.row(), cell.column()), value))
             .map_err(|error| map_common_table_error(error.into_parts().0))?;
         if let Some(comment) = comment {
             budget
@@ -1192,7 +1189,7 @@ impl CellValueSink<PagesCellReadBudget> for PagesCellSink<'_, '_, '_> {
                     amount: self.comments.len().saturating_add(1),
                 })?;
             self.comments.push(CellComment::new(
-                CellPosition::new(cell.row(), cell.column()),
+                At::new(cell.row(), cell.column()),
                 comment,
             ));
         }

@@ -7,7 +7,7 @@
 use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::iwa::{Archive, SnappyStream};
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
-use litchi_numbers::{CellPosition, Package};
+use litchi_numbers::{At, Package};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -88,7 +88,7 @@ fn set_varint(data: &[u8], number: u32, value: u64) -> Vec<u8> {
 /// author (listed in the author storage, commenting nowhere) and registers
 /// the storage's edge to it. With `rename`, `litchi-iwa` is renamed too, so
 /// the package holds no generated author.
-fn two_authors(rename: bool) -> TestResult<(Package, CellPosition, CellPosition)> {
+fn two_authors(rename: bool) -> TestResult<(Package, At, At)> {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/numbers/comment-metadata-native-resaved.numbers");
     let package = Package::open(path)?;
@@ -98,7 +98,7 @@ fn two_authors(rename: bool) -> TestResult<(Package, CellPosition, CellPosition)
         .next()
         .ok_or("a native comment")?;
     let semantic = package.sheets()[0].tables().next().ok_or("table")?;
-    let added = CellPosition::new(semantic.row_count() - 1, semantic.column_count() - 1);
+    let added = At::new(semantic.row_count() - 1, semantic.column_count() - 1);
     let package = package
         .set_table_cell_comment(0, 0, added, "second")?
         .into_package();
@@ -236,7 +236,7 @@ fn two_authors(rename: bool) -> TestResult<(Package, CellPosition, CellPosition)
     Ok((package, native, added))
 }
 
-fn author(package: &Package, position: CellPosition) -> Option<String> {
+fn author(package: &Package, position: At) -> Option<String> {
     package
         .table_cell_comment(0, 0, position)
         .ok()
@@ -254,7 +254,7 @@ fn the_generated_author_is_reused_among_several() -> TestResult {
     assert_eq!(author(&package, native).as_deref(), Some("litchi-iwa"));
     assert_ne!(author(&package, added).as_deref(), Some("litchi-iwa"));
     let source = bytes(&package)?;
-    let third = CellPosition::new(added.row(), added.column() - 1);
+    let third = At::new(added.row(), added.column() - 1);
     let commit = package.set_table_cell_comment(0, 0, third, "third")?;
     let reopened = Package::from_bytes(&bytes(commit.package())?)?;
     assert_eq!(author(&reopened, third).as_deref(), Some("litchi-iwa"));
@@ -271,7 +271,7 @@ fn a_new_generated_author_joins_the_storage() -> TestResult {
     assert_eq!(author(&package, native).as_deref(), Some("Other"));
     let present = author(&package, added);
     let source = bytes(&package)?;
-    let third = CellPosition::new(added.row(), added.column() - 1);
+    let third = At::new(added.row(), added.column() - 1);
     let commit = package.set_table_cell_comment(0, 0, third, "third")?;
     let reopened = Package::from_bytes(&bytes(commit.package())?)?;
     assert_eq!(author(&reopened, third).as_deref(), Some("litchi-iwa"));
@@ -283,7 +283,7 @@ fn a_new_generated_author_joins_the_storage() -> TestResult {
         .apply_table_cell_comment(&commit.patch().inverse())?;
     assert_eq!(bytes(restored.package())?, source);
     // A further comment reuses the new generated author.
-    let fourth = CellPosition::new(added.row() - 1, added.column());
+    let fourth = At::new(added.row() - 1, added.column());
     let again = reopened.set_table_cell_comment(0, 0, fourth, "fourth")?;
     assert_eq!(
         author(again.package(), fourth).as_deref(),

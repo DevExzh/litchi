@@ -2,17 +2,13 @@
 
 use std::env;
 
-use litchi_iwa::keynote::{KeynoteEditor, KeynoteSlideTextRole};
+use litchi_iwa::keynote::{self};
 
-#[expect(
-    deprecated,
-    reason = "demonstrates the legacy raw-ID Keynote editor API, which takes native object IDs; litchi_keynote::Package has no equivalent text-box route yet"
-)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = env::args()
         .nth(1)
         .ok_or("usage: inspect_keynote_text_boxes <input.key>")?;
-    let editor = KeynoteEditor::open(input)?;
+    let editor = keynote::Editor::open(input)?;
     for slide in editor.slides()? {
         println!("slide={} name={:?}", slide.index, slide.name);
         let mut text_box_index = 0usize;
@@ -21,27 +17,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .into_iter()
             .enumerate()
         {
-            let ordinary_index = (text.role == KeynoteSlideTextRole::TextBox).then(|| {
+            let ordinary_index = (text.role == keynote::SlideTextRole::TextBox).then(|| {
                 let index = text_box_index;
                 text_box_index += 1;
                 index
             });
-            let geometry = if text.role == KeynoteSlideTextRole::TextBox {
+            let geometry = if text.role == keynote::SlideTextRole::TextBox {
                 Some(editor.slide_text_box_geometry(slide.index, text.drawable_object_id)?)
             } else {
                 None
             };
-            let properties = if text.role == KeynoteSlideTextRole::TextBox {
+            let properties = if text.role == keynote::SlideTextRole::TextBox {
                 Some(editor.slide_text_box_properties(slide.index, text.drawable_object_id)?)
             } else {
                 None
             };
-            let columns = if text.role == KeynoteSlideTextRole::TextBox {
+            let columns = if text.role == keynote::SlideTextRole::TextBox {
                 Some(editor.slide_text_box_columns(slide.index, text.drawable_object_id)?)
             } else {
                 None
             };
-            let text_layout = if text.role == KeynoteSlideTextRole::TextBox {
+            let text_layout = if text.role == keynote::SlideTextRole::TextBox {
                 Some(editor.slide_text_box_text_layout(slide.index, text.drawable_object_id)?)
             } else {
                 None

@@ -185,6 +185,11 @@ required-features = ["xlsx", "xlsb", "xls", "eval"]
 name              = "m4_bench"
 required-features = ["xlsx", "xlsb", "xls", "eval"]
 
+# Sheet-trait static-dispatch measurements: evaluation and per-cell reads (record 0353).
+[[example]]
+name              = "sheet_dispatch_bench"
+required-features = ["xlsx", "xlsb", "xls", "eval"]
+
 # Paired leaf-vs-unified template merge measurements (record 0274).
 [[example]]
 name              = "merge_bench"

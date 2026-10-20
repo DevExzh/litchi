@@ -23,7 +23,7 @@ use litchi_numbers::cell::data_format::{
         transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path},
     },
 };
-use litchi_numbers::{CellPosition, Package, SheetSelector, TableSelector};
+use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::{BncCell, StoredValue};
 use prost::Message as _;
 
@@ -45,12 +45,12 @@ impl ExactBytes for Package {
     }
 }
 
-fn selected_position() -> CellPosition {
-    CellPosition::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
+fn selected_position() -> At {
+    At::new(fixture::FIRST_CELL.0 as u32, fixture::FIRST_CELL.1 as u32)
 }
 
-fn second_position() -> CellPosition {
-    CellPosition::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
+fn second_position() -> At {
+    At::new(fixture::SECOND_CELL.0 as u32, fixture::SECOND_CELL.1 as u32)
 }
 
 fn source(family: fixture::CustomFamily) -> TestResult<Vec<u8>> {
@@ -231,7 +231,7 @@ fn read_custom(
     family: fixture::CustomFamily,
     sheet: impl Into<SheetSelector<'static>>,
     table: impl Into<TableSelector<'static>>,
-    position: CellPosition,
+    position: At,
 ) -> Result<Option<Custom>, Error> {
     let _ = family;
     package.table_cell_custom_format(sheet, table, position)

@@ -8,6 +8,7 @@
 
 use std::fs::File;
 
+use litchi::sheet::Worksheet as _;
 use litchi::sheet::text::{Workbook, delimited, dif, fixed_width, sylk};
 use litchi::sheet::{CellValue, WorkbookTrait};
 

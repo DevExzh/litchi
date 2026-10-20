@@ -7,7 +7,7 @@ use crate::charts::series_symbol::{
 };
 use crate::charts::{ChartSeriesSymbol, Index};
 
-impl NumbersEditor {
+impl Editor {
     pub fn sheet_chart_series_symbols(
         &self,
         sheet_id: u64,
@@ -56,7 +56,7 @@ impl NumbersEditor {
 }
 
 fn sheet_chart_series_symbols(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Vec<Option<ChartSeriesSymbol>>> {
@@ -79,7 +79,7 @@ fn sheet_chart_series_symbols(
 }
 
 fn set_sheet_chart_series_symbols(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     symbols: &[Option<ChartSeriesSymbol>],
@@ -105,7 +105,7 @@ fn set_sheet_chart_series_symbols(
         series_count,
         symbols,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_series_symbols(sheet_id, drawable_object_id)? != symbols {
         return Err(Error::InvalidFormat(
             "Numbers chart data-symbol update failed validation".to_owned(),

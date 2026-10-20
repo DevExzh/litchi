@@ -8,7 +8,7 @@ use crate::charts::gaps::{
     set_chart_gap_spacing as set_native_chart_gap_spacing,
 };
 
-impl KeynoteEditor {
+impl Editor {
     /// Read the spacing between items and sets for one native slide chart.
     pub fn slide_chart_gap_spacing(
         &self,
@@ -30,7 +30,7 @@ impl KeynoteEditor {
 }
 
 fn slide_chart_gap_spacing(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Spacing> {
@@ -44,7 +44,7 @@ fn slide_chart_gap_spacing(
 }
 
 fn set_slide_chart_gap_spacing(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     spacing: Spacing,
@@ -61,7 +61,7 @@ fn set_slide_chart_gap_spacing(
         "Keynote",
         spacing,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_gap_spacing(slide_index, drawable_object_id)? != spacing {
         return Err(Error::InvalidFormat(
             "Keynote chart gap update failed validation".to_owned(),

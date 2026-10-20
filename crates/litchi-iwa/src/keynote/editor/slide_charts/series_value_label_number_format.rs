@@ -8,7 +8,7 @@ use crate::charts::series_value_label_number_format::{
 };
 use crate::charts::{Index, NumberFormat};
 
-impl KeynoteEditor {
+impl Editor {
     /// Read every series' value-label number format in native series order.
     pub fn slide_chart_series_value_label_number_formats(
         &self,
@@ -76,7 +76,7 @@ impl KeynoteEditor {
 }
 
 fn slide_chart_series_value_label_number_formats(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Vec<NumberFormat>> {
@@ -99,7 +99,7 @@ fn slide_chart_series_value_label_number_formats(
 }
 
 fn set_slide_chart_series_value_label_number_formats(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     formats: &[NumberFormat],
@@ -139,7 +139,7 @@ fn set_slide_chart_series_value_label_number_formats(
         graph.info.kind,
         &expected,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_series_value_label_number_formats(slide_index, drawable_object_id)?
         != expected
     {

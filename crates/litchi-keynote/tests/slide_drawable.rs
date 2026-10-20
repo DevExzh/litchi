@@ -821,7 +821,7 @@ fn corpus_text_boxes_take_character_styles() -> TestResult {
 #[test]
 fn slide_table_cells_take_values() -> TestResult {
     use litchi_iwa_common::table::cell::value::Value;
-    use litchi_iwa_common::table::coordinate::CellPosition;
+    use litchi_iwa_common::table::coordinate::At;
     use litchi_keynote::slide::drawable::TableCellValue;
     for name in [
         "slide-table-read-native.key",
@@ -878,12 +878,12 @@ fn slide_table_cells_take_values() -> TestResult {
                 let read = candidate.slide_table_cells(slide, 0_usize)?;
                 let table = read.table();
                 assert_eq!(
-                    table.get(CellPosition::new(rows - 1, columns - 1)),
+                    table.get(At::new(rows - 1, columns - 1)),
                     Some(&Value::Text("written".into())),
                     "{name}"
                 );
                 assert!(matches!(
-                    table.get(CellPosition::new(0, columns - 1)),
+                    table.get(At::new(0, columns - 1)),
                     Some(Value::Number(number)) if number.get() == 42.5
                 ));
             }
@@ -901,7 +901,7 @@ fn slide_table_cells_take_values() -> TestResult {
             let cleared = edit.commit()?.into_package();
             let read = cleared.slide_table_cells(slide, 0_usize)?;
             assert!(!matches!(
-                read.table().get(CellPosition::new(rows - 1, columns - 1)),
+                read.table().get(At::new(rows - 1, columns - 1)),
                 Some(Value::Text(_))
             ));
             done = true;

@@ -8,7 +8,7 @@ use crate::charts::category_labels::{
     set_chart_category_label_layout as set_native_category_label_layout,
 };
 
-impl NumbersEditor {
+impl Editor {
     /// Read the complete category-label menu state for one sheet chart.
     pub fn sheet_chart_category_label_layout(
         &self,
@@ -30,7 +30,7 @@ impl NumbersEditor {
 }
 
 fn sheet_chart_category_label_layout(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Layout> {
@@ -44,7 +44,7 @@ fn sheet_chart_category_label_layout(
 }
 
 fn set_sheet_chart_category_label_layout(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     layout: Layout,
@@ -58,7 +58,7 @@ fn set_sheet_chart_category_label_layout(
         "Numbers",
         layout,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_category_label_layout(sheet_id, drawable_object_id)? != layout {
         return Err(Error::InvalidFormat(
             "Numbers chart category-label layout update failed validation".to_owned(),
@@ -72,13 +72,13 @@ fn set_sheet_chart_category_label_layout(
 mod tests {
     use super::*;
     use crate::charts::{ChartData, Kind};
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::{DrawablePoint, DrawableSize};
     use litchi_iwa_common::chart::category_labels::{Frequency, Interval};
 
     #[test]
     fn scratch_spreadsheet_supports_category_label_layout_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
             .add_sheet_chart(
@@ -117,7 +117,7 @@ mod tests {
         editor
             .set_sheet_chart_category_label_layout(sheet_id, chart.drawable_object_id, customized)
             .unwrap();
-        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_category_label_layout(sheet_id, chart.drawable_object_id)

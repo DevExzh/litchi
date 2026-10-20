@@ -8,7 +8,7 @@ use crate::charts::series_stroke::{
 };
 use crate::charts::{ChartSeriesStroke, Index};
 
-impl KeynoteEditor {
+impl Editor {
     /// Read effective strokes in native series order.
     pub fn slide_chart_series_strokes(
         &self,
@@ -73,7 +73,7 @@ impl KeynoteEditor {
 }
 
 fn slide_chart_series_strokes(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Vec<Option<ChartSeriesStroke>>> {
@@ -96,7 +96,7 @@ fn slide_chart_series_strokes(
 }
 
 fn set_slide_chart_series_strokes(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     strokes: &[Option<ChartSeriesStroke>],
@@ -122,7 +122,7 @@ fn set_slide_chart_series_strokes(
         series_count,
         strokes,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_series_strokes(slide_index, drawable_object_id)? != strokes {
         return Err(Error::InvalidFormat(
             "Keynote chart series stroke update failed validation".to_owned(),
@@ -133,7 +133,7 @@ fn set_slide_chart_series_strokes(
 }
 
 fn reset_slide_chart_series_stroke(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     series: Index,
@@ -156,7 +156,7 @@ fn reset_slide_chart_series_stroke(
         series_count,
         series.zero_based(),
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_series_stroke(slide_index, drawable_object_id, series)? != inherited {
         return Err(Error::InvalidFormat(
             "Keynote chart series stroke reset failed validation".to_owned(),

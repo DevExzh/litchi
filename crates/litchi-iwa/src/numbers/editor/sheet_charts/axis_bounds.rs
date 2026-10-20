@@ -7,7 +7,7 @@ use crate::charts::axis_bounds::{
     set_chart_value_axis_bounds as set_native_chart_value_axis_bounds,
 };
 
-impl NumbersEditor {
+impl Editor {
     /// Read the manual minimum and maximum of a native sheet chart's value axis.
     ///
     /// Missing endpoints use Numbers' automatic scale calculation.
@@ -34,7 +34,7 @@ impl NumbersEditor {
 }
 
 fn sheet_chart_value_axis_bounds(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Bounds> {
@@ -48,7 +48,7 @@ fn sheet_chart_value_axis_bounds(
 }
 
 fn set_sheet_chart_value_axis_bounds(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     bounds: Bounds,
@@ -62,7 +62,7 @@ fn set_sheet_chart_value_axis_bounds(
         "Numbers",
         bounds,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_value_axis_bounds(sheet_id, drawable_object_id)? != bounds {
         return Err(Error::InvalidFormat(
             "Numbers chart value-axis bounds update failed validation".to_owned(),

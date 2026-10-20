@@ -3,8 +3,7 @@
 use std::borrow::Cow;
 
 use litchi_core::sheet::{
-    Cell as CellTrait, CellIterator, CellValue, Result as SheetResult, RowIterator,
-    Worksheet as WorksheetTrait, WorksheetIterator,
+    Cell as CellTrait, CellValue, Result as SheetResult, Worksheet as WorksheetTrait,
 };
 
 use crate::error::Error;
@@ -102,7 +101,20 @@ fn coordinate(text: &str) -> Option<(u32, u32)> {
     Some((row, column))
 }
 
-impl WorksheetTrait for Worksheet<'_> {
+impl<'w> WorksheetTrait for Worksheet<'w> {
+    type Cell<'a>
+        = Cell
+    where
+        Self: 'a;
+    type Cells<'a>
+        = Cells<'a>
+    where
+        Self: 'a;
+    type Rows<'a>
+        = Rows<'a>
+    where
+        Self: 'a;
+
     fn name(&self) -> &str {
         self.name
     }
@@ -124,31 +136,27 @@ impl WorksheetTrait for Worksheet<'_> {
         Some((1, 1, rows, columns))
     }
 
-    fn cell(&self, row: u32, column: u32) -> SheetResult<Box<dyn CellTrait + '_>> {
-        Ok(Box::new(Cell::new(
-            row,
-            column,
-            self.value(row, column).clone(),
-        )))
+    fn cell(&self, row: u32, column: u32) -> SheetResult<Cell> {
+        Ok(Cell::new(row, column, self.value(row, column).clone()))
     }
 
-    fn cell_by_coordinate(&self, text: &str) -> SheetResult<Box<dyn CellTrait + '_>> {
+    fn cell_by_coordinate(&self, text: &str) -> SheetResult<Cell> {
         let (row, column) = coordinate(text).ok_or(Error::InvalidCoordinate)?;
         self.cell(row, column)
     }
 
-    fn cells(&self) -> Box<dyn CellIterator<'_> + '_> {
-        Box::new(Cells {
+    fn cells(&self) -> Cells<'_> {
+        Cells {
             rows: self.rows,
             row: 0,
             column: 0,
-        })
+        }
     }
 
-    fn rows(&self) -> Box<dyn RowIterator<'_> + '_> {
-        Box::new(Rows {
+    fn rows(&self) -> Rows<'_> {
+        Rows {
             rows: self.rows.iter(),
-        })
+        }
     }
 
     fn row(&self, row: usize) -> SheetResult<Cow<'_, [CellValue]>> {
@@ -164,7 +172,8 @@ impl WorksheetTrait for Worksheet<'_> {
 }
 
 /// The single-worksheet iterator.
-pub(crate) struct Worksheets<'a> {
+#[derive(Debug)]
+pub struct Worksheets<'a> {
     worksheet: Option<Worksheet<'a>>,
 }
 
@@ -176,22 +185,26 @@ impl<'a> Worksheets<'a> {
     }
 }
 
-impl<'a> WorksheetIterator<'a> for Worksheets<'a> {
-    fn next(&mut self) -> Option<SheetResult<Box<dyn WorksheetTrait + 'a>>> {
-        let worksheet: Box<dyn WorksheetTrait + 'a> = Box::new(self.worksheet.take()?);
-        Some(Ok(worksheet))
+impl<'a> Iterator for Worksheets<'a> {
+    type Item = SheetResult<Worksheet<'a>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.worksheet.take().map(Ok)
     }
 }
 
-/// Every stored cell, row by row.
-struct Cells<'a> {
+/// Every stored cell, row by row, one-based.
+#[derive(Debug)]
+pub struct Cells<'a> {
     rows: &'a [Vec<CellValue>],
     row: usize,
     column: usize,
 }
 
-impl<'a> CellIterator<'a> for Cells<'a> {
-    fn next(&mut self) -> Option<SheetResult<Box<dyn CellTrait + 'a>>> {
+impl Iterator for Cells<'_> {
+    type Item = SheetResult<Cell>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         while let Some(cells) = self.rows.get(self.row) {
             if let Some(value) = cells.get(self.column) {
                 let cell = Cell::new(
@@ -200,7 +213,7 @@ impl<'a> CellIterator<'a> for Cells<'a> {
                     value.clone(),
                 );
                 self.column += 1;
-                return Some(Ok(Box::new(cell)));
+                return Some(Ok(cell));
             }
             self.row += 1;
             self.column = 0;
@@ -210,12 +223,15 @@ impl<'a> CellIterator<'a> for Cells<'a> {
 }
 
 /// Every row, borrowed.
-struct Rows<'a> {
+#[derive(Debug)]
+pub struct Rows<'a> {
     rows: std::slice::Iter<'a, Vec<CellValue>>,
 }
 
-impl<'a> RowIterator<'a> for Rows<'a> {
-    fn next(&mut self) -> Option<SheetResult<Cow<'a, [CellValue]>>> {
+impl<'a> Iterator for Rows<'a> {
+    type Item = SheetResult<Cow<'a, [CellValue]>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         self.rows
             .next()
             .map(|cells| Ok(Cow::Borrowed(cells.as_slice())))

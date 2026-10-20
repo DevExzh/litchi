@@ -280,9 +280,7 @@ impl Edit<'_> {
         for (row, column, value) in &self.cells {
             let stored = read
                 .table()
-                .get(litchi_iwa_common::table::coordinate::CellPosition::new(
-                    *row, *column,
-                ));
+                .get(litchi_iwa_common::table::coordinate::At::new(*row, *column));
             use litchi_iwa_common::table::cell::value::Value as Read;
             let ok = match value {
                 Value::Text(text) => stored == Some(&Read::Text(text.clone())),

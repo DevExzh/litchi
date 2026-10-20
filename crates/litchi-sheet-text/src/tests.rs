@@ -1,7 +1,7 @@
 //! Workbook, format and limit tests.
 
 use litchi_core::BomKind;
-use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
+use litchi_core::sheet::{Cell as _, CellValue, WorkbookTrait, Worksheet as _};
 
 use crate::delimited::Options;
 use crate::{
@@ -84,16 +84,14 @@ fn tsv_quotes_empty_cells_and_inference() {
 fn iterators_visit_every_row_and_cell() {
     let workbook = Workbook::from_bytes(b"a,b,c\n1,2,3\n4,5,6").unwrap();
     let sheet = workbook.worksheet();
-    let mut rows = sheet.rows();
     let mut count = 0;
-    while let Some(row) = rows.next() {
+    for row in sheet.rows() {
         assert_eq!(row.unwrap().len(), 3);
         count += 1;
     }
     assert_eq!(count, 3);
-    let mut cells = sheet.cells();
     let mut seen = Vec::new();
-    while let Some(cell) = cells.next() {
+    for cell in sheet.cells() {
         let cell = cell.unwrap();
         seen.push(cell.coordinate());
     }

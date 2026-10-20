@@ -17,6 +17,7 @@ use super::{SourceWorkbook, Xlsb, XlsbEditor, XlsbOwner};
 use crate::detect::workbook_metadata::MetadataRepairs;
 use crate::error::{Code, Error, Source};
 use crate::options::{OpenOptions, SourceMode};
+use litchi_core::sheet::{Cell as _, Worksheet as _};
 
 fn fixture_path(name: &str) -> PathBuf {
     PathBuf::from(concat!(
@@ -250,8 +251,7 @@ fn workbook_trait_surface_matches_across_owner_states() {
                     assert_eq!(left.row(row).unwrap(), right.row(row).unwrap());
                 }
                 let mut left_cells = left.cells();
-                let mut right_cells = right.cells();
-                while let Some(right) = right_cells.next() {
+                for right in right.cells() {
                     let (left, right) = (left_cells.next().unwrap().unwrap(), right.unwrap());
                     assert_eq!(left.value(), right.value());
                     assert_eq!(left.row(), right.row() + 1);
@@ -408,8 +408,7 @@ fn one_based_trait_cell_reads_reject_zero_and_out_of_grid_before_materialization
     ] {
         let error = worksheet
             .cell(row, column)
-            .err()
-            .expect("invalid cell must fail");
+            .expect_err("invalid cell must fail");
         let error = error
             .downcast::<Error>()
             .expect("invalid cell keeps the typed ops error");
@@ -474,8 +473,7 @@ fn a_changed_source_is_a_typed_io_error_on_every_read() {
     ] {
         changed(
             *result
-                .err()
-                .expect("stale selector refuses before catalog lookup")
+                .expect_err("stale selector refuses before catalog lookup")
                 .downcast::<Error>()
                 .expect("typed trait error"),
         );
@@ -492,8 +490,7 @@ fn a_changed_source_is_a_typed_io_error_on_every_read() {
         *cells
             .next()
             .unwrap()
-            .err()
-            .expect("stale cell iterator reports one error")
+            .expect_err("stale cell iterator reports one error")
             .downcast::<Error>()
             .unwrap(),
     );
@@ -512,8 +509,7 @@ fn a_changed_source_is_a_typed_io_error_on_every_read() {
         *worksheets
             .next()
             .unwrap()
-            .err()
-            .expect("stale worksheet iterator reports one error")
+            .expect_err("stale worksheet iterator reports one error")
             .downcast::<Error>()
             .unwrap(),
     );

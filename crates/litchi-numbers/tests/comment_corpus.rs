@@ -9,7 +9,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use litchi_numbers::{CellPosition, Package};
+use litchi_numbers::{At, Package};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -41,7 +41,7 @@ fn bytes(package: &Package) -> TestResult<Vec<u8>> {
     Ok(bytes)
 }
 
-fn text(package: &Package, sheet: usize, table: usize, position: CellPosition) -> Option<String> {
+fn text(package: &Package, sheet: usize, table: usize, position: At) -> Option<String> {
     package
         .table_cell_comment(sheet, table, position)
         .ok()
@@ -54,7 +54,7 @@ fn round_trip(
     package: &Package,
     sheet: usize,
     table: usize,
-    position: CellPosition,
+    position: At,
     label: &str,
 ) -> TestResult {
     let source = bytes(package)?;
@@ -133,7 +133,7 @@ fn every_corpus_table_takes_and_gives_back_a_cell_comment() -> TestResult {
                     }
                 }
                 // The table read lists exactly the cells that read a comment.
-                let listed: Vec<CellPosition> = package
+                let listed: Vec<At> = package
                     .table_cell_comments(sheet, table)?
                     .into_iter()
                     .map(|(position, _)| position)
@@ -145,9 +145,8 @@ fn every_corpus_table_takes_and_gives_back_a_cell_comment() -> TestResult {
                 }
                 // Record 0329: an empty cell, in a row the tile does not
                 // store (the table's last cell), takes a comment too.
-                let stored: Vec<CellPosition> =
-                    semantic.iter_cells().map(|cell| cell.position()).collect();
-                let last = CellPosition::new(
+                let stored: Vec<At> = semantic.iter_cells().map(|cell| cell.position()).collect();
+                let last = At::new(
                     semantic.row_count().saturating_sub(1),
                     semantic.column_count().saturating_sub(1),
                 );
@@ -222,7 +221,7 @@ fn created_workbooks_and_added_tables_take_cell_comments() -> TestResult {
             &package,
             0,
             table,
-            CellPosition::new(1, 1),
+            At::new(1, 1),
             &format!("created table {table}"),
         )?;
     }

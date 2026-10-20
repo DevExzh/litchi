@@ -5,7 +5,7 @@ use std::fmt;
 use crate::{
     SheetSelector, TableSelector,
     table::{
-        CellPosition, CellRange, Dimensions, Table,
+        Area, At, Dimensions, Table,
         cells::{Commit, Input, State, Storage},
     },
 };
@@ -101,7 +101,7 @@ pub enum Error {
         path: Path,
     },
     OutOfBounds {
-        position: CellPosition,
+        position: At,
         dimensions: Dimensions,
     },
     LimitExceeded {
@@ -115,7 +115,7 @@ pub enum Error {
         amount: usize,
     },
     DuplicatePosition {
-        position: CellPosition,
+        position: At,
     },
     InvalidSource {
         path: Path,
@@ -194,7 +194,7 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
     ) -> Result<State, Error> {
         let selected = resolve_table(self, sheet.into(), table.into())?;
         ensure_position(selected.table.dimensions(), position, selected.path)?;
@@ -205,7 +205,7 @@ impl Package {
     /// address.
     ///
     /// This is the string-address convenience form of [`Self::table_cell`].
-    /// The address is parsed by the archive-free [`CellPosition`] parser before
+    /// The address is parsed by the archive-free [`At`] parser before
     /// selector resolution and no native package identifier is retained.
     ///
     /// # Errors
@@ -219,7 +219,7 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
         address: &str,
     ) -> Result<State, Error> {
-        let position = CellPosition::from_a1(address).map_err(|_error| Error::InvalidAddress)?;
+        let position = At::from_a1(address).map_err(|_error| Error::InvalidAddress)?;
         self.table_cell(sheet, table, position)
     }
 
@@ -234,7 +234,7 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
         input: Input,
     ) -> Result<Commit, Error> {
         self.edit_table_cells(sheet, table)?
@@ -253,7 +253,7 @@ impl Package {
         address: &str,
         input: Input,
     ) -> Result<Commit, Error> {
-        let position = CellPosition::from_a1(address).map_err(|_error| Error::InvalidAddress)?;
+        let position = At::from_a1(address).map_err(|_error| Error::InvalidAddress)?;
         self.set_table_cell(sheet, table, position, input)
     }
 
@@ -266,7 +266,7 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
     ) -> Result<Commit, Error> {
         self.edit_table_cells(sheet, table)?
             .clear(position)?
@@ -280,7 +280,7 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
         address: &str,
     ) -> Result<Commit, Error> {
-        let position = CellPosition::from_a1(address).map_err(|_error| Error::InvalidAddress)?;
+        let position = At::from_a1(address).map_err(|_error| Error::InvalidAddress)?;
         self.clear_table_cell(sheet, table, position)
     }
 
@@ -297,7 +297,7 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        range: CellRange,
+        range: Area,
     ) -> Result<Vec<State>, Error> {
         let selected = resolve_table(self, sheet.into(), table.into())?;
         ensure_range(selected.table.dimensions(), range, selected.path)?;
@@ -354,7 +354,7 @@ impl Package {
             .peekable();
         for row in start.row()..end.row() {
             for column in start.column()..end.column() {
-                let position = CellPosition::new(row, column);
+                let position = At::new(row, column);
                 while stored.peek().is_some_and(|cell| cell.position() < position) {
                     stored.next();
                 }
@@ -381,7 +381,7 @@ impl Package {
     /// This is the string-address convenience form of [`Self::table_cells`].
     /// A single cell such as `B2` yields a one-element range; an inclusive
     /// range such as `B2:C3` yields the same half-open dense result as the
-    /// checked [`CellRange`] API.
+    /// checked [`Area`] API.
     ///
     /// # Errors
     ///
@@ -394,7 +394,7 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
         address: &str,
     ) -> Result<Vec<State>, Error> {
-        let range = CellRange::from_a1(address).map_err(|_error| Error::InvalidAddress)?;
+        let range = Area::from_a1(address).map_err(|_error| Error::InvalidAddress)?;
         self.table_cells(sheet, table, range)
     }
 }
@@ -476,7 +476,7 @@ pub(super) fn resolve_table<'package>(
     })
 }
 
-fn state_at(table: &Table, position: CellPosition, path: Path) -> Result<State, Error> {
+fn state_at(table: &Table, position: At, path: Path) -> Result<State, Error> {
     let storage = match table.get(position) {
         Some(value) => Storage::Stored(try_clone_value(value, path)?),
         None => Storage::Missing,
@@ -484,7 +484,7 @@ fn state_at(table: &Table, position: CellPosition, path: Path) -> Result<State, 
     Ok(State::new(position, storage))
 }
 
-fn selected_text_bytes(table: &Table, range: CellRange) -> Option<usize> {
+fn selected_text_bytes(table: &Table, range: Area) -> Option<usize> {
     table.cells(range).ok()?.try_fold(0_usize, |total, cell| {
         total.checked_add(owned_text_bytes(cell.value()))
     })
@@ -530,11 +530,7 @@ fn try_clone_text(source: &str) -> Result<String, Error> {
     Ok(target)
 }
 
-fn ensure_position(
-    dimensions: Dimensions,
-    position: CellPosition,
-    _path: Path,
-) -> Result<(), Error> {
+fn ensure_position(dimensions: Dimensions, position: At, _path: Path) -> Result<(), Error> {
     if position.row() >= dimensions.rows() || position.column() >= dimensions.columns() {
         return Err(Error::OutOfBounds {
             position,
@@ -544,7 +540,7 @@ fn ensure_position(
     Ok(())
 }
 
-fn ensure_range(dimensions: Dimensions, range: CellRange, _path: Path) -> Result<(), Error> {
+fn ensure_range(dimensions: Dimensions, range: Area, _path: Path) -> Result<(), Error> {
     let (_start, end) = range.bounds();
     if end.row() > dimensions.rows() || end.column() > dimensions.columns() {
         return Err(Error::OutOfBounds {
@@ -575,14 +571,13 @@ mod tests {
 
     #[test]
     fn package_projection_preserves_stored_empty() {
-        let position = CellPosition::new(0, 0);
+        let position = At::new(0, 0);
         let mut builder = Table::builder("Presence", Dimensions::new(1, 2));
         builder.set(position, Value::Empty).expect("in bounds");
         let table = builder.finish().expect("unique coordinate");
 
         let stored = state_at(&table, position, Path::Package).expect("stored value");
-        let missing =
-            state_at(&table, CellPosition::new(0, 1), Path::Package).expect("missing value");
+        let missing = state_at(&table, At::new(0, 1), Path::Package).expect("missing value");
 
         assert!(matches!(stored.storage(), Storage::Stored(Value::Empty)));
         assert!(matches!(missing.storage(), Storage::Missing));

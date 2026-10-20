@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages;
 use litchi_iwa::shapes::DrawableFlipAxis;
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_pages::movie::Options as PagesMovieOptions;
@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let movie = fs::read(&movie_path)?;
     let poster = fs::read(&poster_path)?;
 
-    let mut editor = PagesEditor::create_with_text(BODY_TEXT)?;
+    let mut editor = pages::Editor::create_with_text(BODY_TEXT)?;
     let created = editor.add_body_movie(
         BODY_TEXT.encode_utf16().count(),
         movie_filename,

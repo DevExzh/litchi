@@ -1,8 +1,10 @@
 //! The module holds the vocabulary the workbook formats share:
 //!
 //! - The generic sheet traits: [`WorkbookTrait`](crate::sheet::WorkbookTrait),
-//!   [`Worksheet`](crate::sheet::Worksheet), [`Cell`](crate::sheet::Cell)
-//!   and their iterators, over [`CellValue`](crate::sheet::CellValue).
+//!   [`Worksheet`](crate::sheet::Worksheet) and [`Cell`](crate::sheet::Cell),
+//!   over [`CellValue`](crate::sheet::CellValue). They dispatch statically:
+//!   each implementation names its worksheet, cell and iterator types as
+//!   associated types, and the iterators are standard [`Iterator`]s.
 //! - `text` (the `sheet-text` feature): the `litchi-sheet-text` crate's CSV,
 //!   TSV, PRN, SYLK, DIF and fixed-width text workbooks.
 //! - [`view`](crate::sheet::view): worksheet-view semantics shared by XLSX
@@ -15,12 +17,13 @@
 //! Open an XLS, XLSX, XLSB or ODS workbook with `litchi::open`. Its workbook
 //! view (`File::workbook`) lists the worksheets and implements
 //! `WorkbookTrait` by static dispatch, so generic sheet code and the formula
-//! evaluator borrow it directly. The traits report boxed errors.
+//! evaluator borrow it directly; its worksheets and cells are the
+//! `litchi_ops::view::sheet` types. The traits report boxed errors.
 //!
 //! ```
 //! # #[cfg(feature = "xlsx")]
 //! # {
-//! use litchi::sheet::WorkbookTrait;
+//! use litchi::sheet::{WorkbookTrait, Worksheet as _};
 //!
 //! # let path = concat!(
 //! #     env!("CARGO_MANIFEST_DIR"),
@@ -62,5 +65,5 @@ pub mod text {
 
 #[cfg(feature = "eval")]
 pub use eval::FormulaEvaluator;
-pub use traits::{Cell, CellIterator, RowIterator, WorkbookTrait, Worksheet, WorksheetIterator};
+pub use traits::{Cell, WorkbookTrait, Worksheet};
 pub use types::{CellValue, Result};

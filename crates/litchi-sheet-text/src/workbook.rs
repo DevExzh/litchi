@@ -5,9 +5,7 @@ use std::io::{BufReader, Read, Write};
 use std::path::Path;
 
 use litchi_core::BomKind;
-use litchi_core::sheet::{
-    CellValue, Result as SheetResult, WorkbookTrait, Worksheet as WorksheetTrait, WorksheetIterator,
-};
+use litchi_core::sheet::{CellValue, Result as SheetResult, WorkbookTrait};
 
 use crate::delimited::{self, Options};
 use crate::error::{Error, Result};
@@ -189,15 +187,18 @@ impl Workbook {
 }
 
 impl WorkbookTrait for Workbook {
-    fn active_worksheet(&self) -> SheetResult<Box<dyn WorksheetTrait + '_>> {
-        Ok(Box::new(self.worksheet()))
+    type Worksheet<'a> = Worksheet<'a>;
+    type Worksheets<'a> = Worksheets<'a>;
+
+    fn active_worksheet(&self) -> SheetResult<Worksheet<'_>> {
+        Ok(self.worksheet())
     }
 
     fn worksheet_names(&self) -> &[String] {
         std::slice::from_ref(&self.name)
     }
 
-    fn worksheet_by_name(&self, name: &str) -> SheetResult<Box<dyn WorksheetTrait + '_>> {
+    fn worksheet_by_name(&self, name: &str) -> SheetResult<Worksheet<'_>> {
         if name == self.name {
             self.active_worksheet()
         } else {
@@ -205,15 +206,15 @@ impl WorkbookTrait for Workbook {
         }
     }
 
-    fn worksheet_by_index(&self, index: usize) -> SheetResult<Box<dyn WorksheetTrait + '_>> {
+    fn worksheet_by_index(&self, index: usize) -> SheetResult<Worksheet<'_>> {
         match index {
             0 => self.active_worksheet(),
             _ => Err(Error::MissingWorksheet.into()),
         }
     }
 
-    fn worksheets(&self) -> Box<dyn WorksheetIterator<'_> + '_> {
-        Box::new(Worksheets::new(self.worksheet()))
+    fn worksheets(&self) -> Worksheets<'_> {
+        Worksheets::new(self.worksheet())
     }
 
     fn worksheet_count(&self) -> usize {

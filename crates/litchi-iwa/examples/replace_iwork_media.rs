@@ -3,10 +3,10 @@ use std::fs;
 use std::path::Path;
 
 use litchi_iwa::IWorkMediaEditor;
-use litchi_iwa::keynote::KeynoteEditor;
+use litchi_iwa::keynote;
 use litchi_iwa::media::MediaAssetId;
-use litchi_iwa::numbers::NumbersEditor;
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::numbers;
+use litchi_iwa::pages;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arguments = env::args().skip(1).collect::<Vec<_>>();
@@ -75,19 +75,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .and_then(|extension| extension.to_str())
         {
             Some("key") => {
-                let mut app = KeynoteEditor::open(input)?;
+                let mut app = keynote::Editor::open(input)?;
                 let previous = app.replace_media(data_identifier, &replacement)?;
                 app.save(output)?;
                 previous
             },
             Some("numbers") => {
-                let mut app = NumbersEditor::open(input)?;
+                let mut app = numbers::Editor::open(input)?;
                 let previous = app.replace_media(data_identifier, &replacement)?;
                 app.save(output)?;
                 previous
             },
             Some("pages") => {
-                let mut app = PagesEditor::open(input)?;
+                let mut app = pages::Editor::open(input)?;
                 let previous = app.replace_media(data_identifier, &replacement)?;
                 app.save(output)?;
                 previous

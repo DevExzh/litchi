@@ -1,9 +1,6 @@
 use std::env;
 
-use litchi_iwa::pages::{
-    PagesCellValue, PagesDocumentBuilder, PagesEditor, PagesTableCellUpdate,
-    PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
-};
+use litchi_iwa::pages::{self};
 use litchi_numbers::table::topology::{ColumnInsertion, RowInsertion};
 use litchi_pages::table::dimension::{Dimension, Size};
 use litchi_pages::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
@@ -14,7 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
         .nth(1)
         .unwrap_or_else(|| "scratch-table.pages".to_owned());
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Quarterly revenue\n")
         .body_table("Revenue", 4, 3)
         .build()?;
@@ -22,26 +19,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_table_cells(
         table.model_object_id,
         [
-            PagesTableCellUpdate::new(0, 0, PagesCellValue::Text("Quarter".to_owned())),
-            PagesTableCellUpdate::new(0, 1, PagesCellValue::Text("Revenue".to_owned())),
-            PagesTableCellUpdate::new(0, 2, PagesCellValue::Text("Growth".to_owned())),
-            PagesTableCellUpdate::new(1, 0, PagesCellValue::Text("Q1".to_owned())),
-            PagesTableCellUpdate::new(1, 1, PagesCellValue::number(125_000.0)?),
-            PagesTableCellUpdate::new(1, 2, PagesCellValue::number(0.18)?),
+            pages::TableCellUpdate::new(0, 0, pages::CellValue::Text("Quarter".to_owned())),
+            pages::TableCellUpdate::new(0, 1, pages::CellValue::Text("Revenue".to_owned())),
+            pages::TableCellUpdate::new(0, 2, pages::CellValue::Text("Growth".to_owned())),
+            pages::TableCellUpdate::new(1, 0, pages::CellValue::Text("Q1".to_owned())),
+            pages::TableCellUpdate::new(1, 1, pages::CellValue::number(125_000.0)?),
+            pages::TableCellUpdate::new(1, 2, pages::CellValue::number(0.18)?),
         ],
     )?;
     editor.set_table_formula(
         table.model_object_id,
         3,
         1,
-        PagesTableFormulaExpression::function(
+        pages::TableFormulaExpression::function(
             "SUM",
-            [PagesTableFormulaExpression::range(
-                PagesTableFormulaCellReference::relative(1, 1),
-                PagesTableFormulaCellReference::relative(2, 1),
+            [pages::TableFormulaExpression::range(
+                pages::TableFormulaCellReference::relative(1, 1),
+                pages::TableFormulaCellReference::relative(2, 1),
             )],
         ),
-        PagesTableFormulaCachedValue::Number(125_000.0.try_into()?),
+        pages::TableFormulaCachedValue::Number(125_000.0.try_into()?),
     )?;
     let focused = Package::from_bytes(&editor.to_bytes()?)?;
     let header_commit = focused
@@ -74,17 +71,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let mut dimension_bytes = Vec::new();
     dimensions.write_to(&mut dimension_bytes)?;
-    editor = PagesEditor::from_bytes(&dimension_bytes)?;
+    editor = pages::Editor::from_bytes(&dimension_bytes)?;
     editor.insert_table_row(table.model_object_id, RowInsertion::body(2))?;
     editor.insert_table_column(table.model_object_id, ColumnInsertion::body(1))?;
     editor.set_table_cells(
         table.model_object_id,
         [
-            PagesTableCellUpdate::new(3, 0, PagesCellValue::Text("Q2".to_owned())),
-            PagesTableCellUpdate::new(3, 1, PagesCellValue::number(142_000.0)?),
-            PagesTableCellUpdate::new(3, 2, PagesCellValue::Text("provisional".to_owned())),
-            PagesTableCellUpdate::new(3, 3, PagesCellValue::number(0.14)?),
-            PagesTableCellUpdate::new(0, 2, PagesCellValue::Text("Status".to_owned())),
+            pages::TableCellUpdate::new(3, 0, pages::CellValue::Text("Q2".to_owned())),
+            pages::TableCellUpdate::new(3, 1, pages::CellValue::number(142_000.0)?),
+            pages::TableCellUpdate::new(3, 2, pages::CellValue::Text("provisional".to_owned())),
+            pages::TableCellUpdate::new(3, 3, pages::CellValue::number(0.14)?),
+            pages::TableCellUpdate::new(0, 2, pages::CellValue::Text("Status".to_owned())),
         ],
     )?;
     let second_anchor = editor.body_text()?.encode_utf16().count();
@@ -93,7 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         notes.model_object_id,
         0,
         0,
-        PagesCellValue::Text("Generated independently".to_owned()),
+        pages::CellValue::Text("Generated independently".to_owned()),
     )?;
     let focused = Package::from_bytes(&editor.to_bytes()?)?;
     let commit = focused

@@ -7,7 +7,7 @@ use crate::charts::border_stroke::{
 };
 use crate::shapes::Stroke;
 
-impl KeynoteEditor {
+impl Editor {
     /// Read the chart-area border stroke independently of border visibility.
     ///
     /// `None` represents the native inspector's empty-stroke option.
@@ -31,7 +31,7 @@ impl KeynoteEditor {
 }
 
 fn slide_chart_border_stroke(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Option<Stroke>> {
@@ -45,7 +45,7 @@ fn slide_chart_border_stroke(
 }
 
 fn set_slide_chart_border_stroke(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     stroke: Option<Stroke>,
@@ -62,7 +62,7 @@ fn set_slide_chart_border_stroke(
         "Keynote",
         stroke,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_border_stroke(slide_index, drawable_object_id)? != stroke {
         return Err(Error::InvalidFormat(
             "Keynote chart border stroke update failed validation".to_owned(),

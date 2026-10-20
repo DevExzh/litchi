@@ -317,29 +317,6 @@ impl CellTrait for Cell {
     }
 }
 
-// Implement Cell for &Cell to allow zero-copy reference returns
-impl CellTrait for &Cell {
-    fn row(&self) -> u32 {
-        (*self).row()
-    }
-
-    fn column(&self) -> u32 {
-        (*self).column()
-    }
-
-    fn coordinate(&self) -> String {
-        (*self).coordinate()
-    }
-
-    fn value(&self) -> &CellValue {
-        (*self).value()
-    }
-
-    fn is_formula(&self) -> bool {
-        (*self).is_formula()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

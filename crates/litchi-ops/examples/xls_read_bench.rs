@@ -32,7 +32,7 @@ mod enabled {
     use std::time::Instant;
 
     use litchi_core::FileFormat;
-    use litchi_core::sheet::{CellValue, WorkbookTrait};
+    use litchi_core::sheet::{Cell as _, CellValue, WorkbookTrait, Worksheet as _};
     use litchi_ops::path::Path;
     use litchi_ops::query::{Plan, Query};
     use litchi_ops::{File, OpenOptions, SourceMode};
@@ -296,8 +296,7 @@ mod enabled {
         }
         let reader = fixture.native.reader_ref().expect("reader");
         let worksheet = WorkbookTrait::worksheet_by_index(reader, 0).expect("worksheet");
-        let mut cells = worksheet.cells();
-        while let Some(cell) = cells.next() {
+        for cell in worksheet.cells() {
             checksum = mix(checksum, &display(cell.expect("cell").value()));
         }
         checksum

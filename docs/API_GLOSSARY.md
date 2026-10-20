@@ -38,7 +38,7 @@ Rules of reading:
 | Read-only semantic projection, spreadsheets | `Workbook` | `Spreadsheet` | ✅ numbers `Document`→`Workbook`, owned `Package::workbook()` / borrowed `workbook_ref()`, module `litchi_numbers::workbook` (0297) · ✅ xlsx `Workbook` owned projection via `Package::workbook()` (0250) · ✅ ods `Spreadsheet`→`Workbook` owned projection via `Package::workbook()` (0268) · ✅ XLS (0197) |
 | Read-only semantic projection, decks | `Presentation` | — | ✅ keynote (0298): `Document`→`presentation::Presentation`, `Package::semantic_snapshot()`→`Package::presentation()` · ✅ pptx view / odp `Presentation` owned projection via `Package::presentation()` (0268) · ✅ PPT shared owned projection (0211) |
 | Projection accessor | `Package::{document, workbook, presentation}()` | — | owned projections primary; borrowed `*_ref()` views secondary |
-| Option-bearing fresh authoring | per-format `Builder` in a focused module | `WorkbookWriter` (xlsb), `Writer` (doc), `*DocumentBuilder` prefixes (litchi-iwa) | ✅ XLSB (0175), XLS (0200), PPT (0213) and RTF (0225) `Builder::build()` return `Package`; ✅ ODT/ODS/ODP `Builder::build()` return `Package` (0268); ✅ OTH/ODM/ODG/ODC/ODI/ODB/ODF-formula `Builder::build()` return `Package` (0282); ✅ pages `builder::Builder::build() -> Package` (0299); ✅ Numbers `litchi_numbers::create::Builder::build() -> Package` (0297); ✅ Keynote `litchi_keynote::builder::Builder::build()` returns `Package`, identity required (0298); ✅ DOCX `Builder` (0251), PPTX `builder::Builder` (0127), DOC `Builder` (0188); XLSX has no option-bearing authoring and creates through `Package::new()` (its `create()` duplicate deleted, 0250) · ⏸ the unpublished host crate `litchi-iwa` keeps its `*DocumentBuilder` prefixes (0343 D11) |
+| Option-bearing fresh authoring | per-format `Builder` in a focused module | `WorkbookWriter` (xlsb), `Writer` (doc), `PagesDocumentBuilder`/`KeynoteDocumentBuilder`/`NumbersDocumentBuilder` prefixes (litchi-iwa) | ✅ XLSB (0175), XLS (0200), PPT (0213) and RTF (0225) `Builder::build()` return `Package`; ✅ ODT/ODS/ODP `Builder::build()` return `Package` (0268); ✅ OTH/ODM/ODG/ODC/ODI/ODB/ODF-formula `Builder::build()` return `Package` (0282); ✅ pages `builder::Builder::build() -> Package` (0299); ✅ Numbers `litchi_numbers::create::Builder::build() -> Package` (0297); ✅ Keynote `litchi_keynote::builder::Builder::build()` returns `Package`, identity required (0298); ✅ DOCX `Builder` (0251), PPTX `builder::Builder` (0127), DOC `Builder` (0188); XLSX has no option-bearing authoring and creates through `Package::new()` (its `create()` duplicate deleted, 0250) · ✅ the unpublished migration host `litchi-iwa`: `PagesDocumentBuilder`, `KeynoteDocumentBuilder`, `NumbersDocumentBuilder` → `litchi_iwa::{pages, keynote, numbers}::Builder`, and every other `Pages*`/`Keynote*`/`Numbers*` type or alias inside those modules loses its redundant prefix (`pages::Editor`, `keynote::SlideInfo`, `numbers::TableCellTextFont`, 168 names); the old names are banned in the new `iwa` profile (0352) |
 | iWork document identity (explicit, required) | `Identity` with `Identity::generate()` / fixed bytes | implicit random identity inside builders | ✅ pages `builder::Identity::{generate, from_bytes}`; `Builder::build()` without one is `PackageError::MissingIdentity`; fixed identities give byte-identical builds (0299) · ✅ Numbers `create::Identity` (`generate`, `from_bytes`, fixed `BLANK`); `Builder::build()` without identity is `create::Error::MissingIdentity` (0297) · ✅ Keynote `litchi_keynote::Identity` (`generate()`, `from_bytes`, fixed `Identity::BLANK`, `Package::identity()`); `Builder::build()` without identity is `builder::Error::MissingIdentity` (0298) |
 
 ## 2. Transaction vocabulary (iWork canonical form)
@@ -331,7 +331,7 @@ semantic-limit migrations.
 | Catalog selector | `Selector<'a> = Name(Cow<'a, str>) \| Position(Position)` | the `Id` variant (raw IDs live in raw modules); `Index(usize)` (numbers); `At`/`Index` selector forms (pages footnotes) | ✅ core/pages/keynote shape · ✅ XLS `cell_values`/`sheet_visibility` `Position(Position)` (0259) · ✅ pages `ImageSelector`/`BodyChartSelector` `Position(Position)`, footnote `Selector::{Anchor, Position}` (0299) · ✅ numbers `SheetSelector`/`TableSelector`/`ChartSelector::Position(Position)`, `#[non_exhaustive]` (0297) |
 | Positional selection word | `Position` — checked, zero-based value type | `Index` as a selector variant; raw `usize` in public signatures (facade `slide(usize)`, `paragraph(usize)`) | ✅ the facade's family views `DocumentView::{paragraph, paragraph_text}` and `PresentationView::slide`, the PPTX handle's `slide`, and the compat table `row_at`/`cell_at`/`grid_span_at` take `impl Into<Position>` (`From<usize>` keeps call sites terse); a rustdoc-JSON scan of `litchi-ops` finds no other positional `usize` parameter (counts, limits and capacities remain `usize`) (0343) |
 | Selector-taking methods | `impl Into<Selector>` parameter, `Result<Option<_>>` return; missing → `Ok(None)`, ambiguous/invalid → typed error, never panics, no `Index` trait | method-level splits that bypass the selector channel | pptx `scene::get/at` converge (W2) |
-| Grid coordinates (not selectors) | `At` / `Area` with A1 parsing at the edge | treating coordinates as catalog selectors; numbers `Position`/`Range` coordinate aliases | ✅ xlsx; rule recorded · ✅ numbers `Position`/`Range` aliases (root, `table`, facade `litchi::numbers`) deleted for `CellPosition`/`CellRange` (0300) · ⏸ numbers/iwa-common `CellPosition`/`CellRange` → `At`/`Area` (0343 D10) |
+| Grid coordinates (not selectors) | `At` / `Area` with A1 parsing at the edge | treating coordinates as catalog selectors; numbers `Position`/`Range` coordinate aliases | ✅ xlsx; rule recorded · ✅ numbers `Position`/`Range` aliases (root, `table`, facade `litchi::numbers`) deleted (0300) · ✅ iWork: `litchi_iwa_common::table::coordinate::{CellPosition, CellRange}` → `At`/`Area` (re-exported by numbers, keynote `slide::table::cells` and the facade `litchi::numbers`), the Keynote-local `number_format::CellPosition`/`CellPositionError` → `At`/`AtError` and the transaction error variant `CellPositionNotFound` → `CellNotFound`, the `table::model` `Position`/`Range` aliases deleted; every workspace caller migrated, the old names banned in the `iwa-common`, `numbers-*`, `keynote-*`, `pages` and `facade-iwork` profiles (0352) |
 | Name identity policy | follows the producing application; fresh authoring defaults to Unicode caseless | silently mixing case policies | ✅ behavior unchanged; per-format registration below |
 
 Registered name-identity policies: xlsx sheet names — Unicode caseless
@@ -2533,7 +2533,7 @@ Both profiles now register 30 families.
 | Canonical name | Notes | Status |
 | --- | --- | --- |
 | `litchi_iwa_text_wire::{CharacterProperties, CharStyleRun, CharStyleError, char_style_runs, styles_in_span, restyle_span, character_style_variation, character_style_properties, character_style_parent, stylesheet_with_style}` | Shared TSWP `table_char_style` runs and the character-style variation records a span restyle writes | ✅ 0309 |
-| `litchi_numbers::cell::text_style::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, CharacterProperties}` | Registered family (32nd) in `numbers-minimal` / `numbers-full`; `Package::{edit_table_cell_text_style, apply_table_cell_text_style, table_cell_text_style}`; `Edit::set(CellPosition, CharacterProperties)` on stored cells | ✅ 0309 |
+| `litchi_numbers::cell::text_style::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, CharacterProperties}` | Registered family (32nd) in `numbers-minimal` / `numbers-full`; `Package::{edit_table_cell_text_style, apply_table_cell_text_style, table_cell_text_style}`; `Edit::set(At, CharacterProperties)` on stored cells | ✅ 0309 |
 | `litchi_numbers_wire::table_write::{tile_cell, tile_set_cell, header_adjust, list_intern, list_release, cell_bytes, cell_formula_state, table_formula_state, CellInput, FormulaState, TileCellWrite, WriteError}` | Shared TST cell writer for Pages and Keynote tables | ✅ 0309 |
 | `litchi_pages::table::values::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Value}` | Registered family in `pages`; `Package::{edit_body_table_values, apply_body_table_values}`; `Edit::set(row, column, Value)` | ✅ 0309 |
 | `litchi_keynote::slide::drawable::{Edit::set_table_cell, TableCellValue, Unsupported::{TableFormulas, TableStorage}}` | Slide-table cell values in the slide-drawable commit | ✅ 0309 |
@@ -2947,6 +2947,26 @@ raw query surface only).
 
 See [0346](unified-ops/0346-pptx-p0-final.md).
 
+## Sheet traits: static dispatch (record 0353)
+
+Owner decision 0350 (memo item 29): the `litchi-core::sheet` traits no
+longer return trait objects. Each implementation names its concrete types
+as generic associated types, and the iterators are standard `Iterator`s.
+The traits are therefore not object-safe: generic code takes
+`W: WorkbookTrait`, and a heterogeneous collection is an enum over the
+concrete formats. The removed iterator traits are deleted, not aliased.
+
+| Name | Status |
+|---|---|
+| `litchi_core::sheet::Worksheet::{Cell, Cells, Rows}`, `WorkbookTrait::{Worksheet, Worksheets}` (associated types) | adopted (0353), replacing `Box<dyn Cell>`, `Box<dyn Worksheet>` and the boxed iterators |
+| `litchi_core::sheet::{CellIterator, RowIterator, WorksheetIterator}` (and their `litchi::sheet` re-exports) | deleted (0353): `Worksheet::cells`, `Worksheet::rows` and `WorkbookTrait::worksheets` return `Iterator`s |
+| `Cell for &T`, `Cell for Cow<'_, T>`, `Worksheet for &T`, `Worksheet for Arc<T>` (blanket impls in `litchi_core::sheet`) | adopted (0353); the XLS `Cell for &Cell` and `Worksheet for &Worksheet` impls they supersede are removed |
+| `litchi_ops::view::sheet::{Worksheet, Cell, Cells, Rows, Worksheets}` | adopted (0353): the associated types of `WorkbookView`, `Xlsx`, `Xlsb` and `Xls`, enums over the per-format types |
+| `litchi_xls::worksheet::{Cells, Rows}`, `litchi_xls::workbook::Worksheets` | adopted (0353): the XLS reader's trait iterators (`Worksheet::cell` lends `Cow<'_, Cell>`, `WorkbookTrait` lends `&Worksheet`) |
+| `litchi_xlsb::sheet::{StoredCells, Rows}`, `litchi_xlsb::workbook::Worksheets` | adopted (0353); `litchi_xlsb::workbook::WorksheetIterator` renamed `Worksheets`. The eager `Workbook` lends the cache's `Arc<Worksheet>` instead of a clone of the worksheet |
+
+See [0353](unified-ops/0353-sheet-trait-static-dispatch.md).
+
 ## Text workbooks in their own leaf (record 0354)
 
 Owner decision 0350 (memo item 26): the facade's `litchi::sheet::text`
@@ -2958,7 +2978,7 @@ and writer stays; the names follow the focused-module rule. The
 | Name | Status |
 |---|---|
 | `litchi_sheet_text::Workbook` (one sheet, immutable: `new(rows, options)`, `with_name`, `open`, `open_with_options`, `from_bytes`, `from_bytes_with_options`, `from_reader`, `from_reader_with_options`, `options`, `name`, `rows`, `bom`, `worksheet`, `write_to`, `to_bytes`) | adopted (0354); replaces `TextWorkbook` and its `from_path_with_config`, `worksheet_name`, `set_worksheet_name`, `set_data`, `detected_bom`, `config` (no `&mut self` method, record 0351 §2.1) |
-| `litchi_sheet_text::{Worksheet, Cell}` | adopted (0354); `Worksheet<'a>` borrows the workbook's rows; replace `TextWorksheet`, `TextCell` and the three public iterator types |
+| `litchi_sheet_text::{Worksheet, Cell, Worksheets, Cells, Rows}` | adopted (0354); `Worksheet<'a>` borrows the workbook's rows; the iterators are the statically dispatched associated types of the 0353 sheet traits; replace `TextWorksheet`, `TextCell`, `TextWorksheetIterator`, `TextCellIterator`, `TextRowIterator` |
 | `litchi_sheet_text::delimited::{Options, Dialect, Tokenizer, declared_delimiter, read, write}` | adopted (0354); `Options` merges `TextConfig` and `DelimitedConfig`; `Tokenizer` replaces `TextParser` and import's private parser; `read`/`write` replace `read_delimited`/`write_delimited` |
 | `litchi_sheet_text::{sylk, dif, fixed_width}::{Options, read, write}` | adopted (0354); replace `SylkConfig`/`DifConfig`/`FixedWidthConfig`, the `*Parser` types and `read_*`/`write_*` |
 | `litchi_sheet_text::{Encoding, SourceLimits, SemanticLimits, LimitKind, SourceLimitKind, SemanticLimitKind, Error, Format, OptionKind}` | adopted (0354); every reader takes caller limits (`max_input_bytes`, `max_cells`); `litchi_ops::import::Encoding` is this `Encoding` |

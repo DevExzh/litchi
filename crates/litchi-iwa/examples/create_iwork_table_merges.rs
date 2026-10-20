@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::numbers::{FormulaCachedValue, FormulaExpression, NumbersDocumentBuilder};
-use litchi_iwa::pages::PagesDocumentBuilder;
+use litchi_iwa::keynote;
+use litchi_iwa::numbers::{self, FormulaCachedValue, FormulaExpression};
+use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_numbers::TableSelector;
 use litchi_numbers::table::merge::Region;
@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn create_numbers(output: &Path, region: Region) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_name("Merged Cells")
         .table_dimensions(TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
@@ -57,7 +57,7 @@ fn create_numbers(output: &Path, region: Region) -> Result<(), Box<dyn std::erro
 }
 
 fn create_pages(output: &Path, region: Region) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Native merged-cell CRUD\n")
         .body_table("Merged Cells", TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
@@ -84,7 +84,7 @@ fn create_pages(output: &Path, region: Region) -> Result<(), Box<dyn std::error:
 }
 
 fn create_keynote(output: &Path, region: Region) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = KeynoteDocumentBuilder::new()
+    let mut editor = keynote::Builder::new()
         .title("Native merged-cell CRUD")
         .build()?;
     let table = editor.add_slide_table(

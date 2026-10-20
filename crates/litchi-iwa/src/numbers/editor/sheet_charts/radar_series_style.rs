@@ -8,7 +8,7 @@ use crate::charts::radar_series_style::{
     set_chart_radar_series_style as set_native_radar_style,
 };
 
-impl NumbersEditor {
+impl Editor {
     /// Read the chart-wide Radar `Style` selection.
     pub fn sheet_chart_radar_series_style(
         &self,
@@ -58,7 +58,7 @@ impl NumbersEditor {
             series_count,
             style,
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_radar_series_style(sheet_id, drawable_object_id)? != style {
             return Err(Error::InvalidFormat(
                 "Numbers Radar series-style update failed validation".to_owned(),
@@ -72,12 +72,12 @@ impl NumbersEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn duplicated_radar_charts_have_copy_on_write_series_styles() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(

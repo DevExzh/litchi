@@ -1579,10 +1579,8 @@ impl cache::CacheBaseline for FinalBaseline<'_> {
             .map_err(|_| cache::Failure::UnsupportedDependency(cache::Unsupported::MissingOwner))?;
         match self.external[position]
             .table
-            .view(crate::table::CellPosition::new(
-                coordinate.row,
-                coordinate.column,
-            )) {
+            .view(crate::table::At::new(coordinate.row, coordinate.column))
+        {
             crate::table::View::Missing | crate::table::View::Stored(Value::Empty) => Ok(None),
             crate::table::View::Stored(Value::Number(value)) => {
                 Ok(Some(cache::ScalarValue::Number(to_native(*value))))
@@ -2266,7 +2264,7 @@ const fn as_u64(value: usize) -> u64 {
 mod tests {
     use std::cell::Cell;
 
-    use crate::table::{CellPosition, Dimensions};
+    use crate::table::{At, Dimensions};
 
     use super::*;
 
@@ -2343,28 +2341,22 @@ mod tests {
         let mut builder = Table::builder("Formula", Dimensions::new(1, 5));
         builder
             .set(
-                CellPosition::new(0, 0),
+                At::new(0, 0),
                 Value::number(1.0).expect("finite baseline number"),
             )
             .expect("number cell is in bounds");
         builder
-            .set(CellPosition::new(0, 1), Value::Formula("=A1".to_owned()))
+            .set(At::new(0, 1), Value::Formula("=A1".to_owned()))
             .expect("formula cell is in bounds");
         builder
-            .set(
-                CellPosition::new(0, 2),
-                Value::Text("ignored by SUM".to_owned()),
-            )
+            .set(At::new(0, 2), Value::Text("ignored by SUM".to_owned()))
             .expect("text cell is in bounds");
         builder
-            .set(
-                CellPosition::new(0, 3),
-                Value::date(12.0).expect("finite date"),
-            )
+            .set(At::new(0, 3), Value::date(12.0).expect("finite date"))
             .expect("date cell is in bounds");
         builder
             .set(
-                CellPosition::new(0, 4),
+                At::new(0, 4),
                 Value::duration(3.5).expect("finite duration"),
             )
             .expect("duration cell is in bounds");

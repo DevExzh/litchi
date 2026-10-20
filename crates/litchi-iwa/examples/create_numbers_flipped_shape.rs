@@ -1,6 +1,6 @@
 //! Create a Numbers shape and apply a native horizontal Arrange flip from scratch.
 
-use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::numbers;
 use litchi_iwa::shapes::{DrawableFlipAxis, DrawablePoint, DrawableSize};
 use litchi_iwa_common::shape::path::Preset;
 
@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
         .nth(1)
         .ok_or("usage: create_numbers_flipped_shape <output.numbers>")?;
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .sheet_name("Flipped Shape")
         .table_name("Data")
         .build()?;

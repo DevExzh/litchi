@@ -1,5 +1,5 @@
 use super::*;
-use crate::numbers::NumbersDocumentBuilder;
+use crate::numbers;
 use crate::shapes::{RgbColorSpace, RgbaColor};
 use litchi_iwa_common::table::cell::conditional_highlight::{
     Date, DateRange, Number, Offset, OffsetDirection, Period, PeriodUnit, Range, Style, Text,
@@ -9,7 +9,7 @@ fn rule(condition: Condition, color: RgbaColor) -> Rule {
     Rule::new(condition, Style::with_fill(color))
 }
 
-fn applied_rule(editor: &NumbersEditor, table_id: u64, row: usize, column: usize) -> Option<u32> {
+fn applied_rule(editor: &Editor, table_id: u64, row: usize, column: usize) -> Option<u32> {
     let location = locate_cell(&editor.package, table_id, row, column).unwrap();
     let cell = read_tile_cell(
         &editor.package,
@@ -26,7 +26,7 @@ fn applied_rule(editor: &NumbersEditor, table_id: u64, row: usize, column: usize
 }
 
 fn share_conditional_highlight(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     table_id: u64,
     row: usize,
     source_column: usize,
@@ -60,7 +60,7 @@ fn share_conditional_highlight(
 
 #[test]
 fn scratch_document_conditional_highlights_create_replace_and_delete() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(4, 3)
         .build()
         .unwrap();
@@ -182,7 +182,7 @@ fn scratch_document_conditional_highlights_create_replace_and_delete() {
 
 #[test]
 fn shared_conditional_child_rejects_deletion_transactionally() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(2, 2)
         .build()
         .unwrap();
@@ -234,7 +234,7 @@ fn shared_conditional_child_rejects_deletion_transactionally() {
 
 #[test]
 fn equal_size_replacement_preserves_conditional_graph_identity() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(2, 2)
         .build()
         .unwrap();
@@ -293,7 +293,7 @@ fn equal_size_replacement_preserves_conditional_graph_identity() {
 
 #[test]
 fn variable_size_replacement_retains_and_reclaims_conditional_children() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(2, 2)
         .build()
         .unwrap();
@@ -380,7 +380,7 @@ fn variable_size_replacement_retains_and_reclaims_conditional_children() {
 
 #[test]
 fn shared_conditional_graph_replacement_is_copy_on_write() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(2, 3)
         .build()
         .unwrap();
@@ -431,7 +431,7 @@ fn shared_conditional_graph_replacement_is_copy_on_write() {
 
 #[test]
 fn shared_conditional_copy_on_write_rolls_back_after_late_failure() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(2, 3)
         .build()
         .unwrap();
@@ -504,7 +504,7 @@ fn shared_conditional_copy_on_write_rolls_back_after_late_failure() {
 
 #[test]
 fn empty_or_excessive_rule_sets_are_rejected_transactionally() {
-    let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+    let mut editor = numbers::Builder::new().build().unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
     assert!(
         editor
@@ -563,7 +563,7 @@ fn range_conditions_use_inclusive_between_and_strictly_outside_not_between() {
 
 #[test]
 fn blank_predicates_round_trip_and_apply_to_empty_and_populated_cells() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(3, 3)
         .build()
         .unwrap();
@@ -614,7 +614,7 @@ fn blank_predicates_round_trip_and_apply_to_empty_and_populated_cells() {
 
 #[test]
 fn relative_date_predicates_round_trip_apply_and_observe_day_boundaries() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(3, 5)
         .build()
         .unwrap();
@@ -772,7 +772,7 @@ fn date_period_predicates_round_trip_all_units_and_use_calendar_boundaries() {
         ]);
     }
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(2, 3)
         .build()
         .unwrap();
@@ -863,7 +863,7 @@ fn volatile_date_predicates_register_native_dependency_owners_and_tiles() {
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
     let period = Period::new(2, Unit::Days).unwrap();
     let volatile_rule = rule(Condition::DateIsInNext(period), red);
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(2, 3)
         .build()
         .unwrap();
@@ -1138,7 +1138,7 @@ fn fixed_date_predicates_round_trip_apply_and_preserve_native_graphs() {
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
     let rules = conditions.clone().map(|condition| rule(condition, red));
     let midday = SECONDS_PER_DAY / 2.0;
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(3, 6)
         .build()
         .unwrap();
@@ -1338,7 +1338,7 @@ fn fixed_date_predicates_round_trip_apply_and_preserve_native_graphs() {
 
 #[test]
 fn numeric_sign_predicates_round_trip_and_exclude_zero_and_non_numbers() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(3, 4)
         .build()
         .unwrap();
@@ -1437,7 +1437,7 @@ fn numeric_sign_predicates_round_trip_and_exclude_zero_and_non_numbers() {
 
 #[test]
 fn boolean_predicates_round_trip_and_match_only_the_exact_boolean() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(3, 5)
         .build()
         .unwrap();
@@ -1546,7 +1546,7 @@ fn boolean_predicates_round_trip_and_match_only_the_exact_boolean() {
 
 #[test]
 fn checkbox_predicates_round_trip_and_require_native_checkbox_format() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(3, 5)
         .build()
         .unwrap();
@@ -1670,7 +1670,7 @@ fn checkbox_predicates_round_trip_and_require_native_checkbox_format() {
 
 #[test]
 fn blank_predicates_reject_noncanonical_formula_graphs() {
-    let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+    let mut editor = numbers::Builder::new().build().unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
     editor
@@ -1728,7 +1728,7 @@ fn blank_predicates_reject_noncanonical_formula_graphs() {
 
 #[test]
 fn text_predicates_are_case_insensitive_and_round_trip_from_scratch() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(3, 3)
         .build()
         .unwrap();

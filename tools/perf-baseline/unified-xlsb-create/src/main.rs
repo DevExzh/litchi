@@ -8,7 +8,7 @@
 //! creation-only evidence; it makes no claim about opening or writing a file.
 
 use litchi_core::FileFormat;
-use litchi_core::sheet::WorkbookTrait;
+use litchi_core::sheet::{WorkbookTrait, Worksheet as _};
 use litchi_ops::File;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
