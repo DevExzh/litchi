@@ -1,6 +1,9 @@
 # 0331 — Owner decision memo (2026-10-17)
 
-Status: awaiting owner confirmation. Every item below is already in effect
+Status: decided by the owner on 2026-10-20 (record
+[0350](0350-owner-api-debt-decision.md)): items 14–20, 23, 24, 26 and 29
+are overridden (required work); item 22 is deferred; every other item is
+confirmed. Originally: awaiting owner confirmation. Every item below is already in effect
 as the adopted default, so no work waits on it. The owner can confirm an
 item, or override it; an override becomes a numbered record and follow-up
 work.

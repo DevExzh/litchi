@@ -896,6 +896,12 @@ Work packages, in waves of up to four agents:
 - Merged `ws-hygiene` (0349) — **determinism fix**: `serde-saphyr` (the `yaml` feature) enables `serde_json/preserve_order`, so durable patch JSON kept insertion order and its bytes and digests depended on Cargo feature unification. The new `litchi_core::canonical_json::{to_writer, to_vec}` always sorts keys and is used by the core patch envelope and every other durable writer (ODT layout/protection, RTF tail-append, DOCX tail-append stream, ODF repair plan, which really differed between builds). Workspace clippy, tests and rustdoc are clean; `gate.sh` now runs all three workspace-wide plus a `litchi-ppt` build without `preserve_order`.
 - Merged `pptx-batch` (0348): the PPTX leaf reports per-edit changes from batched staging, and cell/notes plans resolve against one-pass indexes. After review, the indexes validate every body with the reader, so batches stay equivalent to one-at-a-time sets (new corpus property test `pptx_batch_equivalence.rs`; it also caught an empty-notes divergence 0346 had). Notes staging is one pass (leaf 10k 511 → 22 ms). Cells 1.05–1.31×, warm notes 1.19–1.22×, cold notes 1.89–1.97× (follow-up 0348-P1); the bench-matrix TSV is split per format. **Every PPTX batch route is within the 2× budget.**
 
+## Owner decision (2026-10-20): API debt is required work (record 0350)
+- Memo items 14–20, 23, 24, 26 and 29 are overridden: immutable `Package` APIs, one Edit/Commit/Patch/Diagnostics contract, one error taxonomy, configurable limits through options, structured metadata, iWork and `litchi-iwa` naming, `sheet::text` module ownership, and static dispatch on the `litchi-core::sheet` traits. All consumers migrate in the same change; correctness, fidelity and performance are preserved.
+- Item 22 (the comprehensive redaction audit) is deferred; its rules still apply.
+- Every other memo item is confirmed (1–13, 21, 25, 27, 28, 30).
+- Plan: an inventory and contract design (record 0351) first, then foundational changes, then per-crate migrations.
+
 ## Coordinator status (2026-10-19): code work for the definition of done complete
 The third audit (`.coord/r9/dod-audit-2026-10-19-final.md`, outside the repository) listed three code items: PPTX batch budget (0348), the 34 DOCX chart rows (deferred-P1, owner memo 30) and docs hygiene. All three are done, and the workspace-wide gate now passes on trunk. What remains is the owner's:
 - the 30 decisions in [0331](0331-owner-decision-memo.md); items 12, 27, 28 and 29 decide definition-of-done verdicts;
