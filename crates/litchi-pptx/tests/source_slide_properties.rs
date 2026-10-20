@@ -130,7 +130,7 @@ fn eager_and_source_slide_properties_escape_names_and_use_producer_bool_spelling
     assert!(eager_xml.contains(r#"show="0""#));
     let mut eager_visible_edit = eager.edit().unwrap();
     assert!(eager_visible_edit.set_slide_hidden(0_usize, false).unwrap());
-    let mut eager_visible = eager_visible_edit.commit().unwrap().into_package();
+    let eager_visible = eager_visible_edit.commit().unwrap().into_package();
     assert!(slide_xml(&eager_visible.to_bytes().unwrap()).contains(r#"show="1""#));
 
     let source = open_source(&before);
@@ -372,7 +372,7 @@ fn eager_rename_updates_staged_name_selection_and_ambiguity() {
     assert!(edit.set_slide_hidden("new name", true).unwrap());
     edit.set_slide_name(Position::new(1), "new name").unwrap();
     assert!(edit.set_slide_hidden("new name", false).is_err());
-    let mut changed = edit.commit().unwrap().into_package();
+    let changed = edit.commit().unwrap().into_package();
     let reopened = open_source(&changed.to_bytes().unwrap());
     assert!(
         reopened
@@ -483,7 +483,7 @@ fn combined_primary_properties_match_sequential_edits_and_preserve_prior_staging
     let mut edit = eager.edit().unwrap();
     edit.set_slide_properties(0, Some("Roadmap\tQ4"), Some(true))
         .unwrap();
-    let mut eager = edit.commit().unwrap().into_package();
+    let eager = edit.commit().unwrap().into_package();
     assert_eq!(eager.to_bytes().unwrap(), changed.to_bytes().unwrap());
 }
 

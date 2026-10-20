@@ -108,7 +108,7 @@ fn test_package_round_trip(path: &str) -> Result<(), Box<dyn StdError>> {
         assert_eq!(presentation.slide_height(), 5_143_500);
         assert!(presentation.is_modified());
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     package.save(path)?;
 
     let reopened = Package::open(path)?;

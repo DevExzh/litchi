@@ -248,7 +248,7 @@ fn durable_noop_preserves_signed_source_and_changed_signed_replay_refuses() {
     // Rebind an unsigned fixture's real delta to the signed root. Its selected
     // slide closure still matches, so the refusal must be signature policy.
     let mut unsigned = crate::Package::from_bytes(&signed).unwrap();
-    unsigned.unsign().unwrap();
+    unsigned = unsigned.unsign().unwrap();
     let mut encoded = wire(&fresh(unsigned.to_bytes().unwrap()), "changed");
     encoded[8..40].copy_from_slice(&noop.to_bytes().unwrap()[8..40]);
     let decoded = Patch::from_bytes(&encoded).unwrap();

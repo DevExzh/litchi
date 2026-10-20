@@ -61,7 +61,7 @@ fn generate_agile(password: &str) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn write_encrypted(
-    mut package: Package,
+    package: Package,
     output: &str,
     password: &str,
     mode: Mode,

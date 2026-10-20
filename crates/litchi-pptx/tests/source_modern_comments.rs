@@ -121,7 +121,7 @@ fn deck() -> Vec<u8> {
             .unwrap()
             .set_title(title);
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     let bytes = package.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
 

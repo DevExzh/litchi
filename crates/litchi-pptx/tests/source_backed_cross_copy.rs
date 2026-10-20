@@ -947,7 +947,7 @@ fn authored_package(slide_titles: &[&str]) -> TestResult<Vec<u8>> {
             slide.add_text_box(&format!("body:{title}"), 10, 20, 300, 400);
         }
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     package.to_bytes()
 }
 

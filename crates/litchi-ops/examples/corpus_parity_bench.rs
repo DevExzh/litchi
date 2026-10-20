@@ -119,7 +119,7 @@ mod enabled {
             .expect("format");
             edit.commit().expect("commit").into_package()
         };
-        let mut check = leaf_add();
+        let check = leaf_add();
         let unified = file.add("/slide[1]", node.clone()).expect("unified add");
         assert_eq!(
             check.to_bytes().expect("leaf bytes"),
@@ -156,7 +156,7 @@ mod enabled {
                 .expect("add");
             edit.commit().expect("commit").into_package()
         };
-        let mut check = leaf_plain();
+        let check = leaf_plain();
         let unified = file
             .add("/slide[1]", plain.clone())
             .expect("unified plain add");
@@ -198,7 +198,7 @@ mod enabled {
             .expect("fill");
             edit.commit().expect("commit").into_package()
         };
-        let mut check = leaf_fill();
+        let check = leaf_fill();
         let unified = file
             .set(
                 "/slide[1]/shape[1]",
@@ -238,7 +238,7 @@ mod enabled {
                 .expect("transition");
             edit.commit().expect("commit").into_package()
         };
-        let mut check = leaf_transition();
+        let check = leaf_transition();
         let unified = file
             .set("/slide[1]", props! { "transition" => "push-right" })
             .expect("unified transition");

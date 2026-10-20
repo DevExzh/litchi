@@ -93,7 +93,7 @@ fn package_with_actions(fragment: &str, add_relationships: bool) -> OpcPackage {
     let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     builder.presentation().unwrap().add_slide().unwrap();
     builder.presentation().unwrap().add_slide().unwrap();
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     let bytes = package.to_bytes().unwrap();
     let mut package = OpcPackage::from_vec(bytes).unwrap();
     install_actions(&mut package, fragment, add_relationships);

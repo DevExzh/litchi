@@ -169,11 +169,11 @@ fn eager_text_chunks_match_bounded_sequential_oracle_and_replay() {
     let replacements = text_replacements(&texts);
     let chunks: Vec<_> = replacements.chunks(CHUNK_SIZE).collect();
 
-    let mut source = Package::from_bytes(&before).unwrap();
+    let source = Package::from_bytes(&before).unwrap();
     let mut edit = source.edit().unwrap();
     assert_eq!(edit.set_shape_text_chunks(0_usize, &chunks).unwrap(), 1_000);
     let commit = edit.commit().unwrap();
-    let mut changed = commit.clone().into_package();
+    let changed = commit.clone().into_package();
     let changed_bytes = changed.to_bytes().unwrap();
 
     let mut oracle = Package::from_bytes(&before).unwrap();
@@ -191,9 +191,9 @@ fn eager_text_chunks_match_bounded_sequential_oracle_and_replay() {
     assert_eq!(text_values(&changed)[999], "chunked-999");
 
     let patch = transported_opened(commit.patch());
-    let mut replayed = Package::from_bytes(&before).unwrap().apply(&patch).unwrap();
+    let replayed = Package::from_bytes(&before).unwrap().apply(&patch).unwrap();
     assert_eq!(replayed.to_bytes().unwrap(), changed_bytes);
-    let mut restored = Package::from_bytes(&changed_bytes)
+    let restored = Package::from_bytes(&changed_bytes)
         .unwrap()
         .apply(&patch.inverse())
         .unwrap();
@@ -300,14 +300,14 @@ fn eager_and_source_property_chunks_mix_text_and_bounds_like_sequential_batches(
     let replacements = property_replacements(&texts);
     let chunks: Vec<_> = replacements.chunks(CHUNK_SIZE).collect();
 
-    let mut source = Package::from_bytes(&before).unwrap();
+    let source = Package::from_bytes(&before).unwrap();
     let mut edit = source.edit().unwrap();
     assert_eq!(
         edit.set_shape_property_chunks(0_usize, &chunks).unwrap(),
         1_000
     );
     let commit = edit.commit().unwrap();
-    let mut changed = commit.clone().into_package();
+    let changed = commit.clone().into_package();
     let changed_bytes = changed.to_bytes().unwrap();
     let mut oracle = Package::from_bytes(&before).unwrap();
     let mut sequential = oracle.edit().unwrap();
@@ -398,7 +398,7 @@ fn ten_thousand_text_chunks_change_every_shape_once_without_changing_input() {
     let replacements = text_replacements(&texts);
     let chunks: Vec<_> = replacements.chunks(CHUNK_SIZE).collect();
 
-    let mut source = Package::from_bytes(&before).unwrap();
+    let source = Package::from_bytes(&before).unwrap();
     let mut edit = source.edit().unwrap();
     assert_eq!(
         edit.set_shape_text_chunks(0_usize, &chunks).unwrap(),
@@ -683,7 +683,7 @@ fn chunk_local_text_limits_allow_a_global_budget_below_scene_output_limit() {
         before
     );
 
-    let mut source = Package::from_bytes(&before).unwrap();
+    let source = Package::from_bytes(&before).unwrap();
     let mut edit = source.edit().unwrap();
     assert_eq!(
         edit.set_shape_text_chunks(0_usize, &[&replacements[..1], &replacements[1..]])
@@ -736,7 +736,7 @@ fn property_chunks_split_the_legacy_text_budget_for_eager_and_source_primary() {
         before
     );
 
-    let mut source = Package::from_bytes(&before).unwrap();
+    let source = Package::from_bytes(&before).unwrap();
     let mut edit = source.edit().unwrap();
     assert_eq!(
         edit.set_shape_property_chunks(0_usize, &[&replacements[..1], &replacements[1..]])

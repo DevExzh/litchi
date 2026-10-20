@@ -34,7 +34,7 @@ fn package_bytes(slides: &[Vec<u8>]) -> Vec<u8> {
             presentation.add_slide().expect("add slide");
         }
     }
-    let mut authored = builder.build().expect("new PPTX package");
+    let authored = builder.build().expect("new PPTX package");
     let authored_bytes = authored.to_bytes().expect("serialize authored package");
     let mut package = Package::from_bytes(&authored_bytes).expect("open authored package");
     package

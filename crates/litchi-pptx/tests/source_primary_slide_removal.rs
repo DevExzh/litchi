@@ -38,7 +38,7 @@ fn fixture() -> Vec<u8> {
                 .add_text_box(text, 0, 0, 914_400, 914_400);
         }
     }
-    let mut authored = builder.build().unwrap();
+    let authored = builder.build().unwrap();
     authored.to_bytes().unwrap()
 }
 
@@ -442,7 +442,7 @@ fn final_slide_and_hidden_slide_are_refused_without_changing_the_edit() {
             .add_slide()
             .unwrap()
             .add_text_box("only", 0, 0, 914_400, 914_400);
-        let mut package = builder.build().unwrap();
+        let package = builder.build().unwrap();
         package.to_bytes().unwrap()
     };
     let source = fresh(&one_slide);

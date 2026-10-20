@@ -6,7 +6,6 @@
 
 //! Regression tests for the `PresentationML` package facade.
 
-use litchi_opc::PackURI;
 use litchi_opc::constants::relationship_type as rt;
 
 use super::Package;
@@ -31,7 +30,7 @@ fn owned_presentation_noop_output_preserves_exact_archive() {
             .expect("serialize presentation"),
         b"pptx exact source",
     );
-    let mut package = Package::from_reader(std::io::Cursor::new(source.clone()))
+    let package = Package::from_reader(std::io::Cursor::new(source.clone()))
         .expect("open owned presentation");
 
     assert_eq!(package.to_bytes().expect("serialize no-op package"), source);
@@ -58,7 +57,7 @@ fn new_writer_round_trips_the_bounded_slide_graph() {
         presentation.set_widescreen_slide_size();
     }
 
-    let mut package = builder.build().expect("new package");
+    let package = builder.build().expect("new package");
     let bytes = package.to_bytes().expect("serialize package");
     let reopened = Package::from_bytes(&bytes).expect("reopen package");
     let presentation = reopened.presentation().expect("presentation");
@@ -82,8 +81,7 @@ fn new_writer_round_trips_the_bounded_slide_graph() {
 
 #[test]
 fn fresh_and_opened_packages_have_canonical_edit_roots() {
-    let mut package = Package::new().expect("new package");
-    assert!(package.mutable_pres.is_none());
+    let package = Package::new().expect("new package");
     assert!(
         package
             .edit()
@@ -95,61 +93,7 @@ fn fresh_and_opened_packages_have_canonical_edit_roots() {
     );
     let bytes = package.to_bytes().expect("serialize package");
     let opened = Package::from_bytes(&bytes).expect("reopen package");
-    assert!(opened.mutable_pres.is_none());
     assert!(package.same_content(&opened).expect("same content"));
-}
-
-#[test]
-fn failed_internal_edit_restores_builder_authoring_state() {
-    let mut package = Package::new_authoring().expect("new package");
-    let presentation_part = PackURI::new("/ppt/presentation.xml").expect("part URI");
-    let before = package
-        .opc
-        .get_part(&presentation_part)
-        .expect("presentation part")
-        .blob()
-        .to_vec();
-
-    {
-        let presentation = package
-            .authoring_presentation()
-            .expect("mutable presentation");
-        presentation
-            .add_slide()
-            .expect("pending slide")
-            .set_title("must remain pending");
-    }
-    package.opc.rels_mut().add_relationship(
-        rt::CUSTOM_PROPERTIES.to_owned(),
-        "https://example.invalid/custom.xml".to_owned(),
-        "rIdInvalidCustom".to_owned(),
-        true,
-    );
-
-    let mut props = Props::new();
-    props.insert("Owner", "Alice").expect("property");
-    assert!(package.put_custom_props(props).is_err());
-    assert_eq!(
-        package
-            .opc
-            .get_part(&presentation_part)
-            .expect("presentation part")
-            .blob(),
-        before.as_slice()
-    );
-    assert!(package.mutable_pres.is_some());
-
-    let _ = package.opc.rels_mut().remove("rIdInvalidCustom");
-    let bytes = package.to_bytes().expect("flush restored presentation");
-    let reopened = Package::from_bytes(&bytes).expect("reopen package");
-    assert_eq!(
-        reopened
-            .presentation()
-            .expect("presentation")
-            .slide_count()
-            .expect("slide count"),
-        1
-    );
 }
 
 #[test]
@@ -181,7 +125,7 @@ fn custom_property_no_ops_preserve_signatures_and_changes_require_explicit_unsig
     ));
     assert!(package.opc.is_signed());
     assert!(package.custom_props().expect("read").is_empty());
-    package.unsign().expect("explicit unsign");
+    package = package.unsign().expect("explicit unsign");
     package
         .put_custom_props(owner())
         .expect("write custom properties");

@@ -17647,7 +17647,7 @@ fn build_pptx_cross_copy_corpus(case: Case) -> Result<PptxCrossCopyCorpus, Box<d
 
     let mut published_destination =
         litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.clone()))?;
-    let mut source_for_publication =
+    let source_for_publication =
         litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.clone()))?;
     let mut publication = published_destination.edit()?;
     publication.stage_cross_slide_copy(&source_for_publication, &plan)?;
@@ -20205,7 +20205,7 @@ fn verify_pptx_cross_copy_refusal_gates(
     )?;
     stale_source = stale_source_edit.commit()?.into_package();
     let stale_source_before = stale_source.to_bytes()?;
-    let mut stale_source_destination =
+    let stale_source_destination =
         litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
     let stale_source_destination_before = stale_source_destination.to_bytes()?;
     let stale_source_result = stale_source_destination
@@ -20215,7 +20215,7 @@ fn verify_pptx_cross_copy_refusal_gates(
         && stale_source.to_bytes()? == stale_source_before
         && stale_source_destination.to_bytes()? == stale_source_destination_before;
 
-    let mut foreign_destination =
+    let foreign_destination =
         litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
     let foreign_before = foreign_destination.to_bytes()?;
     let foreign_source =
@@ -51545,7 +51545,7 @@ fn run_pptx_cross_copy(
     };
 
     for iteration in 0..iterations {
-        let mut source =
+        let source =
             litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.source_archive.clone()))?;
         let mut destination = litchi_pptx::Package::from_reader(std::io::Cursor::new(
             corpus.destination_archive.clone(),
@@ -51783,7 +51783,7 @@ fn run_pptx_cross_copy_lifecycle(
         let process_before = process_metrics::Snapshot::read().ok();
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let mut source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_input))?;
+        let source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_input))?;
         let mut destination =
             litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_input))?;
         let source_snapshot = source.opened_presentation()?;

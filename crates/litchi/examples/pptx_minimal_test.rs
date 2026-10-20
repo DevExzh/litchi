@@ -30,7 +30,7 @@ fn main() -> std::result::Result<(), Box<dyn Error>> {
     }
 
     let output = "pptx_minimal_test.pptx";
-    let mut pkg = builder.build()?;
+    let pkg = builder.build()?;
     pkg.save(output)?;
     println!("Saved to: {}", output);
 

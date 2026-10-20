@@ -111,7 +111,7 @@ fn reopened_facades_support_names_limits_removal_and_stable_slide_ids() {
         .add_slide()
         .unwrap()
         .add_text_box("Named shape", 0, 0, 1_000_000, 500_000);
-    let mut authored = builder.build().unwrap();
+    let authored = builder.build().unwrap();
     let bytes = authored.to_bytes().unwrap();
     let mut package = Package::from_bytes(&bytes).unwrap();
     let (slide_name, shape_name) = {
@@ -176,7 +176,7 @@ fn slide_designer_tags_follow_stable_id_reorder_and_refuse_broken_binding() {
     let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     builder.presentation().unwrap().add_slide().unwrap();
     builder.presentation().unwrap().add_slide().unwrap();
-    let mut authored = builder.build().unwrap();
+    let authored = builder.build().unwrap();
     let bytes = authored.to_bytes().unwrap();
     let mut package = Package::from_bytes(&bytes).unwrap();
     let expected = tags("stable", "first");

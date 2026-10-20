@@ -18,6 +18,8 @@ use crate::{Package, Result};
 /// ```
 pub struct Builder {
     package: Package,
+    presentation: MutablePresentation,
+    embed_fonts: bool,
 }
 impl Builder {
     /// Start the native minimal empty presentation.
@@ -27,6 +29,8 @@ impl Builder {
     pub fn new() -> Result<Self> {
         Ok(Self {
             package: Package::new_authoring()?,
+            presentation: MutablePresentation::new(),
+            embed_fonts: false,
         })
     }
 
@@ -35,7 +39,7 @@ impl Builder {
     /// # Errors
     /// Returns native authoring admission failures.
     pub fn presentation(&mut self) -> Result<&mut MutablePresentation> {
-        self.package.authoring_presentation()
+        Ok(&mut self.presentation)
     }
 
     /// Select automatic font embedding during native graph finalization.
@@ -56,7 +60,11 @@ impl Builder {
     /// embedding failures are returned by [`Self::build`].
     #[cfg(feature = "automatic-fonts")]
     pub fn font_embedding(&mut self, mode: litchi_fonts::embedding::Mode) -> Result<&mut Self> {
-        self.package.set_font_embedding(mode)?;
+        self.package.opc.with_fonts(match mode {
+            litchi_fonts::embedding::Mode::Full => litchi_opc::FontEmbedding::Full,
+            litchi_fonts::embedding::Mode::Subset => litchi_opc::FontEmbedding::Subset,
+        });
+        self.embed_fonts = true;
         Ok(self)
     }
 
@@ -65,7 +73,8 @@ impl Builder {
     /// # Errors
     /// Returns native graph construction and validation failures.
     pub fn build(self) -> Result<Package> {
-        self.package.finish_creation()
+        self.package
+            .publish_authored(&self.presentation, self.embed_fonts)
     }
 }
 impl std::fmt::Debug for Builder {
@@ -85,7 +94,6 @@ mod tests {
             .add_slide()?
             .add_text_box("before", 0, 0, 914400, 914400);
         let package = builder.build()?;
-        assert!(!package.is_modified());
         let mut original = Vec::new();
         package.write_to(&mut original)?;
         let mut edit = package.edit()?;

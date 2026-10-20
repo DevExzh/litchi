@@ -106,7 +106,7 @@ fn package_with_picture_background() -> Package {
         .add_slide()
         .unwrap()
         .set_background(expected_background());
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     package.save(output.path()).unwrap();
     let mut package = Package::open(output.path()).unwrap();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();

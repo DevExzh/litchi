@@ -3570,7 +3570,7 @@ mod compaction_tests {
             let slide = builder.presentation()?.add_slide()?;
             slide.add_text_box(&format!("compaction {index}"), 10, 20, 300, 400);
         }
-        let mut package = builder.build()?;
+        let package = builder.build()?;
         Package::from_reader(std::io::Cursor::new(package.to_bytes()?))?.opened_presentation()
     }
 
@@ -3580,7 +3580,7 @@ mod compaction_tests {
             let slide = builder.presentation()?.add_slide()?;
             slide.add_text_box(&format!("compaction {index}"), 10, 20, 300, 400);
         }
-        let mut package = builder.build()?;
+        let package = builder.build()?;
         let mut package = Package::from_reader(std::io::Cursor::new(package.to_bytes()?))?;
         let part_name = litchi_opc::PackURI::new("/ppt/slides/slide1.xml").unwrap();
         let original = package.opc.get_part(&part_name)?.blob().to_vec();
@@ -3827,7 +3827,7 @@ mod compaction_tests {
         let slide = builder.presentation()?.add_slide()?;
         slide.add_text_box("first", 10, 20, 300, 400);
         slide.add_text_box("second", 10, 500, 300, 400);
-        let mut package = builder.build()?;
+        let package = builder.build()?;
         let snapshot = Package::from_reader(std::io::Cursor::new(package.to_bytes()?))?
             .opened_presentation()?;
         let mut edit = snapshot.edit();

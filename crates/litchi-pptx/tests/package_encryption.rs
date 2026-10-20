@@ -132,7 +132,7 @@ fn encrypted_wrong_family_is_rejected_after_decryption() {
 fn standard_and_agile_ingress_retain_mode_and_reencrypt() {
     for mode in [Mode::Standard, Mode::Agile] {
         let bytes = encrypted(mode, "old password");
-        let mut package =
+        let package =
             Package::from_reader_with_password(Cursor::new(bytes), "old password").unwrap();
         assert_eq!(package.encryption(), Some(mode));
         assert!(matches!(
@@ -219,8 +219,8 @@ fn downgrade_and_mutation_are_explicit() {
 }
 
 #[test]
-fn selected_mode_and_atomic_save_update_mode_only_after_success() {
-    let mut package = Package::from_reader_with_password(
+fn selected_mode_saves_leave_the_retained_mode_unchanged() {
+    let package = Package::from_reader_with_password(
         Cursor::new(encrypted(Mode::Standard, "secret")),
         "secret",
     )
@@ -245,7 +245,8 @@ fn selected_mode_and_atomic_save_update_mode_only_after_success() {
     package
         .save_encrypted(&output, "new password", Mode::Agile)
         .unwrap();
-    assert_eq!(package.encryption(), Some(Mode::Agile));
+    // Output never changes the package: it keeps the mode it was opened with.
+    assert_eq!(package.encryption(), Some(Mode::Standard));
     let saved = std::fs::read(output).unwrap();
     assert_eq!(
         encryption::inspect(&saved).unwrap(),
@@ -259,7 +260,7 @@ fn selected_mode_and_atomic_save_update_mode_only_after_success() {
 fn atomic_encrypted_save_preserves_permissions_and_refuses_symlinks() {
     use std::os::unix::fs::{PermissionsExt, symlink};
 
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     let directory = tempfile::tempdir().unwrap();
     let output = directory.path().join("encrypted.pptx");
     std::fs::write(&output, b"old destination").unwrap();
@@ -268,7 +269,7 @@ fn atomic_encrypted_save_preserves_permissions_and_refuses_symlinks() {
     package
         .save_encrypted(&output, "password", Mode::Agile)
         .unwrap();
-    assert_eq!(package.encryption(), Some(Mode::Agile));
+    assert_eq!(package.encryption(), None);
     assert_eq!(
         std::fs::metadata(&output).unwrap().permissions().mode() & 0o777,
         0o640
@@ -282,7 +283,7 @@ fn atomic_encrypted_save_preserves_permissions_and_refuses_symlinks() {
         package.save_encrypted(&link, "password", Mode::Standard),
         Err(Error::Opc(_))
     ));
-    assert_eq!(package.encryption(), Some(Mode::Agile));
+    assert_eq!(package.encryption(), None);
     assert_eq!(std::fs::read(&target).unwrap(), b"original target");
     assert!(
         std::fs::symlink_metadata(&link)
@@ -294,7 +295,7 @@ fn atomic_encrypted_save_preserves_permissions_and_refuses_symlinks() {
 
 #[test]
 fn retained_mode_is_required_and_raw_edit_is_explicit_declassification() {
-    let mut plain = Package::new().unwrap();
+    let plain = Package::new().unwrap();
     assert!(matches!(
         plain.to_reencrypted("password"),
         Err(Error::EncryptionPolicy { .. })
@@ -321,7 +322,7 @@ fn unchanged_inner_signature_survives_encrypt_open_and_reencrypt() {
 
     let encrypted = signed.to_encrypted("first", Mode::Agile).unwrap();
     assert_eq!(signature_graph(signed.opc().unwrap()), expected);
-    let mut opened = Package::from_reader_with_password(Cursor::new(encrypted), "first").unwrap();
+    let opened = Package::from_reader_with_password(Cursor::new(encrypted), "first").unwrap();
     assert_eq!(signature_graph(opened.opc().unwrap()), expected);
 
     let reencrypted = opened.to_reencrypted("second").unwrap();
@@ -392,9 +393,7 @@ fn immutable_reencryption_preserves_profile_content_and_protection() {
         let input = encrypted(mode, "old");
         let package = Package::from_reader_with_password(Cursor::new(input), "old").unwrap();
         let mut output = Vec::new();
-        package
-            .write_reencrypted(&mut output, "new", EncryptionLimits::default())
-            .unwrap();
+        package.write_reencrypted(&mut output, "new").unwrap();
         let clear = encryption::open(output, "new").unwrap();
         assert_eq!(clear.mode(), Some(mode));
         assert_eq!(clear.into_bytes(), plain());
@@ -408,17 +407,39 @@ fn immutable_reencryption_preserves_profile_content_and_protection() {
 
 #[test]
 fn immutable_reencryption_refuses_before_emitting_ciphertext_on_staging_failure() {
-    let package =
-        Package::from_reader_with_password(Cursor::new(encrypted(Mode::Standard, "old")), "old")
-            .unwrap();
-    let mut sink = Vec::new();
+    // The encryption limits are the ones the package was opened with; a
+    // metadata edit (which keeps the provenance) grows the clear package
+    // past them.
+    let input = encrypted(Mode::Standard, "old");
+    let clear_len = Package::from_reader_with_password(Cursor::new(input.clone()), "old")
+        .unwrap()
+        .to_plain_bytes()
+        .unwrap()
+        .len();
     let limits = EncryptionLimits {
-        max_plaintext_bytes: 1,
+        max_plaintext_bytes: clear_len + 256,
         ..EncryptionLimits::default()
     };
-    let error = package
-        .write_reencrypted(&mut sink, "new", limits)
-        .unwrap_err();
+    let opened = Package::from_reader_with_password_and_options(
+        Cursor::new(input),
+        "old",
+        litchi_pptx::OpenOptions::default().encryption_limits(limits),
+    )
+    .unwrap();
+    let mut edit = opened.edit_metadata().unwrap();
+    // An incompressible title, so the clear ZIP grows past the limit.
+    let mut state = 0x2545_f491_u32;
+    let title: String = (0..8192)
+        .map(|_| {
+            state = state.wrapping_mul(1_103_515_245).wrapping_add(12_345);
+            char::from(b'a' + u8::try_from((state >> 16) % 26).unwrap())
+        })
+        .collect();
+    edit.update(|metadata| metadata.title = Some(title))
+        .unwrap();
+    let package = edit.commit().unwrap().into_package();
+    let mut sink = Vec::new();
+    let error = package.write_reencrypted(&mut sink, "new").unwrap_err();
     assert!(matches!(
         error,
         Error::Encryption(encryption::Error::Limit {
@@ -427,21 +448,17 @@ fn immutable_reencryption_refuses_before_emitting_ciphertext_on_staging_failure(
         })
     ));
     assert!(sink.is_empty());
-    assert!(
-        package
-            .write_reencrypted(&mut sink, "", EncryptionLimits::default())
-            .is_err()
-    );
+    assert!(package.write_reencrypted(&mut sink, "").is_err());
     assert!(sink.is_empty());
     assert_eq!(package.encryption(), Some(Mode::Standard));
     let authored = Package::new().unwrap();
     assert!(matches!(
-        authored.write_reencrypted(&mut sink, "new", EncryptionLimits::default()),
+        authored.write_reencrypted(&mut sink, "new"),
         Err(Error::EncryptionPolicy { .. })
     ));
     let clear = Package::from_reader(Cursor::new(plain())).unwrap();
     assert!(matches!(
-        clear.write_reencrypted(&mut sink, "new", EncryptionLimits::default()),
+        clear.write_reencrypted(&mut sink, "new"),
         Err(Error::EncryptionPolicy { .. })
     ));
     assert!(sink.is_empty());
@@ -470,15 +487,11 @@ fn immutable_reencryption_keeps_sink_errors_and_owner_protection() {
     let package =
         Package::from_reader_with_password(Cursor::new(encrypted(Mode::Standard, "old")), "old")
             .unwrap();
-    let error = package
-        .write_reencrypted(FailedSink, "new", EncryptionLimits::default())
-        .unwrap_err();
+    let error = package.write_reencrypted(FailedSink, "new").unwrap_err();
     assert!(
         matches!(error, Error::Io(ref source) if source.kind() == std::io::ErrorKind::BrokenPipe)
     );
-    let error = package
-        .write_reencrypted(FlushFailure, "new", EncryptionLimits::default())
-        .unwrap_err();
+    let error = package.write_reencrypted(FlushFailure, "new").unwrap_err();
     assert!(
         matches!(error, Error::Io(ref source) if source.kind() == std::io::ErrorKind::BrokenPipe)
     );

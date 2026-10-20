@@ -33,7 +33,7 @@ fn inserted_slides_keep_position_and_ids_after_round_trip() {
             [260, 256, 259, 257, 258, 261]
         );
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     package.save(output.path()).unwrap();
 
     let reopened = Package::open(output.path()).unwrap();

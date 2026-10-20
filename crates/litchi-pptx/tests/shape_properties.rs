@@ -282,7 +282,7 @@ fn source_spans_survive_bom_mce_and_retention() {
 
 #[test]
 fn eager_shape_property_batch_composes_text_and_bounds_and_replays() {
-    let mut original = authored_package();
+    let original = authored_package();
     let source_bytes = original.to_bytes().unwrap();
     let mut edit = original.edit().unwrap();
     let replacements = [
@@ -298,7 +298,7 @@ fn eager_shape_property_batch_composes_text_and_bounds_and_replays() {
     );
     let changed = edit.commit().unwrap();
     let patch = Patch::from_bytes(&changed.patch().to_bytes().unwrap()).unwrap();
-    let mut changed_package = changed.clone().into_package();
+    let changed_package = changed.clone().into_package();
     assert_eq!(shape_values(&original)[0].0.as_deref(), Some("first"));
     assert_eq!(
         shape_values(&changed_package)[0].0.as_deref(),
@@ -314,16 +314,16 @@ fn eager_shape_property_batch_composes_text_and_bounds_and_replays() {
     );
     assert_eq!(original.to_bytes().unwrap(), source_bytes);
 
-    let mut replayed = original.apply(&patch).unwrap();
+    let replayed = original.apply(&patch).unwrap();
     let changed_bytes = changed_package.to_bytes().unwrap();
     assert_eq!(replayed.to_bytes().unwrap(), changed_bytes);
-    let mut restored = replayed.apply(&patch.inverse()).unwrap();
+    let restored = replayed.apply(&patch.inverse()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), source_bytes);
 }
 
 #[test]
 fn shape_property_noop_is_exact_and_invalid_batches_are_atomic() {
-    let mut original = authored_package();
+    let original = authored_package();
     let source_bytes = original.to_bytes().unwrap();
     let current = shape_values(&original);
     let mut noop = original.edit().unwrap();
@@ -336,7 +336,7 @@ fn shape_property_noop_is_exact_and_invalid_batches_are_atomic() {
     assert_eq!(noop.set_shape_properties(0, &replacements).unwrap(), 0);
     let noop_commit = noop.commit().unwrap();
     assert!(noop_commit.patch().is_noop());
-    let mut noop_package = noop_commit.clone().into_package();
+    let noop_package = noop_commit.clone().into_package();
     assert_eq!(noop_package.to_bytes().unwrap(), source_bytes);
 
     let mut edit = original.edit().unwrap();

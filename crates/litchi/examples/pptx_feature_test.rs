@@ -156,7 +156,7 @@ fn add_summary_slide(
     Ok(())
 }
 
-fn save_and_reopen(mut package: Package, path: &str) -> Result<(), Box<dyn StdError>> {
+fn save_and_reopen(package: Package, path: &str) -> Result<(), Box<dyn StdError>> {
     package.save(path)?;
     let reopened = Package::open(path)?;
     assert_eq!(reopened.presentation()?.slide_count()?, 1);

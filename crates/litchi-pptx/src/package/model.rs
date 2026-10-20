@@ -6,13 +6,11 @@ use litchi_opc::packuri::PackURI;
 use crate::custom::{Host, Props};
 use crate::parts::PresentationPart;
 use crate::presentation::Presentation;
-use crate::writer::MutablePresentation;
 use crate::{Error, Result};
 
 /// Main entry point for `PresentationML` package ownership.
 pub struct Package {
     pub(crate) opc: OpcPackage,
-    pub(crate) mutable_pres: Option<MutablePresentation>,
     /// Whether ingress retained the exact source archive needed for physical
     /// revision authorization of topology-changing cross-package edits.
     pub(crate) physical_source_provenance: bool,
@@ -44,8 +42,10 @@ pub struct Package {
     pub(crate) part_digests: std::sync::OnceLock<std::sync::Arc<crate::opened::PartDigests>>,
     #[cfg(feature = "encryption")]
     pub(crate) encryption: litchi_ooxml_common::package_encryption::PackageEncryption,
-    #[cfg(feature = "automatic-fonts")]
-    pub(crate) font_embedding_dirty: bool,
+    /// Limits of the encrypted container this package was opened under,
+    /// also used for its encrypted output.
+    #[cfg(feature = "encryption")]
+    pub(crate) encryption_limits: litchi_crypto::ooxml::Limits,
 }
 
 impl std::fmt::Debug for Package {
@@ -53,7 +53,6 @@ impl std::fmt::Debug for Package {
         formatter
             .debug_struct("Package")
             .field("part_count", &self.opc.part_count())
-            .field("pending_authoring", &self.mutable_pres.is_some())
             .field("physical_source_retained", &self.physical_source_provenance)
             .finish_non_exhaustive()
     }
@@ -65,8 +64,8 @@ pub(crate) struct OpenedOwnerState {
     tolerance: crate::leniency::ToleranceReport,
     #[cfg(feature = "encryption")]
     encryption: litchi_ooxml_common::package_encryption::PackageEncryption,
-    #[cfg(feature = "automatic-fonts")]
-    font_embedding_dirty: bool,
+    #[cfg(feature = "encryption")]
+    encryption_limits: litchi_crypto::ooxml::Limits,
 }
 
 impl OpenedOwnerState {
@@ -121,7 +120,6 @@ impl Package {
     /// Returns an error when managed authoring state is stale or the bounded
     /// package graph is malformed.
     pub fn task_panes(&self) -> Result<Option<crate::web::Panes>> {
-        self.ensure_graph_current("task_panes")?;
         Ok(litchi_ooxml_common::web::load(&self.opc)?)
     }
 
@@ -131,7 +129,6 @@ impl Package {
     ///
     /// Returns an error if the operation fails.
     pub fn presentation(&self) -> Result<Presentation<'_>> {
-        self.ensure_graph_current("presentation")?;
         Ok(Presentation::new(
             PresentationPart::from_package(&self.opc)?,
             &self.opc,
@@ -147,20 +144,6 @@ impl Package {
     /// malformed or outside the default bounds.
     pub fn ink_actions(&self) -> Result<Vec<crate::presentation::embedded::ink_actions::Snapshot>> {
         self.presentation()?.ink_actions()
-    }
-
-    /// Borrow the mutable presentation model for a newly authored package.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn authoring_presentation(&mut self) -> Result<&mut MutablePresentation> {
-        self.ensure_plain_mutation("authoring_presentation")?;
-        self.mutable_pres.as_mut().ok_or(Error::refused(
-            litchi_core::edit::RefusalKind::UnsupportedOperation,
-            "authoring_presentation",
-            "the lossless facade cannot hydrate an opened package into the mutable writer",
-        ))
     }
 
     /// Capture one immutable transaction root for a canonical presentation.
@@ -186,14 +169,6 @@ impl Package {
         &self,
         limits: crate::opened::Limits,
     ) -> Result<crate::opened::Snapshot> {
-        self.ensure_graph_current("opened_presentation")?;
-        if self.mutable_pres.is_some() {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedOperation,
-                "opened_presentation",
-                "finish the builder before starting a package transaction",
-            ));
-        }
         let mut snapshot = match self.part_digest_memo() {
             Some(parent) => crate::opened::capture_with_parent_digests(
                 &self.opc,
@@ -248,7 +223,6 @@ impl Package {
         &self,
         patch: &crate::slide_removal::Patch,
     ) -> Result<(Self, crate::opened::Snapshot)> {
-        self.ensure_graph_current("remove_slide")?;
         self.ensure_plain_mutation("remove_slide")?;
         let mut opc = self.opc.clone();
         let snapshot =
@@ -274,8 +248,6 @@ impl Package {
         source: &Self,
         patch: &crate::cross_slide_copy::Patch,
     ) -> Result<(Self, crate::opened::Snapshot)> {
-        self.ensure_graph_current("apply_cross_slide_copy")?;
-        source.ensure_graph_current("apply_cross_slide_copy")?;
         self.require_physical_provenance(source)?;
         let mut opc = self.opc.clone();
         let snapshot = crate::opened::cross_copy_plan::apply_patch(
@@ -359,15 +331,6 @@ impl Package {
     /// Compare exact visible OPC content using the native revision proof.
     /// Pending mutable authoring state is refused; ZIP record encoding is not compared.
     pub fn same_content(&self, other: &Self) -> Result<bool> {
-        self.ensure_graph_current("same_content")?;
-        other.ensure_graph_current("same_content")?;
-        if self.mutable_pres.is_some() || other.mutable_pres.is_some() {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedOperation,
-                "same_content",
-                "comparison requires already-opened packages",
-            ));
-        }
         let left =
             crate::opened::package_fingerprint_with_memo(&self.opc, self.part_digest_memo())?.0;
         let right =
@@ -377,14 +340,6 @@ impl Package {
 
     /// Publish an immutable opened package without flushing mutable authoring state.
     pub fn write_to(&self, writer: impl std::io::Write) -> Result<()> {
-        self.ensure_graph_current("write_to")?;
-        if self.mutable_pres.is_some() {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedOperation,
-                "write_to",
-                "publication requires an already-opened package",
-            ));
-        }
         #[cfg(feature = "encryption")]
         self.encryption
             .ordinary_output()
@@ -409,14 +364,6 @@ impl Package {
     /// Refuses pending authoring state, signed changes,
     /// stale resources, and invalid or unbounded candidate graphs.
     pub fn apply(&self, patch: &crate::opened::Patch) -> Result<Self> {
-        self.ensure_graph_current("apply")?;
-        if self.mutable_pres.is_some() {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedOperation,
-                "apply",
-                "presentation patches require an already-opened package",
-            ));
-        }
         if !patch.is_noop() {
             super::signature::refuse_signed_change(&self.opc)?;
         }
@@ -440,8 +387,8 @@ impl Package {
             tolerance: self.tolerance.clone(),
             #[cfg(feature = "encryption")]
             encryption: self.encryption,
-            #[cfg(feature = "automatic-fonts")]
-            font_embedding_dirty: self.font_embedding_dirty,
+            #[cfg(feature = "encryption")]
+            encryption_limits: self.encryption_limits,
         }
     }
 
@@ -459,14 +406,13 @@ impl Package {
     pub(crate) fn derive(&self, opc: OpcPackage) -> Self {
         Self {
             opc,
-            mutable_pres: None,
             physical_source_provenance: self.physical_source_provenance,
             tolerance: self.tolerance.clone(),
             part_digests: std::sync::OnceLock::new(),
             #[cfg(feature = "encryption")]
             encryption: self.encryption,
-            #[cfg(feature = "automatic-fonts")]
-            font_embedding_dirty: self.font_embedding_dirty,
+            #[cfg(feature = "encryption")]
+            encryption_limits: self.encryption_limits,
         }
     }
 
@@ -488,14 +434,13 @@ impl Package {
         let state = &snapshot.owner_state;
         let mut package = Self {
             opc,
-            mutable_pres: None,
             physical_source_provenance: snapshot.physical_source_provenance,
             tolerance: state.tolerance.clone(),
             part_digests: std::sync::OnceLock::new(),
             #[cfg(feature = "encryption")]
             encryption: state.encryption,
-            #[cfg(feature = "automatic-fonts")]
-            font_embedding_dirty: state.font_embedding_dirty,
+            #[cfg(feature = "encryption")]
+            encryption_limits: state.encryption_limits,
         };
         package.adopt_part_digests(snapshot);
         package
@@ -516,7 +461,6 @@ impl Package {
         &self,
         slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<crate::change_tracking::Snapshot> {
-        self.ensure_graph_current("change_tracking")?;
         let owner = self.resolve_slide(slide.into())?;
         crate::change_tracking::load(&self.opc, &owner)
     }
@@ -531,7 +475,6 @@ impl Package {
     /// Returns an error when mutable authoring state is stale or the notes
     /// graph is malformed or exceeds its resource limits.
     pub fn notes(&self) -> Result<Option<crate::notes::Graph>> {
-        self.ensure_graph_current("notes")?;
         let presentation = PresentationPart::from_package(&self.opc)?;
         crate::notes::load(&self.opc, presentation.part().partname())
     }
@@ -543,7 +486,6 @@ impl Package {
     /// Returns an error when mutable authoring state is stale or the notes
     /// graph is malformed or exceeds its resource limits.
     pub fn notes_snapshot(&self) -> Result<Option<crate::notes::Snapshot>> {
-        self.ensure_graph_current("notes_snapshot")?;
         let presentation = PresentationPart::from_package(&self.opc)?;
         crate::notes::load_snapshot(&self.opc, presentation.part().partname())
     }
@@ -554,19 +496,7 @@ impl Package {
     ///
     /// Returns an error if the operation fails.
     pub fn fonts(&self) -> Result<Option<crate::font::Fonts>> {
-        self.ensure_graph_current("fonts")?;
         crate::font::load(&self.opc)
-    }
-
-    /// Whether a mutable model is currently pending managed publication.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn is_modified(&self) -> bool {
-        self.mutable_pres
-            .as_ref()
-            .is_some_and(MutablePresentation::is_modified)
     }
 
     /// Borrow the underlying clear OPC graph when it is current.
@@ -579,7 +509,6 @@ impl Package {
     ///
     /// Returns an error if the operation fails.
     pub fn opc(&self) -> Result<&OpcPackage> {
-        self.ensure_graph_current("opc")?;
         Ok(&self.opc)
     }
 
@@ -625,7 +554,6 @@ impl Package {
     ///
     /// Returns an error if the operation fails.
     pub fn with_opc<T>(&self, operation: impl FnOnce(&OpcPackage) -> Result<T>) -> Result<T> {
-        self.ensure_graph_current("with_opc")?;
         operation(&self.opc)
     }
 
@@ -642,7 +570,6 @@ impl Package {
         &self,
         slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<Option<crate::tag::List>> {
-        self.ensure_graph_current("tags")?;
         let slide_name = self.resolve_slide(slide.into())?;
         Ok(crate::tag::load(&self.opc, &slide_name)?.map(crate::tag::Source::into_list))
     }
@@ -656,7 +583,6 @@ impl Package {
         &self,
         slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<crate::presentation_properties::metadata::designer_tags::Snapshot> {
-        self.ensure_graph_current("slide_designer_tags")?;
         let (_, slide_id) = self.resolve_slide_identity(slide.into())?;
         crate::presentation_properties::metadata::designer_tags::load_snapshot(&self.opc, slide_id)
     }
@@ -672,7 +598,6 @@ impl Package {
     pub fn math_properties(
         &self,
     ) -> Result<Option<crate::presentation_properties::math::Properties>> {
-        self.ensure_graph_current("math_properties")?;
         crate::presentation_properties::load_math_from_package(&self.opc)
     }
 
@@ -686,7 +611,6 @@ impl Package {
     /// Returns an error if the presentation-properties owner is malformed or
     /// ambiguous.
     pub fn read_only_recommended(&self) -> Result<Option<bool>> {
-        self.ensure_graph_current("read_only_recommended")?;
         crate::presentation_properties::read_only_recommended::load(&self.opc)
     }
 
@@ -702,7 +626,6 @@ impl Package {
     pub fn read_only_recommended_snapshot(
         &self,
     ) -> Result<Option<crate::presentation_properties::read_only_recommended::Snapshot>> {
-        self.ensure_graph_current("read_only_recommended_snapshot")?;
         crate::presentation_properties::read_only_recommended::load_snapshot(&self.opc)
     }
 
@@ -715,7 +638,6 @@ impl Package {
         &self,
         slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<crate::shape::zoom::Owner> {
-        self.ensure_graph_current("zooms")?;
         let slide_name = self.resolve_slide(slide.into())?;
         crate::shape::zoom::load(&self.opc, &slide_name)
     }
@@ -730,7 +652,6 @@ impl Package {
         slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::tag::List>> {
-        self.ensure_graph_current("shape_tags")?;
         let slide_name = self.resolve_slide(slide.into())?;
         Ok(crate::tag::shape::load(&self.opc, &slide_name, shape)?
             .map(crate::tag::Source::into_list))
@@ -748,7 +669,6 @@ impl Package {
         slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::shape::classification::Snapshot>> {
-        self.ensure_graph_current("shape_classification")?;
         let slide_name = self.resolve_slide(slide.into())?;
         crate::shape::classification::load(&self.opc, &slide_name, shape)
     }
@@ -765,7 +685,6 @@ impl Package {
         slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::shape::designer::Snapshot>> {
-        self.ensure_graph_current("shape_design_element")?;
         let slide_name = self.resolve_slide(slide.into())?;
         crate::shape::designer::load(&self.opc, &slide_name, shape)
     }
@@ -780,7 +699,6 @@ impl Package {
         slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<crate::shape::designer::properties::Snapshot> {
-        self.ensure_graph_current("shape_designer_properties")?;
         let (slide_name, _) = self.resolve_slide_identity(slide.into())?;
         crate::shape::designer::load_properties(&self.opc, &slide_name, shape)
     }
@@ -794,7 +712,6 @@ impl Package {
         &self,
         slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<Vec<crate::model3d::Model>> {
-        self.ensure_graph_current("model3ds")?;
         let slide_name = self.resolve_slide(slide.into())?;
         crate::model3d::package::load_all(&self.opc, &slide_name)
     }
@@ -809,7 +726,6 @@ impl Package {
         slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::model3d::Model>> {
-        self.ensure_graph_current("model3d")?;
         let slide_name = self.resolve_slide(slide.into())?;
         crate::model3d::package::load(&self.opc, &slide_name, shape.into())
     }
@@ -846,7 +762,8 @@ impl Package {
         self.with_opc(crate::presentation_properties::metadata::slide_sync::load)
     }
 
-    /// Remove every package signature explicitly (ADR 0006).
+    /// A new package with every signature removed explicitly (ADR 0006);
+    /// this package is unchanged.
     ///
     /// Every signature relationship and signature part is removed, and the
     /// resulting unsigned graph is authorized for publication
@@ -857,31 +774,30 @@ impl Package {
     /// facade and their functions on an [`OpcPackage`]), and a changed
     /// [`Self::edit_opc`]. Call this first to edit one. A signed package that
     /// is saved unchanged, or edited by an exact no-op, keeps its signature
-    /// byte for byte. A package that carries no signature, and no
-    /// signature-policy requirement, is left untouched.
+    /// byte for byte. For a package that carries no signature, and no
+    /// signature-policy requirement, the result is an equal package.
     ///
     /// ```
     /// use litchi_pptx::Package;
     ///
-    /// let mut package = Package::from_reader(std::io::Cursor::new(Package::new()?.to_bytes()?))?;
-    /// package.unsign()?;
-    /// assert!(!package.opc()?.is_signed());
+    /// let package = Package::from_reader(std::io::Cursor::new(Package::new()?.to_bytes()?))?;
+    /// let unsigned = package.unsign()?;
+    /// assert!(!unsigned.opc()?.is_signed());
     /// # Ok::<(), litchi_pptx::Error>(())
     /// ```
     ///
     /// # Errors
     ///
     /// Returns the encryption-policy error for a package opened with a
-    /// password, whose typed mutations are refused, and an error when pending
-    /// authoring state cannot be published first.
-    pub fn unsign(&mut self) -> Result<&mut Self> {
-        if self.opc.is_signed() || self.opc.requires_signature_edit_policy() {
-            self.edit_typed(|opc| {
-                opc.unsign();
-                Ok(())
-            })?;
+    /// password, whose typed mutations are refused.
+    pub fn unsign(&self) -> Result<Self> {
+        if !(self.opc.is_signed() || self.opc.requires_signature_edit_policy()) {
+            return Ok(self.duplicate());
         }
-        Ok(self)
+        self.ensure_plain_mutation("unsign")?;
+        let mut opc = self.opc.clone();
+        opc.unsign();
+        Ok(self.derive(opc))
     }
 
     /// Adopt, as this package's memo, `snapshot`'s payload-digest memo
@@ -944,33 +860,12 @@ impl Package {
         self.part_digests.get().map(std::sync::Arc::as_ref)
     }
 
-    /// Drop the retained payload-digest memo.
-    ///
-    /// Called by every mutation that does not produce an opened-presentation
-    /// snapshot to adopt, so the facade never retains a payload allocation its
-    /// own graph has replaced. The next capture hashes from cold, which costs
-    /// time and can never change a value.
-    pub(crate) fn release_part_digests(&mut self) {
-        self.part_digests = std::sync::OnceLock::new();
-    }
-
     pub(crate) fn ensure_plain_mutation(&self, operation: &'static str) -> Result<()> {
         let _ = operation;
         #[cfg(feature = "encryption")]
         self.encryption
             .ordinary_output()
             .map_err(|source| Error::EncryptionPolicy { operation, source })?;
-        Ok(())
-    }
-
-    pub(super) fn ensure_graph_current(&self, operation: &'static str) -> Result<()> {
-        if self.is_modified() {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedOperation,
-                operation,
-                super::codec::STALE_PRESENTATION_GRAPH_REASON,
-            ));
-        }
         Ok(())
     }
 

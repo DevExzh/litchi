@@ -33,7 +33,7 @@ fn source_bytes(slide_ids: &str) -> Vec<u8> {
             .unwrap()
             .set_title(&format!("Slide {index}"));
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     let bytes = package.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
     let uri = PackURI::new("/ppt/presentation.xml").unwrap();

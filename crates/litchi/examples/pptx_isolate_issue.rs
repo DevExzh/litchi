@@ -187,7 +187,7 @@ fn write_case(
             slide.add_text_box(body, X, Y, WIDTH, HEIGHT);
         }
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     package.save(path)?;
     let reopened = Package::open(path)?;
     assert_eq!(reopened.presentation()?.slide_count()?, slide_count);

@@ -70,7 +70,7 @@ fn names(package: &Package) -> Vec<String> {
 #[test]
 fn insertions_into_empty_and_populated_lists_compose_and_invert_losslessly() {
     for strict in [false, true] {
-        let mut original = source(strict);
+        let original = source(strict);
         let original_bytes = original.to_bytes().unwrap();
         let layout = layout(&original);
         let mut edit = original.edit().unwrap();
@@ -82,15 +82,15 @@ fn insertions_into_empty_and_populated_lists_compose_and_invert_losslessly() {
         assert_eq!(edit.slides().len(), 3);
         assert_ne!(first.id(), second.id());
         assert_ne!(second.id(), third.id());
-        let (mut changed, patch) = edit.commit().unwrap().into_parts();
+        let (changed, patch) = edit.commit().unwrap().into_parts();
         assert_eq!(names(&changed), [second.name(), first.name(), third.name()]);
         let wire = Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
-        let mut replay = original.apply(&wire).unwrap();
+        let replay = original.apply(&wire).unwrap();
         assert_eq!(replay.to_bytes().unwrap(), changed.to_bytes().unwrap());
         let reopened =
             Package::from_reader(std::io::Cursor::new(replay.to_bytes().unwrap())).unwrap();
         assert_eq!(names(&reopened), names(&changed));
-        let mut restored = replay
+        let restored = replay
             .apply(&Patch::from_bytes(&wire.inverse().to_bytes().unwrap()).unwrap())
             .unwrap();
         assert_eq!(restored.to_bytes().unwrap(), original_bytes);
@@ -167,8 +167,8 @@ fn inverse_refuses_a_new_incoming_owner_atomically() {
     let mut edit = original.edit().unwrap();
     edit.insert_slide(Position::new(0), &layout(&original))
         .unwrap();
-    let (mut changed, patch) = edit.commit().unwrap().into_parts();
-    let mut dependent = Package::from_reader(std::io::Cursor::new(with_incoming_reference(
+    let (changed, patch) = edit.commit().unwrap().into_parts();
+    let dependent = Package::from_reader(std::io::Cursor::new(with_incoming_reference(
         &changed.to_bytes().unwrap(),
     )))
     .unwrap();
@@ -181,7 +181,7 @@ fn inverse_refuses_a_new_incoming_owner_atomically() {
 }
 #[test]
 fn insertion_does_not_activate_an_existing_dangling_target() {
-    let mut original = source(false);
+    let original = source(false);
     let original = Package::from_reader(std::io::Cursor::new(with_incoming_reference(
         &original.to_bytes().unwrap(),
     )))
@@ -189,7 +189,7 @@ fn insertion_does_not_activate_an_existing_dangling_target() {
     let mut edit = original.edit().unwrap();
     edit.insert_slide(Position::new(0), &layout(&original))
         .unwrap();
-    let mut changed = edit.commit().unwrap().into_package();
+    let changed = edit.commit().unwrap().into_package();
     let bytes = changed.to_bytes().unwrap();
     let archive = ArchiveReader::new(&bytes).unwrap();
     assert!(
@@ -201,7 +201,7 @@ fn insertion_does_not_activate_an_existing_dangling_target() {
 
 #[test]
 fn duplicate_layout_names_are_a_typed_atomic_refusal() {
-    let mut original = source(false);
+    let original = source(false);
     let blank = layout(&original);
     let (member, other) = original
         .presentation()
@@ -245,7 +245,7 @@ fn duplicate_layout_names_are_a_typed_atomic_refusal() {
 }
 #[test]
 fn insertion_and_inverse_preserve_unrelated_destination_metadata() {
-    let mut original = source(false);
+    let original = source(false);
     let mut edit = original.edit().unwrap();
     edit.insert_slide(Position::new(0), &layout(&original))
         .unwrap();
@@ -268,7 +268,7 @@ fn insertion_and_inverse_preserve_unrelated_destination_metadata() {
     let overlay =
         Package::from_reader(std::io::Cursor::new(writer.finish().unwrap().into_inner())).unwrap();
     let wire = Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
-    let mut changed = overlay.apply(&wire).unwrap();
+    let changed = overlay.apply(&wire).unwrap();
     let bytes = changed.to_bytes().unwrap();
     let archive = ArchiveReader::new(&bytes).unwrap();
     for (name, _) in &expected {
@@ -278,7 +278,7 @@ fn insertion_and_inverse_preserve_unrelated_destination_metadata() {
                 .contains("independent destination markup")
         );
     }
-    let mut restored = changed
+    let restored = changed
         .apply(&Patch::from_bytes(&wire.inverse().to_bytes().unwrap()).unwrap())
         .unwrap();
     let bytes = restored.to_bytes().unwrap();
@@ -294,7 +294,7 @@ fn inverse_checks_root_dependencies_but_allows_external_references() {
     let mut edit = original.edit().unwrap();
     edit.insert_slide(Position::new(0), &layout(&original))
         .unwrap();
-    let (mut changed, patch) = edit.commit().unwrap().into_parts();
+    let (changed, patch) = edit.commit().unwrap().into_parts();
     let bytes = changed.to_bytes().unwrap();
     for external in [false, true] {
         let archive = ArchiveReader::new(&bytes).unwrap();
@@ -314,7 +314,7 @@ fn inverse_checks_root_dependencies_but_allows_external_references() {
             }
             writer.write_stored(name, &bytes).unwrap();
         }
-        let mut overlay =
+        let overlay =
             Package::from_reader(std::io::Cursor::new(writer.finish().unwrap().into_inner()))
                 .unwrap();
         let before = overlay.to_bytes().unwrap();
@@ -330,7 +330,7 @@ fn inverse_checks_root_dependencies_but_allows_external_references() {
 
 #[test]
 fn fresh_package_insertion_uses_the_same_immutable_transaction() {
-    let mut original = Package::new().unwrap();
+    let original = Package::new().unwrap();
     let before = original.to_bytes().unwrap();
     let mut edit = original.edit().unwrap();
     let slide = edit
@@ -338,12 +338,12 @@ fn fresh_package_insertion_uses_the_same_immutable_transaction() {
         .unwrap();
     edit.add_text_box(slide.name(), "fresh", (0, 0, 914400, 914400))
         .unwrap();
-    let (mut changed, patch) = edit.commit().unwrap().into_parts();
-    let mut replay = original
+    let (changed, patch) = edit.commit().unwrap().into_parts();
+    let replay = original
         .apply(&Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap())
         .unwrap();
     assert_eq!(changed.to_bytes().unwrap(), replay.to_bytes().unwrap());
-    let mut restored = replay.apply(&patch.inverse()).unwrap();
+    let restored = replay.apply(&patch.inverse()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), before);
     assert!(
         original
@@ -357,13 +357,13 @@ fn fresh_package_insertion_uses_the_same_immutable_transaction() {
 
 #[test]
 fn forward_replay_refuses_to_activate_a_destination_dangling_reference() {
-    let mut original = source(false);
+    let original = source(false);
     let mut edit = original.edit().unwrap();
     edit.insert_slide(Position::new(0), &layout(&original))
         .unwrap();
     let patch =
         Patch::from_bytes(&edit.commit().unwrap().into_patch().to_bytes().unwrap()).unwrap();
-    let mut destination = Package::from_reader(std::io::Cursor::new(with_incoming_reference(
+    let destination = Package::from_reader(std::io::Cursor::new(with_incoming_reference(
         &original.to_bytes().unwrap(),
     )))
     .unwrap();
@@ -375,7 +375,7 @@ fn forward_replay_refuses_to_activate_a_destination_dangling_reference() {
 #[test]
 fn insertion_refuses_dangling_xml_bindings_ranges_and_unknown_extensions() {
     for strict in [false, true] {
-        let mut base = source(strict);
+        let base = source(strict);
         let bytes = base.to_bytes().unwrap();
         let archive = ArchiveReader::new(&bytes).unwrap();
         let rels =
@@ -401,7 +401,7 @@ fn insertion_refuses_dangling_xml_bindings_ranges_and_unknown_extensions() {
                 }
                 writer.write_stored(name, &payload).unwrap();
             }
-            let mut source =
+            let source =
                 Package::from_reader(std::io::Cursor::new(writer.finish().unwrap().into_inner()))
                     .unwrap();
             let before = source.to_bytes().unwrap();

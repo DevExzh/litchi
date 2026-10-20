@@ -17,7 +17,7 @@ const P1710_NS: &str = "http://schemas.microsoft.com/office/powerpoint/2017/10/m
 const URI: &str = "{1BD7E111-0CB8-44D6-8891-C1BB2F81B7CC}";
 
 fn package_with_properties(xml: &[u8]) -> Package {
-    let mut authored = Package::new().expect("new package");
+    let authored = Package::new().expect("new package");
     let bytes = authored.to_bytes().expect("serialize package");
     let mut opc = OpcPackage::from_bytes(&bytes).expect("reopen package");
     let properties = PackURI::new("/ppt/presProps.xml").expect("properties part URI");
@@ -128,7 +128,7 @@ fn exact_signed_noop_is_allowed_but_changed_edit_requires_explicit_policy() {
 
 #[test]
 fn duplicate_presentation_properties_parts_are_rejected() {
-    let mut authored = Package::new().expect("new package");
+    let authored = Package::new().expect("new package");
     let bytes = authored.to_bytes().expect("serialize package");
     let mut opc = OpcPackage::from_bytes(&bytes).expect("reopen package");
     let orphan = PackURI::new("/ppt/presProps-orphan.xml").expect("orphan URI");

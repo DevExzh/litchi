@@ -545,9 +545,9 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
         return Err("owning PPTX stale-source refusal mutated its package".into());
     }
 
-    let mut foreign_seed = litchi_pptx::Package::new()?;
+    let foreign_seed = litchi_pptx::Package::new()?;
     let foreign_bytes = foreign_seed.to_bytes()?;
-    let mut foreign = litchi_pptx::Package::from_reader(std::io::Cursor::new(foreign_bytes))?;
+    let foreign = litchi_pptx::Package::from_reader(std::io::Cursor::new(foreign_bytes))?;
     let foreign_before = foreign.to_bytes()?;
     let foreign_error = foreign
         .apply(&forward)

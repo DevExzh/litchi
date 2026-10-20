@@ -61,7 +61,7 @@ fn package_and_presentation_manage_local_revision_and_changes_information() {
 }
 
 fn base_opc() -> OpcPackage {
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     let package_bytes = package.to_bytes().unwrap();
     OpcPackage::from_bytes(&package_bytes).unwrap()
 }

@@ -45,7 +45,7 @@ fn fixture() -> Vec<u8> {
                 .add_text_box(text, 0, 0, 914_400, 914_400);
         }
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     package.to_bytes().unwrap()
 }
 
@@ -510,7 +510,7 @@ fn final_slide_shared_owner_dependency_unknown_macro_and_signed_sources_refuse_a
             .add_slide()
             .unwrap()
             .add_text_box("only", 0, 0, 914_400, 914_400);
-        let mut package = builder.build().unwrap();
+        let package = builder.build().unwrap();
         package.to_bytes().unwrap()
     };
     let final_error = open(&one_slide)

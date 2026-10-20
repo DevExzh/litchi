@@ -339,7 +339,7 @@ fn changed_slide_limit_refuses_atomically_across_successive_commits() {
             .unwrap()
             .add_text_box("original", 0, 0, 914_400, 914_400);
     }
-    let mut authored = builder.build().unwrap();
+    let authored = builder.build().unwrap();
     let source = Package::from_read_at(Arc::new(litchi_core::OwnedSource::new(
         authored.to_bytes().unwrap(),
     )))

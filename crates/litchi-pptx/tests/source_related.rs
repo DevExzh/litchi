@@ -68,7 +68,7 @@ fn rich_deck() -> Vec<u8> {
         second.set_title("Details");
     }
 
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     let bytes = package.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
 

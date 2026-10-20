@@ -25,7 +25,7 @@ fn duplicated_slide_takes_requested_position_after_round_trip() {
         assert!(presentation.insert_duplicate_slide(0, 9).is_err());
         assert_eq!(presentation.slide_count(), 4);
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     package.save(output.path()).unwrap();
 
     let reopened = Package::open(output.path()).unwrap();

@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Save the presentation
     let output_path = "pptx_writer_showcase.pptx";
     println!("\n✓ Saving presentation to: {}", output_path);
-    let mut pkg = builder.build()?;
+    let pkg = builder.build()?;
     pkg.save(output_path)?;
 
     println!("\n======================================================");

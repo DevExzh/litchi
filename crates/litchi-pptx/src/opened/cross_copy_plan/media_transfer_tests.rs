@@ -66,7 +66,7 @@ fn authored(prefix: &str, slides: usize) -> Result<Vec<u8>> {
             .add_slide()?
             .set_title(&format!("change-0742-{prefix}-{index}"));
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     package.to_bytes()
 }
 

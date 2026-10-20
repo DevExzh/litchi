@@ -275,7 +275,7 @@ fn demo_pptx_operations() -> ExampleResult<()> {
     );
 
     // Save
-    let mut pkg = builder.build()?;
+    let pkg = builder.build()?;
     pkg.save("demo_presentation.pptx")?;
     println!("✓ Created: demo_presentation.pptx");
 

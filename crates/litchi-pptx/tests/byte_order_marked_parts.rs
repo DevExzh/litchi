@@ -176,7 +176,7 @@ fn text_deck() -> Vec<u8> {
             }
         }
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     package.to_bytes().unwrap()
 }
 

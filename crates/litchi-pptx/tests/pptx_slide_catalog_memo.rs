@@ -33,7 +33,7 @@ fn authored(slides: usize) -> Package {
                 .set_title(&format!("Slide {index}"));
         }
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     package.save(output.path()).unwrap();
     Package::open(output.path()).unwrap()
 }

@@ -87,7 +87,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
     }
 
     let output_path = "pptx_advanced_features.pptx";
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     package.save(output_path)?;
     let reopened = Package::open(output_path)?;
     println!("\n✓ Wrote and reopened {output_path}");

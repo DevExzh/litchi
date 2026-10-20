@@ -178,6 +178,6 @@ fn package_with_slides(count: usize) -> OpcPackage {
     for _ in 0..count {
         builder.presentation().unwrap().add_slide().unwrap();
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     OpcPackage::from_vec(package.to_bytes().unwrap()).unwrap()
 }

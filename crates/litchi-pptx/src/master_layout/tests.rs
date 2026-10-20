@@ -767,7 +767,7 @@ fn p232_noop_is_byte_stable_and_signature_policy_is_explicit() {
         crate::Error::Opc(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     ));
     assert!(package.opc().unwrap().is_signed());
-    package.unsign().unwrap();
+    package = package.unsign().unwrap();
     package
         .apply_placeholder_type_extension_slot_patch(changed.patch())
         .unwrap();

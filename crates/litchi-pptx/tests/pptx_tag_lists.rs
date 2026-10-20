@@ -359,7 +359,7 @@ fn package_with_named_slides() -> Package {
     let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     builder.presentation().unwrap().add_slide().unwrap();
     builder.presentation().unwrap().add_slide().unwrap();
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     package.save(output.path()).unwrap();
 
     let mut package = Package::open(output.path()).unwrap();

@@ -374,7 +374,7 @@ fn authored_package(names: &[&str]) -> TestResult<Vec<u8>> {
             slide.add_text_box(&format!("body:{name}"), 10, 20, 300, 400);
         }
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     let bytes = package.to_bytes()?;
     let mut opc = OpcPackage::from_vec(bytes)?;
     for (index, name) in names.iter().enumerate() {

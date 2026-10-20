@@ -38,7 +38,7 @@ fn fixture() -> Vec<u8> {
                 .add_text_box(text, 0, 0, 914_400, 914_400);
         }
     }
-    let mut authored = builder.build().unwrap();
+    let authored = builder.build().unwrap();
     authored.to_bytes().unwrap()
 }
 

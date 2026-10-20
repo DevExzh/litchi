@@ -60,7 +60,7 @@ fn marked_slides_package(count: usize, marked: &[usize]) -> Result<Package> {
             slide.set_notes("First notes");
         }
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     let bytes = package.to_bytes()?;
     let mut package = Package::from_reader(std::io::Cursor::new(bytes))?;
     for &index in marked {

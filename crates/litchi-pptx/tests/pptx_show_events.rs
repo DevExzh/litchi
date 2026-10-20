@@ -80,14 +80,14 @@ fn event_drafts() -> Vec<Draft> {
 fn package_with_slide() -> OpcPackage {
     let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     builder.presentation().unwrap().add_slide().unwrap();
-    let mut authored = builder.build().unwrap();
+    let authored = builder.build().unwrap();
     OpcPackage::from_bytes(&authored.to_bytes().unwrap()).unwrap()
 }
 
 fn package_with_show_event_extension(extension: &str) -> OpcPackage {
     let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     builder.presentation().unwrap().add_slide().unwrap();
-    let mut authored = builder.build().unwrap();
+    let authored = builder.build().unwrap();
     let bytes = authored.to_bytes().unwrap();
     let mut package = OpcPackage::from_bytes(&bytes).unwrap();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();

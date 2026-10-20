@@ -107,14 +107,14 @@ fn generated_package() -> Package {
     {
         builder.presentation().unwrap().add_slide().unwrap();
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     let bytes = package.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
     chart::add(&mut opc, "/ppt/slides/slide1.xml", &chart).unwrap();
     Package::from_opc_package(opc).unwrap()
 }
 
-fn edit_package(mut package: Package, edit: impl FnOnce(&mut OpcPackage)) -> Package {
+fn edit_package(package: Package, edit: impl FnOnce(&mut OpcPackage)) -> Package {
     let bytes = package.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
     edit(&mut opc);

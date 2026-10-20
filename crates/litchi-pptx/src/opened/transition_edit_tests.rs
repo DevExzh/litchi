@@ -80,7 +80,7 @@ fn eager_edit_sets_replaces_and_clears_transitions() -> Result<()> {
 
 #[test]
 fn source_edit_matches_the_eager_edit_and_inverts() -> Result<()> {
-    let mut deck = deck()?;
+    let deck = deck()?;
     let bytes = deck.to_bytes()?;
     let push = Transition::new(Kind::Push(Side::Left));
     let (eager, _) = set(&Package::from_bytes(&bytes)?, Some(&push))?;

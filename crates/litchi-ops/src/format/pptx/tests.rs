@@ -487,7 +487,7 @@ fn related_order_fixture() -> Vec<u8> {
             Ok(())
         })
         .unwrap();
-    let mut package = opc_edit.commit().unwrap().into_package();
+    let package = opc_edit.commit().unwrap().into_package();
     package.to_bytes().unwrap()
 }
 

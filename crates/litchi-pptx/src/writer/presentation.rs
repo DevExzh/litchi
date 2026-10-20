@@ -223,6 +223,7 @@ impl MutablePresentation {
         self.modified || self.slides.iter().any(MutableSlide::is_modified)
     }
 
+    #[cfg(test)]
     pub(crate) fn mark_clean(&mut self) {
         self.modified = false;
         for slide in &mut self.slides {

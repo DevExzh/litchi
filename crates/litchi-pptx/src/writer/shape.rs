@@ -402,6 +402,7 @@ impl MutableShape {
         self.modified
     }
 
+    #[cfg(test)]
     pub(crate) fn mark_clean(&mut self) {
         self.modified = false;
     }

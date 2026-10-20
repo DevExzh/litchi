@@ -565,7 +565,7 @@ fn notes_capture_matrix_keeps_the_16m_notes_root_limit_distinct_from_the_64m_par
 
 #[test]
 fn notes_capture_matrix_does_not_cross_contaminate_immutable_package_sources() -> Result<()> {
-    let mut first = opened_two_slide_package()?;
+    let first = opened_two_slide_package()?;
     let bytes = first.to_bytes()?;
     let mut second = Package::from_reader(std::io::Cursor::new(bytes))?;
 
@@ -642,7 +642,7 @@ fn opened_two_slide_package() -> Result<Package> {
         second.add_text_box("Second body", 10, 20, 300, 400);
         second.set_notes("Second notes");
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     let bytes = package.to_bytes()?;
     Package::from_reader(std::io::Cursor::new(bytes))
 }
@@ -653,13 +653,13 @@ fn opened_plain_slide_package() -> Result<Package> {
         .presentation()?
         .add_slide()?
         .set_title("Copy source");
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     let bytes = package.to_bytes()?;
     Package::from_reader(std::io::Cursor::new(bytes))
 }
 
 fn borrowed_plain_slide_package() -> Result<Package> {
-    let mut package = opened_plain_slide_package()?;
+    let package = opened_plain_slide_package()?;
     Package::from_bytes(&package.to_bytes()?)
 }
 
@@ -669,7 +669,7 @@ fn opened_plain_slides_package(count: usize) -> Result<Package> {
         let title = format!("Removal source {index}");
         builder.presentation()?.add_slide()?.set_title(&title);
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     let bytes = package.to_bytes()?;
     Package::from_reader(std::io::Cursor::new(bytes))
 }
@@ -725,7 +725,7 @@ fn opened_slide_name_index_preserves_ambiguity() -> Result<()> {
 }
 
 fn borrowed_plain_slides_package(count: usize) -> Result<Package> {
-    let mut package = opened_plain_slides_package(count)?;
+    let package = opened_plain_slides_package(count)?;
     Package::from_bytes(&package.to_bytes()?)
 }
 
@@ -736,11 +736,11 @@ fn cross_slide_copy_is_source_exact_reversible_and_reopens() -> Result<()> {
         .presentation()?
         .add_slide()?
         .set_title("cross-source");
-    let mut authored_source = builder.build()?;
+    let authored_source = builder.build()?;
     let mut source = Package::from_bytes(&authored_source.to_bytes()?)?;
     rename_slide(&mut source, 0, "cross-source")?;
     let source_bytes = source.to_bytes()?;
-    let mut source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
 
     let mut destination = opened_plain_slides_package(2)?;
     rename_slide(&mut destination, 0, "destination-first")?;
@@ -796,7 +796,7 @@ fn cross_slide_copy_is_source_exact_reversible_and_reopens() -> Result<()> {
 fn opened_transaction_does_not_upgrade_borrowed_physical_provenance() -> Result<()> {
     let authored = opened_plain_slide_package()?;
     let bytes = {
-        let mut authored = authored;
+        let authored = authored;
         authored.to_bytes()?
     };
     let borrowed = Package::from_bytes(&bytes)?;
@@ -821,7 +821,7 @@ fn opened_transaction_does_not_upgrade_borrowed_physical_provenance() -> Result<
 fn cross_slide_copy_refuses_slide_name_and_unknown_physical_collisions() -> Result<()> {
     let mut builder = crate::builder::Builder::new()?;
     builder.presentation()?.add_slide()?.set_title("same-name");
-    let mut authored_source = builder.build()?;
+    let authored_source = builder.build()?;
     let mut source = Package::from_bytes(&authored_source.to_bytes()?)?;
     rename_slide(&mut source, 0, "same-name")?;
     attach_copy_ole(&mut source)?;
@@ -908,16 +908,16 @@ fn cross_slide_copy_refuses_slide_name_and_unknown_physical_collisions() -> Resu
 
 #[test]
 fn cross_slide_copy_authorizes_known_noncanonical_source_archives() -> Result<()> {
-    let mut authored_source = opened_plain_slide_package()?;
+    let authored_source = opened_plain_slide_package()?;
     let canonical_source_bytes = authored_source.to_bytes()?;
     let source_bytes = with_eocd_comment(canonical_source_bytes.clone(), b"cross raw source")?;
     let canonical_source =
         Package::from_reader(std::io::Cursor::new(canonical_source_bytes.clone()))?;
-    let mut source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
     let mut destination = opened_plain_slides_package(2)?;
     rename_slide(&mut destination, 0, "destination-first")?;
     rename_slide(&mut destination, 1, "destination-second")?;
-    let mut destination = Package::from_reader(std::io::Cursor::new(destination.to_bytes()?))?;
+    let destination = Package::from_reader(std::io::Cursor::new(destination.to_bytes()?))?;
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination.opened_presentation()?;
     let plan = destination_snapshot.plan_cross_slide_copy(&source_snapshot, 0, 0, 1)?;
@@ -949,9 +949,9 @@ fn cross_slide_copy_authorizes_known_noncanonical_source_archives() -> Result<()
 
 #[test]
 fn cross_slide_copy_preserves_noncanonical_destination_members_and_live_inverse() -> Result<()> {
-    let mut authored_source = opened_plain_slide_package()?;
+    let authored_source = opened_plain_slide_package()?;
     let source_bytes = authored_source.to_bytes()?;
-    let mut source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
     let source_states_before = part_states(&source);
 
     let mut authored_destination = opened_plain_slides_package(2)?;
@@ -1067,7 +1067,7 @@ fn cross_slide_copy_preserves_private_closure_and_inert_external_targets() -> Re
     attach_copy_ole(&mut source)?;
     attach_external_link(&mut source)?;
     let source_bytes = source.to_bytes()?;
-    let mut source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
     let mut destination = opened_plain_slides_package(2)?;
     rename_slide(&mut destination, 0, "destination-first")?;
     rename_slide(&mut destination, 1, "destination-second")?;
@@ -1086,7 +1086,7 @@ fn cross_slide_copy_preserves_private_closure_and_inert_external_targets() -> Re
 
 #[test]
 fn cross_slide_copy_rejects_layout_mismatch_and_stale_or_forged_publication() -> Result<()> {
-    let mut source = opened_plain_slide_package()?;
+    let source = opened_plain_slide_package()?;
     let source = Package::from_reader(std::io::Cursor::new(source.to_bytes()?))?;
     let mut mismatched_destination = opened_plain_slides_package(2)?;
     rename_slide(&mut mismatched_destination, 0, "destination-first")?;
@@ -1228,7 +1228,7 @@ fn cross_slide_copy_refuses_mixed_strict_and_transitional_packages_both_directio
     let transitional_source = opened_plain_slide_package()?;
     let mut strict_source = borrowed_plain_slide_package()?;
     make_package_strict(&mut strict_source)?;
-    let mut strict_source = Package::from_reader(std::io::Cursor::new(strict_source.to_bytes()?))?;
+    let strict_source = Package::from_reader(std::io::Cursor::new(strict_source.to_bytes()?))?;
 
     let mut mixed_strict_source =
         Package::from_reader(std::io::Cursor::new(strict_source.to_bytes()?))?;
@@ -4634,7 +4634,7 @@ fn changed_commit_refuses_a_signed_package_until_it_is_unsigned() -> Result<()> 
     assert!(package.opc.get_part(&origin).is_ok());
     assert!(package.opc.is_signed());
 
-    package.unsign()?;
+    package = package.unsign()?;
     assert!(package.opc.get_part(&origin).is_err());
     let source = package.opened_presentation()?;
     let mut edit = source.edit();
@@ -5442,7 +5442,7 @@ fn a_superseded_cross_slide_copy_patch_is_refused_by_name() -> Result<()> {
         .presentation()?
         .add_slide()?
         .set_title("cross-source");
-    let mut authored_source = builder.build()?;
+    let authored_source = builder.build()?;
     let mut source = Package::from_reader(std::io::Cursor::new(authored_source.to_bytes()?))?;
     rename_slide(&mut source, 0, "cross-source")?;
     let mut destination = opened_plain_slides_package(2)?;
@@ -5598,7 +5598,7 @@ fn the_facade_memo_never_outlives_the_graph_it_describes() -> Result<()> {
         .presentation()?
         .add_slide()?
         .set_title("memo-cross-source");
-    let mut authored = builder.build()?;
+    let authored = builder.build()?;
     let mut source = Package::from_bytes(&authored.to_bytes()?)?;
     rename_slide(&mut source, 0, "memo-cross-source")?;
     let source = Package::from_reader(std::io::Cursor::new(source.to_bytes()?))?;
@@ -5793,7 +5793,7 @@ fn authored_charts_carry_a_deterministic_embedded_workbook_and_edit_in_place() -
         "Sales chart",
         (10, 20, 3_000_000, 2_000_000),
     )?;
-    let mut committed = edit.commit()?.into_package();
+    let committed = edit.commit()?.into_package();
     let mut again = source.edit();
     again.add_chart(
         0_usize,
@@ -5802,7 +5802,7 @@ fn authored_charts_carry_a_deterministic_embedded_workbook_and_edit_in_place() -
         (10, 20, 3_000_000, 2_000_000),
     )?;
     // Deterministic: the same input produces the same package bytes.
-    let mut repeated = again.commit()?.into_package();
+    let repeated = again.commit()?.into_package();
     assert_eq!(committed.to_bytes()?, repeated.to_bytes()?);
 
     let reopened = Package::from_bytes(&committed.to_bytes()?)?;
@@ -5966,7 +5966,7 @@ fn extended_charts_are_chartex_parts_with_their_companions() -> Result<()> {
         .with_series(Series::new("Cash", vec![100.0, -30.0, 70.0]));
     let mut edit = source.edit();
     let id = edit.add_chart(0_usize, &spec, "Cash", (10, 20, 3_000_000, 2_000_000))?;
-    let mut committed = edit.commit()?.into_package();
+    let committed = edit.commit()?.into_package();
     let mut again = source.edit();
     again.add_chart(0_usize, &spec, "Cash", (10, 20, 3_000_000, 2_000_000))?;
     assert_eq!(

@@ -30,7 +30,7 @@ fn deck() -> Vec<u8> {
         .add_slide()
         .expect("slide")
         .set_title("Details");
-    let mut package = builder.build().expect("package");
+    let package = builder.build().expect("package");
     package.to_bytes().expect("bytes")
 }
 

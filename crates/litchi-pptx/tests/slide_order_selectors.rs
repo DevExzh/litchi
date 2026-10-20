@@ -29,7 +29,7 @@ fn names(package: &Package) -> Vec<String> {
 
 #[test]
 fn semantic_order_edits_compose_replay_invert_and_preserve_the_source() {
-    let mut original = package();
+    let original = package();
     let source = original.to_bytes().unwrap();
     let original_names = names(&original);
     let mut edit = original.edit().unwrap();
@@ -52,7 +52,7 @@ fn semantic_order_edits_compose_replay_invert_and_preserve_the_source() {
         ])
         .unwrap()
     );
-    let (mut changed, patch) = edit.commit().unwrap().into_parts();
+    let (changed, patch) = edit.commit().unwrap().into_parts();
     assert_eq!(
         names(&changed),
         [
@@ -64,9 +64,9 @@ fn semantic_order_edits_compose_replay_invert_and_preserve_the_source() {
     );
     assert_eq!(original.to_bytes().unwrap(), source);
     let wire = Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
-    let mut replayed = original.apply(&wire).unwrap();
+    let replayed = original.apply(&wire).unwrap();
     assert_eq!(replayed.to_bytes().unwrap(), changed.to_bytes().unwrap());
-    let mut restored = replayed.apply(&wire.inverse()).unwrap();
+    let restored = replayed.apply(&wire.inverse()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), source);
     let reopened = Package::from_reader(std::io::Cursor::new(changed.to_bytes().unwrap())).unwrap();
     assert_eq!(names(&reopened), names(&changed));
@@ -112,7 +112,7 @@ fn failed_and_duplicate_selectors_leave_staged_order_usable() {
 
 #[test]
 fn semantic_identity_noops_keep_the_exact_publication() {
-    let mut original = package();
+    let original = package();
     let source = original.to_bytes().unwrap();
     let original_names = names(&original);
     let mut edit = original.edit().unwrap();
@@ -128,7 +128,7 @@ fn semantic_identity_noops_keep_the_exact_publication() {
     );
     let selectors: Vec<_> = original_names.iter().map(Selector::from).collect();
     assert!(!edit.reorder_slides(&selectors).unwrap());
-    let (mut unchanged, patch) = edit.commit().unwrap().into_parts();
+    let (unchanged, patch) = edit.commit().unwrap().into_parts();
     assert!(patch.is_noop());
     assert_eq!(unchanged.to_bytes().unwrap(), source);
     assert!(

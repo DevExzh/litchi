@@ -132,7 +132,7 @@ fn facade_publishes_and_reverses_exact_source_checked_commit() {
     let slide = builder.presentation().unwrap().add_slide().unwrap();
     slide.add_text_box("Title", 0, 0, 100, 100);
     slide.add_ellipse(0, 0, 100, 100, None);
-    let mut authored = builder.build().unwrap();
+    let authored = builder.build().unwrap();
     let bytes = authored.to_bytes().unwrap();
     let package = Package::from_bytes(&bytes).unwrap();
 
@@ -193,7 +193,7 @@ fn facade_publishes_and_reverses_exact_source_checked_commit() {
     ));
     assert!(edit.commit().unwrap().patch().is_noop());
     assert!(signed.opc.is_signed());
-    signed.unsign().unwrap();
+    signed = signed.unsign().unwrap();
     let mut edit = signed.edit_change_tracking().unwrap();
     edit.set_creation_id(0_usize, 100_u32).unwrap();
     let unsigned = edit.commit().unwrap().into_package();

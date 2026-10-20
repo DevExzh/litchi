@@ -182,7 +182,7 @@ fn authored_fixture(slide_titles: &[&str]) -> TestResult<Vec<u8>> {
             slide.add_text_box(&format!("body:{title}"), 10, 20, 300, 400);
         }
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     let mut archive = OpcPackage::from_vec(package.to_bytes()?)?;
     for (index, title) in slide_titles.iter().enumerate() {
         let uri =

@@ -260,7 +260,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     let output_path = "smartart_demo.pptx";
     package.save(output_path)?;
 

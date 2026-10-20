@@ -187,7 +187,7 @@ fn sign(plain: &[u8]) -> Vec<u8> {
 /// the content an exact no-op needs.
 fn signed_with(name: &str, prepare: impl FnOnce(&mut Package)) -> Vec<u8> {
     let mut package = Package::from_reader(std::io::Cursor::new(fixture(name))).unwrap();
-    package.unsign().unwrap();
+    package = package.unsign().unwrap();
     prepare(&mut package);
     sign(&package.to_bytes().unwrap())
 }
@@ -907,7 +907,7 @@ fn every_family_refuses_a_signed_package_until_it_is_unsigned() {
             assert!(package.opc().unwrap().is_signed(), "{label}");
             assert_eq!(package.to_bytes().unwrap(), source, "{label}: refusal");
 
-            package.unsign().unwrap();
+            package = package.unsign().unwrap();
             (change.edit)(&mut package)
                 .unwrap_or_else(|error| panic!("{label}: after unsign: {error:?}"));
             let output = package.to_bytes().unwrap();
@@ -957,7 +957,7 @@ fn notes_refuse_a_signed_package_until_it_is_unsigned() {
     assert!(is_refusal(&package.clear_notes_in_place().unwrap_err()));
     assert_eq!(package.to_bytes().unwrap(), source);
 
-    package.unsign().unwrap();
+    package = package.unsign().unwrap();
     assert!(package.remove_notes_in_place(0_usize).unwrap());
     let output = package.to_bytes().unwrap();
     assert!(!carries_signature(&output));
@@ -1027,7 +1027,7 @@ fn model3d_refuses_a_signed_package_until_it_is_unsigned() {
     ));
     assert_eq!(package.to_bytes().unwrap(), source);
 
-    package.unsign().unwrap();
+    package = package.unsign().unwrap();
     assert!(
         package
             .remove_model3d_in_place(0_usize, "3D Model")
@@ -1117,7 +1117,7 @@ fn legacy_comment_no_ops_keep_a_signed_package_exact() {
     }
     assert_eq!(package.to_bytes().unwrap(), source);
 
-    package.unsign().unwrap();
+    package = package.unsign().unwrap();
     package
         .edit_opc_in_place(|opc| {
             litchi_pptx::reorder_presentation_comment_authors(opc, &[2, 1], conformance)
@@ -1193,7 +1193,7 @@ fn modern_comment_no_ops_keep_a_signed_package_exact() {
     }
     assert_eq!(package.to_bytes().unwrap(), source);
 
-    package.unsign().unwrap();
+    package = package.unsign().unwrap();
     package
         .edit_opc_in_place(|opc| {
             modern_comments::reorder_modern_comment_authors(opc, &reversed).map(drop)
@@ -1235,7 +1235,7 @@ fn modern_comment_command_no_op_keeps_a_signed_package_exact() {
     assert!(is_refusal(&package.edit_opc_in_place(change).unwrap_err()));
     assert_eq!(package.to_bytes().unwrap(), source);
 
-    package.unsign().unwrap();
+    package = package.unsign().unwrap();
     package.edit_opc_in_place(change).unwrap();
     assert!(!carries_signature(&package.to_bytes().unwrap()));
 }
@@ -1293,7 +1293,7 @@ fn theme_no_ops_keep_a_signed_package_exact() {
     }
     assert_eq!(package.to_bytes().unwrap(), source);
 
-    package.unsign().unwrap();
+    package = package.unsign().unwrap();
     package
         .edit_opc_in_place(|opc| theme::remove_override(opc, SLIDE).map(drop))
         .unwrap();

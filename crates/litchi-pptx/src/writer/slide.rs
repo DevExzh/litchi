@@ -383,6 +383,7 @@ impl MutableSlide {
         self.modified || self.shapes.iter().any(MutableShape::is_modified)
     }
 
+    #[cfg(test)]
     pub(crate) fn mark_clean(&mut self) {
         self.modified = false;
         for shape in &mut self.shapes {

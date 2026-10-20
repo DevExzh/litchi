@@ -94,7 +94,7 @@ fn main() -> Result<()> {
     if removed.len() != 1 || !font::put(&mut graph, fonts)? {
         return Err(missing("fresh font graph publication").into());
     }
-    let mut package = Package::from_opc_package(graph)?;
+    let package = Package::from_opc_package(graph)?;
     let unchanged =
         font::load(package.opc()?)?.ok_or_else(|| missing("published font collection"))?;
     let mut no_op_graph = package.opc()?.clone();

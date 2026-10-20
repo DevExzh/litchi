@@ -538,7 +538,7 @@ fn verify_move_durable(corpus: &Corpus) -> Result<(bool, bool, bool, bool), Box<
 fn verify_dependency_refusal(corpus: &Corpus) -> Result<bool, Box<dyn StdError>> {
     let source = corpus.dependency_archive.as_slice();
     let source_before = source.to_vec();
-    let mut package = Package::from_reader(std::io::Cursor::new(source_before.clone()))?;
+    let package = Package::from_reader(std::io::Cursor::new(source_before.clone()))?;
     let snapshot = package.opened_presentation()?;
     let source_revision = snapshot.revision();
     let before_names = snapshot

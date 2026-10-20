@@ -472,7 +472,7 @@ mod tests {
             edit.set_shape_hyperlink(0_usize, 0_usize, Some(&url))
                 .unwrap()
         );
-        let mut package = edit.commit().unwrap().into_package();
+        let package = edit.commit().unwrap().into_package();
         assert_eq!(shape_link(&package), Some(url.clone()));
         // Equal again: an exact no-op, even after a reopen.
         let reopened = crate::Package::from_bytes(&package.to_bytes().unwrap()).unwrap();

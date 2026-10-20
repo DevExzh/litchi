@@ -8,35 +8,6 @@ use crate::writer::MutablePresentation;
 use crate::{Error, Result};
 
 impl Package {
-    /// Select automatic system-font publication for managed saves.
-    ///
-    /// The policy is available only to packages with a complete mutable
-    /// presentation model. Opened packages retain opaque source text and are
-    /// therefore rejected instead of risking an incomplete glyph inventory.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn set_font_embedding(
-        &mut self,
-        embedding: litchi_fonts::embedding::Mode,
-    ) -> Result<&mut Self> {
-        self.ensure_plain_mutation("set_font_embedding")?;
-        if self.mutable_pres.is_none() {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedOperation,
-                "set_font_embedding",
-                "font discovery requires a complete mutable presentation model",
-            ));
-        }
-        self.opc.with_fonts(match embedding {
-            litchi_fonts::embedding::Mode::Full => litchi_opc::FontEmbedding::Full,
-            litchi_fonts::embedding::Mode::Subset => litchi_opc::FontEmbedding::Subset,
-        });
-        self.font_embedding_dirty = true;
-        Ok(self)
-    }
-
     pub(crate) fn embed_fonts_for_presentation(
         &mut self,
         presentation: &MutablePresentation,

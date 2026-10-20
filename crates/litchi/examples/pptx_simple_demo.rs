@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let output_path = "pptx_simple_demo.pptx";
     println!("\nSaving to {}...", output_path);
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     package.save(output_path)?;
     println!("✓ Done!");
 

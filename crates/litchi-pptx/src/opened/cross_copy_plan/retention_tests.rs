@@ -28,7 +28,7 @@ fn owned_slides(titles: &[&str]) -> Result<Package> {
     for title in titles {
         builder.presentation()?.add_slide()?.set_title(title);
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     let bytes = package.to_bytes()?;
     Package::from_reader(std::io::Cursor::new(bytes))
 }
@@ -112,7 +112,7 @@ fn plan_under(
 /// application publishes, and they seal to the plan's own physical revision.
 #[test]
 fn a_plan_retains_the_archive_its_application_publishes() -> Result<()> {
-    let (source, mut destination) = cross_copy_fixture()?;
+    let (source, destination) = cross_copy_fixture()?;
     let plan = plan_for(&source, &destination)?;
 
     let held = plan
@@ -159,7 +159,7 @@ fn a_plan_retains_the_archive_its_application_publishes() -> Result<()> {
 /// exceeding the budget is a fallback to the rebuild, never a refusal.
 #[test]
 fn a_candidate_above_the_budget_falls_back_to_the_rebuild() -> Result<()> {
-    let (source, mut destination) = cross_copy_fixture()?;
+    let (source, destination) = cross_copy_fixture()?;
 
     let retained = plan_for(&source, &destination)?;
     let archive_bytes = retained
@@ -230,7 +230,7 @@ fn the_tighter_retained_candidate_budget_binds() -> Result<()> {
 /// it applicable through the rebuild; dropping the plan returns them too.
 #[test]
 fn releasing_and_dropping_return_the_retained_bytes() -> Result<()> {
-    let (source, mut destination) = cross_copy_fixture()?;
+    let (source, destination) = cross_copy_fixture()?;
     let mut plan = plan_for(&source, &destination)?;
     let archive = Arc::clone(
         &plan
@@ -345,7 +345,7 @@ fn a_substituted_retained_archive_is_refused_and_publishes_nothing() -> Result<(
 }
 
 fn substitute_and_apply() -> Result<()> {
-    let (source, mut destination) = cross_copy_fixture()?;
+    let (source, destination) = cross_copy_fixture()?;
     let mut plan = plan_for(&source, &destination)?;
 
     // A different, structurally valid PPTX archive: the destination's own.
@@ -381,7 +381,7 @@ fn substitute_and_apply() -> Result<()> {
 /// identical `Result` on each rejecting route.
 #[test]
 fn retention_changes_no_apply_verdict() -> Result<()> {
-    let (mut source, mut destination) = cross_copy_fixture()?;
+    let (source, destination) = cross_copy_fixture()?;
     let retained = plan_for(&source, &destination)?;
     let mut unretained = retained.clone();
     unretained.release_retained_candidate();
@@ -435,7 +435,7 @@ fn retention_changes_no_apply_verdict() -> Result<()> {
     assert!(foreign(&retained)?.contains("PatchConflict"));
 
     // Rejecting route 3: a source whose own bytes drifted after planning.
-    let mut stale_source = |plan: &crate::cross_slide_copy::Plan| -> Result<String> {
+    let stale_source = |plan: &crate::cross_slide_copy::Plan| -> Result<String> {
         let mut drifted = Package::from_reader(std::io::Cursor::new(source.to_bytes()?))?;
         let slide = drifted
             .opened_presentation()?
@@ -476,7 +476,7 @@ fn retention_changes_no_apply_verdict() -> Result<()> {
 /// whether or not the plan that produced the patch retained its candidate.
 #[test]
 fn the_durable_patch_is_untouched_by_retention() -> Result<()> {
-    let (source, mut destination) = cross_copy_fixture()?;
+    let (source, destination) = cross_copy_fixture()?;
     let retained = plan_for(&source, &destination)?;
     let mut unretained = retained.clone();
     unretained.release_retained_candidate();
@@ -542,7 +542,7 @@ fn the_retention_path_never_spills() {
 /// retained candidate archive could publish bytes a rebuild would not.
 #[test]
 fn a_dirty_planning_destination_and_a_clean_applying_one_agree() -> Result<()> {
-    let (source, mut destination) = cross_copy_fixture()?;
+    let (source, destination) = cross_copy_fixture()?;
     let mut dirty = Package::from_reader(std::io::Cursor::new(destination.to_bytes()?))?;
     {
         // An in-place part edit revokes exact-source authorization while owned

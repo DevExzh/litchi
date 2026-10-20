@@ -247,7 +247,7 @@ fn opened_deck(slides: &[(&str, &str)]) -> Package {
         slide.set_title(name);
         slide.set_notes(note);
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     package.save(output.path()).unwrap();
     let mut package = Package::open(output.path()).unwrap();
     for (index, (name, _)) in slides.iter().enumerate() {

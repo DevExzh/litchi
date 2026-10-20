@@ -73,7 +73,7 @@ fn reopened_deck_clears_all_notes_idempotently() {
     assert_eq!(slide_text(&package), before_text);
 
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = package;
+    let package = package;
     package.save(output.path()).unwrap();
     let reopened = Package::open(output.path()).unwrap();
     assert_no_speaker_notes(&reopened);
@@ -136,7 +136,7 @@ fn authored_two_slide_deck() -> NamedTempFile {
     let appendix = presentation.add_slide().unwrap();
     appendix.set_title("Appendix body");
     appendix.set_notes("Appendix secret");
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     package.save(output.path()).unwrap();
     output
 }
@@ -246,7 +246,7 @@ fn clear_notes(package: Package) -> (Package, litchi_pptx::Result<usize>) {
 }
 
 fn edit_package<T>(
-    mut package: Package,
+    package: Package,
     edit: impl FnOnce(&mut OpcPackage) -> litchi_pptx::Result<T>,
 ) -> (Package, litchi_pptx::Result<T>) {
     let bytes = package.to_bytes().unwrap();
