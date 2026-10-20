@@ -757,10 +757,11 @@ fn source_related_scene_reuses_and_trims_the_public_scene_cache() {
 fn managed_source_related_scenes_are_unretained_but_live_snapshots_remain_valid() {
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(rich_deck()));
     let (budget, cancellation, context) = managed_context(16 * 1024 * 1024);
-    let presentation = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
+    let presentation = SourceBackedPresentation::from_read_at_with_options(
         source,
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let slide = presentation.slide(0).unwrap();
@@ -814,9 +815,9 @@ fn source_related_layout_applies_physical_depth_limits_before_mce_and_does_not_c
         .unwrap()
         .build()
         .unwrap();
-    let presentation = SourceBackedPresentation::from_read_at_with_limits(
+    let presentation = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        limits,
+        litchi_pptx::OpenOptions::default().source_limits(limits),
     )
     .unwrap();
     let slide = presentation.slide(0).unwrap();
@@ -855,9 +856,9 @@ fn source_related_mce_expansion_is_bounded_before_scene_publication() {
         .unwrap()
         .build()
         .unwrap();
-    let presentation = SourceBackedPresentation::from_read_at_with_limits(
+    let presentation = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        limits,
+        litchi_pptx::OpenOptions::default().source_limits(limits),
     )
     .unwrap();
     let slide = presentation.slide(0).unwrap();

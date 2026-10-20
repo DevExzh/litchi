@@ -569,9 +569,9 @@ fn main() -> AnyResult<()> {
     let source_sha256 = sha256_hex(&input_bytes);
 
     let limits = inventory_read_limits()?;
-    let source = SourceBackedPresentation::from_read_at_with_limits(
+    let source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(input_bytes.clone())),
-        limits,
+        litchi_pptx::OpenOptions::default().source_limits(limits),
     )?;
     let source_backed = collect_source_backed(&source)?;
     let eager = collect_eager(input_bytes, limits)?;

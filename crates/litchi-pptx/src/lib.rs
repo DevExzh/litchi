@@ -215,7 +215,6 @@ pub use presentation_properties::{
 pub use slide::{Slide, SlideLayout, SlideMaster};
 pub use validation::{
     PptxValidationError, PptxValidationLimits, validate_source, validate_source_backed,
-    validate_source_backed_with_limits, validate_source_with_limits,
 };
 pub use view_properties::{
     CommonSlideView, CommonView, GridSpacing, Guide, GuideOrientation, NormalView, OutlineSlide,

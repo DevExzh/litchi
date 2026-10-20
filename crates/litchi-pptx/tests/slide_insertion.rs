@@ -84,14 +84,16 @@ fn insertions_into_empty_and_populated_lists_compose_and_invert_losslessly() {
         assert_ne!(second.id(), third.id());
         let (changed, patch) = edit.commit().unwrap().into_parts();
         assert_eq!(names(&changed), [second.name(), first.name(), third.name()]);
-        let wire = Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
+        let wire = Patch::from_bytes(&patch.to_bytes().unwrap(), Limits::default()).unwrap();
         let replay = original.apply(&wire).unwrap();
         assert_eq!(replay.to_bytes().unwrap(), changed.to_bytes().unwrap());
         let reopened =
             Package::from_reader(std::io::Cursor::new(replay.to_bytes().unwrap())).unwrap();
         assert_eq!(names(&reopened), names(&changed));
         let restored = replay
-            .apply(&Patch::from_bytes(&wire.inverse().to_bytes().unwrap()).unwrap())
+            .apply(
+                &Patch::from_bytes(&wire.inverse().to_bytes().unwrap(), Limits::default()).unwrap(),
+            )
             .unwrap();
         assert_eq!(restored.to_bytes().unwrap(), original_bytes);
         assert_eq!(original.to_bytes().unwrap(), original_bytes);
@@ -138,7 +140,11 @@ fn failed_insertion_preserves_prior_staged_edits() {
     let changed = edit.commit().unwrap().into_package();
     assert_eq!(names(&changed).len(), 1);
     let limits = Limits::new(1024, 1024, 1024, 10, 1 << 20, 1 << 20).unwrap();
-    let root = original.opened_presentation_with_limits(limits).unwrap();
+    let root = original
+        .opened_presentation_with_options(
+            litchi_pptx::opened::EditOptions::default().limits(limits),
+        )
+        .unwrap();
     let mut bounded = root.edit();
     assert!(matches!(
         bounded.insert_slide(Position::new(0), &layout),
@@ -267,7 +273,7 @@ fn insertion_and_inverse_preserve_unrelated_destination_metadata() {
     }
     let overlay =
         Package::from_reader(std::io::Cursor::new(writer.finish().unwrap().into_inner())).unwrap();
-    let wire = Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
+    let wire = Patch::from_bytes(&patch.to_bytes().unwrap(), Limits::default()).unwrap();
     let changed = overlay.apply(&wire).unwrap();
     let bytes = changed.to_bytes().unwrap();
     let archive = ArchiveReader::new(&bytes).unwrap();
@@ -279,7 +285,7 @@ fn insertion_and_inverse_preserve_unrelated_destination_metadata() {
         );
     }
     let restored = changed
-        .apply(&Patch::from_bytes(&wire.inverse().to_bytes().unwrap()).unwrap())
+        .apply(&Patch::from_bytes(&wire.inverse().to_bytes().unwrap(), Limits::default()).unwrap())
         .unwrap();
     let bytes = restored.to_bytes().unwrap();
     let archive = ArchiveReader::new(&bytes).unwrap();
@@ -340,7 +346,7 @@ fn fresh_package_insertion_uses_the_same_immutable_transaction() {
         .unwrap();
     let (changed, patch) = edit.commit().unwrap().into_parts();
     let replay = original
-        .apply(&Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap())
+        .apply(&Patch::from_bytes(&patch.to_bytes().unwrap(), Limits::default()).unwrap())
         .unwrap();
     assert_eq!(changed.to_bytes().unwrap(), replay.to_bytes().unwrap());
     let restored = replay.apply(&patch.inverse()).unwrap();
@@ -361,8 +367,11 @@ fn forward_replay_refuses_to_activate_a_destination_dangling_reference() {
     let mut edit = original.edit().unwrap();
     edit.insert_slide(Position::new(0), &layout(&original))
         .unwrap();
-    let patch =
-        Patch::from_bytes(&edit.commit().unwrap().into_patch().to_bytes().unwrap()).unwrap();
+    let patch = Patch::from_bytes(
+        &edit.commit().unwrap().into_patch().to_bytes().unwrap(),
+        Limits::default(),
+    )
+    .unwrap();
     let destination = Package::from_reader(std::io::Cursor::new(with_incoming_reference(
         &original.to_bytes().unwrap(),
     )))

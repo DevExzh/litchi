@@ -297,7 +297,11 @@ fn eager_shape_property_batch_composes_text_and_bounds_and_replays() {
         2
     );
     let changed = edit.commit().unwrap();
-    let patch = Patch::from_bytes(&changed.patch().to_bytes().unwrap()).unwrap();
+    let patch = Patch::from_bytes(
+        &changed.patch().to_bytes().unwrap(),
+        litchi_pptx::opened::Limits::default(),
+    )
+    .unwrap();
     let changed_package = changed.clone().into_package();
     assert_eq!(shape_values(&original)[0].0.as_deref(), Some("first"));
     assert_eq!(

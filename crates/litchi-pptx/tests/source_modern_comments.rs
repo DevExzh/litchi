@@ -647,8 +647,10 @@ fn source_modern_comments_honor_caller_part_limits_before_decode() {
         .unwrap()
         .build()
         .unwrap();
-    let error = match SourceBackedPresentation::from_reader_with_limits(Cursor::new(bytes), limits)
-    {
+    let error = match SourceBackedPresentation::from_reader_with_options(
+        Cursor::new(bytes),
+        litchi_pptx::OpenOptions::default().source_limits(limits),
+    ) {
         Ok(source) => source.slide(1).unwrap().modern_comments().unwrap_err(),
         Err(error) => error,
     };

@@ -131,7 +131,7 @@ fn property_replacements<'a>(texts: &'a [String]) -> Vec<ShapePropertiesReplacem
 }
 
 fn transported_opened(patch: &OpenedPatch) -> OpenedPatch {
-    OpenedPatch::from_bytes(&patch.to_bytes().unwrap()).unwrap()
+    OpenedPatch::from_bytes(&patch.to_bytes().unwrap(), Limits::default()).unwrap()
 }
 
 fn transported_source(patch: &SourcePatch) -> SourcePatch {
@@ -814,10 +814,11 @@ fn source_chunk_admission_refuses_before_flatten_and_retains_the_commit_reservat
         token,
         ExecutionLimits::new(NonZeroUsize::MIN, NonZeroUsize::MIN, NonZeroU64::MAX, 0).unwrap(),
     );
-    let source = SourcePackage::from_read_at_with_execution_context(
+    let source = SourcePackage::from_read_at_with_options(
         Arc::new(OwnedSource::new(before.clone())),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = source.edit().unwrap();

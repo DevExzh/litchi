@@ -183,7 +183,7 @@ impl Tag {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn new_with_limits(
+    pub(crate) fn new_with_limits(
         name: impl Into<String>,
         value: impl Into<String>,
         limits: Limits,
@@ -249,11 +249,8 @@ impl Tags {
     }
 
     /// Construct an ordered tag collection under caller-supplied bounds.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_iter_with_limits(
+    #[cfg(test)]
+    pub(crate) fn from_iter_with_limits(
         entries: impl IntoIterator<Item = Tag>,
         limits: Limits,
     ) -> Result<Self> {
@@ -314,7 +311,7 @@ impl Tags {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn push_with_limits(&mut self, entry: Tag, limits: Limits) -> Result<()> {
+    pub(crate) fn push_with_limits(&mut self, entry: Tag, limits: Limits) -> Result<()> {
         self.check_add(&entry, limits)?;
         self.entries
             .try_reserve(1)
@@ -330,12 +327,13 @@ impl Tags {
         Ok(())
     }
 
-    /// Insert a tag at a source-order position under caller-supplied bounds.
+    /// Insert a tag at a source-order position under the default bounds.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn insert_with_limits(&mut self, index: usize, entry: Tag, limits: Limits) -> Result<()> {
+    pub fn insert(&mut self, index: usize, entry: Tag) -> Result<()> {
+        let limits = Limits::default();
         if index > self.entries.len() {
             return Err(Error::IndexOutOfBounds {
                 index,
@@ -357,12 +355,13 @@ impl Tags {
         Ok(())
     }
 
-    /// Replace one tag, returning the previous entry.
+    /// Replace one tag under the default bounds, returning the previous entry.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace_with_limits(&mut self, index: usize, entry: Tag, limits: Limits) -> Result<Tag> {
+    pub fn replace(&mut self, index: usize, entry: Tag) -> Result<Tag> {
+        let limits = Limits::default();
         let previous = self.entries.get(index).ok_or(Error::IndexOutOfBounds {
             index,
             len: self.entries.len(),

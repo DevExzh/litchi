@@ -634,17 +634,6 @@ impl Patch {
         Ok(output)
     }
 
-    /// Parse a stable durable patch under conservative finite limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::DurablePatchRevisionFormat`] for a patch serialized
-    /// under the superseded `LPCP0002` or `LPCP0003` format, and an error for
-    /// malformed, trailing, or unbounded input.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, Limits::default())
-    }
-
     /// Parse a stable durable patch under caller-selected finite limits.
     ///
     /// A patch whose header carries a superseded magic is refused here,
@@ -660,7 +649,7 @@ impl Patch {
     /// Returns [`Error::DurablePatchRevisionFormat`] for a patch serialized
     /// under the superseded `LPCP0002` or `LPCP0003` format, and an error for
     /// malformed, trailing, or unbounded input.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
         let limit = limits
             .max_patch_bytes()
             .checked_add(PATCH_HEADER_BYTES)
@@ -671,7 +660,7 @@ impl Patch {
                 limit,
             });
         }
-        // See `crate::slide_removal::Patch::from_bytes_with_limits`: a superseded magic
+        // See `crate::slide_removal::Patch::from_bytes`: a superseded magic
         // is refused by name before any header field is read, so a revision
         // from a superseded proof never reaches a caller.
         for superseded in SUPERSEDED_PATCH_FORMATS {
@@ -718,7 +707,7 @@ impl Patch {
         if !input.is_empty() {
             return Err(invalid("cross-slide durable patch has trailing bytes"));
         }
-        let patch = OpenedPatch::from_bytes_with_limits(payload, limits)?;
+        let patch = OpenedPatch::from_bytes(payload, limits)?;
         validate_patch_descriptor(
             &patch,
             &source_slide,

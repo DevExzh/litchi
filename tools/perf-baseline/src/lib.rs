@@ -20125,7 +20125,10 @@ fn verify_pptx_cross_copy_refusal_gates(
     let patch_source =
         litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
     let encoded = plan.patch().to_bytes()?;
-    let decoded = litchi_pptx::cross_slide_copy::Patch::from_bytes(&encoded)?;
+    let decoded = litchi_pptx::cross_slide_copy::Patch::from_bytes(
+        &encoded,
+        litchi_pptx::opened::Limits::default(),
+    )?;
     if decoded != *plan.patch() {
         return Err("PPTX cross-copy durable patch did not round-trip".into());
     }
@@ -34292,7 +34295,13 @@ fn run_pptx_validation_report(
         corpus,
         warmup_iterations,
         samples,
-        |source| Ok(litchi_pptx::validate_source(source)?),
+        |source| {
+            Ok(litchi_pptx::validate_source(
+                source,
+                litchi_pptx::PptxValidationLimits::default(),
+                litchi_core::ValidationLimits::default(),
+            )?)
+        },
     )
 }
 

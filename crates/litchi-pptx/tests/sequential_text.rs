@@ -791,12 +791,13 @@ fn source_stale_after_accepted_output_overrides_sink_result() {
 #[test]
 fn source_cancellation_before_output_is_document_progress() {
     let (cancellation_source, context) = execution_context();
-    let presentation = SourceBackedPresentation::from_read_at_with_execution_context(
+    let presentation = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(package_bytes(&[slide_xml(
             r#"<a:t>before</a:t>"#,
         )]))),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .expect("managed source-backed package");
     cancellation_source.cancel();
@@ -814,12 +815,13 @@ fn source_cancellation_before_output_is_document_progress() {
 #[test]
 fn source_cancellation_after_sink_acceptance_overrides_sink_result() {
     let (cancellation_source, context) = execution_context();
-    let presentation = SourceBackedPresentation::from_read_at_with_execution_context(
+    let presentation = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(package_bytes(&[slide_xml(
             r#"<a:t>cancel</a:t>"#,
         )]))),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .expect("managed source-backed package");
     let mut sink = CancelOnWrite {

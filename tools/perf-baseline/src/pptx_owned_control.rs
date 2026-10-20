@@ -468,12 +468,18 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
     }
 
     let durable_forward_bytes = forward.to_bytes()?;
-    let decoded_forward = litchi_pptx::opened::Patch::from_bytes(&durable_forward_bytes)?;
+    let decoded_forward = litchi_pptx::opened::Patch::from_bytes(
+        &durable_forward_bytes,
+        litchi_pptx::opened::Limits::default(),
+    )?;
     if decoded_forward != forward {
         return Err("owning PPTX durable forward patch changed during round-trip".into());
     }
     let durable_inverse_bytes = inverse.to_bytes()?;
-    let decoded_inverse = litchi_pptx::opened::Patch::from_bytes(&durable_inverse_bytes)?;
+    let decoded_inverse = litchi_pptx::opened::Patch::from_bytes(
+        &durable_inverse_bytes,
+        litchi_pptx::opened::Limits::default(),
+    )?;
     if decoded_inverse != inverse {
         return Err("owning PPTX durable inverse patch changed during round-trip".into());
     }

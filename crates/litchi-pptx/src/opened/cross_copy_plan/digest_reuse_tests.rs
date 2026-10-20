@@ -232,7 +232,8 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
     )
     .unwrap();
     record_patch(&mut transcript, &format!("{label}.plan"), plan.patch())?;
-    let durable = crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?)?;
+    let durable =
+        crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?, Limits::default())?;
 
     // The plan, retained and released, into the destination it was planned
     // against and into a fresh open of the same bytes.
@@ -476,7 +477,8 @@ fn caller_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8])
         &format!("{label}.caller.plan"),
         plan.patch(),
     )?;
-    let durable = crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?)?;
+    let durable =
+        crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?, Limits::default())?;
     let outcome = custom.apply_cross_slide_copy_plan(&source, &plan);
     record_outcome(
         &mut transcript,
@@ -515,8 +517,10 @@ fn caller_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8])
         &mut target,
         outcome,
     )?;
-    let ordinary_durable =
-        crate::cross_slide_copy::Patch::from_bytes(&ordinary_plan.patch().to_bytes()?)?;
+    let ordinary_durable = crate::cross_slide_copy::Patch::from_bytes(
+        &ordinary_plan.patch().to_bytes()?,
+        Limits::default(),
+    )?;
     let mut target = with_caller_part(destination_bytes)?;
     let outcome = target.apply_cross_slide_copy_patch(&source, &ordinary_durable);
     record_outcome(
@@ -547,7 +551,7 @@ fn limits_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8])
             .expect("finite nonzero limits");
         let stage = format!("{label}.limits.{name}");
         writeln!(transcript, "{stage}.bound={bound}").unwrap();
-        match crate::cross_slide_copy::Patch::from_bytes_with_limits(&bytes, limits) {
+        match crate::cross_slide_copy::Patch::from_bytes(&bytes, limits) {
             Ok(patch) => {
                 let mut target =
                     Package::from_reader(std::io::Cursor::new(destination_bytes.to_vec()))?;

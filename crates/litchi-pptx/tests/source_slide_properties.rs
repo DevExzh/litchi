@@ -324,10 +324,11 @@ fn managed_slide_property_admission_and_cancellation_are_failure_atomic() {
     const MEMORY: u64 = 16 * 1024 * 1024;
     let before = fixture(1, 1);
     let (budget, cancellation_source, context) = managed_context(MEMORY);
-    let source = SourcePackage::from_read_at_with_execution_context(
+    let source = SourcePackage::from_read_at_with_options(
         Arc::new(OwnedSource::new(before.clone())),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = source.edit().unwrap();

@@ -82,20 +82,6 @@ impl Snapshot {
         super::load_snapshot(package, slide_id)
     }
 
-    /// Load one stable slide-ID owner under caller-supplied bounds.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    #[inline]
-    pub fn load_with_limits(
-        package: &litchi_opc::OpcPackage,
-        slide_id: u32,
-        limits: Limits,
-    ) -> Result<Self> {
-        super::load_snapshot_with_limits(package, slide_id, limits)
-    }
-
     /// Return the stable `p:sldId/@id` key.
     #[inline]
     #[must_use]

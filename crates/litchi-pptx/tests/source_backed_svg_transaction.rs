@@ -457,9 +457,9 @@ fn svg_transaction_checks_replacement_limits_before_publication() {
         .unwrap()
         .build()
         .unwrap();
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits(
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(source.clone())),
-        limits,
+        litchi_pptx::OpenOptions::default().source_limits(limits),
     )
     .unwrap();
     let mut edit = editor.edit_svg_image(0, 0).unwrap();

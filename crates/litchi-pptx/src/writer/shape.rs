@@ -172,7 +172,7 @@ impl MutableShape {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_designer_properties_with_limits(
+    pub(crate) fn set_designer_properties_with_limits(
         &mut self,
         properties: DrawingProperties,
         limits: DesignerLimits,

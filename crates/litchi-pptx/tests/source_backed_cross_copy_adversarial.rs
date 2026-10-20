@@ -98,7 +98,8 @@ fn cross_copy_rejects_tampered_durable_patch_and_limits_before_mutation() -> Tes
     // authorization.
     let source_physical_revision_offset = 8 + 32 * 3;
     tampered_bytes[source_physical_revision_offset] ^= 1;
-    let tampered = litchi_pptx::cross_slide_copy::Patch::from_bytes(&tampered_bytes)?;
+    let tampered =
+        litchi_pptx::cross_slide_copy::Patch::from_bytes(&tampered_bytes, Limits::default())?;
 
     let mut destination = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     let before = serialized(&mut destination)?;
@@ -110,11 +111,9 @@ fn cross_copy_rejects_tampered_durable_patch_and_limits_before_mutation() -> Tes
 
     let tiny_limits = Limits::new(4_096, 1, 1_024, 1, 1_024, 64 * 1024 * 1024)
         .ok_or_else(|| Error::Invalid("test limits are invalid".into()))?;
-    let error = litchi_pptx::cross_slide_copy::Patch::from_bytes_with_limits(
-        &plan.patch().to_bytes()?,
-        tiny_limits,
-    )
-    .expect_err("a restrictive durable-patch byte limit must be enforced");
+    let error =
+        litchi_pptx::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?, tiny_limits)
+            .expect_err("a restrictive durable-patch byte limit must be enforced");
     assert!(matches!(error, Error::Limit { .. }));
     Ok(())
 }
@@ -133,7 +132,10 @@ fn cross_copy_plan_and_durable_patch_are_byte_equivalent_and_inverse_exact() -> 
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination_for_plan.opened_presentation()?;
     let plan = destination_snapshot.plan_cross_slide_copy(&source_snapshot, 0_usize, 0_usize, 1)?;
-    let durable = litchi_pptx::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?)?;
+    let durable = litchi_pptx::cross_slide_copy::Patch::from_bytes(
+        &plan.patch().to_bytes()?,
+        Limits::default(),
+    )?;
 
     let mut plan_destination =
         Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
@@ -150,7 +152,10 @@ fn cross_copy_plan_and_durable_patch_are_byte_equivalent_and_inverse_exact() -> 
         b"destination archive comment"
     );
 
-    let inverse = litchi_pptx::cross_slide_copy::Patch::from_bytes(&durable.inverse().to_bytes()?)?;
+    let inverse = litchi_pptx::cross_slide_copy::Patch::from_bytes(
+        &durable.inverse().to_bytes()?,
+        Limits::default(),
+    )?;
     patch_destination.apply_cross_slide_copy_in_place(&source, &inverse)?;
     assert_eq!(serialized(&mut patch_destination)?, destination_bytes);
     assert_eq!(serialized(&mut source)?, source_bytes);
@@ -257,9 +262,13 @@ fn cross_copy_exact_archive_limit_accepts_and_one_short_rejects_before_publicati
     let exact_source_before = source_bytes.clone();
     let exact_destination_before = destination_bytes.clone();
     let exact_plan = exact_destination
-        .opened_presentation_with_limits(exact_limits)?
+        .opened_presentation_with_options(
+            litchi_pptx::opened::EditOptions::default().limits(exact_limits),
+        )?
         .plan_cross_slide_copy(
-            &exact_source.opened_presentation_with_limits(exact_limits)?,
+            &exact_source.opened_presentation_with_options(
+                litchi_pptx::opened::EditOptions::default().limits(exact_limits),
+            )?,
             0_usize,
             0_usize,
             1,
@@ -283,9 +292,13 @@ fn cross_copy_exact_archive_limit_accepts_and_one_short_rejects_before_publicati
     let short_source_before = source_bytes.clone();
     let short_destination_before = destination_bytes.clone();
     let error = short_destination
-        .opened_presentation_with_limits(short_limits)?
+        .opened_presentation_with_options(
+            litchi_pptx::opened::EditOptions::default().limits(short_limits),
+        )?
         .plan_cross_slide_copy(
-            &short_source.opened_presentation_with_limits(short_limits)?,
+            &short_source.opened_presentation_with_options(
+                litchi_pptx::opened::EditOptions::default().limits(short_limits),
+            )?,
             0_usize,
             0_usize,
             1,
@@ -342,8 +355,14 @@ fn cross_copy_preserves_custom_parts_and_save_options_through_forward_and_invers
     let plan = plan_destination
         .opened_presentation()?
         .plan_cross_slide_copy(&source.opened_presentation()?, 0_usize, 0_usize, 1)?;
-    let durable = litchi_pptx::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?)?;
-    let inverse = litchi_pptx::cross_slide_copy::Patch::from_bytes(&durable.inverse().to_bytes()?)?;
+    let durable = litchi_pptx::cross_slide_copy::Patch::from_bytes(
+        &plan.patch().to_bytes()?,
+        Limits::default(),
+    )?;
+    let inverse = litchi_pptx::cross_slide_copy::Patch::from_bytes(
+        &durable.inverse().to_bytes()?,
+        Limits::default(),
+    )?;
 
     plan_destination.stage_cross_slide_copy_in_place(&source, &plan)?;
     assert_custom_destination_state(&plan_destination, &sentinel_name)?;

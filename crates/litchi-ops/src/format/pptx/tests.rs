@@ -361,10 +361,11 @@ fn cancellation_is_typed() {
     let (cancellation_source, cancellation) = CancellationSource::pair();
     let limits = ExecutionLimits::new(NonZeroUsize::MIN, NonZeroUsize::MIN, NonZeroU64::MAX, 0)
         .expect("valid execution limits");
-    let presentation = pptx::SourceBackedPresentation::from_path_with_limits_and_execution_context(
+    let presentation = pptx::SourceBackedPresentation::open_with_options(
         fixture("backgrounds.pptx"),
-        pptx::SourceLimits::default(),
-        ExecutionContext::new(budget, cancellation, limits),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(pptx::SourceLimits::default())
+            .execution_context(ExecutionContext::new(budget, cancellation, limits)),
     )
     .expect("managed source-backed PPTX");
     let handle = Pptx::from_source(presentation, &options());
@@ -761,10 +762,11 @@ fn unsigned_managed_source_respects_native_materialization_policy() {
     let (_, cancellation) = CancellationSource::pair();
     let limits =
         ExecutionLimits::new(NonZeroUsize::MIN, NonZeroUsize::MIN, NonZeroU64::MAX, 0).unwrap();
-    let presentation = pptx::SourceBackedPresentation::from_path_with_limits_and_execution_context(
+    let presentation = pptx::SourceBackedPresentation::open_with_options(
         fixture("sample.pptx"),
-        pptx::SourceLimits::default(),
-        ExecutionContext::new(budget, cancellation, limits),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(pptx::SourceLimits::default())
+            .execution_context(ExecutionContext::new(budget, cancellation, limits)),
     )
     .unwrap();
     let handle = Pptx::from_source(presentation, &options())

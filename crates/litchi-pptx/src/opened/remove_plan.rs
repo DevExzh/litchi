@@ -127,17 +127,6 @@ impl Patch {
         Ok(output)
     }
 
-    /// Parse a durable removal patch under conservative finite limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for malformed, trailing, or unbounded input, and
-    /// [`Error::DurablePatchRevisionFormat`] for a patch serialized under the
-    /// superseded `LPRM0001` format.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, super::Limits::default())
-    }
-
     /// Parse a durable removal patch under caller-selected finite limits.
     ///
     /// A patch whose header carries the superseded `LPRM0001` magic is refused
@@ -152,7 +141,7 @@ impl Patch {
     /// Returns an error for malformed, trailing, or unbounded input, and
     /// [`Error::DurablePatchRevisionFormat`] for a patch serialized under the
     /// superseded `LPRM0001` format.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: super::Limits) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8], limits: super::Limits) -> Result<Self> {
         let limit = limits
             .max_patch_bytes()
             .checked_add(PATCH_HEADER_BYTES)
@@ -198,7 +187,7 @@ impl Patch {
                 "slide-removal durable patch is truncated or has trailing bytes",
             ));
         }
-        let patch = OpenedPatch::from_bytes_with_limits(&bytes[position..end], limits)?;
+        let patch = OpenedPatch::from_bytes(&bytes[position..end], limits)?;
         if patch.exact_slide_removal_change().is_none() {
             return Err(invalid(
                 "slide-removal durable patch is not an exact presentation-and-slide change",

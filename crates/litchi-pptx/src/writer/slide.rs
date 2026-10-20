@@ -72,7 +72,7 @@ impl MutableSlide {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_designer_tags_with_limits(
+    pub(crate) fn set_designer_tags_with_limits(
         &mut self,
         tags: Tags,
         limits: DesignerLimits,
@@ -246,7 +246,7 @@ impl MutableSlide {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn add_rectangle_with_designer_properties_and_limits(
+    pub(crate) fn add_rectangle_with_designer_properties_and_limits(
         &mut self,
         x: i64,
         y: i64,
@@ -327,7 +327,7 @@ impl MutableSlide {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn add_ellipse_with_designer_properties_and_limits(
+    pub(crate) fn add_ellipse_with_designer_properties_and_limits(
         &mut self,
         x: i64,
         y: i64,

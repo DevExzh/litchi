@@ -159,13 +159,35 @@ impl Package {
         self.opened_presentation_with_limits(crate::opened::Limits::default())
     }
 
-    /// Capture an opened-presentation transaction root with explicit bounds.
+    /// Capture an opened-presentation transaction root under explicit edit
+    /// options.
     ///
     /// # Errors
     ///
     /// Returns an error when the package is not a coherent canonical
-    /// presentation under the supplied finite policy.
-    pub fn opened_presentation_with_limits(
+    /// presentation under the options' finite bounds.
+    pub fn opened_presentation_with_options(
+        &self,
+        options: crate::opened::EditOptions,
+    ) -> Result<crate::opened::Snapshot> {
+        self.opened_presentation_with_limits(options.limits_value())
+    }
+
+    /// Start one detached [`Edit`](crate::opened::Edit) under explicit edit
+    /// options; see [`Self::edit`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error under the same conditions as
+    /// [`Self::opened_presentation_with_options`].
+    pub fn edit_with_options(
+        &self,
+        options: crate::opened::EditOptions,
+    ) -> Result<crate::opened::Edit> {
+        Ok(self.opened_presentation_with_options(options)?.edit())
+    }
+
+    pub(crate) fn opened_presentation_with_limits(
         &self,
         limits: crate::opened::Limits,
     ) -> Result<crate::opened::Snapshot> {

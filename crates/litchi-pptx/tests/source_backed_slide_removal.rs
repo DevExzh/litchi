@@ -575,10 +575,11 @@ fn stale_source_and_cancellation_are_rejected_before_output() {
     assert!(output.is_empty());
 
     let (cancellation_source, context) = managed_context();
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(fixture())),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let plan = editor.plan_slide_removal(Position::new(1)).unwrap();

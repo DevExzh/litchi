@@ -244,7 +244,8 @@ fn durable_patch_routes_consult_the_memos() -> Result<()> {
     let source = Package::from_reader(std::io::Cursor::new(source_bytes))?;
     let mut destination = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     let plan = plan_copy(&source, &destination)?;
-    let forward = crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?)?;
+    let forward =
+        crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?, Limits::default())?;
     let _planning = fingerprint_log::take();
 
     destination.apply_cross_slide_copy_patch(&source, &forward)?;

@@ -576,13 +576,17 @@ mod source_pptx_path {
             0,
         )
         .unwrap();
-        let presentation =
-            litchi_pptx::SourceBackedPresentation::from_path_with_limits_and_execution_context(
-                temporary.path(),
-                litchi_pptx::SourceLimits::default(),
-                litchi_core::ExecutionContext::new(budget, cancellation, limits),
-            )
-            .unwrap();
+        let presentation = litchi_pptx::SourceBackedPresentation::open_with_options(
+            temporary.path(),
+            litchi_pptx::OpenOptions::default()
+                .source_limits(litchi_pptx::SourceLimits::default())
+                .execution_context(litchi_core::ExecutionContext::new(
+                    budget,
+                    cancellation,
+                    limits,
+                )),
+        )
+        .unwrap();
         let file = File::Pptx(Pptx::from_source(presentation, &OpenOptions::new()));
         assert!(file.metadata().unwrap().is_some());
 

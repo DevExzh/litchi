@@ -56,6 +56,28 @@ pub use model::{
     ShapePropertiesReplacement, ShapeTextReplacement, Slide, Snapshot,
 };
 pub use patch::{Conflict, History, Patch, Resolution, ThreeWayPlan};
+
+/// Configuration of a primary edit (record 0351 §2.5): the bounds of its
+/// [`Limits`]. The defaults are the finite [`Limits::default`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: Limits,
+}
+
+impl EditOptions {
+    /// Select the edit's bounds.
+    #[must_use]
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
+        self
+    }
+
+    /// The edit's bounds.
+    #[must_use]
+    pub const fn limits_value(&self) -> Limits {
+        self.limits
+    }
+}
 pub use text_format::{
     CellFill, CellMargin, MAX_FONT_SIZE, MAX_TYPEFACE_BYTES, MIN_FONT_SIZE, Rgb, ShapeFill,
     TextBody, TextEdit, TextProperties, TextTarget,

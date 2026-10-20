@@ -947,9 +947,9 @@ fn batch_expansion_honors_the_source_part_limit_before_allocation() {
         .unwrap()
         .build()
         .unwrap();
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits(
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(source)),
-        limits,
+        litchi_pptx::OpenOptions::default().source_limits(limits),
     )
     .unwrap();
     let mut edit = editor.edit_slide(0).unwrap();
@@ -1091,13 +1091,13 @@ fn mce_limits_strict_and_partial_sink_are_checked() {
         .build()
         .unwrap();
     assert!(matches!(
-        SourceBackedPresentationEditor::from_read_at_with_limits(
+        SourceBackedPresentationEditor::from_read_at_with_options(
             Arc::new(VersionedSource::new(fixture(
                 "",
                 shape_xml(PML, "before"),
                 false
             ))),
-            limits,
+            litchi_pptx::OpenOptions::default().source_limits(limits)
         ),
         Err(Error::Opc(OpcError::Limit { .. }))
     ));
@@ -1847,9 +1847,9 @@ fn direct_transition_rejects_malformed_dtd_limits_stale_source_and_partial_sink(
         .unwrap()
         .build()
         .unwrap();
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits(
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(fixture("", slide, false))),
-        limits,
+        litchi_pptx::OpenOptions::default().source_limits(limits),
     )
     .unwrap();
     let mut edit = editor.edit_slide(0).unwrap();
@@ -1987,10 +1987,11 @@ fn source_slide_order_manages_candidate_memory_before_rewrite_and_releases_it() 
         .blob()
         .len() as u64;
     let (budget, _cancellation, context) = source_order_context_with_memory(root);
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(source)),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     assert_eq!(budget.used(Resource::Memory), root);
@@ -2018,10 +2019,11 @@ fn source_slide_order_retains_candidate_charge_through_patch_clones() {
         .blob()
         .len() as u64;
     let (budget, _cancellation, context) = source_order_context_with_memory(3 * root);
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(source)),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = editor.edit_slide_order().unwrap();
@@ -2204,10 +2206,11 @@ fn source_slide_order_refuses_stale_foreign_signed_cancelled_and_partial_output(
     assert!(output.is_empty());
 
     let (cancellation_source, context) = source_order_context();
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(multi_fixture(3, false))),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = editor.edit_slide_order().unwrap();
@@ -2279,9 +2282,9 @@ fn source_slide_order_rejects_limits_malformed_mce_and_invalid_owners() {
         .build()
         .unwrap();
     assert!(matches!(
-        SourceBackedPresentationEditor::from_read_at_with_limits(
+        SourceBackedPresentationEditor::from_read_at_with_options(
             Arc::new(VersionedSource::new(multi_fixture(3, false))),
-            limits,
+            litchi_pptx::OpenOptions::default().source_limits(limits)
         ),
         Err(Error::Opc(OpcError::Limit { .. }))
     ));

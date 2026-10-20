@@ -63,7 +63,11 @@ fn semantic_order_edits_compose_replay_invert_and_preserve_the_source() {
         ]
     );
     assert_eq!(original.to_bytes().unwrap(), source);
-    let wire = Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
+    let wire = Patch::from_bytes(
+        &patch.to_bytes().unwrap(),
+        litchi_pptx::opened::Limits::default(),
+    )
+    .unwrap();
     let replayed = original.apply(&wire).unwrap();
     assert_eq!(replayed.to_bytes().unwrap(), changed.to_bytes().unwrap());
     let restored = replayed.apply(&wire.inverse()).unwrap();

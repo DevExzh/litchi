@@ -485,10 +485,11 @@ fn stale_source_and_cancellation_reject_removal_commit_atomically() {
     assert!(edit.commit().is_err());
 
     let (cancellation_source, context) = managed_context();
-    let source = Package::from_read_at_with_execution_context(
+    let source = Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(fixture())),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = source.edit().unwrap();
@@ -584,10 +585,11 @@ fn removal_patch_and_inverse_retain_managed_images_until_last_drop() {
         cancellation,
         ExecutionLimits::new(NonZeroUsize::MIN, NonZeroUsize::MIN, NonZeroU64::MAX, 0).unwrap(),
     );
-    let source = Package::from_read_at_with_execution_context(
+    let source = Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(fixture())),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = source.edit().unwrap();
@@ -671,10 +673,11 @@ fn repeated_structural_revision_edits_do_not_retain_prior_candidate_chains() {
         cancellation,
         ExecutionLimits::new(NonZeroUsize::MIN, NonZeroUsize::MIN, NonZeroU64::MAX, 0).unwrap(),
     );
-    let mut package = Package::from_read_at_with_execution_context(
+    let mut package = Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(fixture())),
-        SourceLimits::default(),
-        context,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = package.edit().unwrap();

@@ -476,8 +476,14 @@ fn verify_remove_durable(corpus: &Corpus) -> Result<(bool, bool, bool, bool), Bo
     let plan = source_package
         .opened_presentation()?
         .plan_slide_removal(REPRESENTATIVE_REMOVE_POSITION)?;
-    let forward = SlideRemovalPatch::from_bytes(&plan.patch().to_bytes()?)?;
-    let inverse = SlideRemovalPatch::from_bytes(&plan.patch().inverse().to_bytes()?)?;
+    let forward = SlideRemovalPatch::from_bytes(
+        &plan.patch().to_bytes()?,
+        litchi_pptx::opened::Limits::default(),
+    )?;
+    let inverse = SlideRemovalPatch::from_bytes(
+        &plan.patch().inverse().to_bytes()?,
+        litchi_pptx::opened::Limits::default(),
+    )?;
     let mut applied = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
     applied = applied.apply_slide_removal(&forward)?.into_package();
     let applied_bytes = applied.to_bytes()?;
@@ -510,8 +516,14 @@ fn verify_move_durable(corpus: &Corpus) -> Result<(bool, bool, bool, bool), Box<
         litchi_core::Position::new(REPRESENTATIVE_MOVE.1),
     )?;
     let commit = transaction.commit()?;
-    let forward = Patch::from_bytes(&commit.patch().to_bytes()?)?;
-    let inverse = Patch::from_bytes(&forward.inverse().to_bytes()?)?;
+    let forward = Patch::from_bytes(
+        &commit.patch().to_bytes()?,
+        litchi_pptx::opened::Limits::default(),
+    )?;
+    let inverse = Patch::from_bytes(
+        &forward.inverse().to_bytes()?,
+        litchi_pptx::opened::Limits::default(),
+    )?;
     let mut applied = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
     applied = applied.apply(&forward)?;
     let applied_bytes = applied.to_bytes()?;
@@ -623,12 +635,16 @@ fn verify_refusal_gates(
     let limits =
         Limits::new(64, 1, 1_024, 1, 1, 1).ok_or("PPTX boundary test limits must be nonzero")?;
     let remove_limited = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?
-        .opened_presentation_with_limits(limits)?
+        .opened_presentation_with_options(
+            litchi_pptx::opened::EditOptions::default().limits(limits),
+        )?
         .plan_slide_removal(REPRESENTATIVE_REMOVE_POSITION)
         .is_err();
     let move_limited = {
         let package = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
-        let snapshot = package.opened_presentation_with_limits(limits)?;
+        let snapshot = package.opened_presentation_with_options(
+            litchi_pptx::opened::EditOptions::default().limits(limits),
+        )?;
         let mut transaction = snapshot.edit();
         transaction.move_slide(
             REPRESENTATIVE_MOVE.0,

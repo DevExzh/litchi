@@ -876,21 +876,12 @@ impl Patch {
         Ok(output)
     }
 
-    /// Parse a stable durable patch under conservative finite limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for malformed or unbounded input.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, Limits::default())
-    }
-
     /// Parse a stable durable patch under caller-selected finite limits.
     ///
     /// # Errors
     ///
     /// Returns an error for malformed or unbounded input.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
         if bytes.len() > limits.max_patch_bytes() {
             return Err(Error::EditLimit {
                 kind: crate::opened::LimitKind::PatchBytes,
