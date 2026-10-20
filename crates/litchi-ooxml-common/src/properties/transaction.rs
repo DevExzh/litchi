@@ -10,13 +10,18 @@
 //! 1. [`Snapshot::read`] (owning [`OpcPackage`]) or
 //!    [`Snapshot::read_source_backed`] ([`SourceBackedPackage`]) captures the
 //!    strictly validated graph and the exact part bytes of every family;
-//! 2. [`Snapshot::edit`] starts an [`Edit`], which stages a whole
-//!    [`Metadata`], application properties, or custom properties;
+//! 2. [`Edit::new`] starts an [`Edit`] over an owning package, which stages
+//!    a whole [`Metadata`], application properties, or custom properties;
 //! 3. [`Edit::commit`] computes a [`Patch`]: the exact before and after bytes
 //!    of each part that changes, the part created when a family was absent,
-//!    or the part removed when the custom family is emptied;
-//! 4. the host applies the patch ([`Patch::apply`]) to a copy of its package
-//!    and publishes the result as a new owner.
+//!    or the part removed when the custom family is emptied, and publishes
+//!    it as a new [`OpcPackage`] in a [`Commit`] (the source is unchanged);
+//! 4. the host wraps the new package as its new owner, and replays a patch
+//!    with [`Patch::apply`] on a copy of its package.
+//!
+//! An owner that publishes over a retained source ([`SourceBackedPackage`])
+//! stages the same change with a detached [`Snapshot::plan`] and publishes
+//! the [`Plan::finish`] patch itself.
 //!
 //! Each [`Metadata`] field lands in the family that stores it
 //! ([`super::CORE_FIELDS`], [`super::app::METADATA_FIELDS`]); changing a
@@ -430,10 +435,10 @@ impl Snapshot {
             .map(|present| present.bytes.as_slice())
     }
 
-    /// Start an edit of this snapshot.
+    /// Start a detached [`Plan`] of a change of this snapshot.
     #[must_use]
-    pub fn edit(&self) -> Edit {
-        Edit {
+    pub fn plan(&self) -> Plan {
+        Plan {
             base: self.clone(),
             metadata: None,
             app: None,
@@ -522,21 +527,29 @@ fn family_state<P: PackageMetadata>(
     })
 }
 
-/// A staged edit of a [`Snapshot`]'s document properties.
+/// A detached plan of a change of a [`Snapshot`]'s document properties.
+///
+/// A plan stages like an [`Edit`] but holds no package: [`Plan::finish`]
+/// returns the exact [`Patch`] (with the read view after it and the
+/// [`Diagnostics`]) for an owner that publishes over a retained source
+/// rather than an owning [`OpcPackage`] (the XLSB source-backed workbook,
+/// through [`Patch::check_source_backed`] and
+/// [`Patch::prepare_source_backed`]). An owning package uses [`Edit`],
+/// whose commit publishes the new package.
 ///
 /// Each family is either untouched (its part is never read or written by
 /// the commit) or staged with a complete target value. Staging a value
-/// equal to the current one commits nothing.
+/// equal to the current one changes nothing.
 #[derive(Debug, Clone)]
-pub struct Edit {
+pub struct Plan {
     base: Snapshot,
     metadata: Option<Metadata>,
     app: Option<Option<app::Props>>,
     custom: Option<custom::Props>,
 }
 
-impl Edit {
-    /// The snapshot this edit started from.
+impl Plan {
+    /// The snapshot this plan started from.
     #[must_use]
     pub const fn base(&self) -> &Snapshot {
         &self.base
@@ -610,7 +623,9 @@ impl Edit {
         self
     }
 
-    /// Compute the exact patch of the staged values.
+    /// Compute the exact patch of the staged values: the read view after
+    /// it, the patch and what changed. Nothing is published; the owner
+    /// checks and publishes the patch over its source.
     ///
     /// # Errors
     ///
@@ -619,7 +634,7 @@ impl Edit {
     /// content its writer cannot carry, a value outside its lexical space,
     /// or removing a part another relationship targets; and
     /// [`Error::Limit`] for an exceeded bound.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn finish(self) -> Result<(Snapshot, Patch, Diagnostics)> {
         let Self {
             base,
             metadata,
@@ -754,16 +769,141 @@ impl Edit {
         if changes.is_empty() {
             changed_fields.clear();
         }
-        Ok(Commit {
-            snapshot: after,
-            patch: Patch {
+        Ok((
+            after,
+            Patch {
                 changes: changes.into_boxed_slice(),
             },
-            diagnostics: Diagnostics {
+            Diagnostics {
                 families,
                 fields: changed_fields.into_boxed_slice(),
             },
+        ))
+    }
+}
+
+/// A staged edit of an owning package's document properties.
+///
+/// The edit shares the source package (an [`OpcPackage`] clone shares every
+/// part payload) and the [`Snapshot`] read from it, and never changes them:
+/// [`Edit::commit`] publishes a new package, and dropping the edit
+/// discards it. Each family is either untouched (its part is never read or
+/// written by the commit) or staged with a complete target value. Staging
+/// a value equal to the current one commits nothing.
+#[derive(Debug, Clone)]
+pub struct Edit {
+    package: OpcPackage,
+    plan: Plan,
+}
+
+impl Edit {
+    /// Capture the document properties of `package` and start an edit.
+    ///
+    /// `host` decides which reserved custom properties belong to the
+    /// document ([`custom::Props::read_for`]).
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Snapshot::read`].
+    pub fn new(package: &OpcPackage, host: Host) -> Result<Self> {
+        let snapshot = Snapshot::read(package, host)?;
+        Ok(Self {
+            package: package.clone(),
+            plan: snapshot.plan(),
         })
+    }
+
+    /// The snapshot this edit started from.
+    #[must_use]
+    pub const fn base(&self) -> &Snapshot {
+        self.plan.base()
+    }
+
+    /// The staged metadata: the staged value, or the snapshot's.
+    ///
+    /// # Errors
+    ///
+    /// Returns the decoding errors of [`Snapshot::metadata`] when no value is
+    /// staged.
+    pub fn metadata(&self) -> Result<Metadata> {
+        self.plan.metadata()
+    }
+
+    /// Stage the complete metadata. Fields equal to the snapshot's change
+    /// nothing; a changed field lands in the family that stores it.
+    pub fn set_metadata(&mut self, metadata: Metadata) -> &mut Self {
+        self.plan.set_metadata(metadata);
+        self
+    }
+
+    /// Stage a change of the metadata, starting from the staged value.
+    ///
+    /// # Errors
+    ///
+    /// Returns the decoding errors of [`Snapshot::metadata`].
+    pub fn update_metadata(&mut self, update: impl FnOnce(&mut Metadata)) -> Result<&mut Self> {
+        self.plan.update_metadata(update)?;
+        Ok(self)
+    }
+
+    /// The staged application properties: the staged value, or the
+    /// snapshot's.
+    ///
+    /// # Errors
+    ///
+    /// Returns the decoding errors of [`Snapshot::app_props`] when the family
+    /// is not staged.
+    pub fn app_props(&self) -> Result<Option<app::Props>> {
+        self.plan.app_props()
+    }
+
+    /// Stage the complete application properties; `None` removes the part.
+    ///
+    /// Metadata staged with [`Self::set_metadata`] is merged on top of this
+    /// value at commit.
+    pub fn set_app_props(&mut self, props: Option<app::Props>) -> &mut Self {
+        self.plan.set_app_props(props);
+        self
+    }
+
+    /// The staged custom properties: the staged value, or the snapshot's.
+    #[must_use]
+    pub fn custom_props(&self) -> &custom::Props {
+        self.plan.custom_props()
+    }
+
+    /// Stage the complete custom properties; an empty collection removes the
+    /// part.
+    pub fn set_custom_props(&mut self, props: custom::Props) -> &mut Self {
+        self.plan.set_custom_props(props);
+        self
+    }
+
+    /// Discard every staged change, keeping the edit.
+    pub fn reset(&mut self) {
+        self.plan = self.plan.base.plan();
+    }
+
+    /// Compute the exact patch of the staged values and publish it as a new
+    /// package.
+    ///
+    /// An exact no-op publishes the source package itself, so a signed
+    /// package keeps every byte; a changed edit of a signed package is
+    /// refused with [`Error::Signed`] (ADR 0006).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Unsupported`] for a changed field no OOXML family
+    /// stores; [`Error::Invalid`] for a core or custom part that holds
+    /// content its writer cannot carry, a value outside its lexical space,
+    /// or removing a part another relationship targets; [`Error::Limit`]
+    /// for an exceeded bound; and [`Error::Signed`] for a changed edit of a
+    /// signed package.
+    pub fn commit(self) -> Result<Commit> {
+        let (_, patch, diagnostics) = self.plan.finish()?;
+        let mut package = self.package;
+        patch.apply(&mut package)?;
+        Ok(Commit::new(package, patch, diagnostics))
     }
 }
 
@@ -891,40 +1031,10 @@ impl Diagnostics {
     }
 }
 
-/// The result of [`Edit::commit`]: the document properties after the edit,
-/// the patch that produces them, and what changed.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    diagnostics: Diagnostics,
-}
-
-impl Commit {
-    /// The document properties after the patch.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// The exact patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// What the commit changed.
-    #[must_use]
-    pub const fn diagnostics(&self) -> &Diagnostics {
-        &self.diagnostics
-    }
-
-    /// Consume the commit into its snapshot, patch and diagnostics.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch, Diagnostics) {
-        (self.snapshot, self.patch, self.diagnostics)
-    }
-}
+/// A published document-properties change: the new package, the exact
+/// [`Patch`] and what changed. Read the properties after it with
+/// [`Snapshot::read`]`(commit.package(), host)`.
+pub type Commit = litchi_core::edit::Commit<OpcPackage, Patch, Diagnostics>;
 
 /// The exact change of one family's part.
 ///

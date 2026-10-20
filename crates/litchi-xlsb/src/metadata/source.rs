@@ -98,7 +98,7 @@ pub struct Edit<'a> {
     workbook: &'a SourceBackedWorkbook,
     /// The properties this edit started from.
     start: Snapshot,
-    inner: properties::Edit,
+    inner: properties::Plan,
 }
 
 impl std::fmt::Debug for Edit<'_> {
@@ -165,7 +165,7 @@ impl Edit<'_> {
     /// cannot carry, [`Error::Signed`] for a changed edit of a signed
     /// workbook, and the source-change and topology errors of the planner.
     pub fn commit(self) -> Result<Commit> {
-        let (current, patch, diagnostics) = self.inner.commit()?.into_parts();
+        let (current, patch, diagnostics) = self.inner.finish()?;
         if patch.is_noop() {
             return Ok(Commit {
                 package: self.workbook.clone(),
@@ -290,7 +290,7 @@ impl SourceBackedWorkbook {
         let start = self.metadata_snapshot()?;
         Ok(Edit {
             workbook: self,
-            inner: start.edit(),
+            inner: start.plan(),
             start,
         })
     }

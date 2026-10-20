@@ -9,7 +9,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI};
 
-use super::{Core, Error, Family, Keywords, Snapshot, app, write_core};
+use super::{Core, Edit, Error, Family, Keywords, Snapshot, app, write_core};
 use crate::custom::{self, Host, Value};
 use crate::leniency::ToleranceReport;
 
@@ -81,7 +81,7 @@ fn keyword_lists_round_trip_the_source_bytes_until_they_change() {
     assert_eq!(snapshot.metadata().unwrap().keywords, ["a", "b", "c", "d"]);
 
     // Setting the list it already holds writes nothing.
-    let mut edit = snapshot.edit();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
     edit.update_metadata(|metadata| {
         metadata.keywords = ["a", "b", "c", "d"].map(str::to_owned).to_vec();
     })
@@ -89,11 +89,15 @@ fn keyword_lists_round_trip_the_source_bytes_until_they_change() {
     let commit = edit.commit().unwrap();
     assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
+    assert_eq!(
+        bytes(commit.package(), "/docProps/core.xml").unwrap(),
+        before
+    );
     assert_eq!(bytes(&package, "/docProps/core.xml").unwrap(), before);
 
     // A changed list is joined with `, `; a keyword holding a separator
     // becomes a `cp:value`, so it reads back whole.
-    let mut edit = Snapshot::read(&package, Host::Word).unwrap().edit();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
     edit.update_metadata(|metadata| {
         metadata.keywords = ["a", "b", "x, y"].map(str::to_owned).to_vec();
     })
@@ -101,6 +105,10 @@ fn keyword_lists_round_trip_the_source_bytes_until_they_change() {
     let commit = edit.commit().unwrap();
     assert_eq!(commit.diagnostics().fields(), [Field::Keywords]);
     assert!(commit.patch().apply(&mut package).unwrap());
+    assert_eq!(
+        bytes(commit.package(), "/docProps/core.xml"),
+        bytes(&package, "/docProps/core.xml")
+    );
     let core_xml = String::from_utf8(bytes(&package, "/docProps/core.xml").unwrap()).unwrap();
     assert!(
         core_xml.contains("<cp:keywords>a, b, <cp:value>x, y</cp:value></cp:keywords>"),
@@ -114,7 +122,7 @@ fn keyword_lists_round_trip_the_source_bytes_until_they_change() {
 fn metadata_edit_routes_fields_to_their_families_and_inverts_exactly() {
     let mut package = full();
     let core_before = bytes(&package, "/docProps/core.xml").unwrap();
-    let mut edit = Snapshot::read(&package, Host::Word).unwrap().edit();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
     edit.update_metadata(|metadata| {
         metadata.title = Some("After".into());
         metadata.manager = Some("Lin".into());
@@ -158,17 +166,24 @@ fn equal_values_commit_nothing_even_on_a_signed_package() {
     let mut package = full();
     sign(&mut package);
     let snapshot = Snapshot::read(&package, Host::Word).unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
     edit.set_metadata(snapshot.metadata().unwrap());
     let commit = edit.commit().unwrap();
     assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
+    assert!(commit.package().is_signed());
     assert!(!commit.patch().apply(&mut package).unwrap());
 
-    let mut edit = snapshot.edit();
+    // A changed edit of a signed package is refused at commit; its planned
+    // patch is refused by the replay.
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
     edit.update_metadata(|metadata| metadata.title = Some("Changed".into()))
         .unwrap();
-    let patch = edit.commit().unwrap().patch().clone();
+    assert!(matches!(edit.commit(), Err(Error::Signed)));
+    let mut plan = snapshot.plan();
+    plan.update_metadata(|metadata| metadata.title = Some("Changed".into()))
+        .unwrap();
+    let (_, patch, _) = plan.finish().unwrap();
     assert!(matches!(patch.apply(&mut package), Err(Error::Signed)));
 }
 
@@ -185,22 +200,22 @@ fn fields_no_family_stores_are_refused_not_dropped() {
         }),
     ];
     for (field, update) in updates {
-        let mut edit = snapshot.edit();
-        edit.update_metadata(update).unwrap();
+        let mut plan = snapshot.plan();
+        plan.update_metadata(update).unwrap();
         assert!(
-            matches!(edit.commit(), Err(Error::Unsupported { field: refused }) if refused == field)
+            matches!(plan.finish(), Err(Error::Unsupported { field: refused }) if refused == field)
         );
     }
-    let mut edit = snapshot.edit();
-    edit.update_metadata(|metadata| metadata.page_count = Some(u32::MAX))
+    let mut plan = snapshot.plan();
+    plan.update_metadata(|metadata| metadata.page_count = Some(u32::MAX))
         .unwrap();
-    assert!(matches!(edit.commit(), Err(Error::Invalid(_))));
+    assert!(matches!(plan.finish(), Err(Error::Invalid(_))));
 }
 
 #[test]
 fn an_empty_package_gains_canonical_parts() {
     let mut package = OpcPackage::new();
-    let mut edit = Snapshot::read(&package, Host::Excel).unwrap().edit();
+    let mut edit = Edit::new(&package, Host::Excel).unwrap();
     edit.set_metadata(Metadata {
         author: Some("Ada".into()),
         company: Some("Litchi".into()),
@@ -233,11 +248,11 @@ fn an_empty_package_gains_canonical_parts() {
 #[test]
 fn a_stale_patch_conflicts_without_mutation() {
     let mut package = full();
-    let mut edit = Snapshot::read(&package, Host::Word).unwrap().edit();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
     edit.update_metadata(|metadata| metadata.title = Some("One".into()))
         .unwrap();
     let first = edit.commit().unwrap().patch().clone();
-    let mut edit = Snapshot::read(&package, Host::Word).unwrap().edit();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
     edit.update_metadata(|metadata| metadata.title = Some("Two".into()))
         .unwrap();
     let second = edit.commit().unwrap().patch().clone();
@@ -256,10 +271,10 @@ fn source_backed(package: &OpcPackage) -> litchi_opc::SourceBackedPackage {
 }
 
 fn edited(snapshot: &Snapshot, title: &str) -> (Snapshot, super::Patch) {
-    let mut edit = snapshot.edit();
-    edit.update_metadata(|metadata| metadata.title = Some(title.into()))
+    let mut plan = snapshot.plan();
+    plan.update_metadata(|metadata| metadata.title = Some(title.into()))
         .unwrap();
-    let (after, patch, _) = edit.commit().unwrap().into_parts();
+    let (after, patch, _) = plan.finish().unwrap();
     (after, patch)
 }
 
@@ -289,16 +304,16 @@ fn a_patch_prepares_over_a_source_backed_package_without_materializing_it() {
     let package = full();
     let source = source_backed(&package);
     let snapshot = Snapshot::read_source_backed(&source, Host::Word).unwrap();
-    let mut edit = snapshot.edit();
-    edit.update_metadata(|metadata| {
+    let mut plan = snapshot.plan();
+    plan.update_metadata(|metadata| {
         metadata.title = Some("After".into());
         metadata.manager = Some("Lin".into());
     })
     .unwrap();
-    let mut custom = edit.custom_props().clone();
+    let mut custom = plan.custom_props().clone();
     custom.insert("Phase", "two").unwrap();
-    edit.set_custom_props(custom);
-    let (after, patch, _) = edit.commit().unwrap().into_parts();
+    plan.set_custom_props(custom);
+    let (after, patch, _) = plan.finish().unwrap();
     let topology = patch.prepare_source_backed(&source).unwrap();
     let mut published = Vec::new();
     topology.publish_to_stream(&mut published).unwrap();
@@ -350,4 +365,29 @@ fn a_changed_source_backed_patch_refuses_a_signed_package() {
         patch.prepare_source_backed(&source),
         Err(Error::Signed)
     ));
+}
+
+#[test]
+fn an_edit_publishes_a_new_package_and_leaves_its_source_unchanged() {
+    let package = full();
+    let core_before = bytes(&package, "/docProps/core.xml").unwrap();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.update_metadata(|metadata| metadata.title = Some("Staged".into()))
+        .unwrap();
+    edit.reset();
+    let unchanged = edit.clone().commit().unwrap();
+    assert!(!unchanged.diagnostics().changed());
+    assert!(unchanged.patch().is_noop());
+
+    edit.update_metadata(|metadata| metadata.title = Some("After".into()))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(bytes(&package, "/docProps/core.xml").unwrap(), core_before);
+    let after = Snapshot::read(commit.package(), Host::Word).unwrap();
+    assert_eq!(after.metadata().unwrap().title.as_deref(), Some("After"));
+    let (published, patch) = commit.into_parts();
+    let mut restored = published.clone();
+    assert!(patch.inverse().apply(&mut restored).unwrap());
+    assert_eq!(bytes(&restored, "/docProps/core.xml").unwrap(), core_before);
 }

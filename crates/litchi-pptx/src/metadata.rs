@@ -106,8 +106,11 @@ impl Edit<'_> {
     /// cannot carry, and [`Error::Signed`] for a changed edit of a signed
     /// package.
     pub fn commit(self) -> Result<Commit> {
-        let (_, patch, diagnostics) = self.inner.commit()?.into_parts();
-        let package = self.package.apply_metadata(&patch)?;
+        let commit = self.inner.commit()?;
+        let diagnostics = commit.diagnostics().clone();
+        let (opc, patch) = commit.into_parts();
+        // An exact no-op publishes the source graph itself.
+        let package = self.package.with_metadata_opc(opc);
         Ok(Commit {
             package,
             patch,
@@ -188,7 +191,7 @@ impl Package {
     pub fn edit_metadata(&self) -> Result<Edit<'_>> {
         Ok(Edit {
             package: self,
-            inner: self.metadata_snapshot()?.edit(),
+            inner: properties::Edit::new(&self.opc, Host::PowerPoint)?,
         })
     }
 
@@ -204,7 +207,12 @@ impl Package {
     pub fn apply_metadata(&self, patch: &Patch) -> Result<Self> {
         let mut opc = self.opc.clone();
         patch.apply(&mut opc)?;
-        Ok(Self {
+        Ok(self.with_metadata_opc(opc))
+    }
+
+    /// This package with `opc`, whose document properties changed.
+    fn with_metadata_opc(&self, opc: litchi_opc::OpcPackage) -> Self {
+        Self {
             opc,
             part_digests: std::sync::OnceLock::new(),
             physical_source_provenance: self.physical_source_provenance,
@@ -213,7 +221,7 @@ impl Package {
             encryption: self.encryption,
             #[cfg(feature = "encryption")]
             encryption_limits: self.encryption_limits,
-        })
+        }
     }
 }
 

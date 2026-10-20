@@ -97,14 +97,14 @@ impl Package {
         // A dirty cached value would make the part bytes stale.
         self.ensure_opc_current("edit_metadata")?;
         let snapshot = families::Snapshot::read(&self.opc, Host::Word)?;
-        let mut edit = snapshot.edit();
+        let mut plan = snapshot.plan();
         if let Some(app) = app {
-            edit.set_app_props(app);
+            plan.set_app_props(app);
         }
         if let Some(custom) = custom {
-            edit.set_custom_props(custom);
+            plan.set_custom_props(custom);
         }
-        Ok(edit.commit()?.into_parts().1)
+        Ok(plan.finish()?.1)
     }
 
     /// Publish `target` as the core properties of a new package, and `parts`

@@ -102,8 +102,14 @@ impl Edit<'_> {
     /// cannot carry, and [`Error::Signed`] for a changed edit of a signed
     /// workbook.
     pub fn commit(self) -> Result<Commit> {
-        let (_, patch, diagnostics) = self.inner.commit()?.into_parts();
-        let package = self.package.apply_metadata(&patch)?;
+        let commit = self.inner.commit()?;
+        let diagnostics = commit.diagnostics().clone();
+        let (opc, patch) = commit.into_parts();
+        let package = if patch.is_noop() {
+            self.package.clone()
+        } else {
+            self.package.adopt_metadata(opc)?
+        };
         Ok(Commit {
             package,
             patch,
@@ -183,7 +189,7 @@ impl Package {
     pub fn edit_metadata(&self) -> Result<Edit<'_>> {
         Ok(Edit {
             package: self,
-            inner: self.metadata_snapshot()?.edit(),
+            inner: properties::Edit::new(self.opc(), Host::Excel)?,
         })
     }
 
@@ -203,6 +209,11 @@ impl Package {
         }
         let mut candidate = self.opc().clone();
         patch.apply(&mut candidate)?;
+        self.adopt_metadata(candidate)
+    }
+
+    /// Wrap a package whose document properties changed as a new package.
+    fn adopt_metadata(&self, candidate: litchi_opc::OpcPackage) -> Result<Self> {
         self.workbook_ref()
             .adopt_published_package(candidate)
             .map(Self::from_workbook)
