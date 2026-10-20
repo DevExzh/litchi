@@ -6,7 +6,7 @@ use super::*;
 
 /// Stable identity and dimensions of a Numbers table.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NumbersTableInfo {
+pub struct TableInfo {
     /// Native model identity retained only inside the IWA adapter.
     pub(crate) object_id: u64,
     /// Checked zero-based position in the editor's semantic table catalog.
@@ -20,14 +20,14 @@ pub struct NumbersTableInfo {
 
 /// Stable identity and name of a sheet in workbook order.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NumbersSheetInfo {
+pub struct SheetInfo {
     /// Native identity retained only inside the IWA adapter.
     pub(crate) object_id: u64,
     pub index: usize,
     pub name: String,
 }
 
-impl NumbersTableInfo {
+impl TableInfo {
     /// Return the stable native table identifier accepted by cell-level APIs.
     #[must_use]
     pub const fn id(&self) -> u64 {
@@ -39,7 +39,7 @@ impl NumbersTableInfo {
     }
 }
 
-impl NumbersSheetInfo {
+impl SheetInfo {
     /// Return the stable native sheet identifier accepted by sheet-scoped APIs.
     #[must_use]
     pub const fn id(&self) -> u64 {
@@ -53,7 +53,7 @@ impl NumbersSheetInfo {
 
 /// A writable ordinary text box owned by one Numbers sheet.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NumbersTextBoxInfo {
+pub struct TextBoxInfo {
     pub sheet_id: u64,
     pub drawable_object_id: u64,
     pub storage: TextStorageInfo,
@@ -62,73 +62,73 @@ pub struct NumbersTextBoxInfo {
 /// A Numbers text box removed from a sheet with its final text state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RemovedNumbersTextBox {
-    pub text_box: NumbersTextBoxInfo,
+    pub text_box: TextBoxInfo,
 }
 
 /// A pivot aggregate category that can be used in a formula expression.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NumbersPivotCategoryInfo {
+pub struct PivotCategoryInfo {
     pub reference: FormulaPivotCategoryReference,
     pub label: Option<String>,
 }
 
 /// Horizontal text alignment shared by native Numbers table cells.
-pub type NumbersTableCellTextAlignment = Alignment;
+pub type TableCellTextAlignment = Alignment;
 /// Typed first-line, left, and right indents for a Numbers table cell.
-pub type NumbersTableCellParagraphIndents = Indents;
+pub type TableCellParagraphIndents = Indents;
 /// Typed native line spacing applied to a whole Numbers table cell.
-pub type NumbersTableCellParagraphLineSpacing = LineSpacing;
+pub type TableCellParagraphLineSpacing = LineSpacing;
 /// Typed before/after paragraph spacing applied to a whole Numbers table cell.
-pub type NumbersTableCellParagraphSpacing = Spacing;
+pub type TableCellParagraphSpacing = Spacing;
 /// Canonical native list preset applied uniformly to a Numbers table cell.
-pub type NumbersTableCellParagraphList = ParagraphList;
+pub type TableCellParagraphList = ParagraphList;
 /// A validated custom text-bullet marker in a Numbers table cell.
-pub type NumbersTableCellParagraphListBullet = ParagraphListBullet;
+pub type TableCellParagraphListBullet = ParagraphListBullet;
 /// Typed marker size and baseline in a Numbers table cell.
-pub type NumbersTableCellParagraphListBulletGeometry = ParagraphListBulletGeometry;
+pub type TableCellParagraphListBulletGeometry = ParagraphListBulletGeometry;
 /// Typed native list-label and text-gap indentation in a Numbers table cell.
-pub type NumbersTableCellParagraphListIndentation = ParagraphListIndentation;
-pub type NumbersTableCellParagraphListLabelColor = ParagraphListLabelColor;
+pub type TableCellParagraphListIndentation = ParagraphListIndentation;
+pub type TableCellParagraphListLabelColor = ParagraphListLabelColor;
 /// Locale-aware numbered-list label format in a Numbers table cell.
-pub type NumbersTableCellParagraphListNumberFormat = ParagraphListNumberFormat;
+pub type TableCellParagraphListNumberFormat = ParagraphListNumberFormat;
 /// Flat or hierarchical numbered-list labels in a Numbers table cell.
-pub type NumbersTableCellParagraphListNumberTiering = ParagraphListNumberTiering;
+pub type TableCellParagraphListNumberTiering = ParagraphListNumberTiering;
 /// Number-label size for a numbered paragraph in a Numbers table cell.
-pub type NumbersTableCellParagraphListNumberScale = ParagraphListNumberScale;
+pub type TableCellParagraphListNumberScale = ParagraphListNumberScale;
 /// A validated zero-based list nesting level in a Numbers table cell.
-pub type NumbersTableCellParagraphListLevel = ParagraphListLevel;
+pub type TableCellParagraphListLevel = ParagraphListLevel;
 /// One effective list-level boundary in a Numbers table cell.
-pub type NumbersTableCellParagraphListLevelPlacement = ParagraphListLevelPlacement;
+pub type TableCellParagraphListLevelPlacement = ParagraphListLevelPlacement;
 /// Whether a Numbers table-cell paragraph continues or restarts list numbering.
-pub type NumbersTableCellParagraphListNumbering = ParagraphListNumbering;
+pub type TableCellParagraphListNumbering = ParagraphListNumbering;
 /// One paragraph-scoped list preset boundary in a Numbers table cell.
-pub type NumbersTableCellParagraphListPlacement = ParagraphListPlacement;
+pub type TableCellParagraphListPlacement = ParagraphListPlacement;
 /// Ordered explicit ruler tab stops for a Numbers table cell.
-pub type NumbersTableCellParagraphTabStops = ParagraphTabStops;
+pub type TableCellParagraphTabStops = ParagraphTabStops;
 /// Typed solid background painted behind a whole Numbers table cell's text.
-pub type NumbersTableCellTextBackground = Background;
+pub type TableCellTextBackground = Background;
 /// Validated custom baseline displacement applied to a whole Numbers cell.
-pub type NumbersTableCellTextBaselineShift = TextBaselineShift;
+pub type TableCellTextBaselineShift = TextBaselineShift;
 /// Typed capitalization applied to a whole Numbers table cell.
-pub type NumbersTableCellTextCapitalization = TextCapitalization;
+pub type TableCellTextCapitalization = TextCapitalization;
 /// Validated tracking applied to a whole Numbers table cell.
-pub type NumbersTableCellTextCharacterSpacing = TextCharacterSpacing;
+pub type TableCellTextCharacterSpacing = TextCharacterSpacing;
 /// Validated foreground color applied to a whole Numbers table cell.
-pub type NumbersTableCellTextColor = RgbaColor;
+pub type TableCellTextColor = RgbaColor;
 /// Typed underline and strikethrough formatting for a whole Numbers table cell.
-pub type NumbersTableCellTextDecorations = TextDecorations;
+pub type TableCellTextDecorations = TextDecorations;
 /// Strict PostScript font identity applied to a whole Numbers table cell.
-pub type NumbersTableCellTextFont = TextFont;
+pub type TableCellTextFont = TextFont;
 /// Typed ligature policy applied to a whole Numbers table cell.
-pub type NumbersTableCellTextLigatures = TextLigatures;
+pub type TableCellTextLigatures = TextLigatures;
 /// Typed outline applied to a whole Numbers table cell's text.
-pub type NumbersTableCellTextOutline = Outline;
+pub type TableCellTextOutline = Outline;
 /// Typed normal, superscript, or subscript formatting for a whole Numbers cell.
-pub type NumbersTableCellTextScript = TextScript;
+pub type TableCellTextScript = TextScript;
 /// Typed drop shadow applied to a whole Numbers table cell's text.
-pub type NumbersTableCellTextShadow = Shadow;
+pub type TableCellTextShadow = Shadow;
 /// Whole-cell point size, bold, and italic formatting.
-pub type NumbersTableCellTextStyle = TextStyle;
+pub type TableCellTextStyle = TextStyle;
 
 /// Storage identity and rule count of conditional highlighting attached to one cell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -146,6 +146,6 @@ pub struct TableCellConditionalHighlightInfo {
 /// Each semantic edit is applied to a cloned package and committed only after
 /// all affected IWA components serialize successfully.
 #[derive(Debug, Clone)]
-pub struct NumbersEditor {
+pub struct Editor {
     pub(in crate::numbers::editor) package: IWorkPackage,
 }

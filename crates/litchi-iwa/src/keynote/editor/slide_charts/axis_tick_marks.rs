@@ -10,7 +10,7 @@ use crate::charts::axis_style::{
 use litchi_iwa_common::chart::axis::style::Visibility;
 use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
 
-impl KeynoteEditor {
+impl Editor {
     /// Read whether Keynote shows minor tick marks for one native slide-chart axis.
     pub fn slide_chart_axis_minor_tick_marks_visible(
         &self,
@@ -67,7 +67,7 @@ impl KeynoteEditor {
 }
 
 fn slide_chart_axis_minor_tick_marks_visible(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
@@ -83,7 +83,7 @@ fn slide_chart_axis_minor_tick_marks_visible(
 }
 
 fn set_slide_chart_axis_minor_tick_marks_visible(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
@@ -99,7 +99,7 @@ fn set_slide_chart_axis_minor_tick_marks_visible(
         axis,
         visible,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_axis_minor_tick_marks_visible(slide_index, drawable_object_id, axis)?
         != visible
     {
@@ -112,7 +112,7 @@ fn set_slide_chart_axis_minor_tick_marks_visible(
 }
 
 fn slide_chart_axis_tick_mark_location(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
@@ -128,7 +128,7 @@ fn slide_chart_axis_tick_mark_location(
 }
 
 fn set_slide_chart_axis_tick_mark_location(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
@@ -144,7 +144,7 @@ fn set_slide_chart_axis_tick_mark_location(
         axis,
         location,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_axis_tick_mark_location(slide_index, drawable_object_id, axis)?
         != location
     {

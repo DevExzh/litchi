@@ -10,7 +10,7 @@ use crate::calc::{Delta, Mode, Opts, Threads};
 use crate::comments::{Record, Run};
 use crate::raw::kind;
 use crate::writer::{MutableChartSheet, MutableWorksheet};
-use litchi_core::sheet::{CellValue, WorkbookTrait};
+use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
 use litchi_opc::constants::relationship_type as rel;
 use litchi_opc::{OpcPackage, PackURI};
 use std::io::Cursor;
@@ -376,8 +376,7 @@ fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
     assert!(reader.worksheet_by_name("Tail").is_ok());
     let chart_name_error = reader
         .worksheet_by_name("Sales Chart")
-        .err()
-        .expect("chart sheet must not be exposed as a worksheet");
+        .expect_err("chart sheet must not be exposed as a worksheet");
     assert!(
         chart_name_error
             .downcast_ref::<crate::package::error::Error>()
@@ -387,8 +386,7 @@ fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
 
     let index_error = reader
         .worksheet_by_index(2)
-        .err()
-        .expect("worksheet index after Tail must be out of range");
+        .expect_err("worksheet index after Tail must be out of range");
     assert!(
         index_error
             .downcast_ref::<crate::package::error::Error>()

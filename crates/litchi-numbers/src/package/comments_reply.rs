@@ -21,7 +21,7 @@ use litchi_iwa_protos::package_metadata_codec::{
 use litchi_iwa_protos::tst;
 use thiserror::Error as ThisError;
 
-use crate::{SheetSelector, TableSelector, table::CellPosition};
+use crate::{SheetSelector, TableSelector, table::At};
 
 use super::super::comments_reply_native::{
     NativeReplyMember, NativeReplyObjectRoute, NativeReplyOperation, NativeReplyRequest,
@@ -860,7 +860,7 @@ fn resolve_reply_state<'sheet, 'table>(
     source: &Package,
     sheet: impl Into<SheetSelector<'sheet>>,
     table: impl Into<TableSelector<'table>>,
-    position: CellPosition,
+    position: At,
 ) -> Result<ReplyState, Error> {
     let located = resolve_comment(source, sheet, table, position).map_err(|error| {
         let path = match error {
@@ -1451,7 +1451,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         .charge_candidate_reopen(candidate_catalog, BudgetPath::Package)
         .map_err(|error| map_budget_error(error, path))?;
     let (sheet, table, row, column) = path.cell_parts();
-    let position = CellPosition::try_from_usize(row, column).map_err(|_| Error::Verification)?;
+    let position = At::try_from_usize(row, column).map_err(|_| Error::Verification)?;
     let actual = candidate
         .table_cell_comment_replies(
             SheetSelector::index(sheet),
@@ -1577,7 +1577,7 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
         index: CommentReplyIndex,
     ) -> Result<CommentReply, Error> {
         let state = resolve_reply_state(self, sheet, table, position)?;
@@ -1599,7 +1599,7 @@ impl Package {
         address: &str,
         index: CommentReplyIndex,
     ) -> Result<CommentReply, Error> {
-        let position = CellPosition::from_a1(address).map_err(|_| Error::InvalidAddress)?;
+        let position = At::from_a1(address).map_err(|_| Error::InvalidAddress)?;
         self.table_cell_comment_reply(sheet, table, position, index)
     }
 
@@ -1608,7 +1608,7 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
     ) -> Result<Edit<'_>, Error> {
         let state = resolve_reply_state(self, sheet, table, position)?;
         let path = root_to_reply_path(state.located.target.path).as_cell();
@@ -1631,7 +1631,7 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
         address: &str,
     ) -> Result<Edit<'_>, Error> {
-        let position = CellPosition::from_a1(address).map_err(|_| Error::InvalidAddress)?;
+        let position = At::from_a1(address).map_err(|_| Error::InvalidAddress)?;
         self.edit_table_cell_comment_replies(sheet, table, position)
     }
 
@@ -1640,7 +1640,7 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
         index: CommentReplyIndex,
         text: impl AsRef<str>,
     ) -> Result<Commit, Error> {
@@ -1658,7 +1658,7 @@ impl Package {
         index: CommentReplyIndex,
         text: impl AsRef<str>,
     ) -> Result<Commit, Error> {
-        let position = CellPosition::from_a1(address).map_err(|_| Error::InvalidAddress)?;
+        let position = At::from_a1(address).map_err(|_| Error::InvalidAddress)?;
         self.set_table_cell_comment_reply(sheet, table, position, index, text)
     }
 
@@ -1667,7 +1667,7 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
         index: CommentReplyIndex,
     ) -> Result<Commit, Error> {
         self.edit_table_cell_comment_replies(sheet, table, position)?
@@ -1683,7 +1683,7 @@ impl Package {
         address: &str,
         index: CommentReplyIndex,
     ) -> Result<Commit, Error> {
-        let position = CellPosition::from_a1(address).map_err(|_| Error::InvalidAddress)?;
+        let position = At::from_a1(address).map_err(|_| Error::InvalidAddress)?;
         self.remove_table_cell_comment_reply(sheet, table, position, index)
     }
 
@@ -1692,7 +1692,7 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
         text: impl AsRef<str>,
     ) -> Result<Commit, Error> {
         self.edit_table_cell_comment_replies(sheet, table, position)?
@@ -1708,7 +1708,7 @@ impl Package {
         address: &str,
         text: impl AsRef<str>,
     ) -> Result<Commit, Error> {
-        let position = CellPosition::from_a1(address).map_err(|_| Error::InvalidAddress)?;
+        let position = At::from_a1(address).map_err(|_| Error::InvalidAddress)?;
         self.add_table_cell_comment_reply(sheet, table, position, text)
     }
 
@@ -1720,8 +1720,7 @@ impl Package {
             return Err(Error::PatchConflict);
         }
         let (sheet, table, row, column) = patch.path.cell_parts();
-        let position =
-            CellPosition::try_from_usize(row, column).map_err(|_| Error::PatchConflict)?;
+        let position = At::try_from_usize(row, column).map_err(|_| Error::PatchConflict)?;
         let current = self
             .table_cell_comment_replies(
                 SheetSelector::index(sheet),

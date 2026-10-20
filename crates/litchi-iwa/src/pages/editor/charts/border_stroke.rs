@@ -7,7 +7,7 @@ use crate::charts::border_stroke::{
 };
 use crate::shapes::Stroke;
 
-impl PagesEditor {
+impl Editor {
     /// Read the chart-area border stroke independently of border visibility.
     ///
     /// `None` represents the native inspector's empty-stroke option.
@@ -25,10 +25,7 @@ impl PagesEditor {
     }
 }
 
-fn body_chart_border_stroke(
-    editor: &PagesEditor,
-    drawable_object_id: u64,
-) -> Result<Option<Stroke>> {
+fn body_chart_border_stroke(editor: &Editor, drawable_object_id: u64) -> Result<Option<Stroke>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_border_stroke(
         editor.package(),
@@ -39,7 +36,7 @@ fn body_chart_border_stroke(
 }
 
 fn set_body_chart_border_stroke(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     stroke: Option<Stroke>,
 ) -> Result<()> {
@@ -55,7 +52,7 @@ fn set_body_chart_border_stroke(
         "Pages",
         stroke,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_border_stroke(drawable_object_id)? != stroke {
         return Err(Error::InvalidFormat(
             "Pages chart border stroke update failed validation".to_owned(),

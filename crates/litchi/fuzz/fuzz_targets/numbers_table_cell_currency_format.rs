@@ -19,7 +19,7 @@ use std::{
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    CellPosition, Package, SheetSelector,
+    At, Package, SheetSelector,
     TableSelector,
     cell::data_format::currency::{
         Currency, CurrencyCode, CurrencyStyle, DecimalPlaces, NegativeStyle, ThousandsSeparator,
@@ -52,9 +52,9 @@ const NATIVE_NUMBERS: &[u8] = include_bytes!("../../../../test-data/iwork/number
 // B3 is a stable explicit Number cell in the checked-in Numbers source.  It
 // is useful as a real-package wrong-family oracle; the source-built fixture
 // below is the success source for Currency transactions.
-const NATIVE_POSITION: CellPosition = CellPosition::new(2, 1);
-const FIXTURE_POSITION: CellPosition = CellPosition::new(0, 0);
-const FIXTURE_SIBLING_POSITION: CellPosition = CellPosition::new(0, 1);
+const NATIVE_POSITION: At = At::new(2, 1);
+const FIXTURE_POSITION: At = At::new(0, 0);
+const FIXTURE_SIBLING_POSITION: At = At::new(0, 1);
 
 fuzz_target!(|data: &[u8]| {
     match Package::from_bytes_with_options(data, options()) {
@@ -159,7 +159,7 @@ fn secondary_currency_package() -> &'static Package {
 fn exercise_package(
     package: &Package,
     data: &[u8],
-    position: CellPosition,
+    position: At,
     fixture_invariants: bool,
 ) {
     exercise_selector_reads(package, data, position);
@@ -199,8 +199,8 @@ fn exercise_package(
     assert_eq!(package_bytes(package), source_bytes);
 }
 
-fn exercise_selector_reads(package: &Package, data: &[u8], position: CellPosition) {
-    let random_position = CellPosition::new(
+fn exercise_selector_reads(package: &Package, data: &[u8], position: At) {
+    let random_position = At::new(
         u32::from(control(data, 4) % 8),
         u32::from(control(data, 5) % 8),
     );
@@ -226,7 +226,7 @@ fn exercise_selector_reads(package: &Package, data: &[u8], position: CellPositio
     }
 }
 
-fn exercise_selector_errors(package: &Package, position: CellPosition) {
+fn exercise_selector_errors(package: &Package, position: At) {
     let source_bytes = package_bytes(package);
     let sheet_count = package.workbook_ref().sheets().len();
     if let Err(error) = package.table_cell_currency_format(
@@ -253,7 +253,7 @@ fn exercise_selector_errors(package: &Package, position: CellPosition) {
     if let Err(error) = package.table_cell_currency_format(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(u32::MAX, u32::MAX),
+        At::new(u32::MAX, u32::MAX),
     ) {
         observe_error(error);
     }
@@ -265,7 +265,7 @@ fn exercise_transaction(
     source_bytes: &[u8],
     before: Option<Currency>,
     requested: Currency,
-    position: CellPosition,
+    position: At,
     data: &[u8],
     fixture_invariants: bool,
 ) {
@@ -383,7 +383,7 @@ fn exercise_transaction(
     black_box((patch.before(), patch.after(), patch.path()));
 }
 
-fn exercise_wrong_family(package: &Package, position: CellPosition) {
+fn exercise_wrong_family(package: &Package, position: At) {
     let source_bytes = package_bytes(package);
     let read = package.table_cell_currency_format(
         SheetSelector::index(0),

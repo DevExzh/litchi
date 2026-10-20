@@ -361,9 +361,9 @@ fn direct_insets(properties: &tswp::ShapeStylePropertiesArchive) -> Result<Optio
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keynote::KeynoteEditor;
-    use crate::numbers::NumbersEditor;
-    use crate::pages::PagesEditor;
+    use crate::keynote;
+    use crate::numbers;
+    use crate::pages;
     use crate::shapes::{DrawablePoint, DrawableSize};
     use litchi_iwa_common::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
     use litchi_iwa_text::columns::{Columns, Count};
@@ -405,10 +405,6 @@ mod tests {
     }
 
     #[test]
-    #[expect(
-        deprecated,
-        reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-    )]
     fn scratch_suite_text_boxes_support_composable_layout_crud() {
         let inset = Inset::from_points(9.0).unwrap();
         let layout = Layout::new(
@@ -418,7 +414,7 @@ mod tests {
         );
         let columns = Columns::equal(Count::new(2).unwrap(), None);
 
-        let mut pages = PagesEditor::create_with_text("Body").unwrap();
+        let mut pages = pages::Editor::create_with_text("Body").unwrap();
         let pages_box = pages
             .add_text_box(4, "Pages layout", POSITION, SIZE)
             .unwrap();
@@ -431,7 +427,7 @@ mod tests {
         pages
             .set_text_box_text_layout(pages_box.drawable_object_id, layout)
             .unwrap();
-        let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages
                 .text_box_text_layout(pages_box.drawable_object_id)
@@ -467,7 +463,7 @@ mod tests {
                 .unwrap()
         );
 
-        let mut numbers = NumbersEditor::create().unwrap();
+        let mut numbers = numbers::Editor::create().unwrap();
         let sheet_id = numbers.sheets().unwrap()[0].object_id;
         let numbers_box = numbers
             .add_sheet_text_box(sheet_id, "Numbers layout", POSITION, SIZE)
@@ -475,7 +471,7 @@ mod tests {
         numbers
             .set_sheet_text_box_text_layout(sheet_id, numbers_box.drawable_object_id, layout)
             .unwrap();
-        let mut numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        let mut numbers = numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
         assert_eq!(
             numbers
                 .sheet_text_box_text_layout(sheet_id, numbers_box.drawable_object_id)
@@ -488,14 +484,14 @@ mod tests {
                 .unwrap()
         );
 
-        let mut keynote = KeynoteEditor::create().unwrap();
+        let mut keynote = keynote::Editor::create().unwrap();
         let keynote_box = keynote
             .add_slide_text_box(0, "Keynote layout", POSITION, SIZE)
             .unwrap();
         keynote
             .set_slide_text_box_text_layout(0, keynote_box.drawable_object_id, layout)
             .unwrap();
-        let mut keynote = KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let mut keynote = keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
             keynote
                 .slide_text_box_text_layout(0, keynote_box.drawable_object_id)

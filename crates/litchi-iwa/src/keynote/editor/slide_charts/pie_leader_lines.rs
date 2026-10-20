@@ -7,7 +7,7 @@ use crate::charts::pie_leader_lines::{
 };
 use crate::charts::{ChartPieWedgeIndex, LeaderLineVisibility};
 
-impl KeynoteEditor {
+impl Editor {
     /// Read every pie or donut wedge's leader-line visibility.
     pub fn slide_chart_pie_leader_line_visibilities(
         &self,
@@ -77,7 +77,7 @@ impl KeynoteEditor {
 }
 
 fn slide_chart_pie_leader_line_visibilities(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Vec<LeaderLineVisibility>> {
@@ -99,7 +99,7 @@ fn slide_chart_pie_leader_line_visibilities(
 }
 
 fn set_slide_chart_pie_leader_line_visibilities(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     visibilities: &[LeaderLineVisibility],
@@ -137,7 +137,7 @@ fn set_slide_chart_pie_leader_line_visibilities(
         "Keynote",
         &expected,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_pie_leader_line_visibilities(slide_index, drawable_object_id)?
         != expected
     {

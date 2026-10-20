@@ -292,12 +292,12 @@ fn appearance_wire_limits(package: &IWorkPackage) -> Result<litchi_iwa_common::W
 
 #[derive(Debug, Clone)]
 pub(crate) struct PagesTableGraph {
-    pub(super) info: PagesTableInfo,
+    pub(super) info: TableInfo,
     pub(super) attachment_object_id: u64,
     pub(super) formula_context_ids: Vec<u64>,
 }
 
-pub(crate) fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGraph>> {
+pub(crate) fn body_table_graphs(editor: &Editor) -> Result<Vec<PagesTableGraph>> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
         editor.body_storage_id.get(),
@@ -441,7 +441,7 @@ pub(crate) fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGr
         result.push(PagesTableGraph {
             attachment_object_id: attachment_reference.identifier,
             formula_context_ids,
-            info: PagesTableInfo {
+            info: TableInfo {
                 drawable_object_id: drawable.identifier,
                 model_object_id: model_id,
                 anchor_character_index: entry.character_index as usize,

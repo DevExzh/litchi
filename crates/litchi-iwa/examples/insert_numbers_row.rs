@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use litchi_iwa::numbers::NumbersEditor;
+use litchi_iwa::numbers;
 use litchi_numbers::TableSelector;
 use litchi_numbers::table::topology::RowInsertion;
 
@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra argument".into());
     }
 
-    let mut editor = NumbersEditor::open(input)?;
+    let mut editor = numbers::Editor::open(input)?;
     editor.insert_table_row(TableSelector::index(table_index), RowInsertion::body(row))?;
     editor.save(output)?;
     Ok(())

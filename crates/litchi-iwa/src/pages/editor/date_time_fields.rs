@@ -1,11 +1,11 @@
 //! Date & Time smart-field CRUD for Pages text boxes.
 
-use super::PagesEditor;
+use super::Editor;
 use crate::Result;
 use crate::text::{TextDateTimeField, TextDateTimeFieldId, TextPosition, TextRange};
 use litchi_iwa_text::date_time::{DisplayText, Settings};
 
-impl PagesEditor {
+impl Editor {
     /// Read every native Date & Time field in one Pages text box.
     pub fn text_box_date_time_fields(
         &self,

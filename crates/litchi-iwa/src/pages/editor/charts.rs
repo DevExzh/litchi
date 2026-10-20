@@ -91,7 +91,7 @@ const PAGES_THEME_MESSAGE_TYPE: u32 = 10_001;
 
 /// One native inline-data chart anchored to the Pages body text flow.
 #[derive(Debug, Clone, PartialEq)]
-pub struct PagesBodyChartInfo {
+pub struct BodyChartInfo {
     /// UTF-16 index of the object-replacement character in the body text.
     pub anchor_character_index: u32,
     pub drawable_object_id: u64,
@@ -105,12 +105,12 @@ pub struct PagesBodyChartInfo {
 /// Result of removing a body chart and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedPagesBodyChart {
-    pub chart: PagesBodyChartInfo,
+    pub chart: BodyChartInfo,
 }
 
-impl PagesEditor {
+impl Editor {
     /// List native charts anchored to the body in text-flow order.
-    pub fn body_charts(&self) -> Result<Vec<PagesBodyChartInfo>> {
+    pub fn body_charts(&self) -> Result<Vec<BodyChartInfo>> {
         body_chart_infos(self)
     }
 
@@ -126,7 +126,7 @@ impl PagesEditor {
         data: ChartData,
         position: DrawablePoint,
         size: DrawableSize,
-    ) -> Result<PagesBodyChartInfo> {
+    ) -> Result<BodyChartInfo> {
         require_creatable_kind(kind)?;
         let geometry = chart_geometry("Pages", position, size)?;
         let root = pages_document_root_facts(self.package())?;
@@ -428,7 +428,7 @@ impl PagesEditor {
         &mut self,
         source_drawable_object_id: u64,
         anchor_character_index: usize,
-    ) -> Result<PagesBodyChartInfo> {
+    ) -> Result<BodyChartInfo> {
         let source = body_chart_graph(self, source_drawable_object_id)?;
         let mut staged = self.package().clone();
         let first_identifier = next_object_identifier(&staged)?;
@@ -735,7 +735,7 @@ fn chart_data_shape_and_labels_match(before: &ChartData, after: &ChartData) -> b
 }
 
 fn set_focused_body_chart_data(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     chart_position: usize,
     data: ChartData,
 ) -> Result<()> {
@@ -762,7 +762,7 @@ fn set_focused_body_chart_data(
                 "focused Pages chart data package write failed: {error}"
             ))
         })?;
-    let verified = PagesEditor::from_bytes(&target_bytes)?;
+    let verified = Editor::from_bytes(&target_bytes)?;
     *editor = verified;
     Ok(())
 }

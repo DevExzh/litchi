@@ -22608,7 +22608,7 @@ fn xlsb_names_digest(names: &[String]) -> Result<String, Box<dyn Error>> {
 fn xlsb_collect_cells_in_order(
     worksheets: &[litchi_xlsb::Worksheet],
 ) -> Result<Vec<XlsbCellRecord>, Box<dyn Error>> {
-    use litchi_core::sheet::Worksheet as _;
+    use litchi_core::sheet::{Cell as _, Worksheet as _};
 
     let mut cells = Vec::new();
     for (sheet, worksheet) in worksheets.iter().enumerate() {
@@ -22639,7 +22639,7 @@ fn xlsb_collect_cells_in_order(
 fn xlsb_scan_cells_in_order(
     worksheets: &[litchi_xlsb::Worksheet],
 ) -> Result<(usize, [u8; 32]), Box<dyn Error>> {
-    use litchi_core::sheet::Worksheet as _;
+    use litchi_core::sheet::{Cell as _, Worksheet as _};
 
     let mut digest = Sha256::new();
     digest.update(XLSB_CELL_DIGEST_DOMAIN);

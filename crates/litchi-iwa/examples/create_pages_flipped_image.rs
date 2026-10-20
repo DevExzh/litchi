@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::Path;
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages;
 use litchi_iwa::shapes::DrawableFlipAxis;
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_pages::image::Options as ImageOptions;
@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let image = fs::read(&image_path)?;
     let body = "This mirrored image was created entirely by litchi-iwa.";
 
-    let mut editor = PagesEditor::create_with_text(body)?;
+    let mut editor = pages::Editor::create_with_text(body)?;
     let created = editor.add_body_image(
         body.encode_utf16().count(),
         preferred_filename,

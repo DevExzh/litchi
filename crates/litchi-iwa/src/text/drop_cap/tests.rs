@@ -1,7 +1,7 @@
 use crate::archive::RawMessage;
-use crate::keynote::KeynoteDocumentBuilder;
-use crate::numbers::NumbersDocumentBuilder;
-use crate::pages::PagesEditor;
+use crate::keynote;
+use crate::numbers;
+use crate::pages;
 use crate::protobuf::tswp;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use crate::text::IWorkTextEditor;
@@ -30,7 +30,7 @@ fn text_box_geometry() -> (DrawablePoint, DrawableSize) {
 
 #[test]
 fn scratch_pages_supports_multi_paragraph_drop_cap_crud() {
-    let mut editor = PagesEditor::create_with_text("Body").unwrap();
+    let mut editor = pages::Editor::create_with_text("Body").unwrap();
     let (position, size) = text_box_geometry();
     let created = editor
         .add_text_box(4, "😀 Alpha\nBeta paragraph", position, size)
@@ -67,7 +67,7 @@ fn scratch_pages_supports_multi_paragraph_drop_cap_crud() {
     editor
         .set_text_box_paragraph_drop_cap(created.drawable_object_id, second_start, updated)
         .unwrap();
-    let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reopened = pages::Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .text_box_paragraph_drop_cap(created.drawable_object_id, second_start)
@@ -88,10 +88,6 @@ fn scratch_pages_supports_multi_paragraph_drop_cap_crud() {
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn scratch_numbers_and_keynote_support_drop_cap_crud() {
     let (position, size) = text_box_geometry();
     let expected = model(6, 2)
@@ -100,7 +96,7 @@ fn scratch_numbers_and_keynote_support_drop_cap_crud() {
         .with_padding(Padding::from_points(8.0).unwrap())
         .with_outdent(Outdent::from_ratio(0.4).unwrap());
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(sheet_id, "Numbers Drop Cap", position, size)
@@ -113,7 +109,7 @@ fn scratch_numbers_and_keynote_support_drop_cap_crud() {
             expected,
         )
         .unwrap();
-    let numbers = crate::numbers::NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_paragraph_drop_cap(
@@ -125,7 +121,7 @@ fn scratch_numbers_and_keynote_support_drop_cap_crud() {
         Some(expected)
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(0, "Keynote Drop Cap", position, size)
         .unwrap();
@@ -161,7 +157,7 @@ fn shared_numbers_style_uses_copy_on_write() {
     let updated = model(7, 2)
         .with_wrap(Wrap::Contour)
         .with_outdent(Outdent::from_ratio(0.3).unwrap());
-    let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+    let mut editor = numbers::Builder::new().build().unwrap();
     let sheet_id = editor.sheets().unwrap()[0].object_id;
     let source = editor
         .add_sheet_text_box(sheet_id, "Shared style source", position, size)
@@ -224,7 +220,7 @@ fn shared_numbers_style_uses_copy_on_write() {
             TextPosition::ZERO,
         )
         .unwrap();
-    let reopened = crate::numbers::NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reopened = crate::numbers::Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .sheet_text_box_paragraph_drop_cap(
@@ -249,7 +245,7 @@ fn shared_numbers_style_uses_copy_on_write() {
 
 #[test]
 fn invalid_paragraph_is_transactional() {
-    let mut editor = PagesEditor::create_with_text("Body").unwrap();
+    let mut editor = pages::Editor::create_with_text("Body").unwrap();
     let (position, size) = text_box_geometry();
     let created = editor
         .add_text_box(4, "Not a boundary", position, size)
@@ -266,7 +262,7 @@ fn invalid_paragraph_is_transactional() {
 
 #[test]
 fn create_remove_restores_storage_object_exactly() {
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let (position, size) = text_box_geometry();
     let created = pages
         .add_text_box(4, "Storage preservation", position, size)
@@ -294,7 +290,7 @@ fn create_remove_restores_storage_object_exactly() {
 
 #[test]
 fn mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let (position, size) = text_box_geometry();
     let created = pages
         .add_text_box(4, "Storage preservation", position, size)

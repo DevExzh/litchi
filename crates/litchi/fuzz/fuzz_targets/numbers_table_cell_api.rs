@@ -8,7 +8,7 @@ use litchi::numbers::{
     TableSelector,
     cell::Value,
     table::cells::{Error as CellError, Input, Storage},
-    table::{CellPosition, CellRange, Dimensions},
+    table::{At, Area, Dimensions},
 };
 
 const MAX_INPUT_BYTES: u64 = 512 * 1024;
@@ -102,7 +102,7 @@ fn exercise_package(package: &Package, data: &[u8]) {
         position,
     ));
 
-    let range = CellRange::single(position)
+    let range = Area::single(position)
         .unwrap_or_else(|error| panic!("checked position must form a range: {error}"));
     observe_result(package.table_cells(0usize, 0usize, range));
     observe_result(package.table_cells_a1(0usize, 0usize, address));
@@ -114,7 +114,7 @@ fn exercise_package(package: &Package, data: &[u8]) {
 }
 
 fn exercise_presence(package: &Package, dimensions: Dimensions) {
-    let first = CellPosition::new(0, 0);
+    let first = At::new(0, 0);
     if let Ok(state) = package.table_cell(0usize, 0usize, first) {
         match state.storage() {
             Storage::Missing => {
@@ -135,17 +135,17 @@ fn exercise_presence(package: &Package, dimensions: Dimensions) {
     // The one-over dimensions are guaranteed to trigger a typed bounds error
     // whenever the selected table has a positive extent.  This probes the
     // dense API's pre-allocation check without retaining a partial Vec.
-    let out_of_bounds = CellPosition::new(dimensions.rows(), dimensions.columns());
+    let out_of_bounds = At::new(dimensions.rows(), dimensions.columns());
     observe_result(package.table_cell(0usize, 0usize, out_of_bounds));
-    let malformed = CellRange::new(CellPosition::new(0, 0), out_of_bounds);
+    let malformed = Area::new(At::new(0, 0), out_of_bounds);
     if let Ok(range) = malformed {
         observe_result(package.table_cells(0usize, 0usize, range));
     }
 }
 
-fn exercise_bounded_batch(package: &Package, data: &[u8], position: CellPosition, address: &str) {
+fn exercise_bounded_batch(package: &Package, data: &[u8], position: At, address: &str) {
     let source_bytes = package_bytes(package);
-    let before_state = CellPosition::from_a1(address)
+    let before_state = At::from_a1(address)
         .ok()
         .and_then(|position| package.table_cell(0usize, 0usize, position).ok());
     let input = match control(data, 1) % 4 {
@@ -183,7 +183,7 @@ fn exercise_bounded_batch(package: &Package, data: &[u8], position: CellPosition
                 "table-cell inverse did not restore exact source bytes"
             );
             if let (Some(before), Ok(position)) =
-                (before_state.as_ref(), CellPosition::from_a1(address))
+                (before_state.as_ref(), At::from_a1(address))
             {
                 let after = restored
                     .package()
@@ -241,7 +241,7 @@ fn exercise_bounded_batch(package: &Package, data: &[u8], position: CellPosition
 /// writable scalar target; the command selects every finite scalar variant,
 /// including the date path that the A1 batch intentionally does not use.
 fn exercise_checked_scalar(package: &Package, data: &[u8]) {
-    let position = CellPosition::new(2, 1);
+    let position = At::new(2, 1);
     let source_bytes = package_bytes(package);
     let input = match control(data, 7) % 5 {
         0 => Input::boolean(control(data, 8) & 1 != 0),
@@ -328,9 +328,9 @@ fn exercise_table_range_edges(package: &Package, data: &[u8]) {
         .unwrap_or_default();
     let table_name = table.name();
 
-    let empty = CellRange::new(
-        CellPosition::new(dimensions.rows(), 0),
-        CellPosition::new(dimensions.rows(), 0),
+    let empty = Area::new(
+        At::new(dimensions.rows(), 0),
+        At::new(dimensions.rows(), 0),
     )
     .unwrap_or_else(|error| panic!("empty table-cell range must construct: {error}"));
     let empty_states = package.table_cells(
@@ -343,17 +343,17 @@ fn exercise_table_range_edges(package: &Package, data: &[u8]) {
         Err(error) => observe_error(error),
     }
 
-    let inverted = CellRange::new(CellPosition::new(1, 1), CellPosition::new(0, 0));
+    let inverted = Area::new(At::new(1, 1), At::new(0, 0));
     observe_result(inverted);
 
-    let overflow = CellRange::single(CellPosition::new(u32::MAX, u32::MAX));
+    let overflow = Area::single(At::new(u32::MAX, u32::MAX));
     observe_result(overflow);
 
     // Keep one name-selected dense request in this route as well. Its shape
     // is bounded by the source table and the command bytes, so it cannot
     // bypass the package's materialized-cell guard.
-    let end = CellPosition::new(dimensions.rows().min(2), dimensions.columns().min(2));
-    let bounded = CellRange::new(CellPosition::new(0, 0), end)
+    let end = At::new(dimensions.rows().min(2), dimensions.columns().min(2));
+    let bounded = Area::new(At::new(0, 0), end)
         .unwrap_or_else(|error| panic!("bounded table-cell range must construct: {error}"));
     if bounded.area().is_some_and(|area| area > 0) && control(data, 12) & 1 != 0 {
         observe_result(package.table_cells(
@@ -369,7 +369,7 @@ fn exercise_table_range_edges(package: &Package, data: &[u8]) {
 /// is applied as a directional patch.
 fn exercise_exact_noop(package: &Package) {
     let source_bytes = package_bytes(package);
-    let position = CellPosition::new(1, 1);
+    let position = At::new(1, 1);
     let before = package
         .table_cell(0usize, 0usize, position)
         .unwrap_or_else(|error| panic!("native no-op source cell must read: {error}"));
@@ -448,7 +448,7 @@ fn exercise_constructor_limits() {
             assert!(Input::duration(value).is_err());
         }
 
-        assert!(matches!(CellPosition::from_a1(""), Err(_)));
+        assert!(matches!(At::from_a1(""), Err(_)));
     });
 }
 
@@ -465,8 +465,8 @@ fn exercise_input_limit() {
     });
 }
 
-fn position(data: &[u8], dimensions: Dimensions) -> CellPosition {
-    CellPosition::new(
+fn position(data: &[u8], dimensions: Dimensions) -> At {
+    At::new(
         u32::from(control(data, 5)) % dimensions.rows().max(1),
         u32::from(control(data, 6)) % dimensions.columns().max(1),
     )

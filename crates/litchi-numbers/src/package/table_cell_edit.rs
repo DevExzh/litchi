@@ -5186,7 +5186,7 @@ fn caller_staging_usage(
         .checked_mul(size_of::<crate::table::cells::Change>())
         .and_then(|bytes| {
             updates
-                .checked_mul(size_of::<crate::table::CellPosition>())
+                .checked_mul(size_of::<crate::table::At>())
                 .and_then(|live| bytes.checked_add(live))
         })
         .and_then(|bytes| bytes.checked_add(owned_value_bytes))
@@ -6491,7 +6491,7 @@ mod tests {
         formula::{BinaryOperator, CachedValue, CellReference, Expression},
         package::table_cells::{DependencyKind, Error, Path},
         table::{
-            CellPosition,
+            At,
             cells::{Change, Input},
         },
     };
@@ -6516,14 +6516,12 @@ mod tests {
             .try_reserve_exact(3)
             .expect("staged change capacity");
         changes.push(Change::set(
-            CellPosition::from_a1("B3").expect("B3 parses"),
+            At::from_a1("B3").expect("B3 parses"),
             Input::number(42.0).expect("finite no-op number"),
         ));
-        changes.push(Change::clear(
-            CellPosition::from_a1("A1").expect("A1 parses"),
-        ));
+        changes.push(Change::clear(At::from_a1("A1").expect("A1 parses")));
         changes.push(Change::set(
-            CellPosition::from_a1("G22").expect("G22 parses"),
+            At::from_a1("G22").expect("G22 parses"),
             Input::number(43.0).expect("finite changed number"),
         ));
         let capacity = changes.capacity();
@@ -6534,7 +6532,7 @@ mod tests {
         assert_eq!(changes.len(), 1);
         assert_eq!(
             changes[0].position(),
-            CellPosition::from_a1("G22").expect("G22 parses")
+            At::from_a1("G22").expect("G22 parses")
         );
     }
 
@@ -6565,7 +6563,7 @@ mod tests {
         let payload = patch_varint_field(&message.data, 6, true, Some(513))
             .expect("raw-preserving row-count seed patch");
         let (resolved, _report) =
-            super::resolve::resolve_changed_target(&source, 0, 0, &[CellPosition::new(2, 1)])
+            super::resolve::resolve_changed_target(&source, 0, 0, &[At::new(2, 1)])
                 .expect("original body coordinate resolves dependencies");
         let owner_route = resolved
             .dependencies
@@ -6684,7 +6682,7 @@ mod tests {
     fn synthetic_wide_source(columns: u32) -> Package {
         let source = Package::open(fixture()).expect("native basic fixture opens");
         let (target, _report) =
-            super::resolve::resolve_changed_target(&source, 0, 0, &[CellPosition::new(1, 1)])
+            super::resolve::resolve_changed_target(&source, 0, 0, &[At::new(1, 1)])
                 .expect("basic body coordinate resolves");
         assert!(columns > target.native.columns);
 
@@ -6908,7 +6906,7 @@ mod tests {
     fn synthetic_formula_cache_source(unsupported_formula: bool) -> Package {
         let source = Package::open(fixture()).expect("native basic fixture opens");
         let (target, _report) =
-            super::resolve::resolve_changed_target(&source, 0, 0, &[CellPosition::new(2, 1)])
+            super::resolve::resolve_changed_target(&source, 0, 0, &[At::new(2, 1)])
                 .expect("basic body coordinate resolves");
         let tile_route = target.storage.tiles.first().expect("basic has tile zero");
         let mut a2 = BncCell::minimal();
@@ -7077,7 +7075,7 @@ mod tests {
         const HOSTS_PER_ROW: usize = 4_096;
         let columns = u32::try_from(formulas.min(HOSTS_PER_ROW) + 8).expect("formula width fits");
         let source = synthetic_wide_source(columns);
-        let source_position = CellPosition::new(1, 7);
+        let source_position = At::new(1, 7);
         let (target, _report) =
             super::resolve::resolve_changed_target(&source, 0, 0, &[source_position])
                 .expect("wide formula source resolves");
@@ -7250,7 +7248,7 @@ mod tests {
 
     fn synthetic_unique_rich_source() -> (Package, u64, u64) {
         let source = Package::open(fixture()).expect("native basic fixture opens");
-        let position = CellPosition::from_a1("C2").expect("C2 is canonical");
+        let position = At::from_a1("C2").expect("C2 is canonical");
         let (target, _report) = super::resolve::resolve_changed_target(&source, 0, 0, &[position])
             .expect("basic body coordinate resolves");
         let rich_index = target
@@ -7495,11 +7493,11 @@ mod tests {
         )
     }
 
-    fn formula_cache_number(package: &Package, position: CellPosition) -> f64 {
+    fn formula_cache_number(package: &Package, position: At) -> f64 {
         crate::package::table_headers::resolve::resolve_target(package, 0, 0)
             .expect("formula seed native target resolves");
         let (target, _report) =
-            super::resolve::resolve_changed_target(package, 0, 0, &[CellPosition::new(1, 1)])
+            super::resolve::resolve_changed_target(package, 0, 0, &[At::new(1, 1)])
                 .expect("formula seed resolves");
         let tile_id = position.row() / target.storage.tile_size;
         let route = target
@@ -7555,7 +7553,7 @@ mod tests {
             for index in 0..changes {
                 edit = edit
                     .set(
-                        CellPosition::new(
+                        At::new(
                             u32::try_from(index / 4_096 + 1).expect("wide row fits"),
                             u32::try_from(index % 4_096 + 7).expect("wide coordinate fits"),
                         ),
@@ -7700,7 +7698,7 @@ mod tests {
             for index in 0..4_096 {
                 edit = edit
                     .set(
-                        CellPosition::new(
+                        At::new(
                             1,
                             u32::try_from(index + 7).expect("refusal coordinate fits"),
                         ),
@@ -7745,7 +7743,7 @@ mod tests {
         let run = || {
             source
                 .edit_table_cells(0usize, 0usize)?
-                .set_formula_cached(CellPosition::new(2, 2), expression.clone(), cache.clone())?
+                .set_formula_cached(At::new(2, 2), expression.clone(), cache.clone())?
                 .commit()
         };
 
@@ -7923,7 +7921,7 @@ mod tests {
                 source
                     .edit_table_cells(0usize, 0usize)?
                     .set(
-                        CellPosition::new(512, 6),
+                        At::new(512, 6),
                         Input::number(513.0).expect("finite sparse evidence input"),
                     )?
                     .commit()
@@ -7969,14 +7967,14 @@ mod tests {
         fn measured(formulas: usize) -> super::budget::Usage {
             let source = synthetic_formula_fanout_source(formulas);
             let (target, _report) =
-                super::resolve::resolve_changed_target(&source, 0, 0, &[CellPosition::new(1, 7)])
+                super::resolve::resolve_changed_target(&source, 0, 0, &[At::new(1, 7)])
                     .expect("rooted formula target resolves");
             assert_eq!(target.path(), Path::Table { sheet: 0, table: 0 });
             let (commit, usage) = super::budget::testing::observe(None, || {
                 source
                     .edit_table_cells(0usize, 0usize)?
                     .set(
-                        CellPosition::new(1, 7),
+                        At::new(1, 7),
                         Input::number(2.0).expect("finite formula source update"),
                     )?
                     .commit()
@@ -8038,7 +8036,7 @@ mod tests {
                 let mut edit = source.edit_table_cells(0usize, 0usize)?;
                 for index in 0..formulas {
                     edit = edit.set_formula_cached(
-                        CellPosition::new(
+                        At::new(
                             u32::try_from(1 + index / HOSTS_PER_ROW).expect("formula row fits"),
                             u32::try_from(8 + index % HOSTS_PER_ROW).expect("formula column fits"),
                         ),
@@ -8122,7 +8120,7 @@ mod tests {
 
     fn row_header_cell_count(package: &Package, row: u32) -> Option<u32> {
         let (target, _report) =
-            super::resolve::resolve_changed_target(package, 0, 0, &[CellPosition::new(row, 1)])
+            super::resolve::resolve_changed_target(package, 0, 0, &[At::new(row, 1)])
                 .expect("row-header target resolves");
         let bucket =
             usize::try_from(row / super::sparse::HEADER_BUCKET_ROWS).expect("header bucket fits");
@@ -8151,7 +8149,7 @@ mod tests {
             .commit()?;
         let state = commit
             .package()
-            .table_cell(0usize, 0usize, CellPosition::from_a1("B3")?)?;
+            .table_cell(0usize, 0usize, At::from_a1("B3")?)?;
         assert!(matches!(
             state.storage().value(),
             Some(Value::Number(value)) if value.get() == 43.0
@@ -8174,7 +8172,7 @@ mod tests {
     fn native_existing_row_header_count_tracks_insert_and_delete_exactly() -> TestResult {
         let source = Package::open(fixture())?;
         let source_bytes = source.source_bytes().to_vec();
-        let position = CellPosition::from_a1("C3")?;
+        let position = At::from_a1("C3")?;
         assert!(
             source
                 .table_cell(0usize, 0usize, position)?
@@ -8248,7 +8246,7 @@ mod tests {
             .commit()?;
         let state = commit
             .package()
-            .table_cell(0usize, 0usize, CellPosition::from_a1("B2")?)?;
+            .table_cell(0usize, 0usize, At::from_a1("B2")?)?;
         assert!(matches!(
             state.storage().value(),
             Some(Value::Text(value)) if value == "replacement"
@@ -8275,7 +8273,7 @@ mod tests {
         // evidence gate and intentionally is not copied into the repository.
         let source = Package::open(path)?;
         let before = source.source_bytes().to_vec();
-        let position = CellPosition::from_a1("C2")?;
+        let position = At::from_a1("C2")?;
         let commit = source
             .edit_table_cells(0usize, 0usize)?
             .set(position, Input::text("CELL: Café changed")?)?
@@ -8301,7 +8299,7 @@ mod tests {
     fn synthetic_unique_rich_commit_apply_inverse_and_reference_release_are_exact() -> TestResult {
         let (source, storage_identifier, style_identifier) = synthetic_unique_rich_source();
         let before = source.source_bytes().to_vec();
-        let position = CellPosition::from_a1("C2")?;
+        let position = At::from_a1("C2")?;
         let state = source.table_cell(0usize, 0usize, position)?;
         assert!(matches!(
             state.storage().value(),
@@ -8359,7 +8357,7 @@ mod tests {
     #[test]
     fn synthetic_unique_rich_output_is_behind_the_aggregate_execution_barrier() -> TestResult {
         let (source, _storage_identifier, _style_identifier) = synthetic_unique_rich_source();
-        let position = CellPosition::from_a1("C2")?;
+        let position = At::from_a1("C2")?;
         let run = || {
             source
                 .edit_table_cells(0usize, 0usize)?
@@ -8412,9 +8410,9 @@ mod tests {
     fn synthetic_body_formula_chain_refreshes_once_and_replays_exactly() -> TestResult {
         let source = synthetic_formula_cache_source(false);
         let before = source.source_bytes().to_vec();
-        let precedent = CellPosition::from_a1("B2")?;
-        let first_formula = CellPosition::from_a1("C2")?;
-        let downstream_formula = CellPosition::from_a1("D2")?;
+        let precedent = At::from_a1("B2")?;
+        let first_formula = At::from_a1("C2")?;
+        let downstream_formula = At::from_a1("D2")?;
         assert_eq!(formula_cache_number(&source, first_formula), 323.0);
         assert_eq!(formula_cache_number(&source, downstream_formula), 646.0);
 
@@ -8451,11 +8449,11 @@ mod tests {
             .set_a1("B3", Input::number(204.0)?)?
             .commit()?;
         assert_eq!(
-            formula_cache_number(commit.package(), CellPosition::from_a1("C2")?),
+            formula_cache_number(commit.package(), At::from_a1("C2")?),
             325.0
         );
         assert_eq!(
-            formula_cache_number(commit.package(), CellPosition::from_a1("D2")?),
+            formula_cache_number(commit.package(), At::from_a1("D2")?),
             650.0
         );
         assert_eq!(commit.diagnostics().refreshed_formula_caches(), 2);
@@ -8495,7 +8493,7 @@ mod tests {
     fn synthetic_513_row_sparse_commit_apply_and_inverse_are_exact() -> TestResult {
         let source = synthetic_513_row_source();
         let before = source.source_bytes().to_vec();
-        let position = CellPosition::new(512, 6);
+        let position = At::new(512, 6);
         let (resolved, _report) =
             super::resolve::resolve_changed_target(&source, 0, 0, &[position])?;
         assert!(resolved.dependencies.cell_record_tiles.is_empty());

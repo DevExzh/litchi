@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages;
 use litchi_numbers::table::topology::RowInsertion;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra argument".into());
     }
 
-    let mut editor = PagesEditor::open(input)?;
+    let mut editor = pages::Editor::open(input)?;
     editor.insert_table_row(table_id, RowInsertion::body(row))?;
     editor.save(output)?;
     Ok(())

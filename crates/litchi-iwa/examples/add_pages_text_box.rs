@@ -1,6 +1,6 @@
 use std::env;
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = PagesEditor::open(input)?;
+    let mut editor = pages::Editor::open(input)?;
     let anchor = editor.body_text()?.encode_utf16().count();
     let created = editor.add_text_box(
         anchor,

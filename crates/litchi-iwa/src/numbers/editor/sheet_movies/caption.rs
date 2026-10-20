@@ -21,7 +21,7 @@ pub(super) struct MovieCaptionSlot {
     pub(super) object_ids: Vec<u64>,
 }
 
-impl NumbersEditor {
+impl Editor {
     /// Read the native title and caption attached to one ordinary sheet movie.
     pub fn sheet_movie_title_caption(
         &self,
@@ -100,7 +100,7 @@ impl NumbersEditor {
 }
 
 pub(super) fn movie_title_caption(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<DrawableTitleCaption> {
@@ -138,7 +138,7 @@ pub(super) fn movie_title_caption(
 }
 
 pub(super) fn movie_caption_slot(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     kind: DrawableCaptionKind,
@@ -306,7 +306,7 @@ pub(super) fn movie_caption_slot_from_reference(
 }
 
 fn set_sheet_movie_caption(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     text: &str,
@@ -349,7 +349,7 @@ fn set_sheet_movie_caption(
         set_package_last_object_identifier(&mut staged, ids.last())?;
         staged
     };
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_movie_title_caption(sheet_id, drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Numbers movie title/caption update failed validation".to_owned(),
@@ -360,7 +360,7 @@ fn set_sheet_movie_caption(
 }
 
 fn remove_sheet_movie_caption(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     kind: DrawableCaptionKind,
@@ -387,7 +387,7 @@ fn remove_sheet_movie_caption(
     )?;
     add_component_object_uuids(&mut staged, source.component_id, &[standin_id])?;
     set_package_last_object_identifier(&mut staged, standin_id)?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_movie_title_caption(sheet_id, drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Numbers movie title/caption removal failed validation".to_owned(),

@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::keynote::KeynoteEditor;
+use litchi_iwa::keynote;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let editor = KeynoteEditor::open(input)?;
+    let editor = keynote::Editor::open(input)?;
     for slide in editor.slides()? {
         for chart in editor.slide_charts(slide.index)? {
             let legend_font =

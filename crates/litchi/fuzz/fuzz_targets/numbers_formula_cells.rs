@@ -14,7 +14,7 @@ use litchi::numbers::{
         Expression,
     },
     table::cells::{Error as CellError, Input, Storage},
-    table::{CellPosition, CellRange, Dimensions},
+    table::{At, Area, Dimensions},
 };
 
 const MAX_INPUT_BYTES: u64 = 512 * 1024;
@@ -131,7 +131,7 @@ fn exercise_reads(package: &Package, data: &[u8]) {
     observe_result(package.table_cells(
         0usize,
         0usize,
-        CellRange::single(position).unwrap_or_else(|error| {
+        Area::single(position).unwrap_or_else(|error| {
             panic!("a checked native cell position must form a range: {error}")
         }),
     ));
@@ -166,7 +166,7 @@ fn exercise_batch(package: &Package, data: &[u8], dimensions: Dimensions) {
 }
 
 fn no_op_batch(package: &Package) -> Result<litchi::numbers::table::cells::Commit, CellError> {
-    let position = CellPosition::new(2, 1);
+    let position = At::new(2, 1);
     let Ok(state) = package.table_cell(0usize, 0usize, position) else {
         return package
             .edit_table_cells(0usize, 0usize)?
@@ -192,8 +192,8 @@ fn changed_formula_batch(
     package: &Package,
     data: &[u8],
     dimensions: Dimensions,
-    target: CellPosition,
-    formula_target: CellPosition,
+    target: At,
+    formula_target: At,
 ) -> Result<litchi::numbers::table::cells::Commit, CellError> {
     let expression = expression_for(package, data, dimensions, formula_target)?;
     let scalar =
@@ -211,7 +211,7 @@ fn cached_formula_batch(
     package: &Package,
     data: &[u8],
     dimensions: Dimensions,
-    formula_target: CellPosition,
+    formula_target: At,
 ) -> Result<litchi::numbers::table::cells::Commit, CellError> {
     let expression = simple_sum_expression(data, dimensions);
     let cache = CachedValue::number(42.0).map_err(|_| CellError::InvalidSource {
@@ -227,7 +227,7 @@ fn mismatched_cache_batch(
     package: &Package,
     data: &[u8],
     dimensions: Dimensions,
-    formula_target: CellPosition,
+    formula_target: At,
 ) -> Result<litchi::numbers::table::cells::Commit, CellError> {
     let expression = simple_sum_expression(data, dimensions);
     let cache = CachedValue::number(999.0).map_err(|_| CellError::InvalidSource {
@@ -241,7 +241,7 @@ fn mismatched_cache_batch(
 
 fn clear_batch(
     package: &Package,
-    formula_target: CellPosition,
+    formula_target: At,
 ) -> Result<litchi::numbers::table::cells::Commit, CellError> {
     package
         .edit_table_cells(0usize, 0usize)?
@@ -251,7 +251,7 @@ fn clear_batch(
 
 fn duplicate_batch(
     package: &Package,
-    formula_target: CellPosition,
+    formula_target: At,
 ) -> Result<litchi::numbers::table::cells::Commit, CellError> {
     let edit = package
         .edit_table_cells(0usize, 0usize)?
@@ -263,9 +263,9 @@ fn duplicate_batch(
 fn cycle_batch(
     package: &Package,
     dimensions: Dimensions,
-    formula_target: CellPosition,
+    formula_target: At,
 ) -> Result<litchi::numbers::table::cells::Commit, CellError> {
-    let other = CellPosition::new(
+    let other = At::new(
         formula_target.row(),
         (formula_target.column() + 1) % dimensions.columns().max(1),
     );
@@ -288,8 +288,8 @@ fn mixed_batch(
     package: &Package,
     data: &[u8],
     dimensions: Dimensions,
-    target: CellPosition,
-    formula_target: CellPosition,
+    target: At,
+    formula_target: At,
 ) -> Result<litchi::numbers::table::cells::Commit, CellError> {
     let expression = expression_for(package, data, dimensions, formula_target)?;
     let text = input_text(data);
@@ -303,7 +303,7 @@ fn mixed_batch(
 fn stress_formula_batch(
     package: &Package,
     data: &[u8],
-    formula_target: CellPosition,
+    formula_target: At,
 ) -> Result<litchi::numbers::table::cells::Commit, CellError> {
     let expression = stress_expression(data)?;
     package
@@ -339,7 +339,7 @@ fn assert_commit_round_trip(
     package: &Package,
     source: &[u8],
     commit: litchi::numbers::table::cells::Commit,
-    formula_target: CellPosition,
+    formula_target: At,
 ) {
     let patch = commit.patch().clone();
     let diagnostics = commit.diagnostics();
@@ -382,7 +382,7 @@ fn expression_for(
     package: &Package,
     data: &[u8],
     dimensions: Dimensions,
-    target: CellPosition,
+    target: At,
 ) -> Result<Expression, CellError> {
     let left = simple_sum_expression(data, dimensions);
     let right = Expression::number(f64::from(control(data, 5) % 9) + 1.0).map_err(|_| {
@@ -502,7 +502,7 @@ fn exercise_foreign_handle(data: &[u8]) {
     );
     let result = source
         .edit_table_cells(0usize, 0usize)
-        .and_then(|edit| edit.set_formula(CellPosition::new(2, 2), expression));
+        .and_then(|edit| edit.set_formula(At::new(2, 2), expression));
     assert!(matches!(result, Err(CellError::PatchConflict)));
 }
 
@@ -510,7 +510,7 @@ fn exercise_private_errors(package: &Package) {
     if let Err(error) = package.table_cell(
         SheetSelector::name(PRIVATE_SELECTOR),
         TableSelector::index(0),
-        CellPosition::new(0, 0),
+        At::new(0, 0),
     ) {
         observe_redacted(error, PRIVATE_SELECTOR);
     }
@@ -523,10 +523,10 @@ fn exercise_private_errors(package: &Package) {
     black_box(PRIVATE_TEXT);
 }
 
-fn position(data: &[u8], offset: usize, dimensions: Dimensions) -> CellPosition {
+fn position(data: &[u8], offset: usize, dimensions: Dimensions) -> At {
     let rows = dimensions.rows().max(1);
     let columns = dimensions.columns().max(1);
-    CellPosition::new(
+    At::new(
         u32::from(control(data, offset)) % rows,
         u32::from(control(data, offset + 1)) % columns,
     )

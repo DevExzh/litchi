@@ -7,7 +7,7 @@ use crate::charts::axis_label_angle::{
 };
 use crate::charts::{Axis, LabelAngle};
 
-impl NumbersEditor {
+impl Editor {
     /// Read one sheet-chart axis' normalized label angle.
     pub fn sheet_chart_axis_label_angle(
         &self,
@@ -31,7 +31,7 @@ impl NumbersEditor {
 }
 
 fn sheet_chart_axis_label_angle(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -47,7 +47,7 @@ fn sheet_chart_axis_label_angle(
 }
 
 fn set_sheet_chart_axis_label_angle(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -63,7 +63,7 @@ fn set_sheet_chart_axis_label_angle(
         axis,
         angle,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_axis_label_angle(sheet_id, drawable_object_id, axis)? != angle {
         return Err(Error::InvalidFormat(
             "Numbers chart axis label-angle update failed validation".to_owned(),
@@ -77,12 +77,12 @@ fn set_sheet_chart_axis_label_angle(
 mod tests {
     use super::*;
     use crate::charts::{ChartData, Kind};
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_spreadsheet_supports_axis_label_angle_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
             .add_sheet_chart(
@@ -112,7 +112,7 @@ mod tests {
                 expected,
             )
             .unwrap();
-        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_axis_label_angle(sheet_id, chart.drawable_object_id, Axis::Value,)

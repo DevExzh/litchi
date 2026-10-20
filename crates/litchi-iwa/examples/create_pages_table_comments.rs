@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use litchi_iwa::pages::PagesDocumentBuilder;
+use litchi_iwa::pages;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = PathBuf::from(
@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .nth(1)
             .ok_or("usage: create_pages_table_comments <output.pages>")?,
     );
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Native table-comment creation\n")
         .body_table("Review", 3, 3)
         .build()?;

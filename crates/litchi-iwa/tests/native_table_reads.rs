@@ -2,9 +2,9 @@
 
 use std::error::Error;
 
-use litchi_iwa::{keynote::KeynoteEditor, pages::PagesEditor};
+use litchi_iwa::{keynote, pages};
 use litchi_iwa_common::table::{
-    cell::value::Value, coordinate::CellPosition, merge::Region, read::TableRead,
+    cell::value::Value, coordinate::At, merge::Region, read::TableRead,
 };
 
 const PAGES: &[u8] = include_bytes!("../../../test-data/iwork/pages/body-table-read-native.pages");
@@ -45,7 +45,7 @@ fn cells(read: &TableRead) -> Vec<((usize, usize), Value)> {
 #[test]
 fn native_pages_selector_adapter_preserves_semantics_and_source() -> TestResult {
     let focused = litchi_pages::Package::from_bytes(PAGES)?;
-    let host = PagesEditor::from_bytes(PAGES)?;
+    let host = pages::Editor::from_bytes(PAGES)?;
     let catalog = host.tables()?;
     assert_eq!(catalog.len(), 2);
     for (position, info) in catalog.iter().enumerate() {
@@ -62,7 +62,7 @@ fn native_pages_selector_adapter_preserves_semantics_and_source() -> TestResult 
         assert_eq!(read.comment_count(), legacy.comment_count());
         for (position, comment) in legacy.iter_comments() {
             let actual = read
-                .get_comment(CellPosition::try_from_usize(position.0, position.1)?)
+                .get_comment(At::try_from_usize(position.0, position.1)?)
                 .expect("every native comment survives focused readback");
             assert_eq!(actual, comment);
             assert_eq!(
@@ -97,7 +97,7 @@ fn native_pages_selector_adapter_preserves_semantics_and_source() -> TestResult 
 #[test]
 fn native_keynote_selector_adapter_preserves_semantics_and_merge() -> TestResult {
     let focused = litchi_keynote::Package::from_bytes(KEYNOTE)?;
-    let host = KeynoteEditor::from_bytes(KEYNOTE)?;
+    let host = keynote::Editor::from_bytes(KEYNOTE)?;
     let catalog = host.slide_tables(0)?;
     assert_eq!(catalog.len(), 1);
     let legacy = host.slide_table(0, catalog[0].model_object_id)?;

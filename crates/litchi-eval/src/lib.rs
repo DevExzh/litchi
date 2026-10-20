@@ -11,7 +11,7 @@ pub mod parser;
 
 use self::engine::{ReferenceResolver, ResolvedName};
 use self::parser::{RangeRef, parse_range_reference, parse_single_cell_reference};
-use litchi_core::sheet::{CellValue, Result, WorkbookTrait};
+use litchi_core::sheet::{CellValue, Result, WorkbookTrait, Worksheet as _};
 use parking_lot::{Mutex, RwLock};
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
@@ -122,6 +122,43 @@ use std::pin::Pin;
 
 pub(crate) type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
+/// A cell read by the engine: resolved at once, or an uncached formula still
+/// to evaluate.
+///
+/// Reading a stored value, a cached formula result or an already evaluated
+/// cell completes without suspending and allocates nothing for the future.
+/// Only an uncached formula is evaluated through a boxed future, which the
+/// engine's async recursion (formula -> expression -> referenced formula)
+/// requires.
+pub(crate) enum CellRead<'a> {
+    Ready(Option<Result<CellValue>>),
+    Pending(BoxFuture<'a, Result<CellValue>>),
+}
+
+impl CellRead<'_> {
+    pub(crate) const fn ready(result: Result<CellValue>) -> Self {
+        Self::Ready(Some(result))
+    }
+}
+
+impl Future for CellRead<'_> {
+    type Output = Result<CellValue>;
+
+    fn poll(
+        self: Pin<&mut Self>,
+        context: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        match self.get_mut() {
+            Self::Ready(result) => std::task::Poll::Ready(
+                result
+                    .take()
+                    .expect("a ready cell read is polled once after completion"),
+            ),
+            Self::Pending(future) => future.as_mut().poll(context),
+        }
+    }
+}
+
 /// Error returned by a caller-provided [`Fetch`] implementation.
 #[cfg(feature = "web_functions")]
 pub type FetchError = Box<dyn Error + Send + Sync + 'static>;
@@ -148,12 +185,7 @@ pub trait Fetch: Send + Sync {
 
 /// Evaluation context used by the engine runtime.
 pub(crate) trait EngineCtx: Send + Sync {
-    fn get_cell_value<'a>(
-        &'a self,
-        sheet_name: &'a str,
-        row: u32,
-        col: u32,
-    ) -> BoxFuture<'a, Result<CellValue>>;
+    fn get_cell_value<'a>(&'a self, sheet_name: &'a str, row: u32, col: u32) -> CellRead<'a>;
 
     /// Returns the current evaluation position (sheet, row, col) if a formula is being
     /// evaluated. This is primarily used by functions such as ROW() or COLUMN() that need
@@ -164,12 +196,7 @@ pub(crate) trait EngineCtx: Send + Sync {
     ///
     /// This is useful for functions like ISFORMULA that need to inspect the cell's
     /// original content rather than the evaluated result.
-    fn raw_cell_value<'a>(
-        &'a self,
-        sheet_name: &'a str,
-        row: u32,
-        col: u32,
-    ) -> BoxFuture<'a, Result<CellValue>>;
+    fn raw_cell_value<'a>(&'a self, sheet_name: &'a str, row: u32, col: u32) -> CellRead<'a>;
 
     /// Returns true if the workbook backing this context uses the 1904 date system.
     fn is_1904_date_system(&self) -> bool;
@@ -221,12 +248,7 @@ struct NamedTable {
 }
 
 impl<'e, 'w, W: WorkbookTrait + Sync + Send + ?Sized> EngineCtx for At<'e, 'w, W> {
-    fn get_cell_value<'a>(
-        &'a self,
-        sheet_name: &'a str,
-        row: u32,
-        col: u32,
-    ) -> BoxFuture<'a, Result<CellValue>> {
+    fn get_cell_value<'a>(&'a self, sheet_name: &'a str, row: u32, col: u32) -> CellRead<'a> {
         self.evaluator
             .get_cell_value_in(self.session, sheet_name, row, col)
     }
@@ -235,17 +257,8 @@ impl<'e, 'w, W: WorkbookTrait + Sync + Send + ?Sized> EngineCtx for At<'e, 'w, W
         Some(self.position.clone())
     }
 
-    fn raw_cell_value<'a>(
-        &'a self,
-        sheet_name: &'a str,
-        row: u32,
-        col: u32,
-    ) -> BoxFuture<'a, Result<CellValue>> {
-        Box::pin(async move {
-            let sheet = self.evaluator.workbook.worksheet_by_name(sheet_name)?;
-            let value: Cow<'_, CellValue> = sheet.cell_value(row, col)?;
-            Ok(value.into_owned())
-        })
+    fn raw_cell_value<'a>(&'a self, sheet_name: &'a str, row: u32, col: u32) -> CellRead<'a> {
+        CellRead::ready(self.evaluator.stored(sheet_name, row, col))
     }
 
     fn is_1904_date_system(&self) -> bool {
@@ -349,51 +362,86 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
         self
     }
 
+    /// The stored value of a cell, without evaluation.
+    fn stored(&self, sheet_name: &str, row: u32, col: u32) -> Result<CellValue> {
+        let sheet = self.workbook.worksheet_by_name(sheet_name)?;
+        let value: Cow<'_, CellValue> = sheet.cell_value(row, col)?;
+        Ok(value.into_owned())
+    }
+
     fn get_cell_value_in<'b>(
         &'b self,
         session: &'b EvalSession,
         sheet_name: &'b str,
         row: u32,
         col: u32,
-    ) -> BoxFuture<'b, Result<CellValue>> {
-        Box::pin(async move {
-            let sheet_idx = self.sheet_index.get(sheet_name).copied().ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    format!("worksheet '{sheet_name}' is not indexed"),
-                )
-            })?;
-            let key = CellRef {
-                sheet_idx,
-                row,
-                col,
-            };
+    ) -> CellRead<'b> {
+        let Some(sheet_idx) = self.sheet_index.get(sheet_name).copied() else {
+            return CellRead::ready(Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("worksheet '{sheet_name}' is not indexed"),
+            )
+            .into()));
+        };
+        let key = CellRef {
+            sheet_idx,
+            row,
+            col,
+        };
 
-            if let Some(value) = self.eval_state.read().cache.get(&key) {
-                return Ok(value.clone());
-            }
+        if let Some(value) = self.eval_state.read().cache.get(&key) {
+            return CellRead::ready(Ok(value.clone()));
+        }
 
-            let depth = session.depth();
-            if depth >= self.max_depth {
-                return Err(DepthLimit { depth: depth + 1 }.into());
-            }
-            let Some(_visit) = session.enter(key) else {
-                return Ok(CellValue::Error("Circular reference detected".to_string()));
-            };
+        let depth = session.depth();
+        if depth >= self.max_depth {
+            return CellRead::ready(Err(DepthLimit { depth: depth + 1 }.into()));
+        }
+        let Some(visit) = session.enter(key) else {
+            return CellRead::ready(Ok(CellValue::Error(
+                "Circular reference detected".to_string(),
+            )));
+        };
 
-            let result = async {
-                let sheet = self.workbook.worksheet_by_name(sheet_name)?;
-                let value: Cow<'_, CellValue> = sheet.cell_value(row, col)?;
-                self.evaluate_value(session, sheet_name, row, col, value.into_owned())
-                    .await
-            }
-            .await;
+        let value = match self.stored(sheet_name, row, col) {
+            Ok(value) => value,
+            Err(error) => return CellRead::ready(Err(error)),
+        };
+        match value {
+            // Prefer the cached result embedded in the file.
+            CellValue::Formula {
+                cached_value: Some(cached),
+                ..
+            } => {
+                drop(visit);
+                self.finish(key, CellRead::ready(Ok(*cached)))
+            },
+            // No cached value: evaluate the formula text. Any parsing or
+            // semantic issue is reported as `CellValue::Error` rather than a
+            // hard failure.
+            CellValue::Formula { formula, .. } => CellRead::Pending(Box::pin(async move {
+                let _visit = visit;
+                let result = self
+                    .evaluate_formula(session, sheet_name, row, col, &formula)
+                    .await;
+                if let Ok(value) = &result {
+                    self.eval_state.write().cache.insert(key, value.clone());
+                }
+                result
+            })),
+            other => {
+                drop(visit);
+                self.finish(key, CellRead::ready(Ok(other)))
+            },
+        }
+    }
 
-            if let Ok(value) = &result {
-                self.eval_state.write().cache.insert(key, value.clone());
-            }
-            result
-        })
+    /// Cache a resolved read's value and return the read.
+    fn finish<'b>(&self, key: CellRef, read: CellRead<'b>) -> CellRead<'b> {
+        if let CellRead::Ready(Some(Ok(value))) = &read {
+            self.eval_state.write().cache.insert(key, value.clone());
+        }
+        read
     }
 
     pub fn define_name(&mut self, name: &str, reference: &str) {
@@ -637,45 +685,6 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
         }
 
         Ok(rows)
-    }
-
-    /// Core evaluation routine for a single cell value.
-    ///
-    /// This remains conservative and still prefers cached results when
-    /// available. When no cached result is present, it performs a minimal
-    /// evaluation of the formula text, currently limited to:
-    ///
-    /// - Literal constants (numbers, strings, booleans)
-    /// - Single-cell references (same-sheet or qualified with a sheet name)
-    async fn evaluate_value(
-        &self,
-        session: &EvalSession,
-        sheet_name: &str,
-        row: u32,
-        col: u32,
-        value: CellValue,
-    ) -> Result<CellValue> {
-        let result = match value {
-            CellValue::Formula {
-                formula,
-                cached_value,
-                ..
-            } => {
-                if let Some(cached) = cached_value {
-                    // Prefer the cached result embedded in the file.
-                    (*cached).clone()
-                } else {
-                    // No cached value – perform a minimal evaluation of the
-                    // formula text. Any parsing/semantic issues are reported as
-                    // CellValue::Error rather than hard failures.
-                    self.evaluate_formula(session, sheet_name, row, col, &formula)
-                        .await?
-                }
-            },
-            other => other,
-        };
-
-        Ok(result)
     }
 
     async fn evaluate_formula(

@@ -1,6 +1,6 @@
 //! Create a Keynote shape and apply a native horizontal Arrange flip from scratch.
 
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote;
 use litchi_iwa::shapes::{DrawableFlipAxis, DrawablePoint, DrawableSize};
 use litchi_iwa_common::shape::path::Preset;
 
@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
         .nth(1)
         .ok_or("usage: create_keynote_flipped_shape <output.key>")?;
-    let mut editor = KeynoteDocumentBuilder::new()
+    let mut editor = keynote::Builder::new()
         .title("Flipped Shape")
         .subtitle("Typed native Arrange flip")
         .build()?;

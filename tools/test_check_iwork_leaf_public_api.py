@@ -264,7 +264,7 @@ class IworkLeafPublicApiGateTests(unittest.TestCase):
         for path in (
             "litchi_iwa_common::table::model::Table",
             "litchi_iwa_common::table::model::Builder",
-            "litchi_iwa_common::table::coordinate::CellPosition",
+            "litchi_iwa_common::table::coordinate::At",
             "litchi_iwa_common::table::cell::value::Value",
         ):
             with self.subTest(path=path):

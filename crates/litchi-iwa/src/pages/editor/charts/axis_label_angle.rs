@@ -7,7 +7,7 @@ use crate::charts::axis_label_angle::{
 };
 use crate::charts::{Axis, LabelAngle};
 
-impl PagesEditor {
+impl Editor {
     /// Read one body-chart axis' normalized label angle.
     pub fn body_chart_axis_label_angle(
         &self,
@@ -29,7 +29,7 @@ impl PagesEditor {
 }
 
 fn body_chart_axis_label_angle(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
     axis: Axis,
 ) -> Result<LabelAngle> {
@@ -44,7 +44,7 @@ fn body_chart_axis_label_angle(
 }
 
 fn set_body_chart_axis_label_angle(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     axis: Axis,
     angle: LabelAngle,
@@ -59,7 +59,7 @@ fn set_body_chart_axis_label_angle(
         axis,
         angle,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_axis_label_angle(drawable_object_id, axis)? != angle {
         return Err(Error::InvalidFormat(
             "Pages chart axis label-angle update failed validation".to_owned(),
@@ -73,13 +73,13 @@ fn set_body_chart_axis_label_angle(
 mod tests {
     use super::*;
     use crate::charts::{ChartData, Kind};
-    use crate::pages::PagesDocumentBuilder;
+    use crate::pages;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_document_supports_axis_label_angle_crud() {
         let body = "Axis label angle";
-        let mut editor = PagesDocumentBuilder::new().body_text(body).build().unwrap();
+        let mut editor = pages::Builder::new().body_text(body).build().unwrap();
         let chart = editor
             .add_body_chart(
                 body.encode_utf16().count(),
@@ -103,7 +103,7 @@ mod tests {
         editor
             .set_body_chart_axis_label_angle(chart.drawable_object_id, Axis::Value, expected)
             .unwrap();
-        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_chart_axis_label_angle(chart.drawable_object_id, Axis::Value)

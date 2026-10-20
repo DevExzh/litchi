@@ -16,7 +16,7 @@ use litchi_iwa_protos::{tn, tsce, tsd, tsk, tsp, tst, tswp};
 use litchi_numbers::cell::Value;
 use litchi_numbers::cell::comment::Error as TableCellCommentError;
 use litchi_numbers::cell::comment::Path as TableCellCommentPath;
-use litchi_numbers::{CellPosition, Package, Workbook};
+use litchi_numbers::{At, Package, Workbook};
 use litchi_numbers_wire::BncCell;
 use prost::Message as _;
 
@@ -1174,7 +1174,7 @@ fn package_cell_comment_replies_preserve_direct_source_order_for_selector_and_a1
     let sheet = "Mixed table-data-list sheet";
     let table = "Mixed table-data-list table";
 
-    let selected = package.table_cell_comment_replies(sheet, table, CellPosition::new(4, 0))?;
+    let selected = package.table_cell_comment_replies(sheet, table, At::new(4, 0))?;
     assert_eq!(
         selected
             .iter()
@@ -1204,7 +1204,7 @@ fn package_cell_comment_replies_accept_empty_threads_and_report_missing_roots() 
             .table_cell_comment_replies(
                 "Mixed table-data-list sheet",
                 "Mixed table-data-list table",
-                CellPosition::new(4, 0),
+                At::new(4, 0),
             )?
             .is_empty()
     );
@@ -1233,7 +1233,7 @@ fn package_cell_comment_replies_accept_empty_threads_and_report_missing_roots() 
         .table_cell_comment_replies(
             "Mixed table-data-list sheet",
             "Mixed table-data-list table",
-            CellPosition::new(0, 0),
+            At::new(0, 0),
         )
         .expect_err("a cell without a root comment must be rejected");
     assert_eq!(
@@ -1374,7 +1374,7 @@ fn comment_and_reply_debug_redact_authored_text_across_transactions() -> TestRes
         .table_cell_comment(
             "Mixed table-data-list sheet",
             "Mixed table-data-list table",
-            CellPosition::new(4, 0),
+            At::new(4, 0),
         )?
         .ok_or_else(|| std::io::Error::other("threaded synthetic comment is missing"))?;
     let reply = threaded
@@ -1396,7 +1396,7 @@ fn comment_and_reply_debug_redact_authored_text_across_transactions() -> TestRes
     let edit = editable.edit_table_cell_comment(
         "Mixed table-data-list sheet",
         "Mixed table-data-list table",
-        CellPosition::new(4, 0),
+        At::new(4, 0),
     )?;
     let edit_debug = format!("{edit:?}");
     assert!(!edit_debug.contains("Comment retained by Package"));
@@ -1469,7 +1469,7 @@ fn package_cell_comment_edit_clear_and_inverse_are_selector_first() -> TestResul
     let bytes = synthetic_table_data_list_package(Corruption::None, 50)?;
     let original_bytes = bytes.clone();
     let package = Package::from_bytes(&bytes)?;
-    let position = CellPosition::from_a1("A5")?;
+    let position = At::from_a1("A5")?;
     let sheet = "Mixed table-data-list sheet";
     let table = "Mixed table-data-list table";
 
@@ -1612,7 +1612,7 @@ fn metadata_backed_root_comment_clear_reopens_and_inverts_exactly() -> TestResul
     let mut selected = None;
     'rows: for row in 0..table.dimensions().rows() {
         for column in 0..table.dimensions().columns() {
-            let position = CellPosition::new(row, column);
+            let position = At::new(row, column);
             if let Some(comment) =
                 package.table_cell_comment(sheet.name(), table.name(), position)?
             {
@@ -1728,7 +1728,7 @@ fn root_comment_clear_rejects_lossy_metadata_and_storage_object_rewrites() -> Te
             .next()
             .ok_or_else(|| std::io::Error::other("fixture table is missing"))?;
         let error = package
-            .clear_table_cell_comment(sheet.name(), table.name(), CellPosition::new(1, 1))
+            .clear_table_cell_comment(sheet.name(), table.name(), At::new(1, 1))
             .expect_err("lossy clear source must fail closed");
         assert_eq!(error, expected);
         let mut retained = Vec::new();
@@ -1758,7 +1758,7 @@ fn root_comment_clear_supersedes_a_failed_staged_replacement() -> TestResult {
         .tables()
         .next()
         .ok_or_else(|| std::io::Error::other("fixture table is missing"))?;
-    let position = CellPosition::new(1, 1);
+    let position = At::new(1, 1);
 
     let cleared = package
         .edit_table_cell_comment(sheet.name(), table.name(), position)?

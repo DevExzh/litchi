@@ -14,7 +14,7 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    CellPosition, Package, Error as PackageError,
+    At, Package, Error as PackageError,
     SheetSelector, TableSelector,
     cell::data_format::number::{
         DecimalPlaces, FixedDecimalPlaces, NegativeStyle, Number, ThousandsSeparator,
@@ -41,7 +41,7 @@ const NATIVE_NUMBERS: &[u8] = include_bytes!("../../../../test-data/iwork/number
 // B3 is a stable numeric scalar in the repository's native Numbers fixture.
 // Arbitrary valid packages may not contain this coordinate; those sources
 // still exercise bounded selectors and malformed/unsupported read paths.
-const NATIVE_POSITION: CellPosition = CellPosition::new(2, 1);
+const NATIVE_POSITION: At = At::new(2, 1);
 
 fuzz_target!(|data: &[u8]| {
     match Package::from_bytes_with_options(data, options()) {
@@ -109,7 +109,7 @@ fn exercise_package(package: &Package, data: &[u8]) {
 }
 
 fn exercise_selector_reads(package: &Package, data: &[u8]) {
-    let position = CellPosition::new(
+    let position = At::new(
         u32::from(control(data, 4) % 8),
         u32::from(control(data, 5) % 8),
     );
@@ -156,7 +156,7 @@ fn exercise_selector_errors(package: &Package) {
     if let Err(error) = package.table_cell_number_format(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(u32::MAX, u32::MAX),
+        At::new(u32::MAX, u32::MAX),
     ) {
         observe_error(error);
     }

@@ -6,7 +6,7 @@
 
 use litchi_core::Position;
 
-pub use self::number_format::CellPosition;
+pub use self::number_format::At;
 
 /// Effective appearance settings for a table's style graph.
 pub mod appearance;

@@ -10,9 +10,8 @@ mod apply;
 mod wire;
 
 pub use litchi_numbers::table::sort::{
-    ColumnIndex as NumbersTableSortColumnIndex, Direction as NumbersTableSortDirection,
-    Order as NumbersTableSortOrder, RowRange as NumbersTableSortRowRange,
-    Rule as NumbersTableSortRule, Scope as NumbersTableSortScope,
+    ColumnIndex as TableSortColumnIndex, Direction as TableSortDirection, Order as TableSortOrder,
+    RowRange as TableSortRowRange, Rule as TableSortRule, Scope as TableSortScope,
 };
 
 use apply::apply_attached_table_sort_order;
@@ -53,7 +52,7 @@ fn order_from_native(sort: &codec::SortOrderSnapshot) -> Result<Option<Order>> {
         .map_err(invalid_stored_sort)
 }
 
-impl NumbersEditor {
+impl Editor {
     /// Read an attached table's persisted sort-rule configuration.
     ///
     /// An empty native order is reported as `None`, matching the state shown
@@ -218,7 +217,7 @@ fn focused_sort_error(error: litchi_numbers::table::sort::transaction::Error) ->
 
 #[cfg(test)]
 fn focused_table_sort_source(
-    editor: &NumbersEditor,
+    editor: &Editor,
     table_id: u64,
 ) -> Result<(
     FocusedNumbersPackage,
@@ -235,10 +234,7 @@ fn focused_table_sort_source(
     Ok((source, sheet, table))
 }
 
-fn focused_table_sort_order_for_apply(
-    editor: &NumbersEditor,
-    table_id: u64,
-) -> Result<Option<Order>> {
+fn focused_table_sort_order_for_apply(editor: &Editor, table_id: u64) -> Result<Option<Order>> {
     let source_built = !editor.package.source_is_exact();
     let (sheet, table) = super::selectors::focused_table_location(editor, table_id)?;
     let bytes = editor.to_bytes()?;
@@ -272,13 +268,13 @@ fn focused_table_sort_order_for_apply(
 #[cfg(test)]
 fn focused_sort_commit_editor(
     commit: &litchi_numbers::table::sort::transaction::Commit,
-) -> Result<NumbersEditor> {
+) -> Result<Editor> {
     let mut bytes = Vec::new();
     commit
         .package()
         .write_to(&mut bytes)
         .map_err(|error| Error::Io(error.into_io_error()))?;
-    NumbersEditor::from_bytes(&bytes)
+    Editor::from_bytes(&bytes)
 }
 
 /// Read an attached native iWork table's persisted sort-rule configuration.
@@ -447,7 +443,7 @@ pub(super) fn delete_table_sort_column(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use litchi_numbers::table::topology::{
         ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion,
     };
@@ -490,14 +486,14 @@ mod tests {
 
     #[test]
     fn table_sort_selector_resolves_by_name_and_catalog_index() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_name("Revenue")
             .table_dimensions(2, 2)
             .build()
             .unwrap();
-        let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
-            NumbersTableSortColumnIndex::new(0).unwrap(),
-            NumbersTableSortDirection::Ascending,
+        let order = TableSortOrder::new([TableSortRule::new(
+            TableSortColumnIndex::new(0).unwrap(),
+            TableSortDirection::Ascending,
         )])
         .unwrap();
 
@@ -518,7 +514,7 @@ mod tests {
 
     #[test]
     fn full_table_sort_rules_survive_native_topology_semantics() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(4, 4)
             .build()
             .unwrap();

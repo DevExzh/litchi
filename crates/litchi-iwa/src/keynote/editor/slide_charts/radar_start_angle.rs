@@ -7,7 +7,7 @@ use crate::charts::radar_start_angle::{
     set_chart_radar_start_angle as set_native_chart_radar_start_angle,
 };
 
-impl KeynoteEditor {
+impl Editor {
     /// Read one radar chart's `Rotation Angle`.
     pub fn slide_chart_radar_start_angle(
         &self,
@@ -51,7 +51,7 @@ impl KeynoteEditor {
             graph.info.kind,
             angle,
         )?;
-        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_radar_start_angle(slide_index, drawable_object_id)? != angle {
             return Err(Error::InvalidFormat(
                 "Keynote radar chart start-angle update failed validation".to_owned(),
@@ -65,12 +65,12 @@ impl KeynoteEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_presentation_supports_radar_start_angle_crud() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let chart = editor
             .add_slide_chart(
                 0,
@@ -87,7 +87,7 @@ mod tests {
         editor
             .set_slide_chart_radar_start_angle(0, chart.drawable_object_id, angle)
             .unwrap();
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_chart_radar_start_angle(0, chart.drawable_object_id)

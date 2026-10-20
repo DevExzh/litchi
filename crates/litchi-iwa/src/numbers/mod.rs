@@ -66,28 +66,23 @@ impl From<litchi_numbers::table::merge::Error> for crate::Error {
     }
 }
 
-pub use creation::NumbersDocumentBuilder;
+pub use creation::Builder;
 pub use editor::{
-    Direction, NumbersEditor, NumbersPivotCategoryInfo, NumbersSheetAudioInfo,
-    NumbersSheetAudioOptions, NumbersSheetChartInfo, NumbersSheetImageInfo,
-    NumbersSheetImageOptions, NumbersSheetInfo, NumbersSheetMovieInfo, NumbersSheetMovieOptions,
-    NumbersSheetShapeInfo, NumbersTableCellParagraphList, NumbersTableCellParagraphListBullet,
-    NumbersTableCellParagraphListBulletGeometry, NumbersTableCellParagraphListIndentation,
-    NumbersTableCellParagraphListLabelColor, NumbersTableCellParagraphListLevel,
-    NumbersTableCellParagraphListLevelPlacement, NumbersTableCellParagraphListNumberFormat,
-    NumbersTableCellParagraphListNumberScale, NumbersTableCellParagraphListNumberTiering,
-    NumbersTableCellParagraphListNumbering, NumbersTableCellParagraphListPlacement,
-    NumbersTableCellParagraphTabStops, NumbersTableCellTextBackground,
-    NumbersTableCellTextBaselineShift, NumbersTableCellTextCapitalization,
-    NumbersTableCellTextCharacterSpacing, NumbersTableCellTextColor,
-    NumbersTableCellTextDecorations, NumbersTableCellTextFont, NumbersTableCellTextLigatures,
-    NumbersTableCellTextOutline, NumbersTableCellTextScript, NumbersTableCellTextShadow,
-    NumbersTableCellTextStyle, NumbersTableInfo, NumbersTableSortColumnIndex,
-    NumbersTableSortDirection, NumbersTableSortOrder, NumbersTableSortRowRange,
-    NumbersTableSortRule, NumbersTableSortScope, NumbersTextBoxInfo, RemovedNumbersSheetAudio,
-    RemovedNumbersSheetChart, RemovedNumbersSheetImage, RemovedNumbersSheetMovie,
-    RemovedNumbersSheetShape, RemovedNumbersTextBox, TableCellConditionalHighlightInfo,
-    UnverifiedTopologyEdit,
+    Direction, Editor, PivotCategoryInfo, RemovedNumbersSheetAudio, RemovedNumbersSheetChart,
+    RemovedNumbersSheetImage, RemovedNumbersSheetMovie, RemovedNumbersSheetShape,
+    RemovedNumbersTextBox, SheetAudioInfo, SheetAudioOptions, SheetChartInfo, SheetImageInfo,
+    SheetImageOptions, SheetInfo, SheetMovieInfo, SheetMovieOptions, SheetShapeInfo,
+    TableCellConditionalHighlightInfo, TableCellParagraphList, TableCellParagraphListBullet,
+    TableCellParagraphListBulletGeometry, TableCellParagraphListIndentation,
+    TableCellParagraphListLabelColor, TableCellParagraphListLevel,
+    TableCellParagraphListLevelPlacement, TableCellParagraphListNumberFormat,
+    TableCellParagraphListNumberScale, TableCellParagraphListNumberTiering,
+    TableCellParagraphListNumbering, TableCellParagraphListPlacement, TableCellParagraphTabStops,
+    TableCellTextBackground, TableCellTextBaselineShift, TableCellTextCapitalization,
+    TableCellTextCharacterSpacing, TableCellTextColor, TableCellTextDecorations, TableCellTextFont,
+    TableCellTextLigatures, TableCellTextOutline, TableCellTextScript, TableCellTextShadow,
+    TableCellTextStyle, TableInfo, TableSortColumnIndex, TableSortDirection, TableSortOrder,
+    TableSortRowRange, TableSortRule, TableSortScope, TextBoxInfo, UnverifiedTopologyEdit,
 };
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
@@ -104,7 +99,7 @@ pub(crate) trait SemanticTableCellAssertions {
 #[cfg(test)]
 impl SemanticTableCellAssertions for litchi_numbers::Table {
     fn get_cell(&self, row: usize, column: usize) -> Option<&litchi_numbers::cell::Value> {
-        litchi_numbers::CellPosition::try_from_usize(row, column)
+        litchi_numbers::At::try_from_usize(row, column)
             .ok()
             .and_then(|position| self.get(position))
     }

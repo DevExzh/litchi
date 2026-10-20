@@ -11,7 +11,7 @@ use crate::drawable_order::{
 const SLIDE_MESSAGE_TYPE: u32 = 5;
 const SLIDE_DRAWABLES_Z_ORDER_FIELD: u32 = 42;
 
-impl KeynoteEditor {
+impl Editor {
     /// List one slide's drawable identifiers from the back-most to the front-most layer.
     pub fn slide_drawable_order(&self, slide_index: usize) -> Result<Vec<u64>> {
         let graph = ObjectGraph::read(self.package())?;
@@ -142,7 +142,7 @@ fn replace_slide_drawable_order(
 mod tests {
     use super::*;
     use crate::DrawableLayerMove;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     const OVERLAP_POSITION: DrawablePoint = DrawablePoint { x: 704.0, y: 284.0 };
@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_drawable_order_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Layered")
             .subtitle("Arrange API")
             .build()
@@ -186,7 +186,7 @@ mod tests {
         reversed.reverse();
         editor.set_slide_drawable_order(0, &reversed).unwrap();
         assert_eq!(editor.slide_drawable_order(0).unwrap(), reversed);
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.slide_drawable_order(0).unwrap(), reversed);
 
         let bytes = editor.to_bytes().unwrap();
@@ -203,7 +203,7 @@ mod tests {
         );
     }
 
-    fn append_rectangle(editor: &mut KeynoteEditor, text: &str) -> u64 {
+    fn append_rectangle(editor: &mut Editor, text: &str) -> u64 {
         editor
             .add_slide_rectangle(0, text, OVERLAP_POSITION, OVERLAP_SIZE)
             .unwrap()

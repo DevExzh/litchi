@@ -11,6 +11,10 @@ use litchi_core::sheet::WorkbookTrait;
 #[cfg(any(feature = "xlsx", feature = "xlsb", feature = "xls"))]
 use super::test_data;
 use crate::{Code, File};
+#[cfg(feature = "xlsx")]
+use litchi_core::sheet::Cell as _;
+#[cfg(any(feature = "xlsx", feature = "xls"))]
+use litchi_core::sheet::Worksheet as _;
 
 #[cfg(any(feature = "xlsx", feature = "xls"))]
 fn open(relative: &str) -> File {

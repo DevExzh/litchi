@@ -1,6 +1,7 @@
 //! Tests for text-based spreadsheet formats
 
 use super::*;
+use crate::sheet::{Cell as _, Worksheet as _};
 use crate::sheet::{CellValue, WorkbookTrait};
 
 #[test]
@@ -122,9 +123,9 @@ fn test_iterators() {
     let worksheet = workbook.active_worksheet().unwrap();
 
     // Test row iterator
-    let mut rows_iter = worksheet.rows();
+    let rows_iter = worksheet.rows();
     let mut row_count = 0;
-    while let Some(row_result) = rows_iter.next() {
+    for row_result in rows_iter {
         let row = row_result.unwrap();
         row_count += 1;
         match row_count {
@@ -149,9 +150,9 @@ fn test_iterators() {
     assert_eq!(row_count, 3);
 
     // Test cell iterator
-    let mut cells_iter = worksheet.cells();
+    let cells_iter = worksheet.cells();
     let mut cell_count = 0;
-    while let Some(cell_result) = cells_iter.next() {
+    for cell_result in cells_iter {
         let cell = cell_result.unwrap();
         cell_count += 1;
         // Just verify we can access the cells

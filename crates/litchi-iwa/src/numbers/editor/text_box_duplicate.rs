@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl NumbersEditor {
+impl Editor {
     /// Duplicate an ordinary sheet-owned text box with independent storage.
     ///
     /// The shape, stand-in title and caption, and writable storage are cloned
@@ -14,7 +14,7 @@ impl NumbersEditor {
         sheet_id: u64,
         source_drawable_object_id: u64,
         text: &str,
-    ) -> Result<NumbersTextBoxInfo> {
+    ) -> Result<TextBoxInfo> {
         self.duplicate_text_box_to_sheet(
             sheet_id,
             source_drawable_object_id,
@@ -31,7 +31,7 @@ impl NumbersEditor {
         target_sheet_id: u64,
         text: &str,
         offset: f32,
-    ) -> Result<NumbersTextBoxInfo> {
+    ) -> Result<TextBoxInfo> {
         if !offset.is_finite() {
             return Err(Error::ParseError(
                 "Numbers text-box duplicate offset must be finite".to_owned(),

@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use litchi_numbers::cell::text_style::{CharacterProperties, Error};
 use litchi_numbers::table::cells::Input;
-use litchi_numbers::{CellPosition, Package};
+use litchi_numbers::{At, Package};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -25,23 +25,23 @@ fn bold() -> CharacterProperties {
 fn cells_take_text_styles_on_a_created_workbook() -> TestResult {
     let package = Package::new()
         .edit_table_cells(0, 0)?
-        .set(CellPosition::new(1, 1), Input::Text("b".into()))?
-        .set(CellPosition::new(2, 1), Input::Text("c".into()))?
-        .set(CellPosition::new(2, 2), Input::number(4.0)?)?
+        .set(At::new(1, 1), Input::Text("b".into()))?
+        .set(At::new(2, 1), Input::Text("c".into()))?
+        .set(At::new(2, 2), Input::number(4.0)?)?
         .commit()?
         .into_package();
     let source = bytes(&package)?;
-    let base = package.table_cell_text_style(0, 0, CellPosition::new(1, 1))?;
+    let base = package.table_cell_text_style(0, 0, At::new(1, 1))?;
     let mut red = CharacterProperties::new();
     red.color = Some([200, 0, 0]);
     red.size = Some(18.0);
     red.font_name = Some("Helvetica".into());
     let commit = package
         .edit_table_cell_text_style(0, 0)?
-        .set(CellPosition::new(1, 1), bold())?
-        .set(CellPosition::new(2, 1), bold())?
-        .set(CellPosition::new(2, 2), red.clone())?
-        .set(CellPosition::new(2, 2), {
+        .set(At::new(1, 1), bold())?
+        .set(At::new(2, 1), bold())?
+        .set(At::new(2, 2), red.clone())?
+        .set(At::new(2, 2), {
             let mut italic = CharacterProperties::new();
             italic.italic = Some(true);
             italic
@@ -50,12 +50,12 @@ fn cells_take_text_styles_on_a_created_workbook() -> TestResult {
     let styled = commit.package();
     let reopened = Package::from_bytes(&bytes(styled)?)?;
     for candidate in [styled, &reopened] {
-        let b = candidate.table_cell_text_style(0, 0, CellPosition::new(1, 1))?;
+        let b = candidate.table_cell_text_style(0, 0, At::new(1, 1))?;
         assert_eq!(b.bold, Some(true));
         // Unset properties stay inherited from the base style.
         assert_eq!(b.size, base.size);
         assert_eq!(b.font_name, base.font_name);
-        let c = candidate.table_cell_text_style(0, 0, CellPosition::new(2, 2))?;
+        let c = candidate.table_cell_text_style(0, 0, At::new(2, 2))?;
         assert_eq!(c.color, Some([200, 0, 0]));
         assert_eq!(c.size, Some(18.0));
         assert_eq!(c.italic, Some(true));
@@ -69,19 +69,15 @@ fn cells_take_text_styles_on_a_created_workbook() -> TestResult {
     unbold.bold = Some(false);
     let again = styled
         .edit_table_cell_text_style(0, 0)?
-        .set(CellPosition::new(1, 1), unbold)?
+        .set(At::new(1, 1), unbold)?
         .commit()?
         .into_package();
     assert_eq!(
-        again
-            .table_cell_text_style(0, 0, CellPosition::new(1, 1))?
-            .bold,
+        again.table_cell_text_style(0, 0, At::new(1, 1))?.bold,
         Some(false)
     );
     assert_eq!(
-        again
-            .table_cell_text_style(0, 0, CellPosition::new(2, 1))?
-            .bold,
+        again.table_cell_text_style(0, 0, At::new(2, 1))?.bold,
         Some(true)
     );
     let restored = styled.apply_table_cell_text_style(&commit.patch().inverse())?;
@@ -89,13 +85,11 @@ fn cells_take_text_styles_on_a_created_workbook() -> TestResult {
     // A value write keeps the style.
     let rewritten = again
         .edit_table_cells(0, 0)?
-        .set(CellPosition::new(2, 1), Input::Text("changed".into()))?
+        .set(At::new(2, 1), Input::Text("changed".into()))?
         .commit()?
         .into_package();
     assert_eq!(
-        rewritten
-            .table_cell_text_style(0, 0, CellPosition::new(2, 1))?
-            .bold,
+        rewritten.table_cell_text_style(0, 0, At::new(2, 1))?.bold,
         Some(true)
     );
     Ok(())
@@ -107,19 +101,19 @@ fn refusals_are_typed() -> TestResult {
     assert!(matches!(
         package
             .edit_table_cell_text_style(0, 0)?
-            .set(CellPosition::new(0, 0), CharacterProperties::new()),
+            .set(At::new(0, 0), CharacterProperties::new()),
         Err(Error::EmptyStyle)
     ));
     assert!(matches!(
         package
             .edit_table_cell_text_style(0, 0)?
-            .set(CellPosition::new(99, 0), bold()),
+            .set(At::new(99, 0), bold()),
         Err(Error::CellNotFound)
     ));
     assert!(matches!(
         package
             .edit_table_cell_text_style(0, 0)?
-            .set(CellPosition::new(3, 3), bold())?
+            .set(At::new(3, 3), bold())?
             .commit(),
         Err(Error::EmptyCell)
     ));
@@ -192,17 +186,17 @@ fn formulas_work_on_a_created_workbook() -> TestResult {
     use litchi_numbers::formula::Expression;
     let package = Package::new()
         .edit_table_cells(0, 0)?
-        .set(CellPosition::new(1, 1), Input::number(2.0)?)?
+        .set(At::new(1, 1), Input::number(2.0)?)?
         .commit()?
         .into_package();
     let commit = package
         .edit_table_cells(0, 0)?
-        .set_formula(CellPosition::new(2, 1), Expression::parse("B2*3")?)?
+        .set_formula(At::new(2, 1), Expression::parse("B2*3")?)?
         .commit()?;
     let reopened = Package::from_bytes(&bytes(commit.package())?)?;
     let table = reopened.sheets()[0].tables().next().expect("table");
     assert!(matches!(
-        table.get(CellPosition::new(2, 1)),
+        table.get(At::new(2, 1)),
         Some(CellValue::Formula(_))
     ));
     Ok(())

@@ -41,16 +41,14 @@ pub(super) struct SheetAudioGraph {
     pub(super) sheet_id: u64,
     pub(super) archive_name: String,
     pub(super) component_id: u64,
-    pub(super) info: NumbersSheetAudioInfo,
+    pub(super) info: SheetAudioInfo,
     pub(super) geometry: DrawableGeometry,
     pub(super) object_ids: Vec<u64>,
     pub(super) uuid_object_ids: Vec<u64>,
     pub(super) data_references: Vec<(u64, u64)>,
 }
 
-pub(super) fn audio_creation_values(
-    options: NumbersSheetAudioOptions,
-) -> Result<(DrawableGeometry, f32)> {
+pub(super) fn audio_creation_values(options: SheetAudioOptions) -> Result<(DrawableGeometry, f32)> {
     let duration_seconds = options.duration.as_secs_f64();
     if duration_seconds == 0.0 || duration_seconds > f64::from(f32::MAX) {
         return Err(Error::ParseError(
@@ -67,10 +65,7 @@ pub(super) fn audio_creation_values(
     Ok((geometry, duration_seconds as f32))
 }
 
-pub(super) fn audio_infos(
-    editor: &NumbersEditor,
-    sheet_id: u64,
-) -> Result<Vec<NumbersSheetAudioInfo>> {
+pub(super) fn audio_infos(editor: &Editor, sheet_id: u64) -> Result<Vec<SheetAudioInfo>> {
     let (_, _, sheet) = numbers_sheet(editor.package(), sheet_id)?;
     let locations = object_locations(editor.package())?;
     let mut audio = Vec::new();
@@ -126,7 +121,7 @@ pub(super) fn audio_infos(
 }
 
 pub(super) fn audio_graph(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<SheetAudioGraph> {
@@ -287,11 +282,7 @@ pub(super) fn audio_graph(
     })
 }
 
-fn audio_info(
-    package: &IWorkPackage,
-    sheet_id: u64,
-    identifier: u64,
-) -> Result<NumbersSheetAudioInfo> {
+fn audio_info(package: &IWorkPackage, sheet_id: u64, identifier: u64) -> Result<SheetAudioInfo> {
     let locations = object_locations(package)?;
     let archive_name = locations
         .get(&identifier)
@@ -349,7 +340,7 @@ fn audio_info(
             ))
         },
     )?;
-    Ok(NumbersSheetAudioInfo {
+    Ok(SheetAudioInfo {
         sheet_id,
         drawable_object_id: identifier,
         audio_data_identifier,

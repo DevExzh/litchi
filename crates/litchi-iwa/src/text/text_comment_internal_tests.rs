@@ -1,5 +1,5 @@
 use crate::archive::{ArchiveObject, RawMessage};
-use crate::pages::PagesEditor;
+use crate::pages;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use crate::text::highlight_object::validate_annotation_graph;
 use crate::text::highlight_storage::{HIGHLIGHT_TABLE_FIELD, TABLE_ENTRIES_FIELD, locate_storage};
@@ -20,7 +20,7 @@ const SIZE: DrawableSize = DrawableSize {
 };
 
 fn fixture() -> (super::super::IWorkTextEditor, TextStorageId, Vec<u8>) {
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, "Alpha Beta", POSITION, SIZE).unwrap();
     let baseline = pages.to_bytes().unwrap();
     (

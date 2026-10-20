@@ -8,7 +8,7 @@
 
 use std::{env, fs, io, path::Path};
 
-use litchi_numbers::{CellPosition, Package, SheetSelector, TableSelector};
+use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 
 #[path = "../../litchi-numbers/tests/support/numbers_comment_fixture.rs"]
 mod fixture;
@@ -26,13 +26,13 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 const LEGACY_SHEET: &str = "Reply fixture sheet";
 const LEGACY_TABLE: &str = "Reply fixture table";
-const LEGACY_CELL: CellPosition = CellPosition::new(0, 0);
+const LEGACY_CELL: At = At::new(0, 0);
 
 fn compatibility_root(
     source: &[u8],
     sheet: impl Into<SheetSelector<'static>>,
     table: impl Into<TableSelector<'static>>,
-    position: CellPosition,
+    position: At,
 ) -> Result<Option<litchi_numbers::cell::comment::Comment>, TableCellCommentError> {
     Package::__table_cell_comment_from_bytes_for_compatibility(source, sheet, table, position)
 }
@@ -41,7 +41,7 @@ fn compatibility_replies(
     source: &[u8],
     sheet: impl Into<SheetSelector<'static>>,
     table: impl Into<TableSelector<'static>>,
-    position: CellPosition,
+    position: At,
 ) -> Result<Box<[litchi_numbers::cell::comment::CommentReply]>, TableCellCommentError> {
     Package::__table_cell_comment_replies_from_bytes_for_compatibility(
         source, sheet, table, position,
@@ -53,7 +53,7 @@ fn assert_legacy_semantics(source: &[u8], row: u32) -> TestResult {
         source,
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(row, 0),
+        At::new(row, 0),
     )?
     .ok_or_else(|| io::Error::other("legacy source-built root comment is missing"))?;
     assert_eq!(root.text(), "root comment");
@@ -68,7 +68,7 @@ fn assert_legacy_semantics(source: &[u8], row: u32) -> TestResult {
         source,
         SheetSelector::name(LEGACY_SHEET),
         TableSelector::name(LEGACY_TABLE),
-        CellPosition::from_a1("A1")?,
+        At::from_a1("A1")?,
     )?
     .ok_or_else(|| io::Error::other("named legacy root comment is missing"))?;
     assert_eq!(named, root);
@@ -77,7 +77,7 @@ fn assert_legacy_semantics(source: &[u8], row: u32) -> TestResult {
         source,
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(row, 0),
+        At::new(row, 0),
     )?;
     assert_eq!(replies.len(), 1);
     assert_eq!(replies[0].text(), "first reply");
@@ -183,7 +183,7 @@ fn legacy_comment_compatibility_selectors_and_bounds_are_typed() -> TestResult {
             &source,
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(99, 0),
+            At::new(99, 0),
         ),
         Err(TableCellCommentError::OutOfBounds { .. })
     ));
@@ -192,7 +192,7 @@ fn legacy_comment_compatibility_selectors_and_bounds_are_typed() -> TestResult {
             &source,
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(99, 0),
+            At::new(99, 0),
         ),
         Err(TableCellCommentError::OutOfBounds { .. })
     ));
@@ -564,7 +564,7 @@ fn native_comment_ingress_remains_strict_while_compatibility_matches_it() -> Tes
         "/../../test-data/iwork/numbers/comment-reader-native-created.numbers"
     ));
     let package = Package::from_bytes(source)?;
-    let position = CellPosition::new(1, 1);
+    let position = At::new(1, 1);
     let strict = package
         .table_cell_comment(SheetSelector::index(0), TableSelector::index(0), position)?
         .ok_or_else(|| io::Error::other("native root comment is missing"))?;
@@ -613,7 +613,7 @@ fn native_one_table_ceiling_admits_comment_and_empty_replies() -> TestResult {
         .and_then(|b| b.max_references(litchi_numbers::SemanticLimits::MAXIMUM.max_references()))
         .and_then(|b| b.build())?;
     let options = litchi_numbers::OpenOptions::new().semantic_limits(semantic);
-    let position = CellPosition::new(1, 1);
+    let position = At::new(1, 1);
 
     // The strict package path and the compatibility selector-first path must
     // agree that the native archive contains one semantic table.  In

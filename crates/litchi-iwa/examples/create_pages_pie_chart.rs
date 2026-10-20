@@ -3,13 +3,13 @@
 use std::env;
 
 use litchi_iwa::charts::{ChartData, ChartPieStartAngle, ChartPieWedgeExplosion, Kind};
-use litchi_iwa::pages::PagesDocumentBuilder;
+use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = single_output_argument("usage: create_pages_pie_chart <output.pages>")?;
     let body = "Regional Revenue";
-    let mut editor = PagesDocumentBuilder::new().body_text(body).build()?;
+    let mut editor = pages::Builder::new().body_text(body).build()?;
     let chart = editor.add_body_chart(
         body.encode_utf16().count(),
         Kind::Pie2d,

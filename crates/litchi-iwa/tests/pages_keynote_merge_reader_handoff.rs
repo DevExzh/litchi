@@ -8,7 +8,7 @@
 
 use std::error::Error as StdError;
 
-use litchi_iwa::{keynote::KeynoteEditor, pages::PagesEditor};
+use litchi_iwa::{keynote, pages};
 use litchi_iwa_archive::{
     Limits as ArchiveLimits,
     iwa::{Archive, RawMessage, SnappyStream},
@@ -208,7 +208,7 @@ fn pages_merge_handoff_matches_focused_reader_and_preserves_native_bytes() -> Te
     assert_eq!(focused.body_table_merges("Table 1")?, expected);
     assert_eq!(focused.body_table_merges(0usize)?, expected);
 
-    let host = PagesEditor::from_bytes(PAGES)?;
+    let host = pages::Editor::from_bytes(PAGES)?;
     let table = host
         .tables()?
         .into_iter()
@@ -228,7 +228,7 @@ fn keynote_merge_handoff_matches_focused_reader_and_preserves_native_bytes() -> 
     let focused = litchi_keynote::Package::from_bytes(KEYNOTE)?;
     assert_eq!(focused.slide_table_merges(0usize, 0usize)?, expected);
 
-    let host = KeynoteEditor::from_bytes(KEYNOTE)?;
+    let host = keynote::Editor::from_bytes(KEYNOTE)?;
     let table = host
         .slide_tables(0)?
         .into_iter()
@@ -262,7 +262,7 @@ fn pages_merge_handoff_does_not_materialize_unneeded_bnc_tiles() -> TestResult {
         pages_merges()
     );
 
-    let host = PagesEditor::from_bytes(&malformed)?;
+    let host = pages::Editor::from_bytes(&malformed)?;
     let table = host
         .tables()?
         .into_iter()
@@ -296,7 +296,7 @@ fn keynote_merge_handoff_does_not_materialize_unneeded_bnc_tiles() -> TestResult
         keynote_merges()
     );
 
-    let host = KeynoteEditor::from_bytes(&malformed)?;
+    let host = keynote::Editor::from_bytes(&malformed)?;
     let table = host
         .slide_tables(0)?
         .into_iter()
@@ -319,7 +319,7 @@ fn pages_merge_handoff_retains_source_after_input_path_is_removed() -> TestResul
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("native.pages");
     std::fs::write(&path, PAGES)?;
-    let host = PagesEditor::open(&path)?;
+    let host = pages::Editor::open(&path)?;
     let reader = litchi_pages::MergeReader::open(&path)?;
     std::fs::remove_file(&path)?;
 
@@ -342,7 +342,7 @@ fn keynote_merge_handoff_retains_source_after_input_path_is_removed() -> TestRes
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("native.key");
     std::fs::write(&path, KEYNOTE)?;
-    let host = KeynoteEditor::open(&path)?;
+    let host = keynote::Editor::open(&path)?;
     let reader = litchi_keynote::slide::table::merge::transaction::MergeReader::open(&path)?;
     std::fs::remove_file(&path)?;
 
@@ -372,7 +372,7 @@ fn pages_selected_merge_graph_errors_are_terminal_and_source_preserving() -> Tes
         "the focused Pages reader must reject the malformed selected graph"
     );
 
-    let host = PagesEditor::from_bytes(&malformed)?;
+    let host = pages::Editor::from_bytes(&malformed)?;
     let table = host
         .tables()?
         .into_iter()
@@ -395,7 +395,7 @@ fn keynote_selected_merge_graph_errors_are_terminal_and_source_preserving() -> T
         "the focused Keynote reader must reject the malformed selected graph"
     );
 
-    let host = KeynoteEditor::from_bytes(&malformed)?;
+    let host = keynote::Editor::from_bytes(&malformed)?;
     let table = host
         .slide_tables(0)?
         .into_iter()

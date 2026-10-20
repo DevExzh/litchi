@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let editor = PagesEditor::open(input)?;
+    let editor = pages::Editor::open(input)?;
     for chart in editor.body_charts()? {
         println!(
             "anchor={} object={} kind={:?} direction={:?} rows={} columns={}",

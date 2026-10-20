@@ -2,5 +2,5 @@
 pub mod traits;
 pub mod types;
 
-pub use traits::{Cell, CellIterator, RowIterator, WorkbookTrait, Worksheet, WorksheetIterator};
+pub use traits::{Cell, WorkbookTrait, Worksheet};
 pub use types::{CellValue, Result};

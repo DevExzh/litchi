@@ -65,8 +65,7 @@ use std::sync::OnceLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use litchi_core::sheet::{
-    Cell as CoreCell, CellIterator, CellValue, Result as SheetResult, RowIterator, WorkbookTrait,
-    Worksheet as CoreWorksheet, WorksheetIterator,
+    Cell as CoreCell, CellValue, Result as SheetResult, WorkbookTrait, Worksheet as CoreWorksheet,
 };
 use litchi_eval::FormulaEvaluator;
 
@@ -1030,12 +1029,21 @@ fn normalize(formula: &str) -> Cow<'_, str> {
     Cow::Owned(output)
 }
 
-impl WorkbookTrait for Grid<'_> {
+impl<'f> WorkbookTrait for Grid<'f> {
+    type Worksheet<'g>
+        = SheetRef<'g, 'f>
+    where
+        Self: 'g;
+    type Worksheets<'g>
+        = Sheets<'g, 'f>
+    where
+        Self: 'g;
+
     fn active_sheet_index(&self) -> usize {
         0
     }
 
-    fn active_worksheet(&self) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
+    fn active_worksheet(&self) -> SheetResult<SheetRef<'_, 'f>> {
         self.worksheet_by_index(0)
     }
 
@@ -1043,7 +1051,7 @@ impl WorkbookTrait for Grid<'_> {
         self.date1904
     }
 
-    fn worksheet_by_index(&self, index: usize) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
+    fn worksheet_by_index(&self, index: usize) -> SheetResult<SheetRef<'_, 'f>> {
         if index >= self.sheets.len() {
             return Err(Box::new(crate::Error::new(
                 Code::OutOfRange,
@@ -1051,10 +1059,10 @@ impl WorkbookTrait for Grid<'_> {
             )));
         }
         let sheet = self.sheet(index).map_err(|error| self.trip(error))?;
-        Ok(Box::new(SheetRef { grid: self, sheet }))
+        Ok(SheetRef { grid: self, sheet })
     }
 
-    fn worksheet_by_name(&self, name: &str) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
+    fn worksheet_by_name(&self, name: &str) -> SheetResult<SheetRef<'_, 'f>> {
         let index = self
             .names
             .iter()
@@ -1082,11 +1090,11 @@ impl WorkbookTrait for Grid<'_> {
         &self.names
     }
 
-    fn worksheets(&self) -> Box<dyn WorksheetIterator<'_> + '_> {
-        Box::new(Sheets {
+    fn worksheets(&self) -> Sheets<'_, 'f> {
+        Sheets {
             grid: self,
             index: 0,
-        })
+        }
     }
 }
 
@@ -1095,8 +1103,10 @@ struct Sheets<'g, 'f> {
     index: usize,
 }
 
-impl<'g> WorksheetIterator<'g> for Sheets<'g, '_> {
-    fn next(&mut self) -> Option<SheetResult<Box<dyn CoreWorksheet + 'g>>> {
+impl<'g, 'f> Iterator for Sheets<'g, 'f> {
+    type Item = SheetResult<SheetRef<'g, 'f>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         if self.index >= self.grid.names.len() {
             return None;
         }
@@ -1149,24 +1159,17 @@ struct GridCells<'g> {
     inner: std::collections::hash_map::Iter<'g, (u32, u32), CellValue>,
 }
 
-impl<'g> CellIterator<'g> for GridCells<'g> {
-    fn next(&mut self) -> Option<SheetResult<Box<dyn CoreCell + 'g>>> {
+impl<'g> Iterator for GridCells<'g> {
+    type Item = SheetResult<GridCell<'g>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().map(|((row, column), value)| {
-            let cell: Box<dyn CoreCell + 'g> = Box::new(GridCell {
+            Ok(GridCell {
                 row: *row,
                 column: *column,
                 value: Cow::Borrowed(value),
-            });
-            Ok(cell)
+            })
         })
-    }
-}
-
-struct NoRows;
-
-impl<'g> RowIterator<'g> for NoRows {
-    fn next(&mut self) -> Option<SheetResult<Cow<'g, [CellValue]>>> {
-        None
     }
 }
 
@@ -1187,15 +1190,28 @@ impl SheetRef<'_, '_> {
 }
 
 impl CoreWorksheet for SheetRef<'_, '_> {
-    fn cell(&self, row: u32, column: u32) -> SheetResult<Box<dyn CoreCell + '_>> {
-        Ok(Box::new(GridCell {
+    type Cell<'a>
+        = GridCell<'a>
+    where
+        Self: 'a;
+    type Cells<'a>
+        = GridCells<'a>
+    where
+        Self: 'a;
+    type Rows<'a>
+        = std::iter::Empty<SheetResult<Cow<'a, [CellValue]>>>
+    where
+        Self: 'a;
+
+    fn cell(&self, row: u32, column: u32) -> SheetResult<GridCell<'_>> {
+        Ok(GridCell {
             row,
             column,
             value: self.read(row, column)?,
-        }))
+        })
     }
 
-    fn cell_by_coordinate(&self, _coordinate: &str) -> SheetResult<Box<dyn CoreCell + '_>> {
+    fn cell_by_coordinate(&self, _coordinate: &str) -> SheetResult<GridCell<'_>> {
         Err(Box::new(crate::Error::new(
             Code::UnsupportedCapability,
             "the evaluation grid reads cells by row and column",
@@ -1206,10 +1222,10 @@ impl CoreWorksheet for SheetRef<'_, '_> {
         self.read(row, column)
     }
 
-    fn cells(&self) -> Box<dyn CellIterator<'_> + '_> {
-        Box::new(GridCells {
+    fn cells(&self) -> GridCells<'_> {
+        GridCells {
             inner: self.sheet.cells.iter(),
-        })
+        }
     }
 
     fn column_count(&self) -> usize {
@@ -1239,7 +1255,7 @@ impl CoreWorksheet for SheetRef<'_, '_> {
             .map_or(0, |(top, _, bottom, _)| (bottom - top + 1) as usize)
     }
 
-    fn rows(&self) -> Box<dyn RowIterator<'_> + '_> {
-        Box::new(NoRows)
+    fn rows(&self) -> Self::Rows<'_> {
+        std::iter::empty()
     }
 }

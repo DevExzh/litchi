@@ -18,8 +18,7 @@ use crate::protection::SheetProtection;
 use crate::view::View;
 use crate::writer::sort::Config;
 use litchi_core::sheet::{
-    Cell as SheetCell, CellIterator as CellIteratorTrait, CellValue, Result as SheetResult,
-    RowIterator as RowIteratorTrait, Worksheet as WorksheetTrait,
+    Cell as SheetCell, CellValue, Result as SheetResult, Worksheet as WorksheetTrait,
 };
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -849,6 +848,12 @@ impl Worksheet {
 }
 
 impl WorksheetTrait for Worksheet {
+    /// Stored cells are borrowed; an absent position reads as an owned
+    /// empty cell.
+    type Cell<'a> = Cow<'a, Cell>;
+    type Cells<'a> = Cells<'a>;
+    type Rows<'a> = Rows<'a>;
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -869,19 +874,16 @@ impl WorksheetTrait for Worksheet {
         }
     }
 
-    fn cell(&self, row: u32, column: u32) -> SheetResult<Box<dyn SheetCell + '_>> {
+    fn cell(&self, row: u32, column: u32) -> SheetResult<Cow<'_, Cell>> {
         match self.cells.get(&(row, column)) {
             // Return reference instead of clone - zero-copy!
-            Some(cell) => Ok(Box::new(cell)),
-            None => {
-                // Return empty cell for missing positions (owned, unavoidable)
-                let empty_cell = Cell::new(row, column, CellValue::Empty);
-                Ok(Box::new(empty_cell))
-            },
+            Some(cell) => Ok(Cow::Borrowed(cell)),
+            // Return empty cell for missing positions (owned, unavoidable)
+            None => Ok(Cow::Owned(Cell::new(row, column, CellValue::Empty))),
         }
     }
 
-    fn cell_by_coordinate(&self, coordinate: &str) -> SheetResult<Box<dyn SheetCell + '_>> {
+    fn cell_by_coordinate(&self, coordinate: &str) -> SheetResult<Cow<'_, Cell>> {
         let (row, col) = crate::utils::parse_cell_reference(coordinate).ok_or_else(|| {
             let error: Box<dyn std::error::Error + Send + Sync> =
                 Box::new(Error::InvalidCellReference(coordinate.to_string()));
@@ -890,17 +892,17 @@ impl WorksheetTrait for Worksheet {
         self.cell(row, col)
     }
 
-    fn cells(&self) -> Box<dyn CellIteratorTrait<'_> + '_> {
-        Box::new(CellIterator {
+    fn cells(&self) -> Cells<'_> {
+        Cells {
             cells: self.cells.values(),
-        })
+        }
     }
 
-    fn rows(&self) -> Box<dyn RowIteratorTrait<'_> + '_> {
-        Box::new(RowIterator {
+    fn rows(&self) -> Rows<'_> {
+        Rows {
             worksheet: self,
             current_row: 0,
-        })
+        }
     }
 
     fn row(&self, row_idx: usize) -> SheetResult<Cow<'_, [CellValue]>> {
@@ -926,71 +928,31 @@ impl WorksheetTrait for Worksheet {
     }
 }
 
-// Implement Worksheet for &Worksheet to allow zero-copy reference returns
-impl WorksheetTrait for &Worksheet {
-    fn name(&self) -> &str {
-        (*self).name()
-    }
-
-    fn row_count(&self) -> usize {
-        (*self).row_count()
-    }
-
-    fn column_count(&self) -> usize {
-        (*self).column_count()
-    }
-
-    fn dimensions(&self) -> Option<(u32, u32, u32, u32)> {
-        (*self).dimensions()
-    }
-
-    fn cell(&self, row: u32, column: u32) -> SheetResult<Box<dyn SheetCell + '_>> {
-        (*self).cell(row, column)
-    }
-
-    fn cell_by_coordinate(&self, coordinate: &str) -> SheetResult<Box<dyn SheetCell + '_>> {
-        (*self).cell_by_coordinate(coordinate)
-    }
-
-    fn cells(&self) -> Box<dyn CellIteratorTrait<'_> + '_> {
-        (*self).cells()
-    }
-
-    fn rows(&self) -> Box<dyn RowIteratorTrait<'_> + '_> {
-        (*self).rows()
-    }
-
-    fn row(&self, row_idx: usize) -> SheetResult<Cow<'_, [CellValue]>> {
-        (*self).row(row_idx)
-    }
-
-    fn cell_value(&self, row: u32, column: u32) -> SheetResult<Cow<'_, CellValue>> {
-        (*self).cell_value(row, column)
-    }
-}
-
-/// Cell iterator for XLS worksheets
-struct CellIterator<'a> {
+/// The stored cells of an XLS worksheet, in row-major order: the iterator
+/// [`Worksheet::cells`](WorksheetTrait::cells) returns.
+pub struct Cells<'a> {
     cells: std::collections::btree_map::Values<'a, (u32, u32), Cell>,
 }
 
-impl<'a> CellIteratorTrait<'a> for CellIterator<'a> {
-    fn next(&mut self) -> Option<SheetResult<Box<dyn SheetCell + 'a>>> {
-        self.cells.next().map(|cell| {
-            let cell: Box<dyn SheetCell> = Box::new(cell);
-            Ok(cell)
-        })
+impl<'a> Iterator for Cells<'a> {
+    type Item = SheetResult<Cow<'a, Cell>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.cells.next().map(|cell| Ok(Cow::Borrowed(cell)))
     }
 }
 
-/// Row iterator for XLS worksheets
-struct RowIterator<'a> {
+/// The rows of an XLS worksheet: the iterator
+/// [`Worksheet::rows`](WorksheetTrait::rows) returns.
+pub struct Rows<'a> {
     worksheet: &'a Worksheet,
     current_row: usize,
 }
 
-impl<'a> RowIteratorTrait<'a> for RowIterator<'a> {
-    fn next(&mut self) -> Option<SheetResult<Cow<'a, [CellValue]>>> {
+impl<'a> Iterator for Rows<'a> {
+    type Item = SheetResult<Cow<'a, [CellValue]>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         if self.current_row >= self.worksheet.row_count() {
             None
         } else {

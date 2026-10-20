@@ -20,7 +20,7 @@ use litchi_numbers::{
         Expression, LimitKind as FormulaLimitKind, MAX_DEPTH, MAX_NODES, MAX_OWNED_BYTES,
     },
     table::{
-        CellPosition,
+        At,
         cells::{Change, DependencyKind, Error as CellError, Input, Storage},
     },
 };
@@ -680,7 +680,7 @@ fn decode_offset(bytes: &[u8], width: usize) -> Option<usize> {
     }
 }
 
-fn formula_cell(package: &[u8], position: CellPosition) -> TestResult<BncCell> {
+fn formula_cell(package: &[u8], position: At) -> TestResult<BncCell> {
     let catalog = Catalog::from_bytes(package)?;
     let mut matches = Vec::new();
     for member in catalog
@@ -750,7 +750,7 @@ fn formula_cell(package: &[u8], position: CellPosition) -> TestResult<BncCell> {
     Ok(matches.remove(0))
 }
 
-fn assert_formula_source(package: &Package, position: CellPosition) -> TestResult {
+fn assert_formula_source(package: &Package, position: At) -> TestResult {
     assert!(matches!(
         package.table_cell(0usize, 0usize, position)?.storage(),
         Storage::Stored(Value::Formula(source)) if source.starts_with('=') && source.len() > 1
@@ -776,7 +776,7 @@ fn public_formula_values_are_bounded_typed_and_content_free() -> TestResult {
     let expression = Expression::text(secret)?;
     let cached = CachedValue::text(secret)?;
     let input = Input::formula_cached(expression.clone(), cached.clone());
-    let change = Change::set_formula_cached(CellPosition::new(2, 2), expression, cached);
+    let change = Change::set_formula_cached(At::new(2, 2), expression, cached);
     for rendered in [
         format!("{input:?}"),
         format!("{change:?}"),
@@ -1043,7 +1043,7 @@ fn formula_staging_checks_addresses_bounds_and_all_cache_kinds() -> TestResult {
         (5, CachedValue::date(123_456.0)?),
         (6, CachedValue::duration(90.0)?),
     ] {
-        edit = edit.set_formula_cached(CellPosition::new(2, column), expression(), cached)?;
+        edit = edit.set_formula_cached(At::new(2, column), expression(), cached)?;
     }
     assert_eq!(edit.len(), 5);
 
@@ -1056,7 +1056,7 @@ fn formula_staging_checks_addresses_bounds_and_all_cache_kinds() -> TestResult {
     assert!(matches!(
         package
             .edit_table_cells(0usize, 0usize)?
-            .set_formula(CellPosition::new(22, 0), Expression::number(1.0)?,),
+            .set_formula(At::new(22, 0), Expression::number(1.0)?,),
         Err(CellError::OutOfBounds { .. })
     ));
     assert!(matches!(
@@ -1164,7 +1164,7 @@ fn cache_poison_cycles_and_unsupported_descendants_refuse_atomically() -> TestRe
     assert_eq!(unsupported_leaf.diagnostics().changed_cells(), 1);
     assert_eq!(unsupported_leaf.diagnostics().refreshed_formula_caches(), 0);
     let target = exact_bytes(unsupported_leaf.package());
-    assert_formula_source(unsupported_leaf.package(), CellPosition::from_a1("C3")?)?;
+    assert_formula_source(unsupported_leaf.package(), At::from_a1("C3")?)?;
     assert_eq!(formula_entries(&target)?.len(), 1);
     assert_eq!(
         exact_bytes(
@@ -1269,18 +1269,18 @@ fn all_typed_caches_commit_through_native_tiles_and_reopen() -> TestResult {
     );
     let reopened = Package::from_bytes(&target)?;
     for address in ["C3", "D3", "E3", "F3", "G3", "C4", "D4", "E4"] {
-        assert_formula_source(&reopened, CellPosition::from_a1(address)?)?;
+        assert_formula_source(&reopened, At::from_a1(address)?)?;
     }
     assert!(matches!(
-        formula_cell(&target, CellPosition::from_a1("C3")?)?.cached_scalar()?,
+        formula_cell(&target, At::from_a1("C3")?)?.cached_scalar()?,
         Some(CachedScalar::Number(value)) if value.get() == 1.5
     ));
     assert!(matches!(
-        formula_cell(&target, CellPosition::from_a1("D3")?)?.cached_scalar()?,
+        formula_cell(&target, At::from_a1("D3")?)?.cached_scalar()?,
         Some(CachedScalar::Boolean(true))
     ));
     assert!(matches!(
-        formula_cell(&target, CellPosition::from_a1("E3")?)?.cached_scalar()?,
+        formula_cell(&target, At::from_a1("E3")?)?.cached_scalar()?,
         Some(CachedScalar::Unsupported(_))
     ));
     let text_entries = data_list_entries(&target, tst::table_data_list::ListType::String)?;
@@ -1291,16 +1291,16 @@ fn all_typed_caches_commit_through_native_tiles_and_reopen() -> TestResult {
     assert_eq!(typed_text.len(), 1);
     assert_eq!(typed_text[0].refcount, 1);
     assert!(matches!(
-        formula_cell(&target, CellPosition::from_a1("F3")?)?.cached_scalar()?,
+        formula_cell(&target, At::from_a1("F3")?)?.cached_scalar()?,
         Some(CachedScalar::Date(value)) if value.get() == 123_456.0
     ));
     assert!(matches!(
-        formula_cell(&target, CellPosition::from_a1("G3")?)?.cached_scalar()?,
+        formula_cell(&target, At::from_a1("G3")?)?.cached_scalar()?,
         Some(CachedScalar::Duration(value)) if value.get() == 90.0
     ));
     for (address, expected) in [("C4", -5.0), ("D4", 0.5), ("E4", 3.0)] {
         assert!(matches!(
-            formula_cell(&target, CellPosition::from_a1(address)?)?.cached_scalar()?,
+            formula_cell(&target, At::from_a1(address)?)?.cached_scalar()?,
             Some(CachedScalar::Number(value)) if value.get() == expected
         ));
     }
@@ -1323,15 +1323,15 @@ fn all_typed_caches_commit_through_native_tiles_and_reopen() -> TestResult {
         .commit()?;
     let refreshed_bytes = exact_bytes(refreshed.package());
     assert!(matches!(
-        formula_cell(&refreshed_bytes, CellPosition::from_a1("C3")?)?.cached_scalar()?,
+        formula_cell(&refreshed_bytes, At::from_a1("C3")?)?.cached_scalar()?,
         Some(CachedScalar::Number(value)) if value.get() == 44.0
     ));
     assert!(matches!(
-        formula_cell(&refreshed_bytes, CellPosition::from_a1("D3")?)?.cached_scalar()?,
+        formula_cell(&refreshed_bytes, At::from_a1("D3")?)?.cached_scalar()?,
         Some(CachedScalar::Boolean(true))
     ));
     assert!(matches!(
-        formula_cell(&refreshed_bytes, CellPosition::from_a1("G3")?)?.cached_scalar()?,
+        formula_cell(&refreshed_bytes, At::from_a1("G3")?)?.cached_scalar()?,
         Some(CachedScalar::Duration(value)) if value.get() == 90.0
     ));
     assert_eq!(formula_entries(&refreshed_bytes)?.len(), 8);
@@ -1354,12 +1354,12 @@ fn all_typed_caches_commit_through_native_tiles_and_reopen() -> TestResult {
     assert!(matches!(
         cleared
             .package()
-            .table_cell(0usize, 0usize, CellPosition::from_a1("G3")?)?
+            .table_cell(0usize, 0usize, At::from_a1("G3")?)?
             .storage(),
         Storage::Stored(Value::Empty)
     ));
     for address in ["C3", "D3", "E3", "F3", "C4", "D4", "E4"] {
-        assert_formula_source(cleared.package(), CellPosition::from_a1(address)?)?;
+        assert_formula_source(cleared.package(), At::from_a1(address)?)?;
     }
     assert_eq!(
         exact_bytes(
@@ -1458,7 +1458,7 @@ fn locked_table_allows_formula_noop_and_refuses_formula_change() -> TestResult {
 fn native_basic_formula_is_exact_reversible_noop_replaceable_and_clearable() -> TestResult {
     let package = Package::open(fixture_path())?;
     let source = exact_bytes(&package);
-    let c3 = CellPosition::from_a1("C3")?;
+    let c3 = At::from_a1("C3")?;
     let authored_expression = || {
         Expression::function(
             "SUM",
@@ -1591,9 +1591,9 @@ fn sequential_formula_overlays_preserve_survivors_and_exact_inverse() -> TestRes
         )
         .expect("supported native formula")
     };
-    let c3 = CellPosition::from_a1("C3")?;
-    let d3 = CellPosition::from_a1("D3")?;
-    let e3 = CellPosition::from_a1("E3")?;
+    let c3 = At::from_a1("C3")?;
+    let d3 = At::from_a1("D3")?;
+    let e3 = At::from_a1("E3")?;
     let base = Package::open(fixture_path())?;
 
     let first = base
@@ -1702,8 +1702,8 @@ fn sequential_formula_overlays_preserve_survivors_and_exact_inverse() -> TestRes
 fn native_formula_evaluates_against_the_same_batch_final_scalar_overlay() -> TestResult {
     let package = Package::open(fixture_path())?;
     let source = exact_bytes(&package);
-    let b3 = CellPosition::from_a1("B3")?;
-    let c3 = CellPosition::from_a1("C3")?;
+    let b3 = At::from_a1("B3")?;
+    let c3 = At::from_a1("C3")?;
     let expression = Expression::function(
         "SUM",
         [
@@ -1742,7 +1742,7 @@ fn native_formula_evaluates_against_the_same_batch_final_scalar_overlay() -> Tes
 fn local_formula_and_clear_in_multi_owner_engine_preserve_unrelated_owner() -> TestResult {
     let package = two_table_formula_package()?;
     let source = exact_bytes(&package);
-    let c3 = CellPosition::from_a1("C3")?;
+    let c3 = At::from_a1("C3")?;
     let authored = package
         .edit_table_cells("Sheet 1", "Table 1")?
         .set_formula(c3, Expression::cell(CellReference::relative(2, 1)))?
@@ -1861,7 +1861,7 @@ fn every_local_and_distinct_owner_reference_form_commits_and_reopens() -> TestRe
     );
     let reopened = Package::from_bytes(&target)?;
     for address in ["C3", "D3", "E3", "F3", "G3", "C4", "D4", "E4"] {
-        assert_formula_source(&reopened, CellPosition::from_a1(address)?)?;
+        assert_formula_source(&reopened, At::from_a1(address)?)?;
     }
     for (address, expected) in [
         ("C3", 43.0),
@@ -1874,7 +1874,7 @@ fn every_local_and_distinct_owner_reference_form_commits_and_reopens() -> TestRe
         ("E4", 0.0),
     ] {
         assert!(matches!(
-            formula_cell(&target, CellPosition::from_a1(address)?)?.cached_scalar()?,
+            formula_cell(&target, At::from_a1(address)?)?.cached_scalar()?,
             Some(CachedScalar::Number(value)) if value.get() == expected
         ));
     }
@@ -1889,12 +1889,12 @@ fn every_local_and_distinct_owner_reference_form_commits_and_reopens() -> TestRe
     let refreshed_bytes = exact_bytes(refreshed.package());
     for address in ["C3", "D3"] {
         assert!(matches!(
-            formula_cell(&refreshed_bytes, CellPosition::from_a1(address)?)?.cached_scalar()?,
+            formula_cell(&refreshed_bytes, At::from_a1(address)?)?.cached_scalar()?,
             Some(CachedScalar::Number(value)) if value.get() == 44.0
         ));
     }
     assert!(matches!(
-        formula_cell(&refreshed_bytes, CellPosition::from_a1("G3")?)?.cached_scalar()?,
+        formula_cell(&refreshed_bytes, At::from_a1("G3")?)?.cached_scalar()?,
         Some(CachedScalar::Number(value)) if value.get() == 42.0
     ));
     assert_eq!(

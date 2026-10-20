@@ -25,7 +25,7 @@ use graph::*;
 
 /// One independently positioned audio clip owned directly by a Numbers sheet.
 #[derive(Debug, Clone, PartialEq)]
-pub struct NumbersSheetAudioInfo {
+pub struct SheetAudioInfo {
     pub sheet_id: u64,
     pub drawable_object_id: u64,
     pub audio_data_identifier: MediaAssetId,
@@ -40,14 +40,14 @@ pub struct NumbersSheetAudioInfo {
 
 /// Typed placement and playback metadata for a newly created Numbers audio clip.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct NumbersSheetAudioOptions {
+pub struct SheetAudioOptions {
     /// Center point of Numbers' zero-size audio control, in sheet points.
     pub position: DrawablePoint,
     /// Playable duration of the source audio.
     pub duration: Duration,
 }
 
-impl NumbersSheetAudioOptions {
+impl SheetAudioOptions {
     pub const fn new(position: DrawablePoint, duration: Duration) -> Self {
         Self { position, duration }
     }
@@ -56,7 +56,7 @@ impl NumbersSheetAudioOptions {
 /// Result of removing one sheet-owned audio clip and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedNumbersSheetAudio {
-    pub audio: NumbersSheetAudioInfo,
+    pub audio: SheetAudioInfo,
     /// Assets culled because the removed clip held their final package reference.
     pub removed_data_identifiers: Vec<MediaAssetId>,
 }
@@ -67,9 +67,9 @@ enum AudioClonePlacement {
     Preserve,
 }
 
-impl NumbersEditor {
+impl Editor {
     /// List independently positioned audio clips owned directly by one reachable sheet.
-    pub fn sheet_audio(&self, sheet_id: u64) -> Result<Vec<NumbersSheetAudioInfo>> {
+    pub fn sheet_audio(&self, sheet_id: u64) -> Result<Vec<SheetAudioInfo>> {
         audio_infos(self, sheet_id)
     }
 
@@ -83,8 +83,8 @@ impl NumbersEditor {
         sheet_id: u64,
         preferred_filename: &str,
         data: &[u8],
-        options: NumbersSheetAudioOptions,
-    ) -> Result<NumbersSheetAudioInfo> {
+        options: SheetAudioOptions,
+    ) -> Result<SheetAudioInfo> {
         let (geometry, duration_seconds) = audio_creation_values(options)?;
         let context = movie_creation_context(self, sheet_id)?;
         let ids = MovieObjectIds::allocate(next_object_identifier(&self.package)?)?;
@@ -288,7 +288,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         source_drawable_object_id: u64,
-    ) -> Result<NumbersSheetAudioInfo> {
+    ) -> Result<SheetAudioInfo> {
         self.clone_sheet_audio(
             sheet_id,
             source_drawable_object_id,
@@ -302,7 +302,7 @@ impl NumbersEditor {
         source_sheet_id: u64,
         source_drawable_object_id: u64,
         target_sheet_id: u64,
-    ) -> Result<NumbersSheetAudioInfo> {
+    ) -> Result<SheetAudioInfo> {
         self.clone_sheet_audio(
             source_sheet_id,
             source_drawable_object_id,
@@ -317,7 +317,7 @@ impl NumbersEditor {
         source_drawable_object_id: u64,
         target_sheet_id: u64,
         placement: AudioClonePlacement,
-    ) -> Result<NumbersSheetAudioInfo> {
+    ) -> Result<SheetAudioInfo> {
         let source = audio_graph(self, source_sheet_id, source_drawable_object_id)?;
         let (target_archive_name, _, _) = numbers_sheet(&self.package, target_sheet_id)?;
         if target_archive_name != source.archive_name {
@@ -559,7 +559,7 @@ impl NumbersEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::DrawableSize;
     use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 
@@ -567,8 +567,8 @@ mod tests {
     const REPLACEMENT_AUDIO: &[u8] = b"FORM\0\0\0\x10AIFFreplacement-numbers-audio";
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 180.0 };
 
-    fn options() -> NumbersSheetAudioOptions {
-        NumbersSheetAudioOptions::new(POSITION, Duration::from_millis(1_375))
+    fn options() -> SheetAudioOptions {
+        SheetAudioOptions::new(POSITION, Duration::from_millis(1_375))
     }
 
     fn properties(description: &str) -> DrawableProperties {
@@ -583,10 +583,7 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn scratch_spreadsheet_supports_audio_crud_without_a_source_package() {
-        let mut editor = NumbersDocumentBuilder::new()
-            .sheet_name("Audio")
-            .build()
-            .unwrap();
+        let mut editor = numbers::Builder::new().sheet_name("Audio").build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         assert!(editor.sheet_audio(sheet_id).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
@@ -603,7 +600,7 @@ mod tests {
         );
         assert!(editor.sheet_movies(sheet_id).unwrap().is_empty());
 
-        let roundtripped = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let roundtripped = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             roundtripped.sheet_audio(sheet_id).unwrap(),
             std::slice::from_ref(&created)
@@ -693,15 +690,12 @@ mod tests {
         );
         assert!(editor.sheet_audio(sheet_id).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
     fn scratch_spreadsheet_supports_native_audio_duplication() {
-        let mut editor = NumbersDocumentBuilder::new()
-            .sheet_name("Audio")
-            .build()
-            .unwrap();
+        let mut editor = numbers::Builder::new().sheet_name("Audio").build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_audio(sheet_id, "audio.aiff", AUDIO, options())
@@ -779,7 +773,7 @@ mod tests {
             REPLACEMENT_AUDIO
         );
 
-        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.sheet_audio(sheet_id).unwrap().len(), 2);
         assert_eq!(
             reopened
@@ -806,12 +800,12 @@ mod tests {
         );
         assert!(editor.sheet_audio(sheet_id).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
     fn invalid_audio_creation_and_cross_type_edits_are_transactional() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let baseline = editor.to_bytes().unwrap();
         assert!(editor.duplicate_sheet_audio(sheet_id, 999).is_err());
@@ -822,14 +816,14 @@ mod tests {
                 sheet_id,
                 "audio.aiff",
                 AUDIO,
-                NumbersSheetAudioOptions::new(POSITION, Duration::ZERO),
+                SheetAudioOptions::new(POSITION, Duration::ZERO),
             ),
             editor.add_sheet_audio(999, "audio.aiff", AUDIO, options()),
             editor.add_sheet_audio(
                 sheet_id,
                 "audio.aiff",
                 AUDIO,
-                NumbersSheetAudioOptions::new(
+                SheetAudioOptions::new(
                     DrawablePoint {
                         x: f32::NAN,
                         y: 10.0,
@@ -849,7 +843,7 @@ mod tests {
                 b"\0\0\0\x18ftypqt  source-built-numbers-movie",
                 "poster.png",
                 b"\x89PNG\r\n\x1a\nsource-built-numbers-poster",
-                NumbersSheetMovieOptions::new(
+                SheetMovieOptions::new(
                     POSITION,
                     DrawableSize {
                         width: 320.0,
@@ -876,7 +870,7 @@ mod tests {
 
     #[test]
     fn removing_one_sheet_audio_preserves_another() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let first = editor
             .add_sheet_audio(sheet_id, "first.aiff", AUDIO, options())
@@ -886,7 +880,7 @@ mod tests {
                 sheet_id,
                 "second.aiff",
                 REPLACEMENT_AUDIO,
-                NumbersSheetAudioOptions::new(
+                SheetAudioOptions::new(
                     DrawablePoint { x: 640.0, y: 360.0 },
                     Duration::from_secs(2),
                 ),
@@ -904,6 +898,6 @@ mod tests {
             editor.extract_media(second.audio_data_identifier).unwrap(),
             REPLACEMENT_AUDIO
         );
-        NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 }

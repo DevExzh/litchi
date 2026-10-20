@@ -5,12 +5,12 @@ use std::env;
 use litchi_iwa::charts::{
     ChartData, ChartDonutInnerRadius, ChartPieLabelDistance, Kind, LabelVisibility,
 };
-use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::numbers;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = single_output_argument("usage: create_numbers_donut_chart <output.numbers>")?;
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .sheet_name("Regional Revenue")
         .build()?;
     let sheet_id = editor.sheets()?[0].id();

@@ -140,7 +140,7 @@ impl<'package> SourceBuiltAppearanceCatalog<'package> {
     }
 }
 
-impl NumbersEditor {
+impl Editor {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         Self::from_package(IWorkPackage::open(path)?)
     }
@@ -170,7 +170,7 @@ impl NumbersEditor {
         Ok(editor)
     }
 
-    pub fn sheets(&self) -> Result<Vec<NumbersSheetInfo>> {
+    pub fn sheets(&self) -> Result<Vec<SheetInfo>> {
         let document = numbers_document(&self.package)?;
         let locations = object_locations(&self.package)?;
         document
@@ -192,7 +192,7 @@ impl NumbersEditor {
                     ))
                 })?;
                 let (_, sheet) = decode_sheet(object)?;
-                Ok(NumbersSheetInfo {
+                Ok(SheetInfo {
                     object_id: reference.identifier,
                     index,
                     name: sheet.name,
@@ -201,7 +201,7 @@ impl NumbersEditor {
             .collect()
     }
 
-    pub fn tables(&self) -> Result<Vec<NumbersTableInfo>> {
+    pub fn tables(&self) -> Result<Vec<TableInfo>> {
         let source_built = !self.package.source_is_exact();
         let descriptors = table_models(&self.package)?;
         // Source-built and older compatibility packages may not carry the
@@ -268,7 +268,7 @@ impl NumbersEditor {
                     })?;
                     source_built_table_appearance(catalog, &descriptor)?
                 };
-                Ok(NumbersTableInfo {
+                Ok(TableInfo {
                     object_id: descriptor.object_id,
                     index: 0,
                     name: descriptor.model.table_name,
@@ -349,7 +349,7 @@ impl NumbersEditor {
         let mut staged = self.package.clone();
         resize_attached_table_in_package(&mut staged, table_id, rows, columns)?;
 
-        let verified = NumbersEditor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
+        let verified = Editor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         let resized = verified
             .tables()?
             .into_iter()
@@ -370,7 +370,7 @@ impl NumbersEditor {
     /// now-empty component members are removed. Shared storage and styles are
     /// retained. Deletion is rejected while another table has a formula edge
     /// targeting this table.
-    pub fn remove_table(&mut self, selector: TableSelector<'_>) -> Result<NumbersTableInfo> {
+    pub fn remove_table(&mut self, selector: TableSelector<'_>) -> Result<TableInfo> {
         let table_id = selectors::table_id(self, selector)?;
         let table = self
             .tables()?
@@ -498,7 +498,7 @@ impl NumbersEditor {
         release_package_identifier_suffix(&mut staged, &removed_identifiers)?;
 
         let source_built = !self.package.source_is_exact();
-        let verified = NumbersEditor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
+        let verified = Editor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         if table_models(verified.package())?
             .iter()
             .any(|candidate| candidate.object_id == table_id)
@@ -512,7 +512,7 @@ impl NumbersEditor {
     }
 
     /// Append an empty sheet to the workbook and return its allocated object ID.
-    pub fn add_empty_sheet(&mut self, name: &str) -> Result<NumbersSheetInfo> {
+    pub fn add_empty_sheet(&mut self, name: &str) -> Result<SheetInfo> {
         validate_name(name, "sheet")?;
         let locations = object_locations(&self.package)?;
         let identifier = locations
@@ -545,7 +545,7 @@ impl NumbersEditor {
             Ok(())
         })?;
         let source_built = !self.package.source_is_exact();
-        let verified = NumbersEditor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
+        let verified = Editor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         let created = verified
             .sheets()?
             .into_iter()
@@ -571,7 +571,7 @@ impl NumbersEditor {
         name: &str,
         rows: usize,
         columns: usize,
-    ) -> Result<NumbersTableInfo> {
+    ) -> Result<TableInfo> {
         let sheet_id = selectors::sheet_id(self, selector)?;
         let sheets = self.sheets()?;
         if !sheets.iter().any(|sheet| sheet.object_id == sheet_id) {
@@ -648,7 +648,7 @@ impl NumbersEditor {
         })?;
 
         let source_built = !self.package.source_is_exact();
-        let verified = NumbersEditor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
+        let verified = Editor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         let created = verified
             .tables()?
             .into_iter()
@@ -672,7 +672,7 @@ impl NumbersEditor {
     /// styles and referenced rich-text/comment payloads retain their native
     /// copy-on-write sharing.
     #[allow(deprecated)]
-    pub fn duplicate_table(&mut self, selector: TableSelector<'_>) -> Result<NumbersTableInfo> {
+    pub fn duplicate_table(&mut self, selector: TableSelector<'_>) -> Result<TableInfo> {
         let source_built = !self.package.source_is_exact();
         let table_id = selectors::table_id(self, selector)?;
         let descriptors = table_models(&self.package)?;
@@ -732,7 +732,7 @@ impl NumbersEditor {
             Ok(())
         })?;
 
-        let verified = NumbersEditor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
+        let verified = Editor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         let created = verified
             .tables()?
             .into_iter()

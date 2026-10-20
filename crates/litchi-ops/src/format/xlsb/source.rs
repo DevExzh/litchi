@@ -12,8 +12,7 @@ use std::borrow::Cow;
 
 use litchi_core::FileFormat;
 use litchi_core::sheet::{
-    Cell as CoreCell, CellIterator, CellValue, Result as SheetResult, RowIterator,
-    Worksheet as CoreWorksheet, WorksheetIterator,
+    Cell as CoreCell, CellValue, Result as SheetResult, Worksheet as CoreWorksheet,
 };
 use litchi_xlsb as xlsb;
 
@@ -109,7 +108,7 @@ impl SourceWorkbook {
     fn materialize<'a, T>(
         &'a self,
         handle: &SourceSheet<'a>,
-        operation: impl FnOnce(&dyn CoreWorksheet) -> SheetResult<T>,
+        operation: impl FnOnce(&xlsb::Worksheet) -> SheetResult<T>,
     ) -> SheetResult<T> {
         self.ensure_current().map_err(boxed)?;
         let grid = handle.handle.grid().map_err(|error| boxed(error.into()))?;
@@ -118,14 +117,14 @@ impl SourceWorkbook {
         result
     }
 
-    pub(super) fn worksheet(&self, index: usize) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
+    pub(super) fn worksheet(&self, index: usize) -> SheetResult<SourceSheet<'_>> {
         self.ensure_current().map_err(boxed)?;
         let result = self.worksheet_current(index);
         self.ensure_current().map_err(boxed)?;
         result
     }
 
-    fn worksheet_current(&self, index: usize) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
+    fn worksheet_current(&self, index: usize) -> SheetResult<SourceSheet<'_>> {
         let handle = self
             .workbook
             .worksheet_by_index(index)
@@ -139,17 +138,17 @@ impl SourceWorkbook {
                     .with_format(FileFormat::Xlsb),
                 )
             })?;
-        Ok(Box::new(SourceSheet::new(self, handle)?))
+        SourceSheet::new(self, handle)
     }
 
-    pub(super) fn worksheet_named(&self, name: &str) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
+    pub(super) fn worksheet_named(&self, name: &str) -> SheetResult<SourceSheet<'_>> {
         self.ensure_current().map_err(boxed)?;
         let result = self.worksheet_named_current(name);
         self.ensure_current().map_err(boxed)?;
         result
     }
 
-    fn worksheet_named_current(&self, name: &str) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
+    fn worksheet_named_current(&self, name: &str) -> SheetResult<SourceSheet<'_>> {
         let handle = self
             .workbook
             .worksheet_by_name(name)
@@ -160,10 +159,10 @@ impl SourceWorkbook {
                         .with_format(FileFormat::Xlsb),
                 )
             })?;
-        Ok(Box::new(SourceSheet::new(self, handle)?))
+        SourceSheet::new(self, handle)
     }
 
-    pub(super) fn active_worksheet(&self) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
+    pub(super) fn active_worksheet(&self) -> SheetResult<SourceSheet<'_>> {
         self.ensure_current().map_err(boxed)?;
         let result = self
             .active_worksheet_ordinal
@@ -192,13 +191,15 @@ impl std::fmt::Debug for SourceWorkbook {
 }
 
 /// Iterates the worksheets of a source-backed XLSB owner.
-pub(super) struct SourceWorksheets<'a> {
+pub(crate) struct SourceWorksheets<'a> {
     pub(super) workbook: &'a SourceWorkbook,
     pub(super) index: usize,
 }
 
-impl<'a> WorksheetIterator<'a> for SourceWorksheets<'a> {
-    fn next(&mut self) -> Option<SheetResult<Box<dyn CoreWorksheet + 'a>>> {
+impl<'a> Iterator for SourceWorksheets<'a> {
+    type Item = SheetResult<SourceSheet<'a>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         if self.index == usize::MAX {
             return None;
         }
@@ -227,7 +228,9 @@ impl<'a> WorksheetIterator<'a> for SourceWorksheets<'a> {
     }
 }
 
-struct SourceSheet<'a> {
+/// One worksheet of a source-backed XLSB owner, read through the generic
+/// traits.
+pub(crate) struct SourceSheet<'a> {
     workbook: &'a SourceWorkbook,
     handle: xlsb::SourceBackedWorksheet,
     name: String,
@@ -305,7 +308,7 @@ impl<'a> SourceSheet<'a> {
             .materialize(self, |worksheet| Ok(worksheet.row(row)?.into_owned()))
     }
 
-    fn copy_cell(cell: &dyn CoreCell) -> SheetResult<FacadeCell> {
+    fn copy_cell(cell: &impl CoreCell) -> SheetResult<FacadeCell> {
         let row = cell
             .row()
             .checked_add(1)
@@ -345,16 +348,28 @@ impl<'a> SourceSheet<'a> {
     fn stored_cells(&self) -> SheetResult<Vec<FacadeCell>> {
         self.workbook.materialize(self, |worksheet| {
             let mut cells = Vec::new();
-            let mut iterator = worksheet.cells();
-            while let Some(cell) = iterator.next() {
-                cells.push(Self::copy_cell(cell?.as_ref())?);
+            for cell in worksheet.cells() {
+                cells.push(Self::copy_cell(&cell?)?);
             }
             Ok(cells)
         })
     }
 }
 
-impl CoreWorksheet for SourceSheet<'_> {
+impl<'w> CoreWorksheet for SourceSheet<'w> {
+    type Cell<'a>
+        = FacadeCell
+    where
+        Self: 'a;
+    type Cells<'a>
+        = Cells
+    where
+        Self: 'a;
+    type Rows<'a>
+        = Rows<'a, 'w>
+    where
+        Self: 'a;
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -375,16 +390,15 @@ impl CoreWorksheet for SourceSheet<'_> {
         self.dimensions_inner().ok().flatten()
     }
 
-    fn cell(&self, row: u32, column: u32) -> SheetResult<Box<dyn CoreCell + '_>> {
+    fn cell(&self, row: u32, column: u32) -> SheetResult<FacadeCell> {
         let (row, column) = zero_based_cell(row, column)?;
-        let cell = self.workbook.materialize(self, |worksheet| {
+        self.workbook.materialize(self, |worksheet| {
             let cell = worksheet.cell(row, column)?;
-            Self::copy_cell(cell.as_ref())
-        })?;
-        Ok(Box::new(cell))
+            Self::copy_cell(&cell)
+        })
     }
 
-    fn cell_by_coordinate(&self, coordinate: &str) -> SheetResult<Box<dyn CoreCell + '_>> {
+    fn cell_by_coordinate(&self, coordinate: &str) -> SheetResult<FacadeCell> {
         let at = xlsb::sheet::At::from(coordinate)
             .resolve()
             .map_err(|error| {
@@ -393,27 +407,26 @@ impl CoreWorksheet for SourceSheet<'_> {
                         .caused_by_argument(Code::InvalidArgument),
                 )
             })?;
-        let cell = self.workbook.materialize(self, |worksheet| {
+        self.workbook.materialize(self, |worksheet| {
             let cell = worksheet.cell(at.row().get(), at.column().get())?;
-            Self::copy_cell(cell.as_ref())
-        })?;
-        Ok(Box::new(cell))
+            Self::copy_cell(&cell)
+        })
     }
 
     fn cell_value(&self, row: u32, column: u32) -> SheetResult<Cow<'_, CellValue>> {
         Ok(Cow::Owned(self.value_at(row, column)?))
     }
 
-    fn cells(&self) -> Box<dyn CellIterator<'_> + '_> {
+    fn cells(&self) -> Cells {
         match self.stored_cells() {
-            Ok(cells) => Box::new(Cells {
+            Ok(cells) => Cells {
                 cells: cells.into_iter(),
                 error: None,
-            }),
-            Err(error) => Box::new(Cells {
+            },
+            Err(error) => Cells {
                 cells: Vec::new().into_iter(),
                 error: Some(error),
-            }),
+            },
         }
     }
 
@@ -421,7 +434,7 @@ impl CoreWorksheet for SourceSheet<'_> {
         Ok(Cow::Owned(self.row_values(row_idx)?))
     }
 
-    fn rows(&self) -> Box<dyn RowIterator<'_> + '_> {
+    fn rows(&self) -> Rows<'_, 'w> {
         let (end, error) = match self
             .workbook
             .materialize(self, |worksheet| Ok(worksheet.row_count()))
@@ -429,41 +442,44 @@ impl CoreWorksheet for SourceSheet<'_> {
             Ok(end) => (end, None),
             Err(error) => (0, Some(error)),
         };
-        Box::new(Rows {
+        Rows {
             worksheet: self,
             index: 0,
             end,
             error,
-        })
+        }
     }
 }
 
-struct Cells {
+/// The stored cells of a source-backed XLSB worksheet.
+pub(crate) struct Cells {
     cells: std::vec::IntoIter<FacadeCell>,
     error: Option<BoxError>,
 }
 
-impl<'a> CellIterator<'a> for Cells {
-    fn next(&mut self) -> Option<SheetResult<Box<dyn CoreCell + 'a>>> {
+impl Iterator for Cells {
+    type Item = SheetResult<FacadeCell>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         if let Some(error) = self.error.take() {
             return Some(Err(error));
         }
-        self.cells.next().map(|cell| {
-            let cell: Box<dyn CoreCell + 'a> = Box::new(cell);
-            Ok(cell)
-        })
+        self.cells.next().map(Ok)
     }
 }
 
-struct Rows<'a, 'workbook> {
+/// The rows of a source-backed XLSB worksheet.
+pub(crate) struct Rows<'a, 'workbook> {
     worksheet: &'a SourceSheet<'workbook>,
     index: usize,
     end: usize,
     error: Option<BoxError>,
 }
 
-impl<'a> RowIterator<'a> for Rows<'a, '_> {
-    fn next(&mut self) -> Option<SheetResult<Cow<'a, [CellValue]>>> {
+impl<'a> Iterator for Rows<'a, '_> {
+    type Item = SheetResult<Cow<'a, [CellValue]>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         if let Some(error) = self.error.take() {
             return Some(Err(error));
         }
@@ -480,8 +496,9 @@ impl<'a> RowIterator<'a> for Rows<'a, '_> {
     }
 }
 
+/// One cell of a source-backed XLSB worksheet, one-based.
 #[derive(Debug, Clone)]
-struct FacadeCell {
+pub(crate) struct FacadeCell {
     row: u32,
     column: u32,
     value: CellValue,

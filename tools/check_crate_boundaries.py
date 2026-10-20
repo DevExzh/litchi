@@ -219,7 +219,7 @@ RETIRED_IWA_OBSOLETE_EXAMPLE_PATHS = (
     Path("crates/litchi-iwa/examples/create_pages_stacked_shapes.rs"),
 )
 IWORK_EXAMPLE_LEGACY_API = re.compile(
-    r"(?<![A-Za-z0-9_])(?:litchi_iwa|NumbersEditor|PagesEditor|KeynoteEditor|"
+    r"(?<![A-Za-z0-9_])(?:litchi_iwa|Editor|Editor|Editor|"
     r"IWorkPackage)(?![A-Za-z0-9_])"
 )
 IWORK_EXAMPLE_NATIVE_ID_CALL = re.compile(
@@ -3254,7 +3254,7 @@ def _audit_keynote_media_properties_native_evidence(root: Path) -> list[str]:
 # data into one selector-first package owner.  The owner deliberately covers
 # the shared media payload edge (movie content, movie poster, and audio
 # content) without owning movie/audio creation, duplication, deletion,
-# playback, geometry, title/caption, or generic ``KeynoteEditor::replace_media``
+# playback, geometry, title/caption, or generic ``Editor::replace_media``
 # compatibility.  Keep this inventory independent from the playback and
 # geometry ratchets: a payload replacement must prove both the nested
 # ``TSP.DataReference`` edge and the PackageMetadata digest/length closure.
@@ -3576,7 +3576,7 @@ KEYNOTE_SLIDE_MEDIA_DATA_LIMIT_VARIANTS = frozenset(
         "Allocations",
     }
 )
-# ``KeynoteEditor`` itself lives at ``keynote/editor.rs`` while focused
+# ``Editor`` itself lives at ``keynote/editor.rs`` while focused
 # compatibility helpers live below ``keynote/editor/``.  Scan the whole
 # Keynote source root, but keep the lexical inventory exact to the three
 # retired replacement wrappers so unrelated editor APIs remain untouched.
@@ -6747,7 +6747,7 @@ IWA_KEYNOTE_README_SHOW_SETTINGS_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?KeynoteEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>show_settings|set_show_settings)\b"
         r"[ \t\r\n]*\("
     ),
@@ -6850,7 +6850,7 @@ IWA_KEYNOTE_SOUNDTRACK_SETTINGS_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?KeynoteEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>soundtrack_settings|set_soundtrack_settings)"
         r"\b[ \t\r\n]*\("
     ),
@@ -7158,7 +7158,7 @@ IWA_KEYNOTE_README_SLIDE_TRANSITION_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?KeynoteEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>slide_transition|set_slide_transition|clear_slide_transition)"
         r"\b[ \t\r\n]*\("
     ),
@@ -7586,7 +7586,7 @@ IWA_KEYNOTE_README_SLIDE_DELETE_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?KeynoteEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>remove_slide)\b[ \t\r\n]*\("
     ),
 )
@@ -7722,7 +7722,7 @@ IWA_KEYNOTE_README_PLACEHOLDER_VISIBILITY_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?KeynoteEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>set_slide_text_placeholder_visible|"
         r"set_slide_title_visible|set_slide_body_visible)"
         r"\b[ \t\r\n]*\("
@@ -7774,7 +7774,7 @@ IWA_KEYNOTE_README_SLIDE_NUMBER_VISIBILITY_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?KeynoteEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>set_slide_number_visible)\b[ \t\r\n]*\("
     ),
 )
@@ -8052,7 +8052,7 @@ IWA_NUMBERS_README_NAMES_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?NumbersEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>rename_sheet|rename_table)\b"
         r"[ \t\r\n]*\("
     ),
@@ -8102,7 +8102,7 @@ IWA_NUMBERS_README_TABLE_HEADER_SETTINGS_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?NumbersEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>table_header_settings|set_table_header_settings)"
         r"\b[ \t\r\n]*\("
     ),
@@ -8303,7 +8303,7 @@ IWA_NUMBERS_README_TABLE_TITLE_SETTINGS_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?NumbersEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>table_title_settings|set_table_title_settings)"
         r"\b[ \t\r\n]*\("
     ),
@@ -8930,7 +8930,7 @@ RETIRED_IWA_NUMBERS_TABLE_CELL_CONTROL_TEST_SET = frozenset(
 RETIRED_IWA_NUMBERS_TABLE_CELL_CONTROL_EXAMPLE = Path(
     "crates/litchi-iwa/examples/create_iwork_table_number_formats.rs"
 )
-# The generic NumbersEditor data-format bridge is a compatibility surface, but
+# The generic Editor data-format bridge is a compatibility surface, but
 # its interactive-control branch must remain selector-first internally.  Keep
 # this audit separate from the retired method scan: Pages/Keynote adapters and
 # the private cell_data_format implementation are intentionally out of scope.
@@ -9669,7 +9669,7 @@ NUMBERS_TABLE_CELL_NUMBER_FORMAT_INTEGRATION_MARKERS = {
         re.IGNORECASE,
     ),
     "selector/locality verification": re.compile(
-        r"(?:SheetSelector|TableSelector|CellPosition|locality|reopen|readback)",
+        r"(?:SheetSelector|TableSelector|(?-i:\bAt\b)|locality|reopen|readback)",
         re.IGNORECASE,
     ),
 }
@@ -9995,7 +9995,7 @@ NUMBERS_TABLE_CELL_TEXT_FORMAT_INTEGRATION_MARKERS = {
         re.IGNORECASE,
     ),
     "selector/locality verification": re.compile(
-        r"(?:SheetSelector|TableSelector|CellPosition|locality|reopen|readback)",
+        r"(?:SheetSelector|TableSelector|(?-i:\bAt\b)|locality|reopen|readback)",
         re.IGNORECASE,
     ),
 }
@@ -10085,7 +10085,7 @@ NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_RAW_MARKERS = frozenset(
 # transaction.  Keep the migration-host retirement inventory deliberately
 # narrow: the generic ``DataFormat`` helpers (``cell_date_time_format`` and
 # friends) remain a compatibility surface for source-built packages and for
-# the Pages/Keynote attached-table adapters.  Only these NumbersEditor
+# the Pages/Keynote attached-table adapters.  Only these Editor
 # table-cell methods are retired once the focused owner is present.
 RETIRED_IWA_NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_METHODS = (
     "table_cell_date_time_format",
@@ -10312,7 +10312,7 @@ NUMBERS_TABLE_CELL_DURATION_FORMAT_OWNER_REQUIRED_MARKERS = {
     ),
 }
 
-# Only the dedicated NumbersEditor convenience methods are retired.  The
+# Only the dedicated Editor convenience methods are retired.  The
 # generic ``DataFormat`` helpers intentionally remain available to source-
 # built packages and to the attached Pages/Keynote table adapters.
 RETIRED_IWA_NUMBERS_TABLE_CELL_DURATION_FORMAT_METHODS = (
@@ -10879,7 +10879,7 @@ NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_INTEGRATION_MARKERS = {
         re.IGNORECASE,
     ),
     "selector/locality verification": re.compile(
-        r"(?:SheetSelector|TableSelector|CellPosition|locality|reopen|readback)",
+        r"(?:SheetSelector|TableSelector|(?-i:\bAt\b)|locality|reopen|readback)",
         re.IGNORECASE,
     ),
 }
@@ -11211,7 +11211,7 @@ NUMBERS_TABLE_CELL_CURRENCY_FORMAT_INTEGRATION_MARKERS = {
         re.IGNORECASE,
     ),
     "selector/locality verification": re.compile(
-        r"(?:SheetSelector|TableSelector|CellPosition|locality|reopen|readback)",
+        r"(?:SheetSelector|TableSelector|(?-i:\bAt\b)|locality|reopen|readback)",
         re.IGNORECASE,
     ),
 }
@@ -11533,7 +11533,7 @@ NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_INTEGRATION_MARKERS = {
         re.IGNORECASE,
     ),
     "selector/locality verification": re.compile(
-        r"(?:SheetSelector|TableSelector|CellPosition|locality|reopen|readback)",
+        r"(?:SheetSelector|TableSelector|(?-i:\bAt\b)|locality|reopen|readback)",
         re.IGNORECASE,
     ),
 }
@@ -11863,7 +11863,7 @@ NUMBERS_TABLE_CELL_FRACTION_FORMAT_INTEGRATION_MARKERS = {
         re.IGNORECASE,
     ),
     "selector/locality verification": re.compile(
-        r"(?:SheetSelector|TableSelector|CellPosition|locality|reopen|readback)",
+        r"(?:SheetSelector|TableSelector|(?-i:\bAt\b)|locality|reopen|readback)",
         re.IGNORECASE,
     ),
 }
@@ -11942,9 +11942,9 @@ def _numbers_table_cell_fraction_format_public_leak(identifier: str) -> str | No
     """Classify native vocabulary forbidden by the Fraction facade."""
 
     if identifier in {
-        "NumbersEditor",
-        "PagesEditor",
-        "KeynoteEditor",
+        "Editor",
+        "Editor",
+        "Editor",
         "LitchiIwaPackage",
     }:
         return "monolithic host type"
@@ -12074,7 +12074,7 @@ IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_LEGACY_CALL = re.compile(
     r"(?![A-Za-z0-9_])[ \t\r\n]*\("
 )
 
-# The focused Custom owner now replaces the three NumbersEditor convenience
+# The focused Custom owner now replaces the three Editor convenience
 # methods.  Keep this inventory separate from generic ``DataFormat`` helper
 # names: source-built Numbers packages and attached Pages/Keynote tables still
 # use those compatibility routes.  The shared retirement scanner also masks
@@ -12833,7 +12833,7 @@ NUMBERS_COMMENT_SOURCE = Path("crates/litchi-numbers/src/package/comments.rs")
 # Wave91 adds a read-only, selector-first projection of direct table-cell
 # comment replies.  Keep this ratchet dormant until the canonical semantic
 # type is present: the existing root-comment owner and the raw-ID
-# NumbersEditor reply mutation/identity APIs remain compatibility surfaces.
+# Editor reply mutation/identity APIs remain compatibility surfaces.
 NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE = NUMBERS_COMMENT_SOURCE
 NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE = Path(
     "crates/litchi-iwa-protos/src/comment_storage_codec.rs"
@@ -13100,7 +13100,7 @@ NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_ACTIVATION = re.compile(
 NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_REQUIRED_MARKERS = {
     "rooted selector graph": re.compile(
         r"(?i)\b(?:rooted|resolve[_ -]?(?:comment|reply)|SheetSelector|"
-        r"TableSelector|CellPosition|CommentReplyIndex)\b"
+        r"TableSelector|(?-i:At)|CommentReplyIndex)\b"
     ),
     "comment list and cell references": re.compile(
         r"(?i)\b(?:CommentList|comment[_ -]?list[_ -]?ids|cell[_ -]?comment[_ -]?keys|"
@@ -14216,7 +14216,7 @@ IWA_NUMBERS_README_SHEET_ORDER_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?NumbersEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>move_sheet)\b[ \t\r\n]*\("
     ),
 )
@@ -15043,27 +15043,27 @@ IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PUBLIC_SIGNATURES = {
     "__table_cell_comment_from_bytes_for_compatibility": (
         "pub fn __table_cell_comment_from_bytes_for_compatibility<'sheet, 'table>("
         " bytes: &[u8], sheet: impl Into<SheetSelector<'sheet>>, "
-        "table: impl Into<TableSelector<'table>>, position: CellPosition, ) "
+        "table: impl Into<TableSelector<'table>>, position: At, ) "
         "-> Result<Option<Comment>>"
     ),
     "__table_cell_comment_from_bytes_for_compatibility_with_options": (
         "pub fn __table_cell_comment_from_bytes_for_compatibility_with_options<"
         "'sheet, 'table>( bytes: &[u8], options: OpenOptions, "
         "sheet: impl Into<SheetSelector<'sheet>>, "
-        "table: impl Into<TableSelector<'table>>, position: CellPosition, ) "
+        "table: impl Into<TableSelector<'table>>, position: At, ) "
         "-> Result<Option<Comment>>"
     ),
     "__table_cell_comment_replies_from_bytes_for_compatibility": (
         "pub fn __table_cell_comment_replies_from_bytes_for_compatibility<'sheet, "
         "'table>( bytes: &[u8], sheet: impl Into<SheetSelector<'sheet>>, "
-        "table: impl Into<TableSelector<'table>>, position: CellPosition, ) "
+        "table: impl Into<TableSelector<'table>>, position: At, ) "
         "-> Result<Box<[CommentReply]>>"
     ),
     "__table_cell_comment_replies_from_bytes_for_compatibility_with_options": (
         "pub fn __table_cell_comment_replies_from_bytes_for_compatibility_with_options<"
         " 'sheet, 'table, >( bytes: &[u8], options: OpenOptions, "
         "sheet: impl Into<SheetSelector<'sheet>>, "
-        "table: impl Into<TableSelector<'table>>, position: CellPosition, ) "
+        "table: impl Into<TableSelector<'table>>, position: At, ) "
         "-> Result<Box<[CommentReply]>>"
     ),
 }
@@ -15076,7 +15076,7 @@ IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_TEST_SOURCE = Path(
 IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_SEAM_MARKERS = (
     re.compile(r"\bSheetSelector\b"),
     re.compile(r"\bTableSelector\b"),
-    re.compile(r"\bCellPosition\b"),
+    re.compile(r"\bAt\b"),
     re.compile(
         r"\b(?:physical_package|compatibility_package|PhysicalPackage|"
         r"PackageContext)\b"
@@ -15228,7 +15228,7 @@ IWA_PAGES_README_TABLE_LOCK_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?PagesEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>body_table_lock_state|set_body_table_lock_state)"
         r"\b[ \t\r\n]*\("
     ),
@@ -15265,7 +15265,7 @@ IWA_PAGES_TABLE_TITLE_CALL = re.compile(
 IWA_PAGES_TABLE_TITLE_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_TABLE_TITLE_README_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|PagesEditor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Editor)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>table_title_settings|set_table_title_settings)\b"
         r"[ \t\r\n]*\(",
@@ -15299,7 +15299,7 @@ IWA_PAGES_TABLE_HEADER_CALL = re.compile(
 IWA_PAGES_TABLE_HEADER_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_README_TABLE_HEADER_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|PagesEditor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Editor)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>table_header_settings|set_table_header_settings)\b"
         r"[ \t\r\n]*\(",
@@ -15338,7 +15338,7 @@ IWA_PAGES_TABLE_DIMENSION_CALL = re.compile(
 IWA_PAGES_TABLE_DIMENSION_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_README_TABLE_DIMENSION_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|PagesEditor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Editor)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>table_dimension_size|set_table_dimension_size|"
         r"table_row_height|set_table_row_height|table_column_width|"
@@ -15400,7 +15400,7 @@ IWA_PAGES_FOOTNOTE_LIFECYCLE_CALL = re.compile(
     r"[ \t\r\n]*\("
 )
 IWA_PAGES_FOOTNOTE_READ_CALL = re.compile(
-    r"(?<![A-Za-z0-9_#])(?P<receiver>(?:r#)?(?:self|editor|pages|PagesEditor))"
+    r"(?<![A-Za-z0-9_#])(?P<receiver>(?:r#)?(?:self|editor|pages|Editor))"
     r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?body_footnotes\b"
     r"[ \t\r\n]*\("
 )
@@ -15411,7 +15411,7 @@ IWA_PAGES_FOOTNOTE_FACADE_HELPER = re.compile(
 IWA_PAGES_FOOTNOTE_LIFECYCLE_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_README_FOOTNOTE_LIFECYCLE_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|PagesEditor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Editor)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>insert_body_footnote|remove_body_footnote)\b"
         r"[ \t\r\n]*\(",
@@ -15419,7 +15419,7 @@ IWA_PAGES_README_FOOTNOTE_LIFECYCLE_CALLS = (
 )
 IWA_PAGES_README_FOOTNOTE_READ_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|PagesEditor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Editor)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>body_footnotes)\b[ \t\r\n]*\(",
     ),
@@ -16282,7 +16282,7 @@ KEYNOTE_SLIDE_MOVIE_CREATION_FORBIDDEN_SOURCE_PATTERNS = (
     (
         "legacy editor delegation",
         re.compile(
-            r"(?<![A-Za-z0-9_#])(?:KeynoteEditor|IWorkPackage)"
+            r"(?<![A-Za-z0-9_#])(?:Editor|IWorkPackage)"
             r"(?:[ \t\r\n]*::|[ \t\r\n]*\.)|"
             r"(?<![A-Za-z0-9_#])(?:editor|host|legacy_editor)"
             r"[ \t\r\n]*\.[ \t\r\n]*add_slide_movie\b"
@@ -16308,7 +16308,7 @@ KEYNOTE_SLIDE_MOVIE_CREATION_RAW_API_PARAMETER = re.compile(
     r"(?:u64|u32|usize|Option[ \t\r\n]*<[ \t\r\n]*u64[ \t\r\n]*>)"
 )
 KEYNOTE_SLIDE_MOVIE_CREATION_RAW_API_TYPE = re.compile(
-    r"(?<![A-Za-z0-9_#])(?:ArchiveObject|RawMessage|KeynoteEditor|IWorkPackage)\b"
+    r"(?<![A-Za-z0-9_#])(?:ArchiveObject|RawMessage|Editor|IWorkPackage)\b"
 )
 
 
@@ -16751,7 +16751,7 @@ PAGES_TABLE_TITLE_PROTO_ORIGINS = frozenset(
     {"buffa", "prost", "prost_types", "tsd", "tsp", "tst", "tswp"}
 )
 # Body-table display names are a separate ownership seam from title visibility
-# settings.  The current Pages host still exposes ``PagesEditor::rename_table``
+# settings.  The current Pages host still exposes ``Editor::rename_table``
 # and routes it through the shared Numbers raw-ID helper; keep that migration
 # baseline dormant until the selector-first package owner is actually wired.
 RETIRED_IWA_PAGES_TABLE_NAME_METHODS = ("rename_table",)
@@ -16777,7 +16777,7 @@ IWA_PAGES_TABLE_NAME_HELPER_CALL = re.compile(
 IWA_PAGES_TABLE_NAME_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_TABLE_NAME_README_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|PagesEditor|editor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|Editor|editor)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>rename_table|body_table_name|edit_body_table_name|"
         r"apply_body_table_name)\b[ \t\r\n]*\(",
@@ -17105,7 +17105,7 @@ RETIRED_IWA_PAGES_TABLE_SORT_EXAMPLES = (
 IWA_PAGES_TABLE_SORT_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_README_TABLE_SORT_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|PagesEditor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|Editor)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>table_sort_order|set_table_sort_order|clear_table_sort_order)"
         r"\b[ \t\r\n]*\(",
@@ -17342,7 +17342,7 @@ PAGES_TABLE_SORT_RAW_PARAMETER = re.compile(
 # the current host still resolves native TextStorageId values and owns the
 # package graph.  Once activated, the facade ratchet requires the semantic
 # role vocabulary plus one private package transaction owner, and the host
-# ratchet retires every raw PagesEditor discovery/mutation method together.
+# ratchet retires every raw Editor discovery/mutation method together.
 RETIRED_IWA_PAGES_HEADER_FOOTER_SOURCE = IWA_PAGES_SOURCE_ROOT / "editor.rs"
 RETIRED_IWA_PAGES_HEADER_FOOTER_METHODS = (
     "header_footers",
@@ -17363,7 +17363,7 @@ IWA_PAGES_HEADER_FOOTER_CALL = re.compile(
 IWA_PAGES_HEADER_FOOTER_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_README_HEADER_FOOTER_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|PagesEditor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Editor)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>header_footers|replace_header_footer_text|"
         r"set_header_footer_text|clear_header_footer)\b[ \t\r\n]*\(",
@@ -17563,7 +17563,7 @@ RETIRED_IWA_PAGES_SECTION_TEXT_EXAMPLE = Path(
 IWA_PAGES_SECTION_TEXT_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_README_SECTION_TEXT_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|PagesEditor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Editor)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?(?P<method>"
         r"section_text|replace_section_text|set_section_text|clear_section_text)"
         r"\b[ \t\r\n]*\(",
@@ -17813,7 +17813,7 @@ IWA_PAGES_TABLE_APPEARANCE_CALL = re.compile(
 IWA_PAGES_TABLE_APPEARANCE_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_README_TABLE_APPEARANCE_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|PagesEditor|editor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|Editor|editor)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>body_table_appearance|set_body_table_appearance|"
         r"table_appearance|set_table_appearance)\b[ \t\r\n]*\(",
@@ -18238,21 +18238,21 @@ IWA_PAGES_TABLE_HIDDEN_AXES_CALL = re.compile(
 IWA_PAGES_TABLE_HIDDEN_AXES_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_README_TABLE_HIDDEN_AXES_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|PagesEditor|editor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|Editor|editor)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>table_hidden_axes|set_table_hidden_axes)\b"
         r"[ \t\r\n]*\(",
     ),
 )
 # The focused package must remain a terminal semantic owner.  A new
-# ``litchi_iwa``/``PagesEditor`` call or a direct shared-helper call in its
+# ``litchi_iwa``/``Editor`` call or a direct shared-helper call in its
 # owner would turn an unsupported focused operation into an implicit host
 # fallback.  These patterns are applied after comments, literals, and
 # cfg(test) items are masked.
 PAGES_TABLE_HIDDEN_AXES_FOCUSED_FALLBACK_PATTERNS = (
     re.compile(r"\blitchi_iwa[ \t\r\n]*::"),
     re.compile(r"\blitchi_pages[ \t\r\n]*::"),
-    re.compile(r"\b(?:PagesEditor|PagesPackage|FocusedPagesPackage)\b"),
+    re.compile(r"\b(?:Editor|PagesPackage|FocusedPagesPackage)\b"),
     re.compile(
         r"(?<![A-Za-z0-9_])(?:crate[ \t\r\n]*::[ \t\r\n]*)?"
         r"(?:table_hidden_axes|set_table_hidden_axes)[ \t\r\n]*\("
@@ -18689,7 +18689,7 @@ PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_MARKERS = {
         rf"(?m)^[ \t]*fn[ \t]+"
         rf"{re.escape(PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_NAME)}\b"
     ),
-    "source-built Pages builder": re.compile(r"\bPagesDocumentBuilder\s*::\s*new\s*\("),
+    "source-built Pages builder": re.compile(r"\bpages\s*::\s*Builder\s*::\s*new\s*\("),
     "source-built table": re.compile(r"\bbody_table\s*\("),
     # The focused test deliberately uses the semantic Package transaction
     # directly.  Do not require the old litchi-iwa adapter helper names here:
@@ -18699,7 +18699,7 @@ PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_MARKERS = {
     ),
     "focused hidden-axis read": re.compile(r"\bbody_table_hidden_axes\s*\("),
     "source-built reopen": re.compile(
-        r"\b(?:PagesEditor|PagesPackage|Package)\s*::\s*from_bytes\s*\("
+        r"\b(?:Editor|PagesPackage|Package)\s*::\s*from_bytes\s*\("
     ),
     "source-built exact bytes": re.compile(
         r"\b(?:to_bytes|write_to)\s*\("
@@ -18716,7 +18716,7 @@ PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_EXAMPLE_MARKERS = {
     "Pages migration branch": re.compile(
         r"(?m)^[ \t]*fn[ \t]+create_pages\b"
     ),
-    "Pages source-built builder": re.compile(r"\bPagesDocumentBuilder\s*::\s*new\s*\("),
+    "Pages source-built builder": re.compile(r"\bpages\s*::\s*Builder\s*::\s*new\s*\("),
     "Pages source-built table": re.compile(r"\bbody_table\s*\("),
     "Pages focused package ingress": re.compile(
         r"\bPagesPackage\s*::\s*from_bytes\s*\("
@@ -18726,7 +18726,7 @@ PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_EXAMPLE_MARKERS = {
     ),
     "Pages focused package write": re.compile(r"\bwrite_to\s*\("),
     "Pages source-built reopen": re.compile(
-        r"\bPagesEditor\s*::\s*from_bytes\s*\("
+        r"\bEditor\s*::\s*from_bytes\s*\("
     ),
     "Pages focused native reopen": re.compile(
         r"\bPagesPackage\s*::\s*(?:open|from_bytes)\s*\("
@@ -18831,7 +18831,7 @@ IWA_PAGES_README_SECTION_SETTINGS_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?PagesEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>section_settings|set_section_settings|set_section_name)"
         r"\b[ \t\r\n]*\("
     ),
@@ -18992,7 +18992,7 @@ IWA_PAGES_README_SECTION_BACKGROUND_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?PagesEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>section_background|set_section_background)"
         r"\b[ \t\r\n]*\("
     ),
@@ -22644,7 +22644,7 @@ def _is_numbers_table_cell_pop_up_menu_public_declaration(
 def _numbers_table_cell_number_format_public_leak(identifier: str) -> str | None:
     """Classify native vocabulary forbidden by the Number-format facade."""
 
-    if identifier in {"NumbersEditor", "PagesEditor", "KeynoteEditor", "LitchiIwaPackage"}:
+    if identifier in {"Editor", "Editor", "Editor", "LitchiIwaPackage"}:
         return "monolithic host type"
     if identifier in NUMBERS_TABLE_CELL_NUMBER_FORMAT_PROTO_ORIGINS:
         return "protobuf type"
@@ -24179,7 +24179,7 @@ def audit_iwa_keynote_drawable_comment_host_source_topology(
 
     The focused Keynote package owns the selector-first drawable-comment API.
     The migration host must therefore have no production or test-only
-    identifier for any of the seven former ``KeynoteEditor`` routes.  Scan
+    identifier for any of the seven former ``Editor`` routes.  Scan
     the complete iwa source tree after masking comments and literals so a
     private helper or public re-export cannot quietly recreate the old route.
     The generic ``IWorkDrawableCommentEditor`` remains an intentional shared
@@ -24573,7 +24573,7 @@ def _iwa_numbers_cell_comment_reader_retirement_evidence_ready(
 def audit_iwa_numbers_cell_comment_reader_retirement_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Retire only ``NumbersEditor::cell_comment`` after parity evidence.
+    """Retire only ``Editor::cell_comment`` after parity evidence.
 
     ``cell_comment_replies`` intentionally remains in the retention audit
     above.  This scan is limited to the Numbers host and its callers, so
@@ -24609,7 +24609,7 @@ def audit_iwa_numbers_cell_comment_reader_retirement_source_topology(
                 continue
             name = function.group(1)
             violations.append(
-                "retired litchi-iwa NumbersEditor::cell_comment method returned: "
+                "retired litchi-iwa Editor::cell_comment method returned: "
                 f"{relative}:{line_number}"
             )
             for match in IWA_NUMBERS_CELL_COMMENT_READER_RAW_ID_PARAMETER.finditer(
@@ -24639,28 +24639,30 @@ def audit_iwa_numbers_cell_comment_reader_retirement_source_topology(
     return sorted(set(violations))
 
 
-def audit_iwa_keynote_slide_info_source_topology(root: Path = ROOT) -> list[str]:
-    """Keep migrated Keynote slide and text-storage IDs advisory-deprecated.
+def _iwa_native_field_violations(
+    root: Path, struct_name: str, fields: tuple[str, ...], label: str
+) -> list[str]:
+    """Require documented, non-deprecated native identity fields.
 
-    ``KeynoteSlideInfo`` remains a migration-host compatibility value, but its
-    slide-node, slide, title/body, and speaker-notes identities are native
-    handles. The focused package owns semantic slide and title/body text
-    paths now, so a future edit must not silently make the handles look like
-    supported API again.
+    Owner decision 0350 (record 0352): deprecation is not an accepted end
+    state. The migration host addresses native objects by these identities,
+    so each field stays plain public API whose doc comment names it a native
+    identity; it must not pose as a supported semantic selector.
     """
 
     path = root / IWA_KEYNOTE_EDITOR_SOURCE
     if not path.is_file():
         return []
 
-    source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
-    struct = _rust_named_struct_body(source, "KeynoteSlideInfo")
+    raw = path.read_text(encoding="utf-8")
+    source = _mask_rust_non_code(raw)
+    struct = _rust_named_struct_body(source, struct_name)
     if struct is None:
         return []
     body, body_offset = struct
     violations: list[str] = []
 
-    for field_name in IWA_KEYNOTE_SLIDE_INFO_RAW_FIELDS:
+    for field_name in fields:
         field = re.search(
             rf"^[ \t]*pub[ \t]+(?:r#)?{re.escape(field_name)}\b[ \t]*:",
             body,
@@ -24668,82 +24670,52 @@ def audit_iwa_keynote_slide_info_source_topology(root: Path = ROOT) -> list[str]
         )
         if field is None:
             continue
-
-        prefix = body[: field.start()]
-        attributes = list(re.finditer(r"^[ \t]*#[ \t]*\[", prefix, re.MULTILINE))
-        nearest = attributes[-1] if attributes else None
-        deprecated = False
-        if nearest is not None and re.match(
-            r"[ \t]*#[ \t]*\[[ \t]*deprecated\b",
-            prefix[nearest.start() :],
-        ):
-            closing = prefix.find("]", nearest.end())
-            if closing >= 0 and not prefix[closing + 1 :].strip():
-                deprecated = True
-        if deprecated:
-            continue
-
         line_number = source.count("\n", 0, body_offset + field.start()) + 1
-        violations.append(
-            "litchi-iwa Keynote slide info native field must remain deprecated "
-            f"{field_name}: {IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
-        )
+        # The item's own attribute/doc block: the lines directly above it
+        # that are attributes or doc comments.
+        lines = raw[: body_offset + field.start()].split("\n")[:-1]
+        block: list[str] = []
+        for line in reversed(lines):
+            stripped = line.strip()
+            if stripped.startswith(("///", "#[")) or (block and stripped.startswith(("since", "note", ")]"))):
+                block.append(stripped)
+                continue
+            break
+        if any(re.match(r"#[ \t]*\[[ \t]*deprecated\b", line) for line in block):
+            violations.append(
+                f"litchi-iwa Keynote {label} native field must not be deprecated "
+                f"{field_name}: {IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
+            )
+        if not any(line.startswith("///") and "Native" in line for line in block):
+            violations.append(
+                f"litchi-iwa Keynote {label} native field must be documented as a "
+                f"native identity {field_name}: {IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
+            )
 
     return sorted(set(violations))
+
+
+def audit_iwa_keynote_slide_info_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep the Keynote slide-info native identities documented as native.
+
+    ``SlideInfo``'s slide-node, slide, title/body and speaker-notes
+    identities are native handles; the focused package owns the semantic
+    slide and text paths.
+    """
+
+    return _iwa_native_field_violations(
+        root, "SlideInfo", IWA_KEYNOTE_SLIDE_INFO_RAW_FIELDS, "slide info"
+    )
 
 
 def audit_iwa_keynote_slide_text_info_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Keep migrated Keynote drawable identities advisory-deprecated.
+    """Keep the Keynote slide-text drawable identity documented as native."""
 
-    ``KeynoteSlideTextInfo`` remains a migration-host compatibility value, but
-    its drawable identity is a native handle. The focused package owns
-    selector-first slide text paths now, so the handle must not look like a
-    supported public selector.
-    """
-
-    path = root / IWA_KEYNOTE_EDITOR_SOURCE
-    if not path.is_file():
-        return []
-
-    source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
-    struct = _rust_named_struct_body(source, "KeynoteSlideTextInfo")
-    if struct is None:
-        return []
-    body, body_offset = struct
-    violations: list[str] = []
-
-    for field_name in IWA_KEYNOTE_SLIDE_TEXT_INFO_RAW_FIELDS:
-        field = re.search(
-            rf"^[ \t]*pub[ \t]+(?:r#)?{re.escape(field_name)}\b[ \t]*:",
-            body,
-            re.MULTILINE,
-        )
-        if field is None:
-            continue
-
-        prefix = body[: field.start()]
-        attributes = list(re.finditer(r"^[ \t]*#[ \t]*\[", prefix, re.MULTILINE))
-        nearest = attributes[-1] if attributes else None
-        deprecated = False
-        if nearest is not None and re.match(
-            r"[ \t]*#[ \t]*\[[ \t]*deprecated\b",
-            prefix[nearest.start() :],
-        ):
-            closing = prefix.find("]", nearest.end())
-            if closing >= 0 and not prefix[closing + 1 :].strip():
-                deprecated = True
-        if deprecated:
-            continue
-
-        line_number = source.count("\n", 0, body_offset + field.start()) + 1
-        violations.append(
-            "litchi-iwa Keynote slide text info native field must remain deprecated "
-            f"{field_name}: {IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
-        )
-
-    return sorted(set(violations))
+    return _iwa_native_field_violations(
+        root, "SlideTextInfo", IWA_KEYNOTE_SLIDE_TEXT_INFO_RAW_FIELDS, "slide text info"
+    )
 
 
 def audit_iwa_keynote_document_source_topology(
@@ -27798,7 +27770,7 @@ def audit_iwa_numbers_table_move_source_topology(
             if name != NUMBERS_TABLE_MOVE_PACKAGE_METHOD:
                 continue
             violations.append(
-                "retired litchi-iwa NumbersEditor::move_table returned: "
+                "retired litchi-iwa Editor::move_table returned: "
                 f"{path.relative_to(root)}:{line_number}"
             )
         host_move_calls.extend(
@@ -29265,7 +29237,7 @@ def audit_iwa_numbers_table_cell_pop_up_menu_source_topology(
 
     The Pages table popup adapter and the shared private cell-data-format
     implementation are intentionally outside this ratchet.  They may remain
-    while Numbers migrates, but public NumbersEditor/raw-ID entry points and
+    while Numbers migrates, but public Editor/raw-ID entry points and
     example calls must not bypass the selector-first package owner.
     """
 
@@ -29481,7 +29453,7 @@ def audit_numbers_table_cell_pop_up_menu_facade_source_topology(
             )
             continue
         if method != "apply_table_cell_pop_up_menu_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if not re.search(rf"\b{selector}\b", declaration):
                     violations.append(
                         "focused litchi-numbers popup-menu Package method "
@@ -30127,7 +30099,7 @@ def audit_numbers_table_cell_number_format_facade_source_topology(
             continue
         declaration, line_number = record
         if method != "apply_table_cell_number_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Number-format Package method "
@@ -30625,7 +30597,7 @@ def audit_iwa_numbers_table_cell_number_format_source_topology(
                         "litchi-iwa Numbers Number-format compatibility method must "
                         f"delegate to focused Package {method}: {path.relative_to(root)}:{line_number}"
                     )
-                for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+                for selector in ("SheetSelector", "TableSelector", "At"):
                     if re.search(rf"\b{re.escape(selector)}\b", route) is None:
                         violations.append(
                             "litchi-iwa Numbers Number-format compatibility route is "
@@ -30692,12 +30664,12 @@ def audit_iwa_numbers_table_cell_number_format_source_topology(
 def audit_iwa_numbers_table_cell_custom_format_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Retire NumbersEditor Custom-format raw-ID routes after owner cutover.
+    """Retire Editor Custom-format raw-ID routes after owner cutover.
 
     The focused ``litchi-numbers::Package`` owns the selector-first Custom
     transaction.  Generic ``DataFormat`` helpers remain compatibility-only
     ingress for source-built Numbers packages and attached Pages/Keynote
-    tables, so this audit bans only the three dedicated NumbersEditor method
+    tables, so this audit bans only the three dedicated Editor method
     names.  Focused Package calls with the same names remain valid and are
     checked for their lexical receiver by the shared retirement scanner.
     """
@@ -30771,9 +30743,9 @@ def _numbers_table_cell_text_format_public_leak(identifier: str) -> str | None:
     """Classify native vocabulary forbidden by the Text facade."""
 
     if identifier in {
-        "NumbersEditor",
-        "PagesEditor",
-        "KeynoteEditor",
+        "Editor",
+        "Editor",
+        "Editor",
         "LitchiIwaPackage",
     }:
         return "monolithic host type"
@@ -31179,7 +31151,7 @@ def audit_numbers_table_cell_text_format_facade_source_topology(
             continue
         declaration, line_number = record
         if method != "apply_table_cell_text_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Text-format Package method "
@@ -31752,7 +31724,7 @@ def audit_numbers_table_cell_date_time_format_facade_source_topology(
                 f"unexpected signature {method}: {owner_path.relative_to(root)}:{line_number}"
             )
         if method != "apply_table_cell_date_time_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Date & Time-format Package method "
@@ -31874,9 +31846,9 @@ def _numbers_table_cell_duration_format_public_leak(
     if identifier == "wire" or identifier in NUMBERS_TABLE_CELL_DURATION_FORMAT_WIRE_TYPES:
         return "wire type"
     if identifier in {
-        "NumbersEditor",
-        "PagesEditor",
-        "KeynoteEditor",
+        "Editor",
+        "Editor",
+        "Editor",
         "LitchiIwaPackage",
     }:
         return "monolithic host type"
@@ -32302,7 +32274,7 @@ def audit_numbers_table_cell_duration_format_facade_source_topology(
                 f"unexpected signature {method}: {owner_path.relative_to(root)}:{line_number}"
             )
         if method != "apply_table_cell_duration_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Duration-format Package method "
@@ -32885,7 +32857,7 @@ def audit_numbers_table_cell_custom_format_facade_source_topology(
                 f"{owner_path.relative_to(root)}:{line_number}"
             )
         if method != "apply_table_cell_custom_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Custom-format Package method "
@@ -32894,7 +32866,7 @@ def audit_numbers_table_cell_custom_format_facade_source_topology(
                     )
             selector_positions = [
                 declaration.find(selector)
-                for selector in ("SheetSelector", "TableSelector", "CellPosition")
+                for selector in ("SheetSelector", "TableSelector", "At")
             ]
             receiver_position = declaration.find("&self")
             if (
@@ -33308,9 +33280,9 @@ def _numbers_table_cell_percentage_format_public_leak(identifier: str) -> str | 
     """Classify native vocabulary forbidden by the Percentage facade."""
 
     if identifier in {
-        "NumbersEditor",
-        "PagesEditor",
-        "KeynoteEditor",
+        "Editor",
+        "Editor",
+        "Editor",
         "LitchiIwaPackage",
     }:
         return "monolithic host type"
@@ -33417,9 +33389,9 @@ def _numbers_table_cell_currency_format_public_leak(identifier: str) -> str | No
     """Classify native vocabulary forbidden by the Currency facade."""
 
     if identifier in {
-        "NumbersEditor",
-        "PagesEditor",
-        "KeynoteEditor",
+        "Editor",
+        "Editor",
+        "Editor",
         "LitchiIwaPackage",
     }:
         return "monolithic host type"
@@ -33526,9 +33498,9 @@ def _numbers_table_cell_scientific_format_public_leak(identifier: str) -> str | 
     """Classify native vocabulary forbidden by the Scientific facade."""
 
     if identifier in {
-        "NumbersEditor",
-        "PagesEditor",
-        "KeynoteEditor",
+        "Editor",
+        "Editor",
+        "Editor",
         "LitchiIwaPackage",
     }:
         return "monolithic host type"
@@ -34544,7 +34516,7 @@ def audit_numbers_table_cell_percentage_format_facade_source_topology(
             continue
         declaration, line_number = record
         if method != "apply_table_cell_percentage_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Percentage-format Package method "
@@ -35133,7 +35105,7 @@ def audit_numbers_table_cell_percentage_format_facade_source_topology(
             continue
         declaration, line_number = record
         if method != "apply_table_cell_percentage_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Percentage-format Package method "
@@ -35547,7 +35519,7 @@ def audit_numbers_table_cell_currency_format_facade_source_topology(
             continue
         declaration, line_number = record
         if method != "apply_table_cell_currency_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Currency-format Package method "
@@ -35969,7 +35941,7 @@ def audit_numbers_table_cell_fraction_format_facade_source_topology(
             continue
         declaration, line_number = record
         if method != "apply_table_cell_fraction_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Fraction-format Package method "
@@ -36432,7 +36404,7 @@ def audit_iwa_numbers_table_cell_percentage_format_source_topology(
                         "litchi-iwa Numbers Percentage-format compatibility method must "
                         f"delegate to focused Package {method}: {path.relative_to(root)}:{line_number}"
                     )
-                for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+                for selector in ("SheetSelector", "TableSelector", "At"):
                     if re.search(rf"\b{re.escape(selector)}\b", route_text) is None:
                         violations.append(
                             "litchi-iwa Numbers Percentage-format compatibility route is "
@@ -36645,7 +36617,7 @@ def audit_numbers_table_cell_scientific_format_facade_source_topology(
             continue
         declaration, line_number = record
         if method != "apply_table_cell_scientific_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Scientific-format Package method "
@@ -37108,7 +37080,7 @@ def audit_iwa_numbers_table_cell_percentage_format_source_topology(
                         "litchi-iwa Numbers Percentage-format compatibility method must "
                         f"delegate to focused Package {method}: {path.relative_to(root)}:{line_number}"
                     )
-                for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+                for selector in ("SheetSelector", "TableSelector", "At"):
                     if re.search(rf"\b{re.escape(selector)}\b", route_text) is None:
                         violations.append(
                             "litchi-iwa Numbers Percentage-format compatibility route is "
@@ -37330,7 +37302,7 @@ def audit_iwa_numbers_table_cell_scientific_format_source_topology(
                         "litchi-iwa Numbers Scientific-format compatibility method must "
                         f"delegate to focused Package {method}: {path.relative_to(root)}:{line_number}"
                     )
-                for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+                for selector in ("SheetSelector", "TableSelector", "At"):
                     if re.search(rf"\b{re.escape(selector)}\b", route_text) is None:
                         violations.append(
                             "litchi-iwa Numbers Scientific-format compatibility route is "
@@ -37578,7 +37550,7 @@ def audit_iwa_numbers_table_cell_currency_format_source_topology(
                         "litchi-iwa Numbers Currency-format compatibility method must "
                         f"delegate to focused Package {method}: {path.relative_to(root)}:{line_number}"
                     )
-                for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+                for selector in ("SheetSelector", "TableSelector", "At"):
                     if re.search(rf"\b{re.escape(selector)}\b", route_text) is None:
                         violations.append(
                             "litchi-iwa Numbers Currency-format compatibility route is "
@@ -37719,7 +37691,7 @@ def _audit_iwa_numbers_table_cell_format_retirement(
             name = match.group("name")
             # Calls through the focused Package are canonical and may remain
             # in a migration-host adapter.  The retired surface is the
-            # NumbersEditor raw-ID method, not the focused owner call with the
+            # Editor raw-ID method, not the focused owner call with the
             # same semantic method name.  Validate the receiver and its local
             # scope exactly; a focused call elsewhere on a statement or in a
             # different function must not exempt an unrelated receiver.
@@ -37836,13 +37808,13 @@ def audit_iwa_numbers_table_cell_scientific_format_source_topology(
 def audit_iwa_numbers_table_cell_date_time_format_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Retire NumbersEditor Date & Time raw-ID methods after owner cutover.
+    """Retire Editor Date & Time raw-ID methods after owner cutover.
 
     Date & Time has no migration-only bridge/fallback helpers: source-built
     and attached-table compatibility continues through the generic
     ``DataFormat`` routes, while the focused ``litchi-numbers::Package`` owns
     the selector-first DateTime transaction.  Pass empty inventories to the
-    shared retired-route scanner so only the dedicated NumbersEditor methods
+    shared retired-route scanner so only the dedicated Editor methods
     are rejected.
     """
 
@@ -37860,11 +37832,11 @@ def audit_iwa_numbers_table_cell_date_time_format_source_topology(
 def audit_iwa_numbers_table_cell_duration_format_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Retire NumbersEditor Duration raw-ID methods after owner cutover.
+    """Retire Editor Duration raw-ID methods after owner cutover.
 
     Generic ``DataFormat`` helpers remain compatibility-only routes for
     source-built Numbers packages and attached Pages/Keynote tables.  Once
-    the focused Duration owner is wired, only the dedicated NumbersEditor
+    the focused Duration owner is wired, only the dedicated Editor
     methods are forbidden; focused ``litchi_numbers::Package`` calls remain
     valid adapter ingress.
     """
@@ -38111,10 +38083,10 @@ def audit_iwa_numbers_table_cell_control_bridge_source_topology(
 ) -> list[str]:
     """Verify the generic Numbers bridge delegates controls by selectors.
 
-    The compatibility ``NumbersEditor`` still exposes the historical generic
+    The compatibility ``Editor`` still exposes the historical generic
     data-format entry point.  Interactive controls must nevertheless enter
     ``litchi-numbers::Package`` through ``SheetSelector``/
-    ``TableSelector``/``CellPosition`` and the unified control transaction;
+    ``TableSelector``/``At`` and the unified control transaction;
     this prevents a future split-control change from quietly reintroducing a
     raw-ID per-kind writer.  This audit deliberately reads only the Numbers
     bridge.  Shared cell-data-format code and Pages/Keynote adapters remain
@@ -38235,7 +38207,7 @@ def audit_iwa_numbers_table_cell_control_bridge_source_topology(
                         f"{IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
                     )
 
-    for marker in ("SheetSelector", "TableSelector", "CellPosition"):
+    for marker in ("SheetSelector", "TableSelector", "At"):
         if marker not in source:
             violations.append(
                 "Numbers cell-control selector bridge must expose typed "
@@ -38543,7 +38515,7 @@ def audit_numbers_table_cell_control_facade_source_topology(
             )
             continue
         if method != "apply_table_cell_control_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if not re.search(rf"\b{selector}\b", declaration):
                     violations.append(
                         "focused litchi-numbers cell-control Package method "
@@ -40029,7 +40001,7 @@ def audit_iwa_numbers_cell_comment_delegation_source_topology(
 ) -> list[str]:
     """Keep the retained Numbers comment writer on the focused owner seam.
 
-    ``NumbersEditor::set_cell_comment`` is a deprecated compatibility entry
+    ``Editor::set_cell_comment`` is a deprecated compatibility entry
     point.  It may retain the old archive writer for comment graphs that the
     focused package cannot yet own, but every supported existing-root
     creation or replacement must first cross the selector-first
@@ -40161,8 +40133,8 @@ def audit_iwa_numbers_cell_comment_delegation_source_topology(
         ("SheetSelector::index", r"\bSheetSelector[ \t\r\n]*::[ \t\r\n]*index\b"),
         ("TableSelector::index", r"\bTableSelector[ \t\r\n]*::[ \t\r\n]*index\b"),
         (
-            "CellPosition::try_from_usize",
-            r"\bCellPosition[ \t\r\n]*::[ \t\r\n]*try_from_usize\b",
+            "At::try_from_usize",
+            r"\bAt[ \t\r\n]*::[ \t\r\n]*try_from_usize\b",
         ),
     )
     for label, pattern in selector_requirements:
@@ -40216,7 +40188,7 @@ def audit_iwa_numbers_cell_comment_delegation_source_topology(
             "focused error as legacy-compatible"
         )
 
-    # The focused owner accepts only semantic selectors and CellPosition. A
+    # The focused owner accepts only semantic selectors and At. A
     # native table/object identifier in the actual method argument list would
     # bypass the scoped mapping even if a selector helper exists elsewhere.
     if focused_call is not None:
@@ -40282,7 +40254,7 @@ def audit_iwa_numbers_cell_comment_clear_retirement_source_topology(
         required = (
             "SheetSelector",
             "TableSelector",
-            "CellPosition",
+            "At",
             IWA_NUMBERS_CELL_COMMENT_CLEAR_FOCUSED_METHOD,
         )
         for marker in required:
@@ -40299,7 +40271,7 @@ def audit_iwa_numbers_cell_comment_reply_mutation_source_topology(
 ) -> list[str]:
     """Audit only the Numbers reply bridge after the package owner activates.
 
-    The old ``NumbersEditor`` methods are allowed during the migration while
+    The old ``Editor`` methods are allowed during the migration while
     they remain explicitly deprecated and route through a narrow private
     compatibility helper.  Calls in Numbers examples/production must not be
     mistaken for the supported API.  Pages, Keynote, and the shared
@@ -40358,8 +40330,8 @@ def audit_iwa_numbers_cell_comment_reply_mutation_source_topology(
             ("SheetSelector::index", r"\bSheetSelector\s*::\s*index\b"),
             ("TableSelector::index", r"\bTableSelector\s*::\s*index\b"),
             (
-                "CellPosition::try_from_usize",
-                r"\bCellPosition\s*::\s*try_from_usize\b",
+                "At::try_from_usize",
+                r"\bAt\s*::\s*try_from_usize\b",
             ),
         ):
             if re.search(pattern, route) is None and not (
@@ -40519,7 +40491,7 @@ def audit_iwa_numbers_table_lock_source_topology(root: Path = ROOT) -> list[str]
     table_info_path = root / IWA_NUMBERS_TABLE_INFO_SOURCE
     if table_info_path.is_file():
         source = table_info_path.read_text(encoding="utf-8")
-        body = _rust_named_struct_body(source, "NumbersTableInfo")
+        body = _rust_named_struct_body(source, "TableInfo")
         if body is not None:
             body_source, body_offset = body
             for name in sorted(RETIRED_IWA_NUMBERS_TABLE_INFO_FIELDS):
@@ -40811,7 +40783,7 @@ def _pages_table_name_focused_package_call(
 def audit_iwa_pages_table_name_source_topology(root: Path = ROOT) -> list[str]:
     """Retire raw Pages body-table renames once the focused owner is wired.
 
-    ``PagesEditor::rename_table`` and the shared
+    ``Editor::rename_table`` and the shared
     ``crate::numbers::editor::rename_table_in_package`` helper both accept a
     native model identifier.  They must disappear from production Pages host
     code when ``body_table_name.rs`` is present.  A typed
@@ -41203,7 +41175,7 @@ def audit_iwa_pages_table_hidden_axes_source_topology(
     The focused owner is selector-first and archive free, but it currently
     refuses to create the native hidden-state closure for source-built Pages
     tables.  Until the native changed-edit gate closes, the raw-ID
-    ``PagesEditor`` route, its test coverage, and the mixed iWork example are
+    ``Editor`` route, its test coverage, and the mixed iWork example are
     required compatibility paths.  The host route must continue to use the
     shared executor, while the focused owner remains terminal and cannot call
     back into this compatibility seam.
@@ -42310,7 +42282,7 @@ def _pages_table_appearance_legacy_read_compatibility_call(
     """Allow the sole read-only legacy fallback used by table listing.
 
     The exact package owner intentionally rejects producer profiles it cannot
-    rewrite safely. Legacy ``PagesEditor`` physical table discovery must still
+    rewrite safely. Legacy ``Editor`` physical table discovery must still
     report their existing appearance, but this exception is confined to one
     private helper and never permits a write or package-owner fallback.
     """
@@ -43373,7 +43345,7 @@ def audit_iwa_pages_header_footer_source_topology(
     """Retire the raw Pages header/footer host after owner activation.
 
     Header/footer discovery and text mutation currently live on
-    ``PagesEditor`` and expose ``TextStorageId``/``PagesHeaderFooterInfo``.
+    ``Editor`` and expose ``TextStorageId``/``PagesHeaderFooterInfo``.
     Keep this audit dormant until the private package owner exists so the
     compatibility host remains an intentional migration baseline.  Activation
     is deliberately item-scoped: unrelated Pages graph readers remain valid,
@@ -43781,7 +43753,7 @@ def audit_iwa_pages_footnote_lifecycle_source_topology(
             for match in IWA_PAGES_FOOTNOTE_LIFECYCLE_CALL.finditer(code):
                 # Focused Package calls are the replacement route and are
                 # allowed to retain the semantic method names. The ratchet
-                # targets host PagesEditor compatibility calls only.
+                # targets host Editor compatibility calls only.
                 if match.group("receiver") in {"Package", "PagesPackage"}:
                     continue
                 line_start = code.rfind("\n", 0, match.start()) + 1
@@ -44542,7 +44514,7 @@ def audit_iwa_pages_drawable_order_retirement_source_topology(
     ``litchi-pages`` owns selector-first body ordering now.  The compatibility
     host may continue to use the neutral codec for generic reachability and
     drawable creation, so this ratchet only targets the removed module,
-    ``PagesEditor`` method names, and their executable calls.
+    ``Editor`` method names, and their executable calls.
     """
 
     source_root = root / IWA_PAGES_SOURCE_ROOT
@@ -49401,7 +49373,7 @@ def audit_numbers_table_cell_comment_reply_facade_source_topology(
     use ``SheetSelector``/``TableSelector`` and semantic cell positions, while
     strict comment-storage decoding and a package-wide ownership census stay
     behind the private owner boundary.  This ratchet does not require reply
-    mutation.  The legacy raw-ID ``NumbersEditor`` reply read/add/set/remove
+    mutation.  The legacy raw-ID ``Editor`` reply read/add/set/remove
     methods remain retained mutation/identity compatibility and are
     intentionally neither required nor retired here.
     """
@@ -49842,10 +49814,10 @@ def audit_numbers_table_cell_comment_reply_facade_source_topology(
                     f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
                 )
         if method == "table_cell_comment_replies":
-            if re.search(r"\bCellPosition\b", declaration) is None:
+            if re.search(r"\bAt\b", declaration) is None:
                 violations.append(
                     "focused litchi-numbers comment-reply Package method "
-                    f"{method} must accept selector-first CellPosition: "
+                    f"{method} must accept selector-first At: "
                     f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
                 )
         if re.search(r"\bCommentReply\b", declaration) is None:
@@ -49879,11 +49851,11 @@ def audit_numbers_table_cell_comment_reply_facade_source_topology(
                         f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
                     )
                 if re.search(
-                    r"\bCellPosition[ \t\r\n]*::[ \t\r\n]*from_a1\b", body_code
+                    r"\bAt[ \t\r\n]*::[ \t\r\n]*from_a1\b", body_code
                 ) is None:
                     violations.append(
                         "focused litchi-numbers comment-reply A1 method must construct "
-                        "CellPosition from A1: "
+                        "At from A1: "
                         f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
                     )
 
@@ -50267,11 +50239,11 @@ def audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
         if (
             method != "apply_table_cell_comment_reply"
             and not method.endswith("_a1")
-            and re.search(r"\bCellPosition\b", declaration) is None
+            and re.search(r"\bAt\b", declaration) is None
         ):
             violations.append(
                 "focused Numbers comment-reply mutation Package method "
-                f"{method} must accept selector-first CellPosition: {location(path, line_number)}"
+                f"{method} must accept selector-first At: {location(path, line_number)}"
             )
         if method in {"table_cell_comment_reply", "set_table_cell_comment_reply", "remove_table_cell_comment_reply"} and re.search(
             r"\bCommentReplyIndex\b", declaration
@@ -50290,7 +50262,7 @@ def audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
             if body is None or re.search(r"from_a1", _mask_rust_non_code(body)) is None:
                 violations.append(
                     "focused Numbers comment-reply mutation A1 method "
-                    f"{method} must construct CellPosition from A1: {location(path, line_number)}"
+                    f"{method} must construct At from A1: {location(path, line_number)}"
                 )
         if not any(re.search(rf"\b{re.escape(name)}\b", declaration) for name in method_result_names[method]):
             violations.append(
@@ -58571,7 +58543,7 @@ def audit_keynote_movie_playback_facade_source_topology(
 
     The audit is intentionally dormant until the private owner, neutral codec,
     and package wiring exist together.  This avoids turning the still-live
-    KeynoteEditor compatibility surface into a false migration failure while
+    Editor compatibility surface into a false migration failure while
     the owner is being assembled.
     """
 
@@ -58823,12 +58795,12 @@ def audit_keynote_movie_playback_resource_source_topology(
 
 
 def audit_iwa_keynote_movie_playback_source_topology(root: Path = ROOT) -> list[str]:
-    """Retire KeynoteEditor movie playback methods after package activation.
+    """Retire Editor movie playback methods after package activation.
 
     Pages/Numbers/audio users of the shared ``media_playback`` helper are
     deliberately outside this source-root scan.  The migration surface is
     Keynote-only and callers should use ``litchi_keynote::Package`` directly;
-    no replacement public KeynoteEditor bridge is accepted.
+    no replacement public Editor bridge is accepted.
     """
 
     if not _keynote_movie_playback_owner_present(root):
@@ -65064,7 +65036,7 @@ def audit_keynote_slide_table_physical_sort_resource_source_topology(
 
     # Exact/native packages must not call the old Numbers mutation writer once
     # the owner is active. The sole temporary exception is the marker-proven
-    # KeynoteDocumentBuilder compatibility graph, including its save/reopen
+    # keynote::Builder compatibility graph, including its save/reopen
     # form; its writer is isolated behind one guarded dispatcher. Scan all
     # production Keynote helpers, including split child modules, while masking
     # cfg(test) bodies to avoid fixture decoys.
@@ -67005,7 +66977,7 @@ def audit_iwa_keynote_slide_table_name_source_topology(
 ) -> list[str]:
     """Retire raw Keynote table-name mutation in favor of Package calls.
 
-    ``KeynoteEditor::rename_slide_table`` and the shared Numbers
+    ``Editor::rename_slide_table`` and the shared Numbers
     ``rename_table_in_package`` helper both accept native model identity.  A
     focused ``litchi_keynote::Package`` call remains valid, while editor/self
     calls, helper imports, and helper invocations disappear from production
@@ -67261,7 +67233,7 @@ def audit_iwa_keynote_movie_geometry_source_topology(root: Path = ROOT) -> list[
     """Require the historical bridge before completion, then enforce host exit.
 
     MovieGeometry intentionally does not cover native angle/flip/flags and
-    synthetic compatibility graphs.  The legacy KeynoteEditor declarations
+    synthetic compatibility graphs.  The legacy Editor declarations
     and their internal calls therefore remain allowed in the focused host and
     its geometry helper until the expanded owner explicitly activates.  At
     activation, the completion audit takes over and retires every selector
@@ -70055,7 +70027,7 @@ NEUTRAL_TABLE_COORDINATE_SOURCE = NEUTRAL_TABLE_SOURCE_ROOT / "coordinate.rs"
 NEUTRAL_TABLE_MODEL_SOURCE = NEUTRAL_TABLE_SOURCE_ROOT / "model.rs"
 NEUTRAL_TABLE_REQUIRED_EXPORTS = {
     NEUTRAL_TABLE_VALUE_SOURCE: frozenset({"FiniteF64", "FiniteF64Error", "Type", "Update", "Value"}),
-    NEUTRAL_TABLE_COORDINATE_SOURCE: frozenset({"AddressError", "CellPosition", "CellRange", "Error", "Result"}),
+    NEUTRAL_TABLE_COORDINATE_SOURCE: frozenset({"AddressError", "At", "Area", "Error", "Result"}),
     NEUTRAL_TABLE_MODEL_SOURCE: frozenset({"Builder", "Cell", "Dimensions", "Error", "Grid", "Table", "View"}),
 }
 NEUTRAL_TABLE_REQUIRED_MODULES = {
@@ -71070,7 +71042,7 @@ IWA_TABLE_MERGE_HOST_READ_DELEGATIONS = (
         "format_name": "Pages",
         "source": Path("crates/litchi-iwa/src/pages/editor/tables/semantic.rs"),
         "reader_source": Path("crates/litchi-iwa/src/pages/editor/tables/reader.rs"),
-        "impl_type": "PagesEditor",
+        "impl_type": "Editor",
         "method": "table_cell_merges",
         "focused_method": "body_table_merges",
         "selectors": (
@@ -71082,7 +71054,7 @@ IWA_TABLE_MERGE_HOST_READ_DELEGATIONS = (
         "format_name": "Keynote",
         "source": Path("crates/litchi-iwa/src/keynote/editor/slide_tables.rs"),
         "reader_source": Path("crates/litchi-iwa/src/keynote/editor/slide_tables/reader.rs"),
-        "impl_type": "KeynoteEditor",
+        "impl_type": "Editor",
         "method": "slide_table_cell_merges",
         "focused_method": "slide_table_merges",
         "selectors": (
@@ -71922,7 +71894,7 @@ def audit_neutral_table_model_source_topology(root: Path = ROOT) -> list[str]:
         ),
         (
             Path("crates/litchi-numbers/src/table/coordinate.rs"),
-            frozenset({"AddressError", "CellPosition", "CellRange", "Error", "Result"}),
+            frozenset({"AddressError", "At", "Area", "Error", "Result"}),
         ),
         (
             Path("crates/litchi-numbers/src/table.rs"),
@@ -73293,7 +73265,7 @@ def _audit_numbers_cached_merge_handoff(root: Path) -> list[str]:
     if not (root / owner_path).is_file():
         return []
     owner = (root / owner_path).read_text(encoding="utf-8")
-    methods = _rust_public_method_bodies(owner, "table_cell_merges", type_name="NumbersEditor")
+    methods = _rust_public_method_bodies(owner, "table_cell_merges", type_name="Editor")
     if not methods:
         return []
     violations: list[str] = []
