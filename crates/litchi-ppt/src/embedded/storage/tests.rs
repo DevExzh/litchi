@@ -69,16 +69,16 @@ fn snapshot_projects_wire_metadata_without_copying_or_normalizing_bytes() {
 }
 
 #[test]
-fn editor_commits_a_new_snapshot_and_keeps_the_source_unchanged() {
+fn draft_yields_a_new_storage_and_keeps_the_source_unchanged() {
     let source = Storage::uncompressed(Kind::OleObject, b"original OLE2 bytes".to_vec()).unwrap();
     let source_record = source.to_record_bytes().unwrap();
-    let mut editor = source.edit();
+    let mut draft = source.draft();
 
-    editor.set_kind(Kind::ActiveXControl);
-    editor
+    draft.set_kind(Kind::ActiveXControl);
+    draft
         .replace_uncompressed(b"replacement OLE2 bytes".to_vec())
         .unwrap();
-    let committed = editor.commit().unwrap();
+    let committed = draft.into_storage().unwrap();
 
     assert_eq!(source.kind(), Kind::OleObject);
     assert_eq!(source.stored_bytes(), b"original OLE2 bytes");
@@ -89,34 +89,34 @@ fn editor_commits_a_new_snapshot_and_keeps_the_source_unchanged() {
 }
 
 #[test]
-fn invalid_editor_replacement_is_failure_atomic() {
+fn invalid_draft_replacement_is_failure_atomic() {
     let source = Storage::uncompressed(Kind::VbaProject, b"stable bytes".to_vec()).unwrap();
-    let mut editor = source.edit();
-    let before = editor.snapshot().metadata();
-    let before_bytes = editor.snapshot().stored_bytes().to_vec();
+    let mut draft = source.draft();
+    let before = draft.view().metadata();
+    let before_bytes = draft.view().stored_bytes().to_vec();
 
     assert!(
-        editor
+        draft
             .replace_compressed(MAX_DECLARED_BYTES + 1, vec![1, 2, 3])
             .is_err()
     );
-    assert_eq!(editor.snapshot().metadata(), before);
-    assert_eq!(editor.snapshot().stored_bytes(), before_bytes);
-    assert_eq!(editor.kind(), Kind::VbaProject);
-    assert_eq!(editor.compression(), Compression::Uncompressed);
+    assert_eq!(draft.view().metadata(), before);
+    assert_eq!(draft.view().stored_bytes(), before_bytes);
+    assert_eq!(draft.kind(), Kind::VbaProject);
+    assert_eq!(draft.compression(), Compression::Uncompressed);
 
-    let committed = editor.commit().unwrap();
+    let committed = draft.into_storage().unwrap();
     assert_eq!(committed, source);
 }
 
 #[test]
-fn moved_editor_and_borrowed_snapshot_preserve_exact_record_bytes() {
+fn moved_draft_and_borrowed_snapshot_preserve_exact_record_bytes() {
     let source = Storage::uncompressed(Kind::OleObject, vec![9, 8, 7, 6]).unwrap();
     let record = source.to_record_bytes().unwrap();
     let borrowed = super::Ref::parse_at(&record, 0, Kind::OleObject).unwrap();
     assert_eq!(borrowed.snapshot().to_record_bytes().unwrap(), record);
 
-    let committed = source.into_edit().commit().unwrap();
+    let committed = source.into_draft().into_storage().unwrap();
     assert_eq!(committed.to_record_bytes().unwrap(), record);
 }
 

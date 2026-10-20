@@ -14,6 +14,7 @@ use std::path::PathBuf;
 
 use litchi_core::Position;
 use litchi_core::edit::RefusalKind;
+use litchi_ppt::embedded::object;
 use litchi_ppt::font::Scope;
 use litchi_ppt::master::Kind;
 use litchi_ppt::master::metadata as master_metadata;
@@ -434,4 +435,130 @@ fn master_layout_edits_publish_replay_and_invert_exactly() {
         };
         assert_eq!(refusal.kind(), RefusalKind::NotFound);
     }
+}
+
+fn object_ids(package: &Package) -> Vec<u32> {
+    package
+        .presentation()
+        .unwrap()
+        .ole_objects()
+        .unwrap()
+        .unwrap()
+        .objects
+        .iter()
+        .map(object::ExternalObject::id)
+        .collect()
+}
+
+fn refusal_kind<T: std::fmt::Debug>(result: object::Result<T>) -> RefusalKind {
+    match result {
+        Err(object::Error::Refused(refusal)) => refusal.kind(),
+        other => panic!("expected a refusal, got {other:?}"),
+    }
+}
+
+#[test]
+fn embedded_object_edits_publish_replay_and_invert_exactly() {
+    let source_bytes = fixture("poi/test-data/slideshow/ppt_with_embeded.ppt");
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let source_bytes = source.to_bytes().unwrap();
+    let ids = object_ids(&source);
+    assert_eq!(ids, [1, 2, 3, 4, 5, 6]);
+
+    // An exact no-op, including a reorder back to the source order.
+    let mut edit = source.edit_objects().unwrap();
+    edit.reorder(&ids).unwrap();
+    let no_op = edit.commit().unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), source_bytes);
+
+    // Dropping a staged edit discards it.
+    let mut edit = source.edit_objects().unwrap();
+    edit.reorder(&[6, 5, 4, 3, 2, 1]).unwrap();
+    drop(edit);
+    assert_eq!(source.to_bytes().unwrap(), source_bytes);
+
+    // A changed commit changes the read projection: a reordered list and a
+    // replaced storage behind the first object.
+    let persist_id = source
+        .presentation()
+        .unwrap()
+        .ole_objects()
+        .unwrap()
+        .unwrap()
+        .objects[0]
+        .persist_id();
+    let storage = object_storage(b"replacement OLE2 bytes");
+    let mut edit = source.edit_objects().unwrap();
+    edit.reorder(&[6, 5, 4, 3, 2, 1]).unwrap();
+    edit.replace_storage(persist_id, storage.clone()).unwrap();
+    assert_eq!(
+        edit.objects()
+            .objects
+            .iter()
+            .map(object::ExternalObject::id)
+            .collect::<Vec<_>>(),
+        [6, 5, 4, 3, 2, 1]
+    );
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert!(!commit.patch().is_noop());
+    let changed = commit.package().to_bytes().unwrap();
+    assert_eq!(object_ids(commit.package()), [6, 5, 4, 3, 2, 1]);
+    assert_eq!(
+        commit
+            .package()
+            .presentation()
+            .unwrap()
+            .ole_storage(persist_id)
+            .unwrap(),
+        Some(storage)
+    );
+    assert_eq!(object_ids(&source), ids);
+
+    // The patch replays onto its source and its inverse restores the source.
+    let replayed = source.apply_objects(commit.patch()).unwrap();
+    assert_eq!(replayed.package().to_bytes().unwrap(), changed);
+    let restored = commit
+        .package()
+        .apply_objects(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(restored.package().to_bytes().unwrap(), source_bytes);
+    assert!(matches!(
+        built().apply_objects(commit.patch()),
+        Err(object::Error::PatchConflict)
+    ));
+
+    // Absent targets are typed refusals that leave the edit unchanged.
+    let mut edit = source.edit_objects().unwrap();
+    assert_eq!(refusal_kind(edit.remove(99)), RefusalKind::NotFound);
+    assert_eq!(
+        refusal_kind(edit.replace_storage(0xF_FFFF, object_storage(b"x"))),
+        RefusalKind::NotFound
+    );
+    assert_eq!(
+        refusal_kind(edit.reorder(&[1, 2, 3, 4, 5, 99])),
+        RefusalKind::NotFound
+    );
+    assert_eq!(
+        refusal_kind(edit.reorder(&[1, 2, 3])),
+        RefusalKind::InvalidValue
+    );
+    assert_eq!(edit.objects().objects.len(), ids.len());
+    assert!(!edit.commit().unwrap().diagnostics().changed());
+
+    // A presentation without an external-object list has no target.
+    assert_eq!(
+        refusal_kind(built().edit_objects()),
+        RefusalKind::UnsupportedTarget
+    );
+}
+
+fn object_storage(data: &[u8]) -> litchi_ppt::embedded::storage::Storage {
+    litchi_ppt::embedded::storage::Storage::uncompressed(
+        litchi_ppt::embedded::storage::Kind::OleObject,
+        data.to_vec(),
+    )
+    .unwrap()
 }

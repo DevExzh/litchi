@@ -237,7 +237,6 @@ pub use document_properties::{
     PhotoAlbumFrameShape, PhotoAlbumLayout, PhotoAlbumSettings,
 };
 pub use document_structure::{CustomTableStylesPlacement, DocumentStructure};
-pub use embedded::object::Editor;
 pub use embedded::object::{
     Collection, ColorFollow, ContainerKind, Control, Definition, DimensionPolicy, DrawAspect,
     EmbedPreferences, ExternalObject, LinkInfo, Metadata, ObjectSubtype, ObjectType, UnknownRecord,

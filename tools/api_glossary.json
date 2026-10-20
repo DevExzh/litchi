@@ -5967,6 +5967,87 @@
           "scope": "litchi_ppt",
           "replacement": "use the family's Edit (record 0357)",
           "match": "suffix"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt",
+          "replacement": "Package::edit_objects() and litchi_ppt::embedded::object::Edit"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "Package::edit_objects() and embedded::object::Edit"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::embedded::storage",
+          "replacement": "embedded::storage::Draft (Storage::draft)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "drop the Edit"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "Commit::diagnostics().changed()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "embedded::object::Edit"
+        },
+        {
+          "name": "finish",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "embedded::object::Edit::commit"
+        },
+        {
+          "name": "PackageEditor",
+          "scope": "litchi_ppt::chart",
+          "replacement": "chart::GraphPackage (Graph::draft_package)"
+        },
+        {
+          "name": "finish",
+          "scope": "litchi_ppt::chart",
+          "replacement": "chart::GraphPackage::into_bytes"
+        },
+        {
+          "name": "Snapshot",
+          "scope": "litchi_ppt::chart",
+          "replacement": "chart::View (GraphPackage::view)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt",
+          "replacement": "a package-level scoped family Edit or a value Draft",
+          "match": "suffix"
+        },
+        {
+          "name": "edit_package",
+          "scope": "litchi_ppt::chart",
+          "replacement": "Graph::draft_package"
+        },
+        {
+          "name": "into_package_editor",
+          "scope": "litchi_ppt::chart",
+          "replacement": "Graph::into_draft_package"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::embedded::object::Edit",
+          "replacement": "Edit::objects"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::embedded::storage::Draft",
+          "replacement": "Draft::view"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::chart::GraphPackage",
+          "replacement": "GraphPackage::view"
         }
       ],
       "families": [
@@ -5982,7 +6063,8 @@
         "litchi_ppt::slide_sync",
         "litchi_ppt::client_data",
         "litchi_ppt::master::metadata",
-        "litchi_ppt::master_layout"
+        "litchi_ppt::master_layout",
+        "litchi_ppt::embedded::object"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
@@ -6718,6 +6800,87 @@
           "scope": "litchi_ppt",
           "replacement": "use the family's Edit (record 0357)",
           "match": "suffix"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt",
+          "replacement": "Package::edit_objects() and litchi_ppt::embedded::object::Edit"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "Package::edit_objects() and embedded::object::Edit"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::embedded::storage",
+          "replacement": "embedded::storage::Draft (Storage::draft)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "drop the Edit"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "Commit::diagnostics().changed()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "embedded::object::Edit"
+        },
+        {
+          "name": "finish",
+          "scope": "litchi_ppt::embedded::object",
+          "replacement": "embedded::object::Edit::commit"
+        },
+        {
+          "name": "PackageEditor",
+          "scope": "litchi_ppt::chart",
+          "replacement": "chart::GraphPackage (Graph::draft_package)"
+        },
+        {
+          "name": "finish",
+          "scope": "litchi_ppt::chart",
+          "replacement": "chart::GraphPackage::into_bytes"
+        },
+        {
+          "name": "Snapshot",
+          "scope": "litchi_ppt::chart",
+          "replacement": "chart::View (GraphPackage::view)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt",
+          "replacement": "a package-level scoped family Edit or a value Draft",
+          "match": "suffix"
+        },
+        {
+          "name": "edit_package",
+          "scope": "litchi_ppt::chart",
+          "replacement": "Graph::draft_package"
+        },
+        {
+          "name": "into_package_editor",
+          "scope": "litchi_ppt::chart",
+          "replacement": "Graph::into_draft_package"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::embedded::object::Edit",
+          "replacement": "Edit::objects"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::embedded::storage::Draft",
+          "replacement": "Draft::view"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::chart::GraphPackage",
+          "replacement": "GraphPackage::view"
         }
       ],
       "families": [
@@ -6733,7 +6896,8 @@
         "litchi_ppt::slide_sync",
         "litchi_ppt::client_data",
         "litchi_ppt::master::metadata",
-        "litchi_ppt::master_layout"
+        "litchi_ppt::master_layout",
+        "litchi_ppt::embedded::object"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
