@@ -405,10 +405,7 @@ impl<'a> Tree<'a> {
     /// # Errors
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
-    pub fn parse_with_options(
-        input: &str,
-        options: OpenOptions,
-    ) -> RtfResult<Tree<'static>> {
+    pub fn parse_with_options(input: &str, options: OpenOptions) -> RtfResult<Tree<'static>> {
         Self::parse_internal(input.as_bytes(), options)
     }
 
@@ -544,10 +541,7 @@ impl<'a> Tree<'a> {
 
     /// Parse an owned transport allocation and move that exact allocation into
     /// the retained source after the detached model has been built.
-    fn parse_internal_owned(
-        bytes: Vec<u8>,
-        options: OpenOptions,
-    ) -> RtfResult<Tree<'static>> {
+    fn parse_internal_owned(bytes: Vec<u8>, options: OpenOptions) -> RtfResult<Tree<'static>> {
         let mut document = Self::parse_transport(&bytes, options)?;
         document.preserved_source = Some(bytes);
         Ok(document)
@@ -6193,7 +6187,7 @@ impl<'a> Tree<'a> {
 
 #[cfg(test)]
 mod source_tests {
-    use super::{Tree, RtfError, SourceLimits, read_limited_source};
+    use super::{RtfError, SourceLimits, Tree, read_limited_source};
     use std::io::{self, Read};
     use std::path::PathBuf;
 
@@ -6289,9 +6283,8 @@ mod source_tests {
         let source = br"{\rtf1\ansi owned allocation}".to_vec();
         let pointer = source.as_ptr();
         let capacity = source.capacity();
-        let document =
-            Tree::from_owned_bytes_with_options(source, crate::OpenOptions::default())
-                .expect("parse owned RTF");
+        let document = Tree::from_owned_bytes_with_options(source, crate::OpenOptions::default())
+            .expect("parse owned RTF");
         let retained = document
             .preserved_source
             .as_ref()

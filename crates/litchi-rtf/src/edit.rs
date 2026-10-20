@@ -7501,10 +7501,8 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
         ));
     }
 
-    let mut model = crate::document::Tree::parse_bytes_with_options(
-        source_bytes,
-        edit.source.options(),
-    )?;
+    let mut model =
+        crate::document::Tree::parse_bytes_with_options(source_bytes, edit.source.options())?;
     for operation in &edit.operations {
         match operation {
             Operation::TableCellText { path, after, .. } => {

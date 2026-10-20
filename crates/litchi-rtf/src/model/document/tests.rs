@@ -53,10 +53,9 @@ fn text_concatenates_fragmented_blocks_without_changing_separators() {
 
 #[test]
 fn paragraph_properties_after_a_break_attach_to_the_following_paragraph() {
-    let doc = Tree::parse(
-        r"{\rtf1\ansi\qc\sb40\li80\keepn First\par\sb120\li240\keep\pagebb\qr Second}",
-    )
-    .unwrap();
+    let doc =
+        Tree::parse(r"{\rtf1\ansi\qc\sb40\li80\keepn First\par\sb120\li240\keep\pagebb\qr Second}")
+            .unwrap();
 
     assert_eq!(doc.text(), "First\nSecond");
     assert_eq!(doc.blocks().len(), 3);
@@ -270,8 +269,8 @@ fn rejects_excessively_nested_shape_groups() {
 
 #[test]
 fn ignores_and_records_content_after_the_root_group() {
-    let document = Tree::parse("{\\rtf1 padded} \r\n\0\0")
-        .expect("whitespace and NUL transport padding");
+    let document =
+        Tree::parse("{\\rtf1 padded} \r\n\0\0").expect("whitespace and NUL transport padding");
     assert_eq!(document.text(), "padded");
 
     assert!(document.tolerance_report().is_clean());
@@ -762,8 +761,7 @@ fn preserves_parsed_headers_and_footers_in_owned_document() {
 
 #[test]
 fn decodes_hex_escapes_after_declared_codepage() {
-    let cyrillic =
-        Tree::parse(r"{\rtf1\ansi\ansicpg1251 \'cf\'f0\'e8\'e2\'e5\'f2}").unwrap();
+    let cyrillic = Tree::parse(r"{\rtf1\ansi\ansicpg1251 \'cf\'f0\'e8\'e2\'e5\'f2}").unwrap();
     assert_eq!(cyrillic.text(), "Привет");
 
     let japanese = Tree::parse(r"{\rtf1\ansi\ansicpg932 \'82\'a0\'82\'a2}").unwrap();

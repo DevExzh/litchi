@@ -561,8 +561,7 @@ fn canonical_candidate(
             "compressed RTF needs a transport-aware rewrite",
         ));
     }
-    let mut model =
-        crate::document::Tree::parse_bytes_with_options(bytes, target.options())?;
+    let mut model = crate::document::Tree::parse_bytes_with_options(bytes, target.options())?;
     mutation(&mut model)?;
     let limit = target.limits().max_input_bytes();
     let mut output = BoundedOutput::new(limit);

@@ -1124,7 +1124,7 @@ mod tests {
         let bytes = fixture("Simple.xls");
         let oracle = cell_values::Snapshot::from_bytes(
             bytes.clone(),
-            litchi_doc::tracked_revision::Limits::default(),
+            litchi_ole_common::object::Limits::default(),
         )
         .unwrap();
 

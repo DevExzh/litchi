@@ -153,7 +153,11 @@ impl Transaction {
     ///
     /// Returns an error when the storage has no valid typed ODT or the edited
     /// candidate violates an ODT or package invariant.
-    pub(crate) fn update_info<F>(&mut self, storage_id: u32, edit: F) -> Result<(), TransactionError>
+    pub(crate) fn update_info<F>(
+        &mut self,
+        storage_id: u32,
+        edit: F,
+    ) -> Result<(), TransactionError>
     where
         F: FnOnce(&mut Info),
     {
@@ -168,7 +172,11 @@ impl Transaction {
     ///
     /// Returns an error when the storage has no valid OLEDS link stream, the
     /// callback rejects the candidate, or the package cannot be validated.
-    pub(crate) fn update_link<F>(&mut self, storage_id: u32, edit: F) -> Result<(), TransactionError>
+    pub(crate) fn update_link<F>(
+        &mut self,
+        storage_id: u32,
+        edit: F,
+    ) -> Result<(), TransactionError>
     where
         F: FnOnce(&mut litchi_ole_common::object::link::Link) -> Result<(), litchi_cfb::OleError>,
     {

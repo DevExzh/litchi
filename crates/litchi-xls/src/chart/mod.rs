@@ -20,6 +20,9 @@ mod tests;
 pub use litchi_ograph::chart::{format, group};
 pub use litchi_ograph::record::{chart3d, frame, line, marker, pie, series};
 
+/// The chart family error: the workbook error of the source or republished
+/// package.
+pub use crate::error::Error;
 pub use inventory::{ChartInventory, SemanticCompleteness};
 pub use model::{
     AreaFormat, Axis, AxisKind, AxisLine, AxisLineKind, Cache, CacheKind, CellRef, DataKind,
@@ -28,6 +31,3 @@ pub use model::{
 };
 pub use package::build_workbook;
 pub use package::{Commit, Diagnostics, Edit, EditOptions, Entry, LimitKind, Patch};
-/// The chart family error: the workbook error of the source or republished
-/// package.
-pub use crate::error::Error;

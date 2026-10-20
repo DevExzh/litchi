@@ -19,7 +19,7 @@ use super::super::{
     DocumentThemeLanguages, DocumentThumbnailPreference, DocumentView, DocumentWindowCaption,
     DocumentWord2003Compatibility, DocumentWriteReservations, DocumentXmlPolicies,
     DocumentXslTransform, DocumentXslTransformUsage, HtmlEmailVersion, MAX_DEFAULT_TAB_WIDTH_TWIPS,
-    Tree, RtfWriter, TextDirection, Write, io,
+    RtfWriter, TextDirection, Tree, Write, io,
 };
 
 impl<W: Write> RtfWriter<W> {

@@ -106,8 +106,7 @@ impl Package {
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
     pub fn parse_with_options(input: &str, options: OpenOptions) -> RtfResult<Self> {
-        Tree::parse_with_options(input, options)
-            .map(|model| Self::from_model(model, options))
+        Tree::parse_with_options(input, options).map(|model| Self::from_model(model, options))
     }
 
     /// Parse original RTF transport bytes with the production-safe resource
@@ -129,8 +128,7 @@ impl Package {
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
     pub fn from_bytes_with_options(input: &[u8], options: OpenOptions) -> RtfResult<Self> {
-        Tree::parse_bytes_with_options(input, options)
-            .map(|model| Self::from_model(model, options))
+        Tree::parse_bytes_with_options(input, options).map(|model| Self::from_model(model, options))
     }
 
     /// Parse an owned RTF transport allocation and retain it without copying.

@@ -4221,10 +4221,9 @@ fn document_discovers_bibliography_fields_without_loading_sources() {
 
 #[test]
 fn document_discovers_eq_fields_without_calculating_them() {
-    let document = crate::Tree::parse(
-        r"{\rtf1\ansi Before {\field{\*\fldinst EQ \\f(1,2)}{\fldrslt }}After}",
-    )
-    .unwrap();
+    let document =
+        crate::Tree::parse(r"{\rtf1\ansi Before {\field{\*\fldinst EQ \\f(1,2)}{\fldrslt }}After}")
+            .unwrap();
 
     let equations = document.equations();
     assert_eq!(document.equation_count(), 1);
@@ -4580,8 +4579,7 @@ fn parses_libreoffice_internal_hyperlink_fixtures() {
         ("tdf134614_toc_indent.rtf", "_Toc1"),
     ] {
         let document =
-            crate::Tree::from_bytes(&std::fs::read(fixture_root.join(fixture)).unwrap())
-                .unwrap();
+            crate::Tree::from_bytes(&std::fs::read(fixture_root.join(fixture)).unwrap()).unwrap();
         assert!(
             document.fields().iter().any(|field| {
                 field.extract_bookmark().as_deref() == Some(expected)
@@ -4610,10 +4608,9 @@ fn parses_libreoffice_internal_hyperlink_fixtures() {
         Some(r"c:\temp\doc1.doc")
     );
 
-    let target = crate::Tree::from_bytes(
-        &std::fs::read(fixture_root.join("hyperlink-target.rtf")).unwrap(),
-    )
-    .unwrap();
+    let target =
+        crate::Tree::from_bytes(&std::fs::read(fixture_root.join("hyperlink-target.rtf")).unwrap())
+            .unwrap();
     let ParsedFieldCode::Hyperlink(code) = target.fields()[0].parsed_code() else {
         panic!("expected target-frame hyperlink");
     };

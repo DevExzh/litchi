@@ -888,9 +888,7 @@ mod tests {
         );
         assert_eq!(compress(SPEC_RAW, true).unwrap(), SPEC_COMPRESSED);
         assert_eq!(
-            crate::Tree::from_bytes(SPEC_COMPRESSED)
-                .unwrap()
-                .text(),
+            crate::Tree::from_bytes(SPEC_COMPRESSED).unwrap().text(),
             "hello world"
         );
     }

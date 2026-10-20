@@ -569,8 +569,7 @@ fn document_writer_preserves_inherited_section_boundary() {
 
 #[test]
 fn document_writer_preserves_page_then_section_break_order() {
-    let document =
-        Tree::parse(r"{\rtf1\ansi\sectd One\page\sect\sectd\sbknone Two}").unwrap();
+    let document = Tree::parse(r"{\rtf1\ansi\sectd One\page\sect\sectd\sbknone Two}").unwrap();
     assert_eq!(document.text(), "OneTwo");
     assert_eq!(document.sections().len(), 2);
     assert_eq!(

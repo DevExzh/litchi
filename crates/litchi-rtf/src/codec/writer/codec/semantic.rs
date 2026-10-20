@@ -5,7 +5,7 @@
 
 use super::{
     BodyStoryEvent, CellStoryEvent, Field, FieldOwner, HeaderFooterType, NavigationEntry, Revision,
-    RevisionType, Tree, RtfWriter, Section, StoryEvent, StoryField, Table, Write, field, io,
+    RevisionType, RtfWriter, Section, StoryEvent, StoryField, Table, Tree, Write, field, io,
 };
 
 impl<W: Write> RtfWriter<W> {
