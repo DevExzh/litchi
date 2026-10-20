@@ -149,8 +149,8 @@ impl Snapshot {
 
     /// Start a detached transaction over this slide graph.
     #[inline]
-    pub fn edit(&self) -> Edit {
-        Edit {
+    pub(crate) fn edit(&self) -> Draft {
+        Draft {
             source: self.clone(),
             working: self.parts.as_ref().to_vec(),
             origins: (0..self.parts.len()).map(Some).collect(),
@@ -170,13 +170,13 @@ impl Snapshot {
 
 /// Failure-atomic editor over typed anchor, relationship, and payload values.
 #[derive(Debug, Clone)]
-pub struct Edit {
+pub struct Draft {
     source: Snapshot,
     working: Vec<ContentPart>,
     origins: Vec<Option<usize>>,
 }
 
-impl Edit {
+impl Draft {
     /// Borrow the immutable source snapshot used by this edit.
     #[inline]
     #[must_use]
@@ -498,12 +498,12 @@ impl Edit {
         Ok(part)
     }
 
-    /// Commit the detached graph into a reversible source patch.
+    /// Prepared the detached graph into a reversible source patch.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Prepared> {
         self.validate_all()?;
         validate_relationship_collisions(&self.source, &self.working)?;
         let source_xml = build_source(&self.source, &self.working, &self.origins)?;
@@ -515,8 +515,8 @@ impl Edit {
             self.working,
             slide_relationships,
         )?;
-        Ok(Commit {
-            patch: Patch {
+        Ok(Prepared {
+            patch: Change {
                 before: self.source,
                 after: after.clone(),
             },
@@ -576,52 +576,60 @@ impl Edit {
 
 /// A committed detached transaction.
 #[derive(Debug, Clone)]
-pub struct Commit {
-    patch: Patch,
+pub(crate) struct Prepared {
+    patch: Change,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: Snapshot,
 }
 
-impl Commit {
+impl Prepared {
     /// Snapshot expected after publication.
     #[inline]
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Reversible source patch represented by this commit.
     #[inline]
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &Change {
         &self.patch
     }
 
+    #[cfg(test)]
     fn is_changed(&self) -> bool {
         !self.patch.is_noop()
     }
 
     /// The outcome of this edit or commit.
     #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
         crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Consume the commit and return its patch.
     #[inline]
     #[must_use]
-    pub fn into_patch(self) -> Patch {
+    #[cfg(test)]
+    pub(crate) fn into_patch(self) -> Change {
         self.patch
     }
 }
 
 /// A source-checked, reversible publication plan.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub(crate) struct Change {
     pub(crate) before: Snapshot,
     pub(crate) after: Snapshot,
 }
 
-impl Patch {
+impl Change {
     /// Snapshot required before this patch can be applied.
     ///
     /// # Errors
@@ -629,28 +637,29 @@ impl Patch {
     /// Returns an error if the operation fails.
     #[inline]
     #[must_use]
-    pub fn before(&self) -> &Snapshot {
+    pub(crate) fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Snapshot expected after this patch is applied.
     #[inline]
     #[must_use]
-    pub fn after(&self) -> &Snapshot {
+    pub(crate) fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether applying this patch is an exact no-op.
     #[inline]
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Return the inverse patch for immediate restoration.
     #[inline]
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -663,7 +672,8 @@ impl Patch {
     ///
     /// Returns an error if the operation fails.
     #[inline]
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
+    #[cfg(test)]
+    pub(crate) fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
         super::package::apply_patch(package, self)
     }
 }

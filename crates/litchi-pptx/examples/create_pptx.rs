@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut tags = List::new();
     tags.add(Tag::new("LITCHI_VERIFY", "pptx-tag-crud-v1")?)?;
     let _ = litchi_pptx::tag::put(&mut graph, &owner, tags)?;
-    let mut package = Package::from_opc_package(graph)?;
+    let package = Package::from_opc_package(graph)?;
     package.save(destination)?;
     Ok(())
 }

@@ -1301,7 +1301,9 @@ impl Classify for litchi_pptx::Error {
             },
             Self::Opc(error) => error.classify(),
             Self::Io(error) => error.classify(),
-            Self::PatchConflict => Class::of(Code::IoError),
+            // A patch for another base: the caller supplied it (record 0351).
+            Self::PatchConflict => Class::of(Code::InvalidInput),
+            Self::Refused(refusal) => refusal.classify(),
             Self::UnsupportedOpenPolicy { .. } => Class::of(Code::InvalidArgument),
             Self::EditLimit { .. } => Class::of(Code::LimitExceeded),
             // The core-properties reader reports its OPC failures, among them
@@ -1315,27 +1317,25 @@ impl Classify for litchi_pptx::Error {
             Self::NameNotFound(_) | Self::SlideNameNotFound(_) | Self::SlideLayoutNameNotFound(_) | Self::FontNotFound(_) => {
                 Class::of(Code::NotFound)
             },
+            // The typed refusals classify by kind (record 0351); ambiguous
+            // slide bindings are a malformed source, and removing the final
+            // slide is the argument error every format reports for it.
             Self::SlideOrderPlan { kind, .. } => match kind {
-                litchi_pptx::SlideOrderRefusal::ModifyVerifier => {
-                    Class::of(Code::DocumentProtected)
-                },
                 litchi_pptx::SlideOrderRefusal::AmbiguousBindings => Class::of(Code::CorruptFile),
-                _ => Class::of(Code::UnsupportedCapability),
+                _ => kind.kind().classify(),
             },
             Self::SlideRemovalPlan { kind, .. } => match kind {
                 litchi_pptx::SlideRemovalRefusal::SignedPackage => {
                     Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION)
                 },
-                litchi_pptx::SlideRemovalRefusal::ProtectedPresentation => {
-                    Class::of(Code::DocumentProtected)
-                },
                 litchi_pptx::SlideRemovalRefusal::FinalSlide => {
                     Class::of(Code::InvalidArgument)
                 },
-                _ => Class::of(Code::UnsupportedCapability),
+                _ => kind.kind().classify(),
             },
-            Self::UnsafeEdit { .. } => Class::of(Code::UnsupportedCapability),
-            Self::Allocation { .. } => Class::of(Code::InternalError),
+            Self::SlideCopyPlan { kind, .. } => kind.kind().classify(),
+            Self::ShapeTransfer { kind, .. } => kind.kind().classify(),
+            Self::Allocation { .. } | Self::Internal { .. } => Class::of(Code::InternalError),
             _ => Class::of(Code::CorruptFile),
         }
     }
@@ -2075,6 +2075,10 @@ macro_rules! from_leaf {
     ($(#[$cfg:meta])* $leaf:ty => $variant:ident, $format:expr) => {
         $(#[$cfg])*
         impl From<$leaf> for Error {
+            // An error conversion is never the hot path: keep it out of the
+            // callers' bodies (record 0353a).
+            #[cold]
+            #[inline(never)]
             fn from(error: $leaf) -> Self {
                 Self::from_class(
                     error.classify(),
@@ -2125,6 +2129,8 @@ from_leaf!(#[cfg(feature = "xlsx")] litchi_xlsx::Error => Xlsx, Some(FileFormat:
 // typed cause, but expose only a content-free classification in diagnostics.
 #[cfg(feature = "xlsb")]
 impl From<litchi_xlsb::package::PackageError> for Error {
+    #[cold]
+    #[inline(never)]
     fn from(error: litchi_xlsb::package::PackageError) -> Self {
         let class = error.classify();
         let message = class.code.summary();
@@ -2134,6 +2140,8 @@ impl From<litchi_xlsb::package::PackageError> for Error {
 
 #[cfg(feature = "xlsb")]
 impl From<litchi_xlsb::Error> for Error {
+    #[cold]
+    #[inline(never)]
     fn from(error: litchi_xlsb::Error) -> Self {
         let class = error.classify();
         let message = class.code.summary();
@@ -2302,3 +2310,45 @@ impl Classify for litchi_core::atomic::Error {
     }
 }
 from_leaf!(litchi_core::atomic::Error => Publication, None);
+
+/// Classify a typed error for the format-neutral sheet error the formula
+/// engine reports: the code selects the variant, and the message is the
+/// code's static summary, so no authored content crosses.
+#[cfg(any(feature = "xlsx", feature = "xlsb", feature = "xls", feature = "ods"))]
+impl From<Error> for litchi_core::sheet::Error {
+    #[cold]
+    #[inline(never)]
+    fn from(error: Error) -> Self {
+        use litchi_core::edit::RefusalKind;
+        let code = error.code();
+        let refused = |kind| Self::refused(kind, "read", code.summary());
+        match code {
+            Code::NotFound
+            | Code::PathNotFound
+            | Code::ZeroMatches
+            | Code::RangeTargetNotFound
+            | Code::FileNotFound => refused(RefusalKind::NotFound),
+            Code::OutOfRange
+            | Code::InvalidValue
+            | Code::InvalidInput
+            | Code::InvalidArgument
+            | Code::InvalidPath
+            | Code::InvalidSelector
+            | Code::MissingArgument => refused(RefusalKind::InvalidValue),
+            Code::UnsupportedProperty => refused(RefusalKind::UnsupportedProperty),
+            Code::UnsupportedType | Code::UnsupportedElement | Code::UnsupportedPath => {
+                refused(RefusalKind::UnsupportedTarget)
+            },
+            Code::UnsupportedFormat | Code::UnsupportedCommand | Code::UnsupportedCapability => {
+                refused(RefusalKind::UnsupportedOperation)
+            },
+            Code::LimitExceeded | Code::OutputTooLarge | Code::MaxDepthExceeded => {
+                refused(RefusalKind::UnsupportedContent)
+            },
+            Code::DocumentProtected => refused(RefusalKind::Protected),
+            Code::IoError | Code::FileLocked => Self::Io,
+            Code::CorruptFile | Code::CorruptBatch => Self::Malformed(code.summary()),
+            _ => Self::Internal(code.summary()),
+        }
+    }
+}

@@ -7,6 +7,9 @@
 //! Plumbing for the leniency carrier: every open path produces a handle whose
 //! tolerance report exists, and a conformant fixture leaves it empty.
 
+mod in_place;
+use in_place::InPlace as _;
+
 use litchi_pptx::{Package, SourceBackedPresentation};
 
 const SAMPLE: &str = concat!(
@@ -144,7 +147,7 @@ fn deck_bytes_with_part(name: &str, blob: Vec<u8>) -> Vec<u8> {
     let mut package = Package::from_bytes(SHAPES).unwrap();
     let part = PackURI::new(name).unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.get_part_mut(&part)?.set_blob(blob);
             Ok(())
         })

@@ -54,10 +54,11 @@ impl Edit {
         let mut named = authors.iter().filter(|candidate| candidate.name == author);
         let found = named.next().cloned();
         if named.next().is_some() {
-            return Err(Error::UnsafeEdit {
-                operation: "add_comment_text",
-                reason: "several comment authors share the requested name",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "add_comment_text",
+                "several comment authors share the requested name",
+            ));
         }
         let before = self.working.clone();
         let result = (|| {

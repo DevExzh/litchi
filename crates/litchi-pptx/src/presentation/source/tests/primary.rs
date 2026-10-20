@@ -162,10 +162,11 @@ fn retained_handles_recheck_freshness_and_atomic_save_keeps_destination() {
 #[test]
 fn managed_cancellation_applies_to_commits_projections_replay_and_save() {
     let (_budget, cancellation, context) = source_backed_context(16 * 1024 * 1024);
-    let package = Package::from_read_at_with_execution_context(
+    let package = Package::from_read_at_with_options(
         Arc::new(CountingSource::new(fixture())),
-        SourceLimits::default(),
-        context,
+        crate::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = package.edit().unwrap();
@@ -253,10 +254,11 @@ fn disjoint_replay_preserves_destination_changes_and_atomic_save_reopens() {
 #[test]
 fn managed_candidate_reservation_follows_patch_and_detached_shape_handles() {
     let (budget, _cancel, context) = source_backed_context(16 * 1024 * 1024);
-    let source = Package::from_read_at_with_execution_context(
+    let source = Package::from_read_at_with_options(
         Arc::new(CountingSource::new(fixture())),
-        SourceLimits::default(),
-        context,
+        crate::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = source.edit().unwrap();
@@ -283,10 +285,11 @@ fn managed_candidate_reservation_follows_patch_and_detached_shape_handles() {
 fn rejected_managed_reservation_is_atomic_and_budget_recovers() {
     const MEMORY: u64 = 16 * 1024 * 1024;
     let (budget, _cancel, context) = source_backed_context(MEMORY);
-    let source = Package::from_read_at_with_execution_context(
+    let source = Package::from_read_at_with_options(
         Arc::new(CountingSource::new(fixture())),
-        SourceLimits::default(),
-        context,
+        crate::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = source.edit().unwrap();
@@ -339,7 +342,7 @@ fn changed_slide_limit_refuses_atomically_across_successive_commits() {
             .unwrap()
             .add_text_box("original", 0, 0, 914_400, 914_400);
     }
-    let mut authored = builder.build().unwrap();
+    let authored = builder.build().unwrap();
     let source = Package::from_read_at(Arc::new(litchi_core::OwnedSource::new(
         authored.to_bytes().unwrap(),
     )))
@@ -380,12 +383,13 @@ fn mce_slide(ignored: &str) -> String {
 #[test]
 fn valid_mce_reads_remain_available_and_processed_scenes_keep_managed_charge() {
     let (budget, _cancel, context) = source_backed_context(16 * 1024 * 1024);
-    let source = Package::from_read_at_with_execution_context(
+    let source = Package::from_read_at_with_options(
         Arc::new(litchi_core::OwnedSource::new(with_first_slide(
             mce_slide("").as_bytes(),
         ))),
-        SourceLimits::default(),
-        context,
+        crate::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let scene = source
@@ -400,7 +404,7 @@ fn valid_mce_reads_remain_available_and_processed_scenes_keep_managed_charge() {
     let mut edit = source.edit().unwrap();
     assert!(matches!(
         edit.set_shape_text(0, 0_usize, "unsupported"),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
     assert!(edit.commit().unwrap().patch().is_noop());
     drop((scene, source));
@@ -447,11 +451,11 @@ fn caller_physical_xml_limits_apply_to_reads_and_edits_before_mce() {
         ),
     ];
     for (ignored, limits, expected) in cases {
-        let projection = SourceBackedPresentation::from_read_at_with_limits(
+        let projection = SourceBackedPresentation::from_read_at_with_options(
             Arc::new(litchi_core::OwnedSource::new(with_first_slide(
                 mce_slide(&ignored).as_bytes(),
             ))),
-            limits,
+            crate::OpenOptions::default().source_limits(limits),
         )
         .unwrap();
         let source = Package::from_presentation(&projection).unwrap();

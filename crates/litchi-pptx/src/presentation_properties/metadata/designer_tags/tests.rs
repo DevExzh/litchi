@@ -97,7 +97,7 @@ fn inserts_replaces_and_removes_without_touching_opaque_bytes() {
     // untouched; it is published after the signature is removed explicitly.
     assert!(matches!(
         remove(&mut package, 256),
-        Err(crate::Error::Opc(
+        Err(Error::Opc(
             litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
         ))
     ));

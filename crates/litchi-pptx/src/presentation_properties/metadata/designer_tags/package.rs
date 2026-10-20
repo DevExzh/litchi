@@ -7,7 +7,7 @@ use litchi_opc::{OpcPackage, PackURI};
 
 use super::codec::{self, Located};
 use super::model::{Binding, Snapshot};
-use super::{Commit, Limits, Patch, Tags};
+use super::{Change, Limits, Prepared, Tags};
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
@@ -40,7 +40,7 @@ pub fn load_snapshot(package: &OpcPackage, slide_id: u32) -> Result<Snapshot> {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn load_snapshot_with_limits(
+pub(crate) fn load_snapshot_with_limits(
     package: &OpcPackage,
     slide_id: u32,
     limits: Limits,
@@ -142,7 +142,7 @@ pub fn remove(package: &mut OpcPackage, slide_id: u32) -> Result<Option<Tags>> {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }
 
@@ -162,7 +162,7 @@ pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     let current = load_snapshot_with_limits(package, patch.before.slide_id, patch.before.limits)?;
     if current.presentation_part_name != patch.before.presentation_part_name
         || current.presentation_content_type != patch.before.presentation_content_type

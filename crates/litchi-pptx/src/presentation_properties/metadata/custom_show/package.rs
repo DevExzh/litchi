@@ -5,7 +5,7 @@ use std::sync::Arc;
 use litchi_opc::{OpcPackage, PackURI};
 
 use super::model::List;
-use super::transaction::{Commit, Patch, Snapshot};
+use super::transaction::{Change, Prepared, Snapshot};
 use super::wire;
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
@@ -31,7 +31,7 @@ pub fn load(package: &OpcPackage) -> Result<List> {
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store(package: &mut OpcPackage, value: &List) -> Result<()> {
+pub(crate) fn store(package: &mut OpcPackage, value: &List) -> Result<()> {
     let snapshot = load_snapshot(package)?;
     let mut transaction = snapshot.edit();
     transaction.replace(value.clone())?;
@@ -68,7 +68,7 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Snapshot> {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     let current = load_snapshot(package)?;
     if !current.same_source(patch.before()) {
         return Err(invalid("custom-show PresentationML source is stale"));
@@ -116,7 +116,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
     clippy::needless_pass_by_value,
     reason = "public API consumes the commit to signal it has been applied"
 )]
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }
 
@@ -132,7 +132,7 @@ pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn remove(package: &mut OpcPackage) -> Result<Option<List>> {
+pub(crate) fn remove(package: &mut OpcPackage) -> Result<Option<List>> {
     let before = load_snapshot(package)?;
     if before.list().is_empty() {
         return Ok(None);

@@ -1,4 +1,4 @@
-use litchi_core::sheet::Result as SheetResult;
+use crate::BoxedResult as SheetResult;
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 

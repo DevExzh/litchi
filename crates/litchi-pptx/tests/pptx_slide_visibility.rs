@@ -33,7 +33,7 @@ fn package_with_slide_xml(xml: &[u8]) -> Package {
     // the synthetic graph through the public OPC owner and then adopt it.
     let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     builder.presentation().unwrap().add_slide().unwrap();
-    let mut authored = builder.build().unwrap();
+    let authored = builder.build().unwrap();
     let bytes = authored.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
     opc.get_part_mut(&PackURI::new("/ppt/slides/slide1.xml").unwrap())

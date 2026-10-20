@@ -5,11 +5,11 @@
 //! XML owners. The accompanying package contains a summary slide deck so the
 //! cases remain easy to inspect independently.
 
+use litchi_pptx::Package;
 use litchi_pptx::animations::{Effect, EffectInstance, Sequence, Trigger};
 use litchi_pptx::presentation_properties::metadata::custom_show::{List as ShowList, Show};
 use litchi_pptx::presentation_properties::metadata::handout::{Layout, Master};
 use litchi_pptx::presentation_properties::metadata::sections::{List as SectionList, Section};
-use litchi_pptx::{MutablePresentation, Package};
 use std::error::Error as StdError;
 
 const X: i64 = 914_400;
@@ -174,7 +174,7 @@ fn write_case(
 ) -> Result<(), Box<dyn StdError>> {
     let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation: &mut MutablePresentation = builder.presentation()?;
+        let presentation: &mut litchi_pptx::builder::Presentation = builder.presentation()?;
         presentation.set_widescreen_slide_size();
         for index in 1..=slide_count {
             let slide = presentation.add_slide()?;
@@ -187,7 +187,7 @@ fn write_case(
             slide.add_text_box(body, X, Y, WIDTH, HEIGHT);
         }
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     package.save(path)?;
     let reopened = Package::open(path)?;
     assert_eq!(reopened.presentation()?.slide_count()?, slide_count);

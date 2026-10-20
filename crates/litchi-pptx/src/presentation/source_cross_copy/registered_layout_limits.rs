@@ -21,9 +21,9 @@ fn registered_layout_graph_checks_attribute_limits_before_semantic_projection() 
             .unwrap()
             .build()
             .unwrap();
-        let source = SourceBackedPresentation::from_read_at_with_limits(
+        let source = SourceBackedPresentation::from_read_at_with_options(
             Arc::new(OwnedSource::new(bytes)),
-            limits,
+            crate::OpenOptions::default().source_limits(limits),
         )
         .unwrap();
         let destination = SourceBackedPresentationEditor::from_read_at(Arc::new(OwnedSource::new(
@@ -54,9 +54,9 @@ fn registered_layout_graph_checks_event_limits_before_semantic_projection() {
             .unwrap()
             .build()
             .unwrap();
-        let source = SourceBackedPresentation::from_read_at_with_limits(
+        let source = SourceBackedPresentation::from_read_at_with_options(
             Arc::new(OwnedSource::new(bytes)),
-            limits,
+            crate::OpenOptions::default().source_limits(limits),
         )
         .unwrap();
         let destination = SourceBackedPresentationEditor::from_read_at(Arc::new(OwnedSource::new(

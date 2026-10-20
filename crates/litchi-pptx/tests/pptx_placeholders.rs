@@ -38,7 +38,7 @@ fn slide_shape_placeholders_preserve_type_decoding_errors() {
 }
 
 fn package_with_slide(slide_xml: &[u8]) -> Package {
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
 

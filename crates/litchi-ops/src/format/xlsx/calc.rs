@@ -23,7 +23,7 @@ pub(crate) fn cells(
     }
     let sheet = file.sheet_at(position)?;
     for cell in sheet.cells() {
-        let cell = cell.map_err(crate::calc::sheet_error)?;
+        let cell = cell?;
         // The generic worksheet trait is one-based.
         visit(
             cell.row().saturating_sub(1),

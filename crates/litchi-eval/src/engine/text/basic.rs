@@ -6,15 +6,11 @@ use litchi_core::sheet::{CellValue, Result};
 
 use super::helpers::{to_non_negative_int, to_positive_int};
 
-pub(crate) async fn eval_len(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_len(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 1 {
         return Ok(CellValue::Error("LEN expects 1 argument".to_string()));
     }
-    let v = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let v = evaluate_expression(ctx, current_sheet, &args[0])?;
     let s = to_text(&v);
     Ok(CellValue::Int(s.chars().count() as i64))
 }
@@ -39,33 +35,25 @@ fn halfwidth_to_fullwidth(s: &str) -> String {
         .collect()
 }
 
-pub(crate) async fn eval_asc(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_asc(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 1 {
         return Ok(CellValue::Error("ASC expects 1 argument".to_string()));
     }
-    let value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let value = evaluate_expression(ctx, current_sheet, &args[0])?;
     let text = to_text(&value);
     Ok(CellValue::String(fullwidth_to_halfwidth(&text)))
 }
 
-pub(crate) async fn eval_jis(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_jis(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 1 {
         return Ok(CellValue::Error("JIS expects 1 argument".to_string()));
     }
-    let value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let value = evaluate_expression(ctx, current_sheet, &args[0])?;
     let text = to_text(&value);
     Ok(CellValue::String(halfwidth_to_fullwidth(&text)))
 }
 
-pub(crate) async fn eval_proper(
+pub(crate) fn eval_proper(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -73,7 +61,7 @@ pub(crate) async fn eval_proper(
     if args.len() != 1 {
         return Ok(CellValue::Error("PROPER expects 1 argument".to_string()));
     }
-    let v = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let v = evaluate_expression(ctx, current_sheet, &args[0])?;
     let s = to_text(&v);
     let mut result = String::with_capacity(s.len());
     let mut new_word = true;
@@ -97,20 +85,16 @@ pub(crate) async fn eval_proper(
     Ok(CellValue::String(result))
 }
 
-pub(crate) async fn eval_lenb(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_lenb(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 1 {
         return Ok(CellValue::Error("LENB expects 1 argument".to_string()));
     }
-    let v = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let v = evaluate_expression(ctx, current_sheet, &args[0])?;
     let s = to_text(&v);
     Ok(CellValue::Int(s.len() as i64))
 }
 
-pub(crate) async fn eval_lower(
+pub(crate) fn eval_lower(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -118,12 +102,12 @@ pub(crate) async fn eval_lower(
     if args.len() != 1 {
         return Ok(CellValue::Error("LOWER expects 1 argument".to_string()));
     }
-    let v = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let v = evaluate_expression(ctx, current_sheet, &args[0])?;
     let s = to_text(&v).to_lowercase();
     Ok(CellValue::String(s))
 }
 
-pub(crate) async fn eval_upper(
+pub(crate) fn eval_upper(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -131,25 +115,21 @@ pub(crate) async fn eval_upper(
     if args.len() != 1 {
         return Ok(CellValue::Error("UPPER expects 1 argument".to_string()));
     }
-    let v = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let v = evaluate_expression(ctx, current_sheet, &args[0])?;
     let s = to_text(&v).to_uppercase();
     Ok(CellValue::String(s))
 }
 
-pub(crate) async fn eval_trim(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_trim(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 1 {
         return Ok(CellValue::Error("TRIM expects 1 argument".to_string()));
     }
-    let v = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let v = evaluate_expression(ctx, current_sheet, &args[0])?;
     let s = to_text(&v);
     Ok(CellValue::String(s.trim().to_string()))
 }
 
-pub(crate) async fn eval_concat(
+pub(crate) fn eval_concat(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -159,13 +139,12 @@ pub(crate) async fn eval_concat(
         for_each_value_in_expr(ctx, current_sheet, arg, |v| {
             out.push_str(&to_text(v));
             Ok(())
-        })
-        .await?;
+        })?;
     }
     Ok(CellValue::String(out))
 }
 
-pub(crate) async fn eval_textjoin(
+pub(crate) fn eval_textjoin(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -177,10 +156,10 @@ pub(crate) async fn eval_textjoin(
         ));
     }
 
-    let delimiter_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let delimiter_val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let delimiter = to_text(&delimiter_val);
 
-    let ignore_empty_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let ignore_empty_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let ignore_empty = to_bool(&ignore_empty_val);
 
     let mut parts: Vec<String> = Vec::new();
@@ -191,26 +170,21 @@ pub(crate) async fn eval_textjoin(
             }
             parts.push(to_text(v));
             Ok(())
-        })
-        .await?;
+        })?;
     }
 
     Ok(CellValue::String(parts.join(&delimiter)))
 }
 
-pub(crate) async fn eval_rept(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_rept(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 2 {
         return Ok(CellValue::Error(
             "REPT expects 2 arguments (text, number_times)".to_string(),
         ));
     }
-    let text = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let text = evaluate_expression(ctx, current_sheet, &args[0])?;
     let s = to_text(&text);
-    let times_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let times_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let times = match to_non_negative_int(&times_val) {
         Some(n) => n,
         None => {
@@ -235,7 +209,7 @@ pub(crate) async fn eval_rept(
     Ok(CellValue::String(out))
 }
 
-pub(crate) async fn eval_exact(
+pub(crate) fn eval_exact(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -245,12 +219,12 @@ pub(crate) async fn eval_exact(
             "EXACT expects 2 arguments (text1, text2)".to_string(),
         ));
     }
-    let left = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let right = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let left = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let right = evaluate_expression(ctx, current_sheet, &args[1])?;
     Ok(CellValue::Bool(to_text(&left) == to_text(&right)))
 }
 
-pub(crate) async fn eval_phonetic(
+pub(crate) fn eval_phonetic(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -258,7 +232,7 @@ pub(crate) async fn eval_phonetic(
     if args.len() != 1 {
         return Ok(CellValue::Error("PHONETIC expects 1 argument".to_string()));
     }
-    let value = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let value = evaluate_expression(ctx, current_sheet, &args[0])?;
     match value {
         CellValue::String(_) => Ok(value),
         CellValue::Error(_) => Ok(value),
@@ -329,7 +303,7 @@ fn parse_numbervalue(
     cleaned.parse::<f64>().map_err(|_| "#VALUE!".to_string())
 }
 
-pub(crate) async fn eval_numbervalue(
+pub(crate) fn eval_numbervalue(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -340,11 +314,11 @@ pub(crate) async fn eval_numbervalue(
                 .to_string(),
         ));
     }
-    let text_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let text_val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let text = to_text(&text_val);
 
     let decimal_char = if args.len() >= 2 {
-        let dec_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let dec_val = evaluate_expression(ctx, current_sheet, &args[1])?;
         let dec_text = to_text(&dec_val);
         let trimmed = dec_text.trim();
         if trimmed.len() != 1 {
@@ -356,7 +330,7 @@ pub(crate) async fn eval_numbervalue(
     };
 
     let group_char = if args.len() == 3 {
-        let group_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+        let group_val = evaluate_expression(ctx, current_sheet, &args[2])?;
         let group_text = to_text(&group_val);
         let trimmed = group_text.trim();
         if trimmed.is_empty() {
@@ -376,7 +350,7 @@ pub(crate) async fn eval_numbervalue(
     }
 }
 
-pub(crate) async fn eval_substitute(
+pub(crate) fn eval_substitute(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -387,19 +361,19 @@ pub(crate) async fn eval_substitute(
                 .to_string(),
         ));
     }
-    let text_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let text_val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let text = to_text(&text_val);
-    let old_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let old_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let old_text = to_text(&old_val);
     if old_text.is_empty() {
         return Ok(CellValue::Error(
             "SUBSTITUTE old_text must not be empty".to_string(),
         ));
     }
-    let new_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+    let new_val = evaluate_expression(ctx, current_sheet, &args[2])?;
     let new_text = to_text(&new_val);
     if args.len() == 4 {
-        let instance_val = evaluate_expression(ctx, current_sheet, &args[3]).await?;
+        let instance_val = evaluate_expression(ctx, current_sheet, &args[3])?;
         let instance = match to_positive_int(&instance_val) {
             Some(n) => n,
             None => {
@@ -447,188 +421,188 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_len() {
+    #[test]
+    fn test_eval_len() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello")];
-        let result = eval_len(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_len(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, 5),
             _ => panic!("Expected Int(5)"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_len_unicode() {
+    #[test]
+    fn test_eval_len_unicode() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello 世界")];
-        let result = eval_len(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_len(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, 8), // 5 chars + 1 space + 2 CJK chars
             _ => panic!("Expected Int(8)"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_len_wrong_args() {
+    #[test]
+    fn test_eval_len_wrong_args() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args: Vec<Expr> = vec![];
-        let result = eval_len(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_len(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 1 argument")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_lower() {
+    #[test]
+    fn test_eval_lower() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("HELLO WORLD")];
-        let result = eval_lower(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_lower(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "hello world"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_upper() {
+    #[test]
+    fn test_eval_upper() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello world")];
-        let result = eval_upper(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_upper(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "HELLO WORLD"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_proper() {
+    #[test]
+    fn test_eval_proper() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello world")];
-        let result = eval_proper(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_proper(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "Hello World"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_proper_multiple_spaces() {
+    #[test]
+    fn test_eval_proper_multiple_spaces() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello   world")];
-        let result = eval_proper(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_proper(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "Hello   World"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_trim() {
+    #[test]
+    fn test_eval_trim() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("  hello world  ")];
-        let result = eval_trim(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_trim(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "hello world"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_rept() {
+    #[test]
+    fn test_eval_rept() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("ab"), num_expr(3.0)];
-        let result = eval_rept(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_rept(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "ababab"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_rept_zero() {
+    #[test]
+    fn test_eval_rept_zero() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("ab"), num_expr(0.0)];
-        let result = eval_rept(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_rept(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, ""),
             _ => panic!("Expected empty String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_rept_negative() {
+    #[test]
+    fn test_eval_rept_negative() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("ab"), num_expr(-1.0)];
-        let result = eval_rept(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_rept(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("non-negative")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_exact_same() {
+    #[test]
+    fn test_eval_exact_same() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello"), str_expr("hello")];
-        let result = eval_exact(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_exact(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Bool(v) => assert!(v),
             _ => panic!("Expected Bool(true)"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_exact_different() {
+    #[test]
+    fn test_eval_exact_different() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello"), str_expr("world")];
-        let result = eval_exact(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_exact(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Bool(v) => assert!(!v),
             _ => panic!("Expected Bool(false)"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_exact_case_sensitive() {
+    #[test]
+    fn test_eval_exact_case_sensitive() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("Hello"), str_expr("hello")];
-        let result = eval_exact(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_exact(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Bool(v) => assert!(!v),
             _ => panic!("Expected Bool(false) - EXACT is case sensitive"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_substitute_all() {
+    #[test]
+    fn test_eval_substitute_all() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello world"), str_expr("o"), str_expr("0")];
-        let result = eval_substitute(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_substitute(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "hell0 w0rld"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_substitute_instance() {
+    #[test]
+    fn test_eval_substitute_instance() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![
@@ -637,43 +611,43 @@ mod tests {
             str_expr("0"),
             num_expr(1.0),
         ];
-        let result = eval_substitute(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_substitute(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "hell0 world"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_substitute_empty_old() {
+    #[test]
+    fn test_eval_substitute_empty_old() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello"), str_expr(""), str_expr("x")];
-        let result = eval_substitute(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_substitute(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("must not be empty")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_concat() {
+    #[test]
+    fn test_eval_concat() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello"), str_expr(" "), str_expr("world")];
-        let result = eval_concat(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_concat(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "hello world"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_textjoin() {
+    #[test]
+    fn test_eval_textjoin() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr(","), bool_expr(true), str_expr("a"), str_expr("b")];
-        let result = eval_textjoin(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_textjoin(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "a,b"),
             _ => panic!("Expected String"),
@@ -684,8 +658,8 @@ mod tests {
         Expr::Literal(CellValue::Bool(b))
     }
 
-    #[tokio::test]
-    async fn test_eval_textjoin_ignore_empty() {
+    #[test]
+    fn test_eval_textjoin_ignore_empty() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // Test with ignore_empty = true and an empty string
@@ -696,19 +670,19 @@ mod tests {
             str_expr(""),
             str_expr("b"),
         ];
-        let result = eval_textjoin(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_textjoin(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "a,b"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_numbervalue_default() {
+    #[test]
+    fn test_eval_numbervalue_default() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("123.45")];
-        let result = eval_numbervalue(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_numbervalue(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 123.45).abs() < 1e-9),
             CellValue::Int(v) => assert_eq!(v, 123),
@@ -716,84 +690,84 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_numbervalue_with_group() {
+    #[test]
+    fn test_eval_numbervalue_with_group() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("1,234.56"), str_expr("."), str_expr(",")];
-        let result = eval_numbervalue(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_numbervalue(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 1234.56).abs() < 1e-9),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_numbervalue_invalid() {
+    #[test]
+    fn test_eval_numbervalue_invalid() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("abc")];
-        let result = eval_numbervalue(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_numbervalue(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert_eq!(e, "#VALUE!"),
             _ => panic!("Expected #VALUE! error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_asc() {
+    #[test]
+    fn test_eval_asc() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("ＡＢＣ")]; // Fullwidth characters
-        let result = eval_asc(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_asc(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "ABC"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_jis() {
+    #[test]
+    fn test_eval_jis() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("ABC")];
-        let result = eval_jis(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_jis(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "ＡＢＣ"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_lenb() {
+    #[test]
+    fn test_eval_lenb() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello")];
-        let result = eval_lenb(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_lenb(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, 5), // Byte length
             _ => panic!("Expected Int(5)"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_phonetic() {
+    #[test]
+    fn test_eval_phonetic() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("hello")];
-        let result = eval_phonetic(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_phonetic(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "hello"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_phonetic_non_string() {
+    #[test]
+    fn test_eval_phonetic_non_string() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(123.0)];
-        let result = eval_phonetic(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_phonetic(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, ""),
             _ => panic!("Expected empty String"),

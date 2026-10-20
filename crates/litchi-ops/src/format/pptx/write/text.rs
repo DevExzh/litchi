@@ -15,7 +15,7 @@ use litchi_core::Position;
 use litchi_drawingml::geom::Preset;
 use litchi_drawingml::text::{Alignment, Anchor, Strike, Underline};
 use litchi_pptx::opened::{
-    CellFill, CellMargin, Rgb, ShapeFill, TextEdit, TextProperties, TextTarget,
+    CellFill, CellMargin, Rgb, ShapeFill, TextAssignment, TextProperties, TextTarget,
 };
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -804,8 +804,8 @@ impl Pptx {
         }
         targets.sort_by_key(|(notes, slide, _)| (*notes, *slide));
         let properties = values.properties();
-        let mut groups: Vec<(usize, Vec<TextEdit<'_>>)> = Vec::new();
-        let mut notes_groups: Vec<(usize, Vec<TextEdit<'_>>)> = Vec::new();
+        let mut groups: Vec<(usize, Vec<TextAssignment<'_>>)> = Vec::new();
+        let mut notes_groups: Vec<(usize, Vec<TextAssignment<'_>>)> = Vec::new();
         for (notes, slide, target) in &targets {
             let groups = if *notes {
                 &mut notes_groups
@@ -820,7 +820,7 @@ impl Pptx {
                 unreachable!("a group was just pushed")
             };
             edits.try_reserve(1).map_err(allocation)?;
-            edits.push(TextEdit::new(*target, properties));
+            edits.push(TextAssignment::new(*target, properties));
         }
         self.commit_story_text_edits(&groups, &notes_groups)
     }
@@ -828,7 +828,7 @@ impl Pptx {
     /// Publish slide-grouped text edits through one native edit.
     pub(super) fn commit_text_edits(
         &self,
-        groups: &[(usize, Vec<TextEdit<'_>>)],
+        groups: &[(usize, Vec<TextAssignment<'_>>)],
     ) -> Result<Commit> {
         self.commit_story_text_edits(groups, &[])
     }
@@ -839,8 +839,8 @@ impl Pptx {
     /// as a notes text write is (record 0285).
     pub(super) fn commit_story_text_edits(
         &self,
-        groups: &[(usize, Vec<TextEdit<'_>>)],
-        notes: &[(usize, Vec<TextEdit<'_>>)],
+        groups: &[(usize, Vec<TextAssignment<'_>>)],
+        notes: &[(usize, Vec<TextAssignment<'_>>)],
     ) -> Result<Commit> {
         let capacity = litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS;
         let source = self.editable_owner()?;
@@ -862,7 +862,7 @@ impl Pptx {
             Editable::Source(package) => {
                 let mut edit = package.edit()?;
                 for (slide, edits) in groups {
-                    let chunks: Vec<&[TextEdit<'_>]> = edits.chunks(capacity).collect();
+                    let chunks: Vec<&[TextAssignment<'_>]> = edits.chunks(capacity).collect();
                     operations += edit.set_text_property_chunks(Position::new(*slide), &chunks)?;
                 }
                 let (target, patch) = edit.commit()?.into_parts();
@@ -872,12 +872,12 @@ impl Pptx {
             Editable::Eager(package) => {
                 let mut edit = package.edit()?;
                 for (slide, edits) in groups {
-                    let chunks: Vec<&[TextEdit<'_>]> = edits.chunks(capacity).collect();
+                    let chunks: Vec<&[TextAssignment<'_>]> = edits.chunks(capacity).collect();
                     operations += edit.set_text_property_chunks(*slide, &chunks)?;
                 }
                 for (slide, edits) in notes {
                     // One pass over the notes part (record 0348).
-                    let chunks: Vec<&[TextEdit<'_>]> = edits.chunks(capacity).collect();
+                    let chunks: Vec<&[TextAssignment<'_>]> = edits.chunks(capacity).collect();
                     operations += edit.set_notes_text_property_chunks(*slide, &chunks)?;
                 }
                 let (target, patch) = edit.commit()?.into_parts();

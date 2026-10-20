@@ -4,8 +4,8 @@
 
 use super::model::{Chart, Info, Series, Type};
 use super::package::Part;
+use crate::builder::shape::escape_xml;
 use crate::leniency::{ChartDefect, ToleranceReport};
-use crate::writer::shape::escape_xml;
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::{
     decode_xml_reference, is_drawingml_chart_name, is_drawingml_name, unqualified_attribute_value,

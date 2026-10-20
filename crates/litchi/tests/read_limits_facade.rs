@@ -157,7 +157,7 @@ fn pptx_limits_are_nameable() {
 fn presentation_limits_bound_path_and_byte_ingress() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let path = directory.path().join("bounded.pptx");
-    let mut package = litchi::pptx::Package::new().expect("new PPTX package");
+    let package = litchi::pptx::Package::new().expect("new PPTX package");
     package.save(&path).expect("save PPTX package");
 
     let bytes = std::fs::read(&path).expect("read PPTX fixture");
@@ -196,7 +196,7 @@ fn presentation_limits_reject_invalid_suffix_and_unknown_extension_ooxml() {
     );
 
     let unknown = directory.path().join("bounded-package");
-    let mut package = litchi::pptx::Package::new().expect("new PPTX package");
+    let package = litchi::pptx::Package::new().expect("new PPTX package");
     package.save(&unknown).expect("save PPTX package");
     let bytes = std::fs::read(&unknown).expect("read PPTX fixture");
     let tight = one_byte_short(&bytes);

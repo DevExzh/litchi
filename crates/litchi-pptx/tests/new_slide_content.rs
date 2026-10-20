@@ -81,14 +81,14 @@ fn eager_insertion_instantiates_layout_placeholders() {
     // it; the text-body verb fills it.
     let mut edit = package.edit().unwrap();
     assert!(edit.set_shape_text(1usize, 0usize, "Agenda").is_err());
-    let title = litchi_pptx::opened::TextEdit::new(
+    let title = litchi_pptx::opened::TextAssignment::new(
         litchi_pptx::opened::TextTarget::Shape {
             shape: Position::new(0),
         },
         litchi_pptx::opened::TextProperties::default().with_text("Agenda"),
     );
     assert_eq!(edit.set_text_properties(1usize, &[title]).unwrap(), 1);
-    let mut package = edit.commit().unwrap().into_package();
+    let package = edit.commit().unwrap().into_package();
     let reopened = Package::from_bytes(&package.to_bytes().unwrap()).unwrap();
     let scene_xml = slide_xml(&reopened, 1);
     let scene = litchi_pptx::shape::Scene::read(&scene_xml).unwrap();
@@ -120,8 +120,8 @@ fn notes_text_creates_and_replaces_a_notes_page() {
     // Empty text on a slide without notes changes nothing.
     assert!(!edit.set_notes_text(0usize, "").unwrap());
     assert!(edit.set_notes_text(0usize, "Speaker note").unwrap());
-    let mut created = edit.commit().unwrap().into_package();
-    let mut reopened = Package::from_bytes(&created.to_bytes().unwrap()).unwrap();
+    let created = edit.commit().unwrap().into_package();
+    let reopened = Package::from_bytes(&created.to_bytes().unwrap()).unwrap();
     let source = litchi_pptx::source::Package::from_read_at(Arc::new(OwnedSource::new(
         reopened.to_bytes().unwrap(),
     )))

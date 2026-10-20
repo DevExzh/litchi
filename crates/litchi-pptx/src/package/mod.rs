@@ -11,7 +11,9 @@ mod model;
 pub(crate) mod signature;
 
 #[cfg(test)]
+mod test_seams;
+#[cfg(test)]
 mod tests;
 
-pub(crate) use model::OpenedOwnerState;
 pub use model::Package;
+pub(crate) use model::{OpenedOwnerState, resolve_slide, resolve_slide_identity};

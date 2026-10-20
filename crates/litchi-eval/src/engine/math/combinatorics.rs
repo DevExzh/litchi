@@ -6,11 +6,7 @@ use super::helpers::{
     combination, double_factorial, factorial, number_result, permutation, to_int_if_whole,
 };
 
-pub(crate) async fn eval_gcd(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_gcd(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.is_empty() {
         return Ok(CellValue::Error(
             "GCD expects at least 1 argument".to_string(),
@@ -41,8 +37,7 @@ pub(crate) async fn eval_gcd(
                 None => int_value,
             });
             Ok(())
-        })
-        .await?;
+        })?;
         if invalid.is_some() {
             break;
         }
@@ -58,11 +53,7 @@ pub(crate) async fn eval_gcd(
     }
 }
 
-pub(crate) async fn eval_lcm(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_lcm(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.is_empty() {
         return Ok(CellValue::Error(
             "LCM expects at least 1 argument".to_string(),
@@ -102,8 +93,7 @@ pub(crate) async fn eval_lcm(
                 None => int_value,
             });
             Ok(())
-        })
-        .await?;
+        })?;
         if invalid.is_some() {
             break;
         }
@@ -125,15 +115,11 @@ pub(crate) async fn eval_lcm(
     }
 }
 
-pub(crate) async fn eval_fact(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_fact(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 1 {
         return Ok(CellValue::Error("FACT expects 1 argument".to_string()));
     }
-    let num = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let num = evaluate_expression(ctx, current_sheet, &args[0])?;
     let n = match to_number(&num) {
         Some(v) if v >= 0.0 => v.trunc(),
         Some(_) => {
@@ -149,7 +135,7 @@ pub(crate) async fn eval_fact(
     Ok(number_result(factorial(n as u64)))
 }
 
-pub(crate) async fn eval_factdouble(
+pub(crate) fn eval_factdouble(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -159,7 +145,7 @@ pub(crate) async fn eval_factdouble(
             "FACTDOUBLE expects 1 argument".to_string(),
         ));
     }
-    let num = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let num = evaluate_expression(ctx, current_sheet, &args[0])?;
     let n = match to_number(&num) {
         Some(v) if v >= 0.0 => v.trunc(),
         Some(_) => {
@@ -179,7 +165,7 @@ pub(crate) async fn eval_factdouble(
     Ok(number_result(double_factorial(n as u64)))
 }
 
-pub(crate) async fn eval_combin(
+pub(crate) fn eval_combin(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -187,8 +173,8 @@ pub(crate) async fn eval_combin(
     if args.len() != 2 {
         return Ok(CellValue::Error("COMBIN expects 2 arguments".to_string()));
     }
-    let n_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let k_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let n_val = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let k_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let n = match to_number(&n_val) {
         Some(v) if v >= 0.0 => v.trunc(),
         Some(_) => {
@@ -223,7 +209,7 @@ pub(crate) async fn eval_combin(
     Ok(number_result(combination(n as u64, k as u64)))
 }
 
-pub(crate) async fn eval_combina(
+pub(crate) fn eval_combina(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -231,8 +217,8 @@ pub(crate) async fn eval_combina(
     if args.len() != 2 {
         return Ok(CellValue::Error("COMBINA expects 2 arguments".to_string()));
     }
-    let n_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let k_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let n_val = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let k_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let n = match to_number(&n_val) {
         Some(v) if v >= 0.0 => v.trunc(),
         Some(_) => {
@@ -272,7 +258,7 @@ pub(crate) async fn eval_combina(
     Ok(number_result(combination(total, k as u64)))
 }
 
-pub(crate) async fn eval_permut(
+pub(crate) fn eval_permut(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -280,8 +266,8 @@ pub(crate) async fn eval_permut(
     if args.len() != 2 {
         return Ok(CellValue::Error("PERMUT expects 2 arguments".to_string()));
     }
-    let n_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let k_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let n_val = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let k_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let n = match to_number(&n_val) {
         Some(v) if v >= 0.0 => v.trunc(),
         Some(_) => {
@@ -316,7 +302,7 @@ pub(crate) async fn eval_permut(
     Ok(number_result(permutation(n as u64, k as u64)))
 }
 
-pub(crate) async fn eval_permutationa(
+pub(crate) fn eval_permutationa(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -326,8 +312,8 @@ pub(crate) async fn eval_permutationa(
             "PERMUTATIONA expects 2 arguments".to_string(),
         ));
     }
-    let n_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let k_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let n_val = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let k_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let n = match to_number(&n_val) {
         Some(v) if v >= 0.0 => v.trunc(),
         Some(_) => {
@@ -362,7 +348,7 @@ pub(crate) async fn eval_permutationa(
     Ok(number_result(result))
 }
 
-pub(crate) async fn eval_multinomial(
+pub(crate) fn eval_multinomial(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -375,7 +361,7 @@ pub(crate) async fn eval_multinomial(
     let mut sum: u64 = 0;
     let mut denom = 1.0;
     for expr in args {
-        let value = evaluate_expression(ctx, current_sheet, expr).await?;
+        let value = evaluate_expression(ctx, current_sheet, expr)?;
         let number = match to_number(&value) {
             Some(v) if v >= 0.0 => v.trunc(),
             Some(_) => {
@@ -439,114 +425,114 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_fact() {
+    #[test]
+    fn test_eval_fact() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(5.0)];
-        let result = eval_fact(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_fact(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(120)); // 5! = 120
     }
 
-    #[tokio::test]
-    async fn test_eval_fact_zero() {
+    #[test]
+    fn test_eval_fact_zero() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(0.0)];
-        let result = eval_fact(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_fact(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(1)); // 0! = 1
     }
 
-    #[tokio::test]
-    async fn test_eval_fact_negative() {
+    #[test]
+    fn test_eval_fact_negative() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(-5.0)];
-        let result = eval_fact(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_fact(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("non-negative")),
             _ => panic!("Expected Error result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_combin() {
+    #[test]
+    fn test_eval_combin() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // C(5, 2) = 10
         let args = vec![num_expr(5.0), num_expr(2.0)];
-        let result = eval_combin(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_combin(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(10));
     }
 
-    #[tokio::test]
-    async fn test_eval_combin_k_greater_n() {
+    #[test]
+    fn test_eval_combin_k_greater_n() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.0), num_expr(5.0)];
-        let result = eval_combin(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_combin(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("number_chosen <= number")),
             _ => panic!("Expected Error result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_permut() {
+    #[test]
+    fn test_eval_permut() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // P(5, 2) = 20
         let args = vec![num_expr(5.0), num_expr(2.0)];
-        let result = eval_permut(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_permut(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(20));
     }
 
-    #[tokio::test]
-    async fn test_eval_gcd() {
+    #[test]
+    fn test_eval_gcd() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // GCD(48, 18) = 6
         let args = vec![num_expr(48.0), num_expr(18.0)];
-        let result = eval_gcd(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_gcd(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(6));
     }
 
-    #[tokio::test]
-    async fn test_eval_gcd_single_arg() {
+    #[test]
+    fn test_eval_gcd_single_arg() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(42.0)];
-        let result = eval_gcd(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_gcd(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(42));
     }
 
-    #[tokio::test]
-    async fn test_eval_lcm() {
+    #[test]
+    fn test_eval_lcm() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // LCM(4, 6) = 12
         let args = vec![num_expr(4.0), num_expr(6.0)];
-        let result = eval_lcm(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_lcm(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(12));
     }
 
-    #[tokio::test]
-    async fn test_eval_factdouble() {
+    #[test]
+    fn test_eval_factdouble() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // 6!! = 6 * 4 * 2 = 48
         let args = vec![num_expr(6.0)];
-        let result = eval_factdouble(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_factdouble(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(48));
     }
 
-    #[tokio::test]
-    async fn test_eval_multinomial() {
+    #[test]
+    fn test_eval_multinomial() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // MULTINOMIAL(2, 3, 4) = (2+3+4)! / (2! * 3! * 4!) = 9! / (2! * 3! * 4!) = 1260
         let args = vec![num_expr(2.0), num_expr(3.0), num_expr(4.0)];
-        let result = eval_multinomial(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_multinomial(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(1260));
     }
 }

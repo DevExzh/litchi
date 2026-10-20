@@ -1256,7 +1256,7 @@ mod tests {
             "fixture must exercise an unchanged default binding"
         );
         assert!(proof.opaque);
-        let decoded = Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
+        let decoded = Patch::from_bytes(&patch.to_bytes().unwrap(), Limits::default()).unwrap();
         let mut replayed = source.clone();
         super::super::apply(&mut replayed, &decoded, true).unwrap();
         let mut overlay = source.clone();
@@ -1281,12 +1281,12 @@ mod tests {
             .metadata
             .members
             .retain(|member| member.owner != Owner::ContentTypes);
-        assert!(Patch::from_bytes(&forged.to_bytes().unwrap()).is_err());
+        assert!(Patch::from_bytes(&forged.to_bytes().unwrap(), Limits::default()).is_err());
         let mut inverse = decoded.inverse();
         inverse
             .metadata
             .members
             .retain(|member| member.owner != Owner::ContentTypes);
-        assert!(Patch::from_bytes(&inverse.to_bytes().unwrap()).is_err());
+        assert!(Patch::from_bytes(&inverse.to_bytes().unwrap(), Limits::default()).is_err());
     }
 }

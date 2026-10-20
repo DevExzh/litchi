@@ -80,7 +80,7 @@ fn positional_reading(mut value: u64, digits: &[char; 10], units: &[char; 3]) ->
 /// type 2 = uppercase formal numerals (壹仟贰佰叁拾肆), type 3 = plain
 /// digit-by-digit reading (一二三四). Non-integers are truncated; negative
 /// values, values beyond 2^53, and unknown types yield #VALUE!.
-pub(crate) async fn eval_numberstring(
+pub(crate) fn eval_numberstring(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -91,12 +91,12 @@ pub(crate) async fn eval_numberstring(
         ));
     }
 
-    let value_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let value_val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let value = match to_number(&value_val) {
         Some(n) => n,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let type_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let type_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let num_type = match to_number(&type_val) {
         Some(n) if (1.0..=3.0).contains(&n.trunc()) => n.trunc() as u8,
         _ => return Ok(CellValue::Error("#VALUE!".to_string())),
@@ -127,7 +127,7 @@ pub(crate) async fn eval_numberstring(
     Ok(CellValue::String(text))
 }
 
-pub(crate) async fn eval_arabic(
+pub(crate) fn eval_arabic(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -135,7 +135,7 @@ pub(crate) async fn eval_arabic(
     if args.len() != 1 {
         return Ok(CellValue::Error("ARABIC expects 1 argument".to_string()));
     }
-    let text = to_text(&evaluate_expression(ctx, current_sheet, &args[0]).await?)
+    let text = to_text(&evaluate_expression(ctx, current_sheet, &args[0])?)
         .trim()
         .to_uppercase();
     if text.is_empty() {
@@ -174,7 +174,7 @@ pub(crate) async fn eval_arabic(
     Ok(CellValue::Int(result * multiplier))
 }
 
-pub(crate) async fn eval_roman(
+pub(crate) fn eval_roman(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -184,7 +184,7 @@ pub(crate) async fn eval_roman(
             "ROMAN expects 1 or 2 arguments".to_string(),
         ));
     }
-    let val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let num = match to_number(&val) {
         Some(n) => n.trunc() as i64,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
@@ -233,114 +233,114 @@ mod tests {
     use crate::engine::test_helpers::TestEngine;
     use crate::parser::Expr;
 
-    #[tokio::test]
-    async fn test_eval_arabic_simple() {
+    #[test]
+    fn test_eval_arabic_simple() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![Expr::Literal(CellValue::String("XII".to_string()))];
-        let result = eval_arabic(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_arabic(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(12));
     }
 
-    #[tokio::test]
-    async fn test_eval_arabic_complex() {
+    #[test]
+    fn test_eval_arabic_complex() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![Expr::Literal(CellValue::String("MCMXCIV".to_string()))];
-        let result = eval_arabic(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_arabic(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(1994));
     }
 
-    #[tokio::test]
-    async fn test_eval_arabic_lowercase() {
+    #[test]
+    fn test_eval_arabic_lowercase() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![Expr::Literal(CellValue::String("xiv".to_string()))];
-        let result = eval_arabic(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_arabic(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(14));
     }
 
-    #[tokio::test]
-    async fn test_eval_arabic_empty() {
+    #[test]
+    fn test_eval_arabic_empty() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![Expr::Literal(CellValue::String("".to_string()))];
-        let result = eval_arabic(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_arabic(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(0));
     }
 
-    #[tokio::test]
-    async fn test_eval_arabic_invalid() {
+    #[test]
+    fn test_eval_arabic_invalid() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![Expr::Literal(CellValue::String("ABC".to_string()))];
-        let result = eval_arabic(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_arabic(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Error("#VALUE!".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_arabic_wrong_args() {
+    #[test]
+    fn test_eval_arabic_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args: Vec<Expr> = vec![];
-        let result = eval_arabic(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_arabic(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 1 argument")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_roman_simple() {
+    #[test]
+    fn test_eval_roman_simple() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![Expr::Literal(CellValue::Int(12))];
-        let result = eval_roman(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_roman(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("XII".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_roman_complex() {
+    #[test]
+    fn test_eval_roman_complex() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![Expr::Literal(CellValue::Int(1994))];
-        let result = eval_roman(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_roman(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("MCMXCIV".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_roman_zero() {
+    #[test]
+    fn test_eval_roman_zero() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![Expr::Literal(CellValue::Int(0))];
-        let result = eval_roman(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_roman(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_roman_too_large() {
+    #[test]
+    fn test_eval_roman_too_large() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![Expr::Literal(CellValue::Int(4000))];
-        let result = eval_roman(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_roman(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Error("#VALUE!".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_roman_negative() {
+    #[test]
+    fn test_eval_roman_negative() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![Expr::Literal(CellValue::Int(-5))];
-        let result = eval_roman(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_roman(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Error("#VALUE!".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_eval_roman_wrong_args() {
+    #[test]
+    fn test_eval_roman_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args: Vec<Expr> = vec![];
-        let result = eval_roman(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_roman(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 1 or 2")),
             _ => panic!("Expected Error"),
@@ -355,11 +355,11 @@ mod tests {
         }
     }
 
-    async fn numberstring(value: f64, num_type: i64) -> CellValue {
+    fn numberstring(value: f64, num_type: i64) -> CellValue {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(value), Expr::Literal(CellValue::Int(num_type))];
-        eval_numberstring(ctx, "Sheet1", &args).await.unwrap()
+        eval_numberstring(ctx, "Sheet1", &args).unwrap()
     }
 
     fn expect_string(value: CellValue) -> String {
@@ -369,119 +369,113 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_numberstring_type1_ecma_example() {
+    #[test]
+    fn test_numberstring_type1_ecma_example() {
         // ECMA-376 §18.17.7.242 example.
         assert_eq!(
-            expect_string(numberstring(123456789.0, 1).await),
+            expect_string(numberstring(123456789.0, 1)),
             "一亿二千三百四十五万六千七百八十九"
         );
     }
 
-    #[tokio::test]
-    async fn test_numberstring_type2_ecma_example() {
+    #[test]
+    fn test_numberstring_type2_ecma_example() {
         assert_eq!(
-            expect_string(numberstring(123456789.0, 2).await),
+            expect_string(numberstring(123456789.0, 2)),
             "壹亿贰仟叁佰肆拾伍万陆仟柒佰捌拾玖"
         );
     }
 
-    #[tokio::test]
-    async fn test_numberstring_type3_ecma_example() {
+    #[test]
+    fn test_numberstring_type3_ecma_example() {
         assert_eq!(
-            expect_string(numberstring(123456789.0, 3).await),
+            expect_string(numberstring(123456789.0, 3)),
             "一二三四五六七八九"
         );
     }
 
-    #[tokio::test]
-    async fn test_numberstring_zero() {
-        assert_eq!(expect_string(numberstring(0.0, 1).await), "零");
-        assert_eq!(expect_string(numberstring(0.0, 2).await), "零");
-        assert_eq!(expect_string(numberstring(0.0, 3).await), "零");
+    #[test]
+    fn test_numberstring_zero() {
+        assert_eq!(expect_string(numberstring(0.0, 1)), "零");
+        assert_eq!(expect_string(numberstring(0.0, 2)), "零");
+        assert_eq!(expect_string(numberstring(0.0, 3)), "零");
     }
 
-    #[tokio::test]
-    async fn test_numberstring_small_numbers() {
-        assert_eq!(expect_string(numberstring(5.0, 1).await), "五");
-        assert_eq!(expect_string(numberstring(10.0, 1).await), "十");
-        assert_eq!(expect_string(numberstring(12.0, 1).await), "十二");
-        assert_eq!(expect_string(numberstring(112.0, 1).await), "一百一十二");
+    #[test]
+    fn test_numberstring_small_numbers() {
+        assert_eq!(expect_string(numberstring(5.0, 1)), "五");
+        assert_eq!(expect_string(numberstring(10.0, 1)), "十");
+        assert_eq!(expect_string(numberstring(12.0, 1)), "十二");
+        assert_eq!(expect_string(numberstring(112.0, 1)), "一百一十二");
     }
 
-    #[tokio::test]
-    async fn test_numberstring_zero_gaps() {
-        assert_eq!(expect_string(numberstring(101.0, 1).await), "一百零一");
-        assert_eq!(expect_string(numberstring(1001.0, 1).await), "一千零一");
-        assert_eq!(expect_string(numberstring(10000.0, 1).await), "一万");
-        assert_eq!(expect_string(numberstring(10001.0, 1).await), "一万零一");
-        assert_eq!(expect_string(numberstring(11000.0, 1).await), "一万一千");
-        assert_eq!(
-            expect_string(numberstring(100000001.0, 1).await),
-            "一亿零一"
-        );
-        assert_eq!(
-            expect_string(numberstring(100010000.0, 1).await),
-            "一亿零一万"
-        );
+    #[test]
+    fn test_numberstring_zero_gaps() {
+        assert_eq!(expect_string(numberstring(101.0, 1)), "一百零一");
+        assert_eq!(expect_string(numberstring(1001.0, 1)), "一千零一");
+        assert_eq!(expect_string(numberstring(10000.0, 1)), "一万");
+        assert_eq!(expect_string(numberstring(10001.0, 1)), "一万零一");
+        assert_eq!(expect_string(numberstring(11000.0, 1)), "一万一千");
+        assert_eq!(expect_string(numberstring(100000001.0, 1)), "一亿零一");
+        assert_eq!(expect_string(numberstring(100010000.0, 1)), "一亿零一万");
     }
 
-    #[tokio::test]
-    async fn test_numberstring_type2_zero_gaps() {
-        assert_eq!(expect_string(numberstring(101.0, 2).await), "壹佰零壹");
-        assert_eq!(expect_string(numberstring(10000.0, 2).await), "壹万");
+    #[test]
+    fn test_numberstring_type2_zero_gaps() {
+        assert_eq!(expect_string(numberstring(101.0, 2)), "壹佰零壹");
+        assert_eq!(expect_string(numberstring(10000.0, 2)), "壹万");
     }
 
-    #[tokio::test]
-    async fn test_numberstring_truncates_fraction() {
-        assert_eq!(expect_string(numberstring(12.9, 1).await), "十二");
+    #[test]
+    fn test_numberstring_truncates_fraction() {
+        assert_eq!(expect_string(numberstring(12.9, 1)), "十二");
     }
 
-    #[tokio::test]
-    async fn test_numberstring_negative_value() {
-        match numberstring(-1.0, 1).await {
+    #[test]
+    fn test_numberstring_negative_value() {
+        match numberstring(-1.0, 1) {
             CellValue::Error(e) => assert_eq!(e, "#VALUE!"),
             other => panic!("Expected #VALUE!, got {:?}", other),
         }
     }
 
-    #[tokio::test]
-    async fn test_numberstring_invalid_type() {
-        match numberstring(5.0, 4).await {
+    #[test]
+    fn test_numberstring_invalid_type() {
+        match numberstring(5.0, 4) {
             CellValue::Error(e) => assert_eq!(e, "#VALUE!"),
             other => panic!("Expected #VALUE!, got {:?}", other),
         }
     }
 
-    #[tokio::test]
-    async fn test_numberstring_beyond_exact_f64_range() {
-        match numberstring(1.0e16, 1).await {
+    #[test]
+    fn test_numberstring_beyond_exact_f64_range() {
+        match numberstring(1.0e16, 1) {
             CellValue::Error(e) => assert_eq!(e, "#VALUE!"),
             other => panic!("Expected #VALUE!, got {:?}", other),
         }
     }
 
-    #[tokio::test]
-    async fn test_numberstring_non_numeric() {
+    #[test]
+    fn test_numberstring_non_numeric() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![
             Expr::Literal(CellValue::String("abc".to_string())),
             Expr::Literal(CellValue::Int(1)),
         ];
-        let result = eval_numberstring(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_numberstring(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert_eq!(e, "#VALUE!"),
             other => panic!("Expected #VALUE!, got {:?}", other),
         }
     }
 
-    #[tokio::test]
-    async fn test_numberstring_wrong_arg_count() {
+    #[test]
+    fn test_numberstring_wrong_arg_count() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![Expr::Literal(CellValue::Int(1))];
-        let result = eval_numberstring(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_numberstring(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 2 arguments")),
             _ => panic!("Expected Error"),

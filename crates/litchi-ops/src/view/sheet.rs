@@ -36,7 +36,9 @@ use std::borrow::Cow;
 #[cfg(feature = "xlsb")]
 use std::sync::Arc;
 
-use litchi_core::sheet::{Cell as CoreCell, CellValue, Result, Worksheet as CoreWorksheet};
+use litchi_core::sheet::{Cell as CoreCell, CellValue, Worksheet as CoreWorksheet};
+
+use crate::Result;
 
 #[cfg(feature = "xlsb")]
 use crate::format::xlsb::source;
@@ -143,30 +145,37 @@ impl std::fmt::Debug for Cell<'_> {
 }
 
 impl CoreCell for Cell<'_> {
+    #[inline]
     fn column(&self) -> u32 {
         each!(CellInner, &self.0, cell => cell.column(), CellInner::Never(never, _) => match *never {})
     }
 
+    #[inline]
     fn coordinate(&self) -> String {
         each!(CellInner, &self.0, cell => cell.coordinate(), CellInner::Never(never, _) => match *never {})
     }
 
+    #[inline]
     fn is_date(&self) -> bool {
         each!(CellInner, &self.0, cell => cell.is_date(), CellInner::Never(never, _) => match *never {})
     }
 
+    #[inline]
     fn is_empty(&self) -> bool {
         each!(CellInner, &self.0, cell => cell.is_empty(), CellInner::Never(never, _) => match *never {})
     }
 
+    #[inline]
     fn is_formula(&self) -> bool {
         each!(CellInner, &self.0, cell => cell.is_formula(), CellInner::Never(never, _) => match *never {})
     }
 
+    #[inline]
     fn row(&self) -> u32 {
         each!(CellInner, &self.0, cell => cell.row(), CellInner::Never(never, _) => match *never {})
     }
 
+    #[inline]
     fn value(&self) -> &CellValue {
         each!(CellInner, &self.0, cell => cell.value(), CellInner::Never(never, _) => match *never {})
     }
@@ -208,6 +217,12 @@ impl Blank for litchi_xls::Cell {
 
 #[cfg(any(feature = "xlsb", feature = "xls"))]
 impl<'a, C: Blank> Stored<'a, C> {
+    /// The leaf's stored-cell lookup at `(row, column)`, which the leaf
+    /// trait's `cell` wraps: `None` is an absent position.
+    fn at(cell: Option<&'a C>, row: u32, column: u32) -> Self {
+        cell.map_or(Self::Absent { row, column }, Self::Cell)
+    }
+
     /// A leaf read: borrowed when stored; an owned cell is the leaf's empty
     /// cell for an absent position.
     fn new(cell: Cow<'a, C>) -> Self {
@@ -226,6 +241,7 @@ impl<'a, C: Blank> Stored<'a, C> {
 
 #[cfg(any(feature = "xlsb", feature = "xls"))]
 impl<C: Blank> CoreCell for Stored<'_, C> {
+    #[inline]
     fn column(&self) -> u32 {
         match self {
             Self::Cell(cell) => cell.column(),
@@ -233,6 +249,7 @@ impl<C: Blank> CoreCell for Stored<'_, C> {
         }
     }
 
+    #[inline]
     fn coordinate(&self) -> String {
         match self {
             Self::Cell(cell) => cell.coordinate(),
@@ -240,6 +257,7 @@ impl<C: Blank> CoreCell for Stored<'_, C> {
         }
     }
 
+    #[inline]
     fn is_date(&self) -> bool {
         match self {
             Self::Cell(cell) => cell.is_date(),
@@ -247,6 +265,7 @@ impl<C: Blank> CoreCell for Stored<'_, C> {
         }
     }
 
+    #[inline]
     fn is_empty(&self) -> bool {
         match self {
             Self::Cell(cell) => cell.is_empty(),
@@ -254,6 +273,7 @@ impl<C: Blank> CoreCell for Stored<'_, C> {
         }
     }
 
+    #[inline]
     fn is_formula(&self) -> bool {
         match self {
             Self::Cell(cell) => cell.is_formula(),
@@ -261,6 +281,7 @@ impl<C: Blank> CoreCell for Stored<'_, C> {
         }
     }
 
+    #[inline]
     fn row(&self) -> u32 {
         match self {
             Self::Cell(cell) => cell.row(),
@@ -268,6 +289,7 @@ impl<C: Blank> CoreCell for Stored<'_, C> {
         }
     }
 
+    #[inline]
     fn value(&self) -> &CellValue {
         match self {
             Self::Cell(cell) => cell.value(),
@@ -308,9 +330,13 @@ impl<'a> Iterator for Cells<'a> {
             #[cfg(feature = "xlsb")]
             CellsInner::XlsbEager(cells) => cells
                 .next()?
-                .map(|cell| CellInner::XlsbEager(Stored::new(cell))),
+                .map(|cell| CellInner::XlsbEager(Stored::new(cell)))
+                .map_err(Into::into),
             #[cfg(feature = "xls")]
-            CellsInner::Xls(cells) => cells.next()?.map(|cell| CellInner::Xls(Stored::new(cell))),
+            CellsInner::Xls(cells) => cells
+                .next()?
+                .map(|cell| CellInner::Xls(Stored::new(cell)))
+                .map_err(Into::into),
             CellsInner::Never(never, _) => match *never {},
         };
         Some(cell.map(Cell))
@@ -340,12 +366,17 @@ enum RowsInner<'a> {
 impl<'a> Iterator for Rows<'a> {
     type Item = Result<Cow<'a, [CellValue]>>;
 
+    #[allow(
+        clippy::useless_conversion,
+        reason = "the XLSX arm's error is already the unified error"
+    )]
     fn next(&mut self) -> Option<Self::Item> {
-        each!(RowsInner, &mut self.0, rows => rows.next(), RowsInner::Never(never, _) => match *never {})
+        each!(RowsInner, &mut self.0, rows => rows.next().map(|row| row.map_err(Into::into)), RowsInner::Never(never, _) => match *never {})
     }
 }
 
 impl CoreWorksheet for Worksheet<'_> {
+    type Error = crate::Error;
     type Cell<'b>
         = Cell<'b>
     where
@@ -359,6 +390,7 @@ impl CoreWorksheet for Worksheet<'_> {
     where
         Self: 'b;
 
+    #[inline]
     fn cell(&self, row: u32, column: u32) -> Result<Cell<'_>> {
         let cell = match &self.0 {
             #[cfg(feature = "xlsx")]
@@ -367,10 +399,12 @@ impl CoreWorksheet for Worksheet<'_> {
             SheetInner::XlsbSource(sheet) => CellInner::XlsbSource(sheet.cell(row, column)?),
             #[cfg(feature = "xlsb")]
             SheetInner::XlsbEager(sheet) => {
-                CellInner::XlsbEager(Stored::new(sheet.cell(row, column)?))
+                CellInner::XlsbEager(Stored::at(sheet.get_cell(row, column), row, column))
             },
             #[cfg(feature = "xls")]
-            SheetInner::Xls(sheet) => CellInner::Xls(Stored::new(sheet.cell(row, column)?)),
+            SheetInner::Xls(sheet) => {
+                CellInner::Xls(Stored::at(sheet.get_cell(row, column), row, column))
+            },
             SheetInner::Never(never, _) => match *never {},
         };
         Ok(Cell(cell))
@@ -397,8 +431,13 @@ impl CoreWorksheet for Worksheet<'_> {
         Ok(Cell(cell))
     }
 
+    #[allow(
+        clippy::useless_conversion,
+        reason = "the XLSX arm's error is already the unified error"
+    )]
+    #[inline]
     fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>> {
-        each!(SheetInner, &self.0, sheet => sheet.cell_value(row, column), SheetInner::Never(never, _) => match *never {})
+        each!(SheetInner, &self.0, sheet => sheet.cell_value(row, column).map_err(Into::into), SheetInner::Never(never, _) => match *never {})
     }
 
     fn cells(&self) -> Cells<'_> {
@@ -427,8 +466,12 @@ impl CoreWorksheet for Worksheet<'_> {
         each!(SheetInner, &self.0, sheet => sheet.name(), SheetInner::Never(never, _) => match *never {})
     }
 
+    #[allow(
+        clippy::useless_conversion,
+        reason = "the XLSX arm's error is already the unified error"
+    )]
     fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>> {
-        each!(SheetInner, &self.0, sheet => sheet.row(row_idx), SheetInner::Never(never, _) => match *never {})
+        each!(SheetInner, &self.0, sheet => sheet.row(row_idx).map_err(Into::into), SheetInner::Never(never, _) => match *never {})
     }
 
     fn row_count(&self) -> usize {
@@ -466,7 +509,7 @@ pub(crate) enum WorksheetsInner<'a> {
     Xls(crate::format::xls::Worksheets<'a>),
     /// Yields one error, then ends.
     #[cfg(feature = "ods")]
-    Refused(Option<Box<dyn std::error::Error + Send + Sync>>),
+    Refused(Option<crate::Error>),
     #[allow(
         dead_code,
         reason = "uninhabited: carries the lifetime when no borrowing format is enabled"
@@ -490,7 +533,10 @@ impl<'a> Iterator for Worksheets<'a> {
             #[cfg(feature = "xlsb")]
             WorksheetsInner::XlsbSource(sheets) => sheets.next()?.map(SheetInner::XlsbSource),
             #[cfg(feature = "xlsb")]
-            WorksheetsInner::XlsbEager(sheets) => sheets.next()?.map(SheetInner::XlsbEager),
+            WorksheetsInner::XlsbEager(sheets) => sheets
+                .next()?
+                .map(SheetInner::XlsbEager)
+                .map_err(Into::into),
             #[cfg(feature = "xls")]
             WorksheetsInner::Xls(sheets) => sheets.next()?.map(SheetInner::Xls),
             #[cfg(feature = "ods")]

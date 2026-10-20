@@ -9,47 +9,43 @@ use super::helpers::{
     EPS, collect_numeric_values, collect_numeric_values_unsorted, number_arg, to_positive_index,
 };
 
-pub(crate) async fn eval_large(
+pub(crate) fn eval_large(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    extremum_function(ctx, current_sheet, args, "LARGE", ExtremumKind::Large).await
+    extremum_function(ctx, current_sheet, args, "LARGE", ExtremumKind::Large)
 }
 
-pub(crate) async fn eval_small(
+pub(crate) fn eval_small(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    extremum_function(ctx, current_sheet, args, "SMALL", ExtremumKind::Small).await
+    extremum_function(ctx, current_sheet, args, "SMALL", ExtremumKind::Small)
 }
 
-pub(crate) async fn eval_rank_eq(
+pub(crate) fn eval_rank_eq(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    rank_function(ctx, current_sheet, args, "RANK.EQ", RankType::Equal).await
+    rank_function(ctx, current_sheet, args, "RANK.EQ", RankType::Equal)
 }
 
-pub(crate) async fn eval_rank_avg(
+pub(crate) fn eval_rank_avg(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    rank_function(ctx, current_sheet, args, "RANK.AVG", RankType::Average).await
+    rank_function(ctx, current_sheet, args, "RANK.AVG", RankType::Average)
 }
 
-pub(crate) async fn eval_rank(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
-    rank_function(ctx, current_sheet, args, "RANK", RankType::Equal).await
+pub(crate) fn eval_rank(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
+    rank_function(ctx, current_sheet, args, "RANK", RankType::Equal)
 }
 
-pub(crate) async fn eval_percentile(
+pub(crate) fn eval_percentile(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -61,10 +57,9 @@ pub(crate) async fn eval_percentile(
         "PERCENTILE",
         PercentileMode::Inclusive,
     )
-    .await
 }
 
-pub(crate) async fn eval_percentile_inc(
+pub(crate) fn eval_percentile_inc(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -76,10 +71,9 @@ pub(crate) async fn eval_percentile_inc(
         "PERCENTILE.INC",
         PercentileMode::Inclusive,
     )
-    .await
 }
 
-pub(crate) async fn eval_percentile_exc(
+pub(crate) fn eval_percentile_exc(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -91,10 +85,9 @@ pub(crate) async fn eval_percentile_exc(
         "PERCENTILE.EXC",
         PercentileMode::Exclusive,
     )
-    .await
 }
 
-pub(crate) async fn eval_quartile(
+pub(crate) fn eval_quartile(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -106,10 +99,9 @@ pub(crate) async fn eval_quartile(
         "QUARTILE",
         QuartileMode::Inclusive,
     )
-    .await
 }
 
-pub(crate) async fn eval_quartile_inc(
+pub(crate) fn eval_quartile_inc(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -121,10 +113,9 @@ pub(crate) async fn eval_quartile_inc(
         "QUARTILE.INC",
         QuartileMode::Inclusive,
     )
-    .await
 }
 
-pub(crate) async fn eval_quartile_exc(
+pub(crate) fn eval_quartile_exc(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -136,18 +127,17 @@ pub(crate) async fn eval_quartile_exc(
         "QUARTILE.EXC",
         QuartileMode::Exclusive,
     )
-    .await
 }
 
-pub(crate) async fn eval_percentrank(
+pub(crate) fn eval_percentrank(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    percentrank_function(ctx, current_sheet, args, "PERCENTRANK", RankMode::Inclusive).await
+    percentrank_function(ctx, current_sheet, args, "PERCENTRANK", RankMode::Inclusive)
 }
 
-pub(crate) async fn eval_percentrank_inc(
+pub(crate) fn eval_percentrank_inc(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -159,10 +149,9 @@ pub(crate) async fn eval_percentrank_inc(
         "PERCENTRANK.INC",
         RankMode::Inclusive,
     )
-    .await
 }
 
-pub(crate) async fn eval_percentrank_exc(
+pub(crate) fn eval_percentrank_exc(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -174,7 +163,6 @@ pub(crate) async fn eval_percentrank_exc(
         "PERCENTRANK.EXC",
         RankMode::Exclusive,
     )
-    .await
 }
 
 #[derive(Clone, Copy)]
@@ -207,7 +195,7 @@ enum RankType {
     Average,
 }
 
-async fn extremum_function(
+fn extremum_function(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -220,13 +208,13 @@ async fn extremum_function(
         )));
     }
 
-    let array = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
+    let array = flatten_range_expr(ctx, current_sheet, &args[0])?;
     let numbers = match collect_numeric_values(array.values, func_name) {
         Ok(v) => v,
         Err(err) => return Ok(err),
     };
 
-    let k_value = match number_arg(ctx, current_sheet, &args[1]).await? {
+    let k_value = match number_arg(ctx, current_sheet, &args[1])? {
         Some(v) => v,
         None => return Ok(CellValue::Error(format!("{func_name} k must be numeric"))),
     };
@@ -250,7 +238,7 @@ async fn extremum_function(
     Ok(CellValue::Float(numbers[idx]))
 }
 
-async fn rank_function(
+fn rank_function(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -263,7 +251,7 @@ async fn rank_function(
         )));
     }
 
-    let number = match number_arg(ctx, current_sheet, &args[0]).await? {
+    let number = match number_arg(ctx, current_sheet, &args[0])? {
         Some(v) => v,
         None => {
             return Ok(CellValue::Error(format!(
@@ -278,13 +266,13 @@ async fn rank_function(
         )));
     }
 
-    let array = flatten_range_expr(ctx, current_sheet, &args[1]).await?;
+    let array = flatten_range_expr(ctx, current_sheet, &args[1])?;
     let values = match collect_numeric_values_unsorted(array.values, func_name) {
         Ok(v) => v,
         Err(err) => return Ok(err),
     };
     let ascending = if args.len() == 3 {
-        match number_arg(ctx, current_sheet, &args[2]).await? {
+        match number_arg(ctx, current_sheet, &args[2])? {
             Some(v) => v != 0.0,
             None => {
                 return Ok(CellValue::Error(format!(
@@ -308,7 +296,7 @@ async fn rank_function(
     }
 }
 
-async fn percentile_function(
+fn percentile_function(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -321,13 +309,13 @@ async fn percentile_function(
         )));
     }
 
-    let array = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
+    let array = flatten_range_expr(ctx, current_sheet, &args[0])?;
     let numbers = match collect_numeric_values(array.values, func_name) {
         Ok(v) => v,
         Err(err) => return Ok(err),
     };
 
-    let k = match number_arg(ctx, current_sheet, &args[1]).await? {
+    let k = match number_arg(ctx, current_sheet, &args[1])? {
         Some(v) => v,
         None => return Ok(CellValue::Error(format!("{func_name} k must be numeric"))),
     };
@@ -340,7 +328,7 @@ async fn percentile_function(
     Ok(CellValue::Float(value))
 }
 
-async fn quartile_function(
+fn quartile_function(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -353,13 +341,13 @@ async fn quartile_function(
         )));
     }
 
-    let array = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
+    let array = flatten_range_expr(ctx, current_sheet, &args[0])?;
     let numbers = match collect_numeric_values(array.values, func_name) {
         Ok(v) => v,
         Err(err) => return Ok(err),
     };
 
-    let quart_value = match number_arg(ctx, current_sheet, &args[1]).await? {
+    let quart_value = match number_arg(ctx, current_sheet, &args[1])? {
         Some(v) => v,
         None => {
             return Ok(CellValue::Error(format!(
@@ -400,7 +388,7 @@ async fn quartile_function(
     Ok(CellValue::Float(value))
 }
 
-async fn percentrank_function(
+fn percentrank_function(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -413,13 +401,13 @@ async fn percentrank_function(
         )));
     }
 
-    let array = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
+    let array = flatten_range_expr(ctx, current_sheet, &args[0])?;
     let numbers = match collect_numeric_values(array.values, func_name) {
         Ok(v) => v,
         Err(err) => return Ok(err),
     };
 
-    let x = match number_arg(ctx, current_sheet, &args[1]).await? {
+    let x = match number_arg(ctx, current_sheet, &args[1])? {
         Some(v) => v,
         None => {
             return Ok(CellValue::Error(format!(
@@ -429,7 +417,7 @@ async fn percentrank_function(
     };
 
     let significance = if args.len() == 3 {
-        match number_arg(ctx, current_sheet, &args[2]).await? {
+        match number_arg(ctx, current_sheet, &args[2])? {
             Some(v) => match parse_significance(v, func_name) {
                 Ok(s) => s,
                 Err(err) => return Ok(err),
@@ -763,8 +751,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_large() {
+    #[test]
+    fn test_eval_large() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Array: [3, 1, 4, 1, 5, 9, 2, 6]
@@ -787,15 +775,15 @@ mod tests {
             end_col: 7,
         });
         let args = vec![range, num_expr(3.0)];
-        let result = eval_large(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_large(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 5.0).abs() < 1e-9, "Expected 5, got {}", v),
             _ => panic!("Expected Float, got {:?}", result),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_small() {
+    #[test]
+    fn test_eval_small() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Array: [3, 1, 4, 1, 5, 9, 2, 6]
@@ -819,15 +807,15 @@ mod tests {
         });
         // Get 3rd smallest since there are duplicates of 1
         let args = vec![range, num_expr(3.0)];
-        let result = eval_small(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_small(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 2.0).abs() < 1e-9, "Expected 2, got {}", v),
             _ => panic!("Expected Float, got {:?}", result),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_rank_eq() {
+    #[test]
+    fn test_eval_rank_eq() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Rank of 5 in [1, 2, 3, 4, 5, 6, 7] = 3 (descending order, 5 is 3rd largest)
@@ -847,15 +835,15 @@ mod tests {
             end_col: 6,
         });
         let args = vec![num_expr(5.0), range];
-        let result = eval_rank_eq(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_rank_eq(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 3.0).abs() < 1e-9, "Expected 3, got {}", v),
             _ => panic!("Expected Float, got {:?}", result),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_rank_avg() {
+    #[test]
+    fn test_eval_rank_avg() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Rank of 5 in [5, 5, 5, 4, 3, 2, 1] with duplicates
@@ -875,7 +863,7 @@ mod tests {
             end_col: 6,
         });
         let args = vec![num_expr(5.0), range];
-        let result = eval_rank_avg(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_rank_avg(ctx, "Sheet1", &args).unwrap();
         // Average rank of the three 5s would be (1+2+3)/3 = 2
         match result {
             CellValue::Float(v) => assert!((v - 2.0).abs() < 1e-9, "Expected 2, got {}", v),
@@ -883,8 +871,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_percentile_inc() {
+    #[test]
+    fn test_eval_percentile_inc() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Data: [1, 2, 3, 4, 5], 50th percentile (median) = 3
@@ -902,15 +890,15 @@ mod tests {
             end_col: 4,
         });
         let args = vec![range, num_expr(0.5)];
-        let result = eval_percentile_inc(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_percentile_inc(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 3.0).abs() < 1e-9, "Expected 3, got {}", v),
             _ => panic!("Expected Float, got {:?}", result),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_percentile_exc() {
+    #[test]
+    fn test_eval_percentile_exc() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Data: [1, 2, 3, 4, 5], 50th percentile exclusive
@@ -928,15 +916,15 @@ mod tests {
             end_col: 4,
         });
         let args = vec![range, num_expr(0.5)];
-        let result = eval_percentile_exc(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_percentile_exc(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 3.0).abs() < 1e-9, "Expected 3, got {}", v),
             _ => panic!("Expected Float, got {:?}", result),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_quartile_inc() {
+    #[test]
+    fn test_eval_quartile_inc() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Data: [1, 2, 3, 4, 5, 6, 7, 8], quartile 2 (median) = 4.5
@@ -957,15 +945,15 @@ mod tests {
             end_col: 7,
         });
         let args = vec![range, num_expr(2.0)];
-        let result = eval_quartile_inc(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_quartile_inc(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 4.5).abs() < 1e-9, "Expected 4.5, got {}", v),
             _ => panic!("Expected Float, got {:?}", result),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_percentrank_inc() {
+    #[test]
+    fn test_eval_percentrank_inc() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Data: [1, 2, 3, 4, 5], percent rank of 3 = 0.5
@@ -983,7 +971,7 @@ mod tests {
             end_col: 4,
         });
         let args = vec![range, num_expr(3.0)];
-        let result = eval_percentrank_inc(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_percentrank_inc(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 0.5).abs() < 1e-9, "Expected 0.5, got {}", v),
             _ => panic!("Expected Float, got {:?}", result),

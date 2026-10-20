@@ -1,6 +1,6 @@
 //! XLSX compatibility forwarding for the shared XML Maps codec.
 
-use litchi_core::sheet::Result;
+use crate::BoxedResult as Result;
 use litchi_core::xml::ReaderOrigin;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;

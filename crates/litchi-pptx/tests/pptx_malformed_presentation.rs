@@ -4,6 +4,9 @@
     reason = "test assertions panic on failure by design"
 )]
 
+mod in_place;
+use in_place::InPlace as _;
+
 use litchi_opc::PackURI;
 use litchi_pptx::parts::SlideReference;
 use litchi_pptx::{Error, Package, Result};
@@ -20,13 +23,13 @@ type SlideSize = Result<(i64, i64)>;
 /// presentation reader to accept the replacement during the edit itself.
 fn with_presentation_blob(blob: &[u8]) -> Package {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     package.save(output.path()).unwrap();
 
     let mut package = Package::open(output.path()).unwrap();
     let part_name = PackURI::new("/ppt/presentation.xml").unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.get_part_mut(&part_name)?.set_blob(blob.to_vec());
             Ok(())
         })
@@ -176,7 +179,7 @@ fn slide_reference_owner_skips_case_equivalent_target_parts_first_wins() {
     let presentation = builder.presentation().unwrap();
     presentation.add_slide().unwrap();
     presentation.add_slide().unwrap();
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     package.save(output.path()).unwrap();
 
     let mut package = Package::open(output.path()).unwrap();
@@ -190,7 +193,7 @@ fn slide_reference_owner_skips_case_equivalent_target_parts_first_wins() {
         .clone();
     let second_relationship_id = second.relationship_id().to_owned();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let presentation = opc.get_part_mut(&PackURI::new("/ppt/presentation.xml").unwrap())?;
             presentation
                 .rels_mut()
@@ -247,13 +250,13 @@ fn malformed_slide_accessors_do_not_panic() {
             .add_slide()
             .unwrap()
             .set_title("seed");
-        let mut package = builder.build().unwrap();
+        let package = builder.build().unwrap();
         package.save(output.path()).unwrap();
 
         let mut package = Package::open(output.path()).unwrap();
         let slide_uri = PackURI::new("/ppt/slides/slide1.xml").unwrap();
         package
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
                 opc.get_part_mut(&slide_uri)?.set_blob(blob.clone());
                 Ok(())
             })

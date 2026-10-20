@@ -37,7 +37,7 @@ const COMMENTS_XML: &[u8] = concat!(
 
 #[test]
 fn eager_and_source_comment_snapshots_share_author_and_native_metadata() {
-    let mut package = package_with_comments();
+    let package = package_with_comments();
     let bytes = package.to_bytes().unwrap();
 
     let eager = {
@@ -70,7 +70,7 @@ fn eager_and_source_comment_snapshots_share_author_and_native_metadata() {
 
 #[test]
 fn eager_comment_snapshot_requires_an_author_relationship() {
-    let mut package = package_with_comments();
+    let package = package_with_comments();
     let bytes = package.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
     opc.get_part_mut(&PackURI::new("/ppt/presentation.xml").unwrap())
@@ -165,7 +165,7 @@ fn eager_comment_snapshot_rejects_external_author_relationship() {
 }
 
 fn package_with_comments() -> Package {
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     let authors_name = PackURI::new("/ppt/commentAuthors.xml").unwrap();
@@ -217,7 +217,7 @@ fn package_with_comments() -> Package {
     Package::from_opc_package(package).unwrap()
 }
 
-fn rewrite_package(mut package: Package, edit: impl FnOnce(&mut OpcPackage)) -> Package {
+fn rewrite_package(package: Package, edit: impl FnOnce(&mut OpcPackage)) -> Package {
     let bytes = package.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
     edit(&mut opc);

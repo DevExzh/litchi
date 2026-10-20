@@ -8,7 +8,7 @@ mod package;
 pub mod math;
 
 /// Typed, inert, source-preserving `p1710:readonlyRecommended` metadata.
-pub mod readonly_recommended;
+pub mod read_only_recommended;
 
 /// Presentation/document metadata capabilities that share the presentation
 /// properties facade until the crate-level API integrator publishes their

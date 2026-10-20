@@ -33,7 +33,7 @@ fn source_bytes(slide_ids: &str) -> Vec<u8> {
             .unwrap()
             .set_title(&format!("Slide {index}"));
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     let bytes = package.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
     let uri = PackURI::new("/ppt/presentation.xml").unwrap();
@@ -150,8 +150,10 @@ fn selected_source_limits_are_not_bypassed_by_sections() {
         .unwrap()
         .build()
         .unwrap();
-    let error = match SourceBackedPresentation::from_reader_with_limits(Cursor::new(bytes), limits)
-    {
+    let error = match SourceBackedPresentation::from_reader_with_options(
+        Cursor::new(bytes),
+        litchi_pptx::OpenOptions::default().source_limits(limits),
+    ) {
         Ok(_) => panic!("an over-tight source limit unexpectedly opened the package"),
         Err(error) => error,
     };

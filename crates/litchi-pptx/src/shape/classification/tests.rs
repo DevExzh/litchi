@@ -72,14 +72,3 @@ fn unknown_extensions_survive_first_class_authoring() {
         Some(Outcome::Footer)
     );
 }
-
-#[test]
-fn detached_edits_are_atomic_and_keep_opaque_extensions() {
-    let snapshot = super::Snapshot::new(Outcome::Header);
-    let mut editor = snapshot.edit();
-    editor.set(Outcome::Footer).unwrap();
-    assert_eq!(editor.snapshot().outcome(), Some(Outcome::Footer));
-    let committed = editor.commit().unwrap();
-    assert_eq!(snapshot.outcome(), Some(Outcome::Header));
-    assert_eq!(committed.outcome(), Some(Outcome::Footer));
-}

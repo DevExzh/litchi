@@ -155,9 +155,11 @@ pub(super) fn validate(file: &File) -> Result<Validation> {
         #[cfg(feature = "pptx")]
         FileFormat::Pptx => {
             let bytes = Arc::new(file.to_bytes()?);
-            let leaf = litchi_pptx::validate_source(Arc::new(litchi_core::OwnedSource::from_arc(
-                Arc::clone(&bytes),
-            )))
+            let leaf = litchi_pptx::validate_source(
+                Arc::new(litchi_core::OwnedSource::from_arc(Arc::clone(&bytes))),
+                litchi_pptx::PptxValidationLimits::default(),
+                ValidationLimits::default(),
+            )
             .map_err(Error::Pptx)?;
             with_parts(leaf, bytes)?
         },

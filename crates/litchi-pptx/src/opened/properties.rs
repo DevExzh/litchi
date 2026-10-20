@@ -66,10 +66,11 @@ pub(super) fn stage_shape_properties_admitted(
 
     let scene = crate::shape::Scene::read(xml)?;
     if scene.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "set_shape_properties",
-            reason: "atomic shape property batches do not support markup-compatibility branch selection",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "set_shape_properties",
+            "atomic shape property batches do not support markup-compatibility branch selection",
+        ));
     }
     if replacements.len() > scene.len() {
         return Err(Error::Limit {

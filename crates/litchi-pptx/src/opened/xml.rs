@@ -1371,10 +1371,11 @@ pub(super) fn stage_shape_texts_admitted(
 
     let scene = crate::shape::Scene::read(xml)?;
     if scene.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "set_shape_texts",
-            reason: "atomic shape text batches do not support markup-compatibility branch selection",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "set_shape_texts",
+            "atomic shape text batches do not support markup-compatibility branch selection",
+        ));
     }
     if replacements.len() > scene.len() {
         return Err(Error::Limit {
@@ -1402,10 +1403,11 @@ pub(super) fn stage_shape_texts_admitted(
         if !selected.insert(index) {
             return Err(Error::DuplicateShapeTextSelection { index });
         }
-        let current = shape.common().text().ok_or(Error::UnsafeEdit {
-            operation: "set_shape_text",
-            reason: "the selected shape has no text body",
-        })?;
+        let current = shape.common().text().ok_or(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedTarget,
+            "set_shape_text",
+            "the selected shape has no text body",
+        ))?;
         edits.push(ShapeTextEdit {
             index,
             shape: shape.common().span()?.range(xml.len())?,
@@ -1472,10 +1474,11 @@ fn rewrite_shape_texts(
     owners.extend(edits.iter().map(|edit| edit.shape.clone()));
     let elements = drawing_text_elements_for_owners(xml, &owners)?;
     if elements.iter().any(Vec::is_empty) {
-        return Err(Error::UnsafeEdit {
-            operation: "set_shape_text",
-            reason: "the selected shape has no DrawingML text run",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedTarget,
+            "set_shape_text",
+            "the selected shape has no DrawingML text run",
+        ));
     }
     if !edits.iter().any(|edit| edit.changed) {
         return Ok(None);
@@ -1487,11 +1490,12 @@ fn rewrite_shape_texts(
         .zip(&elements)
         .any(|(edit, spans)| edit.changed && spans.iter().any(|span| span.field))
     {
-        return Err(Error::UnsafeEdit {
-            operation: "set_shape_text",
-            reason: "the shape text holds a field (a:fld), which a shape text set would \
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "set_shape_text",
+            "the shape text holds a field (a:fld), which a shape text set would \
                      overwrite; set the text of its runs instead",
-        });
+        ));
     }
     let mut escaped = Vec::new();
     escaped
@@ -2024,10 +2028,11 @@ fn shape_removal_plan(
 ) -> Result<(Range<usize>, BTreeSet<u32>, usize)> {
     let scene = crate::shape::Scene::read(xml)?;
     if scene.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "remove_shape",
-            reason: "shape removal does not support markup-compatibility branch selection",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "remove_shape",
+            "shape removal does not support markup-compatibility branch selection",
+        ));
     }
     shape_removal_plan_in(&scene, xml, key)
 }
@@ -2044,10 +2049,11 @@ pub(super) fn shape_removal_plan_in(
     let root = scene
         .roots()
         .find(|shape| shape.common().index() == selected_index)
-        .ok_or(Error::UnsafeEdit {
-            operation: "remove_shape",
-            reason: "shape removal requires a direct top-level shape",
-        })?;
+        .ok_or(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedTarget,
+            "remove_shape",
+            "shape removal requires a direct top-level shape",
+        ))?;
     let root_span = root.common().span()?.range(xml.len())?;
     let mut identities = BTreeSet::new();
     let mut removed_identities = BTreeSet::new();
@@ -2160,10 +2166,11 @@ pub(crate) fn validate_shape_removal_dependencies(
         .iter()
         .any(|identity| removed_identities.contains(identity))
     {
-        return Err(Error::UnsafeEdit {
-            operation: "remove_shape",
-            reason: "the removed shape is referenced by a connector or animation target",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedTarget,
+            "remove_shape",
+            "the removed shape is referenced by a connector or animation target",
+        ));
     }
     Ok(())
 }
@@ -2240,10 +2247,11 @@ pub(crate) fn shape_reference_ids(source: &[u8]) -> Result<BTreeSet<u32>> {
                         b"spid" | b"objId" | b"shapeId" | b"objectId"
                     )
                 {
-                    return Err(Error::UnsafeEdit {
-                        operation: "remove_shape",
-                        reason: "an opaque shape identity association cannot be preserved after removal",
-                    });
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "remove_shape",
+                        "an opaque shape identity association cannot be preserved after removal",
+                    ));
                 }
                 continue;
             }
@@ -2257,10 +2265,11 @@ pub(crate) fn shape_reference_ids(source: &[u8]) -> Result<BTreeSet<u32>> {
                 .map_err(|error| Error::Xml(error.to_string()))?;
             identity = Some(value.trim().parse::<u32>().map_err(|_| {
                 if local.as_ref() == b"control" {
-                    Error::UnsafeEdit {
-                        operation: "remove_shape",
-                        reason: "legacy control shape associations cannot be resolved for removal",
-                    }
+                    Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "remove_shape",
+                        "legacy control shape associations cannot be resolved for removal",
+                    )
                 } else {
                     invalid("opened-presentation shape reference identity is invalid")
                 }

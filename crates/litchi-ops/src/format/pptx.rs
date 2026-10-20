@@ -1161,7 +1161,7 @@ impl Pptx {
                 pptx::Package::from_opc_package(package.opc()?.clone())?
             },
         };
-        package.unsign()?;
+        package = package.unsign()?;
         Ok(package)
     }
 }

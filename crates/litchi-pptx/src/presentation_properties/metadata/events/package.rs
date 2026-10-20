@@ -7,7 +7,7 @@ use litchi_opc::{OpcPackage, PackURI};
 
 use super::codec::{self, LoadLimits};
 use super::model::{Draft, Event};
-use super::transaction::{Commit, Patch, Snapshot};
+use super::transaction::{Change, Prepared, Snapshot};
 use super::validation::validate_events;
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
@@ -53,7 +53,11 @@ pub fn load_snapshot(package: &OpcPackage, slide_part_name: &PackURI) -> Result<
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store(package: &mut OpcPackage, slide_part_name: &PackURI, events: &[Draft]) -> Result<()> {
+pub(crate) fn store(
+    package: &mut OpcPackage,
+    slide_part_name: &PackURI,
+    events: &[Draft],
+) -> Result<()> {
     validate_events(events)?;
     refuse_signed_change(package)?;
     let mut candidate = package.clone();
@@ -79,7 +83,10 @@ pub fn store(package: &mut OpcPackage, slide_part_name: &PackURI, events: &[Draf
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn remove(package: &mut OpcPackage, slide_part_name: &PackURI) -> Result<Option<Snapshot>> {
+pub(crate) fn remove(
+    package: &mut OpcPackage,
+    slide_part_name: &PackURI,
+) -> Result<Option<Snapshot>> {
     let Some(before) = load_snapshot(package, slide_part_name)? else {
         return Ok(None);
     };
@@ -109,7 +116,7 @@ pub fn remove(package: &mut OpcPackage, slide_part_name: &PackURI) -> Result<Opt
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     let slide_name = PackURI::new(patch.before().slide_part_name()).map_err(Error::Uri)?;
     let current = load_snapshot(package, &slide_name)?
         .ok_or_else(|| invalid("slide-show event source is absent"))?;
@@ -148,7 +155,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }
 

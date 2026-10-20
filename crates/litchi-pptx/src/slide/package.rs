@@ -53,7 +53,7 @@ pub(crate) fn slide_shape_designer_properties<'a, 'k>(
     part: &SlidePart<'a>,
     shape: impl Into<crate::shape::Key<'k>>,
     limits: crate::shape::designer::Limits,
-) -> Result<crate::shape::designer::PropertiesSnapshot> {
+) -> Result<crate::shape::designer::properties::Snapshot> {
     crate::shape::designer::load_properties_with_limits(
         package,
         part.part().partname(),

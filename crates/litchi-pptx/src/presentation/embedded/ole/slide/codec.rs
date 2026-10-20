@@ -53,7 +53,7 @@ pub(crate) struct Document {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Edit {
+pub(crate) struct Draft {
     pub(crate) range: Range<usize>,
     pub(crate) replacement: Vec<u8>,
 }
@@ -440,7 +440,7 @@ pub(crate) fn attribute_edit(
     local: &[u8],
     relationship: bool,
     value: Option<&str>,
-) -> Result<Option<Edit>> {
+) -> Result<Option<Draft>> {
     let found = node.attributes.iter().find(|attribute| {
         if attribute.local.as_slice() != local {
             return false;
@@ -454,7 +454,7 @@ pub(crate) fn attribute_edit(
         }
     });
     match (found, value) {
-        (Some(attribute), Some(value)) => Ok(Some(Edit {
+        (Some(attribute), Some(value)) => Ok(Some(Draft {
             range: attribute.value_start..attribute.value_end,
             replacement: escape(value).into_bytes(),
         })),
@@ -463,7 +463,7 @@ pub(crate) fn attribute_edit(
             while start > node.start + 1 && is_space(source[start - 1]) {
                 start -= 1;
             }
-            Ok(Some(Edit {
+            Ok(Some(Draft {
                 range: start..attribute.value_end + 1,
                 replacement: Vec::new(),
             }))
@@ -478,7 +478,7 @@ pub(crate) fn attribute_edit(
             } else {
                 String::from_utf8_lossy(local).into_owned()
             };
-            Ok(Some(Edit {
+            Ok(Some(Draft {
                 range: insert..insert,
                 replacement: format!(" {name}=\"{}\"", escape(value)).into_bytes(),
             }))
@@ -487,7 +487,7 @@ pub(crate) fn attribute_edit(
     }
 }
 
-pub(crate) fn apply_edits(source: &[u8], mut edits: Vec<Edit>) -> Result<Vec<u8>> {
+pub(crate) fn apply_edits(source: &[u8], mut edits: Vec<Draft>) -> Result<Vec<u8>> {
     if edits.is_empty() {
         return Ok(source.to_vec());
     }
@@ -516,11 +516,11 @@ pub(crate) fn apply_edits(source: &[u8], mut edits: Vec<Edit>) -> Result<Vec<u8>
     Ok(output)
 }
 
-pub(crate) fn append_fragment(source: &[u8], insertion: usize, fragment: &[u8]) -> Result<Edit> {
+pub(crate) fn append_fragment(source: &[u8], insertion: usize, fragment: &[u8]) -> Result<Draft> {
     if insertion > source.len() {
         return Err(invalid("OLE insertion point escapes the slide"));
     }
-    Ok(Edit {
+    Ok(Draft {
         range: insertion..insertion,
         replacement: fragment.to_vec(),
     })

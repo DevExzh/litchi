@@ -2,7 +2,7 @@
 
 use super::codec::scan_slide;
 use super::model::{ContentPart, Payload, Relationship, RelationshipMetadata, Target};
-use super::transaction::{Commit, Patch, RelationshipState, Snapshot};
+use super::transaction::{Change, Prepared, RelationshipState, Snapshot};
 use super::validation::{
     self, MAX_PAYLOAD_BYTES, MAX_PAYLOAD_RELATIONSHIPS, MAX_RELATIONSHIP_FIELD_BYTES,
     MAX_TOTAL_PAYLOAD_BYTES,
@@ -217,7 +217,7 @@ pub fn load_snapshot(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     let before = patch.before();
     let slide = package.get_part(&before.slide_part_name)?;
     let current = load_snapshot(package, before.slide_index, slide, &mut Limits::default())?;
@@ -257,11 +257,11 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 ///
 /// Returns an error if the operation fails.
 #[inline]
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }
 
-fn install_patch(package: &mut OpcPackage, patch: &Patch) -> Result<()> {
+fn install_patch(package: &mut OpcPackage, patch: &Change) -> Result<()> {
     let before = patch.before();
     let after = patch.after();
     let slide_name = before.slide_part_name.clone();

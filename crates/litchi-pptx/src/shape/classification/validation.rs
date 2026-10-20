@@ -1,6 +1,6 @@
 //! Bounds and value validation for classification edits.
 
-use super::model::{Outcome, Snapshot};
+use super::model::Outcome;
 use crate::{Error, Result};
 
 pub(super) const MAX_SHAPE_BYTES: usize = 64 * 1024 * 1024;
@@ -8,10 +8,6 @@ pub(super) const MAX_SHAPE_NODES: usize = 1_000_000;
 pub(super) const MAX_SHAPE_DEPTH: usize = 512;
 pub(super) const MAX_EXTENSION_BYTES: usize = 1 << 20;
 pub(super) const MAX_EXTENSION_COUNT: usize = 1_024;
-
-pub(super) fn validate_snapshot(snapshot: &Snapshot) -> Result<()> {
-    snapshot.validate()
-}
 
 pub(super) fn validate_outcome(outcome: Outcome) -> Result<()> {
     // Keeping this as a separate seam makes future schema additions explicit

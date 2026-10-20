@@ -16,7 +16,7 @@ fn owned_slides(titles: &[&str]) -> Result<Package> {
     for title in titles {
         builder.presentation()?.add_slide()?.set_title(title);
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     let bytes = package.to_bytes()?;
     Package::from_reader(std::io::Cursor::new(bytes))
 }
@@ -155,7 +155,7 @@ fn snapshot_physical_revision_is_keyed_by_the_archive_bound() -> Result<()> {
 
 #[test]
 fn rebound_snapshot_starts_an_empty_physical_revision_cache() -> Result<()> {
-    let (mut source, _destination) = cross_copy_fixture()?;
+    let (source, _destination) = cross_copy_fixture()?;
     let snapshot = source.opened_presentation()?;
     let limits = snapshot.limits();
     let original = snapshot_physical_revision(&snapshot, limits)?;
@@ -219,7 +219,7 @@ fn planned_and_published_revisions_equal_fresh_serializations() -> Result<()> {
 
 #[test]
 fn warm_snapshot_caches_do_not_hide_a_stale_source_or_destination() -> Result<()> {
-    let (mut source, mut destination) = cross_copy_fixture()?;
+    let (source, destination) = cross_copy_fixture()?;
     let source_bytes = source.to_bytes()?;
     let destination_bytes = destination.to_bytes()?;
     let source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
@@ -260,10 +260,7 @@ fn warm_snapshot_caches_do_not_hide_a_stale_source_or_destination() -> Result<()
     let drifted_before = drifted.opc.clone();
     assert!(matches!(
         drifted.apply_cross_slide_copy_plan(&source, &plan),
-        Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_plan",
-            reason: "the complete destination package graph changed after cross-slide planning",
-        })
+        Err(Error::PatchConflict)
     ));
     assert_eq!(
         physical_package_fingerprint(&drifted.opc, limits)?,
@@ -284,10 +281,7 @@ fn warm_snapshot_caches_do_not_hide_a_stale_source_or_destination() -> Result<()
     );
     assert!(matches!(
         repackaged_destination.apply_cross_slide_copy_plan(&recomment, &plan),
-        Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_plan",
-            reason: "the serialized source package changed after cross-slide planning",
-        })
+        Err(Error::PatchConflict)
     ));
 
     // The unchanged pairing still applies, and publishes the planned archive.

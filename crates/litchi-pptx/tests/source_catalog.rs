@@ -6,6 +6,9 @@
 
 //! Source-backed presentation master/layout catalog projections.
 
+mod in_place;
+use in_place::InPlace as _;
+
 use std::io::{self, Cursor};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -30,7 +33,7 @@ struct CatalogFixture {
 fn catalog_fixture() -> CatalogFixture {
     let mut package = Package::new().unwrap();
     let master_one = PackURI::new(MASTER_ONE).unwrap();
-    let authored_master_two = package.add_slide_master().unwrap();
+    let authored_master_two = package.add_slide_master_in_place().unwrap();
     let master_two = authored_master_two.part_name.clone();
 
     // Keep the fixture small and deterministic: the package template starts
@@ -38,21 +41,21 @@ fn catalog_fixture() -> CatalogFixture {
     // on each master.
     for index in 1..=11 {
         package
-            .remove_slide_layout(
+            .remove_slide_layout_in_place(
                 &PackURI::new(format!("/ppt/slideLayouts/slideLayout{index}.xml")).unwrap(),
             )
             .unwrap();
     }
     let layout_one = package
-        .add_slide_layout(&master_one, SlideLayoutKind::Title, "One Alpha", &[])
+        .add_slide_layout_in_place(&master_one, SlideLayoutKind::Title, "One Alpha", &[])
         .unwrap()
         .part_name;
     let layout_two = package
-        .add_slide_layout(&master_one, SlideLayoutKind::Blank, "One Beta", &[])
+        .add_slide_layout_in_place(&master_one, SlideLayoutKind::Blank, "One Beta", &[])
         .unwrap()
         .part_name;
     let layout_three = package
-        .add_slide_layout(
+        .add_slide_layout_in_place(
             &master_two,
             SlideLayoutKind::TitleOnly,
             "Two Alpha",
@@ -61,7 +64,7 @@ fn catalog_fixture() -> CatalogFixture {
         .unwrap()
         .part_name;
     let layout_four = package
-        .add_slide_layout(&master_two, SlideLayoutKind::SectionHeader, "Two Beta", &[])
+        .add_slide_layout_in_place(&master_two, SlideLayoutKind::SectionHeader, "Two Beta", &[])
         .unwrap()
         .part_name;
 

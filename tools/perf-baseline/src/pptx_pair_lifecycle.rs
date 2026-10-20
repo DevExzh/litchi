@@ -993,9 +993,10 @@ fn semantic_expectation(
     bytes: &[u8],
     expansion_limit: u64,
 ) -> Result<Vec<SlideExpectation>, Box<dyn Error>> {
-    let presentation = litchi_pptx::SourceBackedPresentation::from_read_at_with_limits(
+    let presentation = litchi_pptx::SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes.to_vec())),
-        read_limits(u64::try_from(bytes.len())?, expansion_limit)?,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(read_limits(u64::try_from(bytes.len())?, expansion_limit)?),
     )?;
     presentation
         .slides()
@@ -1213,11 +1214,12 @@ fn run_iteration(
 
     let source_allocation_region = crate::allocation_metrics::begin();
     let source_started = std::time::Instant::now();
-    let source_view = litchi_pptx::SourceBackedPresentation::from_read_at_with_limits_and_cache_limits_and_execution_context(
+    let source_view = litchi_pptx::SourceBackedPresentation::from_read_at_with_options(
         source_read,
-        read_limits,
-        cache_limits,
-        source_context.context.clone(),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(read_limits)
+            .cache_limits(cache_limits)
+            .execution_context(source_context.context.clone()),
     )?;
     let open_source_ns = crate::elapsed_ns(source_started.elapsed())?;
     let open_source_allocation_metrics = source_allocation_region.finish();
@@ -1225,11 +1227,12 @@ fn run_iteration(
     let destination_allocation_region = crate::allocation_metrics::begin();
     let destination_started = std::time::Instant::now();
     let mut destination_editor = Some(
-        litchi_pptx::SourceBackedPresentationEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
+        litchi_pptx::SourceBackedPresentationEditor::from_read_at_with_options(
             destination_read,
-            read_limits,
-            cache_limits,
-            destination_context.context.clone(),
+            litchi_pptx::OpenOptions::default()
+                .source_limits(read_limits)
+                .cache_limits(cache_limits)
+                .execution_context(destination_context.context.clone()),
         )?,
     );
     let open_destination_ns = crate::elapsed_ns(destination_started.elapsed())?;

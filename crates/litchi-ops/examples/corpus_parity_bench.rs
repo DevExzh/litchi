@@ -28,7 +28,7 @@ mod enabled {
     use litchi_drawingml::geom::Preset;
     use litchi_ops::batch::{Options, Unsupported};
     use litchi_ops::{BatchItem, File, NewNode, OpenOptions, Props, SourceMode, props};
-    use litchi_pptx::opened::{Rgb, ShapeFill, TextEdit, TextProperties, TextTarget};
+    use litchi_pptx::opened::{Rgb, ShapeFill, TextAssignment, TextProperties, TextTarget};
     use litchi_pptx::transition::{Kind, Side, Transition};
 
     const DECKS: &[usize] = &[1, 100, 1_000];
@@ -114,12 +114,12 @@ mod enabled {
             let shape = Position::new(shapes);
             edit.set_text_properties(
                 0_usize,
-                &[TextEdit::new(TextTarget::Shape { shape }, format())],
+                &[TextAssignment::new(TextTarget::Shape { shape }, format())],
             )
             .expect("format");
             edit.commit().expect("commit").into_package()
         };
-        let mut check = leaf_add();
+        let check = leaf_add();
         let unified = file.add("/slide[1]", node.clone()).expect("unified add");
         assert_eq!(
             check.to_bytes().expect("leaf bytes"),
@@ -156,7 +156,7 @@ mod enabled {
                 .expect("add");
             edit.commit().expect("commit").into_package()
         };
-        let mut check = leaf_plain();
+        let check = leaf_plain();
         let unified = file
             .add("/slide[1]", plain.clone())
             .expect("unified plain add");
@@ -188,7 +188,7 @@ mod enabled {
             let mut edit = native.edit().expect("edit");
             edit.set_text_properties(
                 0_usize,
-                &[TextEdit::new(
+                &[TextAssignment::new(
                     TextTarget::Shape {
                         shape: Position::new(0),
                     },
@@ -198,7 +198,7 @@ mod enabled {
             .expect("fill");
             edit.commit().expect("commit").into_package()
         };
-        let mut check = leaf_fill();
+        let check = leaf_fill();
         let unified = file
             .set(
                 "/slide[1]/shape[1]",
@@ -238,7 +238,7 @@ mod enabled {
                 .expect("transition");
             edit.commit().expect("commit").into_package()
         };
-        let mut check = leaf_transition();
+        let check = leaf_transition();
         let unified = file
             .set("/slide[1]", props! { "transition" => "push-right" })
             .expect("unified transition");

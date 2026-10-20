@@ -1,73 +1,10 @@
 //! Detached classification edits with atomic commit semantics.
 
-use super::model::{Outcome, Snapshot};
-use super::validation::{validate_outcome, validate_snapshot};
+use super::model::Outcome;
+use super::validation::validate_outcome;
 use crate::Result;
 
 use super::codec::{self, Source};
-
-/// A detached classification edit.
-///
-/// The source snapshot is never mutated. Callers can inspect the projected
-/// snapshot during the edit and consume the editor with [`Editor::commit`].
-#[derive(Debug, Clone)]
-pub struct Editor {
-    original: Snapshot,
-    working: Snapshot,
-}
-
-impl Editor {
-    pub(super) fn new(snapshot: Snapshot) -> Self {
-        Self {
-            original: snapshot.clone(),
-            working: snapshot,
-        }
-    }
-
-    /// Replace the typed outcome while retaining every opaque extension.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn set(&mut self, outcome: Outcome) -> Result<()> {
-        validate_outcome(outcome)?;
-        self.working.outcome = Some(outcome);
-        Ok(())
-    }
-
-    /// Clear only the typed outcome, retaining opaque extensions for a later
-    /// package-level decision.
-    pub fn clear(&mut self) {
-        self.working.outcome = None;
-    }
-
-    /// Borrow the projected snapshot.
-    #[inline]
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.working
-    }
-
-    fn is_changed(&self) -> bool {
-        self.original != self.working
-    }
-
-    /// The outcome of this edit or commit.
-    #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
-        crate::diagnostics::Diagnostics::new(self.is_changed())
-    }
-
-    /// Validate and consume the edit into a new snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Snapshot> {
-        validate_snapshot(&self.working)?;
-        Ok(self.working)
-    }
-}
 
 /// Stage a typed outcome into the selected raw shape while preserving every
 /// unrelated extension and every untouched byte range.

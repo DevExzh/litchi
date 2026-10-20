@@ -2,27 +2,16 @@
 //! from the facade's `sheet::adapters::xlsx`.
 //!
 //! The typed methods (`*_typed`) return [`crate::Result`] and serve the
-//! handle's own reads ([`super::Xlsx::text`]). The trait methods box that
-//! typed [`Error`], because the trait's error type is
-//! `Box<dyn Error + Send + Sync>`; a caller downcasts it to
-//! [`crate::Error`] and reaches the XLSX leaf error through
-//! [`crate::Error::leaf`].
+//! handle's own reads ([`super::Xlsx::text`]). The trait methods report the
+//! same typed [`Error`] (the traits' `Error` associated type); a caller
+//! reaches the XLSX leaf error through [`crate::Error::leaf`].
 
 use std::borrow::Cow;
 
-use litchi_core::sheet::{
-    Cell as CoreCell, CellValue, Result as SheetResult, Worksheet as CoreWorksheet,
-};
+use litchi_core::sheet::{Cell as CoreCell, CellValue, Worksheet as CoreWorksheet};
 use litchi_xlsx::{self as xlsx, Address, Rect};
 
 use crate::error::{Code, Error, Result};
-
-type BoxError = Box<dyn std::error::Error + Send + Sync>;
-
-/// Box a typed error for a `litchi_core::sheet` trait method.
-pub(super) fn boxed(error: Error) -> BoxError {
-    Box::new(error)
-}
 
 fn internal(message: &'static str) -> Error {
     Error::new(Code::InternalError, message).with_format(litchi_core::FileFormat::Xlsx)
@@ -241,6 +230,7 @@ impl Sheet {
 }
 
 impl CoreWorksheet for Sheet {
+    type Error = Error;
     type Cell<'a> = XlsxCell;
     type Cells<'a> = Cells;
     type Rows<'a> = Rows<'a>;
@@ -270,31 +260,27 @@ impl CoreWorksheet for Sheet {
         self.dimensions_typed().ok().flatten()
     }
 
-    fn cell(&self, row: u32, column: u32) -> SheetResult<XlsxCell> {
-        let (row, column) = zero_based_cell(row, column).map_err(boxed)?;
-        Ok(XlsxCell::new(
-            row,
-            column,
-            self.value_at(row, column).map_err(boxed)?,
-        ))
+    fn cell(&self, row: u32, column: u32) -> Result<XlsxCell> {
+        let (row, column) = zero_based_cell(row, column)?;
+        Ok(XlsxCell::new(row, column, self.value_at(row, column)?))
     }
 
-    fn cell_by_coordinate(&self, coordinate: &str) -> SheetResult<XlsxCell> {
-        let address = super::selection::resolve_cell(coordinate.into()).map_err(boxed)?;
+    fn cell_by_coordinate(&self, coordinate: &str) -> Result<XlsxCell> {
+        let address = super::selection::resolve_cell(coordinate.into())?;
         self.cell(address.row().get() + 1, address.column().get() + 1)
     }
 
     fn cells(&self) -> Cells {
         match self.stored_cells() {
             Ok(cells) => cells,
-            Err(error) => Cells::error(boxed(error)),
+            Err(error) => Cells::error(error),
         }
     }
 
     fn rows(&self) -> Rows<'_> {
         let (end, error) = match self.row_end() {
             Ok(end) => (end, None),
-            Err(error) => (0, Some(boxed(error))),
+            Err(error) => (0, Some(error)),
         };
         Rows {
             worksheet: self,
@@ -304,22 +290,20 @@ impl CoreWorksheet for Sheet {
         }
     }
 
-    fn row(&self, row_idx: usize) -> SheetResult<Cow<'_, [CellValue]>> {
+    fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>> {
         let row = u32::try_from(row_idx).map_err(|_| {
-            boxed(
-                Error::new(
-                    Code::OutOfRange,
-                    format!("row index {row_idx} is outside the worksheet grid"),
-                )
-                .with_format(litchi_core::FileFormat::Xlsx),
+            Error::new(
+                Code::OutOfRange,
+                format!("row index {row_idx} is outside the worksheet grid"),
             )
+            .with_format(litchi_core::FileFormat::Xlsx)
         })?;
-        Ok(Cow::Owned(self.row_values(row).map_err(boxed)?))
+        Ok(Cow::Owned(self.row_values(row)?))
     }
 
-    fn cell_value(&self, row: u32, column: u32) -> SheetResult<Cow<'_, CellValue>> {
-        let (row, column) = zero_based_cell(row, column).map_err(boxed)?;
-        Ok(Cow::Owned(self.value_at(row, column).map_err(boxed)?))
+    fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>> {
+        let (row, column) = zero_based_cell(row, column)?;
+        Ok(Cow::Owned(self.value_at(row, column)?))
     }
 }
 
@@ -331,7 +315,7 @@ pub(crate) struct Cells {
 enum CellsInner {
     Owned(std::vec::IntoIter<XlsxCell>),
     Source(std::vec::IntoIter<xlsx::SourceCell>),
-    Error(Option<BoxError>),
+    Error(Option<Error>),
 }
 
 impl Cells {
@@ -341,7 +325,7 @@ impl Cells {
         }
     }
 
-    fn error(error: BoxError) -> Self {
+    fn error(error: Error) -> Self {
         Self {
             inner: CellsInner::Error(Some(error)),
         }
@@ -349,7 +333,7 @@ impl Cells {
 }
 
 impl Iterator for Cells {
-    type Item = SheetResult<XlsxCell>;
+    type Item = Result<XlsxCell>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let cell = match &mut self.inner {
@@ -372,11 +356,11 @@ pub(crate) struct Rows<'a> {
     worksheet: &'a Sheet,
     index: usize,
     end: usize,
-    error: Option<BoxError>,
+    error: Option<Error>,
 }
 
 impl<'a> Iterator for Rows<'a> {
-    type Item = SheetResult<Cow<'a, [CellValue]>>;
+    type Item = Result<Cow<'a, [CellValue]>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(error) = self.error.take() {
@@ -387,12 +371,7 @@ impl<'a> Iterator for Rows<'a> {
         }
         let index = self.index;
         self.index += 1;
-        Some(
-            self.worksheet
-                .row_values(index as u32)
-                .map(Cow::Owned)
-                .map_err(boxed),
-        )
+        Some(self.worksheet.row_values(index as u32).map(Cow::Owned))
     }
 }
 

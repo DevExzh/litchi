@@ -98,7 +98,7 @@ fn identical_foreign_owners_cannot_hide_visible_changes() -> Result<()> {
     assert!(!Arc::ptr_eq(&before.blob, &shared));
     assert!(!Arc::ptr_eq(&after.blob, &shared));
     let encoded = patch.to_bytes()?;
-    assert_eq!(Patch::from_bytes(&encoded)?, patch);
+    assert_eq!(Patch::from_bytes(&encoded, Limits::default())?, patch);
     validate_before(&source, &patch)?;
     validate_before(&target, &patch.inverse())?;
     assert!(validate_before(&target, &patch).is_err());
@@ -240,7 +240,7 @@ fn relationship_count_admission_matches_the_durable_decoder() -> Result<()> {
         assert_eq!(calls.load(Ordering::Relaxed), 0);
         let admitted = Patch::capture(&source, &target, name(9)?, limits(2, 4096)?)?;
         assert_eq!(
-            Patch::from_bytes_with_limits(&admitted.to_bytes()?, limits(2, 4096)?)?,
+            Patch::from_bytes(&admitted.to_bytes()?, limits(2, 4096)?)?,
             admitted
         );
         let narrow_noop = Patch::capture(&source, &source, name(9)?, limits(1, 4096)?)?;
@@ -280,7 +280,10 @@ fn shared_owner_prefix_and_later_accessor_switch_preserve_admitted_bytes() -> Re
             patch.deltas[0].after.as_ref().unwrap().blob.as_slice(),
             b"visible"
         );
-        assert_eq!(Patch::from_bytes(&patch.to_bytes()?)?, patch);
+        assert_eq!(
+            Patch::from_bytes(&patch.to_bytes()?, Limits::default())?,
+            patch
+        );
     }
     Ok(())
 }
@@ -292,7 +295,7 @@ fn captured_foreign_payload_publishes_and_inverts_on_a_real_presentation() -> Re
         .presentation()?
         .add_slide()?
         .add_text_box("original", 0, 0, 100, 100);
-    let mut authored = builder.build()?;
+    let authored = builder.build()?;
     let opened = crate::Package::from_reader(std::io::Cursor::new(authored.to_bytes()?))?;
     let source = opened.opc()?.clone();
     let mut target = source.clone();
@@ -305,7 +308,7 @@ fn captured_foreign_payload_publishes_and_inverts_on_a_real_presentation() -> Re
     target.try_add_part(donor.get_part(&name(0)?)?.clone_part())?;
     let main = opened.opened_presentation()?.presentation_name;
     let patch = Patch::capture(&source, &target, main, Limits::default())?;
-    let durable = Patch::from_bytes(&patch.to_bytes()?)?;
+    let durable = Patch::from_bytes(&patch.to_bytes()?, Limits::default())?;
     let mut published = source.clone();
     super::apply(&mut published, &durable, true)?;
     assert_eq!(

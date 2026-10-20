@@ -1,6 +1,6 @@
 //! XLSX-owned compatibility model for `SpreadsheetML` Custom XML Maps.
 
-use litchi_core::sheet::Result;
+use crate::BoxedResult as Result;
 
 use super::invalid;
 

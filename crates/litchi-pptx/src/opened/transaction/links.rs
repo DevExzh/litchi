@@ -161,10 +161,11 @@ impl Edit {
         let xml = owner.blob().to_vec();
         let scene = crate::shape::Scene::read(&xml)?;
         if scene.is_rewritten() {
-            return Err(crate::Error::UnsafeEdit {
-                operation: "set_hyperlink",
-                reason: "hyperlink edits do not select markup-compatibility branches",
-            });
+            return Err(crate::Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "set_hyperlink",
+                "hyperlink edits do not select markup-compatibility branches",
+            ));
         }
         let shape = scene.shape(key)?;
         // A picture's and a group's click lives on its `p:cNvPr` alone: a
@@ -471,7 +472,7 @@ mod tests {
             edit.set_shape_hyperlink(0_usize, 0_usize, Some(&url))
                 .unwrap()
         );
-        let mut package = edit.commit().unwrap().into_package();
+        let package = edit.commit().unwrap().into_package();
         assert_eq!(shape_link(&package), Some(url.clone()));
         // Equal again: an exact no-op, even after a reopen.
         let reopened = crate::Package::from_bytes(&package.to_bytes().unwrap()).unwrap();
