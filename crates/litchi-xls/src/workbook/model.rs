@@ -17,9 +17,7 @@ use crate::sheet_metadata::SheetMetadata;
 use crate::source_limits::SourceLimits;
 use crate::worksheet::Worksheet;
 use litchi_cfb::OleFile;
-use litchi_core::sheet::{
-    Result as SheetResult, Worksheet as SheetTrait, WorksheetIterator as WorksheetIteratorTrait,
-};
+use litchi_core::sheet::Result as SheetResult;
 use std::io::{Read, Seek};
 use std::sync::Arc;
 
@@ -627,15 +625,24 @@ impl<R: Read + Seek> Reader<R> {
 impl<R: Read + Seek + std::fmt::Debug + Send + Sync> litchi_core::sheet::WorkbookTrait
     for Reader<R>
 {
-    fn active_worksheet(&self) -> SheetResult<Box<dyn SheetTrait + '_>> {
+    /// Worksheets are borrowed from the reader: zero-copy.
+    type Worksheet<'a>
+        = &'a Worksheet
+    where
+        Self: 'a;
+    type Worksheets<'a>
+        = Worksheets<'a>
+    where
+        Self: 'a;
+
+    fn active_worksheet(&self) -> SheetResult<&Worksheet> {
         if self.worksheets.is_empty() {
             return Err(Box::new(Error::WorksheetNotFound(
                 "No worksheets found".to_string(),
             )));
         }
-        // Return reference instead of clone - zero-copy!
         let index = self.active_worksheet_position().unwrap_or(0);
-        Ok(Box::new(&self.worksheets[index]))
+        Ok(&self.worksheets[index])
     }
 
     fn worksheet_names(&self) -> &[String] {
@@ -643,31 +650,28 @@ impl<R: Read + Seek + std::fmt::Debug + Send + Sync> litchi_core::sheet::Workboo
         &self.worksheet_names
     }
 
-    fn worksheet_by_name(&self, name: &str) -> SheetResult<Box<dyn SheetTrait + '_>> {
+    fn worksheet_by_name(&self, name: &str) -> SheetResult<&Worksheet> {
         for worksheet in &self.worksheets {
-            if names_equal(worksheet.name(), name) {
-                // Return reference instead of clone - zero-copy!
-                return Ok(Box::new(worksheet));
+            if names_equal(litchi_core::sheet::Worksheet::name(worksheet), name) {
+                return Ok(worksheet);
             }
         }
         Err(Box::new(Error::WorksheetNotFound(name.to_string())))
     }
 
-    fn worksheet_by_index(&self, index: usize) -> SheetResult<Box<dyn SheetTrait + '_>> {
+    fn worksheet_by_index(&self, index: usize) -> SheetResult<&Worksheet> {
         if index >= self.worksheets.len() {
             return Err(Box::new(Error::WorksheetNotFound(format!(
                 "Index {index} out of bounds"
             ))));
         }
-        // Return reference instead of clone - zero-copy!
-        Ok(Box::new(&self.worksheets[index]))
+        Ok(&self.worksheets[index])
     }
 
-    fn worksheets(&self) -> Box<dyn WorksheetIteratorTrait<'_> + '_> {
-        Box::new(WorksheetIterator {
-            worksheets: self.worksheets.iter().collect(),
-            index: 0,
-        })
+    fn worksheets(&self) -> Worksheets<'_> {
+        Worksheets {
+            worksheets: self.worksheets.iter(),
+        }
     }
 
     fn worksheet_count(&self) -> usize {
@@ -683,22 +687,23 @@ impl<R: Read + Seek + std::fmt::Debug + Send + Sync> litchi_core::sheet::Workboo
     }
 }
 
-/// Worksheet iterator for XLS workbooks
-struct WorksheetIterator<'a> {
-    worksheets: Vec<&'a Worksheet>,
-    index: usize,
+/// The worksheets of an XLS workbook, in workbook order: the iterator
+/// [`WorkbookTrait::worksheets`](litchi_core::sheet::WorkbookTrait::worksheets)
+/// returns.
+#[derive(Debug, Clone)]
+pub struct Worksheets<'a> {
+    worksheets: std::slice::Iter<'a, Worksheet>,
 }
 
-impl<'a> WorksheetIteratorTrait<'a> for WorksheetIterator<'a> {
-    fn next(&mut self) -> Option<SheetResult<Box<dyn SheetTrait + 'a>>> {
-        if self.index >= self.worksheets.len() {
-            None
-        } else {
-            let worksheet = self.worksheets[self.index];
-            self.index += 1;
-            // Return reference instead of clone - zero-copy!
-            Some(Ok(Box::new(worksheet)))
-        }
+impl<'a> Iterator for Worksheets<'a> {
+    type Item = SheetResult<&'a Worksheet>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.worksheets.next().map(Ok)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.worksheets.size_hint()
     }
 }
 

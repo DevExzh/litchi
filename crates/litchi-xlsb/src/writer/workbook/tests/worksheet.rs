@@ -16,7 +16,7 @@ use crate::named_ranges::{Definition, area3d_formula};
 use crate::package::data_validation::{RecordKind, Settings, Validation};
 use crate::raw::kind;
 use crate::writer::{MutableChartSheet, MutableWorksheet, SheetProtection};
-use litchi_core::sheet::{CellValue, WorkbookTrait};
+use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
 use litchi_opc::PackURI;
 use litchi_opc::constants::{content_type as ct, relationship_type as rel};
 use std::io::Cursor;

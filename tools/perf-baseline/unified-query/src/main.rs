@@ -603,9 +603,8 @@ fn cold_xls_leaf(bytes: &[u8], path: Option<&std::path::Path>, limit: usize) -> 
             let reader = leaf.reader_ref().expect("a reader");
             let worksheet =
                 litchi_core::sheet::WorkbookTrait::worksheet_by_index(reader, 0).expect("a sheet");
-            let mut cells = worksheet.cells();
-            while let Some(cell) = cells.next() {
-                if core_over_1000(cell.expect("a cell").value()) {
+            for cell in litchi_core::sheet::Worksheet::cells(worksheet) {
+                if core_over_1000(litchi_core::sheet::Cell::value(&cell.expect("a cell"))) {
                     matches += 1;
                     if matches == limit {
                         break;

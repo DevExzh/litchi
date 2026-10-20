@@ -16,7 +16,7 @@ mod tests;
 
 pub use cache::Stats;
 pub(crate) use model::DrawingLoadPolicy;
-pub use model::{Workbook, WorksheetIterator};
+pub use model::{Workbook, Worksheets};
 pub use source::{
     CellCursor, SourceBackedExternalLink, SourceBackedIndexedWorksheet, SourceBackedWorkbook,
     SourceBackedWorksheet,

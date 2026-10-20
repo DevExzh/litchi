@@ -4,7 +4,7 @@
 //!     cargo run -p litchi-xls --example `read_xls`
 //!     cargo run -p litchi-xls --example `read_xls` -- path/to/file.xls
 
-use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
+use litchi_core::sheet::{Cell as _, CellValue, WorkbookTrait, Worksheet as _};
 use litchi_xls::raw::Reader;
 use std::fs::File;
 
@@ -41,8 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Print up to 10 non-empty cells as a sample.
         let mut shown = 0usize;
-        let mut iter = sheet.cells();
-        while let Some(cell_result) = iter.next() {
+        for cell_result in sheet.cells() {
             let cell =
                 cell_result.map_err(|e| -> Box<dyn std::error::Error> { e.to_string().into() })?;
             if cell.is_empty() {

@@ -5,7 +5,7 @@ use std::io::{BufReader, Read, Seek, Write};
 use std::path::Path;
 
 use super::iterators::TextWorksheetIterator;
-use crate::sheet::{CellValue, Result as SheetResult, WorkbookTrait, Worksheet, WorksheetIterator};
+use crate::sheet::{CellValue, Result as SheetResult, WorkbookTrait};
 use litchi_core::{BomKind, strip_bom, write_bom};
 
 /// Configuration for parsing text-based spreadsheet files
@@ -274,11 +274,14 @@ impl TextWorkbook {
 }
 
 impl WorkbookTrait for TextWorkbook {
-    fn active_worksheet(&self) -> SheetResult<Box<dyn Worksheet + '_>> {
-        Ok(Box::new(super::worksheet::TextWorksheet::from_data(
+    type Worksheet<'a> = super::worksheet::TextWorksheet;
+    type Worksheets<'a> = TextWorksheetIterator<'a>;
+
+    fn active_worksheet(&self) -> SheetResult<super::worksheet::TextWorksheet> {
+        Ok(super::worksheet::TextWorksheet::from_data(
             &self.data,
             self.worksheet_name.clone(),
-        )))
+        ))
     }
 
     fn worksheet_names(&self) -> &[String] {
@@ -286,7 +289,7 @@ impl WorkbookTrait for TextWorkbook {
         std::slice::from_ref(&self.worksheet_name)
     }
 
-    fn worksheet_by_name(&self, name: &str) -> SheetResult<Box<dyn Worksheet + '_>> {
+    fn worksheet_by_name(&self, name: &str) -> SheetResult<super::worksheet::TextWorksheet> {
         if name == self.worksheet_name {
             self.active_worksheet()
         } else {
@@ -294,15 +297,15 @@ impl WorkbookTrait for TextWorkbook {
         }
     }
 
-    fn worksheet_by_index(&self, index: usize) -> SheetResult<Box<dyn Worksheet + '_>> {
+    fn worksheet_by_index(&self, index: usize) -> SheetResult<super::worksheet::TextWorksheet> {
         match index {
             0 => self.active_worksheet(),
             _ => Err(format!("Worksheet index {} out of range", index).into()),
         }
     }
 
-    fn worksheets(&self) -> Box<dyn WorksheetIterator<'_> + '_> {
-        Box::new(TextWorksheetIterator::new(self))
+    fn worksheets(&self) -> TextWorksheetIterator<'_> {
+        TextWorksheetIterator::new(self)
     }
 
     fn worksheet_count(&self) -> usize {

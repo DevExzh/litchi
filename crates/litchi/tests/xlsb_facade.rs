@@ -26,6 +26,7 @@ use litchi::opc::{OpcError, OpcPackage, PackURI, SourceLimitKind};
 use litchi::sheet::WorkbookTrait;
 use litchi::xlsb;
 use litchi::{Code, File, FileFormat, OpenOptions, SourceMode};
+use litchi_core::sheet::Cell as _;
 use litchi_core::sheet::{CellValue, Worksheet as WorksheetTrait};
 
 fn fixture_bytes() -> Vec<u8> {
@@ -341,8 +342,7 @@ fn eager_text(workbook: &xlsb::Workbook) -> String {
     let mut output = String::new();
     for index in 0..WorkbookTrait::worksheet_count(workbook) {
         let worksheet = WorkbookTrait::worksheet_by_index(workbook, index).unwrap();
-        let mut rows = WorksheetTrait::rows(worksheet.as_ref());
-        while let Some(row) = rows.next() {
+        for row in WorksheetTrait::rows(worksheet.as_ref()) {
             let row = row.unwrap();
             for (column, cell) in row.iter().enumerate() {
                 if column != 0 {
@@ -758,8 +758,7 @@ fn eager_and_dynamic_facade_reject_active_chart_as_active_worksheet() {
     let eager = xlsb::Workbook::new(Cursor::new(bytes.clone())).unwrap();
     assert_eq!(WorkbookTrait::active_sheet_index(&eager), 0);
     let eager_error = WorkbookTrait::active_worksheet(&eager)
-        .err()
-        .expect("a chart tab cannot be returned as an active worksheet");
+        .expect_err("a chart tab cannot be returned as an active worksheet");
     assert!(
         matches!(
             eager_error
@@ -775,8 +774,7 @@ fn eager_and_dynamic_facade_reject_active_chart_as_active_worksheet() {
     let dynamic = file.workbook().unwrap();
     assert_eq!(WorkbookTrait::active_sheet_index(&dynamic), 0);
     let dynamic_error = WorkbookTrait::active_worksheet(&dynamic)
-        .err()
-        .expect("a chart tab cannot be returned as an active worksheet");
+        .expect_err("a chart tab cannot be returned as an active worksheet");
     let dynamic_error = unbox(dynamic_error.as_ref());
     assert!(
         matches!(
@@ -867,8 +865,7 @@ fn path_facade_reports_typed_error_for_active_chart_and_source_change_takes_prec
 
     assert_eq!(WorkbookTrait::active_sheet_index(&workbook), 0);
     let error = WorkbookTrait::active_worksheet(&workbook)
-        .err()
-        .expect("a chart tab cannot be returned as an active worksheet");
+        .expect_err("a chart tab cannot be returned as an active worksheet");
     let error = unbox(error.as_ref());
     assert!(
         matches!(

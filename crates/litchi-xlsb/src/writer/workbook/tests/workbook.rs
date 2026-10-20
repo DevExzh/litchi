@@ -8,7 +8,7 @@
 use super::super::Builder;
 use crate::named_ranges::{Definition, area3d_formula};
 use crate::writer::MutableWorksheet;
-use litchi_core::sheet::{CellValue, WorkbookTrait};
+use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
 use std::io::Cursor;
 
 #[test]

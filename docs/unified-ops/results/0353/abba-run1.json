@@ -1,0 +1,119 @@
+{
+ "order": "ABBA per round",
+ "rounds": 8,
+ "rows": 2000,
+ "samples_per_process": 15,
+ "cpu": 30,
+ "baseline": "bench-base",
+ "candidate": "bench-cand",
+ "processes_per_leg": 16,
+ "scenarios": {
+  "cell/xls": {
+   "baseline_median_us": 122.71,
+   "candidate_median_us": 131.56,
+   "ratio": 1.0722,
+   "baseline_min_us": 119.95,
+   "candidate_min_us": 128.85
+  },
+  "cell/xlsb": {
+   "baseline_median_us": 1122.8,
+   "candidate_median_us": 919.2,
+   "ratio": 0.8187,
+   "baseline_min_us": 1082.71,
+   "candidate_min_us": 905.09
+  },
+  "cell/xlsx": {
+   "baseline_median_us": 839.35,
+   "candidate_median_us": 874.87,
+   "ratio": 1.0423,
+   "baseline_min_us": 826.23,
+   "candidate_min_us": 861.6
+  },
+  "cell_value/xls": {
+   "baseline_median_us": 114.85,
+   "candidate_median_us": 108.89,
+   "ratio": 0.9482,
+   "baseline_min_us": 112.37,
+   "candidate_min_us": 107.04
+  },
+  "cell_value/xlsb": {
+   "baseline_median_us": 1160.15,
+   "candidate_median_us": 860.95,
+   "ratio": 0.7421,
+   "baseline_min_us": 1106.78,
+   "candidate_min_us": 845.37
+  },
+  "cell_value/xlsx": {
+   "baseline_median_us": 836.37,
+   "candidate_median_us": 822.2,
+   "ratio": 0.9831,
+   "baseline_min_us": 826.59,
+   "candidate_min_us": 808.98
+  },
+  "cells/xls": {
+   "baseline_median_us": 22.98,
+   "candidate_median_us": 12.75,
+   "ratio": 0.5549,
+   "baseline_min_us": 22.45,
+   "candidate_min_us": 12.61
+  },
+  "cells/xlsb": {
+   "baseline_median_us": 632.54,
+   "candidate_median_us": 325.6,
+   "ratio": 0.5148,
+   "baseline_min_us": 620.15,
+   "candidate_min_us": 320.9
+  },
+  "cells/xlsx": {
+   "baseline_median_us": 314.3,
+   "candidate_median_us": 294.69,
+   "ratio": 0.9376,
+   "baseline_min_us": 311.34,
+   "candidate_min_us": 291.83
+  },
+  "evaluate/xls": {
+   "baseline_median_us": 602.96,
+   "candidate_median_us": 558.98,
+   "ratio": 0.9271,
+   "baseline_min_us": 596.39,
+   "candidate_min_us": 554.25
+  },
+  "evaluate/xlsb": {
+   "baseline_median_us": 2172.09,
+   "candidate_median_us": 1756.0,
+   "ratio": 0.8084,
+   "baseline_min_us": 2069.69,
+   "candidate_min_us": 1743.79
+  },
+  "evaluate/xlsx": {
+   "baseline_median_us": 6032.1,
+   "candidate_median_us": 5872.11,
+   "ratio": 0.9735,
+   "baseline_min_us": 5939.41,
+   "candidate_min_us": 5763.91
+  },
+  "recalculate/xls": {
+   "baseline_median_us": 3021.41,
+   "candidate_median_us": 3031.62,
+   "ratio": 1.0034,
+   "baseline_min_us": 3008.59,
+   "candidate_min_us": 2992.76
+  },
+  "recalculate/xlsb": {
+   "baseline_median_us": 5868.37,
+   "candidate_median_us": 5877.9,
+   "ratio": 1.0016,
+   "baseline_min_us": 5776.14,
+   "candidate_min_us": 5788.67
+  },
+  "recalculate/xlsx": {
+   "baseline_median_us": 5806.68,
+   "candidate_median_us": 5736.01,
+   "ratio": 0.9878,
+   "baseline_min_us": 5729.92,
+   "candidate_min_us": 5710.37
+  }
+ },
+ "record": "0353",
+ "note": "before/after (baseline 5ff605692e vs candidate), not a leaf-vs-unified pair"
+}

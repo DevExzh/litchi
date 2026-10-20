@@ -404,7 +404,10 @@ impl Xls {
     }
 }
 
-type SheetBox<'a> = Box<dyn litchi_core::sheet::Worksheet + 'a>;
+/// The worksheet the eager reader lends.
+pub(crate) type XlsSheet<'a> = &'a litchi_xls::Worksheet;
+
+use crate::view::sheet::{Worksheet as Sheet, WorksheetsInner};
 
 fn boxed(error: crate::Error) -> Box<dyn std::error::Error + Send + Sync> {
     Box::new(error)
@@ -416,13 +419,19 @@ fn boxed(error: crate::Error) -> Box<dyn std::error::Error + Send + Sync> {
 /// once. When that read fails, the fallible methods return its error and the
 /// infallible ones report an empty workbook.
 impl WorkbookTrait for Xls {
+    type Worksheet<'a> = Sheet<'a>;
+    type Worksheets<'a> = crate::view::sheet::Worksheets<'a>;
+
     fn active_sheet_index(&self) -> usize {
         self.trait_workbook()
             .map_or(0, WorkbookTrait::active_sheet_index)
     }
 
-    fn active_worksheet(&self) -> litchi_core::sheet::Result<SheetBox<'_>> {
-        self.trait_workbook().map_err(boxed)?.active_worksheet()
+    fn active_worksheet(&self) -> litchi_core::sheet::Result<Sheet<'_>> {
+        self.trait_workbook()
+            .map_err(boxed)?
+            .active_worksheet()
+            .map(Sheet::xls)
     }
 
     fn is_1904_date_system(&self) -> bool {
@@ -430,16 +439,18 @@ impl WorkbookTrait for Xls {
             .is_ok_and(WorkbookTrait::is_1904_date_system)
     }
 
-    fn worksheet_by_index(&self, index: usize) -> litchi_core::sheet::Result<SheetBox<'_>> {
+    fn worksheet_by_index(&self, index: usize) -> litchi_core::sheet::Result<Sheet<'_>> {
         self.trait_workbook()
             .map_err(boxed)?
             .worksheet_by_index(index)
+            .map(Sheet::xls)
     }
 
-    fn worksheet_by_name(&self, name: &str) -> litchi_core::sheet::Result<SheetBox<'_>> {
+    fn worksheet_by_name(&self, name: &str) -> litchi_core::sheet::Result<Sheet<'_>> {
         self.trait_workbook()
             .map_err(boxed)?
             .worksheet_by_name(name)
+            .map(Sheet::xls)
     }
 
     fn worksheet_count(&self) -> usize {
@@ -452,11 +463,11 @@ impl WorkbookTrait for Xls {
             .map_or(&[], WorkbookTrait::worksheet_names)
     }
 
-    fn worksheets(&self) -> Box<dyn litchi_core::sheet::WorksheetIterator<'_> + '_> {
-        match self.trait_workbook() {
-            Ok(workbook) => workbook.worksheets(),
-            Err(error) => Box::new(Failed(Some(error))),
-        }
+    fn worksheets(&self) -> Self::Worksheets<'_> {
+        crate::view::sheet::Worksheets::new(WorksheetsInner::Xls(match self.trait_workbook() {
+            Ok(workbook) => Worksheets::Read(workbook.worksheets()),
+            Err(error) => Worksheets::Failed(Some(error)),
+        }))
     }
 }
 
@@ -469,12 +480,21 @@ impl std::fmt::Debug for Xls {
     }
 }
 
-/// A worksheet iterator that yields one error: the failed materialization.
-struct Failed(Option<crate::Error>);
+/// The worksheets of an XLS handle through the generic traits: the eager
+/// reader's, or one error, the failed materialization.
+pub(crate) enum Worksheets<'a> {
+    Read(litchi_xls::workbook::Worksheets<'a>),
+    Failed(Option<crate::Error>),
+}
 
-impl<'a> litchi_core::sheet::WorksheetIterator<'a> for Failed {
-    fn next(&mut self) -> Option<litchi_core::sheet::Result<SheetBox<'a>>> {
-        self.0.take().map(|error| Err(boxed(error)))
+impl<'a> Iterator for Worksheets<'a> {
+    type Item = litchi_core::sheet::Result<XlsSheet<'a>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Read(worksheets) => worksheets.next(),
+            Self::Failed(error) => error.take().map(|error| Err(boxed(error))),
+        }
     }
 }
 
@@ -490,7 +510,7 @@ mod tests {
     use crate::Code;
     use crate::detect::{DetectedFormat, detect_format_smart};
     use litchi_cfb::SharedOleFile;
-    use litchi_core::sheet::CellValue;
+    use litchi_core::sheet::{CellValue, Worksheet as _};
     use litchi_ole_common::property_set::PropertySetReader;
     use litchi_xls::SourceBackedError;
     use std::io::Write;
@@ -600,8 +620,7 @@ mod tests {
         let mut out = String::new();
         for index in 0..workbook.worksheet_count() {
             let worksheet = workbook.worksheet_by_index(index).unwrap();
-            let mut rows = worksheet.rows();
-            while let Some(row) = rows.next() {
+            for row in worksheet.rows() {
                 for (column, cell) in row.unwrap().iter().enumerate() {
                     if column > 0 {
                         out.push('\t');
