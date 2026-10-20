@@ -35,13 +35,12 @@ pub(super) fn open<T: ZipTail>(
         return Err(Error::unsupported_format(None));
     }
 
-    #[cfg(any(
-        feature = "odt",
-        feature = "ods",
-        feature = "odp",
-        feature = "odf-objects"
-    ))]
-    if let Some(format) = litchi_odf_common::detect::flat(&bytes) {
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
+    if let Some(format) =
+        litchi_odf_common::detect::flat(&bytes, litchi_odf_common::detect::Limits::default())
+            .ok()
+            .flatten()
+    {
         #[cfg(feature = "ods")]
         if format == FileFormat::Ods {
             return Ok(File::Ods(crate::format::ods::Ods::from_flat(
@@ -109,29 +108,23 @@ pub(super) fn open<T: ZipTail>(
 /// Classify an in-memory ZIP: an ordinary ODF package first, then OOXML
 /// through one OPC index, then the lower-precedence candidates.
 fn zip<T: ZipTail>(bytes: Vec<u8>, options: &OpenOptions, tail: &T) -> Result<File> {
-    #[cfg(any(
-        feature = "odt",
-        feature = "ods",
-        feature = "odp",
-        feature = "odf-objects"
-    ))]
-    let odf = litchi_odf_common::detect::packaged_mime(&bytes);
-    #[cfg(any(
-        feature = "odt",
-        feature = "ods",
-        feature = "odp",
-        feature = "odf-objects"
-    ))]
-    if odf.is_some() && litchi_odf_common::detect::packaged_has_ooxml_catalog(&bytes) == Some(false)
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
+    let odf = litchi_odf_common::detect::packaged_mime(
+        &bytes,
+        litchi_odf_common::detect::Limits::default(),
+    )
+    .ok()
+    .flatten();
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
+    if odf.is_some()
+        && litchi_odf_common::detect::packaged_has_ooxml_catalog(
+            &bytes,
+            litchi_odf_common::detect::CatalogProbeLimits::default(),
+        ) == Some(false)
     {
         return zip_fallback(bytes, options, tail);
     }
-    #[cfg(not(any(
-        feature = "odt",
-        feature = "ods",
-        feature = "odp",
-        feature = "odf-objects"
-    )))]
+    #[cfg(not(any(feature = "odt", feature = "ods", feature = "odp", odf_objects)))]
     let odf: Option<FileFormat> = None;
 
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
@@ -231,22 +224,15 @@ pub(super) fn zip_fallback<T: ZipTail>(
     options: &OpenOptions,
     tail: &T,
 ) -> Result<File> {
-    #[cfg(any(
-        feature = "odt",
-        feature = "ods",
-        feature = "odp",
-        feature = "odf-objects"
-    ))]
-    let bytes = match litchi_odf_common::detect::prepared_or_original(bytes) {
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
+    let bytes = match litchi_odf_common::detect::prepared_or_original(
+        bytes,
+        litchi_odf_common::SourceLimits::default(),
+    ) {
         Ok(prepared) => return super::odf_from_prepared(prepared, options),
         Err(bytes) => bytes,
     };
-    #[cfg(not(any(
-        feature = "odt",
-        feature = "ods",
-        feature = "odp",
-        feature = "odf-objects"
-    )))]
+    #[cfg(not(any(feature = "odt", feature = "ods", feature = "odp", odf_objects)))]
     let _ = options;
     #[cfg(feature = "iwork-adapter")]
     let bytes = match crate::format::iwork::Iwork::detect_bytes(bytes, options)? {

@@ -524,7 +524,7 @@ impl<'xml> Snapshot<'xml> {
     }
 
     /// Parse a canonical ODS `content.xml` owner with caller-selected limits.
-    pub fn parse_with_limits(source_xml: &'xml str, limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(source_xml: &'xml str, limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         let mut snapshot = Parser::new(source_xml, limits).parse()?;
         snapshot.layout = scan_layout(source_xml, limits)?;
@@ -599,9 +599,9 @@ impl<'xml> Snapshot<'xml> {
     /// # Errors
     ///
     /// Returns an allocation error while cloning the modeled catalog.
-    pub fn edit(&self) -> Result<Transaction<'_, 'xml>> {
+    pub(crate) fn edit(&self) -> Result<Edit<'_, 'xml>> {
         let definitions = try_clone_definitions(&self.definitions)?;
-        Ok(Transaction {
+        Ok(Edit {
             source: self,
             draft: definitions,
             operations: 0,
@@ -611,13 +611,13 @@ impl<'xml> Snapshot<'xml> {
 
 /// One clone-staged content-validation catalog transaction.
 #[derive(Debug)]
-pub struct Transaction<'snapshot, 'xml> {
+pub struct Edit<'snapshot, 'xml> {
     source: &'snapshot Snapshot<'xml>,
     draft: Vec<Definition>,
     operations: usize,
 }
 
-impl Transaction<'_, '_> {
+impl Edit<'_, '_> {
     /// Borrow the current staged definition catalog.
     #[must_use]
     pub fn definitions(&self) -> &[Definition] {
@@ -767,12 +767,12 @@ impl Transaction<'_, '_> {
         Ok(removed)
     }
 
-    /// Restore the exact source definition catalog.
+    /// Discard every staged change in place.
     ///
     /// # Errors
     ///
     /// Returns an allocation error while rebuilding the staged catalog.
-    pub fn rollback(&mut self) -> Result<()> {
+    pub fn reset(&mut self) -> Result<()> {
         self.draft = try_clone_definitions(&self.source.definitions)?;
         self.operations = 0;
         Ok(())
@@ -783,7 +783,7 @@ impl Transaction<'_, '_> {
     /// # Errors
     ///
     /// Returns an error for dangling bindings, output bounds, invalid authored XML, or allocation.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         if self.draft == self.source.definitions {
             return Commit::unchanged(self.source.source_xml);
         }
@@ -858,89 +858,17 @@ impl Transaction<'_, '_> {
 
 /// A reversible exact-source content-validation patch.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct Patch {
     source: String,
     target: String,
     splices: Vec<Splice>,
 }
 
-impl Patch {
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.source == self.target
-    }
-
-    /// Return a patch that restores the exact accepted source.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for offset overflow or allocation failure.
-    pub fn inverse(&self) -> Result<Self> {
-        let mut inverse = Vec::new();
-        inverse
-            .try_reserve_exact(self.splices.len())
-            .map_err(|_error| Error::AllocationFailed("inverse splice plan"))?;
-        let mut removed = 0usize;
-        let mut added = 0usize;
-        for splice in &self.splices {
-            let target_start = splice
-                .range
-                .start
-                .checked_sub(removed)
-                .and_then(|value| value.checked_add(added))
-                .ok_or_else(|| {
-                    Error::InvalidStructure("inverse splice offset overflow".to_string())
-                })?;
-            let target_end = checked_add(target_start, splice.after.len(), "inverse splice range")?;
-            inverse.push(Splice {
-                range: target_start..target_end,
-                before: copy_string(&splice.after, "inverse expected source")?,
-                after: copy_string(&splice.before, "inverse replacement")?,
-                fragment: splice.inverse_fragment,
-                inverse_fragment: splice.fragment,
-            });
-            removed = checked_add(
-                removed,
-                splice.range.end - splice.range.start,
-                "inverse removed bytes",
-            )?;
-            added = checked_add(added, splice.after.len(), "inverse added bytes")?;
-        }
-        Ok(Self {
-            source: copy_string(&self.target, "inverse patch source")?,
-            target: copy_string(&self.source, "inverse patch target")?,
-            splices: inverse,
-        })
-    }
-
-    /// Apply only to the exact XML source that produced this patch.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::SourceMismatch`] for stale or foreign snapshots.
-    pub fn apply(&self, snapshot: &Snapshot<'_>) -> Result<Commit> {
-        if snapshot.source_xml != self.source {
-            return Err(Error::SourceMismatch);
-        }
-        check_limit(
-            LimitKind::OutputBytes,
-            self.target.len(),
-            snapshot.limits.output_bytes,
-        )?;
-        let target =
-            Snapshot::parse_with_limits(&self.target, snapshot.limits.for_output_readback())?;
-        validate_binding_closure(&target, &target.definitions)?;
-        Ok(Commit {
-            content_xml: copy_string(&self.target, "patch target XML")?,
-            changed: !self.is_empty(),
-            patch: try_clone_patch(self)?,
-        })
-    }
-}
+impl Patch {}
 
 /// A validated semantic commit awaiting package publication.
 #[derive(Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     content_xml: String,
     changed: bool,
     patch: Patch,
@@ -973,18 +901,13 @@ impl Commit {
     }
 
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
     }
 
     #[must_use]
-    pub fn content_xml(&self) -> &str {
+    pub(crate) fn content_xml(&self) -> &str {
         &self.content_xml
-    }
-
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
     }
 }
 
@@ -1002,27 +925,6 @@ struct Splice {
     after: String,
     fragment: FragmentKind,
     inverse_fragment: FragmentKind,
-}
-
-fn try_clone_patch(source: &Patch) -> Result<Patch> {
-    let mut splices = Vec::new();
-    splices
-        .try_reserve_exact(source.splices.len())
-        .map_err(|_error| Error::AllocationFailed("patch splice clone"))?;
-    for splice in &source.splices {
-        splices.push(Splice {
-            range: splice.range.clone(),
-            before: copy_string(&splice.before, "patch expected source clone")?,
-            after: copy_string(&splice.after, "patch replacement clone")?,
-            fragment: splice.fragment,
-            inverse_fragment: splice.inverse_fragment,
-        });
-    }
-    Ok(Patch {
-        source: copy_string(&source.source, "patch source clone")?,
-        target: copy_string(&source.target, "patch target clone")?,
-        splices,
-    })
 }
 
 pub(crate) fn publish_package_commit(

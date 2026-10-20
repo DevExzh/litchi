@@ -128,7 +128,7 @@ impl<'data> Archive<'data> {
     }
 
     /// Open an ODF ZIP archive with explicit central-directory limits.
-    pub fn new_with_limits(data: &'data [u8], limits: ArchiveLimits) -> Result<Self> {
+    pub(crate) fn new_with_limits(data: &'data [u8], limits: ArchiveLimits) -> Result<Self> {
         #[cfg(test)]
         super::model::note_index_build();
         let reader = ArchiveReader::new_with_limits(data, limits.into_zip_limits())

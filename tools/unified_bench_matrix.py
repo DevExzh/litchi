@@ -2718,6 +2718,85 @@ def pptx_contract_rows(record):
     return out
 
 
+W6_ODF_OPS = {"open_get": "open", "set": "set", "batch1k": "batch"}
+
+
+@needs("0358")
+def p0358():
+    """Record 0358 §8 (W6 ODF contract): odf_w6_probe, one source built on
+    the wave's base (trunk) and head, run A-B-B-A pinned in release; one
+    after/before row per unified route (median of the after runs over the
+    median of the before runs)."""
+    base = RES / "0358"
+    legs: dict = {"before": {}, "after": {}}
+    paths = sorted(base.glob("probe-*-*.json"))
+    for path in paths:
+        leg = path.name.split("-")[1]
+        for r in load_json(path):
+            legs[leg].setdefault(r["scenario"], []).append(r["median_us"])
+    out = []
+    for scen, after in legs["after"].items():
+        before = legs["before"].get(scen)
+        if not before:
+            continue
+        fmt, op = scen.split("/")
+        b, a = med(before), med(after)
+        size = "1k ops" if op == "batch1k" else ""
+        out.append(row("0358", fmt, W6_ODF_OPS.get(op, op), f"File {op.replace('_', ' ')} ({fmt}, W6 head vs base)",
+                       size, b, a, [a / b], regression("0358"), f"odf_w6_probe:{scen}:after-before",
+                       src(paths), comparison="after/before"))
+    return out
+
+
+W6_SOURCE_BACKED = {
+    "ods/cells1": ("ods", "set", "SourceBackedSpreadsheet open + edit_cells (1 cell) + commit + write_to", "12k×8 cells"),
+    "ods/cells100": ("ods", "set", "SourceBackedSpreadsheet open + edit_cells (100 cells) + commit + write_to", "12k×8 cells"),
+    "ods/dde": ("ods", "set", "SourceBackedSpreadsheet open + edit_dde + commit + write_to", "12k×8 cells"),
+    "ods/sheet_metadata": ("ods", "set", "SourceBackedSpreadsheet open + edit_sheet_metadata + commit + write_to", "12k×8 cells"),
+    "odp/tail_append": ("odp", "add", "SourceBackedPresentation open + edit_tail_append + commit + write_to", "2,000 slides"),
+}
+W6_CODEGEN = ("explained residual: the same work (callgrind instructions within 0.3%); the "
+              "fat-LTO codegen-unit partition and its inlining moved with the source-backed "
+              "code added to the binary; with codegen-units=1 the ratio is {cgu1} "
+              "(results/0358a/codegen.json)")
+
+
+@needs("0358a")
+def p0358a():
+    """Record 0358a §6: the source-backed ODF families (after) against the
+    former stream routes (before), byte-identical output, and the record
+    0358 routes (0358a head vs 0358 head), both A-B-B-A pinned in release."""
+    base = RES / "0358a"
+    out = []
+    for probe, label in (("sb", "after/before"), ("w6", "after/before")):
+        legs: dict = {"before": {}, "after": {}}
+        paths = sorted(base.glob(f"{probe}-*-*.json"))
+        for path in paths:
+            leg = path.name.split("-")[1]
+            for r in load_json(path):
+                legs[leg].setdefault(r["scenario"], []).append(r["median_us"])
+        for scen, after in legs["after"].items():
+            before = legs["before"].get(scen)
+            if not before:
+                continue
+            b, a = med(before), med(after)
+            if probe == "sb":
+                fmt, op, scenario, size = W6_SOURCE_BACKED[scen]
+                scenario += ", family route vs former stream route"
+                explanation = ""
+            else:
+                fmt, op = scen.split("/")
+                scenario = f"File {op.replace('_', ' ')} ({fmt}, 0358a head vs 0358 head)"
+                size = "1k ops" if op == "batch1k" else ""
+                op = W6_ODF_OPS.get(op, op)
+                cgu1 = {"odt/set": "1.014", "fodt/open_get": "1.032"}.get(scen)
+                explanation = W6_CODEGEN.format(cgu1=cgu1) if cgu1 and a / b > 1.05 else ""
+            out.append(row("0358a", fmt, op, scenario, size, b, a, [a / b], regression("0358a"),
+                           f"{probe}:{scen}:after-before", src(paths), comparison=label,
+                           explanation=explanation))
+    return out
+
+
 @needs("0357a")
 def p0357a():
     """Record 0357a: record-sized scoped-family patches (1,000 retained
@@ -2745,6 +2824,38 @@ def p0357a():
 
 
 
+@needs("0357b")
+def p0357b():
+    """Record 0357b: incremental block-root digests for the scoped-family
+    patch (0357a-F1). The same probe as 0357a, ABC-CBA over the pre-0357a
+    base, the 0357a tip and this record; the rows compare this record with
+    the pre-0357a base, continuing the 0357a series, plus the first commit
+    on a never-hashed package (a once-per-package cost, no budget)."""
+    out = []
+    path = RES / "0357b" / "summary.json"
+    s = load_json(path)
+    for key, op, label in (("commit_median_us", "set", "scoped commit (external media path)"),
+                           ("apply_median_us", "set", "scoped patch apply"),
+                           ("inverse_apply_median_us", "set", "scoped patch inverse apply")):
+        b, a = s["base"][key], s["b"][key]
+        out.append(row("0357b", "ppt", op, f"{label}, after vs before", "1,000 patches",
+                       b, a, [a / b], regression("0357b"),
+                       f"scoped_patch:{slug(label)}:after-before", src([path]),
+                       comparison="after/before"))
+    b, a = s["base"]["first_commit_median_us"], s["b"]["first_commit_median_us"]
+    out.append(row("0357b", "ppt", "set",
+                   "first scoped commit on a never-hashed package, after vs before",
+                   "200 packages", b, a, [a / b], NONE,
+                   "scoped_patch:first_commit_never_hashed:after-before", src([path]),
+                   comparison="after/before",
+                   explanation="Record 0357b §3: once per package, the first scoped commit "
+                               "builds the source's block list (one SHA-256 pass over the "
+                               "43,520-byte source); every later commit or apply of that "
+                               "package or of a package published from it reuses it. "
+                               "The 0357a tip paid two whole-image hashes here."))
+    return out
+
+
 @needs("0356")
 def p0356():
     """Record 0356 §5 (see pptx_contract_rows)."""
@@ -2757,6 +2868,24 @@ def p0356a():
     trunk 184dd4d908 (record 0356 merged)."""
     return pptx_contract_rows("0356a")
 
+
+@needs("0356b")
+def p0356b():
+    """Record 0356b §4: the source-backed cross-slide-copy routes after the
+    copy moved from `SourceBackedPresentationEditor` onto
+    `source::Package::edit_cross_slide_copy`, perf-baseline built on
+    3e392d750f (before) and on the branch (after), run A-B-B-A three times:
+    after/before per case (median of the per-run p50s)."""
+    path = RES / "0356b" / "summary.json"
+    out = []
+    for case, v in load_json(path)["cases"].items():
+        b, a = v["before_median_us"], v["after_median_us"]
+        out.append(row("0356b", "pptx", "save", f"{case} (cross-slide copy, after vs before)",
+                       "", b, a, [a / b], regression("0356b"),
+                       f"perf_baseline:{case}:after-before", src([path]),
+                       comparison="after/before"))
+    return out
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
@@ -2765,7 +2894,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0306, p0307, p0308, p0309, p0310, p0311, p0312,
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
-           p0347, p0348, p0355, p0355a, p0356, p0356a, p0357, p0357a]
+           p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0357, p0357a, p0357b, p0358, p0358a]
 
 
 

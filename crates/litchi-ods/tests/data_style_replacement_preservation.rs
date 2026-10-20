@@ -139,7 +139,7 @@ fn unsupported_source_payloads_refuse_atomically_after_pending_edit() -> Result<
             .replace_style_graph(&replacement_graph())
             .expect_err(label);
         assert!(
-            matches!(&error, Error::Unsupported(message) if message.contains("unsupported source")),
+            matches!(&error, Error::Refused(refusal) if refusal.reason().contains("unsupported source")),
             "{label}: {error}"
         );
         assert_eq!(edit.as_bytes(), pending.as_slice(), "{label}");

@@ -116,7 +116,7 @@ impl Builder {
         encryption: Option<(String, Profile)>,
         signer: Option<DocumentSigner>,
     ) -> Result<Vec<u8>> {
-        compact_xml::validate(self.content_xml.as_bytes())?;
+        compact_xml::validate(self.content_xml.as_bytes(), compact_xml::Limits::default())?;
         crate::codec::validate(&self.content_xml)?;
         let mut writer = PackageWriter::new();
         writer.set_mimetype(mimetype)?;

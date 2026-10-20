@@ -59,7 +59,9 @@ fn missing(key: &'static str, message: &'static str) -> Error {
 /// else an invalid value.
 fn native(error: litchi_core::Error) -> Error {
     match error {
-        litchi_core::Error::Unsupported(_) => leaf(error, Code::UnsupportedCapability),
+        litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_) => {
+            leaf(error, Code::UnsupportedCapability)
+        },
         other => leaf(other, Code::InvalidValue),
     }
 }

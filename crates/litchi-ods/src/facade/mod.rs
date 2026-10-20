@@ -16,15 +16,13 @@ use std::{
     },
 };
 
-pub use crate::authoring::{Builder, MutableSpreadsheet};
+pub use crate::authoring::Builder;
 use crate::model::names::{Definition, Expression, Range, Scope};
 pub use litchi_odf_common::rdf::{Graph, Object, Subject, Triple};
 pub use selective::{SheetCatalogEntry, SourceBackedSpreadsheetCatalog, SourceReadMetrics};
 pub use source::SourceBackedSpreadsheet;
-pub use source_edit::{
-    FormulaChange, HyperlinkChange, HyperlinkOperation, SourceCellCommit, SourceCellEdit,
-    SourceCellPatch, SourceCellPublicationReport, SourceCellSnapshot,
-};
+pub(crate) use source_edit::SourceCellEdit;
+pub use source_edit::{FormulaChange, HyperlinkChange, HyperlinkOperation};
 
 /// Maximum number of positional cell selectors accepted by one lookup batch.
 ///
@@ -97,11 +95,11 @@ fn map_sheet_metadata_execution(error: litchi_core::ExecutionError) -> litchi_co
             litchi_core::Error::ResourceLimit(value)
         },
         litchi_core::ExecutionError::Cancelled => {
-            litchi_core::Error::Unsupported("ODS metadata operation cancelled".to_string())
+            litchi_core::Error::Other("ODS metadata operation cancelled".to_string())
         },
-        other => litchi_core::Error::Unsupported(format!(
-            "ODS metadata execution policy rejected operation: {other}"
-        )),
+        _other => litchi_core::Error::Other(
+            "ODS metadata execution policy rejected operation".to_string(),
+        ),
     }
 }
 
@@ -144,7 +142,10 @@ impl Workbook {
         // different ODF family still follows the historical package owner so
         // its MIME error is reported at the same boundary; rejected probes
         // recover the original allocation for the ordinary parser.
-        match litchi_odf_common::detect::prepared_or_original(bytes) {
+        match litchi_odf_common::detect::prepared_or_original(
+            bytes,
+            litchi_odf_common::SourceLimits::default(),
+        ) {
             Ok(prepared) if prepared.format() == litchi_core::detection::FileFormat::Ods => {
                 Self::from_package(crate::package::Archive::from_prepared_package(prepared)?)
             },
@@ -280,23 +281,6 @@ impl Workbook {
         crate::styles::table_template::Snapshot::from_source(self.inner.package.styles_xml())
     }
 
-    /// Apply an exact-source table-template patch and rehydrate the facade.
-    pub(crate) fn apply_table_template_patch(
-        &mut self,
-        patch: &crate::styles::table_template::Patch,
-    ) -> Result<()> {
-        let snapshot = self.table_templates()?;
-        let commit = patch.apply(&snapshot)?;
-        if commit.changed() {
-            let package = self
-                .inner
-                .package
-                .replace_styles_xml(commit.snapshot().source_xml())?;
-            *self = Self::from_package(package)?;
-        }
-        Ok(())
-    }
-
     /// Stage a source-checked table-template edit and publish it atomically.
     pub(crate) fn edit_table_templates<F>(&mut self, update: F) -> Result<()>
     where
@@ -328,26 +312,6 @@ impl Workbook {
         )
     }
 
-    /// Apply an exact-source reversible protection patch and fully rehydrate
-    /// this facade only after the candidate has passed its typed readback.
-    ///
-    /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub(crate) fn apply_protection_patch(
-        &mut self,
-        patch: &crate::protection::Patch,
-    ) -> Result<()> {
-        let commit = patch.apply(&self.protection()?)?;
-        if commit.changed() {
-            let package = self
-                .inner
-                .package
-                .replace_content_xml(commit.content_xml())?;
-            *self = Self::from_package(package)?;
-        }
-        Ok(())
-    }
-
     /// Apply a failure-atomic protection edit and rebuild only `content.xml`.
     /// Password values remain inert verifiers; this method never authenticates
     /// or enforces a protection policy.
@@ -356,7 +320,7 @@ impl Workbook {
     /// Returns an error when the operation cannot be completed.
     pub(crate) fn update_protection<F>(&mut self, edit: F) -> Result<()>
     where
-        F: FnOnce(&mut crate::protection::Transaction) -> Result<()>,
+        F: FnOnce(&mut crate::protection::Edit) -> Result<()>,
     {
         let snapshot = self.protection()?;
         let commit = crate::protection::update(&snapshot, edit)?;
@@ -472,24 +436,6 @@ impl Workbook {
         Ok(())
     }
 
-    /// Apply an exact-source DDE patch and rehydrate the accepted package.
-    pub(crate) fn apply_dde_patch(&mut self, patch: &crate::dde::Patch) -> Result<()> {
-        let context = crate::dde::default_context();
-        let snapshot = self.dde_with(crate::dde::Limits::default(), &context)?;
-        let commit = patch.apply(&snapshot)?;
-        if commit.changed() {
-            self.ensure_dde_publication_allowed()?;
-            let package = self
-                .inner
-                .package
-                .replace_content_xml(commit.snapshot().source_xml())?;
-            let candidate = Self::from_package(package)?;
-            context.check().map_err(map_sheet_metadata_execution)?;
-            *self = candidate;
-        }
-        Ok(())
-    }
-
     fn ensure_dde_publication_allowed(&self) -> Result<()> {
         if self
             .inner
@@ -499,9 +445,12 @@ impl Workbook {
             .into_iter()
             .any(|path| litchi_odf_common::core::package::is_signature_owner_path(&path))
         {
-            return Err(litchi_core::Error::Unsupported(
-                "signed-source refusal: changed ODS DDE metadata requires explicit unsign/resign policy"
-                    .to_string(),
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::Protected,
+                    "ods.facade",
+                    "signed-source refusal: changed ODS DDE metadata requires explicit unsign/resign policy",
+                ),
             ));
         }
         Ok(())
@@ -519,24 +468,6 @@ impl Workbook {
                 "ODS scenario metadata inspection failed: {error}"
             ))
         })
-    }
-
-    /// Apply an exact-source, inert scenario metadata patch and rehydrate the
-    /// package only after the candidate has passed typed readback.
-    ///
-    /// Scenario declarations are metadata only.  This method never applies a
-    /// what-if scenario, evaluates a formula, or refreshes external data.
-    pub(crate) fn apply_scenario_patch(&mut self, patch: &crate::scenario::Patch) -> Result<()> {
-        let snapshot = self.scenarios()?;
-        let commit = patch.apply(&snapshot)?;
-        if commit.changed() {
-            let package = self
-                .inner
-                .package
-                .replace_content_xml(commit.snapshot().source_xml())?;
-            *self = Self::from_package(package)?;
-        }
-        Ok(())
     }
 
     /// Stage and publish one failure-atomic scenario metadata edit.
@@ -625,25 +556,6 @@ impl Workbook {
         Ok(())
     }
 
-    /// Apply an exact source patch and rehydrate the owned spreadsheet only
-    /// after the candidate passes complete metadata readback.
-    pub(crate) fn apply_sheet_metadata_patch(
-        &mut self,
-        patch: &crate::sheet_metadata::Patch,
-    ) -> Result<()> {
-        let snapshot = self.sheet_metadata()?;
-        let commit = patch.apply(&snapshot)?;
-        if commit.changed() {
-            self.ensure_sheet_metadata_publication_allowed()?;
-            let package = self
-                .inner
-                .package
-                .replace_content_xml(commit.snapshot().source_xml())?;
-            *self = Self::from_package(package)?;
-        }
-        Ok(())
-    }
-
     fn ensure_sheet_metadata_publication_allowed(&self) -> Result<()> {
         let signed = self
             .inner
@@ -653,9 +565,12 @@ impl Workbook {
             .into_iter()
             .any(|path| litchi_odf_common::core::package::is_signature_owner_path(&path));
         if signed {
-            return Err(litchi_core::Error::Unsupported(
-                "signed-source refusal: changed ODS sheet metadata requires explicit unsign/resign policy"
-                    .to_string(),
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::Protected,
+                    "ods.facade",
+                    "signed-source refusal: changed ODS sheet metadata requires explicit unsign/resign policy",
+                ),
             ));
         }
         Ok(())
@@ -667,29 +582,10 @@ impl Workbook {
     /// Returns an error when the operation cannot be completed.
     pub(crate) fn update_tracked_changes<F>(&mut self, edit: F) -> Result<()>
     where
-        F: FnOnce(&mut crate::tracked_changes::Transaction) -> Result<()>,
+        F: FnOnce(&mut crate::tracked_changes::Edit) -> Result<()>,
     {
         let snapshot = self.tracked_changes()?;
         let commit = crate::tracked_changes::update(&snapshot, edit)?;
-        if !commit.changed() {
-            return Ok(());
-        }
-        let package = self.inner.package.replace_tracked_changes(&commit)?;
-        let candidate = Self::from_package(package)?;
-        *self = candidate;
-        Ok(())
-    }
-
-    /// Apply an exact-source tracked-change patch and fully rehydrate the candidate.
-    ///
-    /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub(crate) fn apply_tracked_changes_patch(
-        &mut self,
-        patch: &crate::tracked_changes::Patch,
-    ) -> Result<()> {
-        let snapshot = self.tracked_changes()?;
-        let commit = patch.apply(&snapshot)?;
         if !commit.changed() {
             return Ok(());
         }
@@ -780,23 +676,6 @@ impl Workbook {
         self.database_range_snapshot()
     }
 
-    /// Apply an exact-source database-range patch and rehydrate the full
-    /// spreadsheet only after typed readback succeeds.
-    ///
-    /// # Errors
-    /// Returns an error for stale lineage, invalid metadata, or failed
-    /// candidate readback.
-    pub(crate) fn apply_database_range_patch(
-        &mut self,
-        patch: &crate::database_range::Patch,
-    ) -> Result<()> {
-        let commit = patch.apply(&self.database_range_snapshot()?)?;
-        if commit.changed() {
-            *self = Self::from_bytes(commit.snapshot().as_bytes().to_vec())?;
-        }
-        Ok(())
-    }
-
     /// Clone-stage inert database-range CRUD and publish one package edit.
     ///
     /// Unknown markup inside the owned XML is retained by no-op transactions
@@ -836,19 +715,6 @@ impl Workbook {
     pub fn worksheet_snapshot(&self) -> Result<crate::worksheet::Snapshot> {
         let package = self.inner.package.clone_without_password()?;
         crate::worksheet::Snapshot::from_shared_package(Arc::new(package))
-    }
-
-    /// Apply an exact-source reversible worksheet patch.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for a stale patch or invalid candidate package.
-    pub(crate) fn apply_worksheet_patch(&mut self, patch: &crate::worksheet::Patch) -> Result<()> {
-        let commit = patch.apply(&self.worksheet_snapshot()?)?;
-        if commit.changed() {
-            *self = Self::from_bytes(commit.snapshot().as_bytes().to_vec())?;
-        }
-        Ok(())
     }
 
     /// Discover embedded charts in content-level drawing order.
@@ -1089,23 +955,6 @@ impl Workbook {
     /// Returns an error when the retained package cannot be reparsed.
     pub fn definitions_snapshot(&self) -> Result<crate::definitions::Snapshot> {
         crate::definitions::Snapshot::from_bytes(self.inner.package.package().as_bytes().to_vec())
-    }
-
-    /// Apply an exact-source reversible named-definition patch.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for a stale patch or invalid candidate package. This facade changes only
-    /// after the complete target has been reparsed.
-    pub(crate) fn apply_definitions_patch(
-        &mut self,
-        patch: &crate::definitions::Patch,
-    ) -> Result<()> {
-        let commit = patch.apply(&self.definitions_snapshot()?)?;
-        if commit.changed() {
-            *self = Self::from_bytes(commit.snapshot().as_bytes().to_vec())?;
-        }
-        Ok(())
     }
 
     /// Return named ranges in their document order.
@@ -1379,6 +1228,7 @@ impl Workbook {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::builder::Workbook as Draft;
     use std::path::Path;
     use std::sync::Arc;
 
@@ -1428,8 +1278,9 @@ mod tests {
             Workbook::from_bytes(bytes.clone()).expect("test fixture or operation should succeed");
         assert!(spreadsheet.tolerance_report().is_clean());
         assert_eq!(spreadsheet.tolerance_report().total(), 0);
-        let prepared = litchi_odf_common::detect::prepared(bytes)
-            .expect("test fixture or operation should succeed");
+        let prepared =
+            litchi_odf_common::detect::prepared(bytes, litchi_odf_common::SourceLimits::default())
+                .expect("test fixture or operation should succeed");
         let spreadsheet = crate::Package::from_prepared_package(prepared)
             .map_err(litchi_core::Error::from)
             .and_then(|package| package.workbook())
@@ -1771,15 +1622,21 @@ mod tests {
         );
 
         let mut mutable = Workbook::from_bytes(bytes.clone())
-            .map(MutableSpreadsheet::from_workbook)
+            .map(Draft::from_workbook)
             .expect("test fixture or operation should succeed");
         mutable
             .edit_annotations(|transaction| {
                 transaction.set("Data", 0, 1, crate::annotations::Annotation::new("added"))
             })
             .expect("test fixture or operation should succeed");
-        let edited = Workbook::from_bytes(mutable.to_bytes())
-            .expect("test fixture or operation should succeed");
+        let edited = Workbook::from_bytes(
+            mutable
+                .build()
+                .expect("the draft builds")
+                .as_bytes()
+                .to_vec(),
+        )
+        .expect("test fixture or operation should succeed");
         assert_eq!(
             edited
                 .annotations()
@@ -1794,11 +1651,14 @@ mod tests {
         assert!(edited.content_xml().contains("vendor:keep"));
 
         let mut no_op = Workbook::from_bytes(bytes.clone())
-            .map(MutableSpreadsheet::from_workbook)
+            .map(Draft::from_workbook)
             .expect("test fixture or operation should succeed");
         no_op
             .edit_annotations(|_| Ok(()))
             .expect("test fixture or operation should succeed");
-        assert_eq!(no_op.to_bytes(), bytes);
+        assert_eq!(
+            no_op.build().expect("the draft builds").as_bytes().to_vec(),
+            bytes
+        );
     }
 }

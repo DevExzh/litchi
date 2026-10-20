@@ -66,6 +66,7 @@
 pub mod advanced;
 pub mod annotations;
 pub mod authoring;
+pub mod builder;
 pub mod charts;
 pub mod codec;
 pub mod content_validation;
@@ -87,11 +88,15 @@ pub(crate) mod package;
 pub mod protection;
 pub mod settings;
 pub mod sheet_metadata;
+pub mod source_backed;
 pub mod source_features;
 pub mod streaming;
 pub mod styles;
 pub mod worksheet;
 mod xml_reference;
+
+#[cfg(test)]
+mod internal_tests;
 
 pub use charts::Chart;
 pub use document::{EditOptions, Package};
@@ -99,13 +104,8 @@ pub use drawing::{Frame, Part};
 pub use embedded::{Kind, Object, Parameter, Root};
 pub use facade::{
     Builder, CellSelector, FormulaChange, HyperlinkChange, HyperlinkOperation, MAX_CELL_SELECTORS,
-    MutableSpreadsheet, SheetCatalogEntry, SourceBackedSpreadsheet, SourceBackedSpreadsheetCatalog,
-    SourceCellCommit, SourceCellEdit, SourceCellPatch, SourceCellPublicationReport,
-    SourceCellSnapshot, SourceReadMetrics, Workbook,
-};
-pub use flat::{
-    FlatCommit, FlatEdit, FlatSpreadsheet, Limits as FlatLimits, Patch as FlatPatch,
-    SheetSelector as FlatSheetSelector, Snapshot as FlatSnapshot,
+    SheetCatalogEntry, SourceBackedSpreadsheet, SourceBackedSpreadsheetCatalog, SourceReadMetrics,
+    Workbook,
 };
 pub use litchi_core::Metadata;
 pub use litchi_odf_common::rdf;

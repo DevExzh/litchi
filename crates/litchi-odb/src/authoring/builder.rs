@@ -36,7 +36,7 @@ impl Builder {
     }
 
     fn build_core(self) -> Result<crate::Package> {
-        compact_xml::validate(self.content_xml.as_bytes())?;
+        compact_xml::validate(self.content_xml.as_bytes(), compact_xml::Limits::default())?;
         crate::codec::validate(&self.content_xml)?;
         let mut writer = PackageWriter::new();
         writer.set_mimetype(crate::package::MIMETYPE)?;

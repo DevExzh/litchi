@@ -66,10 +66,18 @@ fn genuine_writer_master_accepts_typed_body_authoring_with_full_patch_lifecycle(
             .name(),
         Some("Typed Index")
     );
-    compact_xml::validate(changed.document().content_xml().as_bytes()).unwrap();
+    compact_xml::validate(
+        changed.document().content_xml().as_bytes(),
+        compact_xml::Limits::default(),
+    )
+    .unwrap();
     assert!(Package::from_bytes(changed.as_bytes()).is_ok());
     assert_eq!(
-        changed.apply(&commit.patch().inverse()).unwrap().as_bytes(),
+        changed
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         WRITER_ODM
     );
     assert_eq!(
@@ -95,7 +103,8 @@ fn genuine_writer_master_accepts_typed_body_authoring_with_full_patch_lifecycle(
     let title_commit = title_edit.commit().unwrap();
     let merged = master
         .apply(&commit.patch().merge(title_commit.patch()).unwrap())
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(merged.document().title(), Some("Typed body merge"));
     assert_eq!(
         merged.document().structure().items().len(),
@@ -149,6 +158,7 @@ fn body_transfer_retains_source_provenance_and_refuses_unclosed_dependencies() {
             .package()
             .apply(&transfer_commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         destination.as_bytes()
     );

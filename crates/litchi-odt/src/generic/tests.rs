@@ -274,7 +274,7 @@ fn flat_reader_admits_input_incrementally_before_full_stream_consumption() {
         bytes: vec![b'x'; 64 * 1024],
         reads: 0,
     };
-    let result = FlatDocument::from_reader_with_execution_context(&mut reader, 1 << 20, context);
+    let result = FlatDocument::from_reader_with_limit_and_context(&mut reader, 1 << 20, context);
     assert!(matches!(
         result,
         Err(Error::ResourceLimit(limit)) if limit.resource == Resource::InputBytes
@@ -339,7 +339,7 @@ fn flat_snapshot_requires_and_retains_exact_source_memory() {
     let maximum = source_len + 256;
     let (_zero_budget, zero_context) = flat_test_context(0);
     assert!(matches!(
-        FlatDocument::from_bytes_with_execution_context(
+        FlatDocument::from_bytes_with_limit_and_context(
             bytes.clone(),
             maximum,
             zero_context,
@@ -348,7 +348,7 @@ fn flat_snapshot_requires_and_retains_exact_source_memory() {
     ));
     let (budget, context) = flat_test_context(source_capacity);
     let document =
-        FlatDocument::from_bytes_with_execution_context(bytes, maximum, context).unwrap();
+        FlatDocument::from_bytes_with_limit_and_context(bytes, maximum, context).unwrap();
     assert_eq!(budget.used(Resource::Memory), source_capacity);
     drop(document);
     assert_eq!(budget.used(Resource::Memory), 0);
@@ -366,7 +366,7 @@ fn flat_mutation_refusal_keeps_source_reservation_and_bytes() {
     let maximum = source_len + 256;
     let (budget, context) = flat_test_context(source_capacity);
     let mut document =
-        FlatDocument::from_bytes_with_execution_context(bytes, maximum, context).unwrap();
+        FlatDocument::from_bytes_with_limit_and_context(bytes, maximum, context).unwrap();
     let before = document.to_bytes();
     let error = document
         .set_paragraph_rdfa(
@@ -392,7 +392,7 @@ fn flat_mutations_retain_only_the_new_candidate_and_ignore_large_output_cap() {
     let maximum = super::flat::HARD_MAX_FLAT_DOCUMENT_BYTES;
     let (budget, context) = flat_test_context(1 << 20);
     let mut document =
-        FlatDocument::from_bytes_with_execution_context(xml.into_bytes(), maximum, context)
+        FlatDocument::from_bytes_with_limit_and_context(xml.into_bytes(), maximum, context)
             .unwrap();
     document
         .set_paragraph_rdfa(
@@ -422,7 +422,7 @@ fn flat_mutation_noop_keeps_source_usage_unchanged() {
     let source_capacity = u64::try_from(bytes.capacity()).unwrap();
     let (budget, context) = flat_test_context(1 << 20);
     let mut document =
-        FlatDocument::from_bytes_with_execution_context(bytes, source_len + 1, context).unwrap();
+        FlatDocument::from_bytes_with_limit_and_context(bytes, source_len + 1, context).unwrap();
     let before = document.to_bytes();
     document
         .set_paragraph_rdfa(Position::new(0), &crate::RdfaAttributes::default())

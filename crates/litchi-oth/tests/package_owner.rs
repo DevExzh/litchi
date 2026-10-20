@@ -226,11 +226,15 @@ fn an_exact_no_op_commit_is_the_source_byte_for_byte() {
     );
     let (published, patch) = changed.into_parts();
     assert_eq!(
-        package.apply(&patch).unwrap().as_bytes(),
+        package.apply(&patch).unwrap().into_package().as_bytes(),
         published.as_bytes()
     );
     assert_eq!(
-        published.apply(&patch.inverse()).unwrap().as_bytes(),
+        published
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         bytes.as_slice()
     );
 }
@@ -238,7 +242,8 @@ fn an_exact_no_op_commit_is_the_source_byte_for_byte() {
 #[test]
 fn from_prepared_package_adopts_oth_and_refuses_other_formats() {
     let bytes = built(&["prepared"]).to_bytes().unwrap();
-    let prepared = litchi_odf_common::detect::prepared(bytes.clone()).expect("OTH prepares");
+    let prepared = litchi_odf_common::detect::prepared(bytes.clone(), SourceLimits::default())
+        .expect("OTH prepares");
     assert_eq!(prepared.format(), litchi_core::detection::FileFormat::Oth);
     let package = Package::from_prepared_package(prepared).unwrap();
     assert_eq!(package.as_bytes(), bytes.as_slice());
@@ -248,6 +253,7 @@ fn from_prepared_package_adopts_oth_and_refuses_other_formats() {
             .join("../../test-data/odf/corpus/writer-header-footer.odt"),
     )
     .unwrap();
-    let prepared = litchi_odf_common::detect::prepared(odt).expect("ODT prepares");
+    let prepared =
+        litchi_odf_common::detect::prepared(odt, SourceLimits::default()).expect("ODT prepares");
     assert!(Package::from_prepared_package(prepared).is_err());
 }

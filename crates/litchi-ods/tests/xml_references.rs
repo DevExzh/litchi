@@ -13,7 +13,7 @@
 //! references consistently.
 
 use litchi_odf_common::{constants, core::PackageWriter};
-use litchi_ods::{Builder, MutableSpreadsheet, Package};
+use litchi_ods::{Builder, Package, builder::Workbook as Draft};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
@@ -80,9 +80,16 @@ fn standalone_and_fused_parsers_decode_mixed_references_once() -> litchi_core::R
         .content_xml(MIXED_REFERENCES)
         .build()?
         .to_bytes()?;
-    let spreadsheet = MutableSpreadsheet::from_workbook(Package::from_bytes(&bytes)?.workbook()?);
+    let spreadsheet = Draft::from_workbook(Package::from_bytes(&bytes)?.workbook()?);
     assert_eq!(spreadsheet.sheets(), standalone.as_slice());
-    assert_eq!(spreadsheet.to_bytes(), bytes);
+    assert_eq!(
+        spreadsheet
+            .build()
+            .expect("the draft builds")
+            .as_bytes()
+            .to_vec(),
+        bytes
+    );
     Ok(())
 }
 

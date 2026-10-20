@@ -1,9 +1,10 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
+use litchi_odi::flat::Image as FlatImage;
 use litchi_odi::{
-    Builder, ConflictKind, FlatImage, FrameProperty, History, OperationKey, Package,
-    ProtectionDisposition, SecurityPolicy, SemanticPatch, SemanticValue, StyleDependencyState,
-    SurfaceDisposition, SurfaceKind,
+    Builder, ConflictKind, FrameProperty, History, OperationKey, Package, ProtectionDisposition,
+    SecurityPolicy, SemanticPatch, SemanticValue, StyleDependencyState, SurfaceDisposition,
+    SurfaceKind,
     frame::Frame,
     map::{Area, ImageMap},
     source::Source,
@@ -28,7 +29,7 @@ const ODFDOM_ORIGINAL: &[u8] = include_bytes!("fixtures/odfdom-0.13.0-original.o
 const ODFDOM_CHANGED: &[u8] = include_bytes!("fixtures/odfdom-0.13.0-changed.odi");
 
 fn flat() -> FlatImage {
-    FlatImage::from_bytes(FLAT.as_bytes().to_vec()).unwrap()
+    FlatImage::from_bytes(FLAT.as_bytes()).unwrap()
 }
 
 fn package() -> Package {
@@ -60,7 +61,7 @@ fn map() -> ImageMap {
 #[test]
 fn retained_frame_image_and_style_semantics_share_the_durable_wire() {
     let source = flat();
-    let mut edit = source.transaction();
+    let mut edit = source.edit();
     edit.set_frame_xml_id(0, Some("frame-xml-id".into()))
         .unwrap();
     edit.set_frame_title(0, Some("Accessible title".into()))
@@ -79,7 +80,7 @@ fn retained_frame_image_and_style_semantics_share_the_durable_wire() {
     edit.set_copy_of(0, Some("OtherFrame".into())).unwrap();
     edit.set_image_map(0, Some(map())).unwrap();
     let commit = edit.commit().unwrap();
-    let frame = commit.snapshot().frame().unwrap();
+    let frame = commit.package().frame().unwrap();
     assert_eq!(frame.xml_id(), Some("frame-xml-id"));
     assert_eq!(frame.title(), Some("Accessible title"));
     assert_eq!(frame.description(), Some("Accessible description"));
@@ -146,7 +147,7 @@ fn retained_frame_image_and_style_semantics_share_the_durable_wire() {
 
 #[test]
 fn checked_in_normative_synthetic_fodi_is_explicitly_non_producer_evidence() {
-    let image = FlatImage::from_bytes(NORMATIVE_SYNTHETIC.to_vec()).unwrap();
+    let image = FlatImage::from_bytes(NORMATIVE_SYNTHETIC).unwrap();
     assert_eq!(
         image.metadata().unwrap().title.as_deref(),
         Some("Normative synthetic ODI evidence")
@@ -195,7 +196,7 @@ fn public_form_and_extension_inventory_is_inert_and_exact() {
             r#"<office:forms><form:form form:name="Search"><form:text form:id="query"/></form:form></office:forms><vendor:item vendor:flag="1"/><office:body>"#,
             1,
         );
-    let image = FlatImage::from_bytes(xml.clone().into_bytes()).unwrap();
+    let image = FlatImage::from_bytes(xml.clone().as_bytes()).unwrap();
     assert_eq!(image.forms().len(), 3);
     assert_eq!(image.forms()[1].name(), Some("Search"));
     assert_eq!(image.forms()[2].control_id(), Some("query"));
@@ -272,7 +273,7 @@ fn protection_inventory_exposes_exact_signed_rewrite_disposition() {
 #[test]
 fn semantic_patch_is_deterministic_exact_reopenable_and_transferable() {
     let source = flat();
-    let mut edit = source.transaction();
+    let mut edit = source.edit();
     edit.set_style_name(0, Some("gr2".into())).unwrap();
     edit.set_x(0, Some("5cm".into())).unwrap();
     edit.set_image_map(0, Some(map())).unwrap();
@@ -293,12 +294,12 @@ fn semantic_patch_is_deterministic_exact_reopenable_and_transferable() {
             }
     }));
     let exact = patch.apply_flat(&source).unwrap();
-    assert_eq!(exact.as_bytes(), commit.snapshot().as_bytes());
+    assert_eq!(exact.as_bytes(), commit.package().as_bytes());
     assert_eq!(
         patch.inverse().apply_flat(&exact).unwrap().as_bytes(),
         source.as_bytes()
     );
-    let stale = FlatImage::from_bytes(FLAT.replace("gr1", "other").into_bytes()).unwrap();
+    let stale = FlatImage::from_bytes(FLAT.replace("gr1", "other").as_bytes()).unwrap();
     assert!(patch.apply_flat(&stale).is_err());
 
     let package_source = {
@@ -435,7 +436,7 @@ fn package_transfer_copies_complete_resource_and_style_dependencies() {
 #[test]
 fn flat_transfer_reports_dependencies_it_cannot_supply() {
     let source = flat();
-    let mut edit = source.transaction();
+    let mut edit = source.edit();
     edit.set_source(0, Source::Linked("Pictures/absent.png".into()))
         .unwrap();
     edit.set_style_name(0, Some("absent-style".into())).unwrap();
@@ -465,14 +466,14 @@ fn flat_transfer_reports_dependencies_it_cannot_supply() {
 #[test]
 fn compatible_join_and_divergent_three_way_plans_are_non_mutating() {
     let source = flat();
-    let mut style_edit = source.transaction();
+    let mut style_edit = source.edit();
     style_edit
         .set_style_name(0, Some("joined-style".into()))
         .unwrap();
     let style = style_edit.commit().unwrap();
     let style_patch = style.semantic_patch(&SecurityPolicy::default()).unwrap();
 
-    let mut layer_edit = source.transaction();
+    let mut layer_edit = source.edit();
     layer_edit
         .set_layer(0, Some("joined-layer".into()))
         .unwrap();
@@ -487,15 +488,15 @@ fn compatible_join_and_divergent_three_way_plans_are_non_mutating() {
         .commit_flat(&source, &SecurityPolicy::default())
         .unwrap();
     assert_eq!(
-        committed.snapshot().frame().unwrap().style_name(),
+        committed.package().frame().unwrap().style_name(),
         Some("joined-style")
     );
     assert_eq!(
-        committed.snapshot().frame().unwrap().layer(),
+        committed.package().frame().unwrap().layer(),
         Some("joined-layer")
     );
 
-    let mut competing_edit = source.transaction();
+    let mut competing_edit = source.edit();
     competing_edit
         .set_style_name(0, Some("competing".into()))
         .unwrap();
@@ -507,7 +508,7 @@ fn compatible_join_and_divergent_three_way_plans_are_non_mutating() {
     assert!(!conflict.is_conflict_free());
     assert_eq!(conflict.conflicts()[0].kind(), ConflictKind::Diverged);
 
-    let three_way = style_patch.plan_flat(competing.snapshot());
+    let three_way = style_patch.plan_flat(competing.package());
     assert_eq!(three_way.conflicts()[0].kind(), ConflictKind::Diverged);
     assert!(matches!(
         three_way.conflicts()[0].actual(),
@@ -515,7 +516,7 @@ fn compatible_join_and_divergent_three_way_plans_are_non_mutating() {
     ));
     assert!(
         joined
-            .commit_flat(competing.snapshot(), &SecurityPolicy::default())
+            .commit_flat(competing.package(), &SecurityPolicy::default())
             .is_err()
     );
 }
@@ -599,11 +600,11 @@ fn package_metadata_and_resource_crud_have_transferable_inverse_patches() {
 fn flat_metadata_patch_preserves_opaque_nodes_and_transfers_to_package() {
     let source = flat();
     assert_eq!(source.metadata().unwrap().title.as_deref(), Some("Before"));
-    let mut edit = source.transaction();
+    let mut edit = source.edit();
     edit.set_title(Some("Flat After".into())).unwrap();
     edit.set_author(Some("Flat Author".into())).unwrap();
     let commit = edit.commit().unwrap();
-    let xml = std::str::from_utf8(commit.snapshot().as_bytes()).unwrap();
+    let xml = std::str::from_utf8(commit.package().as_bytes()).unwrap();
     assert!(xml.contains("opaque"));
     let patch = commit.semantic_patch(&SecurityPolicy::default()).unwrap();
     assert_eq!(patch.operations().len(), 2);
@@ -639,17 +640,17 @@ fn flat_metadata_patch_preserves_opaque_nodes_and_transfers_to_package() {
 #[test]
 fn commit_coupled_history_is_byte_bounded_and_stale_safe() {
     let source = flat();
-    let mut edit = source.transaction();
+    let mut edit = source.edit();
     edit.set_layer(0, Some("next".into())).unwrap();
     let commit = edit.commit().unwrap();
-    let budget = source.as_bytes().len() + commit.snapshot().as_bytes().len();
+    let budget = source.as_bytes().len() + commit.package().as_bytes().len();
     let mut history = History::with_byte_budget(source.clone(), 4, budget).unwrap();
     assert!(history.record_commit(&commit).unwrap());
     assert_eq!(history.stored_bytes(), budget);
     assert_eq!(history.undo().unwrap().as_bytes(), source.as_bytes());
     assert_eq!(
         history.redo().unwrap().as_bytes(),
-        commit.snapshot().as_bytes()
+        commit.package().as_bytes()
     );
     assert!(history.record_commit(&commit).is_err());
 
@@ -662,7 +663,7 @@ fn commit_coupled_history_is_byte_bounded_and_stale_safe() {
 #[test]
 fn hostile_policy_and_lossless_boundaries_refuse_before_publication() {
     let source = flat();
-    let mut external_edit = source.transaction();
+    let mut external_edit = source.edit();
     external_edit
         .set_source(0, Source::Linked("javascript:alert(1)".into()))
         .unwrap();
@@ -678,7 +679,7 @@ fn hostile_policy_and_lossless_boundaries_refuse_before_publication() {
             .is_err()
     );
 
-    let mut map_edit = source.transaction();
+    let mut map_edit = source.edit();
     map_edit.set_image_map(0, Some(map())).unwrap();
     let map_commit = map_edit.commit().unwrap();
     assert!(
@@ -714,11 +715,6 @@ fn hostile_policy_and_lossless_boundaries_refuse_before_publication() {
         "</draw:frame>",
         r#"<draw:image-map><draw:area-rectangle svg:x="0cm" svg:y="0cm" svg:width="1cm" svg:height="1cm"><office:event-listeners/></draw:area-rectangle></draw:image-map></draw:frame>"#,
     );
-    let eventful = FlatImage::from_bytes(eventful_xml.into_bytes()).unwrap();
-    assert!(
-        eventful
-            .transaction()
-            .set_image_map(0, Some(map()))
-            .is_err()
-    );
+    let eventful = FlatImage::from_bytes(eventful_xml.as_bytes()).unwrap();
+    assert!(eventful.edit().set_image_map(0, Some(map())).is_err());
 }

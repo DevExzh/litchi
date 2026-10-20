@@ -94,7 +94,7 @@ fn an_exact_no_op_commit_is_the_source_byte_for_byte() {
     assert_eq!(commit.package().as_bytes(), bytes.as_slice());
     let (published, patch) = commit.into_parts();
     assert_eq!(
-        package.apply(&patch).unwrap().as_bytes(),
+        package.apply(&patch).unwrap().into_package().as_bytes(),
         published.as_bytes()
     );
 }
@@ -118,10 +118,10 @@ fn a_real_edit_changes_bytes_and_its_patch_replays_on_the_source() {
     let (published, patch) = commit.into_parts();
     assert_eq!(published.pages()[0].name(), Some("Renamed"));
     let replayed = package.apply(&patch).unwrap();
-    assert_eq!(replayed.as_bytes(), published.as_bytes());
+    assert_eq!(replayed.into_package().as_bytes(), published.as_bytes());
     assert!(published.apply(&patch).is_err(), "stale source is refused");
     let restored = published.apply(&patch.inverse()).unwrap();
-    assert_eq!(restored.as_bytes(), source.as_slice());
+    assert_eq!(restored.into_package().as_bytes(), source.as_slice());
 }
 
 #[test]
@@ -263,14 +263,17 @@ fn templates_keep_their_flavor_through_the_owner() {
 #[test]
 fn a_prepared_detection_result_is_adopted_without_reindexing() {
     let bytes = corpus();
-    let prepared = litchi_odf_common::detect::prepared(bytes.clone()).unwrap();
+    let prepared =
+        litchi_odf_common::detect::prepared(bytes.clone(), SourceLimits::default()).unwrap();
     let identity = prepared.prepared_index_identity();
     let package = Package::from_prepared_package(prepared).unwrap();
     assert_eq!(package.as_bytes(), bytes.as_slice());
     assert_eq!(package.prepared_index_identity(), identity);
 
     let template = Builder::new().build_template().unwrap();
-    let prepared = litchi_odf_common::detect::prepared(template.to_bytes().unwrap()).unwrap();
+    let prepared =
+        litchi_odf_common::detect::prepared(template.to_bytes().unwrap(), SourceLimits::default())
+            .unwrap();
     assert!(
         Package::from_prepared_package(prepared)
             .unwrap()
@@ -283,6 +286,7 @@ fn a_prepared_detection_result_is_adopted_without_reindexing() {
                 .join("../../test-data/odf/corpus/writer-header-footer.odt"),
         )
         .unwrap(),
+        SourceLimits::default(),
     )
     .unwrap();
     assert!(Package::from_prepared_package(text).is_err());

@@ -108,7 +108,7 @@ fn assert_cell(
 fn repeated_function_and_cell_scans_keep_each_lexical_boundary() {
     let source = "=LOG10 (A1)+BIN2DEC\t(\"101\")+LOG10";
     let formula = FormulaParser::new(source)
-        .parse()
+        .parse(&Default::default())
         .expect("mixed function and cell-shaped names should parse");
     assert_eq!(formula.text, source);
     assert_eq!(formula.tokens.len(), 11);
@@ -129,7 +129,7 @@ fn repeated_function_and_cell_scans_keep_each_lexical_boundary() {
 fn legacy_sheet_names_spaces_and_lowercase_absolute_columns_are_preserved() {
     let source = "=Sales Data.$a$1+Summary Sheet.b$2+Data.c3";
     let formula = FormulaParser::new(source)
-        .parse()
+        .parse(&Default::default())
         .expect("space-bearing sheet names and lowercase columns should parse");
     assert_eq!(formula.text, source);
     assert_eq!(formula.tokens.len(), 5);
@@ -151,7 +151,7 @@ fn legacy_sheet_names_spaces_and_lowercase_absolute_columns_are_preserved() {
     // prefix; the compact common path must not split these into two tokens.
     for (source, expected_sheet) in [("=A1 Sheet.B2", "A1 Sheet"), ("=A1 .B2", "A1 ")] {
         let formula = FormulaParser::new(source)
-            .parse()
+            .parse(&Default::default())
             .expect("legacy spaced sheet scanner should preserve the full prefix");
         assert_eq!(formula.text, source);
         assert_eq!(formula.tokens.len(), 1);
@@ -170,7 +170,7 @@ fn legacy_sheet_names_spaces_and_lowercase_absolute_columns_are_preserved() {
 fn malformed_identifier_suffixes_remain_typed_syntax_errors() {
     for source in ["=LOG10X(A1)", "=BIN2DEC_1(A1)", "=VLOOKUPX (A1)"] {
         let error = FormulaParser::new(source)
-            .parse()
+            .parse(&Default::default())
             .expect_err("unknown function suffix should not be reclassified as a valid call");
         assert!(
             matches!(error, Error::InvalidFormat(_)),
@@ -187,7 +187,7 @@ fn speculative_cell_allocation_failure_is_not_swallowed_by_fallback() {
     // allocator ordinal and unable to abort unrelated paths.
     for source in ["=A1", "=.A1", "=$A$1"] {
         arm_one_byte_failure();
-        let result = FormulaParser::new(source).parse();
+        let result = FormulaParser::new(source).parse(&Default::default());
         let fired = injection_fired();
         disarm_one_byte_failure();
 

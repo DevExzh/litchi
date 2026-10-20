@@ -84,6 +84,7 @@ fn one_transaction_composes_structure_geometry_style_layers_and_resources() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
@@ -408,7 +409,10 @@ fn shape_text_with_several_paragraphs_is_unsupported() {
     let mut edit = source.edit();
     let error = edit.set_shape_text(0, 0, "new").unwrap_err();
     assert!(
-        matches!(error, litchi_core::Error::Unsupported(_)),
+        matches!(
+            error,
+            litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_)
+        ),
         "{error:?}"
     );
 }

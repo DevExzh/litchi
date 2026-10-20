@@ -287,7 +287,7 @@ mod tests {
     fn failed_argument_releases_kernel_values_and_allows_reuse() {
         let execution = execution();
         let context = EvaluationContext::new(&execution);
-        let expression = Expression::parse("=BITAND(1;2)").unwrap();
+        let expression = Expression::parse("=BITAND(1;2)", &Default::default()).unwrap();
         let mut evaluator = Evaluator::new(
             &expression,
             &context,
@@ -333,7 +333,7 @@ mod tests {
     fn empty_keeps_any_identity_and_uses_required_conversion() {
         let execution = execution();
         let context = EvaluationContext::new(&execution);
-        let expression = Expression::parse("=1").unwrap();
+        let expression = Expression::parse("=1", &Default::default()).unwrap();
         let mut evaluator = Evaluator::new(
             &expression,
             &context,
@@ -357,7 +357,7 @@ mod tests {
     fn eager_bridge_handles_constants_but_rejects_lazy_dispatch() {
         let execution = execution();
         let context = EvaluationContext::new(&execution);
-        let expression = Expression::parse("=TRUE()").unwrap();
+        let expression = Expression::parse("=TRUE()", &Default::default()).unwrap();
         let mut evaluator = Evaluator::new(
             &expression,
             &context,
@@ -379,7 +379,7 @@ mod tests {
     fn empty_comparison_and_text_parameter_profiles_are_explicit() {
         let execution = execution();
         let context = EvaluationContext::new(&execution);
-        let expression = Expression::parse("=1").unwrap();
+        let expression = Expression::parse("=1", &Default::default()).unwrap();
         let mut evaluator = Evaluator::new(
             &expression,
             &context,
@@ -454,7 +454,7 @@ mod tests {
     fn bridge_rejects_pending_frames_and_checks_constant_cancellation() {
         let (source, execution) = execution_with_cancellation();
         let context = EvaluationContext::new(&execution);
-        let expression = Expression::parse("=TRUE()").unwrap();
+        let expression = Expression::parse("=TRUE()", &Default::default()).unwrap();
         let mut evaluator = Evaluator::new(
             &expression,
             &context,
@@ -494,7 +494,7 @@ mod tests {
             "=AND(1;2)",
             "=OR(1;2)",
         ] {
-            let expression = Expression::parse(source).unwrap();
+            let expression = Expression::parse(source, &Default::default()).unwrap();
             let super::super::super::Kind::Function { name } = expression.root().kind() else {
                 panic!("function fixture")
             };

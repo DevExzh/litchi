@@ -12,7 +12,7 @@ use litchi_opc::{SourceCacheLimits, SourceLimits};
 ///   `encryption` feature, the `*_with_password_and_options` routes);
 /// - the positional-source owners
 ///   [`crate::SourceBackedPresentation::open_with_options`] and
-///   [`crate::SourceBackedPresentationEditor::open_with_options`].
+///   [`crate::source::Package::open_with_options`].
 ///
 /// Source limits bound the clear OPC archive. Cache and execution settings
 /// apply only to positional-source owners; owning constructors reject them

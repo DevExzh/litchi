@@ -16,7 +16,7 @@
         feature = "ods",
         feature = "odt",
         feature = "odp",
-        feature = "odf-objects",
+        odf_objects,
         feature = "iwork-adapter"
     )),
     allow(
@@ -78,7 +78,7 @@ enum Inner<'f> {
     Odt(crate::format::odt::views::Json),
     #[cfg(feature = "odp")]
     Odp(crate::format::odp::views::Json),
-    #[cfg(feature = "odf-objects")]
+    #[cfg(odf_objects)]
     Object(crate::format::odf_tree::views::Json),
     #[cfg(feature = "iwork-adapter")]
     Iwork(crate::format::iwork::views::Json),
@@ -169,7 +169,7 @@ impl Json<'_> {
     }
 
     /// An object-tree view (ODG, ODC, ODI, ODB, ODF formula).
-    #[cfg(feature = "odf-objects")]
+    #[cfg(odf_objects)]
     pub(crate) fn object(json: crate::format::odf_tree::views::Json) -> Self {
         Self {
             inner: Inner::Object(json),
@@ -210,7 +210,7 @@ impl Serialize for Json<'_> {
             Inner::Odt(json) => json.serialize(serializer),
             #[cfg(feature = "odp")]
             Inner::Odp(json) => json.serialize(serializer),
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Inner::Object(json) => json.serialize(serializer),
             #[cfg(feature = "iwork-adapter")]
             Inner::Iwork(json) => json.serialize(serializer),

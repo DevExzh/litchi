@@ -80,6 +80,12 @@ pub enum Error {
     #[error("Unsupported feature: {0}")]
     Unsupported(String),
 
+    /// A well-formed request the route refuses, with a static content-free
+    /// reason classified by its [`RefusalKind`](crate::edit::RefusalKind)
+    /// (record 0351 §2.4).
+    #[error("{0}")]
+    Refused(crate::edit::Refusal),
+
     /// Feature disabled at compile time
     #[error("Feature '{0}' is disabled. Enable it with --features {0}")]
     FeatureDisabled(String),

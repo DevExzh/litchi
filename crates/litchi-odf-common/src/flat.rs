@@ -317,8 +317,10 @@ impl Parts {
                     | "META-INF/"
                     | "META-INF/manifest.xml"
             ) {
-                return Err(Error::Unsupported(format!(
-                    "the edit added the package member `{member}`, which a flat ODF document cannot hold"
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odf-common.flat",
+                    "the edit added the package member a member which a flat ODF document cannot hold",
                 )));
             }
         }
@@ -354,9 +356,11 @@ fn changed_children(
     let old = top_level(&before.xml)?;
     let new = top_level(after)?;
     if old.root != new.root {
-        return Err(Error::Unsupported(
-            "the edit changed a flat ODF part's root element".to_owned(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odf-common.flat",
+            "the edit changed a flat ODF part's root element",
+        )));
     }
     if old.children.len() != new.children.len()
         || old.children.len() != before.sources.len()
@@ -366,9 +370,11 @@ fn changed_children(
             .zip(&new.children)
             .any(|(left, right)| left.0 != right.0)
     {
-        return Err(Error::Unsupported(
-            "the edit added or removed a top-level element of a flat ODF part".to_owned(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odf-common.flat",
+            "the edit added or removed a top-level element of a flat ODF part",
+        )));
     }
     for ((old_child, new_child), source) in
         old.children.iter().zip(&new.children).zip(&before.sources)
@@ -392,9 +398,11 @@ fn push_replacement(
         if existing.1 == text {
             return Ok(());
         }
-        return Err(Error::Unsupported(
-            "the edit changed one shared flat ODF element differently in two parts".to_owned(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odf-common.flat",
+            "the edit changed one shared flat ODF element differently in two parts",
+        )));
     }
     replacements.push((range, text));
     Ok(())
@@ -559,7 +567,7 @@ mod tests {
             .replace("office:version=\"1.3\"", "office:version=\"1.4\"");
         assert!(matches!(
             parts.merge(FLAT.as_bytes(), Some(&rooted), None, None, None),
-            Err(litchi_core::Error::Unsupported(_))
+            Err(litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_))
         ));
         let added = parts.content_xml().replace(
             "<office:automatic-styles/>",

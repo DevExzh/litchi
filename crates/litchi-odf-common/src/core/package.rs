@@ -523,12 +523,20 @@ impl ZipReaderAt for SourceReader {
 impl SourceBackedPackage {
     /// Open a positional ODF package with the default finite limits.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, SourceLimits::default())
+        Self::from_read_at_with_options(source, crate::OpenOptions::new())
     }
 
-    /// Open a positional ODF package with explicit finite limits.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: SourceLimits) -> Result<Self> {
-        Self::from_read_at_with_limits_and_password_inner(source, limits, None)
+    /// Open a positional ODF package under the source limits of one
+    /// [`crate::OpenOptions`] envelope.
+    pub fn from_read_at_with_options(
+        source: Arc<dyn ReadAt>,
+        options: crate::OpenOptions,
+    ) -> Result<Self> {
+        Self::from_read_at_with_limits_and_password_inner(
+            source,
+            options.source_limits_value(),
+            None,
+        )
     }
 
     /// Open a positional ODF package and retain a password for lazy entry
@@ -545,15 +553,19 @@ impl SourceBackedPackage {
         )
     }
 
-    /// Open a positional ODF package with explicit limits and a retained
-    /// password for lazy entry decryption.
-    pub fn from_read_at_with_limits_and_password(
+    /// Open a positional ODF package under one [`crate::OpenOptions`]
+    /// envelope and retain a password for lazy entry decryption.
+    pub fn from_read_at_with_password_and_options(
         source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
         password: impl Into<String>,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
         let password = zeroizing_password(password);
-        Self::from_read_at_with_limits_and_password_inner(source, limits, Some(password))
+        Self::from_read_at_with_limits_and_password_inner(
+            source,
+            options.source_limits_value(),
+            Some(password),
+        )
     }
 
     fn from_read_at_with_limits_and_password_inner(
@@ -709,10 +721,14 @@ impl SourceBackedPackage {
         Self::from_read_at(Arc::new(FileSource::open(path)?))
     }
 
-    /// Open a filesystem-backed ODF package with explicit finite limits.
+    /// Open a filesystem-backed ODF package under one [`crate::OpenOptions`]
+    /// envelope.
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
-        Self::from_read_at_with_limits(Arc::new(FileSource::open(path)?), limits)
+    pub fn from_path_with_options(
+        path: impl AsRef<Path>,
+        options: crate::OpenOptions,
+    ) -> Result<Self> {
+        Self::from_read_at_with_options(Arc::new(FileSource::open(path)?), options)
     }
 
     /// Open a filesystem-backed ODF package with a retained decryption
@@ -730,17 +746,18 @@ impl SourceBackedPackage {
         )
     }
 
-    /// Open a filesystem-backed ODF package with explicit limits and password.
+    /// Open a filesystem-backed ODF package under one [`crate::OpenOptions`]
+    /// envelope with a retained decryption password.
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_password(
+    pub fn from_path_with_password_and_options(
         path: impl AsRef<Path>,
-        limits: SourceLimits,
         password: impl Into<String>,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
         let password = zeroizing_password(password);
         Self::from_read_at_with_limits_and_password_inner(
             Arc::new(FileSource::open(path)?),
-            limits,
+            options.source_limits_value(),
             Some(password),
         )
     }
@@ -1074,7 +1091,10 @@ impl SourceBackedPackage {
         // the owned package accepts exactly what this owner accepted.
         let built = match strict {
             Err(_error) if !self.tolerance.is_clean() => {
-                OwnedPackage::from_shared_bytes_with_limits(bytes, self.limits)
+                OwnedPackage::from_shared_bytes_with_options(
+                    bytes,
+                    crate::OpenOptions::new().source_limits(self.limits),
+                )
             },
             other => other,
         };
@@ -1741,13 +1761,18 @@ impl OwnedPackage {
     /// existing convenience method remains source-compatible while gaining
     /// the same bounded ingress contract as positional packages.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(reader, SourceLimits::default())
+        Self::from_reader_with_options(reader, crate::OpenOptions::new())
     }
 
-    /// Open an ODF package from a reader under explicit finite limits.
-    pub fn from_reader_with_limits<R: Read>(reader: R, limits: SourceLimits) -> Result<Self> {
+    /// Open an ODF package from a reader under the source limits of one
+    /// [`crate::OpenOptions`] envelope.
+    pub fn from_reader_with_options<R: Read>(
+        reader: R,
+        options: crate::OpenOptions,
+    ) -> Result<Self> {
+        let limits = options.source_limits_value();
         let data = read_owned_input(reader, limits.max_input_bytes(), "ODF owned package input")?;
-        Self::from_bytes_with_limits(data, limits)
+        Self::from_bytes_with_options(data, options)
     }
 
     /// Open an ODF package from a reader and retain a password for lazy entry
@@ -1760,15 +1785,15 @@ impl OwnedPackage {
         Self::from_reader_with_zeroizing_password(reader, SourceLimits::default(), password)
     }
 
-    /// Open an ODF package from a reader with explicit finite limits and a
-    /// retained password for lazy entry decryption.
-    pub fn from_reader_with_limits_and_password<R: Read>(
+    /// Open an ODF package from a reader under one [`crate::OpenOptions`]
+    /// envelope and retain a password for lazy entry decryption.
+    pub fn from_reader_with_password_and_options<R: Read>(
         reader: R,
-        limits: SourceLimits,
         password: impl Into<String>,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
         let password = zeroizing_password(password);
-        Self::from_reader_with_zeroizing_password(reader, limits, password)
+        Self::from_reader_with_zeroizing_password(reader, options.source_limits_value(), password)
     }
 
     pub(crate) fn from_reader_with_zeroizing_password<R: Read>(
@@ -1786,12 +1811,13 @@ impl OwnedPackage {
     ///
     /// Returns an error when the bytes do not form a valid ZIP archive.
     pub fn from_bytes(data: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(data, SourceLimits::default())
+        Self::from_bytes_with_options(data, crate::OpenOptions::new())
     }
 
-    /// Create an ODF package from bytes under explicit finite limits.
-    pub fn from_bytes_with_limits(data: Vec<u8>, limits: SourceLimits) -> Result<Self> {
-        Self::from_shared_bytes_with_limits(Arc::new(data), limits)
+    /// Create an ODF package from bytes under the source limits of one
+    /// [`crate::OpenOptions`] envelope.
+    pub fn from_bytes_with_options(data: Vec<u8>, options: crate::OpenOptions) -> Result<Self> {
+        Self::from_shared_bytes_with_options(Arc::new(data), options)
     }
 
     /// Adopt shared ODF package bytes without copying the archive buffer.
@@ -1806,12 +1832,15 @@ impl OwnedPackage {
         )
     }
 
-    /// Adopt shared ODF package bytes under explicit finite limits without
-    /// copying the archive buffer.
-    pub fn from_shared_bytes_with_limits(data: Arc<Vec<u8>>, limits: SourceLimits) -> Result<Self> {
+    /// Adopt shared ODF package bytes under the source limits of one
+    /// [`crate::OpenOptions`] envelope without copying the archive buffer.
+    pub fn from_shared_bytes_with_options(
+        data: Arc<Vec<u8>>,
+        options: crate::OpenOptions,
+    ) -> Result<Self> {
         Self::from_shared_bytes_with_policy_and_limits(
             data,
-            limits,
+            options.source_limits_value(),
             soapberry_zip::office::ArchiveValidationPolicy::Normalized,
         )
     }
@@ -1843,7 +1872,10 @@ impl OwnedPackage {
         limits: SourceLimits,
     ) -> std::result::Result<Self, Vec<u8>> {
         let data = Arc::new(data);
-        match Self::from_shared_bytes_with_limits(Arc::clone(&data), limits) {
+        match Self::from_shared_bytes_with_options(
+            Arc::clone(&data),
+            crate::OpenOptions::new().source_limits(limits),
+        ) {
             Ok(package) => Ok(package),
             Err(_error) => {
                 let Some(data) = Arc::into_inner(data) else {
@@ -1952,15 +1984,15 @@ impl OwnedPackage {
         Self::from_bytes_with_zeroizing_password(data, SourceLimits::default(), password)
     }
 
-    /// Open ODF bytes with explicit finite limits and retain a password for
-    /// lazy entry decryption.
-    pub fn from_bytes_with_limits_and_password(
+    /// Open ODF bytes under one [`crate::OpenOptions`] envelope and retain a
+    /// password for lazy entry decryption.
+    pub fn from_bytes_with_password_and_options(
         data: Vec<u8>,
-        limits: SourceLimits,
         password: impl Into<String>,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
         let password = zeroizing_password(password);
-        Self::from_bytes_with_zeroizing_password(data, limits, password)
+        Self::from_bytes_with_zeroizing_password(data, options.source_limits_value(), password)
     }
 
     pub(crate) fn from_bytes_with_zeroizing_password(
@@ -2851,11 +2883,21 @@ mod tests {
         let data = create_test_odf_package("application/vnd.oasis.opendocument.text");
         let source = CountingSource::new(data.clone());
         let limits = input_limits(u64::try_from(data.len() - 1).unwrap());
-        assert!(SourceBackedPackage::from_read_at_with_limits(source, limits).is_err());
+        assert!(
+            SourceBackedPackage::from_read_at_with_options(
+                source,
+                crate::OpenOptions::new().source_limits(limits)
+            )
+            .is_err()
+        );
 
         let limits = input_limits(u64::try_from(data.len()).unwrap());
         let source = CountingSource::new(data.clone());
-        let package = SourceBackedPackage::from_read_at_with_limits(source, limits).unwrap();
+        let package = SourceBackedPackage::from_read_at_with_options(
+            source,
+            crate::OpenOptions::new().source_limits(limits),
+        )
+        .unwrap();
         let materialized = package.materialize().unwrap();
         assert_eq!(materialized.as_bytes(), data.as_slice());
         assert_eq!(materialized.limits(), limits);
@@ -2874,19 +2916,36 @@ mod tests {
         ));
         std::fs::write(&path, &data).unwrap();
         let exact = input_limits(u64::try_from(data.len()).unwrap());
-        assert!(SourceBackedPackage::from_path_with_limits(&path, exact).is_ok());
         assert!(
-            SourceBackedPackage::from_path_with_limits_and_password(&path, exact, "password")
-                .is_ok()
+            SourceBackedPackage::from_path_with_options(
+                &path,
+                crate::OpenOptions::new().source_limits(exact)
+            )
+            .is_ok()
+        );
+        assert!(
+            SourceBackedPackage::from_path_with_password_and_options(
+                &path,
+                "password",
+                crate::OpenOptions::new().source_limits(exact)
+            )
+            .is_ok()
         );
 
         let too_small = input_limits(exact.max_input_bytes() - 1);
         assert!(matches!(
-            SourceBackedPackage::from_path_with_limits(&path, too_small),
+            SourceBackedPackage::from_path_with_options(
+                &path,
+                crate::OpenOptions::new().source_limits(too_small)
+            ),
             Err(Error::ResourceLimit(_))
         ));
         assert!(matches!(
-            SourceBackedPackage::from_path_with_limits_and_password(&path, too_small, "password"),
+            SourceBackedPackage::from_path_with_password_and_options(
+                &path,
+                "password",
+                crate::OpenOptions::new().source_limits(too_small)
+            ),
             Err(Error::ResourceLimit(_))
         ));
         let missing = path.with_extension("missing");
@@ -2898,27 +2957,33 @@ mod tests {
     fn owned_reader_limits_apply_before_zip_indexing_and_match_password_path() {
         let limits = input_limits(8);
         assert!(matches!(
-            OwnedPackage::from_reader_with_limits(Cursor::new(vec![0_u8; 8]), limits),
-            Err(Error::InvalidFormat(_))
-        ));
-        assert!(matches!(
-            OwnedPackage::from_reader_with_limits(Cursor::new(vec![0_u8; 9]), limits),
-            Err(Error::ResourceLimit(_))
-        ));
-
-        assert!(matches!(
-            OwnedPackage::from_reader_with_limits_and_password(
+            OwnedPackage::from_reader_with_options(
                 Cursor::new(vec![0_u8; 8]),
-                limits,
-                "password",
+                crate::OpenOptions::new().source_limits(limits)
             ),
             Err(Error::InvalidFormat(_))
         ));
         assert!(matches!(
-            OwnedPackage::from_reader_with_limits_and_password(
+            OwnedPackage::from_reader_with_options(
                 Cursor::new(vec![0_u8; 9]),
-                limits,
+                crate::OpenOptions::new().source_limits(limits)
+            ),
+            Err(Error::ResourceLimit(_))
+        ));
+
+        assert!(matches!(
+            OwnedPackage::from_reader_with_password_and_options(
+                Cursor::new(vec![0_u8; 8]),
                 "password",
+                crate::OpenOptions::new().source_limits(limits)
+            ),
+            Err(Error::InvalidFormat(_))
+        ));
+        assert!(matches!(
+            OwnedPackage::from_reader_with_password_and_options(
+                Cursor::new(vec![0_u8; 9]),
+                "password",
+                crate::OpenOptions::new().source_limits(limits)
             ),
             Err(Error::ResourceLimit(_))
         ));
@@ -2948,10 +3013,10 @@ mod tests {
             Err(Error::InvalidFormat(_))
         ));
         assert!(matches!(
-            OwnedPackage::from_bytes_with_limits_and_password(
+            OwnedPackage::from_bytes_with_password_and_options(
                 Vec::new(),
-                input_limits(1),
                 "password",
+                crate::OpenOptions::new().source_limits(input_limits(1))
             ),
             Err(Error::InvalidFormat(_))
         ));
@@ -3504,7 +3569,7 @@ mod tests {
         assert!(materialized.tolerance_report().is_clean());
 
         // Smart detection retains the report on the prepared handoff.
-        let prepared = crate::detect::prepared_or_original(data.to_vec())
+        let prepared = crate::detect::prepared_or_original(data.to_vec(), SourceLimits::default())
             .unwrap_or_else(|_| panic!("conforming fixture must be detected"));
         assert_eq!(prepared.format(), crate::detect::Format::Odt);
         assert!(prepared.tolerance_report().is_clean());

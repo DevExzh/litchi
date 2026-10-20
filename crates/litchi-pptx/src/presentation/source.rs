@@ -1077,7 +1077,7 @@ enum PictureQueryResult {
 /// transaction is the bounded exception: it may replace the two media Parts
 /// and their owning slide relationship targets as one checked closure.
 #[derive(Clone)]
-pub struct SourceBackedPresentationEditor {
+pub(crate) struct SourceBackedPresentationEditor {
     pub(super) package: SourceBackedPackage,
     // Retain the catalog validated at open so each selected slide does not
     // reparse the immutable presentation root and rebuild the complete slide
@@ -1445,7 +1445,8 @@ impl SourceBackedPresentation {
     /// - without an error when it is shared ([`SourceBackedIntoEditorError::is_shared`]);
     /// - with the typed cancellation, source-change, allocation, or strict
     ///   slide-list error that prevented the conversion.
-    pub fn try_into_editor(
+    #[cfg(test)]
+    pub(crate) fn try_into_editor(
         self,
     ) -> std::result::Result<SourceBackedPresentationEditor, SourceBackedIntoEditorError> {
         let seed = match self.editor_seed() {
@@ -1733,7 +1734,7 @@ struct EditorSeed {
 
 /// Why [`SourceBackedPresentation::try_into_editor`] could not convert a
 /// presentation. The presentation is returned unchanged and stays readable.
-pub struct SourceBackedIntoEditorError {
+pub(crate) struct SourceBackedIntoEditorError {
     presentation: SourceBackedPresentation,
     error: Option<Error>,
 }
@@ -1742,26 +1743,23 @@ impl SourceBackedIntoEditorError {
     /// Whether the conversion was refused only because another clone of the
     /// presentation, or a [`SourceSlide`] from it, still shares the source.
     #[must_use]
-    pub fn is_shared(&self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn is_shared(&self) -> bool {
         self.error.is_none()
     }
 
     /// The typed error that prevented the conversion, or `None` when the
     /// presentation was merely shared.
     #[must_use]
-    pub fn error(&self) -> Option<&Error> {
+    #[cfg(test)]
+    pub(crate) fn error(&self) -> Option<&Error> {
         self.error.as_ref()
-    }
-
-    /// The unchanged presentation.
-    #[must_use]
-    pub fn presentation(&self) -> &SourceBackedPresentation {
-        &self.presentation
     }
 
     /// Split into the unchanged presentation and the optional typed error.
     #[must_use]
-    pub fn into_parts(self) -> (SourceBackedPresentation, Option<Error>) {
+    #[cfg(test)]
+    pub(crate) fn into_parts(self) -> (SourceBackedPresentation, Option<Error>) {
         (self.presentation, self.error)
     }
 }
@@ -1803,7 +1801,8 @@ impl SourceBackedPresentationEditor {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     #[cfg(any(unix, windows))]
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+    #[cfg(test)]
+    pub(crate) fn open(path: impl AsRef<Path>) -> Result<Self> {
         Self::open_with_options(path, crate::OpenOptions::default())
     }
 
@@ -1815,7 +1814,11 @@ impl SourceBackedPresentationEditor {
     /// Returns an error if the input exceeds the policies, cannot be read or
     /// is malformed.
     #[cfg(any(unix, windows))]
-    pub fn open_with_options(path: impl AsRef<Path>, options: crate::OpenOptions) -> Result<Self> {
+    #[cfg(test)]
+    pub(crate) fn open_with_options(
+        path: impl AsRef<Path>,
+        options: crate::OpenOptions,
+    ) -> Result<Self> {
         Self::from_read_at_with_options(file_source(path)?, options)
     }
 
@@ -1824,7 +1827,8 @@ impl SourceBackedPresentationEditor {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
+    #[cfg(test)]
+    pub(crate) fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
         Self::from_read_at_with_options(source, crate::OpenOptions::default())
     }
 
@@ -1834,7 +1838,8 @@ impl SourceBackedPresentationEditor {
     ///
     /// Returns an error if the input exceeds the policies, cannot be read or
     /// is malformed.
-    pub fn from_read_at_with_options(
+    #[cfg(test)]
+    pub(crate) fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
         options: crate::OpenOptions,
     ) -> Result<Self> {
@@ -1842,37 +1847,8 @@ impl SourceBackedPresentationEditor {
         Self::from_source_backed_package(source_backed_package(source, options)?, limits)
     }
 
-    /// Read a PPTX stream into a retained source under the default finite
-    /// policies.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_options(reader, crate::OpenOptions::default())
-    }
-
-    /// Read a PPTX stream into a retained source under explicit source
-    /// limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::Error::UnsupportedOpenPolicy`] for cache or execution
-    /// policies, which need a positional source, and an error if the input
-    /// exceeds the source limits, cannot be read or is malformed.
-    pub fn from_reader_with_options<R: Read>(
-        reader: R,
-        options: crate::OpenOptions,
-    ) -> Result<Self> {
-        options.check_owning()?;
-        let limits = options.source_limits;
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_reader_with_limits(reader, limits)?,
-            limits,
-        )
-    }
-
     /// Build an owning editor from a validated deferred OPC package.
+    #[cfg(test)]
     fn from_source_backed_package(
         package: SourceBackedPackage,
         limits: SourceLimits,
@@ -1895,7 +1871,8 @@ impl SourceBackedPresentationEditor {
 
     /// Number of logical slides in presentation order.
     #[must_use]
-    pub fn slide_count(&self) -> usize {
+    #[cfg(test)]
+    pub(crate) fn slide_count(&self) -> usize {
         self.slides.len()
     }
 
@@ -1904,7 +1881,8 @@ impl SourceBackedPresentationEditor {
     /// Opening loads the presentation root; capturing one slide loads that
     /// selected slide only. The diagnostic exposes no member identities.
     #[must_use]
-    pub fn cache_diagnostics(&self) -> litchi_opc::SourceCacheDiagnostics {
+    #[cfg(test)]
+    pub(crate) fn cache_diagnostics(&self) -> litchi_opc::SourceCacheDiagnostics {
         self.package.cache_diagnostics()
     }
 
@@ -1916,7 +1894,8 @@ impl SourceBackedPresentationEditor {
     /// [`Self::cache_diagnostics`], observing the snapshot does not load a
     /// part. The infallible method remains available for compatibility
     /// callers.
-    pub fn try_cache_diagnostics(
+    #[cfg(test)]
+    pub(crate) fn try_cache_diagnostics(
         &self,
     ) -> std::result::Result<
         litchi_opc::SourceCacheDiagnostics,

@@ -184,7 +184,7 @@ impl std::fmt::Debug for Edit<'_> {
 
 /// `package` as a source-backed package with no staged state: itself when
 /// it is pristine, else its published artifact reopened (record 0356a).
-fn physical(package: &Package) -> Result<Package> {
+pub(super) fn physical(package: &Package) -> Result<Package> {
     let effective = package.effective()?;
     if effective.is_pristine() {
         return Ok(effective.clone());

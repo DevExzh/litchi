@@ -17,8 +17,13 @@
 //! patch), and the median commit, apply and inverse-apply times. Peak RSS is
 //! measured outside (`/usr/bin/time -v`).
 //!
+//! Record 0357b adds `first_commit_median_us`: the same single-operation
+//! commit on a freshly opened, never-edited package (one per iteration,
+//! `FIRST` iterations, default 200), which pays any once-per-package digest
+//! the steady-state commits amortize. The open is outside the timed region.
+//!
 //! Run with: `cargo run --release -p litchi-ppt --example scoped_patch_probe
-//! -- test-data/unified-ops/0294/video.ppt 1000`
+//! -- test-data/unified-ops/0294/video.ppt 1000 200`
 
 use std::time::Instant;
 
@@ -55,9 +60,25 @@ fn median(samples: &mut [u128]) -> f64 {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
-    let path = args.next().ok_or("usage: scoped_patch_probe FIXTURE [N]")?;
+    let path = args
+        .next()
+        .ok_or("usage: scoped_patch_probe FIXTURE [N] [FIRST]")?;
     let count: usize = args.next().map_or(Ok(1000), |value| value.parse())?;
-    let source = Package::from_bytes(&std::fs::read(path)?)?;
+    let first: usize = args.next().map_or(Ok(200), |value| value.parse())?;
+    let fixture = std::fs::read(path)?;
+
+    let mut first_ns = Vec::with_capacity(first);
+    for index in 0..first {
+        let fresh = Package::from_bytes(&fixture)?;
+        let begin = Instant::now();
+        let mut edit = fresh.edit_external_media()?;
+        edit.set_path(1, Some(format!("first-{index:04}.avi")))?;
+        let commit = edit.commit()?;
+        first_ns.push(begin.elapsed().as_nanos());
+        drop(commit);
+    }
+
+    let source = Package::from_bytes(&fixture)?;
     let source_bytes = source.to_bytes()?;
 
     let started = Instant::now();
@@ -96,13 +117,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "{{\"patches\":{count},\"source_len\":{},\"target_len\":{target_len},\
          \"retained_patch_bytes\":{retained_bytes},\"retained_per_patch\":{},\
          \"commit_total_ms\":{:.3},\"commit_median_us\":{:.3},\
-         \"apply_median_us\":{:.3},\"inverse_apply_median_us\":{:.3}}}",
+         \"apply_median_us\":{:.3},\"inverse_apply_median_us\":{:.3},\
+         \"first_commit_median_us\":{:.3}}}",
         source_bytes.len(),
         retained_bytes / count.max(1),
         commit_total.as_secs_f64() * 1000.0,
         median(&mut commit_ns),
         median(&mut apply_ns),
         median(&mut inverse_ns),
+        median(&mut first_ns),
     );
     Ok(())
 }

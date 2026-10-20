@@ -1,6 +1,6 @@
 use litchi_odf_common::constants;
 use litchi_ods::rdf::{Object, Subject, Triple};
-use litchi_ods::{Builder, MutableSpreadsheet, Package};
+use litchi_ods::{Builder, Package, builder::Workbook as Draft};
 use std::io::{Cursor, Write};
 
 #[test]
@@ -10,7 +10,7 @@ fn builder_and_package_facade_round_trip() {
         .expect("test fixture or operation should succeed")
         .to_bytes()
         .expect("test fixture or operation should succeed");
-    let spreadsheet = MutableSpreadsheet::from_workbook(
+    let spreadsheet = Draft::from_workbook(
         Package::from_bytes(&bytes)
             .expect("test fixture or operation should succeed")
             .workbook()
@@ -22,7 +22,14 @@ fn builder_and_package_facade_round_trip() {
             .content_xml()
             .contains("office:spreadsheet")
     );
-    assert_eq!(spreadsheet.to_bytes(), bytes);
+    assert_eq!(
+        spreadsheet
+            .build()
+            .expect("the draft builds")
+            .as_bytes()
+            .to_vec(),
+        bytes
+    );
 }
 
 #[test]
@@ -34,7 +41,7 @@ fn spreadsheet_facade_owns_rdf_crud() {
         .expect("test fixture or operation should succeed")
         .to_bytes()
         .expect("test fixture or operation should succeed");
-    let mut spreadsheet = MutableSpreadsheet::from_workbook(
+    let mut spreadsheet = Draft::from_workbook(
         Package::from_bytes(&bytes)
             .expect("test fixture or operation should succeed")
             .workbook()

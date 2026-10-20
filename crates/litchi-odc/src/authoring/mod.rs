@@ -32,7 +32,7 @@ pub fn serialize_content(definition: &Definition) -> Result<String> {
 /// # Errors
 ///
 /// Returns an error when validation, serialization, or compactness checks fail.
-pub fn serialize_content_with_limits(
+pub(crate) fn serialize_content_with_limits(
     definition: &Definition,
     limits: crate::Limits,
 ) -> Result<String> {
@@ -45,7 +45,7 @@ pub fn serialize_content_with_limits(
     let compact_limits =
         litchi_odf_common::compact_xml::Limits::new(limits.max_content_bytes(), limits.max_depth())
             .map_err(litchi_core::Error::from)?;
-    litchi_odf_common::compact_xml::validate_with_limits(content.as_bytes(), compact_limits)
+    litchi_odf_common::compact_xml::validate(content.as_bytes(), compact_limits)
         .map_err(litchi_core::Error::from)?;
     Ok(content)
 }

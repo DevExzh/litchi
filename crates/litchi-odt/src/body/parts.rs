@@ -1907,9 +1907,10 @@ impl Region<'_> {
                 ))
             );
             if !allowed {
-                return Err(Error::Unsupported(format!(
-                    "an ODT header or footer region holding {} cannot have its text replaced",
-                    String::from_utf8_lossy(name.as_ref())
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odt.body.parts",
+                    "an ODT header or footer region holding this content cannot have its text replaced",
                 )));
             }
             if first.is_none() {

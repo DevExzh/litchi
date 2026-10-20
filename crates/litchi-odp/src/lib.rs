@@ -21,22 +21,22 @@ pub mod scene;
 pub mod streaming;
 
 pub use authoring::edit::Package;
+pub use authoring::flat;
 pub use facade::layer;
 pub use facade::settings as show;
 pub use facade::slide::{Shape, Slide};
 pub use facade::{
-    Builder, FlatPresentation, MasterPage, Presentation, SlideCatalogEntry,
-    SourceBackedPresentation, SourceBackedPresentationCatalog,
+    Builder, MasterPage, Presentation, SlideCatalogEntry, SourceBackedPresentation,
+    SourceBackedPresentationCatalog,
 };
 pub use facade::{edit, embedded, image, layout, master, page, slide};
 pub use litchi_odf_common::{
     Error, LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,
     SourceLimitKind, SourceLimits, SourceLimitsBuilder,
 };
-pub use package::{
-    SourceBackedTailAppendEdit, SourceBackedTailAppendPublicationPlan, TailAppendError,
-    TailAppendLimits, TailAppendSourceProof,
-};
+/// Bounded, source-backed append of one plain slide (`Edit`, `Limits`,
+/// `PublicationPlan`, `SourceProof`, `Error`).
+pub use package::source_append as tail_append;
 
 // Keep implementation modules ergonomic internally without flattening their
 // semantic vocabulary into the public crate root.

@@ -346,29 +346,31 @@ fn document_edits_compose_with_slide_moves_and_plan() {
     assert_eq!(master_ids(commit.package()), [ids[1], ids[0]]);
     assert_replays_and_inverts(&source, &commit);
 
-    // These edits have no durable form and do not join; three-way plans see
-    // the master list.
-    assert!(matches!(
-        commit
-            .patch()
-            .to_durable(litchi_core::patch::PatchLimits::new(
-                litchi_core::patch::BlobLimits::new(0, 0, 0),
-                1 << 20,
-                64,
-                8,
-                4_096,
-                8 << 20,
-            )),
-        Err(Error::Native(slide_order::Error::Refused(
-            Refusal::UnsupportedPatch { .. }
-        )))
-    ));
+    // These edits have a durable form (record 0357b; the round trips are
+    // in tests/durable_patches.rs).
+    let durable = commit
+        .patch()
+        .to_durable(litchi_core::patch::PatchLimits::new(
+            litchi_core::patch::BlobLimits::new(0, 0, 0),
+            1 << 20,
+            64,
+            8,
+            4_096,
+            8 << 20,
+        ))
+        .unwrap();
+    assert_eq!(durable.operations().len(), 3);
     let mut other = source.edit().unwrap();
     other
         .move_master(Position::new(0), Position::new(1))
         .unwrap();
     let other = other.commit().unwrap();
-    assert!(commit.patch().join(other.patch()).is_err());
+    // Two master reorders do not join: their order decides the result.
+    assert!(matches!(
+        commit.patch().join(other.patch()),
+        Err(Error::Native(slide_order::Error::Refused(Refusal::JoinConflict { target })))
+            if target == "document/master-list"
+    ));
     let plan = source
         .plan_three_way(commit.patch(), other.patch())
         .unwrap();

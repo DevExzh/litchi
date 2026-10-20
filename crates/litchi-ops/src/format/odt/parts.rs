@@ -757,7 +757,7 @@ pub(super) fn region(odt: &Odt, index: u32) -> Result<Option<litchi_odt::body::p
 pub(super) fn tab_edits(
     odt: &Odt,
     paragraph: NodeId,
-) -> Result<Vec<(Option<i64>, litchi_odt::body::TabStopEdit)>> {
+) -> Result<Vec<(Option<i64>, litchi_odt::body::TabStopSpec)>> {
     let body = odt.body()?;
     let Some(node) = body.node(paragraph) else {
         return Ok(Vec::new());
@@ -765,7 +765,7 @@ pub(super) fn tab_edits(
     Ok(litchi_odt::body::parts::tab_stops(node)
         .iter()
         .map(|stop| {
-            let mut edit = litchi_odt::body::TabStopEdit::new(stop.position());
+            let mut edit = litchi_odt::body::TabStopSpec::new(stop.position());
             edit.kind = stop.kind_attribute().map(str::to_owned);
             edit.leader_style = stop.leader_style().map(str::to_owned);
             edit.leader_text = stop.leader_text().map(str::to_owned);

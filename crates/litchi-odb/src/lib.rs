@@ -24,9 +24,9 @@ pub use authoring::{
     ActiveContentDisposition, Change, ChangeAction, ChangeKind, Commit, CompositionLimits,
     DependencyDisposition, Diagnostics, DurablePatch, Edit, EditPolicy, EncryptionCapability,
     EncryptionPolicy, History, HistoryLimits, JoinError, JoinedEdits, Lineage, MergeChoice,
-    MergePlan, MergePlanError, Patch, PreparedEdit, ProtectionCapabilities, ProtectionDecision,
+    MergePlan, MergePlanError, Patch, ProtectionCapabilities, ProtectionDecision,
     ProtectionOperation, ProtectionRefusal, ProtectionStatus, ProtectionSupport,
-    ProtectionTransition, QueryChange, SealedPatch, SignatureCapability, SignaturePolicy,
+    ProtectionTransition, QueryChange, SealedPatch, SignatureCapability, SignaturePolicy, SubEdit,
 };
 pub use facade::{Builder, Database, Package};
 pub use litchi_odf_common::signature::{

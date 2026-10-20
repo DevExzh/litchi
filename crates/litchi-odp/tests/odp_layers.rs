@@ -71,7 +71,11 @@ fn rename_updates_declaration_and_shape_reference_with_exact_patch() {
     assert!(content.contains(r#"vendor:token="keep""#));
     assert!(content.contains("retained layer comment"));
     assert_eq!(
-        source.apply(commit.patch()).unwrap().as_bytes(),
+        source
+            .apply(commit.patch())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         commit.package().as_bytes()
     );
     assert_eq!(
@@ -79,6 +83,7 @@ fn rename_updates_declaration_and_shape_reference_with_exact_patch() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source_bytes
     );
@@ -142,7 +147,11 @@ fn reversing_layer_renames_retains_the_exact_source_package() {
     assert!(!commit.diagnostics().changed());
     assert_eq!(commit.package().as_bytes(), source.as_bytes());
     assert_eq!(
-        source.apply(commit.patch()).unwrap().as_bytes(),
+        source
+            .apply(commit.patch())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 }

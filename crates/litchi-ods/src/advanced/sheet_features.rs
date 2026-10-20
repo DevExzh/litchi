@@ -1379,10 +1379,7 @@ fn put_format_style(
         return Ok((source.to_vec(), "Default".to_owned()));
     }
     let styles = part_xml(source, "styles.xml")?.ok_or_else(|| {
-        Error::Unsupported(
-            "an ODS package without styles.xml takes no conditional-format style (record 0327 follow-up: author styles.xml)"
-                .to_owned(),
-        )
+        Error::Refused(litchi_core::edit::Refusal::new(litchi_core::edit::RefusalKind::UnsupportedOperation, "ods.advanced.sheet_features", "an ODS package without styles.xml takes no conditional-format style (record 0327 follow-up: author styles.xml)"))
     })?;
     let spans = scan(&styles)?;
     let office_styles = spans
@@ -1884,9 +1881,11 @@ fn set_cell_attribute(
         .collect();
     if value.is_some() && !beyond.is_empty() {
         let Some(last) = runs.last() else {
-            return Err(Error::Unsupported(
-                "an ODS sheet without rows takes no validation binding".to_owned(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.advanced.sheet_features",
+                "an ODS sheet without rows takes no validation binding",
+            )));
         };
         let mut markup = String::new();
         let mut cursor = end;
@@ -2049,9 +2048,11 @@ fn cell_edits(
     )?;
     if value.is_some() && !beyond.is_empty() {
         if is_self_closing_span(xml, &spans[row])? {
-            return Err(Error::Unsupported(
-                "an empty ODS row element takes no cells".to_owned(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.advanced.sheet_features",
+                "an empty ODS row element takes no cells",
+            )));
         }
         let at = spans[row].close_start;
         edits.push((
@@ -2232,9 +2233,11 @@ pub(crate) fn set_validation(
         .map(|(span, _)| *span)
         .ok_or_else(|| invalid_error("ODS validation definition is missing"))?;
     if used_elsewhere(&xml, &spans, table, &held.name) {
-        return Err(Error::Unsupported(
-            "an ODS validation another sheet binds is not rewritten".to_owned(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "ods.advanced.sheet_features",
+            "an ODS validation another sheet binds is not rewritten",
+        )));
     }
     let markup = bind(
         validation_markup(&held.name, sheet, spec),
@@ -2374,10 +2377,11 @@ fn auto_filter_span(
             let name = attribute(xml, span, b"table:name")?;
             if buttons || name.as_deref() == Some(anonymous) {
                 if found.is_some() {
-                    return Err(Error::Unsupported(
-                        "an ODS sheet with two filtered database ranges has no single auto-filter"
-                            .to_owned(),
-                    ));
+                    return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "ods.advanced.sheet_features",
+                        "an ODS sheet with two filtered database ranges has no single auto-filter",
+                    )));
                 }
                 found = Some(index);
             }
@@ -2576,9 +2580,11 @@ pub(crate) fn set_breaks(
     let mut touched: BTreeMap<u32, (Option<String>, bool)> = BTreeMap::new();
     let beyond: Vec<u32> = wanted.range(end..).copied().collect();
     if !beyond.is_empty() && runs.is_empty() && rows {
-        return Err(Error::Unsupported(
-            "an ODS sheet without rows takes no row page break".to_owned(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "ods.advanced.sheet_features",
+            "an ODS sheet without rows takes no row page break",
+        )));
     }
     for index in &beyond {
         touched.insert(*index, (None, true));
@@ -2588,10 +2594,11 @@ pub(crate) fn set_breaks(
         let last = run.first.saturating_add(run.repeat);
         if breaking(&base) {
             if run.repeat as usize > MAX_BREAK_INDEXES {
-                return Err(Error::Unsupported(
-                    "an ODS run of more than 4096 breaking rows or columns is not restyled"
-                        .to_owned(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "ods.advanced.sheet_features",
+                    "an ODS run of more than 4096 breaking rows or columns is not restyled",
+                )));
             }
             for index in run.first..last {
                 if !wanted.contains(&index) {

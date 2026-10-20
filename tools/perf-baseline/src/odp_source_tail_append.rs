@@ -25,7 +25,7 @@ use super::{
     process_metrics, record_elapsed, sha256_hex, statistics,
 };
 use litchi_core::{ReadAt, SourceVersion};
-use litchi_odf_common::core::{OwnedPackage, SourceBackedPackage, SourceContentPublicationOptions};
+use litchi_odf_common::core::{OwnedPackage, SourceContentPublicationOptions};
 use serde::Serialize;
 use std::{
     error::Error,
@@ -239,11 +239,12 @@ fn source_arc(bytes: &[u8]) -> Arc<[u8]> {
     Arc::<[u8]>::from(bytes.to_vec())
 }
 
-fn open_source_package(
+fn open_source_presentation(
     source: &Arc<MeasureBytesSource>,
-) -> Result<Arc<SourceBackedPackage>, Box<dyn Error>> {
-    let package = SourceBackedPackage::from_read_at(Arc::clone(source) as Arc<dyn ReadAt>)?;
-    Ok(Arc::new(package))
+) -> Result<litchi_odp::SourceBackedPresentation, Box<dyn Error>> {
+    Ok(litchi_odp::SourceBackedPresentation::from_read_at(
+        Arc::clone(source) as Arc<dyn ReadAt>,
+    )?)
 }
 
 fn append_options() -> SourceContentPublicationOptions {
@@ -476,12 +477,16 @@ fn capture_source_tail_append_candidate(
     let body = odp_existing_append::appended_body(shape);
     let options = append_options();
     let provider = Arc::new(MeasureBytesSource::new(source_arc(source_bytes)));
-    let package = open_source_package(&provider)?;
-    let edit = litchi_odp::SourceBackedTailAppendEdit::new(package, title, body)?;
-    let plan = edit.plan(&options)?;
+    let presentation = open_source_presentation(&provider)?;
+    let mut edit = presentation.edit_tail_append(title, body)?;
+    edit.set_options(options.clone());
+    let plan = edit.prepare()?;
     let proof = plan.proof().clone();
+    let commit = plan.commit()?;
     let mut output = Vec::new();
-    let report = plan.write_to(&mut output, options.clone())?;
+    let report = commit
+        .package()
+        .write_to_with_options(&mut output, options.clone())?;
     let report_bytes = report.bytes();
     let proof_source_version = proof.source_version();
     let report_source_version = report.source_version();
@@ -518,7 +523,8 @@ fn capture_source_tail_append_candidate(
     if provider.metrics().1 == 0 || !provider.matches_bytes(source_bytes) {
         return Err("ODP source append candidate source counters or bytes changed".into());
     }
-    drop(plan);
+    drop(commit);
+    drop(presentation);
     drop(provider);
     Ok(SourceTailAppendCandidateCapture {
         output,
@@ -544,17 +550,19 @@ fn build_odp_source_tail_append_corpus_with_output(
     let options = append_options();
 
     let stale_provider = Arc::new(MeasureBytesSource::new(source_arc(source_bytes)));
-    let stale_package = open_source_package(&stale_provider)?;
-    let stale_edit =
-        litchi_odp::SourceBackedTailAppendEdit::new(stale_package, title.clone(), body.clone())?;
-    let stale_plan = stale_edit.plan(&options)?;
+    let stale_presentation = open_source_presentation(&stale_provider)?;
+    let mut stale_edit = stale_presentation.edit_tail_append(title.clone(), body.clone())?;
+    stale_edit.set_options(options.clone());
+    let stale_commit = stale_edit.commit()?;
     stale_provider.bump_revision();
     let mut stale_output = Vec::new();
-    let stale_refusal_verified = stale_plan
-        .write_to(&mut stale_output, options.clone())
+    let stale_refusal_verified = stale_commit
+        .package()
+        .write_to_with_options(&mut stale_output, options.clone())
         .is_err()
         && stale_output.is_empty();
-    drop(stale_plan);
+    drop(stale_commit);
+    drop(stale_presentation);
     drop(stale_output);
     drop(stale_provider);
     if !stale_refusal_verified {
@@ -753,7 +761,7 @@ pub(crate) fn run_odp_source_tail_append_lifecycle(
     for iteration in 0..iterations {
         // Source bytes, source provider, strings, publication options, and
         // hashing sink are all prepared before the lifecycle clock.  The
-        // clock includes direct SourceBackedPackage opening, the bounded ODP
+        // clock includes SourceBackedPresentation opening, the bounded ODP
         // scan/proof and insertion-plan preparation, and sequential write.
         let iteration_title = title.clone();
         let iteration_body = body.clone();
@@ -765,15 +773,17 @@ pub(crate) fn run_odp_source_tail_append_lifecycle(
         let allocation_region = allocation_metrics::begin();
         let lifecycle_started = std::time::Instant::now();
         let open_started = std::time::Instant::now();
-        let package = open_source_package(&provider)?;
+        let presentation = open_source_presentation(&provider)?;
         let opened = open_started.elapsed();
         let plan_started = std::time::Instant::now();
-        let edit =
-            litchi_odp::SourceBackedTailAppendEdit::new(package, iteration_title, iteration_body)?;
-        let plan = edit.plan(&iteration_options)?;
+        let mut edit = presentation.edit_tail_append(iteration_title, iteration_body)?;
+        edit.set_options(iteration_options.clone());
+        let commit = edit.commit()?;
         let planned = plan_started.elapsed();
         let publication_started = std::time::Instant::now();
-        let report = plan.write_to(&mut sink, iteration_options)?;
+        let report = commit
+            .package()
+            .write_to_with_options(&mut sink, iteration_options)?;
         let published = publication_started.elapsed();
         let lifecycle = lifecycle_started.elapsed();
         let allocation_metrics = allocation_region.finish();
@@ -781,12 +791,16 @@ pub(crate) fn run_odp_source_tail_append_lifecycle(
 
         let report_bytes = report.bytes();
         let report_source_version = report.source_version();
-        let proof_source_version = plan.proof().source_version();
+        let proof = commit
+            .diagnostics()
+            .proof()
+            .ok_or("ODP source append commit has no source proof")?;
+        let proof_source_version = proof.source_version();
         let provider_source_version = provider.version()?;
-        let proof_slide_count = plan.proof().slide_count();
-        let proof_content_xml_bytes = plan.proof().content_bytes();
-        let proof_insert_at = plan.proof().insert_at();
-        let proof_page_name = plan.proof().page_name().to_owned();
+        let proof_slide_count = proof.slide_count();
+        let proof_content_xml_bytes = proof.content_bytes();
+        let proof_insert_at = proof.insert_at();
+        let proof_page_name = proof.page_name().to_owned();
         let (sink_summary, candidate_digest) = sink.finish();
         let (read_calls, read_bytes) = provider.metrics();
         if candidate_digest != corpus.output_sha256
@@ -819,7 +833,8 @@ pub(crate) fn run_odp_source_tail_append_lifecycle(
             );
         }
         std::hint::black_box(candidate_digest.as_str());
-        drop(plan);
+        drop(commit);
+        drop(presentation);
         drop(provider);
 
         if iteration >= warmup_iterations {
@@ -899,7 +914,7 @@ pub(crate) fn run_odp_source_tail_append_lifecycle(
         odp_source_tail_append: Some(OdpSourceTailAppendSummary {
             role: "source_tail_append",
             implementation: "SourceBackedPackage::from_read_at + SourceBackedTailAppendEdit::plan + SourceBackedTailAppendPublicationPlan::write_to",
-            timing_scope: "source archive Arc, positional provider, append strings/options, and HashingDiscardSink construction outside; lifecycle_ns includes direct SourceBackedPackage opening, bounded source scan/proof, insertion-plan preparation, and sequential publication-plan write; output digest finalization, semantic/member/raw/source/stale oracles, report assembly, and operation-owned drops occur outside the clock",
+            timing_scope: "source archive Arc, positional provider, append strings/options, and HashingDiscardSink construction outside; lifecycle_ns includes SourceBackedPresentation opening, bounded source scan/proof, insertion-plan preparation, and sequential publication-plan write; output digest finalization, semantic/member/raw/source/stale oracles, report assembly, and operation-owned drops occur outside the clock",
             performance_claim: "source-backed ODP advanced publication-plan lifecycle evidence only; the returned SourceContentPublicationReport is a publication report and has a different retained-result contract from owned Snapshot/Commit/Patch; no ordinary Commit/Patch optimization or general CRUD claim",
             corpus_generator: ODP_SOURCE_TAIL_APPEND_CORPUS_GENERATOR,
             shape: corpus.source.shape.name(),

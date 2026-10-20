@@ -416,6 +416,25 @@ impl Document {
             .map_or_else(|| Ok(Vec::new()), |styles| read(styles.xml_content()))
     }
 
+    /// The advanced-layout read view of `styles.xml` (master pages, page
+    /// layouts, section layouts), from which master-page and section-layout
+    /// transfers to another document are prepared (record 0358a).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the document has no `styles.xml` or it holds
+    /// malformed layout owners.
+    pub fn layouts(&self) -> Result<crate::header_footer::Snapshot> {
+        let styles = self.state.styles.as_ref().ok_or_else(|| {
+            litchi_core::Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::NotFound,
+                "odt.document.layouts",
+                "the document has no styles.xml",
+            ))
+        })?;
+        crate::header_footer::Snapshot::parse(styles.xml_content().to_owned())
+    }
+
     /// Parse automatic page layouts, their properties, and header/footer styles.
     pub fn page_layouts(&self) -> Result<Vec<PageLayout>> {
         self.state.styles.as_ref().map_or_else(
@@ -625,6 +644,127 @@ impl Document {
     /// Get point and range targets used by `text:reference-ref` fields.
     pub fn reference_marks(&self) -> Result<Vec<crate::ReferenceMark>> {
         crate::reference_mark::parse_reference_marks(self.state.content.xml_content())
+    }
+
+    /// Read the bookmark targets (point and range `text:bookmark*`) in
+    /// document order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// bookmark markup.
+    pub fn bookmark_targets(&self) -> Result<Vec<crate::BookmarkTarget>> {
+        crate::parse_bookmark_targets(self.state.content.xml_content())
+    }
+
+    /// Read the form and control properties in document order, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn form_properties(&self) -> Result<Vec<crate::form::Property>> {
+        crate::form::form_properties(self.state.content.xml_content())
+    }
+
+    /// Read the text, textarea, formatted-text and fixed-text form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn text_controls(&self) -> Result<Vec<crate::form::TextControl>> {
+        crate::form::text_controls(self.state.content.xml_content())
+    }
+
+    /// Read the button and check-box form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn interactive_controls(&self) -> Result<Vec<crate::form::InteractiveControl>> {
+        crate::form::interactive_controls(self.state.content.xml_content())
+    }
+
+    /// Read the list-box and combo-box form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn selection_controls(&self) -> Result<Vec<crate::form::SelectionControl>> {
+        crate::form::selection_controls(self.state.content.xml_content())
+    }
+
+    /// Read the frame, image and hidden form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn visual_controls(&self) -> Result<Vec<crate::form::VisualControl>> {
+        crate::form::visual_controls(self.state.content.xml_content())
+    }
+
+    /// Read the generic (`form:generic-control`) form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn generic_form_controls(&self) -> Result<Vec<crate::form::GenericFormControl>> {
+        crate::form::generic_form_controls(self.state.content.xml_content())
+    }
+
+    /// Read the password and file form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn password_file_controls(&self) -> Result<Vec<crate::form::PasswordFileControl>> {
+        crate::form::password_file_controls(self.state.content.xml_content())
+    }
+
+    /// Read the image-frame form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn image_frame_controls(&self) -> Result<Vec<crate::form::ImageFrameControl>> {
+        crate::form::image_frame_controls(self.state.content.xml_content())
+    }
+
+    /// Read the value-range form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn value_range_controls(&self) -> Result<Vec<crate::form::ValueRangeControl>> {
+        crate::form::value_range_controls(self.state.content.xml_content())
+    }
+
+    /// Read the date, time and number form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn typed_value_controls(&self) -> Result<Vec<crate::form::TypedValueControl>> {
+        crate::form::typed_value_controls(self.state.content.xml_content())
+    }
+
+    /// Read the grid (table) form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn grid_controls(&self) -> Result<Vec<crate::form::GridControl>> {
+        crate::form::grid_controls(self.state.content.xml_content())
     }
 
     /// Get all semantic footnotes and endnotes in document order.

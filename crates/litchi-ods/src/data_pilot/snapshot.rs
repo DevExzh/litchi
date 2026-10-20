@@ -59,7 +59,7 @@ impl Snapshot {
 
     /// Start a source-checked, failure-atomic edit.
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit {
             before: self.clone(),
             draft: self.has_owner.then(|| self.tables.clone()),
@@ -108,8 +108,8 @@ impl Edit {
         OwnedEditor { edit: self }
     }
 
-    /// Restore the exact source candidate.
-    pub fn rollback(&mut self) {
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
         self.draft = self.before.has_owner.then(|| self.before.tables.clone());
     }
 
@@ -117,7 +117,7 @@ impl Edit {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         validation::validate_candidate(
             &self.before_location()?,
             &self.before_owner(),
@@ -145,14 +145,7 @@ impl Edit {
             }
             target
         };
-        Ok(Commit {
-            changed: !unchanged,
-            patch: Patch {
-                source: self.before.source,
-                target: target.source.clone(),
-            },
-            snapshot: target,
-        })
+        Ok(Commit { snapshot: target })
     }
 
     fn before_owner(&self) -> Option<Vec<Table>> {
@@ -242,72 +235,16 @@ impl OwnedEditor<'_> {
     }
 }
 
-/// A source-checked, reversible package patch.
-#[derive(Clone, Debug)]
-pub struct Patch {
-    source: Vec<u8>,
-    target: Vec<u8>,
-}
-
-impl Patch {
-    /// Whether this patch is physically empty.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.source == self.target
-    }
-
-    /// Return the exact-source patch that restores the accepted package.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            source: self.target.clone(),
-            target: self.source.clone(),
-        }
-    }
-
-    /// Apply only to the exact source package snapshot.
-    ///
-    /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
-        if snapshot.source != self.source {
-            return Err(Error::InvalidFormat(
-                "ODS DataPilot patch source snapshot does not match".to_string(),
-            ));
-        }
-        let target = Snapshot::from_bytes(self.target.clone())?;
-        Ok(Commit {
-            changed: !self.is_empty(),
-            patch: self.clone(),
-            snapshot: target,
-        })
-    }
-}
-
 /// A fully rehydrated `DataPilot` publication.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
 }
 
 impl Commit {
-    /// Whether package bytes changed.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
     /// Resulting immutable snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-
-    /// Reversible exact-source patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
     }
 }

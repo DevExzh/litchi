@@ -184,7 +184,7 @@ pub struct Formula {
 
 impl Formula {
     pub(crate) fn from_mathml(mathml: &str, template: bool, limits: codec::Limits) -> Result<Self> {
-        let root = codec::parse_with_limits(mathml, limits)?;
+        let root = codec::parse(mathml, limits)?;
         let archive = crate::package::Archive::create(mathml.as_bytes(), template)?;
         Self::from_validated_parts(archive, root, limits)
     }
@@ -194,7 +194,7 @@ impl Formula {
         limits: codec::Limits,
     ) -> Result<Self> {
         check_package_bytes(archive.as_bytes().len(), limits)?;
-        let root = codec::parse_with_limits(&archive.content_xml()?, limits)?;
+        let root = codec::parse(&archive.content_xml()?, limits)?;
         Self::from_validated_parts(archive, root, limits)
     }
 
@@ -957,6 +957,17 @@ pub struct Commit {
 }
 
 impl Commit {
+    pub(crate) fn replayed(package: Package, patch: Patch) -> Self {
+        Self {
+            diagnostics: Diagnostics {
+                changed: !patch.is_noop(),
+                candidate_reopened: false,
+            },
+            package,
+            patch,
+        }
+    }
+
     fn unchanged(package: Package) -> Self {
         Self {
             patch: Patch {
@@ -1761,7 +1772,7 @@ fn transform_at(
 
 fn validate_candidate(root: &Element, limits: codec::Limits) -> Result<Arc<Element>> {
     let xml = codec::serialize(root);
-    let parsed = codec::parse_with_limits(&xml, limits)?;
+    let parsed = codec::parse(&xml, limits)?;
     validate_starmath_boundaries(&parsed)?;
     Ok(Arc::new(parsed))
 }

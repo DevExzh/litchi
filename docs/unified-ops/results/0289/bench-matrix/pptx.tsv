@@ -641,6 +641,9 @@ pptx	remove (slide)	remove dependency-free slide 6 of shapes.pptx		unified/nativ
 pptx	remove (slide)	remove dependency-free slide 6 of shapes.pptx (native leg)		after/before (native)		1186.8	1150.6	µs	0.973	0.966–0.973	1.05 (no regression above 5%, record 0303)	meets	0303	parsed:0303/pptx-gaps-bench-abba.jsonl	
 pptx	remove (slide)	remove dependency-free slide 6 of shapes.pptx (unified leg)		after/before (unified)		1192.5	1155.1	µs	0.973	0.964–0.973	1.05 (no regression above 5%, record 0303)	meets	0303	parsed:0303/pptx-gaps-bench-abba.jsonl	
 pptx	remove (slide)	remove slide 1 of 45545_Comment.pptx (notes, comments, VML, OLE)		unified/native		2411.4	2419.8	µs	1.004	1.003–1.004	1.10 (single-op write)	meets	0303	parsed:0303/pptx-gaps-bench-abba.jsonl	
+pptx	save	pptx_source_backed_cross_copy_media_rich_lifecycle (cross-slide copy, after vs before)		after/before		13304.8	13264.8	µs	0.997		1.05 (no regression above 5%, record 0356b)	meets	0356b	parsed:0356b/summary.json	
+pptx	save	pptx_source_backed_cross_copy_plain (cross-slide copy, after vs before)		after/before		2541.9	2502.4	µs	0.984		1.05 (no regression above 5%, record 0356b)	meets	0356b	parsed:0356b/summary.json	
+pptx	save	pptx_source_backed_cross_copy_plain_lifecycle (cross-slide copy, after vs before)		after/before		2973.1	2937.6	µs	0.988		1.05 (no regression above 5%, record 0356b)	meets	0356b	parsed:0356b/summary.json	
 pptx	save	save (comments)		after/before (leaf leg)		12069.1	12075.2	µs	1.001		1.05 (no regression above 5%, record 0356)	meets	0356	parsed:0356/contract-after-run1a.jsonl (+11 more)	
 pptx	save	save (comments)		after/before (leaf leg)		12109.9	12122.9	µs	1.001		1.05 (no regression above 5%, record 0356a)	meets	0356a	parsed:0356a/contract-after-run1a.jsonl (+11 more)	
 pptx	save	save (comments)		after/before (unified leg)		6.705	5.675	µs	0.846		1.05 (no regression above 5%, record 0356)	meets	0356	parsed:0356/contract-after-run1a.jsonl (+11 more)	

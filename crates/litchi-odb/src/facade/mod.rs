@@ -257,8 +257,14 @@ impl Package {
     pub fn apply(
         &self,
         patch: &crate::Patch,
-    ) -> std::result::Result<Self, litchi_odf_common::Error> {
-        Ok(patch.apply(self)?)
+    ) -> std::result::Result<crate::Commit, litchi_odf_common::Error> {
+        if !patch.is_applicable_to(self) {
+            return Err(litchi_odf_common::Error::patch_conflict(
+                "odb.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(crate::Commit::replayed(patch.apply(self)?, patch.clone()))
     }
 
     /// Atomically saves the package (sibling temporary file, then rename,
@@ -613,9 +619,13 @@ impl Database {
     ) -> Result<()> {
         match self.protection_decision(operation) {
             crate::ProtectionDecision::Supported => Ok(()),
-            crate::ProtectionDecision::Refused(reason) => Err(Error::Unsupported(format!(
-                "ODB protected-package operation is refused: {reason:?}"
-            ))),
+            crate::ProtectionDecision::Refused(_reason) => {
+                Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::Protected,
+                    "odb.facade",
+                    "ODB protected-package operation is refused",
+                )))
+            },
         }
     }
 

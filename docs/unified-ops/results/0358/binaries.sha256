@@ -1,0 +1,6 @@
+# odf_w6_probe release binaries (not committed; record 0358)
+# before: tree feat/unified-ops-api 7893492f9e + crates/litchi-ops/examples/odf_w6_probe.rs (as committed)
+# after: uo2/w6-odf f997a1ed8c + the same probe
+# build: CARGO_TARGET_DIR=perf/tgt-<leg> cargo build --release -p litchi-ops --features odt,ods,odp,odg,odc --example odf_w6_probe
+5084bc2f6105a0b074483a9fce64b94e88ba293c177876eba3e521291d47516f  tgt-before/release/examples/odf_w6_probe
+62188c1bd243261ddae3ff3f1666eee9e3e6be25052ada10344e37f3464b88c9  tgt-after/release/examples/odf_w6_probe

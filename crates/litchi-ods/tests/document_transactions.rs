@@ -94,17 +94,28 @@ fn one_commit_composes_semantic_owners_and_resource_crud() -> Result<()> {
     assert_eq!(wire, commit.patch().to_deterministic_json()?);
     let decoded = litchi_ods::document::Patch::from_deterministic_json(&wire, snapshot.limits())?;
     assert_eq!(
-        snapshot.apply(&decoded)?.as_bytes(),
+        snapshot.apply(&decoded)?.into_package().as_bytes(),
         commit.package().as_bytes()
     );
     assert_eq!(
-        commit.package().apply(&decoded.inverse())?.as_bytes(),
+        commit
+            .package()
+            .apply(&decoded.inverse())?
+            .into_package()
+            .as_bytes(),
         source
     );
     let inverse_wire = decoded.inverse().to_deterministic_json()?;
     let decoded_inverse =
         litchi_ods::document::Patch::from_deterministic_json(&inverse_wire, snapshot.limits())?;
-    assert_eq!(commit.package().apply(&decoded_inverse)?.as_bytes(), source);
+    assert_eq!(
+        commit
+            .package()
+            .apply(&decoded_inverse)?
+            .into_package()
+            .as_bytes(),
+        source
+    );
     let stale = Package::from_bytes(&Builder::new().build()?.to_bytes()?)?;
     assert!(stale.apply(&decoded).is_err());
     Ok(())
@@ -137,8 +148,14 @@ fn worksheet_noop_publishes_a_canonical_reversible_exact_patch() -> Result<()> {
     assert!(decoded.is_noop());
     assert!(decoded.operations().is_empty());
     assert_eq!(decoded.to_deterministic_json()?, wire);
-    assert_eq!(snapshot.apply(&decoded)?.as_bytes(), source);
-    assert_eq!(snapshot.apply(&decoded.inverse())?.as_bytes(), source);
+    assert_eq!(snapshot.apply(&decoded)?.into_package().as_bytes(), source);
+    assert_eq!(
+        snapshot
+            .apply(&decoded.inverse())?
+            .into_package()
+            .as_bytes(),
+        source
+    );
     Ok(())
 }
 
@@ -163,7 +180,12 @@ fn join_is_deterministic_and_three_way_conflicts_are_explicit() -> Result<()> {
         right_left.to_deterministic_json()?
     );
     let merged = snapshot.apply(&left_right)?;
-    assert!(merged.resource("Data/sidecar.bin")?.is_some());
+    assert!(
+        merged
+            .into_package()
+            .resource("Data/sidecar.bin")?
+            .is_some()
+    );
 
     let competing = formula_patch(&snapshot, "of:=2")?;
     let conflict = left.join(&competing).err();
@@ -180,7 +202,7 @@ fn join_is_deterministic_and_three_way_conflicts_are_explicit() -> Result<()> {
     );
     let _plan = plan.resolve(MergeChoice::Right);
     let resolved = snapshot.apply(&plan.finish()?)?;
-    let reopened = Package::from_bytes(resolved.as_bytes())?.workbook()?;
+    let reopened = Package::from_bytes(resolved.into_package().as_bytes())?.workbook()?;
     assert!(matches!(
         reopened.cell("Data", 0, 0),
         Some(litchi_ods::CellView::Stored(cell)) if cell.formula.as_deref() == Some("of:=2")
@@ -349,6 +371,7 @@ fn real_calc_fixture_reopens_after_resource_transfer_and_inverse() -> Result<()>
         commit
             .package()
             .apply(&commit.patch().inverse())?
+            .into_package()
             .as_bytes(),
         source
     );

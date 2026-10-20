@@ -117,6 +117,21 @@ pub enum CryptoRefusal {
     UsePasswordOpening,
 }
 
+impl CryptoRefusal {
+    /// The refusal class litchi-ops reports for this reason (record 0351
+    /// §2.4): the editor does not implement the lifecycle operation.
+    #[must_use]
+    pub const fn kind(self) -> litchi_core::edit::RefusalKind {
+        match self {
+            Self::SignatureVerificationUnavailable
+            | Self::SignatureAuthoringUnavailable
+            | Self::SignatureRemovalUnavailable
+            | Self::EncryptionAuthoringUnavailable
+            | Self::UsePasswordOpening => litchi_core::edit::RefusalKind::UnsupportedOperation,
+        }
+    }
+}
+
 /// Typed availability result for one cryptographic lifecycle operation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -322,10 +337,10 @@ impl Package {
         options: OpenOptions,
     ) -> std::result::Result<Self, PackageError> {
         let password = zeroize::Zeroizing::new(password.into());
-        let package = OwnedPackage::from_reader_with_limits_and_password(
+        let package = OwnedPackage::from_reader_with_password_and_options(
             File::open(path)?,
-            options.source_limits_value(),
             password.as_str(),
+            options,
         )?;
         Self::from_opened(package, options)
     }
@@ -350,7 +365,10 @@ impl Package {
     ) -> std::result::Result<Self, PackageError> {
         let limits = options.source_limits_value();
         check_input_bytes(bytes.len(), limits)?;
-        let package = OwnedPackage::from_bytes_with_limits(copy_input(bytes)?, limits)?;
+        let package = OwnedPackage::from_bytes_with_options(
+            copy_input(bytes)?,
+            OpenOptions::new().source_limits(limits),
+        )?;
         Self::from_opened(package, options)
     }
 
@@ -380,10 +398,10 @@ impl Package {
         let password = zeroize::Zeroizing::new(password.into());
         let limits = options.source_limits_value();
         check_input_bytes(bytes.len(), limits)?;
-        let package = OwnedPackage::from_bytes_with_limits_and_password(
+        let package = OwnedPackage::from_bytes_with_password_and_options(
             copy_input(bytes)?,
-            limits,
             password.as_str(),
+            OpenOptions::new().source_limits(limits),
         )?;
         Self::from_opened(package, options)
     }
@@ -407,7 +425,7 @@ impl Package {
         reader: impl Read,
         options: OpenOptions,
     ) -> std::result::Result<Self, PackageError> {
-        let package = OwnedPackage::from_reader_with_limits(reader, options.source_limits_value())?;
+        let package = OwnedPackage::from_reader_with_options(reader, options)?;
         Self::from_opened(package, options)
     }
 
@@ -555,10 +573,17 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns an error when this package is not byte-identical to the patch
-    /// source or its signature/encryption policy makes it read-only.
-    pub fn apply(&self, patch: &Patch) -> std::result::Result<Self, PackageError> {
-        Ok(patch.apply(self)?)
+    /// Returns [`PackageError::PatchConflict`] when this package is not
+    /// byte-identical to the patch source, or an error when its
+    /// signature/encryption policy makes it read-only.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, PackageError> {
+        if !same_source(&patch.before, self) {
+            return Err(PackageError::patch_conflict(
+                "odp.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(Commit::replayed(patch.apply(self)?, patch.clone()))
     }
 
     /// Atomically replace `path` with this package (full durability).
@@ -1392,9 +1417,11 @@ impl Edit {
             audit::Limits::default(),
         )
         .map(|_report| ())
-        .map_err(|error| {
-            Error::Unsupported(format!(
-                "ODP foreign blank-slide transfer refuses unaudited donor XML: {error}"
+        .map_err(|_error| {
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odp.authoring.edit",
+                "ODP foreign blank-slide transfer refuses unaudited donor XML",
             ))
         })?;
         if source_presentation.settings()?.is_some()
@@ -1409,18 +1436,22 @@ impl Edit {
             invalid_error("ODP foreign blank-slide transfer donor page metadata is missing")
         })?;
         let source_name = source_page.name.as_deref().ok_or_else(|| {
-            Error::Unsupported(
-                "ODP foreign blank-slide transfer donor requires draw:name".to_string(),
-            )
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odp.authoring.edit",
+                "ODP foreign blank-slide transfer donor requires draw:name",
+            ))
         })?;
-        let source_content =
-            crate::codec::content_source::ContentSource::parse(source_presentation.content_xml())?
-                .ok_or_else(|| {
-                    Error::Unsupported(
-                "ODP foreign blank-slide transfer requires retained donor content fragments"
-                    .to_string(),
-            )
-                })?;
+        let source_content = crate::codec::content_source::ContentSource::parse(
+            source_presentation.content_xml(),
+        )?
+        .ok_or_else(|| {
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odp.authoring.edit",
+                "ODP foreign blank-slide transfer requires retained donor content fragments",
+            ))
+        })?;
         let donor_page = source_content.page(source_index).ok_or_else(|| {
             invalid_error("ODP foreign blank-slide transfer donor page is outside content coverage")
         })?;
@@ -3560,21 +3591,19 @@ impl Edit {
                 .is_some_and(|draft| !draft.operations.is_empty())
     }
 
-    fn check_no_slide_order_change(&self, operation: &str) -> Result<()> {
+    fn check_no_slide_order_change(&self, _operation: &str) -> Result<()> {
         if self.slide_order_changed {
-            return unsupported(format!(
-                "ODP {operation} operation cannot be staged after a slide move"
-            ));
+            return unsupported("ODP operation cannot be staged after a slide move");
         }
         if self.dependency_free_slide_copy_changed {
-            return unsupported(format!(
-                "ODP {operation} operation cannot be staged after a dependency-free blank-slide copy"
-            ));
+            return unsupported(
+                "ODP operation cannot be staged after a dependency-free blank-slide copy",
+            );
         }
         if self.dependency_free_slide_removal_changed {
-            return unsupported(format!(
-                "ODP {operation} operation cannot be staged after a dependency-free blank-slide removal"
-            ));
+            return unsupported(
+                "ODP operation cannot be staged after a dependency-free blank-slide removal",
+            );
         }
         Ok(())
     }
@@ -3631,6 +3660,16 @@ pub struct Commit {
 }
 
 impl Commit {
+    pub(crate) fn replayed(snapshot: Package, patch: Patch) -> Self {
+        Self {
+            changed: !patch.is_noop(),
+            snapshot,
+            patch,
+            #[cfg(test)]
+            publication_audit_hit: false,
+        }
+    }
+
     fn unchanged(snapshot: Package) -> Self {
         let patch = Patch {
             before: snapshot.clone(),
@@ -4755,8 +4794,10 @@ fn validate_compact_xml_parts_against(
         let audit_payload = payload.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&payload);
         let _report =
             audit::verify(audit_payload, limits).map_err(|audit_error| match audit_error {
-                audit::Error::NotCompact(_) => Error::Unsupported(format!(
-                    "ODP XML part '{path}' is not compact: {audit_error}"
+                audit::Error::NotCompact(_) => Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odp.authoring.edit",
+                    "ODP XML part is not compact",
                 )),
                 audit::Error::Limit { .. }
                 | audit::Error::Encoding { .. }
@@ -4786,8 +4827,12 @@ fn invalid_error(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
 
-fn unsupported<T>(message: impl Into<String>) -> Result<T> {
-    Err(Error::Unsupported(message.into()))
+fn unsupported<T>(reason: &'static str) -> Result<T> {
+    Err(Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "odp.authoring.edit",
+        reason,
+    )))
 }
 
 #[cfg(test)]

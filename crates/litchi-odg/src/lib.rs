@@ -12,7 +12,7 @@
 mod authoring;
 mod codec;
 mod facade;
-mod flat;
+pub mod flat;
 pub mod metadata;
 mod model;
 mod package;
@@ -21,10 +21,6 @@ pub mod transition;
 
 pub use facade::edit;
 pub use facade::{Builder, Drawing};
-pub use flat::{
-    FlatDrawing, FlatDrawingCommit, FlatDrawingEdit, FlatDrawingPatch, FlatPage, FlatShape,
-    TextChange,
-};
 pub use litchi_odf_common::{
     Error, LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,
     SourceLimitKind, SourceLimits, SourceLimitsBuilder,

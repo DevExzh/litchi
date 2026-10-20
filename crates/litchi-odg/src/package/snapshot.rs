@@ -19,7 +19,7 @@ use crate::transition::Transition;
 use litchi_core::{
     BlobBundle, BlobLimits, CompositionLimits, DiagnosticFingerprint, Error,
     History as CoreHistory, HistoryLimits, JoinedSubEdits, Metadata, Patch as CorePatch,
-    PatchLimits, PatchOperation, Result, Reversible, ReversibleOperation, SubEdit,
+    PatchLimits, PatchOperation, Result, Reversible, ReversibleOperation,
 };
 use litchi_odf_common::{
     Error as OdfError, OpenOptions, compact_xml,
@@ -155,6 +155,20 @@ pub enum SecurityLifecycleOperation {
 pub enum SecurityLifecycleRefusal {
     ExistingPackageReencryptionUnavailable,
     ExistingPackageResigningUnavailable,
+}
+
+impl SecurityLifecycleRefusal {
+    /// The refusal class litchi-ops reports for this reason (record 0351
+    /// §2.4): the route does not implement the operation.
+    #[must_use]
+    pub const fn kind(self) -> litchi_core::edit::RefusalKind {
+        match self {
+            Self::ExistingPackageReencryptionUnavailable
+            | Self::ExistingPackageResigningUnavailable => {
+                litchi_core::edit::RefusalKind::UnsupportedOperation
+            },
+        }
+    }
 }
 
 /// Supported, exact-preservation-only, or finally unsupported lifecycle disposition.
@@ -783,8 +797,18 @@ impl Package {
     ///
     /// Returns an error when this package is not byte-identical to the patch
     /// source.
-    pub fn apply(&self, patch: &Patch) -> std::result::Result<Self, OdfError> {
-        Ok(patch.apply(self)?)
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, OdfError> {
+        if !patch.is_applicable_to(self) {
+            return Err(OdfError::patch_conflict(
+                "odg.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(Commit {
+            snapshot: patch.apply(self)?,
+            changed: !patch.is_noop(),
+            patch: patch.clone(),
+        })
     }
 
     /// Atomically replaces `path` with this package (full durability).
@@ -1265,8 +1289,10 @@ impl Package {
                 continue;
             }
             let definition = find_style_definition(self, &style_name)?.ok_or_else(|| {
-                Error::Unsupported(format!(
-                    "ODG transfer source has unresolved style '{style_name}'"
+                Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odg.package.snapshot",
+                    "ODG transfer source has unresolved style",
                 ))
             })?;
             transfer_budget.charge(definition.xml.len(), "ODG transfer XML")?;
@@ -1286,8 +1312,10 @@ impl Package {
         let mut style_resource_sources = BTreeMap::new();
         for (kind, value) in required_style_resources {
             let definition = find_style_resource(self, kind, &value)?.ok_or_else(|| {
-                Error::Unsupported(format!(
-                    "ODG transfer source has unresolved named style resource '{value}'"
+                Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odg.package.snapshot",
+                    "ODG transfer source has unresolved named style resource",
                 ))
             })?;
             transfer_budget.charge(definition.xml.len(), "ODG transfer XML")?;
@@ -1299,8 +1327,10 @@ impl Package {
                 .iter()
                 .any(|declared| declared.id() == control)
             {
-                return Err(Error::Unsupported(format!(
-                    "ODG transfer source has unresolved form control '{control}'"
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odg.package.snapshot",
+                    "ODG transfer source has unresolved form control",
                 )));
             }
         }
@@ -1356,14 +1386,16 @@ impl Package {
         // allocating one large fragment at a time before discovering the cap.
         let xml = close_transfer_fragment_namespaces(raw_xml, &source_namespaces)?;
         validate_transfer_fragment_namespaces(&xml)?;
-        compact_xml::validate(xml.as_bytes()).map_err(Error::from)?;
+        compact_xml::validate(xml.as_bytes(), compact_xml::Limits::default())
+            .map_err(Error::from)?;
         let styles = style_sources.keys().cloned().collect::<Vec<_>>();
         let mut style_definitions = BTreeMap::new();
         for (style_name, definition) in style_sources {
             let definition_xml =
                 close_transfer_fragment_namespaces(&definition.xml, &source_namespaces)?;
             validate_transfer_fragment_namespaces(&definition_xml)?;
-            compact_xml::validate(definition_xml.as_bytes()).map_err(Error::from)?;
+            compact_xml::validate(definition_xml.as_bytes(), compact_xml::Limits::default())
+                .map_err(Error::from)?;
             style_definitions.insert(
                 style_name.clone(),
                 TransferStyle {
@@ -1379,7 +1411,8 @@ impl Package {
             let resource_xml =
                 close_transfer_fragment_namespaces(&definition.xml, &source_namespaces)?;
             validate_transfer_fragment_namespaces(&resource_xml)?;
-            compact_xml::validate(resource_xml.as_bytes()).map_err(Error::from)?;
+            compact_xml::validate(resource_xml.as_bytes(), compact_xml::Limits::default())
+                .map_err(Error::from)?;
             style_resources.insert(
                 key,
                 TransferStyleResource {
@@ -1422,9 +1455,10 @@ impl Package {
             let size = archive_view
                 .member_materialized_size(resource.path())?
                 .ok_or_else(|| {
-                    Error::Unsupported(format!(
-                        "ODG transfer resource '{}' is missing",
-                        resource.path()
+                    Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odg.package.snapshot",
+                        "ODG transfer resource is missing",
                     ))
                 })?;
             if size > MAX_OUTPUT_BYTES as u64 {
@@ -1439,9 +1473,10 @@ impl Package {
         for resource_index in resource_indices {
             let resource = &self.resources()[resource_index];
             let bytes = self.resource_bytes(resource_index)?.ok_or_else(|| {
-                Error::Unsupported(format!(
-                    "ODG transfer resource '{}' is missing",
-                    resource.path()
+                Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG transfer resource is missing",
                 ))
             })?;
             if bytes.len() > MAX_OUTPUT_BYTES {
@@ -1463,7 +1498,8 @@ impl Package {
                 let control_xml =
                     close_transfer_fragment_namespaces(raw_control_xml, &source_namespaces)?;
                 validate_transfer_fragment_namespaces(&control_xml)?;
-                compact_xml::validate(control_xml.as_bytes()).map_err(Error::from)?;
+                compact_xml::validate(control_xml.as_bytes(), compact_xml::Limits::default())
+                    .map_err(Error::from)?;
                 Ok(TransferControl {
                     control,
                     xml: control_xml,
@@ -1784,7 +1820,11 @@ impl Edit {
             .get(page)
             .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
         let before = selected.name().ok_or_else(|| {
-            Error::Unsupported("ODG page rename requires an existing draw:name".into())
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page rename requires an existing draw:name",
+            ))
         })?;
         if parsed
             .pages
@@ -1798,9 +1838,11 @@ impl Edit {
             return Ok(());
         }
         if xml_has_attribute(&self.content, DRAW, b"page-name", before)? {
-            return Err(Error::Unsupported(
-                "ODG page rename is blocked by a draw:page-name dependency".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page rename is blocked by a draw:page-name dependency",
+            )));
         }
         let span = parsed.page_attribute_spans[page][0]
             .as_ref()
@@ -1836,7 +1878,11 @@ impl Edit {
             .get(page)
             .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
         let before = selected.style_name().ok_or_else(|| {
-            Error::Unsupported("ODG page style edit requires an existing draw:style-name".into())
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page style edit requires an existing draw:style-name",
+            ))
         })?;
         if before == after {
             return Ok(());
@@ -1876,7 +1922,11 @@ impl Edit {
             .get(page)
             .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
         let style_name = selected.style_name().ok_or_else(|| {
-            Error::Unsupported("ODG page transition requires an existing draw:style-name".into())
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page transition requires an existing draw:style-name",
+            ))
         })?;
         let current = parse_page_transitions(&self.content, self.styles.as_deref(), &parsed.pages)?
             .get(page)
@@ -1893,9 +1943,11 @@ impl Edit {
             page,
             style_name,
         )? {
-            return Err(Error::Unsupported(
-                "ODG page transition style is shared by multiple pages".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page transition style is shared by multiple pages",
+            )));
         }
         let in_content = parse_style_definitions(&self.content)?
             .iter()
@@ -1934,9 +1986,11 @@ impl Edit {
                     })
             };
             if parent.is_some() {
-                return Err(Error::Unsupported(
-                    "ODG inherited page transition cannot be cleared without changing its parent style".into(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG inherited page transition cannot be cleared without changing its parent style",
+                )));
             }
         }
         if in_content == 1 {
@@ -1960,7 +2014,8 @@ impl Edit {
             // here, before editing, so a noncompact producer file is refused
             // atomically instead of being changed and failing publication
             // later.
-            compact_xml::validate(styles.as_bytes()).map_err(Error::from)?;
+            compact_xml::validate(styles.as_bytes(), compact_xml::Limits::default())
+                .map_err(Error::from)?;
             let matches = parse_style_definitions(styles)?
                 .iter()
                 .filter(|definition| {
@@ -1969,9 +2024,11 @@ impl Edit {
                 })
                 .count();
             if matches != 1 {
-                return Err(Error::Unsupported(
-                    "ODG page transition style is not uniquely owned".into(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG page transition style is not uniquely owned",
+                )));
             }
             let after_xml = edit_transition_style_xml(styles, style_name, desired.as_ref())?;
             let requires_projection = !transition_edit_is_lexically_reversible(
@@ -1985,9 +2042,11 @@ impl Edit {
                 self.requires_package_projection = true;
             }
         } else {
-            return Err(Error::Unsupported(
-                "ODG page transition style is not declared".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page transition style is not declared",
+            )));
         }
         self.changes
             .push(Change::PageTransition(Box::new(PageTransitionChange {
@@ -2033,9 +2092,11 @@ impl Edit {
             .and_then(|shapes| shapes.get(shape))
             .ok_or_else(|| Error::InvalidFormat("ODG shape source span is missing".to_string()))?;
         if !matches!(spans.as_slice(), [Some(_)]) {
-            return Err(Error::Unsupported(
-                "ODG shape text is not one losslessly replaceable XML span".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG shape text is not one losslessly replaceable XML span",
+            )));
         }
         if selected.text() == after {
             return Ok(());
@@ -2084,10 +2145,11 @@ impl Edit {
                 Error::InvalidFormat("ODG shape selector is out of bounds".to_string())
             })?;
         let before = selected.name().ok_or_else(|| {
-            Error::Unsupported(
-                "ODG shape rename requires an existing losslessly addressable draw:name"
-                    .to_string(),
-            )
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG shape rename requires an existing losslessly addressable draw:name",
+            ))
         })?;
         let span = parsed
             .name_spans
@@ -2150,10 +2212,11 @@ impl Edit {
             return invalid("ODG destination layer is not declared");
         }
         let before = selected.layer().ok_or_else(|| {
-            Error::Unsupported(
-                "ODG layer change requires an existing losslessly addressable draw:layer"
-                    .to_string(),
-            )
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG layer change requires an existing losslessly addressable draw:layer",
+            ))
         })?;
         let span = parsed
             .layer_spans
@@ -2216,10 +2279,11 @@ impl Edit {
             .iter()
             .map(|span| {
                 span.as_ref().ok_or_else(|| {
-                    Error::Unsupported(
-                        "ODG geometry edit requires existing x, y, width, and height attributes"
-                            .into(),
-                    )
+                    Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odg.package.snapshot",
+                        "ODG geometry edit requires existing x, y, width, and height attributes",
+                    ))
                 })
             })
             .collect::<Result<Vec<_>>>()?;
@@ -2262,9 +2326,11 @@ impl Edit {
             .and_then(|value| value.shapes().get(shape))
             .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
         if selected.kind().is_three_dimensional() {
-            return Err(Error::Unsupported(
-                "ODG dr3d transforms are inert and cannot be edited through draw:transform".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG dr3d transforms are inert and cannot be edited through draw:transform",
+            )));
         }
         if selected.transform() == Some(after.as_str()) {
             return Ok(());
@@ -2306,9 +2372,11 @@ impl Edit {
             .and_then(|value| value.shapes().get(shape))
             .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
         if !matches!(selected.kind(), ShapeKind::Polygon | ShapeKind::Polyline) {
-            return Err(Error::Unsupported(
-                "ODG point-list edit requires a polygon or polyline".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG point-list edit requires a polygon or polyline",
+            )));
         }
         if selected.view_box() == Some(target_view_box.as_str())
             && selected.points() == Some(target_points.as_str())
@@ -2364,9 +2432,11 @@ impl Edit {
             selected.kind(),
             ShapeKind::Line | ShapeKind::Connector | ShapeKind::Measure
         ) {
-            return Err(Error::Unsupported(
-                "ODG line-endpoint edit requires a line, connector, or measure".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG line-endpoint edit requires a line, connector, or measure",
+            )));
         }
         let before = selected.line_geometry();
         if before
@@ -2417,7 +2487,11 @@ impl Edit {
             .and_then(|value| value.shapes().get(shape))
             .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
         let before = selected.style_name().ok_or_else(|| {
-            Error::Unsupported("ODG style edit requires an existing draw:style-name".into())
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG style edit requires an existing draw:style-name",
+            ))
         })?;
         let span = parsed
             .style_name_spans
@@ -2460,12 +2534,18 @@ impl Edit {
             .and_then(|value| value.shapes().get(shape))
             .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
         if selected.kind() != ShapeKind::Path {
-            return Err(Error::Unsupported(
-                "ODG path-data edit requires a draw:path shape".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG path-data edit requires a draw:path shape",
+            )));
         }
         let before = selected.path_data().ok_or_else(|| {
-            Error::Unsupported("ODG path-data edit requires an existing svg:d".into())
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG path-data edit requires an existing svg:d",
+            ))
         })?;
         let span = parsed
             .path_spans
@@ -2508,12 +2588,18 @@ impl Edit {
             .and_then(|value| value.shapes().get(shape))
             .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
         if selected.kind() != ShapeKind::Control {
-            return Err(Error::Unsupported(
-                "ODG form-control edit requires a draw:control shape".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG form-control edit requires a draw:control shape",
+            )));
         }
         let before = selected.control_reference().ok_or_else(|| {
-            Error::Unsupported("ODG form-control edit requires an existing draw:control".into())
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG form-control edit requires an existing draw:control",
+            ))
         })?;
         let span = parsed
             .control_spans
@@ -2642,9 +2728,11 @@ impl Edit {
         if let Some(name) = page.name()
             && xml_has_attribute(&content, DRAW, b"page-name", name)?
         {
-            return Err(Error::Unsupported(
-                "ODG page removal is blocked by a draw:page-name dependency".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page removal is blocked by a draw:page-name dependency",
+            )));
         }
         let span = span.clone();
         self.splice_content(&span, "")?;
@@ -2779,9 +2867,11 @@ impl Edit {
                 .any(|outer| outer != span && outer.start <= span.start && span.end <= outer.end)
         };
         if nested(spans, &moved) {
-            return Err(Error::Unsupported(
-                "ODG group members move with their group".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG group members move with their group",
+            )));
         }
         let at = match targets.get(to) {
             Some(anchor) => {
@@ -2789,9 +2879,11 @@ impl Edit {
                     .as_ref()
                     .ok_or_else(|| Error::InvalidFormat("ODG shape span is missing".into()))?;
                 if nested(targets, anchor) {
-                    return Err(Error::Unsupported(
-                        "ODG shape move position lies inside a group".into(),
-                    ));
+                    return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odg.package.snapshot",
+                        "ODG shape move position lies inside a group",
+                    )));
                 }
                 anchor.start
             },
@@ -2858,15 +2950,18 @@ impl Edit {
     )]
     pub fn insert_shape(&mut self, page: usize, position: usize, shape: Shape) -> Result<()> {
         if shape.kind().is_three_dimensional() {
-            return Err(Error::Unsupported(
-                "ODG 3D shapes are inert read-only owners".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG 3D shapes are inert read-only owners",
+            )));
         }
         if shape.source_backed() {
-            return Err(Error::Unsupported(
-                "ODG parsed shapes require prepare_shape_transfer for source-preserving insertion"
-                    .into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odg.package.snapshot",
+                "ODG parsed shapes require prepare_shape_transfer for source-preserving insertion",
+            )));
         }
         let parsed = parse_content(&self.content)?;
         let selected_page = parsed
@@ -2968,9 +3063,11 @@ impl Edit {
             )
         } else {
             if externally_owned {
-                return Err(Error::Unsupported(
-                    "ODG style owned by styles.xml cannot be shadowed".into(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG style owned by styles.xml cannot be shadowed",
+                )));
             }
             (
                 insert_automatic_style(&self.content, &xml)?,
@@ -3003,9 +3100,11 @@ impl Edit {
             || xml_has_attribute(&self.content, DRAW, b"text-style-name", name)?
             || xml_has_attribute(&self.content, STYLE, b"parent-style-name", name)?
         {
-            return Err(Error::Unsupported(
-                "ODG style removal is blocked by a live dependency".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG style removal is blocked by a live dependency",
+            )));
         }
         let content = remove_xml(&self.content, &existing.span)?;
         let removed = existing.style.clone();
@@ -3054,9 +3153,11 @@ impl Edit {
             )
         } else {
             if externally_owned {
-                return Err(Error::Unsupported(
-                    "ODG named resource owned by styles.xml cannot be shadowed".into(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG named resource owned by styles.xml cannot be shadowed",
+                )));
             }
             (
                 insert_automatic_style(&self.content, &xml)?,
@@ -3094,9 +3195,11 @@ impl Edit {
         };
         for reference in style_resource_reference_locals(kind) {
             if xml_has_attribute(&self.content, DRAW, reference, name)? {
-                return Err(Error::Unsupported(
-                    "ODG named style-resource removal is blocked by a live dependency".into(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG named style-resource removal is blocked by a live dependency",
+                )));
             }
         }
         let content = remove_xml(&self.content, &existing.span)?;
@@ -3213,9 +3316,11 @@ impl Edit {
                 .iter()
                 .any(|shape| shape.control_reference() == Some(identifier))
         }) {
-            return Err(Error::Unsupported(
-                "ODG form-control removal is blocked by a drawing shape".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG form-control removal is blocked by a drawing shape",
+            )));
         }
         let mut matches = parsed
             .form_controls
@@ -3706,9 +3811,11 @@ impl Edit {
             .iter()
             .any(|shape| shape.layer() == Some(name))
         {
-            return Err(Error::Unsupported(
-                "ODG layer removal is blocked by a shape assignment".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG layer removal is blocked by a shape assignment",
+            )));
         }
         let mut matches = selected
             .layers()
@@ -3816,9 +3923,11 @@ impl Edit {
             .iter()
             .any(|resource| resource.path() == path)
         {
-            return Err(Error::Unsupported(
-                "ODG resource removal is blocked by a drawing reference".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG resource removal is blocked by a drawing reference",
+            )));
         }
         let archive = self.source.0.package.package();
         if !archive.has_file(path)? {
@@ -4025,9 +4134,11 @@ impl Edit {
         if self.active_content_policy == ActiveContentWritePolicy::Refuse
             && target_active_content.is_present()
         {
-            return Err(Error::Unsupported(
-                "ODG active-content write policy refuses the staged inventory".into(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG active-content write policy refuses the staged inventory",
+            )));
         }
         let replacements = self
             .resource_edits
@@ -4064,7 +4175,8 @@ impl Edit {
         } else {
             requires_package_projection = self.requires_package_projection;
             ensure_compact_rewrite_source(&self.source)?;
-            compact_xml::validate(self.content.as_bytes()).map_err(Error::from)?;
+            compact_xml::validate(self.content.as_bytes(), compact_xml::Limits::default())
+                .map_err(Error::from)?;
             rebuild(
                 &self.source,
                 &self.content,
@@ -4880,7 +4992,7 @@ impl Patch {
         &self,
         identifier: impl Into<String>,
         limits: CompositionLimits,
-    ) -> Result<PreparedEdit> {
+    ) -> Result<SubEdit> {
         let durable = self.durable()?;
         let writes = if durable
             .operations()
@@ -4922,7 +5034,7 @@ impl Lineage {
 }
 
 /// One independently prepared ODG semantic patch.
-pub type PreparedEdit = SubEdit<Lineage, DurablePatch>;
+pub type SubEdit = litchi_core::SubEdit<Lineage, DurablePatch>;
 
 /// Deterministically ordered, provably disjoint ODG sub-edits.
 pub type JoinedEdits = JoinedSubEdits<Lineage, DurablePatch>;
@@ -5818,9 +5930,11 @@ fn group_selection(parsed: &Parsed, page: usize, shape: usize) -> Result<Group> 
         .and_then(|value| value.shapes().get(shape))
         .ok_or_else(|| Error::InvalidFormat("ODG group selector is out of bounds".into()))?;
     if selected.kind() != ShapeKind::Group {
-        return Err(Error::Unsupported(
-            "ODG group operation requires a draw:g root".into(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odg.package.snapshot",
+            "ODG group operation requires a draw:g root",
+        )));
     }
     let root = parsed.shape_spans[page][shape]
         .as_ref()
@@ -9139,9 +9253,11 @@ fn edit_transition_style_xml(
     validate_xml_source_size(source, "ODG transition XML")?;
     let owner = find_transition_style_owner(source, style_name)?;
     let Some(owner) = owner else {
-        return Err(Error::Unsupported(
-            "ODG drawing-page style has no transition owner".into(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odg.package.snapshot",
+            "ODG drawing-page style has no transition owner",
+        )));
     };
     let fields = transition_fields(transition);
     if owner.property_open_span.is_none() {
@@ -9175,9 +9291,11 @@ fn edit_transition_style_xml(
             let sound_xml = serialize_transition_sound(sound)?;
             if let Some(span) = current_owner.sound_span {
                 if current_owner.sound.as_ref() != Some(sound) {
-                    return Err(Error::Unsupported(
-                        "ODG transition sound edit would discard producer markup".into(),
-                    ));
+                    return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "odg.package.snapshot",
+                        "ODG transition sound edit would discard producer markup",
+                    )));
                 }
                 let _ = span;
             } else if let Some(open) = current_owner.property_open_span {
@@ -9220,9 +9338,11 @@ fn edit_transition_style_xml(
         None => {
             if let Some(span) = current_owner.sound_span {
                 let _ = span;
-                return Err(Error::Unsupported(
-                    "ODG transition sound removal would discard producer markup".into(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odg.package.snapshot",
+                    "ODG transition sound removal would discard producer markup",
+                )));
             }
         },
     }
@@ -10160,9 +10280,11 @@ fn enforce_security_policy(source: &Package, policy: SecurityWritePolicy) -> Res
 
 fn enforce_active_content_policy(source: &Package, policy: ActiveContentWritePolicy) -> Result<()> {
     if policy == ActiveContentWritePolicy::Refuse && source.active_content().is_present() {
-        return Err(Error::Unsupported(
-            "ODG active-content write policy refuses the source inventory".into(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odg.package.snapshot",
+            "ODG active-content write policy refuses the source inventory",
+        )));
     }
     Ok(())
 }
@@ -10174,7 +10296,8 @@ fn ensure_compact_rewrite_source(source: &Package) -> Result<()> {
             .extension()
             .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"));
         if is_xml && path != "META-INF/manifest.xml" {
-            compact_xml::validate(&archive.get_file(&path)?).map_err(Error::from)?;
+            compact_xml::validate(&archive.get_file(&path)?, compact_xml::Limits::default())
+                .map_err(Error::from)?;
         }
     }
     Ok(())
@@ -11613,25 +11736,33 @@ fn validate_transfer_fragment_namespaces(xml: &str) -> Result<()> {
         let declared = declarations.get(&prefix).map(String::as_str);
         match (expected, declared) {
             (Some(expected), Some(declared)) if declared != expected => {
-                return Err(Error::Unsupported(format!(
-                    "ODG transfer fragment binds canonical prefix '{prefix}' to another namespace"
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG transfer fragment binds canonical prefix to another namespace",
                 )));
             },
             (Some(_), _) => {},
             (None, Some(uri)) if transfer_namespace_uri_bytes(uri).is_some() => {
-                return Err(Error::Unsupported(format!(
-                    "ODG transfer fragment aliases known namespace '{uri}' with prefix '{prefix}'"
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG transfer fragment aliases known namespace with prefix",
                 )));
             },
             (None, Some(_)) => {},
             (None, None) if sensitive_aliases.contains(&prefix) => {
-                return Err(Error::Unsupported(format!(
-                    "ODG transfer fragment cannot prove dependency namespace for prefix '{prefix}'"
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG transfer fragment cannot prove dependency namespace for prefix",
                 )));
             },
             (None, None) => {
-                return Err(Error::Unsupported(format!(
-                    "ODG transfer fragment cannot prove namespace for prefix '{prefix}'"
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.package.snapshot",
+                    "ODG transfer fragment cannot prove namespace for prefix",
                 )));
             },
         }
@@ -11657,8 +11788,10 @@ fn close_transfer_fragment_namespaces(
             continue;
         }
         let uri = available.get(&prefix).ok_or_else(|| {
-            Error::Unsupported(format!(
-                "ODG transfer fragment cannot prove namespace closure for prefix '{prefix}'"
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG transfer fragment cannot prove namespace closure for prefix",
             ))
         })?;
         missing.insert(prefix, uri.clone());
@@ -11679,8 +11812,10 @@ fn transfer_namespace_closure_bytes(
             return Ok(total);
         }
         let uri = available.get(&prefix).ok_or_else(|| {
-            Error::Unsupported(format!(
-                "ODG transfer fragment cannot prove namespace closure for prefix '{prefix}'"
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG transfer fragment cannot prove namespace closure for prefix",
             ))
         })?;
         // `ensure_transfer_namespace_values` writes exactly:
@@ -13232,14 +13367,18 @@ fn check_shape_identity(xml: &str, span: &Range<usize>) -> Result<()> {
         .iter()
         .any(|id| outside_values.iter().any(|value| value == id))
     {
-        return Err(Error::Unsupported(
-            "ODG shape move to another page is blocked by a reference to its identity".into(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odg.package.snapshot",
+            "ODG shape move to another page is blocked by a reference to its identity",
+        )));
     }
     if inside_refs.iter().any(|value| !inside_ids.contains(value)) {
-        return Err(Error::Unsupported(
-            "ODG connector move to another page is blocked by its glued shapes".into(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odg.package.snapshot",
+            "ODG connector move to another page is blocked by its glued shapes",
+        )));
     }
     Ok(())
 }

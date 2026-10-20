@@ -159,11 +159,11 @@ fn run_formatting_derives_automatic_styles() {
         let paragraph = body.root().children().nth(1).unwrap();
         let run = paragraph.children().next().unwrap();
         assert_eq!(run.kind(), Kind::Text);
-        let mut bold = TextPropertyEdit::new();
+        let mut bold = TextPropertyUpdate::new();
         bold.bold = Some(true);
         bold.size = Some("14pt".to_owned());
         edit.set_text_properties(run.id(), &bold).unwrap();
-        let mut align = ParagraphPropertyEdit::new();
+        let mut align = ParagraphPropertyUpdate::new();
         align.align = Some("center".to_owned());
         edit.set_paragraph_properties(paragraph.id(), &align)
             .unwrap();
@@ -242,7 +242,7 @@ fn overlapping_edits_are_refused_at_staging() {
     let run = paragraph.children().next().unwrap();
     let mut edit = package.edit();
     edit.set_text(paragraph.id(), "x").unwrap();
-    let mut bold = TextPropertyEdit::new();
+    let mut bold = TextPropertyUpdate::new();
     bold.bold = Some(true);
     assert!(edit.set_text_properties(run.id(), &bold).is_err());
     assert!(edit.remove(paragraph.id()).is_err());
@@ -264,7 +264,7 @@ fn metadata_edits() {
     let metadata = after.document().unwrap().metadata().unwrap();
     assert_eq!(metadata.title.as_deref(), Some("A & B"));
     let restored = after.apply_metadata(&patch.inverse()).unwrap();
-    assert_eq!(restored.as_bytes(), package.as_bytes());
+    assert_eq!(restored.into_package().as_bytes(), package.as_bytes());
 }
 
 #[test]
@@ -275,7 +275,7 @@ fn edits_on_a_real_document() {
             .nodes()
             .filter(|node| node.kind() == Kind::Paragraph)
             .collect();
-        let mut italic = TextPropertyEdit::new();
+        let mut italic = TextPropertyUpdate::new();
         italic.italic = Some(true);
         edit.set_text_properties(paragraphs[0].id(), &italic)
             .unwrap();
@@ -489,7 +489,7 @@ fn paragraph_formatting_rewrites_the_one_paragraph_properties() {
     // `style:paragraph-properties`.
     let package = built();
     let align = |value: &str| {
-        let mut edit = ParagraphPropertyEdit::new();
+        let mut edit = ParagraphPropertyUpdate::new();
         edit.align = Some(value.to_owned());
         edit
     };
@@ -514,12 +514,12 @@ fn paragraph_formatting_rewrites_the_one_paragraph_properties() {
 #[test]
 fn tab_stops_replace_the_declared_ones() {
     let package = built();
-    let mut first = ParagraphPropertyEdit::new();
-    let mut right = TabStopEdit::new("10cm");
+    let mut first = ParagraphPropertyUpdate::new();
+    let mut right = TabStopSpec::new("10cm");
     right.kind = Some("right".to_owned());
     right.leader_style = Some("dotted".to_owned());
     right.leader_text = Some(".".to_owned());
-    first.tab_stops = Some(vec![TabStopEdit::new("2.5cm"), right]);
+    first.tab_stops = Some(vec![TabStopSpec::new("2.5cm"), right]);
     first.align = Some("center".to_owned());
     let once = commit(&package, |edit, body| {
         let paragraph = body.root().children().nth(1).unwrap();
@@ -543,8 +543,8 @@ fn tab_stops_replace_the_declared_ones() {
         ]
     );
     // A second edit of the derived style replaces the list in place.
-    let mut second = ParagraphPropertyEdit::new();
-    second.tab_stops = Some(vec![TabStopEdit::new("3cm")]);
+    let mut second = ParagraphPropertyUpdate::new();
+    second.tab_stops = Some(vec![TabStopSpec::new("3cm")]);
     let twice = commit(&once, |edit, body| {
         let paragraph = body.root().children().nth(1).unwrap();
         edit.set_paragraph_properties(paragraph.id(), &second)
@@ -561,7 +561,7 @@ fn tab_stops_replace_the_declared_ones() {
     let xml = paragraph.automatic_style().unwrap().xml();
     assert_eq!(xml.matches("<style:tab-stops").count(), 1);
     // An empty list declares none.
-    let mut clear = ParagraphPropertyEdit::new();
+    let mut clear = ParagraphPropertyUpdate::new();
     clear.tab_stops = Some(Vec::new());
     let cleared = commit(&twice, |edit, body| {
         let paragraph = body.root().children().nth(1).unwrap();
@@ -570,8 +570,8 @@ fn tab_stops_replace_the_declared_ones() {
     });
     assert!(stops_of(&cleared).is_empty());
     // Invalid stops are refused at staging.
-    let mut bad = ParagraphPropertyEdit::new();
-    bad.tab_stops = Some(vec![TabStopEdit::new("ten")]);
+    let mut bad = ParagraphPropertyUpdate::new();
+    bad.tab_stops = Some(vec![TabStopSpec::new("ten")]);
     let mut edit = cleared.edit();
     let document = cleared.document().unwrap();
     let body = document.body().unwrap();
@@ -602,7 +602,10 @@ fn region_text_replaces_header_and_footer_paragraphs() {
         let mut edit = package.edit();
         // The first header holds a page-number field: refused, not dropped.
         let refused = edit.set_region_text(&regions[0], "x");
-        assert!(matches!(refused, Err(litchi_core::Error::Unsupported(_))));
+        assert!(matches!(
+            refused,
+            Err(litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_))
+        ));
         let mut edit = package.edit();
         edit.set_region_text(&regions[1], "New even\ttop").unwrap();
         edit.set_region_text(&regions[2], "New  bottom").unwrap();

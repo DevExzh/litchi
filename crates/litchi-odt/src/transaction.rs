@@ -31,6 +31,8 @@ use std::{
     sync::Arc,
 };
 
+mod document_verbs;
+
 pub use crate::package::paragraph_transfer::ParagraphTransferPlan;
 /// Shared zero-based semantic collection position.
 pub use litchi_core::Position;
@@ -154,10 +156,10 @@ impl Package {
     ) -> std::result::Result<Self, PackageError> {
         let password = zeroize::Zeroizing::new(password.into());
         let file = std::fs::File::open(path)?;
-        let package = crate::core::OwnedPackage::from_reader_with_limits_and_password(
+        let package = crate::core::OwnedPackage::from_reader_with_password_and_options(
             file,
-            options.source_limits_value(),
             password.as_str(),
+            options,
         )?;
         Self::from_owned_package_with_options(package, options)
     }
@@ -211,10 +213,10 @@ impl Package {
         let password = zeroize::Zeroizing::new(password.into());
         let limits = options.source_limits_value();
         check_input_bytes(bytes.len(), limits)?;
-        let package = crate::core::OwnedPackage::from_bytes_with_limits_and_password(
+        let package = crate::core::OwnedPackage::from_bytes_with_password_and_options(
             copy_input(bytes)?,
-            limits,
             password.as_str(),
+            OpenOptions::new().source_limits(limits),
         )?;
         Self::from_owned_package_with_options(package, options)
     }
@@ -238,10 +240,7 @@ impl Package {
         reader: impl std::io::Read,
         options: OpenOptions,
     ) -> std::result::Result<Self, PackageError> {
-        let package = crate::core::OwnedPackage::from_reader_with_limits(
-            reader,
-            options.source_limits_value(),
-        )?;
+        let package = crate::core::OwnedPackage::from_reader_with_options(reader, options)?;
         Self::from_owned_package_with_options(package, options)
     }
 
@@ -290,10 +289,7 @@ impl Package {
         bytes: Vec<u8>,
         options: OpenOptions,
     ) -> std::result::Result<Self, PackageError> {
-        let package = crate::core::OwnedPackage::from_bytes_with_limits(
-            bytes,
-            options.source_limits_value(),
-        )?;
+        let package = crate::core::OwnedPackage::from_bytes_with_options(bytes, options)?;
         Self::from_owned_package_with_options(package, options)
     }
 
@@ -366,10 +362,16 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns an error when this package is not byte-identical to the patch
-    /// source.
-    pub fn apply(&self, patch: &Patch) -> std::result::Result<Self, PackageError> {
-        Ok(patch.apply(self)?)
+    /// Returns [`PackageError::PatchConflict`] when this package is not
+    /// byte-identical to the patch source.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, PackageError> {
+        if !patch.is_applicable_to(self) {
+            return Err(PackageError::patch_conflict(
+                "odt.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(Commit::replayed(patch.apply(self)?, patch.clone()))
     }
 
     /// Atomically replace `path` with this package (full durability).
@@ -459,14 +461,15 @@ impl Package {
     pub fn apply_metadata(
         &self,
         patch: &crate::metadata::Patch,
-    ) -> std::result::Result<Self, PackageError> {
-        self.apply(patch.primary())
+    ) -> std::result::Result<crate::metadata::Commit, PackageError> {
+        let (package, primary) = self.apply(patch.primary())?.into_parts();
+        Ok(crate::metadata::Commit::replayed(package, primary))
     }
 
     /// Starts a bounded deterministic collection of independently prepared edits.
     #[must_use]
-    pub fn joined_edit(&self) -> JoinedEdit {
-        JoinedEdit::new(self.clone(), DEFAULT_COMPOSITION_LIMITS)
+    pub fn joined_edits(&self) -> JoinedEdits {
+        JoinedEdits::new(self.clone(), DEFAULT_COMPOSITION_LIMITS)
     }
 
     /// Starts commit-coupled bounded undo/redo history at this snapshot.
@@ -1635,7 +1638,7 @@ impl Edit {
     pub fn set_text_properties(
         &mut self,
         node: crate::body::NodeId,
-        properties: &crate::body::TextPropertyEdit,
+        properties: &crate::body::TextPropertyUpdate,
     ) -> Result<&mut Self> {
         self.stage_body(|edits, body| edits.set_text_properties(body, node, properties))
     }
@@ -1649,7 +1652,7 @@ impl Edit {
     pub fn set_paragraph_properties(
         &mut self,
         node: crate::body::NodeId,
-        properties: &crate::body::ParagraphPropertyEdit,
+        properties: &crate::body::ParagraphPropertyUpdate,
     ) -> Result<&mut Self> {
         self.stage_body(|edits, body| edits.set_paragraph_properties(body, node, properties))
     }
@@ -1736,6 +1739,27 @@ impl Edit {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.operations.is_empty()
+    }
+
+    /// Stage one structural document verb.
+    fn document_operation(
+        &mut self,
+        apply: impl Fn(&mut MutableDocument) -> Result<OperationResult> + Send + Sync + 'static,
+    ) -> Result<&mut Self> {
+        self.document_operation_at("/package".to_owned(), apply)
+    }
+
+    /// Stage one structural document verb writing only `scope`, so joined
+    /// and three-way merged edits of disjoint layout owners compose.
+    fn document_operation_at(
+        &mut self,
+        scope: String,
+        apply: impl Fn(&mut MutableDocument) -> Result<OperationResult> + Send + Sync + 'static,
+    ) -> Result<&mut Self> {
+        self.push(Operation::Document {
+            apply: Arc::new(apply),
+            scope: Arc::from(scope),
+        })
     }
 
     fn push(&mut self, operation: Operation) -> Result<&mut Self> {
@@ -1829,8 +1853,21 @@ impl Edit {
                 audit_changed_xml_is_compact(&before_operation, document.transaction_package())?;
                 continue;
             }
+            if matches!(operation, Operation::Document { .. }) {
+                let mut mutable = MutableDocument::from_document(document)?;
+                while let Some(Operation::Document { apply, .. }) =
+                    self.operations.get(operation_index)
+                {
+                    results.push(apply(&mut mutable)?);
+                    operation_index += 1;
+                }
+                document = Document::from_bytes(mutable.to_bytes()?)?;
+                audit_changed_xml_is_compact(&before_operation, document.transaction_package())?;
+                continue;
+            }
             let result = match operation {
                 Operation::Noop => OperationResult::Unit,
+                Operation::Document { .. } => unreachable!("document operations run above"),
                 Operation::Body { count } => {
                     // One result per staged body edit; the edits were applied
                     // together before this loop.
@@ -1844,10 +1881,11 @@ impl Edit {
                     OperationResult::Unit
                 },
                 Operation::RestoreSnapshot => {
-                    return Err(CoreError::Unsupported(
-                        "snapshot restoration is available only through patch application"
-                            .to_string(),
-                    ));
+                    return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odt.transaction",
+                        "snapshot restoration is available only through patch application",
+                    )));
                 },
                 Operation::InsertParagraph { index, text } => {
                     let mut mutable = MutableDocument::from_document(document)?;
@@ -2360,9 +2398,11 @@ impl Edit {
                     let current = Package::from_document(&document)?;
                     let plan = crate::package::resource_gc::plan(current, candidates)?;
                     if !plan.is_applicable() {
-                        return Err(CoreError::Unsupported(
-                            "ODT embedded-resource GC replay contains a typed refusal".to_string(),
-                        ));
+                        return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                            litchi_core::edit::RefusalKind::UnsupportedOperation,
+                            "odt.transaction",
+                            "ODT embedded-resource GC replay contains a typed refusal",
+                        )));
                     }
                     let bytes = plan.apply_to_package(document.transaction_package())?;
                     document.replace_transaction_bytes(bytes)?;
@@ -2601,13 +2641,13 @@ impl JoinConflict {
 }
 
 /// Bounded collection of disjoint edits against one exact immutable snapshot.
-pub struct JoinedEdit {
+pub struct JoinedEdits {
     source: Package,
     limits: CompositionLimits,
     inner: JoinedSubEdits<Lineage, Vec<Operation>>,
 }
 
-impl JoinedEdit {
+impl JoinedEdits {
     /// Creates an empty composition under caller-selected finite bounds.
     #[must_use]
     pub fn new(source: Package, limits: CompositionLimits) -> Self {
@@ -2696,7 +2736,7 @@ pub struct MergePlan {
 
 impl MergePlan {
     /// Plans a merge without mutating or reopening the base snapshot.
-    pub fn new(left: JoinedEdit, right: JoinedEdit) -> Result<Self> {
+    pub fn new(left: JoinedEdits, right: JoinedEdits) -> Result<Self> {
         if left.source.as_bytes() != right.source.as_bytes() {
             return Err(CoreError::InvalidFormat(
                 "ODT merge branches do not share an exact base snapshot".to_string(),
@@ -2736,9 +2776,9 @@ impl MergePlan {
     }
 
     /// Finishes only after every conflict has an explicit resolution.
-    pub fn finish(self) -> std::result::Result<JoinedEdit, Box<Self>> {
+    pub fn finish(self) -> std::result::Result<JoinedEdits, Box<Self>> {
         match self.inner.finish() {
-            Ok(inner) => Ok(JoinedEdit {
+            Ok(inner) => Ok(JoinedEdits {
                 source: self.source,
                 limits: self.limits,
                 inner,
@@ -2833,10 +2873,22 @@ impl History {
     }
 }
 
+/// One staged structural document verb: the closure applies the verb to the
+/// working document of the commit (record 0358).
+type DocumentStep = Arc<dyn Fn(&mut MutableDocument) -> Result<OperationResult> + Send + Sync>;
+
 #[derive(Clone)]
 enum Operation {
     Noop,
     RestoreSnapshot,
+    /// A structural document verb; consecutive document operations share one
+    /// working document.
+    Document {
+        apply: DocumentStep,
+        /// The effect path the step writes (`/package` when it may rewrite
+        /// any part; one layout owner for the layout verbs).
+        scope: Arc<str>,
+    },
     /// `count` staged structural body edits; the edits themselves live in
     /// [`Edit::body`] and are applied together, before every other
     /// operation.
@@ -3124,6 +3176,14 @@ impl Diagnostics {
 }
 
 impl Commit {
+    pub(crate) fn replayed(package: Package, patch: Patch) -> Self {
+        Self {
+            package,
+            patch,
+            results: Vec::new(),
+        }
+    }
+
     fn new(
         before: Package,
         package: Package,
@@ -3214,6 +3274,8 @@ pub enum OperationResult {
     Indices(Vec<usize>),
     /// Package path allocated by a resource insertion operation.
     Path(String),
+    /// Name allocated by a document operation (a frame or drawing name).
+    Name(String),
 }
 
 /// Exact-byte, source-checked package patch.
@@ -3230,6 +3292,13 @@ impl Patch {
     pub fn is_noop(&self) -> bool {
         Arc::ptr_eq(&self.before.bytes, &self.after.bytes)
             || self.before.as_bytes() == self.after.as_bytes()
+    }
+
+    /// Whether this patch was made from exactly `source`'s bytes.
+    #[must_use]
+    pub fn is_applicable_to(&self, source: &Package) -> bool {
+        Arc::ptr_eq(&self.before.bytes, &source.bytes)
+            || source.as_bytes() == self.before.as_bytes()
     }
 
     /// Applies this patch only to the exact snapshot from which it was made.
@@ -3701,10 +3770,11 @@ impl TransferPlan {
                     );
                 },
                 _ => {
-                    return Err(CoreError::Unsupported(
-                        "ODT cross-document transfer refuses this source-local operation"
-                            .to_string(),
-                    ));
+                    return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odt.transaction",
+                        "ODT cross-document transfer refuses this source-local operation",
+                    )));
                 },
             }
         }
@@ -3967,9 +4037,14 @@ impl DurablePatch {
         if operations.is_empty() {
             operations.push(Operation::Noop);
         }
+        // Structural document verbs have no semantic wire vocabulary; a patch
+        // holding one is carried as the exact target artifact (record 0358a).
         let restoring = operations
             .iter()
-            .all(|operation| matches!(operation, Operation::RestoreSnapshot));
+            .all(|operation| matches!(operation, Operation::RestoreSnapshot))
+            || operations
+                .iter()
+                .any(|operation| matches!(operation, Operation::Document { .. }));
         if restoring {
             let target_blob = forward_blobs
                 .insert(patch.after.as_bytes())
@@ -4545,11 +4620,15 @@ fn semantic_patch_operation(
             format!("/package/scripts/{path}"),
             Value::Null,
         ),
-        Operation::RestoreSnapshot | Operation::Annotation(_) | Operation::Body { .. } => {
-            return Err(CoreError::Unsupported(
-                "this ODT operation has not migrated to the semantic durable vocabulary"
-                    .to_string(),
-            ));
+        Operation::RestoreSnapshot
+        | Operation::Annotation(_)
+        | Operation::Body { .. }
+        | Operation::Document { .. } => {
+            return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odt.transaction",
+                "this ODT operation has not migrated to the semantic durable vocabulary",
+            )));
         },
     };
     PatchOperation::new(
@@ -5439,9 +5518,11 @@ fn rdf_triple_value(triple: &crate::rdf::Triple) -> Result<Value> {
         crate::rdf::Subject::Iri(value) => ("iri", value),
         crate::rdf::Subject::BlankNode(value) => ("blank", value),
         _ => {
-            return Err(CoreError::Unsupported(
-                "unsupported RDF subject variant".to_string(),
-            ));
+            return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odt.transaction",
+                "unsupported RDF subject variant",
+            )));
         },
     };
     let object = match &triple.object {
@@ -5460,9 +5541,11 @@ fn rdf_triple_value(triple: &crate::rdf::Triple) -> Result<Value> {
             "value": value,
         }),
         _ => {
-            return Err(CoreError::Unsupported(
-                "unsupported RDF object variant".to_string(),
-            ));
+            return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odt.transaction",
+                "unsupported RDF object variant",
+            )));
         },
     };
     Ok(serde_json::json!({
@@ -5826,9 +5909,11 @@ fn embedded_resource_value(
                 litchi_odf_common::embedded::Root::OpenDocument => "open-document",
                 litchi_odf_common::embedded::Root::MathMl => "mathml",
                 _ => {
-                    return Err(CoreError::Unsupported(
-                        "unsupported embedded XML root".to_string(),
-                    ));
+                    return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odt.transaction",
+                        "unsupported embedded XML root",
+                    )));
                 },
             };
             serde_json::json!({"blob": blob.as_hex(), "root": root, "type": "inline-xml"})
@@ -6270,6 +6355,8 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
         }
         match operation {
             Operation::Noop => {},
+            // A structural document verb may rewrite any part.
+            Operation::Document { scope, .. } => writes.push(scope.to_string()),
             Operation::Body { .. } => writes.push("/body".to_string()),
             Operation::Annotation(_) => writes.push("/body/annotations".to_string()),
             Operation::InsertParagraph { index, .. } | Operation::RemoveParagraph { index } => {
@@ -6610,7 +6697,7 @@ fn audit_changed_xml_is_compact(
             let limits = litchi_odf_common::compact_xml::Limits::new(MAX_PACKAGE_BYTES, 4_096)
                 .map_err(CoreError::from)?;
             let validation_xml = numeric_reference_projection(&xml)?;
-            litchi_odf_common::compact_xml::validate_with_limits(&validation_xml, limits).map_err(
+            litchi_odf_common::compact_xml::validate(&validation_xml, limits).map_err(
                 |source| {
                     CoreError::InvalidFormat(format!(
                         "XML publication rejected for '{path}': {source}"
@@ -6693,13 +6780,16 @@ fn invalid_numeric_reference() -> CoreError {
 
 fn ensure_editable_envelope(snapshot: &Package) -> Result<()> {
     match envelope_kind(snapshot)? {
-        EnvelopeKind::Encrypted => Err(CoreError::Unsupported(
-            "packaged ODT transactions preserve encrypted snapshots only as exact no-ops"
-                .to_string(),
-        )),
-        EnvelopeKind::Signed => Err(CoreError::Unsupported(
-            "packaged ODT transactions preserve signed snapshots only as exact no-ops".to_string(),
-        )),
+        EnvelopeKind::Encrypted => Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "odt.transaction",
+            "packaged ODT transactions preserve encrypted snapshots only as exact no-ops",
+        ))),
+        EnvelopeKind::Signed => Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::Protected,
+            "odt.transaction",
+            "packaged ODT transactions preserve signed snapshots only as exact no-ops",
+        ))),
         EnvelopeKind::Plain => Ok(()),
     }
 }

@@ -159,7 +159,7 @@ fn parses_real_odfdo_and_libreoffice_fixtures() {
     let lo = include_bytes!(
         "../../../test-data/libreoffice-core/sc/qa/unit/data/functions/mathematical/fods/aggregate.fods"
     );
-    let flat = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(lo)).unwrap();
+    let flat = litchi_odt::generic::flat::Document::from_reader(Cursor::new(lo)).unwrap();
     let cells = flat.cell_style_properties().unwrap();
     assert!(!cells.styles.is_empty());
     assert!(

@@ -101,6 +101,27 @@ pub enum EmbeddedResourceGcRefusal {
     },
 }
 
+impl EmbeddedResourceGcRefusal {
+    /// The refusal class litchi-ops reports for this reason (record 0351
+    /// §2.4).
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsafePath
+            | Self::MissingArchiveEntry
+            | Self::MissingManifestEntry
+            | Self::InvalidSubdocument
+            | Self::OverlappingCandidate
+            | Self::PackageNamespaceCollision
+            | Self::UnknownReference { .. } => RefusalKind::UnsupportedContent,
+            Self::SignedPackage | Self::EncryptedPackage | Self::ProtectedDocument => {
+                RefusalKind::Protected
+            },
+        }
+    }
+}
+
 /// The deterministic decision for one candidate.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -176,9 +197,11 @@ impl EmbeddedResourceGcPlan {
             return invalid("ODT embedded-resource GC plan source does not match");
         }
         if !self.is_applicable() {
-            return Err(Error::Unsupported(
-                "ODT embedded-resource GC plan contains a typed refusal".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odt.package.resource_gc",
+                "ODT embedded-resource GC plan contains a typed refusal",
+            )));
         }
         let package = source.document()?.transaction_package().clone();
         let bytes = self.apply_to_package(&package)?;

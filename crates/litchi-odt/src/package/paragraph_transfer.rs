@@ -355,24 +355,30 @@ pub(crate) fn validate_operation_for_durable(
     )
 }
 
-fn validate_envelope(snapshot: &Package, role: &str) -> Result<()> {
+fn validate_envelope(snapshot: &Package, _role: &str) -> Result<()> {
     match snapshot.envelope_kind()? {
         EnvelopeKind::Plain => {},
         EnvelopeKind::Signed => {
-            return Err(Error::Unsupported(format!(
-                "ODT paragraph transfer refuses signed {role} packages"
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::Protected,
+                "odt.package.paragraph_transfer",
+                "ODT paragraph transfer refuses signed packages",
             )));
         },
         EnvelopeKind::Encrypted => {
-            return Err(Error::Unsupported(format!(
-                "ODT paragraph transfer refuses encrypted {role} packages"
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odt.package.paragraph_transfer",
+                "ODT paragraph transfer refuses encrypted packages",
             )));
         },
     }
     let document = snapshot.document()?;
     if document.protection()? != Policy::default() {
-        return Err(Error::Unsupported(format!(
-            "ODT paragraph transfer refuses protected {role} documents"
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::Protected,
+            "odt.package.paragraph_transfer",
+            "ODT paragraph transfer refuses protected documents",
         )));
     }
     if document
@@ -380,14 +386,18 @@ fn validate_envelope(snapshot: &Package, role: &str) -> Result<()> {
         .is_some_and(|scripts| !scripts.scripts.is_empty() || !scripts.event_listeners.is_empty())
         || !document.script_resources()?.is_empty()
     {
-        return Err(Error::Unsupported(format!(
-            "ODT paragraph transfer refuses scripted {role} documents"
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odt.package.paragraph_transfer",
+            "ODT paragraph transfer refuses scripted documents",
         )));
     }
     let declarations = document.variable_declarations()?;
     if !declarations.dde_connections.is_empty() || !declarations.dde_connection_uses.is_empty() {
-        return Err(Error::Unsupported(format!(
-            "ODT paragraph transfer refuses DDE-bearing {role} documents"
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odt.package.paragraph_transfer",
+            "ODT paragraph transfer refuses DDE-bearing documents",
         )));
     }
     Ok(())
@@ -994,8 +1004,10 @@ fn invalid_error(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
 
-fn unsupported<T>(what: &str) -> Result<T> {
-    Err(Error::Unsupported(format!(
-        "ODT paragraph transfer refuses {what}"
+fn unsupported<T>(_what: &str) -> Result<T> {
+    Err(Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "odt.package.paragraph_transfer",
+        "ODT paragraph transfer refuses this source",
     )))
 }

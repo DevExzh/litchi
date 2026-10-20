@@ -451,7 +451,8 @@ fn detached_snapshots_survive_source_editor_conversion_and_drop() {
         (layout, notes, comments, chart, layout_bytes)
     };
 
-    let _editor = source.try_into_editor().unwrap();
+    let _package = litchi_pptx::source::Package::from_presentation(&source).unwrap();
+    drop(source);
     assert_eq!(layout.name(), Some("Charts"));
     assert_eq!(notes.text(), Some("First note"));
     assert_eq!(comments.entries()[0].text(), "Review this slide");

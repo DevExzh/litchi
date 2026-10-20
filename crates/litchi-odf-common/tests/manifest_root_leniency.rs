@@ -51,7 +51,13 @@ fn root_fallback(context: u16) -> Vec<(Defect, u16)> {
 /// `defects`.
 fn assert_opens_everywhere_recording(bytes: &[u8], defects: &[(Defect, u16)], label: &str) {
     // Detection never consulted the manifest root; it still classifies.
-    assert_eq!(detect::bytes(bytes), Some(FileFormat::Odt), "{label}");
+    assert_eq!(
+        detect::bytes(bytes, detect::Limits::default())
+            .ok()
+            .flatten(),
+        Some(FileFormat::Odt),
+        "{label}"
+    );
 
     // Owned open: the borrowed view adopts the fallback.
     let owned = OwnedPackage::from_bytes(bytes.to_vec()).unwrap();
@@ -85,8 +91,9 @@ fn assert_opens_everywhere_recording(bytes: &[u8], defects: &[(Defect, u16)], la
     );
 
     // The prepared detection handoff retains the report.
-    let prepared = detect::prepared_or_original(bytes.to_vec())
-        .unwrap_or_else(|_| panic!("{label}: package must prepare"));
+    let prepared =
+        detect::prepared_or_original(bytes.to_vec(), litchi_odf_common::SourceLimits::default())
+            .unwrap_or_else(|_| panic!("{label}: package must prepare"));
     assert_eq!(
         recorded(prepared.tolerance_report()),
         defects,

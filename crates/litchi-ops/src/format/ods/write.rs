@@ -20,7 +20,7 @@ use std::num::NonZeroUsize;
 use litchi_core::selector::{Path, Predicate, Step};
 use litchi_core::{FileFormat, Position};
 use litchi_ods::annotations::Annotation;
-use litchi_ods::document::{Edit, LogicalRowEdit, SheetPosition};
+use litchi_ods::document::{Edit, LogicalRowOperation, SheetPosition};
 use litchi_ods::model::names::{Definition, Range as NamedRange, Scope};
 use litchi_ods::worksheet::{CellChange, Selector};
 use litchi_ods::{Cell, CellValue, Merge, Package, Row, Sheet};
@@ -173,7 +173,8 @@ pub(super) fn leaf(error: litchi_core::Error, code: Code) -> Error {
     match error {
         litchi_core::Error::InvalidFormat(_)
         | litchi_core::Error::ParseError(_)
-        | litchi_core::Error::Unsupported(_) => core_error(error).caused_by_argument(code),
+        | litchi_core::Error::Unsupported(_)
+        | litchi_core::Error::Refused(_) => core_error(error).caused_by_argument(code),
         other => core_error(other),
     }
 }
@@ -1242,7 +1243,7 @@ fn remove_targets(file: &Ods, targets: &[Target], limits: &SemanticLimits) -> Re
             let mut edit = file.leaf_edit()?;
             edit.edit_logical_rows(
                 &name,
-                &[LogicalRowEdit::Remove {
+                &[LogicalRowOperation::Remove {
                     at: index as usize,
                     count: 1,
                 }],
@@ -1568,7 +1569,7 @@ fn add_row(
     let mut edit = file.leaf_edit()?;
     edit.edit_logical_rows(
         &name,
-        &[LogicalRowEdit::Insert {
+        &[LogicalRowOperation::Insert {
             at: at as usize,
             rows: vec![Row::new()],
         }],
@@ -1773,7 +1774,7 @@ fn move_target(
             let mut edit = file.leaf_edit()?;
             edit.edit_logical_rows(
                 &name,
-                &[LogicalRowEdit::Move {
+                &[LogicalRowOperation::Move {
                     at: index as usize,
                     count: 1,
                     to: to as usize,
@@ -1826,12 +1827,12 @@ fn swap_targets(
             edit.edit_logical_rows(
                 &name,
                 &[
-                    LogicalRowEdit::Move {
+                    LogicalRowOperation::Move {
                         at: second,
                         count: 1,
                         to: first,
                     },
-                    LogicalRowEdit::Move {
+                    LogicalRowOperation::Move {
                         at: first + 1,
                         count: 1,
                         to: second,

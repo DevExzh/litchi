@@ -1615,17 +1615,18 @@ fn run_repeated_publication_iteration(
     let mut publication_hashes = Vec::with_capacity(3);
     for publication_index in 1..=3usize {
         let destination_read: Arc<dyn ReadAt> = destination.clone();
-        let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at_with_options(
+        let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at_with_options(
             destination_read,
             litchi_pptx::OpenOptions::default()
                 .source_limits(SourceLimits::default())
                 .cache_limits(cache_limits)
                 .execution_context(destination_context.context.clone()),
         )?;
-        if editor.slide_count() != corpus.destination_slide_count {
+        let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
+        if editor_view.slide_count() != corpus.destination_slide_count {
             return Err("repeated publication destination slide count changed".into());
         }
-        let destination_opened = editor.try_cache_diagnostics()?;
+        let destination_opened = editor_view.try_cache_diagnostics()?;
         let (destination_opened_cache, destination_opened) = cache_point(
             destination_opened,
             None,
@@ -1664,7 +1665,7 @@ fn run_repeated_publication_iteration(
         {
             return Err("repeated publication plan metadata changed".into());
         }
-        let destination_planned = editor.try_cache_diagnostics()?;
+        let destination_planned = editor_view.try_cache_diagnostics()?;
         let (destination_planned_cache, _destination_planned) = cache_point(
             destination_planned,
             Some(destination_opened),
@@ -1692,7 +1693,9 @@ fn run_repeated_publication_iteration(
         ));
         let mut sink = crate::CountingSink::bounded(sink_ceiling(expected.len())?, MAX_WRITE);
         sink.reserve_budget()?;
-        let published = editor.publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
+        let mut editor_copy = editor.edit_cross_slide_copy()?;
+        let published = editor_copy.stage(&plan)?;
+        editor_copy.commit()?.package().write_to(&mut sink)?;
         if published.destination_slide_count() != corpus.destination_slide_count + 1
             || published.insertion_position() != corpus.insertion_position
             || published.name() != corpus.source_slide_name
@@ -1801,13 +1804,14 @@ fn run_repeated_publication_iteration(
     // count.  It proves the cumulative OutputBytes ceiling when the public
     // publisher performs its preflight reservation before writing.
     let destination_read: Arc<dyn ReadAt> = destination.clone();
-    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at_with_options(
+    let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at_with_options(
         destination_read,
         litchi_pptx::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .cache_limits(cache_limits)
             .execution_context(destination_context.context.clone()),
     )?;
+    let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
     let plan = editor.plan_cross_slide_copy(
         &source_view,
         corpus.source_slide,
@@ -1816,7 +1820,12 @@ fn run_repeated_publication_iteration(
     )?;
     let mut sink = crate::CountingSink::bounded(sink_ceiling(expected.len())?, MAX_WRITE);
     sink.reserve_budget()?;
-    let fourth = editor.publish_cross_slide_copy_to_stream(&mut sink, &plan);
+    let fourth = (|| -> litchi_pptx::Result<_> {
+        let mut copy = editor.edit_cross_slide_copy()?;
+        let copied = copy.stage(&plan)?;
+        copy.commit()?.package().write_to(&mut sink)?;
+        Ok(copied)
+    })();
     let typed_output_refusal = match fourth {
         Ok(_) => false,
         Err(error) => output_refusal(&error),
@@ -2158,20 +2167,21 @@ fn run_lifecycle_iteration(
             .cache_limits(cache_limits)
             .execution_context(source_context.context.clone()),
     )?;
-    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at_with_options(
+    let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at_with_options(
         destination_read,
         litchi_pptx::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .cache_limits(cache_limits)
             .execution_context(destination_context.context.clone()),
     )?;
+    let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
     if source_view.slide_count() != crate::PPTX_CROSS_COPY_SOURCE_SLIDE_COUNT
-        || editor.slide_count() != corpus.destination_slide_count
+        || editor_view.slide_count() != corpus.destination_slide_count
     {
         return Err("managed PPTX lifecycle opening changed prevalidated slide counts".into());
     }
     let source_opened = source_view.try_cache_diagnostics()?;
-    let destination_opened = editor.try_cache_diagnostics()?;
+    let destination_opened = editor_view.try_cache_diagnostics()?;
     let (source_opened_point, source_opened) = cache_point(
         source_opened,
         None,
@@ -2210,7 +2220,7 @@ fn run_lifecycle_iteration(
         return Err("managed PPTX lifecycle plan metadata is not deterministic".into());
     }
     let source_planned = source_view.try_cache_diagnostics()?;
-    let destination_planned = editor.try_cache_diagnostics()?;
+    let destination_planned = editor_view.try_cache_diagnostics()?;
     let (source_planned_point, source_planned) = cache_point(
         source_planned,
         Some(source_opened),
@@ -2235,7 +2245,9 @@ fn run_lifecycle_iteration(
         &destination_context.budget,
     ));
 
-    let published = editor.publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
+    let mut editor_copy = editor.edit_cross_slide_copy()?;
+    let published = editor_copy.stage(&plan)?;
+    editor_copy.commit()?.package().write_to(&mut sink)?;
     if published.destination_slide_count() != corpus.destination_slide_count + 1
         || published.insertion_position() != corpus.insertion_position
         || published.name() != corpus.source_slide_name

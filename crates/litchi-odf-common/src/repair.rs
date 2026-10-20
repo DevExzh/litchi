@@ -39,7 +39,7 @@ use soapberry_zip::{
     office::{ArchiveLimits, ArchiveReader},
 };
 
-use crate::{OdfValidationError, OdfValidationLimits, validate_package_with_limits};
+use crate::{OdfValidationError, OdfValidationLimits, validate_package};
 
 /// Stable report issue code for the supported repair.
 pub const MIMETYPE_LOCAL_EXTRA_ISSUE: &str = "odf.mimetype.local_header_extra";
@@ -1376,7 +1376,7 @@ fn check_report(
     if source_size != Some(expected_len) || source_sha256 != Some(expected_digest) {
         return Err(RepairError::ReportMismatch);
     }
-    let fresh = validate_package_with_limits(
+    let fresh = validate_package(
         source,
         validation_limits(limits, limits.max_input_bytes),
         litchi_core::ValidationLimits::default(),
@@ -2928,7 +2928,7 @@ fn verify_candidate(
             None => Err(RepairError::PlanMismatch),
         };
     }
-    let candidate_report = validate_package_with_limits(
+    let candidate_report = validate_package(
         candidate,
         validation_limits(limits, limits.max_output_bytes),
         litchi_core::ValidationLimits::default(),
@@ -2952,7 +2952,7 @@ fn verify_streaming_proof(
     // was checked immediately before this function, so the already-proved
     // report authorization still applies without retaining report data in the
     // borrowed plan.
-    let report = validate_package_with_limits(
+    let report = validate_package(
         source,
         validation_limits(limits, limits.max_input_bytes),
         litchi_core::ValidationLimits::default(),

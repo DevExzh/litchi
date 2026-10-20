@@ -228,7 +228,8 @@ fn selected_libreoffice_descriptive_statistics_caches_match_literal_resolved_sou
                 formula_column,
                 cells,
             );
-            let expression = Expression::parse(formula).expect("upstream formula parses");
+            let expression =
+                Expression::parse(formula, &Default::default()).expect("upstream formula parses");
             let context = Context::new(
                 &execution,
                 Position::new(&sheet, formula_row - 1, formula_column - 1),

@@ -22,9 +22,12 @@ fn transaction_publishes_compact_xml_without_mutating_source() {
     assert!(commit.diagnostics().changed());
     assert_eq!(source.as_bytes(), source_bytes);
     assert_eq!(commit.package().slides().unwrap().len(), 2);
-    let applied = source.apply(commit.patch()).unwrap();
+    let applied = source.apply(commit.patch()).unwrap().into_package();
     assert_eq!(applied.as_bytes(), commit.package().as_bytes());
-    let restored = applied.apply(&commit.patch().inverse()).unwrap();
+    let restored = applied
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.as_bytes(), source.as_bytes());
     let package = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     for path in ["content.xml", "styles.xml", "meta.xml"] {
@@ -45,7 +48,11 @@ fn exact_noop_and_inverse_patch_preserve_source_bytes() {
     assert!(commit.patch().is_noop());
     assert_eq!(commit.package().as_bytes(), source.as_bytes());
 
-    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.as_bytes(), source.as_bytes());
 }
 
@@ -108,7 +115,12 @@ fn snapshot_clone_and_exact_noop_commit_share_backing_bytes() {
         source.as_bytes().as_ptr()
     );
     assert_eq!(
-        source.apply(commit.patch()).unwrap().as_bytes().as_ptr(),
+        source
+            .apply(commit.patch())
+            .unwrap()
+            .into_package()
+            .as_bytes()
+            .as_ptr(),
         source.as_bytes().as_ptr()
     );
 }
@@ -151,7 +163,12 @@ fn changed_commit_snapshot_and_patch_output_share_backing_bytes() {
 
     assert!(commit.diagnostics().changed());
     assert_eq!(
-        source.apply(commit.patch()).unwrap().as_bytes().as_ptr(),
+        source
+            .apply(commit.patch())
+            .unwrap()
+            .into_package()
+            .as_bytes()
+            .as_ptr(),
         published_pointer
     );
     assert_eq!(commit.into_package().as_bytes().as_ptr(), published_pointer);

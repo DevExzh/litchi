@@ -5,7 +5,7 @@
 )]
 
 //! Durable patches, undo/redo, joins and three-way planning of the primary
-//! PPT edit (record 0357a).
+//! PPT edit (records 0357a, 0357b).
 //!
 //! Record 0357 kept these surfaces on the crate-private native slide-order
 //! owner; they are `package::edit::Patch::{to_durable, join}` and
@@ -15,7 +15,9 @@ use std::path::PathBuf;
 
 use litchi_core::patch::{BlobLimits, Patch as DurablePatch, PatchLimits, Reversible};
 use litchi_ppt::comments::{DateTime, NewComment};
-use litchi_ppt::package::edit::{Error, Position, SlideTransitionVisual, Target};
+use litchi_ppt::package::edit::{
+    CustomTableStylesPlacement, Error, Position, SlideTransitionVisual, Target,
+};
 use litchi_ppt::slide_order::{self, Refusal};
 use litchi_ppt::{Package, TransitionDirection, TransitionSpeed, TransitionType};
 
@@ -319,15 +321,24 @@ fn joins_refuse_overlap_other_operations_and_other_sources() {
         )))
     ));
 
+    // A slide insertion shifts every later position (record 0357b: other
+    // operations join; insertions and removals do not).
+    let mut edit = source.edit().unwrap();
+    edit.insert_slide(Position::new(3)).unwrap();
+    let inserted = edit.commit().unwrap().patch().clone();
+    let error = first.join(&inserted).unwrap_err();
+    assert!(matches!(
+        &error,
+        Error::Native(slide_order::Error::Refused(refusal @ Refusal::UnsupportedPatch { .. }))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+    ));
+    // A slide-visibility change off the moved range joins.
     let mut edit = source.edit().unwrap();
     edit.set_slide_hidden(Position::new(3), true).unwrap();
     let hidden = edit.commit().unwrap().patch().clone();
-    let error = first.join(&hidden).unwrap_err();
-    assert!(matches!(
-        &error,
-        Error::Native(slide_order::Error::Refused(refusal))
-            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
-    ));
+    let joined = source.apply(&first.join(&hidden).unwrap()).unwrap();
+    let native = slide_order::Snapshot::parse(&bytes(joined.package())).unwrap();
+    assert!(native.slide_hidden(Position::new(3)).unwrap());
 
     let other = fixture("poi/test-data/slideshow/basic_test_ppt_file.ppt");
     assert!(matches!(
@@ -443,4 +454,390 @@ fn genuine_visual_transition_reverses_merges_and_undoes() {
             .iter()
             .any(|conflict| conflict.target().ends_with("/transition-visual"))
     );
+}
+
+// Record 0357b: the document-structure verbs of record 0357a (master order,
+// custom table styles, `fNonOutlineData`) have durable operations and join.
+
+fn masters_deck() -> Package {
+    fixture("poi/test-data/slideshow/slide_master.ppt")
+}
+
+/// Two masters, a custom table-style atom after the `EndDocumentAtom`, and
+/// enough slides for disjoint moves.
+fn styles_deck() -> Package {
+    fixture("poi/test-data/slideshow/45543.ppt")
+}
+
+fn structure(package: &Package) -> litchi_ppt::DocumentStructure {
+    package
+        .presentation()
+        .unwrap()
+        .document_structure()
+        .unwrap()
+}
+
+fn master_ids(package: &Package) -> Vec<u32> {
+    structure(package)
+        .masters()
+        .iter()
+        .map(|master| master.master_id())
+        .collect()
+}
+
+fn non_outline_data(package: &Package, position: usize) -> bool {
+    structure(package).slides()[position].flags() & (1 << 2) != 0
+}
+
+/// The custom table-style atom's exact bytes (an equal replacement is a
+/// no-op that returns them).
+fn styles_atom(package: &Package) -> Option<Vec<u8>> {
+    structure(package).custom_table_styles?;
+    let mut edit = package.edit().unwrap();
+    let mut probe = package.edit().unwrap();
+    let atom = probe
+        .replace_custom_table_styles(&[0, 0, 0x28, 0x04, 0, 0, 0, 0])
+        .unwrap();
+    assert_eq!(edit.replace_custom_table_styles(&atom).unwrap(), atom);
+    Some(atom)
+}
+
+/// Everything the document-structure verbs change, plus the slide texts.
+fn projection(package: &Package) -> (Vec<u32>, Option<Vec<u8>>, Vec<bool>, Vec<String>) {
+    let flags = (0..slide_count(package))
+        .map(|position| non_outline_data(package, position))
+        .collect();
+    (
+        master_ids(package),
+        styles_atom(package),
+        flags,
+        slide_texts(package),
+    )
+}
+
+fn blob_limits() -> PatchLimits {
+    limits(BlobLimits::new(4, 1 << 20, 4 << 20))
+}
+
+/// `commit`'s durable patch, through deterministic JSON, replays on
+/// `source` to the commit's bytes, its durable inverse restores the
+/// source's projection, and it refuses another package.
+fn assert_durable_round_trip(source: &Package, commit: &litchi_ppt::package::edit::Commit) {
+    assert!(commit.diagnostics().changed());
+    let durable = round_trip(
+        &commit.patch().to_durable(blob_limits()).unwrap(),
+        blob_limits(),
+    );
+    let replayed = source.apply_durable(&durable).unwrap();
+    assert!(replayed.diagnostics().changed());
+    assert_eq!(bytes(replayed.package()), bytes(commit.package()));
+    let reverted = replayed
+        .package()
+        .apply_durable(&durable.inverse())
+        .unwrap();
+    assert_eq!(projection(reverted.package()), projection(source));
+    // The operations bind the exact source artifact.
+    assert!(commit.package().apply_durable(&durable).is_err());
+}
+
+#[test]
+fn durable_master_reorders_replay_and_revert() {
+    let source = masters_deck();
+    let ids = master_ids(&source);
+    assert_eq!(ids.len(), 3);
+    let mut edit = source.edit().unwrap();
+    edit.reorder_masters(&[Position::new(2), Position::new(0), Position::new(1)])
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(master_ids(commit.package()), [ids[2], ids[0], ids[1]]);
+    // Master order needs no blob.
+    let durable = commit
+        .patch()
+        .to_durable(limits(BlobLimits::new(0, 0, 0)))
+        .unwrap();
+    let operation = &durable.operations()[0];
+    assert_eq!(operation.op, "document-structure.master-order.set");
+    assert_eq!(operation.target, "document");
+    assert_eq!(operation.value, serde_json::json!([2, 0, 1]));
+    assert_eq!(
+        operation.preconditions.keys().collect::<Vec<_>>(),
+        ["artifact_sha256", "order_sha256"]
+    );
+    assert_durable_round_trip(&source, &commit);
+}
+
+#[test]
+fn durable_custom_table_style_edits_replay_and_revert() {
+    let source = styles_deck();
+    let atom = styles_atom(&source).unwrap();
+
+    let mut replacement = atom.clone();
+    replacement.extend_from_slice(b"pad!");
+    let length = u32::try_from(replacement.len() - 8).unwrap();
+    replacement[4..8].copy_from_slice(&length.to_le_bytes());
+    let mut edit = source.edit().unwrap();
+    edit.replace_custom_table_styles(&replacement).unwrap();
+    let replaced = edit.commit().unwrap();
+    assert_eq!(styles_atom(replaced.package()).unwrap(), replacement);
+    assert_durable_round_trip(&source, &replaced);
+    // An atom travels as a blob; no blob fits.
+    assert!(matches!(
+        replaced
+            .patch()
+            .to_durable(limits(BlobLimits::new(0, 0, 0))),
+        Err(Error::Durable(_))
+    ));
+
+    let mut edit = source.edit().unwrap();
+    edit.move_custom_table_styles(CustomTableStylesPlacement::BeforeEndDocument)
+        .unwrap();
+    let moved_styles = edit.commit().unwrap();
+    assert_durable_round_trip(&source, &moved_styles);
+
+    let mut edit = source.edit().unwrap();
+    edit.remove_custom_table_styles().unwrap();
+    let removed = edit.commit().unwrap();
+    assert_eq!(structure(removed.package()).custom_table_styles, None);
+    assert_durable_round_trip(&source, &removed);
+
+    let mut edit = removed.package().edit().unwrap();
+    edit.insert_custom_table_styles(&atom, CustomTableStylesPlacement::BeforeEndDocument)
+        .unwrap();
+    let inserted = edit.commit().unwrap();
+    assert_eq!(
+        structure(inserted.package()).custom_table_styles,
+        Some(CustomTableStylesPlacement::BeforeEndDocument)
+    );
+    assert_durable_round_trip(removed.package(), &inserted);
+}
+
+#[test]
+fn durable_non_outline_data_and_mixed_structure_replay_and_revert() {
+    let source = styles_deck();
+    let before = non_outline_data(&source, 3);
+    let mut edit = source.edit().unwrap();
+    edit.set_slide_non_outline_data(Position::new(3), !before)
+        .unwrap();
+    let flagged = edit.commit().unwrap();
+    assert_eq!(non_outline_data(flagged.package(), 3), !before);
+    assert_durable_round_trip(&source, &flagged);
+
+    // A slide move, a master reorder, a style move and a flag in one
+    // structural segment, each bound to the slide order it runs at.
+    let ids = master_ids(&source);
+    let mut edit = source.edit().unwrap();
+    edit.move_slide(Position::new(0), Position::new(1)).unwrap();
+    edit.move_master(Position::new(1), Position::new(0))
+        .unwrap();
+    edit.move_custom_table_styles(CustomTableStylesPlacement::BeforeEndDocument)
+        .unwrap();
+    edit.set_slide_non_outline_data(Position::new(0), !non_outline_data(&source, 1))
+        .unwrap();
+    let mixed = edit.commit().unwrap();
+    assert_eq!(master_ids(mixed.package()), [ids[1], ids[0]]);
+    let durable = mixed.patch().to_durable(blob_limits()).unwrap();
+    let ops: Vec<_> = durable
+        .operations()
+        .iter()
+        .map(|operation| operation.op.as_str())
+        .collect();
+    assert_eq!(
+        ops,
+        [
+            "slide-order.move",
+            "document-structure.master-order.set",
+            "document-structure.custom-table-styles.move",
+            "document-structure.slide-non-outline-data.set",
+        ]
+    );
+    assert_durable_round_trip(&source, &mixed);
+}
+
+/// The first non-empty shape text at or after slide `from`.
+fn text_target(package: &Package, from: usize) -> Target {
+    let texts = shape_texts(package);
+    let (slide, shape) = texts
+        .iter()
+        .enumerate()
+        .skip(from)
+        .find_map(|(slide, shapes)| {
+            shapes
+                .iter()
+                .position(|text| !text.trim().is_empty())
+                .map(|shape| (slide, shape))
+        })
+        .expect("a slide with shape text");
+    Target::new(Position::new(slide), Position::new(shape))
+}
+
+fn edited(
+    source: &Package,
+    stage: impl FnOnce(&mut litchi_ppt::package::edit::Edit),
+) -> litchi_ppt::package::edit::Patch {
+    let mut edit = source.edit().unwrap();
+    stage(&mut edit);
+    edit.commit().unwrap().patch().clone()
+}
+
+fn join_refusal(error: &Error) -> &Refusal {
+    match error {
+        Error::Native(slide_order::Error::Refused(refusal)) => refusal,
+        other => panic!("expected a join refusal, got {other:?}"),
+    }
+}
+
+#[test]
+fn master_reorders_join_slide_moves_and_text_sets() {
+    let source = styles_deck();
+    let ids = master_ids(&source);
+    let target = text_target(&source, 3);
+    let masters = edited(&source, |edit| {
+        edit.move_master(Position::new(1), Position::new(0))
+            .unwrap();
+    });
+    let slides = moved(&source, 0, 1);
+    let text = edited(&source, |edit| {
+        edit.set_shape_text(target, "Joined text").unwrap();
+    });
+
+    let joined = masters.join(&slides).unwrap().join(&text).unwrap();
+    assert_eq!(joined.operation_count(), 3);
+    let published = source.apply(&joined).unwrap().into_package();
+    assert_eq!(master_ids(&published), [ids[1], ids[0]]);
+    let mut expected = shape_texts(&source);
+    expected[target.slide().get()][target.shape().get()] = "Joined text".into();
+    expected.swap(0, 1);
+    assert_eq!(shape_texts(&published), expected);
+
+    // Joins commute in effect.
+    let swapped = text.join(&slides).unwrap().join(&masters).unwrap();
+    let swapped = source.apply(&swapped).unwrap().into_package();
+    assert_eq!(master_ids(&swapped), master_ids(&published));
+    assert_eq!(shape_texts(&swapped), shape_texts(&published));
+
+    // The joined patch inverts exactly and has a durable form.
+    let restored = published.apply(&joined.inverse()).unwrap().into_package();
+    assert_eq!(bytes(&restored), bytes(&source));
+    let durable = round_trip(&joined.to_durable(blob_limits()).unwrap(), blob_limits());
+    let replayed = source.apply_durable(&durable).unwrap().into_package();
+    assert_eq!(master_ids(&replayed), master_ids(&published));
+    assert_eq!(shape_texts(&replayed), shape_texts(&published));
+    let reverted = replayed
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
+    assert_eq!(projection(&reverted), projection(&source));
+}
+
+#[test]
+fn document_edits_join_each_other_and_flags_off_the_moved_range() {
+    let source = styles_deck();
+    let flag = non_outline_data(&source, 4);
+    let styles = edited(&source, |edit| {
+        edit.move_custom_table_styles(CustomTableStylesPlacement::BeforeEndDocument)
+            .unwrap();
+    });
+    let masters = edited(&source, |edit| {
+        edit.move_master(Position::new(0), Position::new(1))
+            .unwrap();
+    });
+    let flagged = edited(&source, |edit| {
+        edit.set_slide_non_outline_data(Position::new(4), !flag)
+            .unwrap();
+    });
+    let slides = moved(&source, 0, 1);
+    let joined = styles
+        .join(&masters)
+        .unwrap()
+        .join(&flagged)
+        .unwrap()
+        .join(&slides)
+        .unwrap();
+    let published = source.apply(&joined).unwrap().into_package();
+    assert_eq!(
+        structure(&published).custom_table_styles,
+        Some(CustomTableStylesPlacement::BeforeEndDocument)
+    );
+    let ids = master_ids(&source);
+    assert_eq!(master_ids(&published), [ids[1], ids[0]]);
+    assert_eq!(non_outline_data(&published, 4), !flag);
+    let mut texts = slide_texts(&source);
+    texts.swap(0, 1);
+    assert_eq!(slide_texts(&published), texts);
+    assert_eq!(
+        bytes(&published.apply(&joined.inverse()).unwrap().into_package()),
+        bytes(&source)
+    );
+}
+
+#[test]
+fn conflicting_joins_are_typed_refusals() {
+    let source = styles_deck();
+    let conflict = |left: &litchi_ppt::package::edit::Patch,
+                    right: &litchi_ppt::package::edit::Patch|
+     -> String {
+        let error = left.join(right).unwrap_err();
+        let refusal = join_refusal(&error);
+        assert_eq!(
+            refusal.kind(),
+            litchi_core::edit::RefusalKind::UnsupportedOperation
+        );
+        match refusal {
+            Refusal::JoinConflict { target } => target.clone(),
+            other => panic!("expected JoinConflict, got {other:?}"),
+        }
+    };
+
+    // Two master reorders: their order would decide the master list.
+    let first = edited(&source, |edit| {
+        edit.move_master(Position::new(0), Position::new(1))
+            .unwrap();
+    });
+    let second = edited(&source, |edit| {
+        edit.reorder_masters(&[Position::new(1), Position::new(0)])
+            .unwrap();
+    });
+    assert_eq!(conflict(&first, &second), "document/master-list");
+
+    // Two custom table-style edits.
+    let moved_styles = edited(&source, |edit| {
+        edit.move_custom_table_styles(CustomTableStylesPlacement::BeforeEndDocument)
+            .unwrap();
+    });
+    let removed_styles = edited(&source, |edit| {
+        edit.remove_custom_table_styles().unwrap();
+    });
+    assert_eq!(
+        conflict(&moved_styles, &removed_styles),
+        "document/custom-table-styles"
+    );
+
+    // The same slide's flag, and the same shape's text.
+    let flag = non_outline_data(&source, 4);
+    let flagged = edited(&source, |edit| {
+        edit.set_slide_non_outline_data(Position::new(4), !flag)
+            .unwrap();
+    });
+    let flagged_too = flagged.clone();
+    assert_eq!(
+        conflict(&flagged, &flagged_too),
+        "slide-list/position:4/non-outline-data"
+    );
+    let target = text_target(&source, 3);
+    let text = edited(&source, |edit| edit.set_shape_text(target, "One").unwrap());
+    let other_text = edited(&source, |edit| edit.set_shape_text(target, "Two").unwrap());
+    assert!(conflict(&text, &other_text).ends_with("/text"));
+
+    // A flag on a slide the other patch moves reads another slide there.
+    let moved_slides = moved(&source, 3, 5);
+    let error = flagged.join(&moved_slides).unwrap_err();
+    assert!(matches!(
+        join_refusal(&error),
+        Refusal::UnsupportedPatch { .. }
+    ));
+    let error = moved_slides.join(&flagged).unwrap_err();
+    assert!(matches!(
+        join_refusal(&error),
+        Refusal::UnsupportedPatch { .. }
+    ));
 }

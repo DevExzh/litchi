@@ -51,7 +51,8 @@ oth     = ["odt", "dep:litchi-oth"]
 odm     = ["odt", "dep:litchi-odm"]
 # The ODF object formats (record 0282) share one object-tree adapter
 # (`format::odf_tree`); `odf-objects` is its internal umbrella and is turned
-# on by each of them.
+# on by each of them. Code is gated on `cfg(odf_objects)` (build.rs), set when
+# at least one object format is on (record 0358a).
 odg         = ["odf-objects", "dep:litchi-odg"]
 odc         = ["odf-objects", "dep:litchi-odc"]
 odi         = ["odf-objects", "dep:litchi-odi"]

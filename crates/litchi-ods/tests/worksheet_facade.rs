@@ -1,4 +1,6 @@
-use litchi_ods::{Builder, Cell, CellValue, CellView, MutableSpreadsheet, Package, Row, Sheet};
+use litchi_ods::{
+    Builder, Cell, CellValue, CellView, Package, Row, Sheet, builder::Workbook as Draft,
+};
 
 #[test]
 fn worksheet_graph_round_trips_repeats_formula_and_style() {
@@ -116,7 +118,7 @@ fn mutable_worksheet_edits_are_atomic_on_validation_failure() {
         .to_bytes()
         .expect("test fixture or operation should succeed");
 
-    let mut mutable = MutableSpreadsheet::from_workbook(
+    let mut mutable = Draft::from_workbook(
         Package::from_bytes(&bytes)
             .expect("test fixture or operation should succeed")
             .workbook()
@@ -159,7 +161,7 @@ fn mutable_worksheet_remove_is_transactional() {
         .add_sheet(second)
         .expect("test fixture or operation should succeed");
 
-    let mut mutable = MutableSpreadsheet::from_workbook(
+    let mut mutable = Draft::from_workbook(
         Package::from_bytes(
             &builder
                 .build()

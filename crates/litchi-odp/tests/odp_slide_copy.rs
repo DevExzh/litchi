@@ -116,7 +116,7 @@ fn dependency_free_blank_copy_is_exact_named_reversible_and_source_checked() {
     let durable =
         edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
     assert_eq!(
-        source.apply(&durable).unwrap().as_bytes(),
+        source.apply(&durable).unwrap().into_package().as_bytes(),
         commit.package().as_bytes()
     );
     assert_eq!(
@@ -124,6 +124,7 @@ fn dependency_free_blank_copy_is_exact_named_reversible_and_source_checked() {
             .package()
             .apply(&durable.inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
