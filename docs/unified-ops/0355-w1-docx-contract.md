@@ -2,7 +2,7 @@
 
 - Status: implemented on `uo2/w1-docx`, cut from `feat/unified-ops-api`
   at `e652864de8`; trunk merged at `88d253579b` (records 0352, 0353) and
-  again before the final gates (§6).
+  at `4d59677f78` (record 0354) before the final gates (§6).
 - Date: 2026-10-20
 - Input: record [0351](0351-api-contract.md) §2 (the normative contract),
   §3.1 (the DOCX inventory), §4.3 (the W1 gate registrations) and §5 (the
@@ -240,9 +240,10 @@ rows at head and an after/before row for each leg).
 
 ## 6. Gates
 
-Run on the final tree, after the trunk merge at `88d253579b` (trunk tip
-`482f0a18eb`), with the wave's `env.sh` (`CARGO_BUILD_JOBS=6`,
-`RUST_TEST_THREADS=8`). Every command exited 0.
+Run on the final tree, after the trunk merge at `4d59677f78` (trunk tip
+`5f6fb75164`), with the wave's `env.sh` (`CARGO_BUILD_JOBS=6`,
+`RUST_TEST_THREADS=8`). Every command exited 0 except one timing-sensitive
+OPC test under host load (below).
 
 | Gate | Command | Result |
 |---|---|---|
@@ -252,14 +253,14 @@ Run on the final tree, after the trunk merge at `88d253579b` (trunk tip
 | clippy, ODS lib | `cargo clippy -p litchi-ods --lib -- -D warnings` | clean |
 | docs | `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-docx -p litchi-opc` | clean |
 | DOCX tests | `cargo test -p litchi-docx --all-features` | 2,454 passed |
-| OPC tests | `cargo test -p litchi-opc --all-features` | 1,190 passed |
-| ops tests | `cargo test -p litchi-ops --all-features`, lib and the 166 test targets in chunks of 28 | 2,414 passed (the lib's classification test re-run after its §3 update: 950 passed) |
-| facade, CLI | `cargo test -p litchi --all-features`; `cargo test -p litchi-cli --all-features` | 235 and 34 passed |
-| Python | `crates/pyo3-litchi/tests/run_tests.sh` | 298 tests OK |
+| OPC tests | `cargo test -p litchi-opc --all-features` | 1,189 passed; `source_backed_batch::batch_cancellation_during_a_gated_load_returns_cancelled_and_joins_workers` failed once at load average 11 (exit 101) and passed 5 of 5 re-runs and in the pre-merge run; W1 does not touch the source-backed batch |
+| ops tests | `cargo test -p litchi-ops --all-features`, lib and the 167 test targets in chunks of 28 | 2,422 passed |
+| facade, CLI | `cargo test -p litchi --all-features`; `cargo test -p litchi-cli --all-features` | 209 and 34 passed |
+| Python | `crates/pyo3-litchi/tests/run_tests.sh` | 301 tests OK |
 | perf-baseline | `cd tools/perf-baseline && cargo check --locked --all-targets` | clean |
 | native-resave | `cd tools/native-resave && cargo check --locked --features docx` | builds (one unused-import warning, also at base) |
 | boundaries | `python3 tools/check_crate_boundaries.py`; `python3 tools/non_iwork_gate.py verify` | pass |
-| glossary | `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` | 42 profiles, 2,692 bans, 294 families, 60 immutable owners |
+| glossary | `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` | 44 profiles, 2,741 bans, 294 families, 62 immutable owners |
 | goldens | `LITCHI_BLESS=1 cargo test -p litchi-ops --all-features --test capabilities --test registry`, and with every litchi-ops feature but `encryption` | no golden changed |
 | capability delta | `python3 tools/officecli_capability_delta.py --officecli …/3rdparty/OfficeCLI`; `--check` | unchanged |
 | OfficeCLI corpus | `LITCHI_BLESS=1 cargo test -p litchi-cli --all-features --test officecli_corpus`; `python3 tools/officecli_corpus.py`; `--check` | no corpus file changed |
