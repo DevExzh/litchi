@@ -30,13 +30,13 @@ fn xml_attribute_whitespace_preserves_scalar_edit_and_inverse() {
         assert_eq!(snapshot.value(), Some(true));
 
         let mut noop = snapshot.edit();
-        noop.set_readonly_recommended(true).unwrap();
+        noop.set_read_only_recommended(true).unwrap();
         let noop = noop.commit().unwrap();
         assert!(!noop.diagnostics().changed());
         assert_eq!(noop.snapshot().source_xml(), original.as_slice());
 
         let mut edit = snapshot.edit();
-        edit.set_readonly_recommended(false).unwrap();
+        edit.set_read_only_recommended(false).unwrap();
         let commit = edit.commit().unwrap();
         let expected = source(&format!(
             "<p1710:readonlyRecommended{separator}val\t=\n'false'/>"
@@ -58,7 +58,7 @@ fn scalar_edit_and_inverse_preserve_unrelated_source() {
     .into_bytes();
     let snapshot = Snapshot::from_xml(&original).unwrap();
     let mut edit = snapshot.edit();
-    edit.set_readonly_recommended(false).unwrap();
+    edit.set_read_only_recommended(false).unwrap();
     let commit = edit.commit().unwrap();
     let changed = commit.snapshot().source_xml().to_vec();
     assert_eq!(commit.after_value(), Some(false));
@@ -96,7 +96,7 @@ fn exact_noop_keeps_source_bytes() {
     .into_bytes();
     let snapshot = Snapshot::from_xml(&original).unwrap();
     let mut edit = snapshot.edit();
-    edit.set_readonly_recommended(true).unwrap();
+    edit.set_read_only_recommended(true).unwrap();
     let commit = edit.commit().unwrap();
     assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
@@ -120,7 +120,7 @@ fn insertion_and_removal_keep_owner_structure() {
     let original = br#"<p:presentationPr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:extLst><!-- retained --></p:extLst></p:presentationPr>"#.to_vec();
     let snapshot = Snapshot::from_xml(&original).unwrap();
     let mut edit = snapshot.edit();
-    edit.set_readonly_recommended(true).unwrap();
+    edit.set_read_only_recommended(true).unwrap();
     let commit = edit.commit().unwrap();
     let inserted = String::from_utf8(commit.snapshot().source_xml().to_vec()).unwrap();
     assert!(inserted.contains("readonlyRecommended"));
@@ -154,7 +154,7 @@ fn mce_choice_selects_p1710_and_inverse_restores_fallback() {
     let snapshot = Snapshot::from_xml(&source).unwrap();
     assert_eq!(snapshot.value(), Some(true));
     let mut edit = snapshot.edit();
-    edit.set_readonly_recommended(false).unwrap();
+    edit.set_read_only_recommended(false).unwrap();
     let commit = edit.commit().unwrap();
     let updated = String::from_utf8(commit.snapshot().source_xml().to_vec()).unwrap();
     assert!(updated.contains(r#"<p1710:readonlyRecommended val="false"/>"#));

@@ -5,6 +5,9 @@
 )]
 #![cfg(feature = "encryption")]
 
+mod in_place;
+use in_place::InPlace as _;
+
 use std::io::Cursor;
 
 use litchi_opc::constants::relationship_type as rt;
@@ -202,11 +205,7 @@ fn downgrade_and_mutation_are_explicit() {
     .unwrap();
 
     assert!(matches!(
-        package.put_custom_props(Default::default()),
-        Err(Error::EncryptionPolicy { .. })
-    ));
-    assert!(matches!(
-        package.put_fonts(Default::default()),
+        package.put_fonts_in_place(Default::default()),
         Err(Error::EncryptionPolicy { .. })
     ));
 
@@ -304,7 +303,7 @@ fn retained_mode_is_required_and_raw_edit_is_explicit_declassification() {
     let mut retained =
         Package::from_reader_with_password(Cursor::new(encrypted(Mode::Agile, "secret")), "secret")
             .unwrap();
-    retained.edit_opc(|_| Ok(())).unwrap();
+    retained.edit_opc_in_place(|_| Ok(())).unwrap();
     assert_eq!(retained.encryption(), None);
 }
 
@@ -312,7 +311,7 @@ fn retained_mode_is_required_and_raw_edit_is_explicit_declassification() {
 fn unchanged_inner_signature_survives_encrypt_open_and_reencrypt() {
     let mut signed = Package::new().unwrap();
     signed
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             install_inert_signature(opc);
             Ok(())
         })
@@ -335,14 +334,14 @@ fn unchanged_inner_signature_survives_encrypt_open_and_reencrypt() {
 fn raw_opc_noop_preserves_signature_and_changed_edit_requires_explicit_unsign() {
     let mut package = Package::new().unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             install_inert_signature(opc);
             Ok(())
         })
         .unwrap();
     let signed = package.to_bytes().unwrap();
 
-    package.edit_opc(|_| Ok(())).unwrap();
+    package.edit_opc_in_place(|_| Ok(())).unwrap();
     assert!(package.opc().unwrap().is_signed());
     assert_eq!(package.to_bytes().unwrap(), signed);
 
@@ -356,7 +355,7 @@ fn raw_opc_noop_preserves_signature_and_changed_edit_requires_explicit_unsign() 
     // A changed raw edit refuses the signed package and rolls back (ADR
     // 0006); removing the signature inside the closure authorizes it.
     let error = package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             add_raw_part(opc);
             Ok(())
         })
@@ -372,7 +371,7 @@ fn raw_opc_noop_preserves_signature_and_changed_edit_requires_explicit_unsign() 
     assert_eq!(package.to_bytes().unwrap(), signed);
 
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             add_raw_part(opc);
             opc.unsign();
             Ok(())

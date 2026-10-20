@@ -16,6 +16,9 @@
 //! member behind one mark, and a mark appears only on a member whose input
 //! had one. Members an edit never touched keep their mark byte for byte.
 
+mod in_place;
+use in_place::InPlace as _;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use litchi_pptx::Package;
@@ -296,7 +299,7 @@ fn real_shape_tag_deck_marked_everywhere_reads_and_edits_like_the_original() {
             .add(litchi_pptx::tag::Tag::new("Reviewer", "Ada").unwrap())
             .unwrap();
         let old = package
-            .put_shape_tags(0_usize, "Objekt 2", replacement)
+            .put_shape_tags_in_place(0_usize, "Objekt 2", replacement)
             .unwrap();
         observed.push_str(&format!("{old:?}"));
         observed
@@ -325,10 +328,10 @@ fn layout_placeholder_and_font_edits_of_marked_parts_match_unmarked_edits() {
     differential(&deck, is_xml_member, |package| {
         let master = litchi_opc::PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap();
         let first = package
-            .add_slide_layout(&master, SlideLayoutKind::Blank, "First added", &[])
+            .add_slide_layout_in_place(&master, SlideLayoutKind::Blank, "First added", &[])
             .unwrap();
         let second = package
-            .add_slide_layout(
+            .add_slide_layout_in_place(
                 &master,
                 SlideLayoutKind::Title,
                 "Second added",
@@ -336,20 +339,24 @@ fn layout_placeholder_and_font_edits_of_marked_parts_match_unmarked_edits() {
             )
             .unwrap();
         package
-            .store_placeholder_shape(
+            .store_placeholder_shape_in_place(
                 &second.part_name,
                 &PlaceholderSpec::new(PlaceholderKind::CenteredTitle).with_text("retitled"),
             )
             .unwrap();
-        package.remove_slide_layout(&first.part_name).unwrap();
+        package
+            .remove_slide_layout_in_place(&first.part_name)
+            .unwrap();
         package.validate_master_layout_graph().unwrap();
         let mut fonts = litchi_pptx::font::Fonts::new();
         fonts
             .add(litchi_pptx::font::Font::new("Example Sans").unwrap())
             .unwrap();
-        let put = package.put_fonts(fonts).map_err(|error| error.to_string());
+        let put = package
+            .put_fonts_in_place(fonts)
+            .map_err(|error| error.to_string());
         let removed = package
-            .remove_fonts()
+            .remove_fonts_in_place()
             .map(|fonts| fonts.map(|fonts| fonts.len()))
             .map_err(|error| error.to_string());
         format!("{put:?}|{removed:?}|{}", slide_texts(package))
@@ -365,7 +372,7 @@ fn theme_scheme_replacement_of_a_marked_theme_matches_the_unmarked_one() {
     let deck = text_deck();
     let (kept, _) = differential(&deck, is_xml_member, |package| {
         package
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
                 let name = "/ppt/theme/theme1.xml";
                 let current = theme::load(opc, name)?;
                 let colors = current

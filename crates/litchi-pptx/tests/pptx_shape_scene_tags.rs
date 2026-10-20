@@ -4,6 +4,9 @@
     reason = "test assertions panic on failure by design"
 )]
 
+mod in_place;
+use in_place::InPlace as _;
+
 use litchi_pptx::Package;
 use litchi_pptx::shape::LookupError;
 use litchi_pptx::tag::{List, Tag};
@@ -46,7 +49,7 @@ fn facade_replaces_and_removes_a_real_shape_tag_list() {
         .unwrap();
 
     let old = package
-        .put_shape_tags(0_usize, "Objekt 2", replacement)
+        .put_shape_tags_in_place(0_usize, "Objekt 2", replacement)
         .unwrap()
         .unwrap();
     assert!(!old.is_empty());
@@ -76,7 +79,7 @@ fn facade_replaces_and_removes_a_real_shape_tag_list() {
     );
 
     let removed = reopened
-        .remove_shape_tags(0_usize, "Objekt 2")
+        .remove_shape_tags_in_place(0_usize, "Objekt 2")
         .unwrap()
         .unwrap();
     assert_eq!(removed.get("reviewer").unwrap().value(), "Ada");

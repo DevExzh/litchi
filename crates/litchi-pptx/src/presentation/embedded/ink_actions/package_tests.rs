@@ -1,4 +1,5 @@
-//! Public package-owner integration coverage for PresentationML ink actions.
+//! Package-owner coverage for PresentationML ink actions, at the raw OPC
+//! level and through the public package family.
 //!
 //! The action namespace has no checked-in native Office fixture.  These tests
 //! therefore use a small synthetic OPC slide whose owner, relationship, MIME,
@@ -12,11 +13,11 @@
     reason = "integration fixtures and assertions panic on failure by design"
 )]
 
+use crate::Package;
+use crate::presentation::embedded::ink_actions;
 use litchi_drawingml::ink::actions::{ActionSelector, ActionType, ChildSelector};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, Part, SourceLimitKind, SourceLimits};
-use litchi_pptx::Package;
-use litchi_pptx::presentation::embedded::ink_actions;
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
@@ -243,7 +244,7 @@ fn action_snapshot_with_limits(
     package: &OpcPackage,
     slide_name: &PackURI,
     limits: ink_actions::Limits,
-) -> Result<ink_actions::Snapshot, litchi_pptx::Error> {
+) -> Result<ink_actions::Snapshot, crate::Error> {
     let slide = package.get_part(slide_name).expect("slide part");
     ink_actions::load_snapshot(package, 0, slide, &limits)
 }
@@ -365,7 +366,7 @@ fn strict_owner_rejects_a_transitional_presentation_namespace() {
     let before_target = package.get_part(&action_name).unwrap().blob().to_vec();
     let error = load_error(&package, &slide_name);
     assert!(
-        matches!(error, litchi_pptx::Error::Invalid(_)),
+        matches!(error, crate::Error::Invalid(_)),
         "Strict owner with Transitional PresentationML must refuse: {error:?}"
     );
     assert_eq!(
@@ -393,7 +394,7 @@ fn strict_owner_rejects_a_transitional_relationship_namespace() {
     let before_target = package.get_part(&action_name).unwrap().blob().to_vec();
     let error = load_error(&package, &slide_name);
     assert!(
-        matches!(error, litchi_pptx::Error::Invalid(_)),
+        matches!(error, crate::Error::Invalid(_)),
         "Strict owner with Transitional relationships must refuse: {error:?}"
     );
     assert_eq!(
@@ -421,7 +422,7 @@ fn strict_owner_rejects_a_transitional_custom_xml_relationship_type() {
     let before_target = package.get_part(&action_name).unwrap().blob().to_vec();
     let error = load_error(&package, &slide_name);
     assert!(
-        matches!(error, litchi_pptx::Error::Relationship(_)),
+        matches!(error, crate::Error::Relationship(_)),
         "Strict owner with Transitional customXml relationship must refuse: {error:?}"
     );
     assert_eq!(package.get_part(&slide_name).unwrap().blob(), strict_source);
@@ -654,7 +655,7 @@ fn signed_package_root_edge_allows_exact_noop_and_requires_unsign_reload_for_cha
     let error = ink_actions::apply_patch(&mut package, signed_commit.patch()).unwrap_err();
     assert!(matches!(
         error,
-        litchi_pptx::Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy)
+        crate::Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy)
     ));
     assert!(package.is_signed());
     assert_eq!(serialized_opc(&package), before_package);
@@ -677,7 +678,7 @@ fn signed_package_root_edge_allows_exact_noop_and_requires_unsign_reload_for_cha
     );
     let before_stale_target = package.get_part(&action_name).unwrap().blob().to_vec();
     let stale_error = ink_actions::apply_patch(&mut package, signed_commit.patch()).unwrap_err();
-    assert!(matches!(stale_error, litchi_pptx::Error::PatchConflict));
+    assert!(matches!(stale_error, crate::Error::PatchConflict));
     assert_eq!(
         package.get_part(&action_name).unwrap().blob(),
         before_stale_target
@@ -864,7 +865,7 @@ fn known_ecma_outbound_relationship_refuses_typed_action_publication_atomically(
 
     let error = load_error(&package, &slide_name);
     assert!(
-        matches!(error, litchi_pptx::Error::Relationship(_)),
+        matches!(error, crate::Error::Relationship(_)),
         "known ECMA outbound edge must be a typed conformance refusal: {error:?}"
     );
     assert_eq!(package.get_part(&slide_name).unwrap().blob(), before_owner);
@@ -915,7 +916,7 @@ fn package_limits_accept_exact_and_one_under_caps_and_reject_one_over_atomically
         .expect_err("target and aggregate caps must be checked independently");
     assert!(matches!(
         error,
-        litchi_pptx::Error::Limit {
+        crate::Error::Limit {
             resource: "ink-action target bytes",
             ..
         }
@@ -932,7 +933,7 @@ fn package_limits_accept_exact_and_one_under_caps_and_reject_one_over_atomically
         .expect_err("one byte over the aggregate cap must refuse");
     assert!(matches!(
         error,
-        litchi_pptx::Error::Limit {
+        crate::Error::Limit {
             resource: "ink-action aggregate target bytes",
             limit: payload_limit
         } if payload_limit == payload_len - 1
@@ -960,7 +961,7 @@ fn package_limits_accept_exact_and_one_under_caps_and_reject_one_over_atomically
         .expect_err("one anchor over the cap must refuse");
     assert!(matches!(
         error,
-        litchi_pptx::Error::Limit {
+        crate::Error::Limit {
             resource: "ink-action anchor count",
             limit: 1
         }
@@ -977,7 +978,7 @@ fn package_limits_accept_exact_and_one_under_caps_and_reject_one_over_atomically
         .expect_err("one inbound edge over the cap must refuse");
     assert!(matches!(
         error,
-        litchi_pptx::Error::Limit {
+        crate::Error::Limit {
             resource: "ink-action relationship edges",
             limit: 1
         }
@@ -1065,7 +1066,7 @@ fn unrelated_owner_relationships_do_not_consume_selected_target_edge_cap() {
 fn changed_profile_commit(
     package: &OpcPackage,
     slide_name: &PackURI,
-) -> (ink_actions::Snapshot, ink_actions::Commit) {
+) -> (ink_actions::Snapshot, ink_actions::Prepared) {
     let source = action_snapshot(package, slide_name);
     let selector = source.selector(0).unwrap();
     let mut edit = source.edit();
@@ -1101,7 +1102,7 @@ fn patch_read_sets_reject_owner_relationship_target_and_content_type_staleness_a
             .into_bytes();
         package.get_part_mut(&slide_name).unwrap().set_blob(updated);
         let error = ink_actions::apply_patch(&mut package, commit.patch()).unwrap_err();
-        assert!(matches!(error, litchi_pptx::Error::PatchConflict));
+        assert!(matches!(error, crate::Error::PatchConflict));
         assert_ne!(package.get_part(&slide_name).unwrap().blob(), before_owner);
         assert_eq!(source.source_xml(), commit.snapshot().source_xml());
     }
@@ -1124,7 +1125,7 @@ fn patch_read_sets_reject_owner_relationship_target_and_content_type_staleness_a
             false,
         );
         let error = ink_actions::apply_patch(&mut package, commit.patch()).unwrap_err();
-        assert!(matches!(error, litchi_pptx::Error::PatchConflict));
+        assert!(matches!(error, crate::Error::PatchConflict));
     }
 
     {
@@ -1141,7 +1142,7 @@ fn patch_read_sets_reject_owner_relationship_target_and_content_type_staleness_a
             true,
         );
         let error = ink_actions::apply_patch(&mut package, commit.patch()).unwrap_err();
-        assert!(matches!(error, litchi_pptx::Error::Relationship(_)));
+        assert!(matches!(error, crate::Error::Relationship(_)));
         assert_eq!(package.get_part(&slide_name).unwrap().blob(), before_owner);
         assert_eq!(
             package.get_part(&action_name).unwrap().blob(),
@@ -1162,7 +1163,7 @@ fn patch_read_sets_reject_owner_relationship_target_and_content_type_staleness_a
             .unwrap()
             .set_blob(changed);
         let error = ink_actions::apply_patch(&mut package, commit.patch()).unwrap_err();
-        assert!(matches!(error, litchi_pptx::Error::PatchConflict));
+        assert!(matches!(error, crate::Error::PatchConflict));
         assert_ne!(package.get_part(&action_name).unwrap().blob(), before);
     }
 
@@ -1175,7 +1176,7 @@ fn patch_read_sets_reject_owner_relationship_target_and_content_type_staleness_a
             .set_content_type("application/xml".to_owned())
             .unwrap();
         let error = ink_actions::apply_patch(&mut package, commit.patch()).unwrap_err();
-        assert!(matches!(error, litchi_pptx::Error::ContentType { .. }));
+        assert!(matches!(error, crate::Error::ContentType { .. }));
         assert_eq!(
             package.get_part(&action_name).unwrap().content_type(),
             "application/xml"
@@ -1200,7 +1201,7 @@ fn selector_context_is_checked_against_the_new_snapshot() {
     let error = edit
         .edit_profile(selector, |_profile| Ok(()))
         .expect_err("old selector must be stale");
-    assert!(matches!(error, litchi_pptx::Error::PatchConflict));
+    assert!(matches!(error, crate::Error::PatchConflict));
 }
 
 #[test]
@@ -1230,10 +1231,10 @@ fn selector_context_includes_changed_relationship_graph_diagnostics() {
     let error = edit
         .edit_profile(selector, |_profile| Ok(()))
         .expect_err("a selector from the pre-graph-change snapshot must be stale");
-    assert!(matches!(error, litchi_pptx::Error::PatchConflict));
+    assert!(matches!(error, crate::Error::PatchConflict));
 }
 
-fn load_error(package: &OpcPackage, slide_name: &PackURI) -> litchi_pptx::Error {
+fn load_error(package: &OpcPackage, slide_name: &PackURI) -> crate::Error {
     let slide = package.get_part(slide_name).unwrap();
     ink_actions::load_snapshot(package, 0, slide, &ink_actions::Limits::default()).unwrap_err()
 }
@@ -1259,7 +1260,7 @@ fn malformed_inbound_relationship_is_a_typed_closure_error_and_is_not_dropped() 
 
     let error = load_error(&package, &slide_name);
     assert!(
-        matches!(error, litchi_pptx::Error::Relationship(_)),
+        matches!(error, crate::Error::Relationship(_)),
         "malformed inbound edge must not disappear from the closure: {error:?}"
     );
     assert_eq!(package.get_part(&slide_name).unwrap().blob(), before_owner);
@@ -1332,10 +1333,7 @@ fn unsupported_and_ambiguous_mce_shapes_remain_opaque_or_fail_closed() {
         if *rejected {
             let error = load_error(&package, &slide_name);
             assert!(
-                matches!(
-                    error,
-                    litchi_pptx::Error::Invalid(_) | litchi_pptx::Error::Xml(_)
-                ),
+                matches!(error, crate::Error::Invalid(_) | crate::Error::Xml(_)),
                 "{label}: expected typed MCE rejection, got {error:?}"
             );
         } else {
@@ -1356,7 +1354,7 @@ fn unsupported_and_ambiguous_mce_shapes_remain_opaque_or_fail_closed() {
                 let error = edit
                     .edit_profile(selector, |_profile| Ok(()))
                     .expect_err("opaque action-capable MCE must not become typed");
-                assert!(matches!(error, litchi_pptx::Error::Invalid(_)));
+                assert!(matches!(error, crate::Error::Invalid(_)));
             }
         }
         assert_ne!(package.get_part(&slide_name).unwrap().blob(), original);
@@ -1368,7 +1366,7 @@ fn malformed_anchor_and_relationship_closures_fail_without_repair() {
     type RefusalCase = (
         &'static str,
         fn(&mut OpcPackage, &PackURI),
-        fn(litchi_pptx::Error) -> bool,
+        fn(crate::Error) -> bool,
     );
     let variants: &[RefusalCase] = &[
         (
@@ -1382,7 +1380,7 @@ fn malformed_anchor_and_relationship_closures_fail_without_repair() {
                     .unwrap()
                     .set_blob(xml.into_bytes());
             },
-            |error: litchi_pptx::Error| matches!(error, litchi_pptx::Error::Invalid(_)),
+            |error: crate::Error| matches!(error, crate::Error::Invalid(_)),
         ),
         (
             "duplicate-rid",
@@ -1398,7 +1396,7 @@ fn malformed_anchor_and_relationship_closures_fail_without_repair() {
                     .unwrap()
                     .set_blob(xml.into_bytes());
             },
-            |error: litchi_pptx::Error| matches!(error, litchi_pptx::Error::Invalid(_)),
+            |error: crate::Error| matches!(error, crate::Error::Invalid(_)),
         ),
         (
             "wrong-relationship",
@@ -1419,7 +1417,7 @@ fn malformed_anchor_and_relationship_closures_fail_without_repair() {
                         false,
                     );
             },
-            |error: litchi_pptx::Error| matches!(error, litchi_pptx::Error::Relationship(_)),
+            |error: crate::Error| matches!(error, crate::Error::Relationship(_)),
         ),
         (
             "external-target",
@@ -1440,14 +1438,14 @@ fn malformed_anchor_and_relationship_closures_fail_without_repair() {
                         true,
                     );
             },
-            |error: litchi_pptx::Error| matches!(error, litchi_pptx::Error::Relationship(_)),
+            |error: crate::Error| matches!(error, crate::Error::Relationship(_)),
         ),
         (
             "missing-target",
             |package: &mut OpcPackage, _slide_name: &PackURI| {
                 package.remove_part(&PackURI::new(ACTION_NAME).unwrap());
             },
-            |error: litchi_pptx::Error| matches!(error, litchi_pptx::Error::PartNotFound(_)),
+            |error: crate::Error| matches!(error, crate::Error::PartNotFound(_)),
         ),
         (
             "wrong-content-type",
@@ -1458,7 +1456,7 @@ fn malformed_anchor_and_relationship_closures_fail_without_repair() {
                     .set_content_type("application/xml".to_owned())
                     .unwrap();
             },
-            |error: litchi_pptx::Error| matches!(error, litchi_pptx::Error::ContentType { .. }),
+            |error: crate::Error| matches!(error, crate::Error::ContentType { .. }),
         ),
         (
             "wrong-root",
@@ -1468,12 +1466,10 @@ fn malformed_anchor_and_relationship_closures_fail_without_repair() {
                     .unwrap()
                     .set_blob(b"<wrong:root xmlns:wrong=\"urn:wrong\"/>".to_vec());
             },
-            |error: litchi_pptx::Error| {
+            |error: crate::Error| {
                 matches!(
                     error,
-                    litchi_pptx::Error::Invalid(_)
-                        | litchi_pptx::Error::Xml(_)
-                        | litchi_pptx::Error::Drawing(_)
+                    crate::Error::Invalid(_) | crate::Error::Xml(_) | crate::Error::Drawing(_)
                 )
             },
         ),
@@ -1586,18 +1582,22 @@ fn public_package_facade_reads_edits_publishes_and_reopens_ink_actions() {
     let source = package.ink_actions().unwrap().remove(0);
     assert_eq!(source.anchors().len(), 1);
     let selector = source.selector(0).unwrap();
-    let mut edit = source.edit();
-    edit.edit_profile(selector, |profile| {
-        profile.set_start_time(ActionSelector::ordinal(0), "12.5")?;
-        Ok(())
-    })
-    .unwrap();
-    let commit = edit.commit().unwrap();
-    assert!(commit.diagnostics().changed());
-
-    let published = package
-        .apply_ink_actions_patch(commit.patch())
+    let mut edit = package.edit_ink_actions().unwrap();
+    assert!(
+        edit.edit_profile(0, selector, |profile| {
+            profile.set_start_time(ActionSelector::ordinal(0), "12.5")?;
+            Ok(())
+        })
+        .unwrap()
+    );
+    let commit = edit
+        .commit()
         .expect("facade publishes a checked action patch");
+    assert!(commit.diagnostics().changed());
+    let inverse = commit.patch().inverse();
+    package = commit.into_package();
+
+    let published = package.ink_actions().unwrap().remove(0);
     assert_eq!(published.anchors().len(), 1);
     assert_eq!(
         published.anchors()[0]
@@ -1607,6 +1607,11 @@ fn public_package_facade_reads_edits_publishes_and_reopens_ink_actions() {
             .unwrap()
             .start_time(),
         "12.5"
+    );
+    let restored = package.apply_ink_actions(&inverse).unwrap().into_package();
+    assert_eq!(
+        restored.ink_actions().unwrap()[0].source_xml(),
+        source.source_xml()
     );
 
     let bytes = package.to_bytes().unwrap();
@@ -1631,6 +1636,8 @@ fn public_presentation_inventory_charges_shared_targets_once_and_distinct_target
 
     let shared = Package::from_opc_package(package_with_two_slide_presentation(true)).unwrap();
     let shared_snapshots = shared
+        .presentation()
+        .unwrap()
         .ink_actions_with_limits(limits)
         .expect("one shared physical target is charged once across slides");
     assert_eq!(shared_snapshots.len(), 2);
@@ -1641,12 +1648,14 @@ fn public_presentation_inventory_charges_shared_targets_once_and_distinct_target
 
     let distinct = Package::from_opc_package(package_with_two_slide_presentation(false)).unwrap();
     let error = distinct
+        .presentation()
+        .unwrap()
         .ink_actions_with_limits(limits)
         .expect_err("distinct targets must consume the package-wide aggregate cap");
     assert!(
         matches!(
             error,
-            litchi_pptx::Error::Limit {
+            crate::Error::Limit {
                 resource: "ink-action aggregate target bytes",
                 limit
             } if limit == payload_len
@@ -1681,7 +1690,7 @@ fn retained_opc_read_limits_cover_unrelated_candidate_parts_atomically() {
         let error = ink_actions::apply_patch(&mut package, commit.patch()).unwrap_err();
         assert!(matches!(
             error,
-            litchi_pptx::Error::Opc(OpcError::Limit {
+            crate::Error::Opc(OpcError::Limit {
                 kind: SourceLimitKind::Parts,
                 ..
             })
@@ -1720,7 +1729,7 @@ fn retained_opc_read_limits_cover_unrelated_candidate_parts_atomically() {
         assert!(
             matches!(
                 error,
-                litchi_pptx::Error::Opc(OpcError::Limit {
+                crate::Error::Opc(OpcError::Limit {
                     kind: SourceLimitKind::PartBytes,
                     ..
                 })
@@ -1752,7 +1761,7 @@ fn retained_opc_read_limits_cover_unrelated_candidate_parts_atomically() {
         let error = ink_actions::apply_patch(&mut package, commit.patch()).unwrap_err();
         assert!(matches!(
             error,
-            litchi_pptx::Error::Opc(OpcError::Limit {
+            crate::Error::Opc(OpcError::Limit {
                 kind: SourceLimitKind::TotalPartBytes,
                 ..
             })
@@ -1797,7 +1806,7 @@ fn retained_lower_opc_limits_are_checked_during_action_inventory() {
         assert!(
             matches!(
                 error,
-                litchi_pptx::Error::Opc(OpcError::Limit {
+                crate::Error::Opc(OpcError::Limit {
                     kind: SourceLimitKind::Parts,
                     ..
                 })
@@ -1829,7 +1838,7 @@ fn retained_lower_opc_limits_are_checked_during_action_inventory() {
         assert!(
             matches!(
                 error,
-                litchi_pptx::Error::Opc(OpcError::Limit {
+                crate::Error::Opc(OpcError::Limit {
                     kind: SourceLimitKind::PartBytes,
                     ..
                 })
@@ -1859,7 +1868,7 @@ fn retained_lower_opc_limits_are_checked_during_action_inventory() {
         assert!(
             matches!(
                 error,
-                litchi_pptx::Error::Opc(OpcError::Limit {
+                crate::Error::Opc(OpcError::Limit {
                     kind: SourceLimitKind::TotalPartBytes,
                     ..
                 })
@@ -1971,7 +1980,7 @@ fn owner_relationship_metadata_and_read_policy_are_stale_patch_inputs() {
                 true,
             );
         let error = ink_actions::apply_patch(&mut package, commit.patch()).unwrap_err();
-        assert!(matches!(error, litchi_pptx::Error::PatchConflict));
+        assert!(matches!(error, crate::Error::PatchConflict));
         assert_eq!(package.get_part(&slide_name).unwrap().blob(), before_owner);
         assert_eq!(
             package.get_part(&action_name).unwrap().blob(),
@@ -1996,7 +2005,7 @@ fn owner_relationship_metadata_and_read_policy_are_stale_patch_inputs() {
     .unwrap();
     let commit = edit.commit().unwrap();
     let error = ink_actions::apply_patch(&mut package_b, commit.patch()).unwrap_err();
-    assert!(matches!(error, litchi_pptx::Error::PatchConflict));
+    assert!(matches!(error, crate::Error::PatchConflict));
 }
 
 #[test]
@@ -2053,7 +2062,7 @@ fn exact_root_and_owner_relationship_source_members_are_stale_patch_inputs() {
             .to_vec();
         let error = ink_actions::apply_patch(&mut mutated, commit.patch()).unwrap_err();
         assert!(
-            matches!(error, litchi_pptx::Error::PatchConflict),
+            matches!(error, crate::Error::PatchConflict),
             "{member} lexical source change must be stale: {error:?}"
         );
         assert_eq!(mutated.get_part(&slide_name).unwrap().blob(), before_owner);
@@ -2096,7 +2105,7 @@ fn exact_root_relationship_readset_rejects_a_boundary_free_hash_collision() {
         false,
     );
     let error = ink_actions::apply_patch(&mut package, commit.patch()).unwrap_err();
-    assert!(matches!(error, litchi_pptx::Error::PatchConflict));
+    assert!(matches!(error, crate::Error::PatchConflict));
 }
 
 #[test]
@@ -2120,7 +2129,7 @@ fn changed_profile_over_caller_target_cap_refuses_before_publication() {
     assert!(
         matches!(
             error,
-            litchi_pptx::Error::Limit {
+            crate::Error::Limit {
                 resource: "ink-action target bytes",
                 limit
             } if limit == target_cap
@@ -2146,7 +2155,7 @@ fn oversized_profile_bytes_hit_the_target_cap_before_profile_parse_or_staging() 
     assert!(
         matches!(
             error,
-            litchi_pptx::Error::Limit {
+            crate::Error::Limit {
                 resource: "ink-action target bytes",
                 limit
             } if limit == target_cap

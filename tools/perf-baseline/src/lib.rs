@@ -17649,9 +17649,12 @@ fn build_pptx_cross_copy_corpus(case: Case) -> Result<PptxCrossCopyCorpus, Box<d
         litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.clone()))?;
     let mut source_for_publication =
         litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.clone()))?;
-    let published_snapshot =
-        published_destination.apply_cross_slide_copy_plan(&source_for_publication, &plan)?;
-    if published_snapshot.slides().len() != destination_snapshot.slides().len() + 1 {
+    let mut publication = published_destination.edit()?;
+    publication.stage_cross_slide_copy(&source_for_publication, &plan)?;
+    published_destination = publication.commit()?.into_package();
+    if published_destination.presentation()?.slide_count()?
+        != destination_snapshot.slides().len() + 1
+    {
         return Err("PPTX cross-copy corpus publication changed the wrong slide count".into());
     }
     let expected_output = published_destination.to_bytes()?;
@@ -19816,7 +19819,7 @@ fn pptx_cross_copy_expected_content_types(opc: &OpcPackage) -> String {
 fn verify_pptx_cross_copy_part_relationships(
     source_part: &dyn litchi_opc::Part,
     candidate_part: &dyn litchi_opc::Part,
-    plan: &litchi_pptx::opened::CrossSlideCopyPlan,
+    plan: &litchi_pptx::cross_slide_copy::Plan,
     source_slide: &PackURI,
     source_layout: &PackURI,
     destination_layout: &PackURI,
@@ -19866,7 +19869,7 @@ fn verify_pptx_cross_copy_part_relationships(
 fn verify_pptx_cross_copy_presentation_relationships(
     destination_presentation: &dyn litchi_opc::Part,
     candidate_presentation: &dyn litchi_opc::Part,
-    plan: &litchi_pptx::opened::CrossSlideCopyPlan,
+    plan: &litchi_pptx::cross_slide_copy::Plan,
 ) -> Result<bool, Box<dyn Error>> {
     if candidate_presentation.rels().len() != destination_presentation.rels().len() + 1
         || destination_presentation
@@ -19925,7 +19928,7 @@ fn verify_pptx_cross_copy_output(
     source_archive: &[u8],
     destination_archive: &[u8],
     output: &[u8],
-    plan: &litchi_pptx::opened::CrossSlideCopyPlan,
+    plan: &litchi_pptx::cross_slide_copy::Plan,
     expectation: PptxCrossCopySemanticExpectation<'_>,
 ) -> Result<PptxCrossCopyOutputChecks, Box<dyn Error>> {
     let source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
@@ -20113,7 +20116,7 @@ fn verify_pptx_cross_copy_output(
 fn verify_pptx_cross_copy_refusal_gates(
     source_archive: &[u8],
     destination_archive: &[u8],
-    plan: &litchi_pptx::opened::CrossSlideCopyPlan,
+    plan: &litchi_pptx::cross_slide_copy::Plan,
     output_checks: PptxCrossCopyOutputChecks,
     source_immutability_verified: bool,
 ) -> Result<PptxCrossCopyGateSummary, Box<dyn Error>> {
@@ -20122,15 +20125,19 @@ fn verify_pptx_cross_copy_refusal_gates(
     let patch_source =
         litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
     let encoded = plan.patch().to_bytes()?;
-    let decoded = litchi_pptx::opened::CrossSlideCopyPatch::from_bytes(&encoded)?;
+    let decoded = litchi_pptx::cross_slide_copy::Patch::from_bytes(&encoded)?;
     if decoded != *plan.patch() {
         return Err("PPTX cross-copy durable patch did not round-trip".into());
     }
-    patch_destination.apply_cross_slide_copy_patch(&patch_source, &decoded)?;
+    patch_destination = patch_destination
+        .apply_cross_slide_copy(&patch_source, &decoded)?
+        .into_package();
     let published = patch_destination.to_bytes()?;
     let mut inverse_destination =
         litchi_pptx::Package::from_reader(std::io::Cursor::new(published))?;
-    inverse_destination.apply_cross_slide_copy_patch(&patch_source, &decoded.inverse())?;
+    inverse_destination = inverse_destination
+        .apply_cross_slide_copy(&patch_source, &decoded.inverse())?
+        .into_package();
     let durable_patch_round_trip_verified = inverse_destination.to_bytes()? == destination_archive;
 
     let borrowed_source = litchi_pptx::Package::from_bytes(source_archive)?;
@@ -20170,8 +20177,9 @@ fn verify_pptx_cross_copy_refusal_gates(
     )?;
     stale_destination = stale_destination_edit.commit()?.into_package();
     let stale_destination_before = stale_destination.to_bytes()?;
-    let stale_destination_result =
-        stale_destination.apply_cross_slide_copy_plan(&stale_source, &stale_plan);
+    let stale_destination_result = stale_destination
+        .edit()
+        .and_then(|mut edit| edit.stage_cross_slide_copy(&stale_source, &stale_plan));
     let stale_destination_refusal_verified = stale_destination_result.is_err()
         && stale_destination.to_bytes()? == stale_destination_before;
 
@@ -20200,8 +20208,9 @@ fn verify_pptx_cross_copy_refusal_gates(
     let mut stale_source_destination =
         litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
     let stale_source_destination_before = stale_source_destination.to_bytes()?;
-    let stale_source_result =
-        stale_source_destination.apply_cross_slide_copy_plan(&stale_source, &clean_plan);
+    let stale_source_result = stale_source_destination
+        .edit()
+        .and_then(|mut edit| edit.stage_cross_slide_copy(&stale_source, &clean_plan));
     let stale_source_refusal_verified = stale_source_result.is_err()
         && stale_source.to_bytes()? == stale_source_before
         && stale_source_destination.to_bytes()? == stale_source_destination_before;
@@ -20211,7 +20220,9 @@ fn verify_pptx_cross_copy_refusal_gates(
     let foreign_before = foreign_destination.to_bytes()?;
     let foreign_source =
         litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
-    let foreign_result = foreign_destination.apply_cross_slide_copy_plan(&foreign_source, plan);
+    let foreign_result = foreign_destination
+        .edit()
+        .and_then(|mut edit| edit.stage_cross_slide_copy(&foreign_source, plan));
     let foreign_source_refusal_verified =
         foreign_result.is_err() && foreign_destination.to_bytes()? == foreign_before;
 
@@ -51568,9 +51579,11 @@ fn run_pptx_cross_copy(
         }
 
         let started = Instant::now();
-        let published = destination.apply_cross_slide_copy_plan(&source, &plan)?;
+        let mut publication = destination.edit()?;
+        publication.stage_cross_slide_copy(&source, &plan)?;
+        destination = publication.commit()?.into_package();
         let commit_duration = started.elapsed();
-        if published.slides().len() != corpus.destination_slide_count + 1 {
+        if destination.presentation()?.slide_count()? != corpus.destination_slide_count + 1 {
             return Err("PPTX cross-copy commit changed the wrong slide count".into());
         }
 
@@ -51643,7 +51656,7 @@ fn run_pptx_cross_copy(
         return Err("PPTX cross-copy measured output digests are not stable".into());
     }
     let cross_copy = PptxCrossCopySummary {
-        implementation: "opened::CrossSlideCopyPlan + Package::apply_cross_slide_copy_plan + OpcPackage::write_to",
+        implementation: "cross_slide_copy::Plan + opened::Edit::stage_cross_slide_copy + OpcPackage::write_to",
         timing_scope: "plan only; commit only; OPC sequential publication only; setup, reopen, semantic/package/closure/refusal verification excluded",
         performance_claim: "none: opt-in correctness/evidence only; no release ABBA, speedup, allocation, RSS, or physical-I/O claim",
         source_archive_sha256: sha256_hex(&corpus.source_archive),
@@ -51786,7 +51799,9 @@ fn run_pptx_cross_copy_lifecycle(
         let plan_duration = plan_started.elapsed();
 
         let commit_started = Instant::now();
-        let published = destination.apply_cross_slide_copy_plan(&source, &plan)?;
+        let mut publication = destination.edit()?;
+        publication.stage_cross_slide_copy(&source, &plan)?;
+        destination = publication.commit()?.into_package();
         let commit_duration = commit_started.elapsed();
 
         let publication_started = Instant::now();
@@ -51821,7 +51836,7 @@ fn run_pptx_cross_copy_lifecycle(
         {
             return Err("PPTX cross-copy lifecycle plan metadata is not deterministic".into());
         }
-        if published.slides().len() != corpus.destination_slide_count + 1 {
+        if destination.presentation()?.slide_count()? != corpus.destination_slide_count + 1 {
             return Err("PPTX cross-copy lifecycle commit changed the wrong slide count".into());
         }
         if sink.bytes != corpus.expected_output
@@ -51903,7 +51918,7 @@ fn run_pptx_cross_copy_lifecycle(
     reorder_sample_vector(&mut reopen_ns, &sample_order)?;
     reorder_sample_vector(&mut output_digests, &sample_order)?;
     let cross_copy = PptxCrossCopySummary {
-        implementation: "Package::from_vec + opened::CrossSlideCopyPlan + Package::apply_cross_slide_copy_plan + OpcPackage::write_to",
+        implementation: "Package::from_vec + cross_slide_copy::Plan + opened::Edit::stage_cross_slide_copy + OpcPackage::write_to",
         timing_scope: "lifecycle_ns and operation_metrics cover owned source/destination ingress, opened snapshots, plan, atomic cross-copy commit, and final OPC sequential publication; corpus clones and sink reservation are outside; plan/commit/publication are nested diagnostics; reopen and all semantic/package/closure/refusal/source checks are outside",
         performance_claim: "none: opt-in correctness, lifecycle, and operation-allocation evidence only; no release ABBA, speedup, RSS, physical-I/O, or full-retention memory claim",
         source_archive_sha256: sha256_hex(&corpus.source_archive),

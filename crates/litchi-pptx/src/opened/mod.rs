@@ -8,7 +8,7 @@
 //! transfer refusals before mutation.
 
 mod chunks;
-mod copy_plan;
+pub(crate) mod copy_plan;
 pub(crate) mod cross_copy_plan;
 mod enclosed_removal;
 mod geometry;
@@ -19,7 +19,7 @@ mod new_slide;
 mod patch;
 mod properties;
 mod removal_proof;
-mod remove_plan;
+pub(crate) mod remove_plan;
 pub(crate) mod sections;
 mod slide_properties;
 mod text_format;
@@ -50,15 +50,12 @@ mod transition_edit_tests;
 /// [`LimitKind`]. Splitting a focused error out of the crate error is
 /// deferred (record 0252).
 pub use crate::Error;
-pub use copy_plan::{SlideCopyPart, SlideCopyPlan};
-pub use cross_copy_plan::{CrossSlideCopyPatch, CrossSlideCopyPlan};
 pub use limit::LimitKind;
 pub use model::{
     Limits, MAX_SHAPE_PROPERTIES_REPLACEMENTS, MAX_SHAPE_TEXT_REPLACEMENTS,
     ShapePropertiesReplacement, ShapeTextReplacement, Slide, Snapshot,
 };
 pub use patch::{Conflict, History, Patch, Resolution, ThreeWayPlan};
-pub use remove_plan::{SlideRemovalPatch, SlideRemovalPlan};
 pub use text_format::{
     CellFill, CellMargin, MAX_FONT_SIZE, MAX_TYPEFACE_BYTES, MIN_FONT_SIZE, Rgb, ShapeFill,
     TextBody, TextEdit, TextProperties, TextTarget,
@@ -77,7 +74,7 @@ pub(crate) use enclosed_removal::{stage_enclosed_shape_removal, validate_enclose
 pub(crate) use geometry::geometry_skeleton;
 pub(crate) use model::{
     PartDigests, capture_with_parent_digests, capture_with_provenance, package_fingerprint,
-    package_fingerprint_with_memo,
+    package_fingerprint_with_memo, relationships_equal,
 };
 pub(crate) use new_slide::{
     Planned as NewSlidePlaceholder, plan as plan_new_slide_placeholders,

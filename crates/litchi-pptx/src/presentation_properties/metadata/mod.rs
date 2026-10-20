@@ -17,7 +17,7 @@ pub mod guides;
 pub mod handout;
 pub mod protection;
 pub mod revision;
-pub use super::readonly_recommended;
+pub use super::read_only_recommended;
 pub mod sections;
 pub mod slide_sync;
 pub mod structure;

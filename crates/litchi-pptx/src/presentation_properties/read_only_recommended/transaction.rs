@@ -29,15 +29,6 @@ impl Snapshot {
         super::package::load_snapshot(package)
     }
 
-    /// Alias emphasizing the source-bound read.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the owner or its package graph is malformed.
-    pub fn read(package: &OpcPackage) -> Result<Option<Self>> {
-        Self::load(package)
-    }
-
     /// Parse a complete `p:presentationPr` source and retain its exact bytes.
     ///
     /// # Errors
@@ -94,33 +85,12 @@ impl Snapshot {
         &self.source_part_name
     }
 
-    /// Alias using the generic OPC owner vocabulary.
-    #[inline]
-    #[must_use]
-    pub fn part_name(&self) -> &str {
-        self.source_part_name()
-    }
-
     /// Return the optional typed recommendation. `None` means the extension is
     /// absent; it is distinct from `Some(false)`.
     #[inline]
     #[must_use]
     pub const fn value(&self) -> Option<bool> {
         self.located.value
-    }
-
-    /// Alias emphasizing the XML element's semantic name.
-    #[inline]
-    #[must_use]
-    pub const fn readonly_recommended(&self) -> Option<bool> {
-        self.value()
-    }
-
-    /// Alias using the conventional Rust spelling.
-    #[inline]
-    #[must_use]
-    pub const fn read_only_recommended(&self) -> Option<bool> {
-        self.value()
     }
 
     /// Borrow the exact source XML captured by this snapshot.
@@ -140,8 +110,8 @@ impl Snapshot {
     /// Start an atomic detached edit.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Edit {
-        Edit {
+    pub(crate) fn edit(&self) -> Draft {
+        Draft {
             original: self.clone(),
             working: self.value(),
         }
@@ -161,58 +131,33 @@ impl Snapshot {
 
 /// A bounded edit staged against one presentation-properties source.
 #[derive(Clone, Debug)]
-pub struct Edit {
+pub(crate) struct Draft {
     original: Snapshot,
     working: Option<bool>,
 }
 
-impl Edit {
-    /// Borrow the projected optional value.
-    #[inline]
-    #[must_use]
-    pub const fn value(&self) -> Option<bool> {
-        self.working
-    }
-
-    /// Alias for [`Self::value`].
-    #[inline]
-    #[must_use]
-    pub const fn snapshot(&self) -> Option<bool> {
-        self.value()
-    }
-
+impl Draft {
     fn is_changed(&self) -> bool {
         self.original.value() != self.working
-    }
-
-    /// The outcome of this edit or commit.
-    #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
-        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Set or clear the optional recommendation.
     ///
     /// `None` removes the recognized extension while preserving the enclosing
     /// extension list and every unrelated source byte.
-    pub fn set(&mut self, value: Option<bool>) -> Result<bool> {
+    pub(crate) fn set(&mut self, value: Option<bool>) -> Result<bool> {
         let changed = self.working != value;
         self.working = value;
         Ok(changed)
     }
 
-    /// Set the recommendation to a concrete boolean value.
-    pub fn set_readonly_recommended(&mut self, value: bool) -> Result<bool> {
+    /// Set the recommendation.
+    pub(crate) fn set_read_only_recommended(&mut self, value: bool) -> Result<bool> {
         self.set(Some(value))
     }
 
-    /// Alias using the conventional Rust spelling.
-    pub fn set_read_only_recommended(&mut self, value: bool) -> Result<bool> {
-        self.set_readonly_recommended(value)
-    }
-
     /// Remove the recognized recommendation.
-    pub fn remove(&mut self) -> Result<bool> {
+    pub(crate) fn remove(&mut self) -> Result<bool> {
         self.set(None)
     }
 
@@ -221,10 +166,10 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the source splice or typed readback fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Prepared> {
         if !self.is_changed() {
-            let patch = Patch::new(self.original.clone(), self.original.clone());
-            return Ok(Commit {
+            let patch = Change::new(self.original.clone(), self.original.clone());
+            return Ok(Prepared {
                 snapshot: self.original,
                 patch,
                 changed: false,
@@ -247,8 +192,8 @@ impl Edit {
             Arc::clone(&updated),
             located,
         );
-        let patch = Patch::new(self.original, snapshot.clone());
-        Ok(Commit {
+        let patch = Change::new(self.original, snapshot.clone());
+        Ok(Prepared {
             snapshot,
             patch,
             changed: true,
@@ -258,91 +203,93 @@ impl Edit {
 
 /// A committed source-preserving recommendation edit.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Prepared {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: Snapshot,
-    patch: Patch,
+    patch: Change,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     changed: bool,
 }
 
-impl Commit {
+impl Prepared {
+    #[cfg(test)]
     fn is_changed(&self) -> bool {
         self.changed
     }
 
     /// The outcome of this edit or commit.
     #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
         crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     #[inline]
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     #[inline]
     #[must_use]
-    pub const fn before_value(&self) -> Option<bool> {
+    pub(crate) const fn before_value(&self) -> Option<bool> {
         self.patch.before.value()
     }
 
     #[inline]
     #[must_use]
-    pub const fn after_value(&self) -> Option<bool> {
+    #[cfg(test)]
+    pub(crate) const fn after_value(&self) -> Option<bool> {
         self.patch.after.value()
     }
 
     #[inline]
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &Change {
         &self.patch
-    }
-
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
     }
 }
 
 /// A reversible, source-checked replacement of one properties XML source.
 #[derive(Clone, Debug)]
-pub struct Patch {
+pub(crate) struct Change {
     before: Snapshot,
     after: Snapshot,
 }
 
-impl Patch {
+impl Change {
     fn new(before: Snapshot, after: Snapshot) -> Self {
         Self { before, after }
     }
 
     #[inline]
     #[must_use]
-    pub fn before(&self) -> &Snapshot {
+    pub(crate) fn before(&self) -> &Snapshot {
         &self.before
     }
 
     #[inline]
     #[must_use]
-    pub fn after(&self) -> &Snapshot {
+    pub(crate) fn after(&self) -> &Snapshot {
         &self.after
     }
 
     #[inline]
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
-    #[inline]
     #[must_use]
-    pub const fn expected_revision(&self) -> Revision {
-        self.before.revision
-    }
-
-    #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -355,7 +302,8 @@ impl Patch {
     ///
     /// Returns an error when the target is stale or the published source does
     /// not reparse to the committed typed value.
-    pub fn apply(&self, target: &mut Vec<u8>) -> Result<Snapshot> {
+    #[cfg(test)]
+    pub(crate) fn apply(&self, target: &mut Vec<u8>) -> Result<Snapshot> {
         if target.as_slice() != self.before.source_xml.as_slice() {
             return Err(invalid("presentation-properties source is stale"));
         }
@@ -380,21 +328,6 @@ impl Patch {
         }
         *target = self.after.source_xml.as_ref().clone();
         Ok(result)
-    }
-
-    /// Alias emphasizing the detached source target.
-    pub fn apply_to(&self, target: &mut Vec<u8>) -> Result<Snapshot> {
-        self.apply(target)
-    }
-
-    /// Apply this patch atomically to its owning OPC package part.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the package source is stale or the publication
-    /// policy rejects the mutation.
-    pub fn apply_package(&self, target: &mut OpcPackage) -> Result<Snapshot> {
-        super::package::apply_patch(target, self)
     }
 }
 

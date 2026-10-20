@@ -81,6 +81,7 @@ pub mod builder;
 pub mod change_tracking;
 pub mod chart;
 pub mod comments;
+pub mod cross_slide_copy;
 pub mod custom;
 pub mod diagnostics;
 mod error;
@@ -98,14 +99,18 @@ pub mod master_layout;
 pub mod metadata;
 pub(crate) mod namespace;
 pub mod notes;
+pub mod opc;
 mod open_options;
 pub mod opened;
 pub mod package;
+pub(crate) mod part_edit;
 pub mod parts;
 pub mod presentation;
 pub mod presentation_properties;
 pub mod shape;
 pub mod slide;
+pub mod slide_copy;
+pub mod slide_removal;
 mod source_limits;
 pub mod table;
 pub mod tag;
@@ -172,12 +177,8 @@ pub use litchi_ooxml_common::package_encryption::{
 pub use litchi_opc::{SourceLimitKind, SourceLimits};
 pub use master_layout::{
     AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID,
-    PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderKind, PlaceholderSignaturePolicy, PlaceholderSpec,
-    PlaceholderTypeExtension, PlaceholderTypeExtensionCommit, PlaceholderTypeExtensionEdit,
-    PlaceholderTypeExtensionLimits, PlaceholderTypeExtensionPatch,
-    PlaceholderTypeExtensionSlotCommit, PlaceholderTypeExtensionSlotEdit,
-    PlaceholderTypeExtensionSlotPatch, PlaceholderTypeExtensionSlotSnapshot,
-    PlaceholderTypeExtensionSnapshot, SlideLayoutKind,
+    PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderKind, PlaceholderSpec, PlaceholderTypeExtension,
+    SlideLayoutKind,
 };
 pub use media_parts::{
     Bookmark, Data, ExtensionList, Fade, Picture, Poster, Resource, Transform, Trim,
@@ -186,9 +187,8 @@ pub use media_parts::{
 pub use modern_comments::*;
 pub use open_options::{OpenOptions, OpenPolicy};
 pub use opened::{
-    CrossSlideCopyPatch, CrossSlideCopyPlan, MAX_SHAPE_PROPERTIES_REPLACEMENTS,
-    MAX_SHAPE_TEXT_REPLACEMENTS, ShapePropertiesReplacement, ShapeTextReplacement, SlideCopyPart,
-    SlideCopyPlan, SlideRemovalPatch, SlideRemovalPlan,
+    MAX_SHAPE_PROPERTIES_REPLACEMENTS, MAX_SHAPE_TEXT_REPLACEMENTS, ShapePropertiesReplacement,
+    ShapeTextReplacement,
 };
 pub use package::Package;
 pub use presentation::embedded::ink_actions;

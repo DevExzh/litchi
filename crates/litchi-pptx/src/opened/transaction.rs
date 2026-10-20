@@ -56,6 +56,10 @@ pub struct Edit {
     /// disassociates weak references). Commit consults it to avoid reading
     /// the same bytes as a scene a second time; a miss is the ordinary read.
     scene_read: HashMap<PackURI, Weak<Vec<u8>>>,
+    /// The published snapshot and generic patch of a staged slide plan that
+    /// was this edit's first change. Commit publishes them directly while the
+    /// staged graph is still exactly the plan's candidate.
+    planned: Option<(Snapshot, Patch)>,
 }
 
 impl std::fmt::Debug for Edit {
@@ -75,6 +79,7 @@ impl Edit {
             slides: source.slides.clone(),
             slide_name_index: source.slide_name_index.clone(),
             scene_read: HashMap::new(),
+            planned: None,
             source,
         }
     }
@@ -339,6 +344,133 @@ impl Edit {
         self.slides = published.slides;
         self.slide_name_index = published.slide_name_index;
         Ok(selected)
+    }
+
+    /// Record a staged plan's publication when it was this edit's first
+    /// change, so commit can publish it without capturing it again.
+    fn record_plan(&mut self, source_revision: [u8; 32], published: Snapshot, patch: &Patch) {
+        self.slides = published.slides.clone();
+        self.slide_name_index = published.slide_name_index.clone();
+        self.planned = (source_revision == self.source.revision && self.planned.is_none())
+            .then(|| (published, patch.clone()));
+    }
+
+    /// Stage a source-bound same-package whole-slide copy plan
+    /// ([`Snapshot::plan_slide_copy`]).
+    ///
+    /// Planning validated and materialized the complete candidate. Staging
+    /// refuses when any part of the staged graph differs from the planned
+    /// source, including resources outside the copy write set, so a plan is
+    /// staged before any other change of its edit. The plan's durable patch
+    /// replays through [`crate::Package::apply`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] for a stale plan, the encryption
+    /// policy refusal, or an error for a candidate graph that no longer
+    /// applies exactly.
+    pub fn stage_slide_copy(&mut self, plan: &crate::slide_copy::Plan) -> Result<()> {
+        self.source
+            .owner_state
+            .ensure_plain_mutation("stage_slide_copy")?;
+        if super::package_fingerprint(&self.working)? != plan.source_revision() {
+            return Err(Error::PatchConflict);
+        }
+        let mut snapshot = super::apply(
+            &mut self.working,
+            plan.patch(),
+            self.source.physical_source_provenance,
+        )?;
+        snapshot.owner_state = Arc::clone(&self.source.owner_state);
+        self.record_plan(plan.source_revision(), snapshot, plan.patch());
+        Ok(())
+    }
+
+    /// Stage a source-bound whole-slide removal plan
+    /// ([`Snapshot::plan_slide_removal`]).
+    ///
+    /// Planning captured a complete-package fingerprint; staging refuses when
+    /// the staged graph differs from it, so a plan is staged before any other
+    /// change of its edit. The plan's durable [`crate::slide_removal::Patch`]
+    /// replays through [`crate::Package::apply_slide_removal`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] for a stale plan, the encryption
+    /// policy refusal, or an error for a candidate graph that no longer
+    /// applies exactly.
+    pub fn stage_slide_removal(&mut self, plan: &crate::slide_removal::Plan) -> Result<()> {
+        self.source
+            .owner_state
+            .ensure_plain_mutation("stage_slide_removal")?;
+        let mut snapshot = super::remove_plan::apply_patch(
+            &mut self.working,
+            plan.patch(),
+            self.source.physical_source_provenance,
+        )?;
+        snapshot.owner_state = Arc::clone(&self.source.owner_state);
+        let source_revision = plan.patch().source_revision();
+        self.record_plan(source_revision, snapshot, plan.patch().opened_patch());
+        Ok(())
+    }
+
+    /// Stage a source-bound cross-presentation slide-copy plan
+    /// ([`Snapshot::plan_cross_slide_copy`]) from the read-only `source`
+    /// package.
+    ///
+    /// The source must retain the complete graph revision captured during
+    /// planning and the staged graph must still be the planned destination,
+    /// so a plan is staged before any other change of its edit. Source and
+    /// destination must have been opened through source-preserving ingress
+    /// (`open` or `from_reader`) so discarded ZIP ordering and extra fields
+    /// cannot alias the authorization revision. A plan whose candidate
+    /// transfers source-compressed media
+    /// ([`crate::cross_slide_copy::Plan::transfers_source_compressed_media`])
+    /// is rebuilt from the two packages' bytes; into a destination that is
+    /// not an unmodified owned source it publishes the candidate reopened
+    /// from its archive, and a destination holding a caller-defined `Part`
+    /// implementation refuses it. The plan's durable
+    /// [`crate::cross_slide_copy::Patch`] replays through
+    /// [`crate::Package::apply_cross_slide_copy`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] for stale source or destination
+    /// graphs or a foreign source, and an error for non-source-preserving
+    /// ingress, the encryption policy refusal, a transferring plan applied
+    /// to a destination holding a caller-defined part
+    /// ([`crate::SlideCopyRefusal::CallerDefinedPart`]), or a candidate graph
+    /// that no longer applies exactly.
+    pub fn stage_cross_slide_copy(
+        &mut self,
+        source: &crate::Package,
+        plan: &crate::cross_slide_copy::Plan,
+    ) -> Result<()> {
+        if !source.physical_source_provenance || !self.source.physical_source_provenance {
+            return Err(Error::SlideCopyPlan {
+                kind: crate::SlideCopyRefusal::UnknownPhysicalMember,
+                detail: "cross-slide physical authorization requires source-preserving package ingress (use Package::open, from_reader, or their *_with_options forms)".to_owned(),
+            });
+        }
+        source.ensure_plain_mutation("stage_cross_slide_copy")?;
+        self.source
+            .owner_state
+            .ensure_plain_mutation("stage_cross_slide_copy")?;
+        let mut snapshot = super::cross_copy_plan::apply_plan(
+            source.opc()?,
+            &mut self.working,
+            plan,
+            source.physical_source_provenance,
+            self.source.physical_source_provenance,
+            super::cross_copy_plan::LiveDigests {
+                source: source.part_digest_memo(),
+                destination: Some(&self.source.part_digests),
+            },
+        )?;
+        snapshot.owner_state = Arc::clone(&self.source.owner_state);
+        let source_revision = plan.destination_revision();
+        self.record_plan(source_revision, snapshot, plan.patch().opened_patch());
+        Ok(())
     }
 
     /// Replace all visible text runs in one existing semantic shape.
@@ -2206,6 +2338,14 @@ impl Edit {
     /// dependency changed, the patch exceeds bounds, or the complete staged
     /// package cannot be captured as a coherent snapshot.
     pub fn commit(self) -> Result<Commit> {
+        if let Some((snapshot, patch)) = self.planned
+            && super::model::packages_equal(&self.working, snapshot.package.as_ref())
+        {
+            // The staged graph is exactly the candidate a plan published as
+            // this edit's first change: its validated snapshot and patch stand.
+            let package = crate::Package::from_opened_candidate(self.working, &snapshot);
+            return Ok(Commit::new(package, snapshot, patch));
+        }
         let mut working = self.working;
         compact_changed_slides(
             &mut working,
@@ -3337,6 +3477,14 @@ impl std::fmt::Debug for Commit {
 }
 
 impl Commit {
+    pub(crate) fn new(package: crate::Package, snapshot: Snapshot, patch: Patch) -> Self {
+        Self {
+            package: Arc::new(package),
+            snapshot,
+            patch,
+        }
+    }
+
     /// The immutable package produced by this edit.
     #[must_use]
     pub fn package(&self) -> &crate::Package {

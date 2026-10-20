@@ -1,3 +1,6 @@
+mod in_place;
+use in_place::InPlace as _;
+
 use std::io::{self, Write};
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
@@ -35,7 +38,7 @@ fn package_bytes(slides: &[Vec<u8>]) -> Vec<u8> {
     let authored_bytes = authored.to_bytes().expect("serialize authored package");
     let mut package = Package::from_bytes(&authored_bytes).expect("open authored package");
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             for (index, slide) in slides.iter().enumerate() {
                 let uri = PackURI::new(format!("/ppt/slides/slide{}.xml", index + 1))
                     .expect("generated PPTX slide URI is valid");

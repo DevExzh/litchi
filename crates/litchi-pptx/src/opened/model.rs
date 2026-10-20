@@ -225,8 +225,8 @@ impl Limits {
     /// is always available.
     ///
     /// The retained bytes are observable through
-    /// [`CrossSlideCopyPlan::retained_candidate_bytes`] and released by
-    /// [`CrossSlideCopyPlan::release_retained_candidate`] or by dropping the
+    /// [`crate::cross_slide_copy::Plan::retained_candidate_bytes`] and released by
+    /// [`crate::cross_slide_copy::Plan::release_retained_candidate`] or by dropping the
     /// plan.  The default is 64 MiB.  This ceiling bounds what a plan *holds*.
     /// Applying the plan shares the retained archive with the package it
     /// opens and publishes rather than copying it (change 0751), so after an
@@ -238,8 +238,8 @@ impl Limits {
     /// candidate retention off, since no ZIP archive is
     /// one byte long.
     ///
-    /// [`CrossSlideCopyPlan::retained_candidate_bytes`]: crate::opened::CrossSlideCopyPlan::retained_candidate_bytes
-    /// [`CrossSlideCopyPlan::release_retained_candidate`]: crate::opened::CrossSlideCopyPlan::release_retained_candidate
+    /// [`crate::cross_slide_copy::Plan::retained_candidate_bytes`]: crate::cross_slide_copy::Plan::retained_candidate_bytes
+    /// [`crate::cross_slide_copy::Plan::release_retained_candidate`]: crate::cross_slide_copy::Plan::release_retained_candidate
     #[must_use]
     pub const fn max_retained_candidate_bytes(self) -> usize {
         self.max_retained_candidate_bytes

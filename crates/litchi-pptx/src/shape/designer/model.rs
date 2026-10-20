@@ -612,13 +612,6 @@ impl Snapshot {
         &self.unknown_extensions
     }
 
-    /// Start a detached atomic edit of this snapshot.
-    #[inline]
-    #[must_use]
-    pub fn edit(&self) -> crate::shape::designer::Editor {
-        crate::shape::designer::Editor::new(self.clone())
-    }
-
     pub(crate) fn from_wire(value: Option<bool>, unknown_extensions: Vec<Opaque>) -> Result<Self> {
         let snapshot = Self {
             value,

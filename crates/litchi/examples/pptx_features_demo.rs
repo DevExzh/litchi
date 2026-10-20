@@ -56,11 +56,15 @@ fn main() -> std::result::Result<(), Box<dyn StdError>> {
     );
 
     let mut package = builder.build()?;
-    package.edit_opc(move |opc| {
-        store_comments(opc)?;
-        store_sections(opc, &sections.to_xml()?)?;
-        store_media(opc, media)
-    })?;
+    {
+        let mut opc_edit = package.edit_opc()?;
+        opc_edit.update(move |opc| {
+            store_comments(opc)?;
+            store_sections(opc, &sections.to_xml()?)?;
+            store_media(opc, media)
+        })?;
+        package = opc_edit.commit()?.into_package();
+    }
 
     let output_path = "pptx_features_demo.pptx";
     package.save(output_path)?;

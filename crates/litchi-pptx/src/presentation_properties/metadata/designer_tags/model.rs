@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use super::codec::Layout;
-use super::{Edit, Limits, Tags};
+use super::{Draft, Limits, Tags};
 use crate::{Error, Result};
 
 /// The exact relationship and part binding of one stable slide ID.
@@ -156,11 +156,11 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn edit(self) -> Result<Edit> {
+    pub(crate) fn edit(self) -> Result<Draft> {
         if self.occurrences.len() > 1 {
             return Err(ambiguous(self.occurrences.len()));
         }
-        Ok(Edit::new(self))
+        Ok(Draft::new(self))
     }
 
     pub(crate) fn duplicate(&self) -> Self {

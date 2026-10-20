@@ -199,19 +199,17 @@ fn custom_property_no_ops_preserve_signatures_and_changes_require_explicit_unsig
 
 #[test]
 fn task_panes_facade_publishes_compact_source_checked_reversible_patches() {
-    let mut package = Package::new().expect("new package");
-    let patch = package
-        .task_panes_patch(task_panes(), Conformance::Transitional)
-        .expect("plan task panes");
-    assert!(!patch.is_empty());
-    let inverse = patch.inverse();
-
+    let package = Package::new().expect("new package");
+    let mut edit = package.edit_task_panes().expect("edit task panes");
     assert!(
-        package
-            .apply_task_panes_patch(&patch)
-            .expect("publish task panes")
+        edit.set(task_panes(), Conformance::Transitional)
+            .expect("stage task panes")
     );
-    let loaded = package
+    let commit = edit.commit().expect("publish task panes");
+    assert!(commit.diagnostics().changed());
+    let inverse = commit.patch().inverse();
+    let published = commit.into_package();
+    let loaded = published
         .task_panes()
         .expect("load task panes")
         .expect("panes");
@@ -225,7 +223,7 @@ fn task_panes_facade_publishes_compact_source_checked_reversible_patches() {
             .store(),
         Store::Omex
     );
-    for part in package
+    for part in published
         .opc
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -234,13 +232,13 @@ fn task_panes_facade_publishes_compact_source_checked_reversible_patches() {
         assert!(!part.blob().contains(&b'\n'));
         assert!(!part.blob().contains(&b'\r'));
     }
+    assert!(package.task_panes().expect("source unchanged").is_none());
 
-    assert!(
-        package
-            .apply_task_panes_patch(&inverse)
-            .expect("revert task panes")
-    );
-    assert!(package.task_panes().expect("load removed panes").is_none());
+    let reverted = published
+        .apply_task_panes(&inverse)
+        .expect("revert task panes")
+        .into_package();
+    assert!(reverted.task_panes().expect("load removed panes").is_none());
 }
 
 #[test]
@@ -251,14 +249,10 @@ fn empty_task_pane_patch_preserves_signatures() {
         .relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
     assert!(package.opc.is_signed());
 
-    let patch = package
-        .clear_task_panes_patch()
-        .expect("plan empty task-pane removal");
-    assert!(patch.is_empty());
-    assert!(
-        !package
-            .apply_task_panes_patch(&patch)
-            .expect("apply empty patch")
-    );
+    let mut edit = package.edit_task_panes().expect("edit task panes");
+    assert!(!edit.remove().expect("stage empty task-pane removal"));
+    let commit = edit.commit().expect("commit empty removal");
+    assert!(commit.patch().is_noop());
+    assert!(commit.package().opc.is_signed());
     assert!(package.opc.is_signed());
 }

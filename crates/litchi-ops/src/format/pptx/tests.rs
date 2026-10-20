@@ -406,9 +406,10 @@ fn related_order_fixture() -> Vec<u8> {
             slide.add_text_box(name, 0, 0, 914_400, 914_400);
         }
     }
-    let mut package = builder.build().unwrap();
-    package
-        .edit_opc(|opc| {
+    let package = builder.build().unwrap();
+    let mut opc_edit = package.edit_opc().unwrap();
+    opc_edit
+        .update(|opc| {
             // The builder's title is shape text; authored slide facts are the
             // independent p:cSld@name values exposed by the unified node.
             for (index, (name, _, _, _)) in slides.iter().enumerate() {
@@ -486,6 +487,7 @@ fn related_order_fixture() -> Vec<u8> {
             Ok(())
         })
         .unwrap();
+    let mut package = opc_edit.commit().unwrap().into_package();
     package.to_bytes().unwrap()
 }
 

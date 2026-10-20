@@ -22,7 +22,6 @@ use sha2::{Digest, Sha256};
 use soapberry_zip::ZipArchive;
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
-use super::{CrossSlideCopyPatch, CrossSlideCopyPlan};
 use crate::media_parts::Resource;
 use crate::{DurablePatchFormat, Error, Package, Result};
 use litchi_opc::PackURI;
@@ -130,7 +129,7 @@ fn media_fixture() -> Result<(Vec<u8>, Vec<u8>)> {
     Ok((source, destination))
 }
 
-fn plan_copy(source: &Package, destination: &Package) -> Result<CrossSlideCopyPlan> {
+fn plan_copy(source: &Package, destination: &Package) -> Result<crate::cross_slide_copy::Plan> {
     destination.opened_presentation()?.plan_cross_slide_copy(
         &source.opened_presentation()?,
         SOURCE_SLIDE,
@@ -205,7 +204,7 @@ fn assert_fresh_sized_framing(member: &RawMember) {
     );
 }
 
-fn image_parts(plan: &CrossSlideCopyPlan) -> Vec<&crate::opened::SlideCopyPart> {
+fn image_parts(plan: &crate::cross_slide_copy::Plan) -> Vec<&crate::slide_copy::Part> {
     plan.parts()
         .iter()
         .filter(|part| part.content_type().starts_with("image/"))
@@ -282,7 +281,7 @@ fn copied_images_carry_their_source_compressed_span_in_fresh_framing() -> Result
     Ok(())
 }
 
-fn images_target<'a>(plan: &'a CrossSlideCopyPlan, source: &str) -> &'a PackURI {
+fn images_target<'a>(plan: &'a crate::cross_slide_copy::Plan, source: &str) -> &'a PackURI {
     plan.parts()
         .iter()
         .find(|part| part.source().as_str() == source)
@@ -319,7 +318,7 @@ fn retained_released_and_durable_outputs_are_byte_identical() -> Result<()> {
     released.apply_cross_slide_copy_plan(&source, &released_plan)?;
     assert_eq!(released.to_bytes()?, retained_output);
 
-    let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    let durable = crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?)?;
     assert!(durable.transfers_source_compressed_media());
     assert_eq!(durable, *plan.patch());
     let mut patched = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
@@ -340,7 +339,7 @@ fn retained_released_and_durable_outputs_are_byte_identical() -> Result<()> {
     assert_eq!(independent.to_bytes()?, retained_output);
 
     // The inverse restores the destination byte for byte.
-    let inverse = CrossSlideCopyPatch::from_bytes(&durable.inverse().to_bytes()?)?;
+    let inverse = crate::cross_slide_copy::Patch::from_bytes(&durable.inverse().to_bytes()?)?;
     assert!(inverse.transfers_source_compressed_media());
     patched.apply_cross_slide_copy_patch(&source, &inverse)?;
     assert_eq!(patched.to_bytes()?, destination_bytes);
@@ -455,7 +454,7 @@ fn a_byte_identical_modified_destination_accepts_the_same_copy() -> Result<()> {
         &Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?,
     )?;
     assert!(plan.transfers_source_compressed_media());
-    let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    let durable = crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?)?;
     let mut expected = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     expected.apply_cross_slide_copy_plan(&source, &plan)?;
     let expected = expected.to_bytes()?;
@@ -498,7 +497,7 @@ fn the_inverse_of_a_transferring_copy_applies_to_a_modified_destination() -> Res
     let mut modified = Package::from_reader(std::io::Cursor::new(copied.clone()))?;
     modified.opc.get_part_mut(&presentation_uri())?;
     assert!(!modified.opc.is_unmodified_owned_source());
-    let inverse = CrossSlideCopyPatch::from_bytes(&plan.patch().inverse().to_bytes()?)?;
+    let inverse = crate::cross_slide_copy::Patch::from_bytes(&plan.patch().inverse().to_bytes()?)?;
     modified.apply_cross_slide_copy_patch(&source, &inverse)?;
     assert_eq!(modified.to_bytes()?, destination_bytes);
     Ok(())
@@ -643,7 +642,7 @@ fn a_source_member_whose_local_header_disagrees_keeps_the_recompressing_route() 
 
 /// The bytes an unmodified destination of the media fixture publishes for
 /// `plan`.
-fn output_bytes_of(source: &Package, plan: &CrossSlideCopyPlan) -> Result<Vec<u8>> {
+fn output_bytes_of(source: &Package, plan: &crate::cross_slide_copy::Plan) -> Result<Vec<u8>> {
     let (_source_bytes, destination_bytes) = media_fixture()?;
     let mut destination = Package::from_reader(std::io::Cursor::new(destination_bytes))?;
     destination.apply_cross_slide_copy_plan(source, plan)?;
@@ -733,8 +732,8 @@ fn legacy_lpcp0003_patches_are_refused_by_name() -> Result<()> {
     for (label, bytes) in [("forward", FORWARD), ("inverse", INVERSE)] {
         assert_eq!(&bytes[..8], b"LPCP0003", "{label} fixture magic");
         for parsed in [
-            CrossSlideCopyPatch::from_bytes(bytes),
-            CrossSlideCopyPatch::from_bytes_with_limits(bytes, super::Limits::default()),
+            crate::cross_slide_copy::Patch::from_bytes(bytes),
+            crate::cross_slide_copy::Patch::from_bytes_with_limits(bytes, super::Limits::default()),
         ] {
             let error = parsed.expect_err("a legacy patch is refused");
             assert!(
@@ -906,7 +905,7 @@ fn a_member_with_bytes_after_its_final_block_keeps_the_recompressing_route() -> 
     let mut patched = Package::from_reader(std::io::Cursor::new(destination_bytes))?;
     patched.apply_cross_slide_copy_patch(
         &source,
-        &CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?,
+        &crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?)?,
     )?;
     assert_eq!(patched.to_bytes()?, output);
     Ok(())
@@ -922,8 +921,8 @@ fn redo_after_undo_publishes_the_first_copy_again() -> Result<()> {
         &Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?,
     )?;
     assert!(plan.transfers_source_compressed_media());
-    let forward = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
-    let inverse = CrossSlideCopyPatch::from_bytes(&forward.inverse().to_bytes()?)?;
+    let forward = crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?)?;
+    let inverse = crate::cross_slide_copy::Patch::from_bytes(&forward.inverse().to_bytes()?)?;
 
     let mut first = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     first.apply_cross_slide_copy_patch(&source, &forward)?;
@@ -947,7 +946,7 @@ fn redo_after_undo_publishes_the_first_copy_again() -> Result<()> {
 }
 
 /// Offset of the copied-media encoding byte in an `LPCP0004` header.
-fn encoding_offset(plan: &CrossSlideCopyPlan) -> usize {
+fn encoding_offset(plan: &crate::cross_slide_copy::Plan) -> usize {
     8 + 6 * 32
         + (4 + plan.source().part_name().as_str().len())
         + (4 + plan.destination().part_name().as_str().len())
@@ -978,13 +977,13 @@ fn a_tampered_encoding_byte_is_refused() -> Result<()> {
     let mut unknown = encoded.clone();
     unknown[offset] = 2;
     assert!(matches!(
-        CrossSlideCopyPatch::from_bytes(&unknown),
+        crate::cross_slide_copy::Patch::from_bytes(&unknown),
         Err(Error::Invalid(message)) if message.contains("copied-media encoding")
     ));
 
     let mut flipped = encoded;
     flipped[offset] = 0;
-    let flipped = CrossSlideCopyPatch::from_bytes(&flipped)?;
+    let flipped = crate::cross_slide_copy::Patch::from_bytes(&flipped)?;
     assert!(!flipped.transfers_source_compressed_media());
     for patch in [flipped.clone(), flipped.inverse()] {
         let mut destination =
@@ -1082,7 +1081,7 @@ fn captures_that_do_not_fit_record_the_recompressing_route() -> Result<()> {
                 POSITION,
             )
     };
-    let publish = |source: &Package, plan: &CrossSlideCopyPlan| -> Result<Vec<u8>> {
+    let publish = |source: &Package, plan: &crate::cross_slide_copy::Plan| -> Result<Vec<u8>> {
         let mut destination =
             Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
         destination.apply_cross_slide_copy_plan(source, plan)?;
@@ -1100,7 +1099,7 @@ fn captures_that_do_not_fit_record_the_recompressing_route() -> Result<()> {
     let mut patched = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     patched.apply_cross_slide_copy_patch(
         &source,
-        &CrossSlideCopyPatch::from_bytes_with_limits(
+        &crate::cross_slide_copy::Patch::from_bytes_with_limits(
             &tight.patch().to_bytes()?,
             patch_byte_limits(with - 1),
         )?,
@@ -1123,7 +1122,7 @@ fn captures_that_do_not_fit_record_the_recompressing_route() -> Result<()> {
     // refused; the destination is untouched.
     let roomy = plan_under(&source, with)?;
     assert!(roomy.transfers_source_compressed_media());
-    let squeezed = CrossSlideCopyPatch::from_bytes_with_limits(
+    let squeezed = crate::cross_slide_copy::Patch::from_bytes_with_limits(
         &roomy.patch().to_bytes()?,
         patch_byte_limits(with - 1),
     )?;
@@ -1177,13 +1176,13 @@ fn a_published_candidate_lends_its_media_to_a_further_copy() -> Result<()> {
         );
         assert_fresh_sized_framing(&published);
     }
-    let durable = CrossSlideCopyPatch::from_bytes(&second.patch().to_bytes()?)?;
+    let durable = crate::cross_slide_copy::Patch::from_bytes(&second.patch().to_bytes()?)?;
     let mut patched = Package::from_reader(std::io::Cursor::new(third_bytes.clone()))?;
     patched.apply_cross_slide_copy_patch(&middle, &durable)?;
     assert_eq!(patched.to_bytes()?, output);
     patched.apply_cross_slide_copy_patch(
         &middle,
-        &CrossSlideCopyPatch::from_bytes(&durable.inverse().to_bytes()?)?,
+        &crate::cross_slide_copy::Patch::from_bytes(&durable.inverse().to_bytes()?)?,
     )?;
     assert_eq!(patched.to_bytes()?, third_bytes);
     Ok(())
@@ -1288,7 +1287,7 @@ fn copies_into_a_destination_with_a_caller_defined_part_keep_its_behavior() -> R
         let (mut destination, writes) = with_sentinel(&destination_bytes)?;
         let plan = plan_copy(source, &destination)?;
         assert!(!plan.transfers_source_compressed_media());
-        let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+        let durable = crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?)?;
         destination.apply_cross_slide_copy_plan(source, &plan)?;
         assert_sentinel_behaves(&mut destination, &writes)?;
 
@@ -1312,7 +1311,7 @@ fn a_transferring_copy_is_refused_by_a_destination_with_a_caller_defined_part() 
     let ordinary = Package::from_reader(std::io::Cursor::new(before.clone()))?;
     let plan = plan_copy(&source, &ordinary)?;
     assert!(plan.transfers_source_compressed_media());
-    let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    let durable = crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?)?;
     let caller_defined = |error: &Error| {
         matches!(
             error,

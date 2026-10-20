@@ -12,7 +12,7 @@ use super::copy_plan::{
     validate_registered_layout,
 };
 use super::model::{Slide, Snapshot, invalid};
-use super::patch::Patch;
+use super::patch::Patch as OpenedPatch;
 use super::patch::SinglePartChange;
 use crate::{Error, Result, SlideCopyRefusal, SlideRemovalRefusal};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -39,13 +39,18 @@ const PATCH_HEADER_BYTES: usize = PATCH_MAGIC.len() + 32 + 32 + 8;
 /// proof across serialization: both forward and inverse publication require the
 /// exact complete-package revision captured during planning.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SlideRemovalPatch {
+pub struct Patch {
     source_revision: [u8; 32],
     target_revision: [u8; 32],
-    patch: Patch,
+    patch: OpenedPatch,
 }
 
-impl SlideRemovalPatch {
+impl Patch {
+    /// The generic exact-write-set patch this durable patch carries.
+    pub(crate) const fn opened_patch(&self) -> &OpenedPatch {
+        &self.patch
+    }
+
     /// Complete-package revision required before publication.
     #[must_use]
     pub const fn source_revision(&self) -> [u8; 32] {
@@ -193,7 +198,7 @@ impl SlideRemovalPatch {
                 "slide-removal durable patch is truncated or has trailing bytes",
             ));
         }
-        let patch = Patch::from_bytes_with_limits(&bytes[position..end], limits)?;
+        let patch = OpenedPatch::from_bytes_with_limits(&bytes[position..end], limits)?;
         if patch.exact_slide_removal_change().is_none() {
             return Err(invalid(
                 "slide-removal durable patch is not an exact presentation-and-slide change",
@@ -216,16 +221,16 @@ impl SlideRemovalPatch {
 /// exactly the presentation owner; every other resource remains outside the
 /// write set.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SlideRemovalPlan {
+pub struct Plan {
     source: Slide,
     position: usize,
     layout: PackURI,
     planned_bytes: usize,
     source_revision: [u8; 32],
-    patch: SlideRemovalPatch,
+    patch: Patch,
 }
 
-impl SlideRemovalPlan {
+impl Plan {
     /// Source semantic slide identity captured by the immutable snapshot.
     #[must_use]
     pub const fn source(&self) -> &Slide {
@@ -258,10 +263,10 @@ impl SlideRemovalPlan {
 
     /// Exact durable complete-revision-bound forward patch.
     ///
-    /// The patch can be serialized with [`SlideRemovalPatch::to_bytes`] and
-    /// restored after application with [`SlideRemovalPatch::inverse`].
+    /// The patch can be serialized with [`Patch::to_bytes`] and
+    /// restored after application with [`Patch::inverse`].
     #[must_use]
-    pub const fn patch(&self) -> &SlideRemovalPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 }
@@ -283,7 +288,7 @@ impl Snapshot {
     pub fn plan_slide_removal<'s>(
         &self,
         slide: impl Into<crate::slide::Selector<'s>>,
-    ) -> Result<SlideRemovalPlan> {
+    ) -> Result<Plan> {
         let selected = resolve_slide(self, slide.into())?;
         let position = self
             .slides
@@ -390,7 +395,7 @@ impl Snapshot {
         }
 
         let candidate = build_candidate(self, &selected, owned.parts())?;
-        let exact_patch = Patch::capture(
+        let exact_patch = OpenedPatch::capture(
             self.package.as_ref(),
             &candidate,
             self.presentation_name.clone(),
@@ -415,12 +420,12 @@ impl Snapshot {
             ));
         }
         let target_revision = super::model::package_fingerprint(&candidate)?;
-        let patch = SlideRemovalPatch {
+        let patch = Patch {
             source_revision: self.revision,
             target_revision,
             patch: exact_patch,
         };
-        Ok(SlideRemovalPlan {
+        Ok(Plan {
             source: selected,
             position,
             layout,
@@ -433,7 +438,7 @@ impl Snapshot {
 
 pub(crate) fn apply_patch(
     package: &mut OpcPackage,
-    patch: &SlideRemovalPatch,
+    patch: &Patch,
     physical_source_provenance: bool,
 ) -> Result<Snapshot> {
     if super::model::package_fingerprint(package)? != patch.source_revision {
@@ -477,7 +482,7 @@ pub(crate) fn apply_patch(
     }
 }
 
-impl SlideRemovalPatch {
+impl Patch {
     fn has_same_semantics(&self, other: &Self) -> bool {
         self.source_revision == other.source_revision
             && self.target_revision == other.target_revision
@@ -485,7 +490,7 @@ impl SlideRemovalPatch {
     }
 }
 
-fn replan_exact_removal(snapshot: &Snapshot, slide_name: &PackURI) -> Result<SlideRemovalPlan> {
+fn replan_exact_removal(snapshot: &Snapshot, slide_name: &PackURI) -> Result<Plan> {
     let position = snapshot
         .slides()
         .iter()

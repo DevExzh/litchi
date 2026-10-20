@@ -11,14 +11,14 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write as _;
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part as OpcPart, TargetMode};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::model::{Slide, Snapshot, invalid};
-use super::patch::Patch;
+use super::patch::Patch as OpenedPatch;
 use crate::{Error, Result, SlideCopyRefusal};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -44,7 +44,7 @@ const XML: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 
 /// One raw part in a dependency-closed whole-slide copy plan.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SlideCopyPart {
+pub struct Part {
     pub(super) source: PackURI,
     pub(super) target: PackURI,
     pub(super) content_type: String,
@@ -52,7 +52,7 @@ pub struct SlideCopyPart {
     pub(super) relationships: usize,
 }
 
-impl SlideCopyPart {
+impl Part {
     /// Existing source part whose exact bytes and relationship IDs would be retained.
     #[must_use]
     pub const fn source(&self) -> &PackURI {
@@ -92,20 +92,20 @@ impl SlideCopyPart {
 /// use.  Arbitrary equal parts are never deduplicated: byte equality alone does
 /// not prove equivalent ownership or relationship semantics.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SlideCopyPlan {
+pub struct Plan {
     source: Slide,
     position: usize,
     slide_id: u32,
     presentation_relationship_id: String,
-    parts: Box<[SlideCopyPart]>,
+    parts: Box<[Part]>,
     reused_layout: PackURI,
     external_relationships: usize,
     planned_bytes: usize,
     source_revision: [u8; 32],
-    patch: Patch,
+    patch: OpenedPatch,
 }
 
-impl SlideCopyPlan {
+impl Plan {
     /// Source semantic slide identity captured by the immutable snapshot.
     #[must_use]
     pub const fn source(&self) -> &Slide {
@@ -132,7 +132,7 @@ impl SlideCopyPlan {
 
     /// Raw slide and private dependency parts in deterministic source-name order.
     #[must_use]
-    pub fn parts(&self) -> &[SlideCopyPart] {
+    pub fn parts(&self) -> &[Part] {
         &self.parts
     }
 
@@ -160,7 +160,7 @@ impl SlideCopyPlan {
         self.source_revision
     }
 
-    pub(crate) const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &OpenedPatch {
         &self.patch
     }
 }
@@ -189,7 +189,7 @@ impl Snapshot {
         &self,
         source: impl Into<crate::slide::Selector<'s>>,
         position: usize,
-    ) -> Result<SlideCopyPlan> {
+    ) -> Result<Plan> {
         if position > self.slides.len() {
             return Err(Error::SlideIndexOutOfBounds {
                 index: position,
@@ -263,7 +263,7 @@ impl Snapshot {
             })?;
         for name in names {
             let part = self.package.get_part(&name)?;
-            parts.push(SlideCopyPart {
+            parts.push(Part {
                 target: available_copy_name(self.package.as_ref(), &name, self.limits.max_parts())?,
                 source: name,
                 content_type: try_copy_string(
@@ -286,13 +286,13 @@ impl Snapshot {
             &reused_layout,
             &parts,
         )?;
-        let patch = Patch::capture(
+        let patch = OpenedPatch::capture(
             self.package.as_ref(),
             &candidate,
             self.presentation_name.clone(),
             self.limits,
         )?;
-        Ok(SlideCopyPlan {
+        Ok(Plan {
             source,
             position,
             slide_id,
@@ -309,8 +309,8 @@ impl Snapshot {
 
 fn preflight_copy_candidate(
     snapshot: &Snapshot,
-    parts: &[SlideCopyPart],
-    presentation: &dyn Part,
+    parts: &[Part],
+    presentation: &dyn OpcPart,
     planned_bytes: usize,
 ) -> Result<()> {
     let resulting_parts = snapshot
@@ -379,7 +379,7 @@ fn build_copy_candidate(
     slide_id: u32,
     presentation_relationship_id: &str,
     reused_layout: &PackURI,
-    parts: &[SlideCopyPart],
+    parts: &[Part],
 ) -> Result<OpcPackage> {
     let mut mapping = HashMap::new();
     mapping
@@ -656,7 +656,7 @@ pub(super) fn collect_owned_closure(
     ))
 }
 
-fn checked_plan_bytes(total: usize, part: &dyn Part) -> Result<usize> {
+fn checked_plan_bytes(total: usize, part: &dyn OpcPart) -> Result<usize> {
     let mut next = total
         .checked_add(part.partname().as_str().len())
         .and_then(|value| value.checked_add(part.content_type().len()))
@@ -736,7 +736,7 @@ fn owned_role(value: &str) -> Option<OwnedRole> {
     }
 }
 
-fn validate_owned_target(role: OwnedRole, part: &dyn Part) -> Result<()> {
+fn validate_owned_target(role: OwnedRole, part: &dyn OpcPart) -> Result<()> {
     let content_type = part.content_type();
     let valid = match role {
         OwnedRole::Image => content_type.starts_with("image/"),
@@ -773,7 +773,7 @@ fn validate_owned_target(role: OwnedRole, part: &dyn Part) -> Result<()> {
     }
 }
 
-fn validate_owned_surface(role: OwnedRole, part: &dyn Part) -> Result<()> {
+fn validate_owned_surface(role: OwnedRole, part: &dyn OpcPart) -> Result<()> {
     let surface = match role {
         OwnedRole::Chart => Some(XmlSurface::Chart),
         OwnedRole::ChartDrawing => Some(XmlSurface::ChartDrawing),
@@ -1264,7 +1264,7 @@ pub(super) fn available_copy_name_avoiding(
 
 pub(super) fn validate_registered_layout(
     package: &OpcPackage,
-    presentation_part: &dyn Part,
+    presentation_part: &dyn OpcPart,
     selected: &PackURI,
 ) -> Result<()> {
     let presentation = crate::Presentation::new(

@@ -211,7 +211,7 @@ impl<'a> Slide<'a> {
     pub fn shape_designer_properties<'k>(
         &self,
         shape: impl Into<crate::shape::Key<'k>>,
-    ) -> Result<crate::shape::designer::PropertiesSnapshot> {
+    ) -> Result<crate::shape::designer::properties::Snapshot> {
         self.shape_designer_properties_with_limits(shape, crate::shape::designer::Limits::default())
     }
 
@@ -224,7 +224,7 @@ impl<'a> Slide<'a> {
         &self,
         shape: impl Into<crate::shape::Key<'k>>,
         limits: crate::shape::designer::Limits,
-    ) -> Result<crate::shape::designer::PropertiesSnapshot> {
+    ) -> Result<crate::shape::designer::properties::Snapshot> {
         package::slide_shape_designer_properties(self.package, &self.part, shape, limits)
     }
 

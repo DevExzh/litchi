@@ -4,6 +4,9 @@
     reason = "test assertions panic on failure by design"
 )]
 
+mod in_place;
+use in_place::InPlace as _;
+
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::notes;
@@ -232,13 +235,13 @@ fn assert_no_speaker_notes(package: &Package) {
 
 fn remove_notes(package: Package, slide_name: &str) -> (Package, litchi_pptx::Result<bool>) {
     let mut package = package;
-    let result = package.remove_notes(slide_name);
+    let result = package.remove_notes_in_place(slide_name);
     (package, result)
 }
 
 fn clear_notes(package: Package) -> (Package, litchi_pptx::Result<usize>) {
     let mut package = package;
-    let result = package.clear_notes();
+    let result = package.clear_notes_in_place();
     (package, result)
 }
 

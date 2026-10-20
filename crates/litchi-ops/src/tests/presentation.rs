@@ -391,16 +391,21 @@ mod source_pptx_path {
             .unwrap()
             .relationship_id()
             .to_owned();
-        package
-            .edit_opc(|opc| {
-                let presentation =
-                    opc.get_part_mut(&litchi_opc::PackURI::new("/ppt/presentation.xml").unwrap())?;
-                presentation
-                    .rels_mut()
-                    .retarget(&second, "../docProps/core.xml".to_owned())?;
-                Ok(())
-            })
-            .unwrap();
+        {
+            let mut opc_edit = package.edit_opc().unwrap();
+            opc_edit
+                .update(|opc| {
+                    let presentation = opc.get_part_mut(
+                        &litchi_opc::PackURI::new("/ppt/presentation.xml").unwrap(),
+                    )?;
+                    presentation
+                        .rels_mut()
+                        .retarget(&second, "../docProps/core.xml".to_owned())?;
+                    Ok(())
+                })
+                .unwrap();
+            package = opc_edit.commit().unwrap().into_package();
+        }
         let output = tempfile::Builder::new().suffix(".pptx").tempfile().unwrap();
         package.save(output.path()).unwrap();
         let bytes = std::fs::read(output.path()).unwrap();

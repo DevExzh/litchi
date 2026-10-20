@@ -6,10 +6,7 @@ use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{BlobPart, PackURI, TargetMode};
 use sha2::{Digest, Sha256};
 
-use super::{
-    CrossSlideCopyPatch, History, Limits, Patch, Resolution, ShapeTextReplacement,
-    SlideRemovalPatch,
-};
+use super::{History, Limits, Patch, Resolution, ShapeTextReplacement};
 use crate::{Error, Package, Result, SlideCopyRefusal, SlideRemovalRefusal};
 
 /// Reproduce the capture sequence that preceded the capture-local projection
@@ -781,7 +778,7 @@ fn cross_slide_copy_is_source_exact_reversible_and_reopens() -> Result<()> {
     );
 
     let encoded = plan.patch().to_bytes()?;
-    let decoded = CrossSlideCopyPatch::from_bytes(&encoded)?;
+    let decoded = crate::cross_slide_copy::Patch::from_bytes(&encoded)?;
     assert_eq!(decoded, *plan.patch());
     let published = destination.apply_cross_slide_copy_plan(&source, &plan)?;
     assert_eq!(published.slides().len(), 3);
@@ -1051,10 +1048,10 @@ fn cross_slide_copy_preserves_noncanonical_destination_members_and_live_inverse(
         "Slide 256"
     );
 
-    let serialized_inverse = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?
+    let serialized_inverse = crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?)?
         .inverse()
         .to_bytes()?;
-    let inverse = CrossSlideCopyPatch::from_bytes(&serialized_inverse)?;
+    let inverse = crate::cross_slide_copy::Patch::from_bytes(&serialized_inverse)?;
     destination.apply_cross_slide_copy_patch(&source, &inverse)?;
     assert_eq!(destination.to_bytes()?, destination_before);
 
@@ -1216,7 +1213,7 @@ fn cross_slide_copy_rejects_layout_mismatch_and_stale_or_forged_publication() ->
     let mut forged_bytes = plan.patch().to_bytes()?;
     let revision_offset = 8;
     forged_bytes[revision_offset] ^= 1;
-    let forged = CrossSlideCopyPatch::from_bytes(&forged_bytes)?;
+    let forged = crate::cross_slide_copy::Patch::from_bytes(&forged_bytes)?;
     let mut forged_destination =
         Package::from_reader(std::io::Cursor::new(clean_destination_bytes))?;
     assert!(matches!(
@@ -2739,7 +2736,8 @@ fn slide_removal_plan_handles_first_middle_and_last_durably() -> Result<()> {
         assert!(package.opc.contains_part(plan.retained_layout()));
         assert_eq!(part_states(&package), before, "planning must not publish");
 
-        let durable_inverse = SlideRemovalPatch::from_bytes(&plan.patch().inverse().to_bytes()?)?;
+        let durable_inverse =
+            crate::slide_removal::Patch::from_bytes(&plan.patch().inverse().to_bytes()?)?;
         let published = package.apply_slide_removal_plan(&plan)?;
         let expected: Vec<_> = source_slides
             .iter()
@@ -3264,8 +3262,9 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
     let mut inbound_stale = opened_plain_slides_package(2)?;
     let snapshot = inbound_stale.opened_presentation()?;
     let selected = snapshot.slides()[0].part_name().clone();
-    let durable =
-        SlideRemovalPatch::from_bytes(&snapshot.plan_slide_removal(0_usize)?.patch().to_bytes()?)?;
+    let durable = crate::slide_removal::Patch::from_bytes(
+        &snapshot.plan_slide_removal(0_usize)?.patch().to_bytes()?,
+    )?;
     let new_owner = PackURI::new("/ppt/customXml/late-owner.bin").map_err(Error::Invalid)?;
     inbound_stale.opc.try_add_part(Box::new(BlobPart::new(
         new_owner.clone(),
@@ -3322,7 +3321,7 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
             .to_le_bytes(),
     );
     forged_bytes.extend_from_slice(&inner_bytes);
-    let forged = SlideRemovalPatch::from_bytes(&forged_bytes)?;
+    let forged = crate::slide_removal::Patch::from_bytes(&forged_bytes)?;
     let before_apply = part_states(&forged_source);
     assert!(forged_source.apply_slide_removal_patch(&forged).is_err());
     assert_eq!(part_states(&forged_source), before_apply);
@@ -3336,7 +3335,7 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
         .patch()
         .to_bytes()?;
     encoded[8 + 32] ^= 0x80;
-    let corrupted = SlideRemovalPatch::from_bytes(&encoded)?;
+    let corrupted = crate::slide_removal::Patch::from_bytes(&encoded)?;
     assert!(
         corrupted_target
             .apply_slide_removal_patch(&corrupted)
@@ -3344,7 +3343,7 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
     );
     assert_eq!(part_states(&corrupted_target), source_state);
     encoded.push(0);
-    assert!(SlideRemovalPatch::from_bytes(&encoded).is_err());
+    assert!(crate::slide_removal::Patch::from_bytes(&encoded).is_err());
 
     let mut patch_stale = opened_plain_slides_package(2)?;
     let patch = patch_stale
@@ -5397,14 +5396,17 @@ fn a_superseded_slide_removal_patch_is_refused_by_name() -> Result<()> {
         "the current durable slide-removal magic must be LPRM0002"
     );
     // A v2 patch still round-trips to an equal value.
-    assert_eq!(SlideRemovalPatch::from_bytes(&current)?, *plan.patch());
+    assert_eq!(
+        crate::slide_removal::Patch::from_bytes(&current)?,
+        *plan.patch()
+    );
 
     let inverse = plan.patch().inverse().to_bytes()?;
     for (label, encoded) in [("forward", &current), ("inverse", &inverse)] {
         let superseded = with_magic(encoded, crate::DurablePatchFormat::SlideRemovalV1.magic());
         for parsed in [
-            SlideRemovalPatch::from_bytes(&superseded),
-            SlideRemovalPatch::from_bytes_with_limits(&superseded, Limits::default()),
+            crate::slide_removal::Patch::from_bytes(&superseded),
+            crate::slide_removal::Patch::from_bytes_with_limits(&superseded, Limits::default()),
         ] {
             let error = parsed.expect_err("a superseded durable patch must be refused");
             assert!(
@@ -5425,7 +5427,7 @@ fn a_superseded_slide_removal_patch_is_refused_by_name() -> Result<()> {
     // An unrecognized magic keeps the refusal it has today.
     let unknown = with_magic(&current, b"LPRM9999");
     assert!(matches!(
-        SlideRemovalPatch::from_bytes(&unknown),
+        crate::slide_removal::Patch::from_bytes(&unknown),
         Err(Error::Invalid(_))
     ));
     Ok(())
@@ -5457,7 +5459,10 @@ fn a_superseded_cross_slide_copy_patch_is_refused_by_name() -> Result<()> {
         crate::DurablePatchFormat::CrossSlideCopyV4.magic(),
         "the current durable cross-copy magic must be LPCP0004"
     );
-    assert_eq!(CrossSlideCopyPatch::from_bytes(&current)?, *plan.patch());
+    assert_eq!(
+        crate::cross_slide_copy::Patch::from_bytes(&current)?,
+        *plan.patch()
+    );
 
     let inverse = plan.patch().inverse().to_bytes()?;
     for (label, encoded) in [("forward", &current), ("inverse", &inverse)] {
@@ -5467,8 +5472,11 @@ fn a_superseded_cross_slide_copy_patch_is_refused_by_name() -> Result<()> {
         ] {
             let superseded = with_magic(encoded, found.magic());
             for parsed in [
-                CrossSlideCopyPatch::from_bytes(&superseded),
-                CrossSlideCopyPatch::from_bytes_with_limits(&superseded, Limits::default()),
+                crate::cross_slide_copy::Patch::from_bytes(&superseded),
+                crate::cross_slide_copy::Patch::from_bytes_with_limits(
+                    &superseded,
+                    Limits::default(),
+                ),
             ] {
                 let error = parsed.expect_err("a superseded durable patch must be refused");
                 assert!(
@@ -5489,7 +5497,7 @@ fn a_superseded_cross_slide_copy_patch_is_refused_by_name() -> Result<()> {
 
     let unknown = with_magic(&current, b"LPCP9999");
     assert!(matches!(
-        CrossSlideCopyPatch::from_bytes(&unknown),
+        crate::cross_slide_copy::Patch::from_bytes(&unknown),
         Err(Error::Invalid(_))
     ));
     Ok(())
@@ -5508,7 +5516,7 @@ fn the_superseded_refusal_does_not_displace_the_durable_byte_limit() -> Result<(
     );
     let tight = Limits::new(1, 1, 1, 1, 1, 1).expect("a finite nonzero policy");
     assert!(matches!(
-        SlideRemovalPatch::from_bytes_with_limits(&superseded, tight),
+        crate::slide_removal::Patch::from_bytes_with_limits(&superseded, tight),
         Err(Error::Limit {
             resource: "slide-removal durable patch bytes",
             ..
@@ -5558,7 +5566,7 @@ fn the_facade_memo_never_outlives_the_graph_it_describes() -> Result<()> {
     // A slide-removal patch publishes a snapshot, so its exact memo is adopted.
     let plan = package.opened_presentation()?.plan_slide_removal(0_usize)?;
     assert_facade_memo_names_only_its_own_package("after a second capture", &package);
-    let patch = SlideRemovalPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    let patch = crate::slide_removal::Patch::from_bytes(&plan.patch().to_bytes()?)?;
     package.apply_slide_removal_patch(&patch)?;
     assert!(facade_memo_len(&package) > 0);
     assert_facade_memo_names_only_its_own_package("after a removal patch", &package);
@@ -5607,7 +5615,7 @@ fn the_facade_memo_never_outlives_the_graph_it_describes() -> Result<()> {
         1,
     )?;
     assert!(!plan.transfers_source_compressed_media());
-    let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    let durable = crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?)?;
     assert_publication_keeps_no_copy("cross-copy plan", &mut by_plan, &custom, |package| {
         package.apply_cross_slide_copy_plan(&source, &plan)
     })?;

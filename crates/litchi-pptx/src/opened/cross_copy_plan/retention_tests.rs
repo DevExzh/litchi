@@ -19,7 +19,7 @@
 
 use std::sync::Arc;
 
-use super::{CrossSlideCopyPlan, physical_package_fingerprint, seal_physical_revision};
+use super::{physical_package_fingerprint, seal_physical_revision};
 use crate::opened::model::Limits;
 use crate::{Error, Package, Result};
 
@@ -91,7 +91,7 @@ fn limits_retaining(max_retained_candidate_bytes: usize) -> Result<Limits> {
     .ok_or_else(|| Error::Invalid("test limits are invalid".into()))
 }
 
-fn plan_for(source: &Package, destination: &Package) -> Result<CrossSlideCopyPlan> {
+fn plan_for(source: &Package, destination: &Package) -> Result<crate::cross_slide_copy::Plan> {
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination.opened_presentation()?;
     destination_snapshot.plan_cross_slide_copy(&source_snapshot, 0_usize, 0_usize, 1)
@@ -102,7 +102,7 @@ fn plan_under(
     destination: &Package,
     source_limits: Limits,
     destination_limits: Limits,
-) -> Result<CrossSlideCopyPlan> {
+) -> Result<crate::cross_slide_copy::Plan> {
     let source_snapshot = source.opened_presentation_with_limits(source_limits)?;
     let destination_snapshot = destination.opened_presentation_with_limits(destination_limits)?;
     destination_snapshot.plan_cross_slide_copy(&source_snapshot, 0_usize, 0_usize, 1)
@@ -401,7 +401,7 @@ fn retention_changes_no_apply_verdict() -> Result<()> {
     );
 
     // Rejecting route 1: a destination whose slide XML drifted.
-    let drift = |plan: &CrossSlideCopyPlan| -> Result<String> {
+    let drift = |plan: &crate::cross_slide_copy::Plan| -> Result<String> {
         let mut drifted = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
         let slide = drifted
             .opened_presentation()?
@@ -424,7 +424,7 @@ fn retention_changes_no_apply_verdict() -> Result<()> {
 
     // Rejecting route 2: a foreign source package.
     let foreign_source = owned_slides(&["foreign"])?;
-    let foreign = |plan: &CrossSlideCopyPlan| -> Result<String> {
+    let foreign = |plan: &crate::cross_slide_copy::Plan| -> Result<String> {
         let mut target = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
         Ok(format!(
             "{:?}",
@@ -435,7 +435,7 @@ fn retention_changes_no_apply_verdict() -> Result<()> {
     assert!(foreign(&retained)?.contains("PatchConflict"));
 
     // Rejecting route 3: a source whose own bytes drifted after planning.
-    let mut stale_source = |plan: &CrossSlideCopyPlan| -> Result<String> {
+    let mut stale_source = |plan: &crate::cross_slide_copy::Plan| -> Result<String> {
         let mut drifted = Package::from_reader(std::io::Cursor::new(source.to_bytes()?))?;
         let slide = drifted
             .opened_presentation()?
@@ -459,7 +459,7 @@ fn retention_changes_no_apply_verdict() -> Result<()> {
 
     // Rejecting route 4: borrowed graph-only ingress carries no physical
     // provenance and is refused before any candidate is built.
-    let borrowed = |plan: &CrossSlideCopyPlan| -> Result<String> {
+    let borrowed = |plan: &crate::cross_slide_copy::Plan| -> Result<String> {
         let mut target = Package::from_bytes(&destination_bytes)?;
         Ok(format!(
             "{:?}",

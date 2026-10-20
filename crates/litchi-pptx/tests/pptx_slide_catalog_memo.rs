@@ -11,6 +11,9 @@
 //! moves a refusal — in particular it must not lend `slide_count`'s
 //! package-graph validation to `slide`, which has never performed it.
 
+mod in_place;
+use in_place::InPlace as _;
+
 use litchi_core::TextOutputOptions;
 use litchi_opc::PackURI;
 use litchi_pptx::Package;
@@ -40,7 +43,7 @@ fn authored(slides: usize) -> Package {
 fn with_presentation_blob(package: &mut Package, blob: Vec<u8>) {
     let part_name = PackURI::new("/ppt/presentation.xml").unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.get_part_mut(&part_name)?.set_blob(blob.clone());
             Ok(())
         })

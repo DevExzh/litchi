@@ -23,6 +23,8 @@ mod validation;
 mod tests;
 
 pub use codec::{load, put, remove};
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
 // Classification and other shape-owned semantic owners need the same
 // selector-to-byte-span mapping as programmable tags. Keep the scanner

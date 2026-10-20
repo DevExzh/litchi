@@ -126,8 +126,8 @@ impl Snapshot {
 
     /// Start a detached atomic edit over this snapshot.
     #[must_use]
-    pub fn edit(&self) -> Edit {
-        Edit {
+    pub(crate) fn edit(&self) -> Draft {
+        Draft {
             source: self.clone(),
             working: self.graph.clone(),
         }
@@ -143,32 +143,14 @@ impl Snapshot {
 
 /// Failure-atomic editor for inert notes text, master XML, and theme XML.
 #[derive(Clone, Debug)]
-pub struct Edit {
+pub(crate) struct Draft {
     source: Snapshot,
     working: Graph,
 }
 
-impl Edit {
-    /// Borrow the immutable source snapshot used by this edit.
-    #[must_use]
-    pub fn source(&self) -> &Snapshot {
-        &self.source
-    }
-
-    /// Borrow the currently staged semantic graph.
-    #[must_use]
-    pub fn graph(&self) -> &Graph {
-        &self.working
-    }
-
+impl Draft {
     fn is_changed(&self) -> bool {
         self.working != self.source.graph
-    }
-
-    /// The outcome of this edit or commit.
-    #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
-        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Replace the complete detached graph without changing physical owners.
@@ -177,7 +159,7 @@ impl Edit {
     ///
     /// Returns an error when the replacement is malformed or retargets any
     /// presentation, master, theme, slide, or notes relationship identity.
-    pub fn replace(&mut self, graph: Graph) -> Result<bool> {
+    pub(crate) fn replace(&mut self, graph: Graph) -> Result<bool> {
         super::package::validate_graph(&graph)?;
         if !same_ownership(&self.source.graph, &graph) {
             return Err(invalid(
@@ -196,7 +178,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_text(&mut self, index: usize, text: impl AsRef<str>) -> Result<bool> {
+    pub(crate) fn set_text(&mut self, index: usize, text: impl AsRef<str>) -> Result<bool> {
         let text = text.as_ref();
         let slide = self
             .working
@@ -212,21 +194,12 @@ impl Edit {
         Ok(true)
     }
 
-    /// Alias emphasizing that text is owned by one notes slide.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn set_slide_text(&mut self, index: usize, text: impl AsRef<str>) -> Result<bool> {
-        self.set_text(index, text)
-    }
-
     /// Replace one notes slide's XML after bounded conformance validation.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace_slide_xml(&mut self, index: usize, xml: Vec<u8>) -> Result<bool> {
+    pub(crate) fn replace_slide_xml(&mut self, index: usize, xml: Vec<u8>) -> Result<bool> {
         let conformance = self.working.conformance();
         validate_resource_xml(&xml, MAX_NOTES_XML, conformance, "notes", "notes slide")?;
         let slide = self
@@ -246,7 +219,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace_master_xml(&mut self, xml: Vec<u8>) -> Result<bool> {
+    pub(crate) fn replace_master_xml(&mut self, xml: Vec<u8>) -> Result<bool> {
         let conformance = self.working.conformance();
         validate_resource_xml(
             &xml,
@@ -267,7 +240,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace_theme_xml(&mut self, xml: Vec<u8>) -> Result<bool> {
+    pub(crate) fn replace_theme_xml(&mut self, xml: Vec<u8>) -> Result<bool> {
         let conformance = self.working.conformance();
         validate_resource_xml(&xml, MAX_THEME_XML, conformance, "theme", "notes theme")?;
         if self.working.master().theme().xml() == xml {
@@ -282,15 +255,15 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Prepared> {
         super::package::validate_graph(&self.working)?;
         let changed = self.is_changed();
         if !changed {
-            let patch = Patch {
+            let patch = Change {
                 before: self.source.clone(),
                 after: self.source.clone(),
             };
-            return Ok(Commit {
+            return Ok(Prepared {
                 snapshot: self.source,
                 patch,
             });
@@ -302,31 +275,37 @@ impl Edit {
             parts,
             self.working,
         )?;
-        let patch = Patch {
+        let patch = Change {
             before: self.source,
             after: snapshot.clone(),
         };
-        Ok(Commit { snapshot, patch })
+        Ok(Prepared { snapshot, patch })
     }
 }
 
 /// A successful detached edit and its reversible package patch.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Prepared {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: Snapshot,
-    patch: Patch,
+    patch: Change,
 }
 
-impl Commit {
+impl Prepared {
     /// Snapshot expected after publication.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Source-checked patch represented by this commit.
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    #[cfg(test)]
+    pub(crate) fn patch(&self) -> &Change {
         &self.patch
     }
 
@@ -336,62 +315,51 @@ impl Commit {
 
     /// The outcome of this edit or commit.
     #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
         crate::diagnostics::Diagnostics::new(self.is_changed())
-    }
-
-    /// Consume the commit into its target snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
     }
 
     /// Consume the commit into its patch.
     #[must_use]
-    pub fn into_patch(self) -> Patch {
+    pub(crate) fn into_patch(self) -> Change {
         self.patch
     }
 }
 
 /// A reversible source-checked replacement of one existing notes graph.
 #[derive(Clone, Debug)]
-pub struct Patch {
+pub(crate) struct Change {
     before: Snapshot,
     after: Snapshot,
 }
 
-impl Patch {
+impl Change {
     /// Snapshot required before forward application.
     #[must_use]
-    pub fn before(&self) -> &Snapshot {
+    pub(crate) fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Snapshot expected after forward application.
     #[must_use]
-    pub fn after(&self) -> &Snapshot {
+    pub(crate) fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether this patch is an exact no-op.
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Return the exact inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
         }
-    }
-
-    /// Source fingerprint required for publication.
-    #[must_use]
-    pub const fn expected_revision(&self) -> Revision {
-        self.before.revision
     }
 
     /// Publish this patch atomically to an OPC package.

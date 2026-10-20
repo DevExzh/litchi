@@ -29,7 +29,6 @@ use std::fmt::Write as _;
 use sha2::{Digest, Sha256};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
-use super::{CrossSlideCopyPatch, CrossSlideCopyPlan};
 use crate::media_parts::Resource;
 use crate::opened::Limits;
 use crate::{Package, Result};
@@ -143,7 +142,7 @@ fn plain_pair() -> Result<(Vec<u8>, Vec<u8>)> {
     ))
 }
 
-fn plan_copy(source: &Package, destination: &Package) -> Result<CrossSlideCopyPlan> {
+fn plan_copy(source: &Package, destination: &Package) -> Result<crate::cross_slide_copy::Plan> {
     destination.opened_presentation()?.plan_cross_slide_copy(
         &source.opened_presentation()?,
         SOURCE_SLIDE,
@@ -152,7 +151,11 @@ fn plan_copy(source: &Package, destination: &Package) -> Result<CrossSlideCopyPl
     )
 }
 
-fn record_patch(transcript: &mut String, label: &str, patch: &CrossSlideCopyPatch) -> Result<()> {
+fn record_patch(
+    transcript: &mut String,
+    label: &str,
+    patch: &crate::cross_slide_copy::Patch,
+) -> Result<()> {
     writeln!(transcript, "{label}.bytes={}", hex(&patch.to_bytes()?)).unwrap();
     writeln!(
         transcript,
@@ -229,7 +232,7 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
     )
     .unwrap();
     record_patch(&mut transcript, &format!("{label}.plan"), plan.patch())?;
-    let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    let durable = crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?)?;
 
     // The plan, retained and released, into the destination it was planned
     // against and into a fresh open of the same bytes.
@@ -366,7 +369,7 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
     // A destination whose exact-source authorization an edit revoked while
     // keeping its bytes accepts the copy and publishes the same output.
     let mut revoked = Package::from_reader(std::io::Cursor::new(destination_bytes.to_vec()))?;
-    revoked.edit_opc(|opc| {
+    revoked.edit_opc_in_place(|opc| {
         opc.set_save_options(litchi_opc::SaveOptions::default());
         Ok(())
     })?;
@@ -380,7 +383,7 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
 
     // A source edited back to its own bytes plans and publishes the same copy.
     let mut resaved_source = Package::from_reader(std::io::Cursor::new(source_bytes.to_vec()))?;
-    resaved_source.edit_opc(|opc| {
+    resaved_source.edit_opc_in_place(|opc| {
         opc.set_save_options(litchi_opc::SaveOptions::default());
         Ok(())
     })?;
@@ -473,7 +476,7 @@ fn caller_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8])
         &format!("{label}.caller.plan"),
         plan.patch(),
     )?;
-    let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    let durable = crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?)?;
     let outcome = custom.apply_cross_slide_copy_plan(&source, &plan);
     record_outcome(
         &mut transcript,
@@ -512,7 +515,8 @@ fn caller_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8])
         &mut target,
         outcome,
     )?;
-    let ordinary_durable = CrossSlideCopyPatch::from_bytes(&ordinary_plan.patch().to_bytes()?)?;
+    let ordinary_durable =
+        crate::cross_slide_copy::Patch::from_bytes(&ordinary_plan.patch().to_bytes()?)?;
     let mut target = with_caller_part(destination_bytes)?;
     let outcome = target.apply_cross_slide_copy_patch(&source, &ordinary_durable);
     record_outcome(
@@ -543,7 +547,7 @@ fn limits_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8])
             .expect("finite nonzero limits");
         let stage = format!("{label}.limits.{name}");
         writeln!(transcript, "{stage}.bound={bound}").unwrap();
-        match CrossSlideCopyPatch::from_bytes_with_limits(&bytes, limits) {
+        match crate::cross_slide_copy::Patch::from_bytes_with_limits(&bytes, limits) {
             Ok(patch) => {
                 let mut target =
                     Package::from_reader(std::io::Cursor::new(destination_bytes.to_vec()))?;

@@ -19,10 +19,7 @@ use std::sync::Arc;
 use litchi_opc::{OpcPackage, PackURI};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
-use super::{
-    CrossSlideCopyPatch, CrossSlideCopyPlan, physical_package_fingerprint,
-    streamed_physical_revision,
-};
+use super::{physical_package_fingerprint, streamed_physical_revision};
 use crate::media_parts::Resource;
 use crate::opened::Limits;
 use crate::opened::model::fingerprint_log::{self, Entry};
@@ -111,7 +108,7 @@ fn media_pair() -> Result<(Vec<u8>, Vec<u8>)> {
     Ok((source, destination))
 }
 
-fn plan_copy(source: &Package, destination: &Package) -> Result<CrossSlideCopyPlan> {
+fn plan_copy(source: &Package, destination: &Package) -> Result<crate::cross_slide_copy::Plan> {
     destination.opened_presentation()?.plan_cross_slide_copy(
         &source.opened_presentation()?,
         SOURCE_SLIDE,
@@ -180,14 +177,16 @@ fn an_application_hashes_only_payloads_no_memo_names() -> Result<()> {
 
     destination.apply_cross_slide_copy_plan(&source, &plan)?;
     let consulted = fingerprint_log::take_with_parent();
+    // The primary edit that stages the plan captures the destination first;
+    // planning filled its memo, so that capture hashes nothing (record 0356).
     assert_eq!(
         hashed(&consulted),
-        [0, 0, UNSHARED, 0],
-        "live source, live destination, candidate capture, published capture: {consulted:?}"
+        [0, 0, 0, UNSHARED, 0],
+        "edit capture, live source, live destination, candidate capture, published capture: {consulted:?}"
     );
-    assert_eq!(consulted[0].parts, source.opc.part_count());
-    assert_eq!(consulted[2].parts, destination.opc.part_count());
+    assert_eq!(consulted[1].parts, source.opc.part_count());
     assert_eq!(consulted[3].parts, destination.opc.part_count());
+    assert_eq!(consulted[4].parts, destination.opc.part_count());
     // The facade adopted the published capture's memo.
     assert_eq!(
         destination.part_digest_memo().map(|memo| memo.len()),
@@ -225,8 +224,8 @@ fn an_application_without_facade_memos_hashes_the_live_packages_once() -> Result
             .iter()
             .map(|entry| entry.hashed)
             .collect::<Vec<_>>(),
-        [UNSHARED, 0],
-        "candidate capture and published capture: {log:?}"
+        [0, UNSHARED, 0],
+        "live destination (answered by the memo the staging edit's capture filled), candidate capture and published capture: {log:?}"
     );
     Ok(())
 }
@@ -245,7 +244,7 @@ fn durable_patch_routes_consult_the_memos() -> Result<()> {
     let source = Package::from_reader(std::io::Cursor::new(source_bytes))?;
     let mut destination = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     let plan = plan_copy(&source, &destination)?;
-    let forward = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    let forward = crate::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?)?;
     let _planning = fingerprint_log::take();
 
     destination.apply_cross_slide_copy_patch(&source, &forward)?;

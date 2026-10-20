@@ -6,7 +6,7 @@ use litchi_opc::constants::content_type as ct;
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcError, OpcPackage, PackURI};
 
-use super::transaction::{Commit, Patch, Snapshot};
+use super::transaction::{Change, Prepared, Snapshot};
 use super::{EXTENSION_URI, NAMESPACE};
 use crate::presentation_properties::{P_NS, P_STRICT};
 use crate::{Error, Result};
@@ -33,7 +33,7 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
 }
 
 /// Apply a source-checked recommendation patch atomically.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     let name = PackURI::new(patch.before().source_part_name()).map_err(Error::Uri)?;
     let current = load_snapshot(package)?
         .ok_or_else(|| invalid("presentation-properties source part is absent"))?;
@@ -66,7 +66,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 }
 
 /// Apply a committed recommendation edit atomically.
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }
 
@@ -78,7 +78,7 @@ pub fn put(package: &mut OpcPackage, value: bool) -> Result<Option<bool>> {
     }
     if let Some(snapshot) = load_snapshot(package)? {
         let mut edit = snapshot.edit();
-        edit.set_readonly_recommended(value)?;
+        edit.set_read_only_recommended(value)?;
         let commit = edit.commit()?;
         let previous = commit.before_value();
         apply_commit(package, commit)?;

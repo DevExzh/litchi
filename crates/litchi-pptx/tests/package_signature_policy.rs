@@ -11,6 +11,9 @@
 //! without signature parts; an exact no-op keeps the signed source byte for
 //! byte.
 
+mod in_place;
+use in_place::InPlace as _;
+
 use std::path::PathBuf;
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -214,7 +217,7 @@ const SHAPE: &str = "Self-contained";
 
 fn add_self_contained_shape(package: &mut Package) {
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let part = opc.get_part_mut(&slide())?;
             let xml = String::from_utf8(part.blob().to_vec()).unwrap().replacen(
                 "</p:spTree>",
@@ -349,7 +352,7 @@ fn families() -> Vec<Family> {
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    package.edit_opc(|opc| {
+                    package.edit_opc_in_place(|opc| {
                         litchi_pptx::add_presentation_comment_author(
                             opc,
                             legacy_author(1, "Reviewer"),
@@ -364,7 +367,7 @@ fn families() -> Vec<Family> {
                 },
             }),
             no_op: Some(|package| {
-                package.edit_opc(|opc| {
+                package.edit_opc_in_place(|opc| {
                     litchi_pptx::remove_presentation_comment_author(
                         opc,
                         1,
@@ -379,7 +382,7 @@ fn families() -> Vec<Family> {
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    package.edit_opc(|opc| {
+                    package.edit_opc_in_place(|opc| {
                         modern_comments::add_modern_comment_author(
                             opc,
                             modern_author(MODERN_AUTHOR_A, "Ada"),
@@ -397,7 +400,7 @@ fn families() -> Vec<Family> {
                 },
             }),
             no_op: Some(|package| {
-                package.edit_opc(|opc| {
+                package.edit_opc_in_place(|opc| {
                     modern_comments::remove_modern_comment_author(opc, MODERN_AUTHOR_A).map(drop)
                 })
             }),
@@ -409,8 +412,8 @@ fn families() -> Vec<Family> {
             // `notes_refuse_a_signed_package_until_it_is_unsigned`.
             change: None,
             no_op: Some(|package| {
-                assert!(!package.remove_notes(0_usize)?);
-                assert_eq!(package.clear_notes()?, 0);
+                assert!(!package.remove_notes_in_place(0_usize)?);
+                assert_eq!(package.clear_notes_in_place()?, 0);
                 Ok(())
             }),
         },
@@ -418,10 +421,10 @@ fn families() -> Vec<Family> {
             name: "slide tags",
             prepare: None,
             change: Some(Change {
-                edit: |package| package.put_tags(0_usize, tag_list()).map(drop),
+                edit: |package| package.put_tags_in_place(0_usize, tag_list()).map(drop),
                 shows: |package| Ok(package.tags(0_usize)?.is_some()),
             }),
-            no_op: Some(|package| package.remove_tags(0_usize).map(drop)),
+            no_op: Some(|package| package.remove_tags_in_place(0_usize).map(drop)),
         },
         Family {
             name: "shape tags",
@@ -429,22 +432,27 @@ fn families() -> Vec<Family> {
             change: Some(Change {
                 edit: |package| {
                     package
-                        .put_shape_tags(0_usize, 0_usize, tag_list())
+                        .put_shape_tags_in_place(0_usize, 0_usize, tag_list())
                         .map(drop)
                 },
                 shows: |package| Ok(package.shape_tags(0_usize, 0_usize)?.is_some()),
             }),
-            no_op: Some(|package| package.remove_shape_tags(0_usize, 0_usize).map(drop)),
+            no_op: Some(|package| {
+                package
+                    .remove_shape_tags_in_place(0_usize, 0_usize)
+                    .map(drop)
+            }),
         },
         Family {
             name: "change tracking",
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    let mut edit = package.change_tracking(0_usize)?.edit();
-                    edit.set_creation_id(7_u32);
+                    let mut edit = package.edit_change_tracking()?;
+                    edit.set_creation_id(0_usize, 7_u32)?;
                     let commit = edit.commit()?;
-                    package.apply_change_tracking_commit(commit).map(drop)
+                    *package = commit.into_package();
+                    Ok(())
                 },
                 shows: |package| {
                     Ok(package.change_tracking(0_usize)?.state().creation_id()
@@ -452,9 +460,11 @@ fn families() -> Vec<Family> {
                 },
             }),
             no_op: Some(|package| {
-                let commit = package.change_tracking(0_usize)?.edit().commit()?;
+                package.change_tracking(0_usize)?;
+                let commit = package.edit_change_tracking()?.commit()?;
                 assert!(commit.patch().is_noop());
-                package.apply_change_tracking_commit(commit).map(drop)
+                *package = commit.into_package();
+                Ok(())
             }),
         },
         Family {
@@ -463,7 +473,7 @@ fn families() -> Vec<Family> {
             change: Some(Change {
                 edit: |package| {
                     package
-                        .put_shape_classification(0_usize, SHAPE, Outcome::Header)
+                        .put_shape_classification_in_place(0_usize, SHAPE, Outcome::Header)
                         .map(drop)
                 },
                 shows: |package| {
@@ -475,7 +485,7 @@ fn families() -> Vec<Family> {
             }),
             no_op: Some(|package| {
                 package
-                    .remove_shape_classification(0_usize, SHAPE)
+                    .remove_shape_classification_in_place(0_usize, SHAPE)
                     .map(drop)
             }),
         },
@@ -485,7 +495,7 @@ fn families() -> Vec<Family> {
             change: Some(Change {
                 edit: |package| {
                     package
-                        .put_shape_design_element(0_usize, SHAPE, true)
+                        .put_shape_design_element_in_place(0_usize, SHAPE, true)
                         .map(drop)
                 },
                 shows: |package| {
@@ -497,7 +507,7 @@ fn families() -> Vec<Family> {
             }),
             no_op: Some(|package| {
                 package
-                    .remove_shape_design_element(0_usize, SHAPE)
+                    .remove_shape_design_element_in_place(0_usize, SHAPE)
                     .map(drop)
             }),
         },
@@ -507,7 +517,7 @@ fn families() -> Vec<Family> {
             change: Some(Change {
                 edit: |package| {
                     package
-                        .put_shape_designer_properties(
+                        .put_shape_designer_properties_in_place(
                             0_usize,
                             SHAPE,
                             DrawingProperties::new().with_editable(Some(true)),
@@ -523,7 +533,7 @@ fn families() -> Vec<Family> {
             }),
             no_op: Some(|package| {
                 package
-                    .remove_shape_designer_properties(0_usize, SHAPE)
+                    .remove_shape_designer_properties_in_place(0_usize, SHAPE)
                     .map(drop)
             }),
         },
@@ -534,8 +544,8 @@ fn families() -> Vec<Family> {
             // `model3d_refuses_a_signed_package_until_it_is_unsigned`.
             change: None,
             no_op: Some(|package| {
-                assert!(package.remove_zooms(0_usize)?.is_none());
-                assert!(package.remove_model3d(0_usize, 0_usize)?.is_none());
+                assert!(package.remove_zooms_in_place(0_usize)?.is_none());
+                assert!(package.remove_model3d_in_place(0_usize, 0_usize)?.is_none());
                 Ok(())
             }),
         },
@@ -544,7 +554,7 @@ fn families() -> Vec<Family> {
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    package.edit_opc(|opc| {
+                    package.edit_opc_in_place(|opc| {
                         let current = theme::load(opc, THEME)?;
                         theme::add(opc, "Signed copy", &current.colors, &current.fonts).map(drop)
                     })
@@ -556,7 +566,7 @@ fn families() -> Vec<Family> {
                 },
             }),
             no_op: Some(|package| {
-                package.edit_opc(|opc| {
+                package.edit_opc_in_place(|opc| {
                     assert!(!theme::remove_override(opc, SLIDE)?);
                     Ok(())
                 })
@@ -566,17 +576,17 @@ fn families() -> Vec<Family> {
             name: "math properties",
             prepare: None,
             change: Some(Change {
-                edit: |package| package.put_math_properties(math()).map(drop),
+                edit: |package| package.put_math_properties_in_place(math()).map(drop),
                 shows: |package| Ok(package.math_properties()? == Some(math())),
             }),
-            no_op: Some(|package| package.remove_math_properties().map(drop)),
+            no_op: Some(|package| package.remove_math_properties_in_place().map(drop)),
         },
         Family {
             name: "presentation structure (sections)",
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    package.edit_opc(|opc| {
+                    package.edit_opc_in_place(|opc| {
                         structure::add_section(opc, Section::new("Signed", SECTION)).map(drop)
                     })
                 },
@@ -585,7 +595,7 @@ fn families() -> Vec<Family> {
                 },
             }),
             no_op: Some(|package| {
-                package.edit_opc(|opc| {
+                package.edit_opc_in_place(|opc| {
                     assert!(!structure::remove_section(opc, SECTION)?);
                     Ok(())
                 })
@@ -596,7 +606,7 @@ fn families() -> Vec<Family> {
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    package.edit_opc(|opc| {
+                    package.edit_opc_in_place(|opc| {
                         let mut shows = CustomShows::new();
                         shows.create("Signed", vec![first_slide_id(opc)?]);
                         custom_show::store(opc, &shows)
@@ -605,7 +615,7 @@ fn families() -> Vec<Family> {
                 shows: |package| package.with_opc(|opc| Ok(!custom_show::load(opc)?.is_empty())),
             }),
             no_op: Some(|package| {
-                package.edit_opc(|opc| {
+                package.edit_opc_in_place(|opc| {
                     assert!(custom_show::remove(opc)?.is_none());
                     Ok(())
                 })
@@ -616,14 +626,14 @@ fn families() -> Vec<Family> {
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    package.edit_opc(|opc| {
+                    package.edit_opc_in_place(|opc| {
                         events::store(opc, &slide(), &[Draft::play(Offset::ms(1), 2)])
                     })
                 },
                 shows: |package| package.with_opc(|opc| Ok(events::load(opc, &slide())?.is_some())),
             }),
             no_op: Some(|package| {
-                package.edit_opc(|opc| {
+                package.edit_opc_in_place(|opc| {
                     assert!(events::remove(opc, &slide())?.is_none());
                     Ok(())
                 })
@@ -634,7 +644,7 @@ fn families() -> Vec<Family> {
             prepare: None,
             // A guide graph is not authored here; removing none is the no-op.
             change: None,
-            no_op: Some(|package| package.edit_opc(|opc| guides::remove(opc).map(drop))),
+            no_op: Some(|package| package.edit_opc_in_place(|opc| guides::remove(opc).map(drop))),
         },
         Family {
             name: "slide Designer tags",
@@ -642,24 +652,30 @@ fn families() -> Vec<Family> {
             change: Some(Change {
                 edit: |package| {
                     package
-                        .put_slide_designer_tags(0_usize, designer_tags())
+                        .put_slide_designer_tags_in_place(0_usize, designer_tags())
                         .map(drop)
                 },
                 shows: |package| {
                     Ok(package.slide_designer_tags(0_usize)?.tags()? == Some(&designer_tags()))
                 },
             }),
-            no_op: Some(|package| package.remove_slide_designer_tags(0_usize).map(drop)),
+            no_op: Some(|package| {
+                package
+                    .remove_slide_designer_tags_in_place(0_usize)
+                    .map(drop)
+            }),
         },
         Family {
             name: "Changes Information",
             prepare: None,
             change: Some(Change {
-                edit: |package| package.edit_opc(|opc| changes::store(opc, &changes_part())),
+                edit: |package| {
+                    package.edit_opc_in_place(|opc| changes::store(opc, &changes_part()))
+                },
                 shows: |package| package.with_opc(|opc| Ok(changes::load(opc)?.is_some())),
             }),
             no_op: Some(|package| {
-                package.edit_opc(|opc| {
+                package.edit_opc_in_place(|opc| {
                     assert!(changes::remove(opc)?.is_none());
                     Ok(())
                 })
@@ -670,7 +686,7 @@ fn families() -> Vec<Family> {
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    package.edit_opc(|opc| {
+                    package.edit_opc_in_place(|opc| {
                         ole::add(
                             opc,
                             SLIDE,
@@ -692,7 +708,7 @@ fn families() -> Vec<Family> {
                 },
             }),
             no_op: Some(|package| {
-                package.edit_opc(|opc| {
+                package.edit_opc_in_place(|opc| {
                     let snapshot = ole::slide::load(opc, 0, &slide())?;
                     let commit = snapshot.edit().commit()?;
                     ole::slide::apply_commit(opc, commit).map(drop)
@@ -703,11 +719,11 @@ fn families() -> Vec<Family> {
             name: "embedded fonts",
             prepare: None,
             change: Some(Change {
-                edit: |package| package.put_fonts(fonts()).map(drop),
+                edit: |package| package.put_fonts_in_place(fonts()).map(drop),
                 shows: |package| Ok(package.fonts()?.is_some()),
             }),
             no_op: Some(|package| {
-                assert!(package.remove_fonts()?.is_none());
+                assert!(package.remove_fonts_in_place()?.is_none());
                 Ok(())
             }),
         },
@@ -718,7 +734,7 @@ fn families() -> Vec<Family> {
                 edit: |package| {
                     let mut styles = package.styles()?.expect("table-style catalog");
                     styles.set_default(StyleId::parse(OTHER_TABLE_STYLE)?);
-                    package.put_styles(styles).map(drop)
+                    package.put_styles_in_place(styles).map(drop)
                 },
                 shows: |package| {
                     Ok(package.styles()?.expect("table-style catalog").default()
@@ -727,7 +743,7 @@ fn families() -> Vec<Family> {
             }),
             no_op: Some(|package| {
                 let styles = package.styles()?.expect("table-style catalog");
-                assert!(!package.put_styles(styles)?);
+                assert!(!package.put_styles_in_place(styles)?);
                 Ok(())
             }),
         },
@@ -735,7 +751,7 @@ fn families() -> Vec<Family> {
             name: "slide masters, layouts and placeholders",
             prepare: None,
             change: Some(Change {
-                edit: |package| package.add_slide_master().map(drop),
+                edit: |package| package.add_slide_master_in_place().map(drop),
                 shows: |package| {
                     package.with_opc(|opc| {
                         Ok(opc.contains_part(
@@ -745,20 +761,20 @@ fn families() -> Vec<Family> {
                 },
             }),
             no_op: Some(|package| {
-                let commit = package
-                    .placeholder_type_extension_slot_snapshot(&slide(), 0_usize)?
-                    .edit()
-                    .commit()?;
-                package
-                    .apply_placeholder_type_extension_slot_patch(&commit.into_patch())
-                    .map(drop)
+                package.placeholder_type_extension(&slide(), 0_usize)?;
+                let commit = package.edit_placeholder_type_extension()?.commit()?;
+                assert!(commit.patch().is_noop());
+                *package = commit.into_package();
+                Ok(())
             }),
         },
         Family {
             name: "charts",
             prepare: None,
             change: Some(Change {
-                edit: |package| package.edit_opc(|opc| chart::add(opc, SLIDE, &chart()).map(drop)),
+                edit: |package| {
+                    package.edit_opc_in_place(|opc| chart::add(opc, SLIDE, &chart()).map(drop))
+                },
                 shows: |package| {
                     package.with_opc(|opc| {
                         Ok(opc.contains_part(&PackURI::new("/ppt/charts/chart1.xml").unwrap()))
@@ -773,7 +789,7 @@ fn families() -> Vec<Family> {
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    package.edit_opc(|opc| {
+                    package.edit_opc_in_place(|opc| {
                         let part = opc.get_part_mut(&slide())?;
                         let xml = String::from_utf8(part.blob().to_vec())
                             .unwrap()
@@ -792,7 +808,7 @@ fn families() -> Vec<Family> {
                     })
                 },
             }),
-            no_op: Some(|package| package.edit_opc(|_| Ok(()))),
+            no_op: Some(|package| package.edit_opc_in_place(|_| Ok(()))),
         },
         Family {
             name: "opened-presentation transaction",
@@ -830,10 +846,10 @@ fn families() -> Vec<Family> {
         name: "custom properties (shared owner)",
         prepare: None,
         change: Some(Change {
-            edit: |package| package.put_custom_props(custom_props()),
+            edit: |package| package.put_custom_props_in_place(custom_props()),
             shows: |package| Ok(package.custom_props()?.get("Project").is_some()),
         }),
-        no_op: Some(|package| package.remove_custom_props()),
+        no_op: Some(|package| package.put_custom_props_in_place(litchi_pptx::custom::Props::new())),
     });
     #[cfg(feature = "vba-inspection")]
     families.push(Family {
@@ -841,7 +857,7 @@ fn families() -> Vec<Family> {
         prepare: None,
         change: Some(Change {
             edit: |package| {
-                package.edit_opc(|opc| {
+                package.edit_opc_in_place(|opc| {
                     vba::store(opc, &presentation(), b"inert project".to_vec()).map(drop)
                 })
             },
@@ -850,7 +866,7 @@ fn families() -> Vec<Family> {
             },
         }),
         no_op: Some(|package| {
-            package.edit_opc(|opc| {
+            package.edit_opc_in_place(|opc| {
                 assert!(!vba::remove(opc, &presentation())?);
                 Ok(())
             })
@@ -912,7 +928,7 @@ fn raw_edit_that_unsigns_explicitly_publishes_without_a_signature() {
     for name in SIGNED {
         let mut package = Package::from_reader(std::io::Cursor::new(fixture(name))).unwrap();
         package
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
                 opc.unsign();
                 litchi_pptx::add_presentation_comment_author(
                     opc,
@@ -932,15 +948,17 @@ fn notes_refuse_a_signed_package_until_it_is_unsigned() {
     let mut package = Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
     let graph = package.notes().unwrap().expect("notes graph");
 
-    package.put_notes(graph).unwrap();
+    package.put_notes_in_place(graph).unwrap();
     assert_eq!(package.to_bytes().unwrap(), source);
 
-    assert!(is_refusal(&package.remove_notes(0_usize).unwrap_err()));
-    assert!(is_refusal(&package.clear_notes().unwrap_err()));
+    assert!(is_refusal(
+        &package.remove_notes_in_place(0_usize).unwrap_err()
+    ));
+    assert!(is_refusal(&package.clear_notes_in_place().unwrap_err()));
     assert_eq!(package.to_bytes().unwrap(), source);
 
     package.unsign().unwrap();
-    assert!(package.remove_notes(0_usize).unwrap());
+    assert!(package.remove_notes_in_place(0_usize).unwrap());
     let output = package.to_bytes().unwrap();
     assert!(!carries_signature(&output));
     let reopened = Package::from_reader(std::io::Cursor::new(output)).unwrap();
@@ -957,7 +975,7 @@ fn model3d_refuses_a_signed_package_until_it_is_unsigned() {
     const MODEL_FRAME: &str = r#"<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="42" name="3D Model"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm/><a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/drawing/2017/model3d"><am3d:model3d xmlns:am3d="http://schemas.microsoft.com/office/drawing/2017/model3d" r:embed="rIdModel"><am3d:spPr/><am3d:camera/><am3d:trans/><am3d:raster rName="Office Renderer" rVer="17.0"><am3d:blip r:embed="rIdPreview"/></am3d:raster><am3d:objViewport/></am3d:model3d></a:graphicData></a:graphic></p:graphicFrame>"#;
     let source = signed_with(SIGNED[0], |package| {
         package
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
                 let part = opc.get_part_mut(&slide())?;
                 let xml = String::from_utf8(part.blob().to_vec()).unwrap().replacen(
                     "</p:spTree>",
@@ -998,19 +1016,21 @@ fn model3d_refuses_a_signed_package_until_it_is_unsigned() {
         .expect("model");
 
     package
-        .put_model3d(0_usize, "3D Model", model.clone())
+        .put_model3d_in_place(0_usize, "3D Model", model.clone())
         .unwrap();
     assert_eq!(package.to_bytes().unwrap(), source);
 
     assert!(is_refusal(
-        &package.remove_model3d(0_usize, "3D Model").unwrap_err()
+        &package
+            .remove_model3d_in_place(0_usize, "3D Model")
+            .unwrap_err()
     ));
     assert_eq!(package.to_bytes().unwrap(), source);
 
     package.unsign().unwrap();
     assert!(
         package
-            .remove_model3d(0_usize, "3D Model")
+            .remove_model3d_in_place(0_usize, "3D Model")
             .unwrap()
             .is_some()
     );
@@ -1039,7 +1059,7 @@ fn legacy_comment_no_ops_keep_a_signed_package_exact() {
     };
     let source = signed_with(SIGNED[0], |package| {
         package
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
                 litchi_pptx::add_presentation_comment_author(
                     opc,
                     legacy_author(1, "Ada"),
@@ -1063,7 +1083,7 @@ fn legacy_comment_no_ops_keep_a_signed_package_exact() {
     let mut package = Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
 
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let author = litchi_pptx::find_presentation_comment_author(opc, 1)?.unwrap();
             litchi_pptx::update_presentation_comment_author(opc, 1, author, conformance)?;
             litchi_pptx::reorder_presentation_comment_authors(opc, &[1, 2], conformance)?;
@@ -1075,10 +1095,10 @@ fn legacy_comment_no_ops_keep_a_signed_package_exact() {
     assert_eq!(package.to_bytes().unwrap(), source);
 
     let refused = [
-        package.edit_opc(|opc| {
+        package.edit_opc_in_place(|opc| {
             litchi_pptx::reorder_presentation_comment_authors(opc, &[2, 1], conformance)
         }),
-        package.edit_opc(|opc| {
+        package.edit_opc_in_place(|opc| {
             litchi_pptx::update_presentation_comment(
                 opc,
                 SLIDE,
@@ -1088,7 +1108,7 @@ fn legacy_comment_no_ops_keep_a_signed_package_exact() {
                 conformance,
             )
         }),
-        package.edit_opc(|opc| {
+        package.edit_opc_in_place(|opc| {
             litchi_pptx::remove_presentation_comment(opc, SLIDE, 2, 1, conformance).map(drop)
         }),
     ];
@@ -1099,7 +1119,7 @@ fn legacy_comment_no_ops_keep_a_signed_package_exact() {
 
     package.unsign().unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             litchi_pptx::reorder_presentation_comment_authors(opc, &[2, 1], conformance)
         })
         .unwrap();
@@ -1112,7 +1132,7 @@ fn legacy_comment_no_ops_keep_a_signed_package_exact() {
 fn modern_comment_no_ops_keep_a_signed_package_exact() {
     let source = signed_with(SIGNED[1], |package| {
         package
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
                 modern_comments::add_modern_comment_author(
                     opc,
                     modern_author(MODERN_AUTHOR_A, "Ada"),
@@ -1134,7 +1154,7 @@ fn modern_comment_no_ops_keep_a_signed_package_exact() {
     let authors = [MODERN_AUTHOR_A.to_owned(), MODERN_AUTHOR_B.to_owned()];
 
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             assert!(modern_comments::update_modern_comment_author(
                 opc,
                 MODERN_AUTHOR_A,
@@ -1155,16 +1175,16 @@ fn modern_comment_no_ops_keep_a_signed_package_exact() {
 
     let reversed = [MODERN_AUTHOR_B.to_owned(), MODERN_AUTHOR_A.to_owned()];
     let refused = [
-        package.edit_opc(|opc| {
+        package.edit_opc_in_place(|opc| {
             modern_comments::reorder_modern_comment_authors(opc, &reversed).map(drop)
         }),
-        package.edit_opc(|opc| {
+        package.edit_opc_in_place(|opc| {
             modern_comments::update_modern_comment(opc, &slide(), MODERN_COMMENT, |comment| {
                 comment.title = Some("Changed".into());
             })
             .map(drop)
         }),
-        package.edit_opc(|opc| {
+        package.edit_opc_in_place(|opc| {
             modern_comments::remove_modern_comment_author(opc, MODERN_AUTHOR_B).map(drop)
         }),
     ];
@@ -1175,7 +1195,9 @@ fn modern_comment_no_ops_keep_a_signed_package_exact() {
 
     package.unsign().unwrap();
     package
-        .edit_opc(|opc| modern_comments::reorder_modern_comment_authors(opc, &reversed).map(drop))
+        .edit_opc_in_place(|opc| {
+            modern_comments::reorder_modern_comment_authors(opc, &reversed).map(drop)
+        })
         .unwrap();
     assert!(!carries_signature(&package.to_bytes().unwrap()));
 }
@@ -1186,7 +1208,7 @@ fn modern_comment_no_ops_keep_a_signed_package_exact() {
 fn modern_comment_command_no_op_keeps_a_signed_package_exact() {
     let source = signed_with(SIGNED[0], |package| {
         package
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
                 changes::store(opc, &changes_part())?;
                 // Publish the commands in this library's own spelling first,
                 // so the no-op below reproduces the stored bytes.
@@ -1197,7 +1219,7 @@ fn modern_comment_command_no_op_keeps_a_signed_package_exact() {
     });
     let mut package = Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             assert!(modern_comments::update_modern_comment_changes(opc, |_| {})?);
             Ok(())
         })
@@ -1210,11 +1232,11 @@ fn modern_comment_command_no_op_keeps_a_signed_package_exact() {
         })
         .map(drop)
     };
-    assert!(is_refusal(&package.edit_opc(change).unwrap_err()));
+    assert!(is_refusal(&package.edit_opc_in_place(change).unwrap_err()));
     assert_eq!(package.to_bytes().unwrap(), source);
 
     package.unsign().unwrap();
-    package.edit_opc(change).unwrap();
+    package.edit_opc_in_place(change).unwrap();
     assert!(!carries_signature(&package.to_bytes().unwrap()));
 }
 
@@ -1234,7 +1256,7 @@ fn theme_no_ops_keep_a_signed_package_exact() {
     };
     let source = signed_with(SIGNED[1], |package| {
         package
-            .edit_opc(|opc| {
+            .edit_opc_in_place(|opc| {
                 theme::add(opc, "Signed", &colors, &fonts)?;
                 // Replace the schemes once while unsigned, so the theme holds
                 // them in the spelling a replacement publishes.
@@ -1247,7 +1269,7 @@ fn theme_no_ops_keep_a_signed_package_exact() {
     let mut package = Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
 
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             theme::put_colors(opc, AUTHORED, &colors)?;
             theme::put_fonts(opc, AUTHORED, &fonts)?;
             theme::put_override(opc, SLIDE, &palette_override).map(drop)
@@ -1260,9 +1282,9 @@ fn theme_no_ops_keep_a_signed_package_exact() {
         fonts: Some(fonts.clone()),
     };
     let refused = [
-        package.edit_opc(|opc| theme::put_override(opc, SLIDE, &fonts_override).map(drop)),
-        package.edit_opc(|opc| theme::remove_override(opc, SLIDE).map(drop)),
-        package.edit_opc(|opc| {
+        package.edit_opc_in_place(|opc| theme::put_override(opc, SLIDE, &fonts_override).map(drop)),
+        package.edit_opc_in_place(|opc| theme::remove_override(opc, SLIDE).map(drop)),
+        package.edit_opc_in_place(|opc| {
             theme::attach(opc, "/ppt/slideMasters/slideMaster1.xml", AUTHORED).map(drop)
         }),
     ];
@@ -1273,7 +1295,7 @@ fn theme_no_ops_keep_a_signed_package_exact() {
 
     package.unsign().unwrap();
     package
-        .edit_opc(|opc| theme::remove_override(opc, SLIDE).map(drop))
+        .edit_opc_in_place(|opc| theme::remove_override(opc, SLIDE).map(drop))
         .unwrap();
     assert!(!carries_signature(&package.to_bytes().unwrap()));
 }
@@ -1287,34 +1309,34 @@ fn shape_put_no_ops_keep_a_signed_package_exact() {
     let source = signed_with(SIGNED[0], |package| {
         add_self_contained_shape(package);
         package
-            .put_shape_classification(0_usize, SHAPE, Outcome::Header)
+            .put_shape_classification_in_place(0_usize, SHAPE, Outcome::Header)
             .unwrap();
         package
-            .put_shape_design_element(0_usize, SHAPE, true)
+            .put_shape_design_element_in_place(0_usize, SHAPE, true)
             .unwrap();
     });
     let mut package = Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
 
     package
-        .put_shape_classification(0_usize, SHAPE, Outcome::Header)
+        .put_shape_classification_in_place(0_usize, SHAPE, Outcome::Header)
         .unwrap();
     package
-        .put_shape_design_element(0_usize, SHAPE, true)
+        .put_shape_design_element_in_place(0_usize, SHAPE, true)
         .unwrap();
     assert_eq!(package.to_bytes().unwrap(), source);
 
     let refused = [
         package
-            .put_shape_classification(0_usize, SHAPE, Outcome::Footer)
+            .put_shape_classification_in_place(0_usize, SHAPE, Outcome::Footer)
             .map(drop),
         package
-            .remove_shape_classification(0_usize, SHAPE)
+            .remove_shape_classification_in_place(0_usize, SHAPE)
             .map(drop),
         package
-            .put_shape_design_element(0_usize, SHAPE, false)
+            .put_shape_design_element_in_place(0_usize, SHAPE, false)
             .map(drop),
         package
-            .remove_shape_design_element(0_usize, SHAPE)
+            .remove_shape_design_element_in_place(0_usize, SHAPE)
             .map(drop),
     ];
     for result in refused {
