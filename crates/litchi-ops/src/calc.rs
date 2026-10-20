@@ -244,8 +244,8 @@ impl Options {
     }
 
     /// Bound the chain of formula cells one evaluation follows. The engine
-    /// recurses once per formula on the chain, about 3 KiB of stack each in
-    /// an optimized build and several times that in a debug build, so raise
+    /// recurses once per formula on the chain, about 2 to 2.5 KiB of stack
+    /// each in an optimized build and about 10 KiB in a debug build, so raise
     /// the bound only on a thread with stack to match.
     #[must_use]
     pub const fn max_depth(mut self, depth: usize) -> Self {

@@ -6,18 +6,14 @@ use super::{
 use crate::parser::Expr;
 use litchi_core::sheet::{CellValue, Result};
 
-pub(crate) async fn eval_dget(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_dget(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 3 {
         return Ok(CellValue::Error(
             "DGET expects 3 arguments (database, field, criteria)".to_string(),
         ));
     }
 
-    let database = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
+    let database = flatten_range_expr(ctx, current_sheet, &args[0])?;
     let rows = database.rows;
     let cols = database.cols;
 
@@ -30,7 +26,7 @@ pub(crate) async fn eval_dget(
     let header_values = &database.values[..cols];
     let header_texts: Vec<String> = header_values.iter().map(to_text).collect();
 
-    let field_arg = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let field_arg = evaluate_expression(ctx, current_sheet, &args[1])?;
     let field_index = match field_to_index(&field_arg, &header_texts) {
         Some(idx) => idx,
         None => {
@@ -40,7 +36,7 @@ pub(crate) async fn eval_dget(
         },
     };
 
-    let criteria_range = flatten_range_expr(ctx, current_sheet, &args[2]).await?;
+    let criteria_range = flatten_range_expr(ctx, current_sheet, &args[2])?;
     if criteria_range.rows < 2 || criteria_range.cols == 0 {
         return Ok(CellValue::Error(
             "DGET criteria must include header row and at least one criteria row".to_string(),
@@ -64,23 +60,15 @@ pub(crate) async fn eval_dget(
     }
 }
 
-pub(crate) async fn eval_dmax(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
-    eval_database_stat(ctx, current_sheet, args, "DMAX", DatabaseStat::Max).await
+pub(crate) fn eval_dmax(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
+    eval_database_stat(ctx, current_sheet, args, "DMAX", DatabaseStat::Max)
 }
 
-pub(crate) async fn eval_dmin(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
-    eval_database_stat(ctx, current_sheet, args, "DMIN", DatabaseStat::Min).await
+pub(crate) fn eval_dmin(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
+    eval_database_stat(ctx, current_sheet, args, "DMIN", DatabaseStat::Min)
 }
 
-pub(crate) async fn eval_dcount(
+pub(crate) fn eval_dcount(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -92,50 +80,45 @@ pub(crate) async fn eval_dcount(
         "DCOUNT",
         DatabaseStat::CountNumeric,
     )
-    .await
 }
 
-pub(crate) async fn eval_dcounta(
+pub(crate) fn eval_dcounta(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    eval_database_stat(ctx, current_sheet, args, "DCOUNTA", DatabaseStat::CountAll).await
+    eval_database_stat(ctx, current_sheet, args, "DCOUNTA", DatabaseStat::CountAll)
 }
 
-pub(crate) async fn eval_dsum(
+pub(crate) fn eval_dsum(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
+    eval_database_stat(ctx, current_sheet, args, "DSUM", DatabaseStat::Sum)
+}
+
+pub(crate) fn eval_dproduct(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    eval_database_stat(ctx, current_sheet, args, "DSUM", DatabaseStat::Sum).await
+    eval_database_stat(ctx, current_sheet, args, "DPRODUCT", DatabaseStat::Product)
 }
 
-pub(crate) async fn eval_dproduct(
+pub(crate) fn eval_daverage(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    eval_database_stat(ctx, current_sheet, args, "DPRODUCT", DatabaseStat::Product).await
+    eval_database_stat(ctx, current_sheet, args, "DAVERAGE", DatabaseStat::Average)
 }
 
-pub(crate) async fn eval_daverage(
+pub(crate) fn eval_dstdev(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    eval_database_stat(ctx, current_sheet, args, "DAVERAGE", DatabaseStat::Average).await
+    eval_database_stat(ctx, current_sheet, args, "DSTDEV", DatabaseStat::StdSample)
 }
 
-pub(crate) async fn eval_dstdev(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
-    eval_database_stat(ctx, current_sheet, args, "DSTDEV", DatabaseStat::StdSample).await
-}
-
-pub(crate) async fn eval_dstdevp(
+pub(crate) fn eval_dstdevp(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -147,18 +130,13 @@ pub(crate) async fn eval_dstdevp(
         "DSTDEVP",
         DatabaseStat::StdPopulation,
     )
-    .await
 }
 
-pub(crate) async fn eval_dvar(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
-    eval_database_stat(ctx, current_sheet, args, "DVAR", DatabaseStat::VarSample).await
+pub(crate) fn eval_dvar(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
+    eval_database_stat(ctx, current_sheet, args, "DVAR", DatabaseStat::VarSample)
 }
 
-pub(crate) async fn eval_dvarp(
+pub(crate) fn eval_dvarp(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -170,7 +148,6 @@ pub(crate) async fn eval_dvarp(
         "DVARP",
         DatabaseStat::VarPopulation,
     )
-    .await
 }
 
 enum DatabaseStat {
@@ -187,7 +164,7 @@ enum DatabaseStat {
     VarPopulation,
 }
 
-async fn eval_database_stat(
+fn eval_database_stat(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -200,7 +177,7 @@ async fn eval_database_stat(
         )));
     }
 
-    let database = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
+    let database = flatten_range_expr(ctx, current_sheet, &args[0])?;
     if database.rows < 2 || database.cols == 0 {
         return Ok(CellValue::Error(format!(
             "{name} database must include header row and at least one record"
@@ -210,7 +187,7 @@ async fn eval_database_stat(
     let header_values = &database.values[..database.cols];
     let header_texts: Vec<String> = header_values.iter().map(to_text).collect();
 
-    let field_arg = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let field_arg = evaluate_expression(ctx, current_sheet, &args[1])?;
     let field_index = match field_to_index(&field_arg, &header_texts) {
         Some(idx) => idx,
         None => {
@@ -220,7 +197,7 @@ async fn eval_database_stat(
         },
     };
 
-    let criteria_range = flatten_range_expr(ctx, current_sheet, &args[2]).await?;
+    let criteria_range = flatten_range_expr(ctx, current_sheet, &args[2])?;
     if criteria_range.rows < 2 || criteria_range.cols == 0 {
         return Ok(CellValue::Error(format!(
             "{name} criteria must include header row and at least one criteria row"
@@ -570,8 +547,8 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn test_dget_single_match() {
+    #[test]
+    fn test_dget_single_match() {
         let engine = TestEngine::new();
         setup_database(&engine);
         setup_age_criteria(&engine, 10, 0, 30); // Age = 30
@@ -582,12 +559,12 @@ mod tests {
         let criteria = create_criteria_range(10, 0);
 
         let args = vec![database, field, criteria];
-        let result = eval_dget(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dget(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(90)); // Bob's score
     }
 
-    #[tokio::test]
-    async fn test_dget_no_match() {
+    #[test]
+    fn test_dget_no_match() {
         let engine = TestEngine::new();
         setup_database(&engine);
         setup_age_criteria(&engine, 10, 0, 99); // Age = 99 (no match)
@@ -598,15 +575,15 @@ mod tests {
         let criteria = create_criteria_range(10, 0);
 
         let args = vec![database, field, criteria];
-        let result = eval_dget(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dget(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("found no rows")),
             _ => panic!("Expected Error result, got {:?}", result),
         }
     }
 
-    #[tokio::test]
-    async fn test_dget_multiple_matches() {
+    #[test]
+    fn test_dget_multiple_matches() {
         let engine = TestEngine::new();
         setup_database(&engine);
         setup_age_criteria(&engine, 10, 0, 25); // Age = 25 (Alice and Carol)
@@ -617,15 +594,15 @@ mod tests {
         let criteria = create_criteria_range(10, 0);
 
         let args = vec![database, field, criteria];
-        let result = eval_dget(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dget(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("multiple rows")),
             _ => panic!("Expected Error result, got {:?}", result),
         }
     }
 
-    #[tokio::test]
-    async fn test_dget_field_by_index() {
+    #[test]
+    fn test_dget_field_by_index() {
         let engine = TestEngine::new();
         setup_database(&engine);
         setup_age_criteria(&engine, 10, 0, 30);
@@ -636,12 +613,12 @@ mod tests {
         let criteria = create_criteria_range(10, 0);
 
         let args = vec![database, field, criteria];
-        let result = eval_dget(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dget(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(90));
     }
 
-    #[tokio::test]
-    async fn test_dsum() {
+    #[test]
+    fn test_dsum() {
         let engine = TestEngine::new();
         setup_database(&engine);
         setup_age_criteria(&engine, 10, 0, 25); // Age = 25 (Alice=85, Carol=78)
@@ -652,12 +629,12 @@ mod tests {
         let criteria = create_criteria_range(10, 0);
 
         let args = vec![database, field, criteria];
-        let result = eval_dsum(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dsum(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Float(163.0)); // 85 + 78
     }
 
-    #[tokio::test]
-    async fn test_daverage() {
+    #[test]
+    fn test_daverage() {
         let engine = TestEngine::new();
         setup_database(&engine);
         setup_age_criteria(&engine, 10, 0, 25); // Age = 25
@@ -668,12 +645,12 @@ mod tests {
         let criteria = create_criteria_range(10, 0);
 
         let args = vec![database, field, criteria];
-        let result = eval_daverage(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_daverage(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Float(81.5)); // (85 + 78) / 2
     }
 
-    #[tokio::test]
-    async fn test_dcount() {
+    #[test]
+    fn test_dcount() {
         let engine = TestEngine::new();
         setup_database(&engine);
         setup_age_criteria(&engine, 10, 0, 25);
@@ -684,12 +661,12 @@ mod tests {
         let criteria = create_criteria_range(10, 0);
 
         let args = vec![database, field, criteria];
-        let result = eval_dcount(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dcount(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(2)); // 2 numeric scores
     }
 
-    #[tokio::test]
-    async fn test_dcounta() {
+    #[test]
+    fn test_dcounta() {
         let engine = TestEngine::new();
         setup_database(&engine);
         // Add criteria to match all rows (using Score > 0)
@@ -702,12 +679,12 @@ mod tests {
         let criteria = create_criteria_range(10, 0);
 
         let args = vec![database, field, criteria];
-        let result = eval_dcounta(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dcounta(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(4)); // 4 names match Score > 0
     }
 
-    #[tokio::test]
-    async fn test_dmax() {
+    #[test]
+    fn test_dmax() {
         let engine = TestEngine::new();
         setup_database(&engine);
         // Match all by using criteria with blank value
@@ -720,12 +697,12 @@ mod tests {
         let criteria = create_criteria_range(10, 0);
 
         let args = vec![database, field, criteria];
-        let result = eval_dmax(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dmax(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(92)); // Dave's score
     }
 
-    #[tokio::test]
-    async fn test_dmin() {
+    #[test]
+    fn test_dmin() {
         let engine = TestEngine::new();
         setup_database(&engine);
         engine.set_cell("Sheet1", 0, 10, CellValue::String("Score".to_string()));
@@ -737,12 +714,12 @@ mod tests {
         let criteria = create_criteria_range(10, 0);
 
         let args = vec![database, field, criteria];
-        let result = eval_dmin(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dmin(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(78)); // Carol's score
     }
 
-    #[tokio::test]
-    async fn test_dproduct() {
+    #[test]
+    fn test_dproduct() {
         let engine = TestEngine::new();
         setup_database(&engine);
         setup_age_criteria(&engine, 10, 0, 25); // Age = 25 (scores 85, 78)
@@ -753,12 +730,12 @@ mod tests {
         let criteria = create_criteria_range(10, 0);
 
         let args = vec![database, field, criteria];
-        let result = eval_dproduct(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dproduct(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Float(6630.0)); // 85 * 78
     }
 
-    #[tokio::test]
-    async fn test_dstddev() {
+    #[test]
+    fn test_dstddev() {
         let engine = TestEngine::new();
         setup_database(&engine);
         engine.set_cell("Sheet1", 0, 10, CellValue::String("Score".to_string()));
@@ -770,7 +747,7 @@ mod tests {
         let criteria = create_criteria_range(10, 0);
 
         let args = vec![database, field, criteria];
-        let result = eval_dstdev(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dstdev(ctx, "Sheet1", &args).unwrap();
         // Sample standard deviation of [85, 90, 78, 92]
         // mean = 86.25, variance = 38.916667, stddev = 6.238322
         match result {
@@ -787,8 +764,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_dstddevp() {
+    #[test]
+    fn test_dstddevp() {
         let engine = TestEngine::new();
         setup_database(&engine);
         engine.set_cell("Sheet1", 0, 10, CellValue::String("Score".to_string()));
@@ -800,7 +777,7 @@ mod tests {
         let criteria = create_criteria_range(10, 0);
 
         let args = vec![database, field, criteria];
-        let result = eval_dstdevp(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dstdevp(ctx, "Sheet1", &args).unwrap();
         // Population standard deviation of [85, 90, 78, 92]
         // mean = 86.25, variance = 29.1875, stddev = 5.402546
         match result {
@@ -817,8 +794,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_dvar() {
+    #[test]
+    fn test_dvar() {
         let engine = TestEngine::new();
         setup_database(&engine);
         engine.set_cell("Sheet1", 0, 10, CellValue::String("Score".to_string()));
@@ -830,7 +807,7 @@ mod tests {
         let criteria = create_criteria_range(10, 0);
 
         let args = vec![database, field, criteria];
-        let result = eval_dvar(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dvar(ctx, "Sheet1", &args).unwrap();
         // Sample variance of [85, 90, 78, 92] = 38.916667
         match result {
             CellValue::Float(v) => {
@@ -846,8 +823,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_dvarp() {
+    #[test]
+    fn test_dvarp() {
         let engine = TestEngine::new();
         setup_database(&engine);
         engine.set_cell("Sheet1", 0, 10, CellValue::String("Score".to_string()));
@@ -859,7 +836,7 @@ mod tests {
         let criteria = create_criteria_range(10, 0);
 
         let args = vec![database, field, criteria];
-        let result = eval_dvarp(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dvarp(ctx, "Sheet1", &args).unwrap();
         // Population variance of [85, 90, 78, 92] = 29.1875
         match result {
             CellValue::Float(v) => {
@@ -875,20 +852,20 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_dget_wrong_args() {
+    #[test]
+    fn test_dget_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![];
-        let result = eval_dget(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dget(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 3 arguments")),
             _ => panic!("Expected Error result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_dget_invalid_field() {
+    #[test]
+    fn test_dget_invalid_field() {
         let engine = TestEngine::new();
         setup_database(&engine);
         setup_age_criteria(&engine, 10, 0, 30);
@@ -899,7 +876,7 @@ mod tests {
         let criteria = create_criteria_range(10, 0);
 
         let args = vec![database, field, criteria];
-        let result = eval_dget(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_dget(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("valid column header")),
             _ => panic!("Expected Error result, got {:?}", result),

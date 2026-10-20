@@ -95,7 +95,7 @@ fn format_complex(c: Complex64, suffix: &str) -> String {
     }
 }
 
-pub(crate) async fn eval_complex(
+pub(crate) fn eval_complex(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -106,8 +106,8 @@ pub(crate) async fn eval_complex(
         ));
     }
 
-    let re_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let im_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let re_val = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let im_val = evaluate_expression(ctx, current_sheet, &args[1])?;
 
     let re = match to_number(&re_val) {
         Some(n) => n,
@@ -119,7 +119,7 @@ pub(crate) async fn eval_complex(
     };
 
     let suffix = if args.len() == 3 {
-        let s_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+        let s_val = evaluate_expression(ctx, current_sheet, &args[2])?;
         let s = to_text(&s_val);
         if s != "i" && s != "j" {
             return Ok(CellValue::Error("#VALUE!".to_string()));
@@ -135,7 +135,7 @@ pub(crate) async fn eval_complex(
     )))
 }
 
-pub(crate) async fn eval_imabs(
+pub(crate) fn eval_imabs(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -143,7 +143,7 @@ pub(crate) async fn eval_imabs(
     if args.len() != 1 {
         return Ok(CellValue::Error("IMABS expects 1 argument".to_string()));
     }
-    let val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let text = to_text(&val);
     match parse_complex(&text) {
         Some(c) => Ok(CellValue::Float(c.norm())),
@@ -151,7 +151,7 @@ pub(crate) async fn eval_imabs(
     }
 }
 
-pub(crate) async fn eval_imaginary(
+pub(crate) fn eval_imaginary(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -159,7 +159,7 @@ pub(crate) async fn eval_imaginary(
     if args.len() != 1 {
         return Ok(CellValue::Error("IMAGINARY expects 1 argument".to_string()));
     }
-    let val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let text = to_text(&val);
     match parse_complex(&text) {
         Some(c) => Ok(CellValue::Float(c.im)),
@@ -167,7 +167,7 @@ pub(crate) async fn eval_imaginary(
     }
 }
 
-pub(crate) async fn eval_imreal(
+pub(crate) fn eval_imreal(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -175,7 +175,7 @@ pub(crate) async fn eval_imreal(
     if args.len() != 1 {
         return Ok(CellValue::Error("IMREAL expects 1 argument".to_string()));
     }
-    let val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let text = to_text(&val);
     match parse_complex(&text) {
         Some(c) => Ok(CellValue::Float(c.re)),
@@ -183,7 +183,7 @@ pub(crate) async fn eval_imreal(
     }
 }
 
-pub(crate) async fn eval_imargument(
+pub(crate) fn eval_imargument(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -193,7 +193,7 @@ pub(crate) async fn eval_imargument(
             "IMARGUMENT expects 1 argument".to_string(),
         ));
     }
-    let val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let text = to_text(&val);
     match parse_complex(&text) {
         Some(c) => Ok(CellValue::Float(c.arg())),
@@ -201,7 +201,7 @@ pub(crate) async fn eval_imargument(
     }
 }
 
-pub(crate) async fn eval_imconjugate(
+pub(crate) fn eval_imconjugate(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -211,7 +211,7 @@ pub(crate) async fn eval_imconjugate(
             "IMCONJUGATE expects 1 argument".to_string(),
         ));
     }
-    let val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let text = to_text(&val);
     let suffix = if text.ends_with('j') { "j" } else { "i" };
     match parse_complex(&text) {
@@ -220,7 +220,7 @@ pub(crate) async fn eval_imconjugate(
     }
 }
 
-pub(crate) async fn eval_imsum(
+pub(crate) fn eval_imsum(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -234,7 +234,7 @@ pub(crate) async fn eval_imsum(
     let mut suffix = "i";
 
     for arg in args {
-        let val = evaluate_expression(ctx, current_sheet, arg).await?;
+        let val = evaluate_expression(ctx, current_sheet, arg)?;
         let text = to_text(&val);
         if text.ends_with('j') {
             suffix = "j";
@@ -247,7 +247,7 @@ pub(crate) async fn eval_imsum(
     Ok(CellValue::String(format_complex(total, suffix)))
 }
 
-pub(crate) async fn eval_imsub(
+pub(crate) fn eval_imsub(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -255,8 +255,8 @@ pub(crate) async fn eval_imsub(
     if args.len() != 2 {
         return Ok(CellValue::Error("IMSUB expects 2 arguments".to_string()));
     }
-    let val1 = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let val2 = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let val1 = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let val2 = evaluate_expression(ctx, current_sheet, &args[1])?;
     let text1 = to_text(&val1);
     let text2 = to_text(&val2);
 
@@ -272,7 +272,7 @@ pub(crate) async fn eval_imsub(
     }
 }
 
-pub(crate) async fn eval_improduct(
+pub(crate) fn eval_improduct(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -286,7 +286,7 @@ pub(crate) async fn eval_improduct(
     let mut suffix = "i";
 
     for arg in args {
-        let val = evaluate_expression(ctx, current_sheet, arg).await?;
+        let val = evaluate_expression(ctx, current_sheet, arg)?;
         let text = to_text(&val);
         if text.ends_with('j') {
             suffix = "j";
@@ -299,7 +299,7 @@ pub(crate) async fn eval_improduct(
     Ok(CellValue::String(format_complex(total, suffix)))
 }
 
-pub(crate) async fn eval_imdiv(
+pub(crate) fn eval_imdiv(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -307,8 +307,8 @@ pub(crate) async fn eval_imdiv(
     if args.len() != 2 {
         return Ok(CellValue::Error("IMDIV expects 2 arguments".to_string()));
     }
-    let val1 = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let val2 = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let val1 = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let val2 = evaluate_expression(ctx, current_sheet, &args[1])?;
     let text1 = to_text(&val1);
     let text2 = to_text(&val2);
 
@@ -329,55 +329,55 @@ pub(crate) async fn eval_imdiv(
     }
 }
 
-pub(crate) async fn eval_imsin(
+pub(crate) fn eval_imsin(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    eval_unary_complex(ctx, current_sheet, args, "IMSIN", |c| c.sin()).await
+    eval_unary_complex(ctx, current_sheet, args, "IMSIN", |c| c.sin())
 }
 
-pub(crate) async fn eval_imcos(
+pub(crate) fn eval_imcos(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    eval_unary_complex(ctx, current_sheet, args, "IMCOS", |c| c.cos()).await
+    eval_unary_complex(ctx, current_sheet, args, "IMCOS", |c| c.cos())
 }
 
-pub(crate) async fn eval_imtan(
+pub(crate) fn eval_imtan(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    eval_unary_complex(ctx, current_sheet, args, "IMTAN", |c| c.tan()).await
+    eval_unary_complex(ctx, current_sheet, args, "IMTAN", |c| c.tan())
 }
 
-pub(crate) async fn eval_imsinh(
+pub(crate) fn eval_imsinh(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    eval_unary_complex(ctx, current_sheet, args, "IMSINH", |c| c.sinh()).await
+    eval_unary_complex(ctx, current_sheet, args, "IMSINH", |c| c.sinh())
 }
 
-pub(crate) async fn eval_imcosh(
+pub(crate) fn eval_imcosh(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    eval_unary_complex(ctx, current_sheet, args, "IMCOSH", |c| c.cosh()).await
+    eval_unary_complex(ctx, current_sheet, args, "IMCOSH", |c| c.cosh())
 }
 
-pub(crate) async fn eval_imtanh(
+pub(crate) fn eval_imtanh(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    eval_unary_complex(ctx, current_sheet, args, "IMTANH", |c| c.tanh()).await
+    eval_unary_complex(ctx, current_sheet, args, "IMTANH", |c| c.tanh())
 }
 
-pub(crate) async fn eval_imcsc(
+pub(crate) fn eval_imcsc(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -386,10 +386,9 @@ pub(crate) async fn eval_imcsc(
         let s = c.sin();
         Complex64::new(1.0, 0.0) / s
     })
-    .await
 }
 
-pub(crate) async fn eval_imcsch(
+pub(crate) fn eval_imcsch(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -398,10 +397,9 @@ pub(crate) async fn eval_imcsch(
         let s = c.sinh();
         Complex64::new(1.0, 0.0) / s
     })
-    .await
 }
 
-pub(crate) async fn eval_imsec(
+pub(crate) fn eval_imsec(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -410,10 +408,9 @@ pub(crate) async fn eval_imsec(
         let s = c.cos();
         Complex64::new(1.0, 0.0) / s
     })
-    .await
 }
 
-pub(crate) async fn eval_imsech(
+pub(crate) fn eval_imsech(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -422,10 +419,9 @@ pub(crate) async fn eval_imsech(
         let s = c.cosh();
         Complex64::new(1.0, 0.0) / s
     })
-    .await
 }
 
-pub(crate) async fn eval_imcot(
+pub(crate) fn eval_imcot(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -434,50 +430,45 @@ pub(crate) async fn eval_imcot(
         let t = c.tan();
         Complex64::new(1.0, 0.0) / t
     })
-    .await
 }
 
-pub(crate) async fn eval_imsqrt(
+pub(crate) fn eval_imsqrt(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    eval_unary_complex(ctx, current_sheet, args, "IMSQRT", |c| c.sqrt()).await
+    eval_unary_complex(ctx, current_sheet, args, "IMSQRT", |c| c.sqrt())
 }
 
-pub(crate) async fn eval_imln(
+pub(crate) fn eval_imln(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
+    eval_unary_complex(ctx, current_sheet, args, "IMLN", |c| c.ln())
+}
+
+pub(crate) fn eval_imlog10(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    eval_unary_complex(ctx, current_sheet, args, "IMLN", |c| c.ln()).await
+    eval_unary_complex(ctx, current_sheet, args, "IMLOG10", |c| c.log(10.0))
 }
 
-pub(crate) async fn eval_imlog10(
+pub(crate) fn eval_imlog2(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    eval_unary_complex(ctx, current_sheet, args, "IMLOG10", |c| c.log(10.0)).await
+    eval_unary_complex(ctx, current_sheet, args, "IMLOG2", |c| c.log(2.0))
 }
 
-pub(crate) async fn eval_imlog2(
+pub(crate) fn eval_imexp(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    eval_unary_complex(ctx, current_sheet, args, "IMLOG2", |c| c.log(2.0)).await
+    eval_unary_complex(ctx, current_sheet, args, "IMEXP", |c| c.exp())
 }
 
-pub(crate) async fn eval_imexp(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
-    eval_unary_complex(ctx, current_sheet, args, "IMEXP", |c| c.exp()).await
-}
-
-pub(crate) async fn eval_impower(
+pub(crate) fn eval_impower(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -485,8 +476,8 @@ pub(crate) async fn eval_impower(
     if args.len() != 2 {
         return Ok(CellValue::Error("IMPOWER expects 2 arguments".to_string()));
     }
-    let val1 = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let val2 = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let val1 = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let val2 = evaluate_expression(ctx, current_sheet, &args[1])?;
     let text1 = to_text(&val1);
     let power = match to_number(&val2) {
         Some(n) => n,
@@ -501,7 +492,7 @@ pub(crate) async fn eval_impower(
     }
 }
 
-async fn eval_unary_complex<F>(
+fn eval_unary_complex<F>(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -514,7 +505,7 @@ where
     if args.len() != 1 {
         return Ok(CellValue::Error(format!("{} expects 1 argument", name)));
     }
-    let val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let text = to_text(&val);
     let suffix = if text.ends_with('j') { "j" } else { "i" };
     match parse_complex(&text) {
@@ -618,138 +609,138 @@ mod tests {
         assert_eq!(format_complex(Complex64::new(0.0, -1.0), "i"), "-i");
     }
 
-    #[tokio::test]
-    async fn test_eval_complex_basic() {
+    #[test]
+    fn test_eval_complex_basic() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.0), num_expr(4.0)];
-        let result = eval_complex(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_complex(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "3+4i"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_complex_with_j() {
+    #[test]
+    fn test_eval_complex_with_j() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.0), num_expr(4.0), str_expr("j")];
-        let result = eval_complex(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_complex(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "3+4j"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_complex_wrong_args() {
+    #[test]
+    fn test_eval_complex_wrong_args() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.0)];
-        let result = eval_complex(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_complex(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 2 or 3")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_imabs() {
+    #[test]
+    fn test_eval_imabs() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // |3+4i| = 5
         let args = vec![str_expr("3+4i")];
-        let result = eval_imabs(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_imabs(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 5.0).abs() < 1e-9),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_imreal() {
+    #[test]
+    fn test_eval_imreal() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("3+4i")];
-        let result = eval_imreal(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_imreal(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 3.0).abs() < 1e-9),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_imaginary() {
+    #[test]
+    fn test_eval_imaginary() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("3+4i")];
-        let result = eval_imaginary(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_imaginary(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 4.0).abs() < 1e-9),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_imargument() {
+    #[test]
+    fn test_eval_imargument() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // arg(1+0i) = 0
         let args = vec![str_expr("1")];
-        let result = eval_imargument(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_imargument(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!(v.abs() < 1e-9),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_imconjugate() {
+    #[test]
+    fn test_eval_imconjugate() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // conj(3+4i) = 3-4i
         let args = vec![str_expr("3+4i")];
-        let result = eval_imconjugate(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_imconjugate(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "3-4i"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_imsum() {
+    #[test]
+    fn test_eval_imsum() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // (3+4i) + (1+2i) = 4+6i
         let args = vec![str_expr("3+4i"), str_expr("1+2i")];
-        let result = eval_imsum(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_imsum(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "4+6i"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_imsub() {
+    #[test]
+    fn test_eval_imsub() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // (3+4i) - (1+2i) = 2+2i
         let args = vec![str_expr("3+4i"), str_expr("1+2i")];
-        let result = eval_imsub(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_imsub(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "2+2i"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_improduct() {
+    #[test]
+    fn test_eval_improduct() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // (3+4i) * (1+2i) = -5+10i
         let args = vec![str_expr("3+4i"), str_expr("1+2i")];
-        let result = eval_improduct(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_improduct(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => {
                 // The result should be -5+10i
@@ -759,88 +750,88 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_imdiv() {
+    #[test]
+    fn test_eval_imdiv() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // (5+10i) / (1+2i) = 5
         let args = vec![str_expr("5+10i"), str_expr("1+2i")];
-        let result = eval_imdiv(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_imdiv(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert_eq!(s, "5"),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_imdiv_by_zero() {
+    #[test]
+    fn test_eval_imdiv_by_zero() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("3+4i"), str_expr("0")];
-        let result = eval_imdiv(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_imdiv(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("#NUM!")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_imsin() {
+    #[test]
+    fn test_eval_imsin() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("0")];
-        let result = eval_imsin(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_imsin(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert!(s.contains("0")),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_imcos() {
+    #[test]
+    fn test_eval_imcos() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("0")];
-        let result = eval_imcos(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_imcos(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert!(s.contains("1")),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_imsqrt() {
+    #[test]
+    fn test_eval_imsqrt() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // sqrt(4) = 2
         let args = vec![str_expr("4")];
-        let result = eval_imsqrt(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_imsqrt(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert!(s.contains("2")),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_imexp() {
+    #[test]
+    fn test_eval_imexp() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // exp(0) = 1
         let args = vec![str_expr("0")];
-        let result = eval_imexp(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_imexp(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert!(s.contains("1")),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_impower() {
+    #[test]
+    fn test_eval_impower() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // (3+4i)^2 = -7+24i
         let args = vec![str_expr("3+4i"), num_expr(2.0)];
-        let result = eval_impower(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_impower(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => {
                 // Result should be approximately -7+24i
@@ -854,63 +845,63 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_imln() {
+    #[test]
+    fn test_eval_imln() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // ln(1) = 0
         let args = vec![str_expr("1")];
-        let result = eval_imln(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_imln(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert!(s.contains("0")),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_imlog10() {
+    #[test]
+    fn test_eval_imlog10() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // log10(10) = 1
         let args = vec![str_expr("10")];
-        let result = eval_imlog10(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_imlog10(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert!(s.contains("1")),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_imlog2() {
+    #[test]
+    fn test_eval_imlog2() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // log2(2) = 1
         let args = vec![str_expr("2")];
-        let result = eval_imlog2(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_imlog2(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::String(s) => assert!(s.contains("1")),
             _ => panic!("Expected String"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_complex_invalid_suffix() {
+    #[test]
+    fn test_eval_complex_invalid_suffix() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.0), num_expr(4.0), str_expr("k")];
-        let result = eval_complex(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_complex(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("#VALUE!")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_imabs_invalid() {
+    #[test]
+    fn test_eval_imabs_invalid() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("invalid")];
-        let result = eval_imabs(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_imabs(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("#VALUE!")),
             _ => panic!("Expected Error"),

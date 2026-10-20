@@ -314,7 +314,7 @@ static UNITS: Lazy<HashMap<&'static str, UnitInfo>> = Lazy::new(|| {
     m
 });
 
-pub(crate) async fn eval_convert(
+pub(crate) fn eval_convert(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -323,13 +323,13 @@ pub(crate) async fn eval_convert(
         return Ok(CellValue::Error("CONVERT expects 3 arguments".to_string()));
     }
 
-    let number = match to_number(&evaluate_expression(ctx, current_sheet, &args[0]).await?) {
+    let number = match to_number(&evaluate_expression(ctx, current_sheet, &args[0])?) {
         Some(n) => n,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
 
-    let from_unit = to_text(&evaluate_expression(ctx, current_sheet, &args[1]).await?);
-    let to_unit = to_text(&evaluate_expression(ctx, current_sheet, &args[2]).await?);
+    let from_unit = to_text(&evaluate_expression(ctx, current_sheet, &args[1])?);
+    let to_unit = to_text(&evaluate_expression(ctx, current_sheet, &args[2])?);
 
     let from_info = match UNITS.get(from_unit.as_str()) {
         Some(i) => i,
@@ -386,179 +386,179 @@ mod tests {
         Expr::Literal(CellValue::String(s.to_string()))
     }
 
-    #[tokio::test]
-    async fn test_eval_convert_weight() {
+    #[test]
+    fn test_eval_convert_weight() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // Convert 1 kg to grams
         let args = vec![num_expr(1.0), str_expr("kg"), str_expr("g")];
-        let result = eval_convert(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_convert(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 1000.0).abs() < 1e-9),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_convert_distance() {
+    #[test]
+    fn test_eval_convert_distance() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // Convert 1 mile to meters
         let args = vec![num_expr(1.0), str_expr("mi"), str_expr("m")];
-        let result = eval_convert(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_convert(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 1609.344).abs() < 0.001),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_convert_time() {
+    #[test]
+    fn test_eval_convert_time() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // Convert 1 hour to seconds
         let args = vec![num_expr(1.0), str_expr("hr"), str_expr("sec")];
-        let result = eval_convert(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_convert(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 3600.0).abs() < 1e-9),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_convert_temperature_c_to_f() {
+    #[test]
+    fn test_eval_convert_temperature_c_to_f() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // Convert 0°C to Fahrenheit (32°F)
         let args = vec![num_expr(0.0), str_expr("C"), str_expr("F")];
-        let result = eval_convert(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_convert(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 32.0).abs() < 1e-9),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_convert_temperature_f_to_c() {
+    #[test]
+    fn test_eval_convert_temperature_f_to_c() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // Convert 212°F to Celsius (100°C)
         let args = vec![num_expr(212.0), str_expr("F"), str_expr("C")];
-        let result = eval_convert(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_convert(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 100.0).abs() < 1e-9),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_convert_temperature_c_to_k() {
+    #[test]
+    fn test_eval_convert_temperature_c_to_k() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // Convert 0°C to Kelvin (273.15K)
         let args = vec![num_expr(0.0), str_expr("C"), str_expr("K")];
-        let result = eval_convert(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_convert(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 273.15).abs() < 1e-9),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_convert_wrong_args() {
+    #[test]
+    fn test_eval_convert_wrong_args() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(1.0), str_expr("kg")];
-        let result = eval_convert(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_convert(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 3 arguments")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_convert_invalid_unit() {
+    #[test]
+    fn test_eval_convert_invalid_unit() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(1.0), str_expr("kg"), str_expr("invalid")];
-        let result = eval_convert(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_convert(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("#N/A")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_convert_incompatible_units() {
+    #[test]
+    fn test_eval_convert_incompatible_units() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // Can't convert weight to distance
         let args = vec![num_expr(1.0), str_expr("kg"), str_expr("m")];
-        let result = eval_convert(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_convert(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("#N/A")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_convert_pressure() {
+    #[test]
+    fn test_eval_convert_pressure() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // Convert 1 atm to Pa
         let args = vec![num_expr(1.0), str_expr("atm"), str_expr("Pa")];
-        let result = eval_convert(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_convert(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 101325.0).abs() < 1.0),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_convert_force() {
+    #[test]
+    fn test_eval_convert_force() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // Convert 1 lbf to Newtons
         let args = vec![num_expr(1.0), str_expr("lbf"), str_expr("N")];
-        let result = eval_convert(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_convert(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 4.448).abs() < 0.01),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_convert_power() {
+    #[test]
+    fn test_eval_convert_power() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // Convert 1 HP to Watts
         let args = vec![num_expr(1.0), str_expr("HP"), str_expr("W")];
-        let result = eval_convert(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_convert(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 745.7).abs() < 1.0),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_convert_volume() {
+    #[test]
+    fn test_eval_convert_volume() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         // Convert 1 gallon to liters
         let args = vec![num_expr(1.0), str_expr("gal"), str_expr("l")];
-        let result = eval_convert(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_convert(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 3.785).abs() < 0.01),
             _ => panic!("Expected Float"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_convert_non_numeric() {
+    #[test]
+    fn test_eval_convert_non_numeric() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![str_expr("not a number"), str_expr("kg"), str_expr("g")];
-        let result = eval_convert(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_convert(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("#VALUE!")),
             _ => panic!("Expected Error"),

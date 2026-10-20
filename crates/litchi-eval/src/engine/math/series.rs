@@ -5,7 +5,7 @@ use rand::RngExt;
 
 use super::helpers::flatten_numeric_values;
 
-pub(crate) async fn eval_sumsq(
+pub(crate) fn eval_sumsq(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -17,13 +17,12 @@ pub(crate) async fn eval_sumsq(
                 total += n * n;
             }
             Ok(())
-        })
-        .await?;
+        })?;
     }
     Ok(CellValue::Float(total))
 }
 
-pub(crate) async fn eval_sumx2my2(
+pub(crate) fn eval_sumx2my2(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -33,8 +32,8 @@ pub(crate) async fn eval_sumx2my2(
             "SUMX2MY2 expects 2 arguments (array_x, array_y)".to_string(),
         ));
     }
-    let x_vals = flatten_numeric_values(ctx, current_sheet, &args[0]).await?;
-    let y_vals = flatten_numeric_values(ctx, current_sheet, &args[1]).await?;
+    let x_vals = flatten_numeric_values(ctx, current_sheet, &args[0])?;
+    let y_vals = flatten_numeric_values(ctx, current_sheet, &args[1])?;
     if x_vals.len() != y_vals.len() {
         return Ok(CellValue::Error(
             "SUMX2MY2 requires arrays of the same size".to_string(),
@@ -47,7 +46,7 @@ pub(crate) async fn eval_sumx2my2(
     Ok(CellValue::Float(total))
 }
 
-pub(crate) async fn eval_sumx2py2(
+pub(crate) fn eval_sumx2py2(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -57,8 +56,8 @@ pub(crate) async fn eval_sumx2py2(
             "SUMX2PY2 expects 2 arguments (array_x, array_y)".to_string(),
         ));
     }
-    let x_vals = flatten_numeric_values(ctx, current_sheet, &args[0]).await?;
-    let y_vals = flatten_numeric_values(ctx, current_sheet, &args[1]).await?;
+    let x_vals = flatten_numeric_values(ctx, current_sheet, &args[0])?;
+    let y_vals = flatten_numeric_values(ctx, current_sheet, &args[1])?;
     if x_vals.len() != y_vals.len() {
         return Ok(CellValue::Error(
             "SUMX2PY2 requires arrays of the same size".to_string(),
@@ -71,7 +70,7 @@ pub(crate) async fn eval_sumx2py2(
     Ok(CellValue::Float(total))
 }
 
-pub(crate) async fn eval_sumxmy2(
+pub(crate) fn eval_sumxmy2(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -81,8 +80,8 @@ pub(crate) async fn eval_sumxmy2(
             "SUMXMY2 expects 2 arguments (array_x, array_y)".to_string(),
         ));
     }
-    let x_vals = flatten_numeric_values(ctx, current_sheet, &args[0]).await?;
-    let y_vals = flatten_numeric_values(ctx, current_sheet, &args[1]).await?;
+    let x_vals = flatten_numeric_values(ctx, current_sheet, &args[0])?;
+    let y_vals = flatten_numeric_values(ctx, current_sheet, &args[1])?;
     if x_vals.len() != y_vals.len() {
         return Ok(CellValue::Error(
             "SUMXMY2 requires arrays of the same size".to_string(),
@@ -95,7 +94,7 @@ pub(crate) async fn eval_sumxmy2(
     Ok(CellValue::Float(total))
 }
 
-pub(crate) async fn eval_seriessum(
+pub(crate) fn eval_seriessum(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -106,15 +105,15 @@ pub(crate) async fn eval_seriessum(
         ));
     }
 
-    let x = match to_number(&evaluate_expression(ctx, current_sheet, &args[0]).await?) {
+    let x = match to_number(&evaluate_expression(ctx, current_sheet, &args[0])?) {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let n = match to_number(&evaluate_expression(ctx, current_sheet, &args[1]).await?) {
+    let n = match to_number(&evaluate_expression(ctx, current_sheet, &args[1])?) {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
-    let m = match to_number(&evaluate_expression(ctx, current_sheet, &args[2]).await?) {
+    let m = match to_number(&evaluate_expression(ctx, current_sheet, &args[2])?) {
         Some(v) => v,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
@@ -125,8 +124,7 @@ pub(crate) async fn eval_seriessum(
             coefficients.push(c);
         }
         Ok(())
-    })
-    .await?;
+    })?;
 
     if coefficients.is_empty() {
         return Ok(CellValue::Float(0.0));
@@ -141,7 +139,7 @@ pub(crate) async fn eval_seriessum(
     Ok(CellValue::Float(total))
 }
 
-pub(crate) async fn eval_sequence(
+pub(crate) fn eval_sequence(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -153,7 +151,7 @@ pub(crate) async fn eval_sequence(
     }
 
     let rows = match args.first() {
-        Some(expr) => match to_number(&evaluate_expression(ctx, current_sheet, expr).await?) {
+        Some(expr) => match to_number(&evaluate_expression(ctx, current_sheet, expr)?) {
             Some(n) if n >= 0.0 => n.trunc() as usize,
             _ => return Ok(CellValue::Error("#VALUE!".to_string())),
         },
@@ -161,7 +159,7 @@ pub(crate) async fn eval_sequence(
     };
 
     let cols = match args.get(1) {
-        Some(expr) => match to_number(&evaluate_expression(ctx, current_sheet, expr).await?) {
+        Some(expr) => match to_number(&evaluate_expression(ctx, current_sheet, expr)?) {
             Some(n) if n >= 0.0 => n.trunc() as usize,
             _ => return Ok(CellValue::Error("#VALUE!".to_string())),
         },
@@ -169,7 +167,7 @@ pub(crate) async fn eval_sequence(
     };
 
     let start = match args.get(2) {
-        Some(expr) => match to_number(&evaluate_expression(ctx, current_sheet, expr).await?) {
+        Some(expr) => match to_number(&evaluate_expression(ctx, current_sheet, expr)?) {
             Some(n) => n,
             _ => return Ok(CellValue::Error("#VALUE!".to_string())),
         },
@@ -177,7 +175,7 @@ pub(crate) async fn eval_sequence(
     };
 
     let step = match args.get(3) {
-        Some(expr) => match to_number(&evaluate_expression(ctx, current_sheet, expr).await?) {
+        Some(expr) => match to_number(&evaluate_expression(ctx, current_sheet, expr)?) {
             Some(n) => n,
             _ => return Ok(CellValue::Error("#VALUE!".to_string())),
         },
@@ -193,7 +191,7 @@ pub(crate) async fn eval_sequence(
     Ok(CellValue::Float(start))
 }
 
-pub(crate) async fn eval_vstack(
+pub(crate) fn eval_vstack(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -204,10 +202,10 @@ pub(crate) async fn eval_vstack(
         ));
     }
     // Placeholder: return first value of first argument
-    evaluate_expression(ctx, current_sheet, &args[0]).await
+    evaluate_expression(ctx, current_sheet, &args[0])
 }
 
-pub(crate) async fn eval_hstack(
+pub(crate) fn eval_hstack(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -218,10 +216,10 @@ pub(crate) async fn eval_hstack(
         ));
     }
     // Placeholder: return first value of first argument
-    evaluate_expression(ctx, current_sheet, &args[0]).await
+    evaluate_expression(ctx, current_sheet, &args[0])
 }
 
-pub(crate) async fn eval_wrapcols(
+pub(crate) fn eval_wrapcols(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -232,10 +230,10 @@ pub(crate) async fn eval_wrapcols(
         ));
     }
     // Placeholder: return first value of first argument
-    evaluate_expression(ctx, current_sheet, &args[0]).await
+    evaluate_expression(ctx, current_sheet, &args[0])
 }
 
-pub(crate) async fn eval_wraprows(
+pub(crate) fn eval_wraprows(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -246,10 +244,10 @@ pub(crate) async fn eval_wraprows(
         ));
     }
     // Placeholder: return first value of first argument
-    evaluate_expression(ctx, current_sheet, &args[0]).await
+    evaluate_expression(ctx, current_sheet, &args[0])
 }
 
-pub(crate) async fn eval_randarray(
+pub(crate) fn eval_randarray(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -262,7 +260,7 @@ pub(crate) async fn eval_randarray(
     }
 
     let rows = match args.first() {
-        Some(expr) => match to_number(&evaluate_expression(ctx, current_sheet, expr).await?) {
+        Some(expr) => match to_number(&evaluate_expression(ctx, current_sheet, expr)?) {
             Some(n) if n >= 0.0 => n.trunc() as usize,
             _ => return Ok(CellValue::Error("#VALUE!".to_string())),
         },
@@ -270,7 +268,7 @@ pub(crate) async fn eval_randarray(
     };
 
     let cols = match args.get(1) {
-        Some(expr) => match to_number(&evaluate_expression(ctx, current_sheet, expr).await?) {
+        Some(expr) => match to_number(&evaluate_expression(ctx, current_sheet, expr)?) {
             Some(n) if n >= 0.0 => n.trunc() as usize,
             _ => return Ok(CellValue::Error("#VALUE!".to_string())),
         },
@@ -278,7 +276,7 @@ pub(crate) async fn eval_randarray(
     };
 
     let min = match args.get(2) {
-        Some(expr) => match to_number(&evaluate_expression(ctx, current_sheet, expr).await?) {
+        Some(expr) => match to_number(&evaluate_expression(ctx, current_sheet, expr)?) {
             Some(n) => n,
             _ => return Ok(CellValue::Error("#VALUE!".to_string())),
         },
@@ -286,7 +284,7 @@ pub(crate) async fn eval_randarray(
     };
 
     let max = match args.get(3) {
-        Some(expr) => match to_number(&evaluate_expression(ctx, current_sheet, expr).await?) {
+        Some(expr) => match to_number(&evaluate_expression(ctx, current_sheet, expr)?) {
             Some(n) => n,
             _ => return Ok(CellValue::Error("#VALUE!".to_string())),
         },
@@ -295,7 +293,7 @@ pub(crate) async fn eval_randarray(
 
     let whole_number = match args.get(4) {
         Some(expr) => {
-            let val = evaluate_expression(ctx, current_sheet, expr).await?;
+            let val = evaluate_expression(ctx, current_sheet, expr)?;
             match val {
                 CellValue::Bool(b) => b,
                 _ => match to_number(&val) {
@@ -356,8 +354,8 @@ mod tests {
         })
     }
 
-    #[tokio::test]
-    async fn test_eval_sumsq() {
+    #[test]
+    fn test_eval_sumsq() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Add some values to the engine
@@ -371,28 +369,28 @@ mod tests {
 
         // SUMSQ(Sheet1!A1:B2) = 1^2 + 2^2 + 3^2 + 4^2 = 30
         let args = vec![range_expr("Sheet1", 1, 1, 2, 2)];
-        let result = eval_sumsq(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_sumsq(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 30.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_sumsq_single_values() {
+    #[test]
+    fn test_eval_sumsq_single_values() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // SUMSQ(3, 4) = 3^2 + 4^2 = 25
         let args = vec![num_expr(3.0), num_expr(4.0)];
-        let result = eval_sumsq(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_sumsq(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 25.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_sumx2my2() {
+    #[test]
+    fn test_eval_sumx2my2() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Arrays: [1, 2, 3] and [1, 2, 3]
@@ -406,15 +404,15 @@ mod tests {
             range_expr("Sheet1", 1, 1, 1, 3),
             range_expr("Sheet1", 2, 1, 2, 3),
         ];
-        let result = eval_sumx2my2(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_sumx2my2(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!(v.abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_sumx2py2() {
+    #[test]
+    fn test_eval_sumx2py2() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Arrays: [3, 4] and [0, 0]
@@ -428,15 +426,15 @@ mod tests {
             range_expr("Sheet1", 1, 1, 1, 2),
             range_expr("Sheet1", 2, 1, 2, 2),
         ];
-        let result = eval_sumx2py2(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_sumx2py2(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 25.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_sumxmy2() {
+    #[test]
+    fn test_eval_sumxmy2() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Arrays: [1, 2, 3] and [0, 0, 0]
@@ -450,15 +448,15 @@ mod tests {
             range_expr("Sheet1", 1, 1, 1, 3),
             range_expr("Sheet1", 2, 1, 2, 3),
         ];
-        let result = eval_sumxmy2(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_sumxmy2(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 14.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_sumxmy2_wrong_size() {
+    #[test]
+    fn test_eval_sumxmy2_wrong_size() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let values1 = vec![CellValue::Int(1), CellValue::Int(2)];
@@ -470,15 +468,15 @@ mod tests {
             range_expr("Sheet1", 1, 1, 1, 2),
             range_expr("Sheet1", 2, 1, 2, 1),
         ];
-        let result = eval_sumxmy2(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_sumxmy2(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("same size")),
             _ => panic!("Expected Error result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_seriessum() {
+    #[test]
+    fn test_eval_seriessum() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // x=2, n=0, m=1, coefficients=[1, 2, 3]
@@ -492,108 +490,108 @@ mod tests {
             num_expr(1.0),
             range_expr("Sheet1", 1, 1, 1, 3),
         ];
-        let result = eval_seriessum(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_seriessum(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 17.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_seriessum_wrong_args() {
+    #[test]
+    fn test_eval_seriessum_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(2.0), num_expr(0.0)];
-        let result = eval_seriessum(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_seriessum(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 4 arguments")),
             _ => panic!("Expected Error result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_sequence() {
+    #[test]
+    fn test_eval_sequence() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // SEQUENCE(3, 2) - returns first value as placeholder
         let args = vec![num_expr(3.0), num_expr(2.0)];
-        let result = eval_sequence(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_sequence(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 1.0).abs() < 1e-9), // Returns start value
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_sequence_zero_rows() {
+    #[test]
+    fn test_eval_sequence_zero_rows() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(0.0)];
-        let result = eval_sequence(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_sequence(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("#CALC!")),
             _ => panic!("Expected Error result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_vstack() {
+    #[test]
+    fn test_eval_vstack() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(42.0)];
-        let result = eval_vstack(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_vstack(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(42));
     }
 
-    #[tokio::test]
-    async fn test_eval_vstack_no_args() {
+    #[test]
+    fn test_eval_vstack_no_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args: Vec<Expr> = vec![];
-        let result = eval_vstack(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_vstack(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects at least 1 argument")),
             _ => panic!("Expected Error result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_hstack() {
+    #[test]
+    fn test_eval_hstack() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(42.0)];
-        let result = eval_hstack(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_hstack(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(42));
     }
 
-    #[tokio::test]
-    async fn test_eval_wrapcols() {
+    #[test]
+    fn test_eval_wrapcols() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // WRAPCOLS with literal value
         let args = vec![num_expr(42.0), num_expr(2.0)];
-        let result = eval_wrapcols(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_wrapcols(ctx, "Sheet1", &args).unwrap();
         // Returns the value as placeholder
         assert_eq!(result, CellValue::Int(42));
     }
 
-    #[tokio::test]
-    async fn test_eval_wraprows() {
+    #[test]
+    fn test_eval_wraprows() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // WRAPROWS with literal value
         let args = vec![num_expr(42.0), num_expr(2.0)];
-        let result = eval_wraprows(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_wraprows(ctx, "Sheet1", &args).unwrap();
         // Returns the value as placeholder
         assert_eq!(result, CellValue::Int(42));
     }
 
-    #[tokio::test]
-    async fn test_eval_randarray() {
+    #[test]
+    fn test_eval_randarray() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.0), num_expr(2.0)];
-        let result = eval_randarray(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_randarray(ctx, "Sheet1", &args).unwrap();
         // Returns a single random value between 0 and 1
         match result {
             CellValue::Float(v) => assert!((0.0..=1.0).contains(&v)),
@@ -601,8 +599,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_randarray_whole_number() {
+    #[test]
+    fn test_eval_randarray_whole_number() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // RANDARRAY(3, 2, 1, 10, TRUE)
@@ -613,15 +611,15 @@ mod tests {
             num_expr(10.0),
             num_expr(1.0), // TRUE
         ];
-        let result = eval_randarray(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_randarray(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert!((1..=10).contains(&v)),
             _ => panic!("Expected Int result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_randarray_min_greater_max() {
+    #[test]
+    fn test_eval_randarray_min_greater_max() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![
@@ -630,7 +628,7 @@ mod tests {
             num_expr(10.0),
             num_expr(1.0), // min > max
         ];
-        let result = eval_randarray(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_randarray(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("#VALUE!")),
             _ => panic!("Expected Error result"),
