@@ -68,7 +68,11 @@ fn built_timeline_add_update_reorder_remove_and_reopen() {
     edit.remove(slide, 1).unwrap();
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
-    assert_eq!(commit.patch().before_bytes(), source_bytes.as_slice());
+    assert_eq!(commit.patch().source_len(), source_bytes.len());
+    assert_eq!(
+        commit.patch().target_len(),
+        commit.package().to_bytes().unwrap().len()
+    );
 
     let reopened = commit.package().edit_animations().unwrap();
     assert_eq!(root_children(&reopened, slide), 1);

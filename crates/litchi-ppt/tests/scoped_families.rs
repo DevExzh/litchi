@@ -83,7 +83,11 @@ fn font_edits_publish_replay_and_invert_exactly() {
     edit.replace_font(Scope::Base, 0, font).unwrap();
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
-    assert_eq!(commit.patch().before_bytes(), source_bytes.as_slice());
+    assert_eq!(commit.patch().source_len(), source_bytes.len());
+    assert_eq!(
+        commit.patch().target_len(),
+        commit.package().to_bytes().unwrap().len()
+    );
     let fonts = commit.package().presentation().unwrap().fonts().unwrap();
     assert_eq!(fonts.get_base(0).unwrap().name, "Scoped Font");
     assert_eq!(slide_texts(commit.package()), slide_texts(&source));
@@ -196,13 +200,33 @@ fn external_media_edits_publish_replay_and_invert_exactly() {
     assert_eq!(edit.changes().len(), 1);
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
-    assert_eq!(commit.patch().before_bytes(), source_bytes.as_slice());
+    assert_eq!(commit.patch().source_len(), source_bytes.len());
+    assert_eq!(
+        commit.patch().target_len(),
+        commit.package().to_bytes().unwrap().len()
+    );
     assert_eq!(
         movie_path(commit.package(), id).as_deref(),
         Some("scoped.avi")
     );
     assert_eq!(movie_path(&source, id), original);
     assert_eq!(slide_texts(commit.package()), slide_texts(&source));
+    // The patch is record-sized (record 0357a): the append-only publisher
+    // appends the rewritten document container and touches a few header,
+    // FAT and directory sectors; the patch carries only those, never the
+    // whole package.
+    let changed = commit.patch().changed_bytes();
+    let grown = commit.patch().target_len() - source_bytes.len();
+    assert!(changed >= grown);
+    assert!(
+        changed <= grown + 8 * 512 && changed.saturating_mul(2) < source_bytes.len(),
+        "a one-path patch spans {changed} of {} bytes (grown by {grown})",
+        source_bytes.len()
+    );
+    let inverse = commit.patch().inverse();
+    assert_eq!(inverse.changed_bytes(), changed);
+    assert_eq!(inverse.source_len(), commit.patch().target_len());
+    assert_eq!(inverse.target_len(), source_bytes.len());
 
     let replayed = source.apply_external_media(commit.patch()).unwrap();
     assert_eq!(
@@ -269,7 +293,11 @@ fn master_metadata_edits_publish_replay_and_invert_exactly() {
     assert_eq!(edit.name().unwrap().unwrap().as_str(), "Scoped master");
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
-    assert_eq!(commit.patch().before_bytes(), source_bytes.as_slice());
+    assert_eq!(commit.patch().source_len(), source_bytes.len());
+    assert_eq!(
+        commit.patch().target_len(),
+        commit.package().to_bytes().unwrap().len()
+    );
     let published = commit
         .package()
         .edit_master_metadata(Kind::Main, main)

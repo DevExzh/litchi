@@ -49,13 +49,16 @@ All families share the crate-private plumbing in
   keeps its bytes and the slide list is unchanged;
 - an exact no-op commit returns the source package (byte-identical,
   signatures kept); a changed commit of a signed package is `Error::Signed`;
-- a family patch is exact and whole-artifact (source and target bytes),
-  `inverse` swaps them, and `apply_x` refuses any other package with
-  `Error::PatchConflict`;
+- a family patch is exact and record-sized since
+  [0357a](0357a-ppt-record-sized-patches.md) (endpoint length and SHA-256
+  plus the changed 512-byte ranges; it was whole-artifact source and target
+  bytes), `inverse` swaps the endpoints, and `apply_x` refuses any other
+  package with `Error::PatchConflict`;
 - `family!("noun")` declares `Diagnostics` (`litchi_core::edit`), `Commit =
   litchi_core::edit::Commit<Package, Patch>`, `LimitKind` (no caller-selected
   dimension), `Error {Package, Refused, PatchConflict, Signed}`, `Result` and
-  `Patch {is_noop, inverse, before_bytes, after_bytes}`.
+  `Patch {is_noop, inverse, source_len, target_len, changed_bytes}`
+  (`before_bytes`/`after_bytes` until 0357a).
 
 | Family | Entry | Was |
 |---|---|---|
@@ -252,8 +255,10 @@ into_package_editor, finish}` and `snapshot` on every family `Edit`.
   signed deck at the start (the object publisher cannot open them).
 - Master editing: the existing master validator refuses the notes master of
   13 of 25 corpus decks; no corpus deck has a title master.
-- The scoped family patches carry whole-artifact bytes (as `package::metadata`
-  did); a record-sized durable patch is a follow-up.
+- The scoped family patches carried whole-artifact bytes; record
+  [0357a](0357a-ppt-record-sized-patches.md) made them record-sized
+  byte-range diffs. `package::metadata::Patch` and `package::edit::Patch`
+  still carry whole-artifact bytes.
 - For W5: `litchi-ole-common`, `litchi-crypto` and `litchi-ograph` were not
   changed; none of their banned names reaches the PPT surface (the
   crate-wide bans pass).

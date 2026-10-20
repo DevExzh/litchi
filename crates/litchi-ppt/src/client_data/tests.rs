@@ -487,7 +487,11 @@ fn package_client_data_edits_publish_replay_and_invert_exactly() {
     assert_eq!(edit.changes().len(), 1);
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
-    assert_eq!(commit.patch().before_bytes(), source_bytes.as_slice());
+    assert_eq!(commit.patch().source_len(), source_bytes.len());
+    assert_eq!(
+        commit.patch().target_len(),
+        commit.package().to_bytes().unwrap().len()
+    );
     assert_eq!(
         kinds(commit.package()),
         vec![

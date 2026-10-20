@@ -413,7 +413,11 @@ fn package_diagram_edits_publish_replay_and_invert_exactly() {
     assert_eq!(edit.changes().len(), 2);
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
-    assert_eq!(commit.patch().before_bytes(), source_bytes.as_slice());
+    assert_eq!(commit.patch().source_len(), source_bytes.len());
+    assert_eq!(
+        commit.patch().target_len(),
+        commit.package().to_bytes().unwrap().len()
+    );
     let published = commit.package().edit_diagrams(slide).unwrap();
     let build = published.builds().next().unwrap();
     assert_eq!(build.id(), moved);
