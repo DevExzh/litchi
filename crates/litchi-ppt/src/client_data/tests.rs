@@ -532,3 +532,26 @@ fn package_client_data_edits_publish_replay_and_invert_exactly() {
         RefusalKind::NotFound
     );
 }
+
+#[test]
+fn package_client_data_edits_admit_a_signed_package_and_refuse_a_changed_commit() {
+    use litchi_core::Position;
+
+    use crate::text_edit::Target;
+
+    let (source, _) = package_with_client_data();
+    let signed = crate::scoped::signed(&source);
+    let bytes = signed.to_bytes().unwrap();
+    let target = Target::new(Position::new(0), Position::new(0));
+
+    let no_op = signed.edit_client_data(target).unwrap().commit().unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), bytes);
+
+    let flags = ClientDataChild::new(ClientDataChildKind::ShapeFlags, vec![1]).unwrap();
+    let mut edit = signed.edit_client_data(target).unwrap();
+    edit.insert(0, flags).unwrap();
+    assert!(matches!(edit.commit(), Err(super::Error::Signed)));
+    assert_eq!(signed.to_bytes().unwrap(), bytes);
+}

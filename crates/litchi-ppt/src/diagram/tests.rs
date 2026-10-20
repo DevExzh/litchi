@@ -460,3 +460,30 @@ fn package_diagram_edits_publish_replay_and_invert_exactly() {
     };
     assert_eq!(refusal.kind(), RefusalKind::UnsupportedTarget);
 }
+
+#[test]
+fn package_diagram_edits_admit_a_signed_package_and_refuse_a_changed_commit() {
+    use litchi_core::Position;
+
+    let (source, _, _) = package_with_diagram();
+    let signed = crate::scoped::signed(&source);
+    let bytes = signed.to_bytes().unwrap();
+    let slide = Position::new(0);
+    let id = signed
+        .edit_diagrams(slide)
+        .unwrap()
+        .builds()
+        .next()
+        .unwrap()
+        .id();
+
+    let no_op = signed.edit_diagrams(slide).unwrap().commit().unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), bytes);
+
+    let mut edit = signed.edit_diagrams(slide).unwrap();
+    edit.set_mode(id, BuildType::Down).unwrap();
+    assert!(matches!(edit.commit(), Err(Error::Signed)));
+    assert_eq!(signed.to_bytes().unwrap(), bytes);
+}

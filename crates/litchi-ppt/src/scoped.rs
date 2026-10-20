@@ -646,6 +646,34 @@ macro_rules! family {
 
 pub(crate) use family;
 
+/// `package` with a digital-signature storage added (`_xmlsignatures`
+/// with one stream), the shape a signed deck has, for the families'
+/// signed-package tests.
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "a test fixture builder panics on failure by design"
+)]
+pub(crate) fn signed(package: &Package) -> Package {
+    use litchi_cfb::{OleFile, OleWriter};
+
+    let mut source = OleFile::open(Cursor::new(package.to_bytes().unwrap())).unwrap();
+    let mut writer = OleWriter::new();
+    for path in source.list_streams() {
+        let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
+        let data = source.open_stream(&refs).unwrap();
+        writer.create_stream(&refs, &data).unwrap();
+    }
+    writer
+        .create_stream(&["_xmlsignatures", "origin.sigs"], b"signature")
+        .unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    let signed = Package::from_bytes(&output.into_inner()).unwrap();
+    assert!(contains_signature(&signed.to_bytes().unwrap()).unwrap());
+    signed
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,

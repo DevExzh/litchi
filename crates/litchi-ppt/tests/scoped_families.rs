@@ -994,3 +994,46 @@ fn object_storage(data: &[u8]) -> litchi_ppt::embedded::storage::Storage {
     )
     .unwrap()
 }
+
+#[test]
+fn a_signed_deck_admits_external_media_edits_and_refuses_only_a_changed_commit() {
+    let source = signed(&Package::from_bytes(&fixture("unified-ops/0294/video.ppt")).unwrap());
+    assert_signed_rule!(
+        &source,
+        |package: &Package| package.edit_external_media().unwrap(),
+        |edit: &mut external_media::Edit| {
+            edit.set_path(1, Some("scoped.avi".into())).unwrap();
+        },
+        external_media::Error::Signed
+    );
+}
+
+#[test]
+fn a_signed_deck_admits_master_edits_and_refuses_only_a_changed_commit() {
+    // Main and handout masters, a notes master with a MasterId-domain
+    // slideIdRef, and a title master.
+    for (source, kind) in [
+        (mastered(), Kind::Main),
+        (mastered(), Kind::Handout),
+        (mastered(), Kind::Notes),
+        (titled(), Kind::Title),
+    ] {
+        let source = signed(&source);
+        let position = Position::new(0);
+        assert_signed_rule!(
+            &source,
+            |package: &Package| package.edit_master_metadata(kind, position).unwrap(),
+            |edit: &mut master_metadata::Edit| edit.set_name("Scoped master").unwrap(),
+            master_metadata::Error::Signed
+        );
+        assert_signed_rule!(
+            &source,
+            |package: &Package| package.edit_master_layout(kind, position).unwrap(),
+            |edit: &mut master_layout::Edit| {
+                let last = edit.record().children.last().unwrap().clone();
+                edit.append(master_layout::Path::root(), last).unwrap();
+            },
+            master_layout::Error::Signed
+        );
+    }
+}
