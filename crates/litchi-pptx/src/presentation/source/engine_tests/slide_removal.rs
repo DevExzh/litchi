@@ -17,14 +17,14 @@ use std::ops::Range;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
+use crate::builder::Builder;
+use crate::{Error, SlideRemovalRefusal, SourceBackedPresentationEditor, SourceLimits};
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, Position,
     ReadAt, SourceVersion,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, TargetMode};
-use litchi_pptx::builder::Builder;
-use litchi_pptx::{Error, SlideRemovalRefusal, SourceBackedPresentationEditor, SourceLimits};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 const MAIN: &str = "/ppt/presentation.xml";
@@ -54,7 +54,7 @@ fn open(bytes: &[u8]) -> SourceBackedPresentationEditor {
         .unwrap()
 }
 
-fn write_removal(bytes: &[u8], position: usize) -> litchi_pptx::Result<Vec<u8>> {
+fn write_removal(bytes: &[u8], position: usize) -> crate::Result<Vec<u8>> {
     let editor = open(bytes);
     let plan = editor.plan_slide_removal(Position::new(position))?;
     let mut output = Vec::new();
@@ -577,7 +577,7 @@ fn stale_source_and_cancellation_are_rejected_before_output() {
     let (cancellation_source, context) = managed_context();
     let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(fixture())),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context),
     )

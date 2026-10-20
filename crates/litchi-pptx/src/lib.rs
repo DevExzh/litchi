@@ -185,9 +185,7 @@ pub use opened::{
 pub use package::Package;
 pub use presentation::embedded::ink_actions;
 pub use presentation::{
-    MAX_SOURCE_BACKED_SLIDE_BATCH, Presentation, SourceBackedCrossSlideCopyPlan,
-    SourceBackedCrossSlideCopySnapshot, SourceBackedIntoEditorError, SourceBackedPresentation,
-    SourceBackedPresentationEditor, SourceBackedSlideRemovalPlan, SourceImage,
+    MAX_SOURCE_BACKED_SLIDE_BATCH, Presentation, SourceBackedPresentation, SourceImage,
     SourceImageDescriptor, SourceImageTarget, SourceSlide, SourceSvgDescriptor, SourceSvgImage,
 };
 pub use presentation_properties::{
@@ -211,5 +209,7 @@ pub use writer::{
     StreamingPresentationWriter, StreamingSlideWriter, TextBoxSpec,
 };
 
+#[cfg(test)]
+pub(crate) use presentation::source::SourceBackedPresentationEditor;
 /// Immutable source-backed PPTX package ownership and primary editing.
 pub use presentation::source::primary as source;

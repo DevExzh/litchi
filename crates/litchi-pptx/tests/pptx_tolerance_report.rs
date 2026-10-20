@@ -705,9 +705,10 @@ fn slide_list_defects_are_repaired_first_wins_and_recorded_at_open() {
     .unwrap();
     assert_eq!(located(source.tolerance_report()), expected);
 
-    // The lossless editor keeps the strict slide-list contract.
+    // The lossless source-backed package keeps the strict slide-list
+    // contract.
     assert!(
-        litchi_pptx::SourceBackedPresentationEditor::from_read_at(std::sync::Arc::new(
+        litchi_pptx::source::Package::from_read_at(std::sync::Arc::new(
             litchi_core::source::OwnedSource::new(deck),
         ))
         .is_err()

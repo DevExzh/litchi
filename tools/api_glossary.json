@@ -1936,36 +1936,6 @@
           "replacement": "use open_with_options with OpenOptions (record 0252)"
         },
         {
-          "name": "open_with_limits",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_cache_limits",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_limits_and_cache_limits",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_execution_context",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_limits_and_execution_context",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_limits_and_cache_limits_and_execution_context",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
           "name": "StaleSource",
           "scope": "litchi_pptx::Error",
           "replacement": "Error::PatchConflict (ADR 0034 §6; record 0252)"
@@ -2132,6 +2102,31 @@
           "name": "SourceBackedSvgSnapshot",
           "scope": "litchi_pptx",
           "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedPresentationEditor",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
+        },
+        {
+          "name": "SourceBackedCrossSlideCopyPlan",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
+        },
+        {
+          "name": "SourceBackedCrossSlideCopySnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
+        },
+        {
+          "name": "SourceBackedSlideRemovalPlan",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
+        },
+        {
+          "name": "SourceBackedIntoEditorError",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
         }
       ],
       "families": [
@@ -2179,7 +2174,8 @@
         "litchi_pptx::presentation_properties::metadata::revision",
         "litchi_pptx::presentation_properties::metadata::slide_sync",
         "litchi_pptx::source",
-        "litchi_pptx::source::svg"
+        "litchi_pptx::source::svg",
+        "litchi_pptx::source::cross_slide_copy"
       ],
       "immutable_owners": [
         "litchi_pptx::Presentation",
@@ -2679,36 +2675,6 @@
           "replacement": "use open_with_options with OpenOptions (record 0252)"
         },
         {
-          "name": "open_with_limits",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_cache_limits",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_limits_and_cache_limits",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_execution_context",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_limits_and_execution_context",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_limits_and_cache_limits_and_execution_context",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
           "name": "StaleSource",
           "scope": "litchi_pptx::Error",
           "replacement": "Error::PatchConflict (ADR 0034 §6; record 0252)"
@@ -2875,6 +2841,31 @@
           "name": "SourceBackedSvgSnapshot",
           "scope": "litchi_pptx",
           "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedPresentationEditor",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
+        },
+        {
+          "name": "SourceBackedCrossSlideCopyPlan",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
+        },
+        {
+          "name": "SourceBackedCrossSlideCopySnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
+        },
+        {
+          "name": "SourceBackedSlideRemovalPlan",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
+        },
+        {
+          "name": "SourceBackedIntoEditorError",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
         }
       ],
       "families": [
@@ -2923,7 +2914,8 @@
         "litchi_pptx::presentation_properties::metadata::slide_sync",
         "litchi_pptx::presentation::embedded::vba",
         "litchi_pptx::source",
-        "litchi_pptx::source::svg"
+        "litchi_pptx::source::svg",
+        "litchi_pptx::source::cross_slide_copy"
       ],
       "immutable_owners": [
         "litchi_pptx::Presentation",

@@ -6,15 +6,18 @@
 //! deliberately does not model a durable or inverse edit and does not mutate
 //! the primary source-backed presentation editor.
 
+#[cfg(test)]
 use std::io::Write;
 use std::sync::Arc;
 
 use litchi_core::{Position, Reservation, Resource, SourceVersion};
+#[cfg(test)]
+use litchi_opc::PreparedTopology;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::xml_splice::authored_xml_requires_source_proof;
 use litchi_opc::{
-    AuthoredXmlFragment, PackURI, PreparedTopology, Relationship, SourceBackedPackage,
-    SourceLimits, SourceTopologyPlan,
+    AuthoredXmlFragment, PackURI, Relationship, SourceBackedPackage, SourceLimits,
+    SourceTopologyPlan,
 };
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -34,13 +37,22 @@ const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatib
 /// raw candidate keeps untouched members as lazy source transfers. The plan is
 /// process-local and one-way: it carries no durable revision patch and no
 /// inverse operation.
-pub struct SourceBackedSlideRemovalPlan {
+pub(crate) struct SourceBackedSlideRemovalPlan {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the source-level engine tests")
+    )]
     package: SourceBackedPackage,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the source-level engine tests")
+    )]
     description: RemovalDescription,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the source-level engine tests")
+    )]
     source_version: SourceVersion,
-    source_position: usize,
-    source_slide_count: usize,
-    slide_count: usize,
     _candidate_xml_reservation: Option<Arc<Reservation>>,
 }
 
@@ -50,37 +62,44 @@ pub struct SourceBackedSlideRemovalPlan {
 /// topology later without treating a prepared candidate as a durable patch.
 #[derive(Clone)]
 struct RemovalDescription {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the source-level engine tests")
+    )]
     presentation_uri: PackURI,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the source-level engine tests")
+    )]
     presentation_relationship_id: String,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the source-level engine tests")
+    )]
     candidate_presentation_xml: Arc<Vec<u8>>,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the source-level engine tests")
+    )]
     source_xml: Option<litchi_opc::SourceXmlPart>,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the source-level engine tests")
+    )]
     removed_slide: PackURI,
     /// Parts the removed slide owned exclusively (record 0303).
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the source-level engine tests")
+    )]
     removed_dependents: Vec<PackURI>,
 }
 
 impl SourceBackedSlideRemovalPlan {
-    /// Zero-based source position selected for removal.
-    #[must_use]
-    pub const fn source_position(&self) -> usize {
-        self.source_position
-    }
-
-    /// Number of slides in the candidate after removal.
-    #[must_use]
-    pub const fn slide_count(&self) -> usize {
-        self.slide_count
-    }
-
-    /// Number of slides in the source editor before removal.
-    #[must_use]
-    pub const fn source_slide_count(&self) -> usize {
-        self.source_slide_count
-    }
-
     /// Prepare and return the checked OPC topology candidate through an
     /// explicit raw view.
-    pub fn raw(&self) -> Result<PreparedTopology> {
+    #[cfg(test)]
+    pub(crate) fn raw(&self) -> Result<PreparedTopology> {
         self.package.check_execution()?;
         if self.package.source_version()? != self.source_version {
             return Err(Error::PatchConflict);
@@ -99,12 +118,14 @@ impl SourceBackedSlideRemovalPlan {
     /// The underlying prepared topology checks the source lineage, source
     /// revision, execution policy, and all retained transfer sources again
     /// before accepting output.
-    pub fn write_to<W: Write>(&self, writer: W) -> Result<()> {
+    #[cfg(test)]
+    pub(crate) fn write_to<W: Write>(&self, writer: W) -> Result<()> {
         Ok(self.raw()?.publish_to_stream(writer)?)
     }
 
     /// Rebuild the typed source topology represented by this process-local
     /// description for the next primary integration layer.
+    #[cfg(test)]
     pub(super) fn rebuild_topology(&self) -> Result<SourceTopologyPlan> {
         let mut topology = SourceTopologyPlan::new();
         if let Some(source_xml) = &self.description.source_xml {
@@ -141,7 +162,7 @@ impl SourceBackedPresentationEditor {
     /// another owner still targets stay (record 0303). Signature, macro, protected,
     /// MCE, unknown-physical-member, positional, and unknown semantic surfaces
     /// are refused through the typed [`SlideRemovalRefusal`] boundary.
-    pub fn plan_slide_removal(
+    pub(crate) fn plan_slide_removal(
         &self,
         position: impl Into<Position>,
     ) -> Result<SourceBackedSlideRemovalPlan> {
@@ -328,11 +349,6 @@ impl SourceBackedPresentationEditor {
         }
         Ok(SourceBackedSlideRemovalPlan {
             package: self.package.clone(),
-            source_position: position,
-            source_slide_count,
-            slide_count: source_slide_count
-                .checked_sub(1)
-                .ok_or_else(|| Error::Invalid("slide-removal source count underflow".into()))?,
             source_version,
             description: RemovalDescription {
                 presentation_uri: presentation.partname().clone(),

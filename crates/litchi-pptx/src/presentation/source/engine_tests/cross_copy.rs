@@ -9,6 +9,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, Write};
 use std::sync::{Arc, RwLock};
 
+use crate::{
+    Error, Package, SourceBackedPresentation, SourceBackedPresentationEditor, SourceLimits,
+};
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
     Resource, SourceVersion,
@@ -16,9 +19,6 @@ use litchi_core::{
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part};
-use litchi_pptx::{
-    Error, Package, SourceBackedPresentation, SourceBackedPresentationEditor, SourceLimits,
-};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
@@ -29,7 +29,7 @@ const PRESENTATION_RELATIONSHIPS: &str = "ppt/_rels/presentation.xml.rels";
 const PRESENTATION_XML: &str = "ppt/presentation.xml";
 const CONTENT_TYPES_XML: &str = "[Content_Types].xml";
 
-type TestResult<T = ()> = litchi_pptx::Result<T>;
+type TestResult<T = ()> = crate::Result<T>;
 
 const CHART_0383_GRAPHIC_URI: &str = "http://schemas.openxmlformats.org/drawingml/2006/chart";
 const CHART_0383_NS: &str = "http://schemas.openxmlformats.org/drawingml/2006/chart";
@@ -519,13 +519,13 @@ fn source_backed_cross_copy_chart_cancellation_is_fallible() -> TestResult {
     let context = ExecutionContext::new(budget, token, single_execution_limits()?);
     let source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(source_bytes)),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context.clone()),
     )?;
     let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(destination_bytes)),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context),
     )?;
@@ -546,7 +546,7 @@ fn source_backed_cross_copy_chart_limits_fail_before_materialization() -> TestRe
     assert!(
         SourceBackedPresentation::from_read_at_with_options(
             Arc::new(OwnedSource::new(source_bytes)),
-            litchi_pptx::OpenOptions::default()
+            crate::OpenOptions::default()
                 .source_limits(SourceLimits::default())
                 .execution_context(context)
         )
@@ -941,7 +941,7 @@ fn add_zip_metadata(bytes: &[u8], archive_comment: &[u8]) -> TestResult<Vec<u8>>
 /// graph and dependency-free slide bodies. Names are changed in the ZIP after
 /// authoring because the public writer intentionally derives names from IDs.
 fn authored_package(slide_titles: &[&str]) -> TestResult<Vec<u8>> {
-    let mut builder = litchi_pptx::builder::Builder::new()?;
+    let mut builder = crate::builder::Builder::new()?;
     {
         let presentation = builder.presentation()?;
         for title in slide_titles {
@@ -1705,7 +1705,7 @@ fn source_backed_cross_copy_refuses_limits_and_cancellation_before_output() -> T
     assert!(
         SourceBackedPresentation::from_read_at_with_options(
             Arc::new(OwnedSource::new(source_bytes.clone())),
-            litchi_pptx::OpenOptions::default().source_limits(too_small)
+            crate::OpenOptions::default().source_limits(too_small)
         )
         .is_err()
     );
@@ -1725,13 +1725,13 @@ fn source_backed_cross_copy_refuses_limits_and_cancellation_before_output() -> T
     let context = ExecutionContext::new(budget, cancellation, execution_limits);
     let source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(source_bytes)),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context.clone()),
     )?;
     let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(destination_bytes)),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context),
     )?;
@@ -1759,13 +1759,13 @@ fn source_backed_cross_copy_preserves_typed_cancellation_during_output() -> Test
     let context = ExecutionContext::new(budget, cancellation, execution_limits);
     let source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(source_bytes)),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context.clone()),
     )?;
     let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(destination_bytes)),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context),
     )?;
@@ -1843,13 +1843,13 @@ fn source_backed_cross_copy_managed_memory_reservation_is_exact_and_bounded() ->
         ExecutionContext::new(measure_budget.clone(), measure_token, execution_limits);
     let measured_source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(source_bytes.clone())),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(measure_context.clone()),
     )?;
     let measured_editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(destination_bytes.clone())),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(measure_context),
     )?;
@@ -1881,13 +1881,13 @@ fn source_backed_cross_copy_managed_memory_reservation_is_exact_and_bounded() ->
         let context = ExecutionContext::new(budget, token, execution_limits);
         let source = SourceBackedPresentation::from_read_at_with_options(
             Arc::new(OwnedSource::new(source_bytes.clone())),
-            litchi_pptx::OpenOptions::default()
+            crate::OpenOptions::default()
                 .source_limits(SourceLimits::default())
                 .execution_context(context.clone()),
         )?;
         let editor = SourceBackedPresentationEditor::from_read_at_with_options(
             Arc::new(OwnedSource::new(destination_bytes.clone())),
-            litchi_pptx::OpenOptions::default()
+            crate::OpenOptions::default()
                 .source_limits(SourceLimits::default())
                 .execution_context(context),
         )?;
@@ -2687,67 +2687,59 @@ fn source_backed_cross_copy_refuses_unsupported_picture_media_closures() -> Test
         (
             "external image",
             external,
-            litchi_pptx::SlideCopyRefusal::UnsupportedRelationship,
+            crate::SlideCopyRefusal::UnsupportedRelationship,
         ),
         (
             "linked image",
             linked,
-            litchi_pptx::SlideCopyRefusal::UnsupportedRelationship,
+            crate::SlideCopyRefusal::UnsupportedRelationship,
         ),
         (
             "missing media",
             missing_media,
-            litchi_pptx::SlideCopyRefusal::AmbiguousTopology,
+            crate::SlideCopyRefusal::AmbiguousTopology,
         ),
         (
             "wrong media type",
             wrong_media_type,
-            litchi_pptx::SlideCopyRefusal::AmbiguousTopology,
+            crate::SlideCopyRefusal::AmbiguousTopology,
         ),
         (
             "media outbound relationship",
             outbound_media,
-            litchi_pptx::SlideCopyRefusal::UnsupportedRelationship,
+            crate::SlideCopyRefusal::UnsupportedRelationship,
         ),
         (
             "multiple images",
             multiple_images,
-            litchi_pptx::SlideCopyRefusal::AmbiguousTopology,
+            crate::SlideCopyRefusal::AmbiguousTopology,
         ),
         (
             "unreferenced image relationship",
             unreferenced_image,
-            litchi_pptx::SlideCopyRefusal::UnsupportedRelationship,
+            crate::SlideCopyRefusal::UnsupportedRelationship,
         ),
-        (
-            "MCE",
-            mce,
-            litchi_pptx::SlideCopyRefusal::MarkupCompatibility,
-        ),
+        ("MCE", mce, crate::SlideCopyRefusal::MarkupCompatibility),
         (
             "chart",
             chart,
-            litchi_pptx::SlideCopyRefusal::UnknownSemanticSurface,
+            crate::SlideCopyRefusal::UnknownSemanticSurface,
         ),
         (
             "table",
             table,
-            litchi_pptx::SlideCopyRefusal::UnknownSemanticSurface,
+            crate::SlideCopyRefusal::UnknownSemanticSurface,
         ),
         (
             "notes",
             notes,
-            litchi_pptx::SlideCopyRefusal::UnknownSemanticSurface,
+            crate::SlideCopyRefusal::UnknownSemanticSurface,
         ),
-        (
-            "OLE",
-            ole,
-            litchi_pptx::SlideCopyRefusal::UnknownSemanticSurface,
-        ),
+        ("OLE", ole, crate::SlideCopyRefusal::UnknownSemanticSurface),
         (
             "opaque member",
             opaque,
-            litchi_pptx::SlideCopyRefusal::UnknownPhysicalMember,
+            crate::SlideCopyRefusal::UnknownPhysicalMember,
         ),
     ];
     for (label, candidate, expected) in cases {
@@ -2772,7 +2764,7 @@ fn source_backed_cross_copy_refuses_duplicate_scene_trees_and_misplaced_picture_
         "duplicate top-level shape trees",
         &duplicate_scene_tree,
         &destination,
-        litchi_pptx::SlideCopyRefusal::AmbiguousTopology,
+        crate::SlideCopyRefusal::AmbiguousTopology,
     )?;
 
     let without_direct_blip = replace_text_member(
@@ -2791,7 +2783,7 @@ fn source_backed_cross_copy_refuses_duplicate_scene_trees_and_misplaced_picture_
         "misplaced picture blip",
         &misplaced_blip,
         &destination,
-        litchi_pptx::SlideCopyRefusal::UnknownSemanticSurface,
+        crate::SlideCopyRefusal::UnknownSemanticSurface,
     )?;
     Ok(())
 }
@@ -2867,13 +2859,13 @@ fn source_backed_cross_copy_reserves_before_reading_picture_media() -> TestResul
         ExecutionContext::new(measure_budget.clone(), measure_token, execution_limits);
     let measured_source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(source_bytes.clone())),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(measure_context.clone()),
     )?;
     let measured_editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(destination_bytes.clone())),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(measure_context),
     )?;
@@ -2910,13 +2902,13 @@ fn source_backed_cross_copy_reserves_before_reading_picture_media() -> TestResul
     let context = ExecutionContext::new(budget, token, execution_limits);
     let source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(source_adapter),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context.clone()),
     )?;
     let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(destination_bytes)),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context),
     )?;
@@ -2942,7 +2934,7 @@ fn expect_plan_refusal(
     label: &str,
     source_bytes: &[u8],
     destination_bytes: &[u8],
-    expected: litchi_pptx::SlideCopyRefusal,
+    expected: crate::SlideCopyRefusal,
 ) -> TestResult {
     let source = open_source(source_bytes)?;
     let editor = open_editor(destination_bytes)?;
@@ -3612,13 +3604,13 @@ fn source_backed_cross_copy_aggregates_image_reservation_before_payload_reads() 
     );
     let measured_source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(source_bytes.clone())),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(measure_context.clone()),
     )?;
     let measured_editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(destination_bytes.clone())),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(measure_context),
     )?;
@@ -3651,13 +3643,13 @@ fn source_backed_cross_copy_aggregates_image_reservation_before_payload_reads() 
     let context = ExecutionContext::new(budget, token, single_execution_limits()?);
     let source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(source),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context.clone()),
     )?;
     let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(destination_bytes)),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context),
     )?;
@@ -3701,13 +3693,13 @@ fn source_backed_cross_copy_preserves_media_read_errors() -> TestResult {
     let context = ExecutionContext::new(budget, token, single_execution_limits()?);
     let source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(source),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context.clone()),
     )?;
     let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(destination_fixture()?)),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context),
     )?;
@@ -4163,13 +4155,13 @@ fn source_backed_cross_copy_observes_post_entry_planning_cancellation() -> TestR
     let context = ExecutionContext::new(budget, cancellation, single_execution_limits()?);
     let source = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(source_adapter),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context.clone()),
     )?;
     let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(OwnedSource::new(destination_bytes)),
-        litchi_pptx::OpenOptions::default()
+        crate::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context),
     )?;
@@ -5319,7 +5311,7 @@ fn source_backed_cross_copy_lazily_copies_shared_payload_on_writer_memory_refusa
                 MultiRangeCountingSource::new(source_bytes.clone(), vec![range], overlaps.clone());
             let source = SourceBackedPresentation::from_read_at_with_options(
                 Arc::new(provider),
-                litchi_pptx::OpenOptions::default()
+                crate::OpenOptions::default()
                     .source_limits(SourceLimits::default())
                     .execution_context(context),
             )?;
@@ -5342,7 +5334,7 @@ fn source_backed_cross_copy_lazily_copies_shared_payload_on_writer_memory_refusa
             );
             let editor = SourceBackedPresentationEditor::from_read_at_with_options(
                 Arc::new(OwnedSource::new(destination.clone())),
-                litchi_pptx::OpenOptions::default()
+                crate::OpenOptions::default()
                     .source_limits(SourceLimits::default())
                     .execution_context(destination_context),
             )?;
@@ -5521,7 +5513,7 @@ fn source_backed_cross_copy_unnamed_slides_keep_nonempty_name_conflicts() -> Tes
         "named collision beside unnamed slide",
         &source,
         &destination,
-        litchi_pptx::SlideCopyRefusal::AmbiguousTopology,
+        crate::SlideCopyRefusal::AmbiguousTopology,
     )?;
     let source = replace_text_member(
         &source_fixture()?,
@@ -5539,7 +5531,7 @@ fn source_backed_cross_copy_unnamed_slides_keep_nonempty_name_conflicts() -> Tes
         "duplicate nonempty destination names",
         &source,
         &duplicate,
-        litchi_pptx::SlideCopyRefusal::AmbiguousTopology,
+        crate::SlideCopyRefusal::AmbiguousTopology,
     )?;
     publish(&source, &destination_fixture()?, 0, 1, 1)?;
     publish(&source_fixture()?, &destination, 0, 1, 1)?;
@@ -5572,7 +5564,7 @@ fn source_backed_cross_copy_unnamed_admission_still_requires_common_slide_data()
         let editor = open_editor(&destination_bytes)?;
         match editor.plan_cross_slide_copy(&source, 0, 1, 1) {
             Err(Error::SlideCopyPlan {
-                kind: litchi_pptx::SlideCopyRefusal::AmbiguousTopology,
+                kind: crate::SlideCopyRefusal::AmbiguousTopology,
                 detail,
             }) => assert!(detail.contains("common data is missing")),
             Err(error) => panic!("unexpected structural refusal: {error:?}"),
@@ -5632,5 +5624,69 @@ fn source_backed_cross_copy_preserves_noncompact_source_xml_with_checked_splices
     let source_slide = read_zip_member_bytes(&source, "ppt/slides/slide1.xml")?;
     let (_, copied_slide, _) = copied_slide_parts(&output)?;
     assert_eq!(copied_slide.as_bytes(), source_slide.as_slice());
+    Ok(())
+}
+
+/// The `source::cross_slide_copy` family (record 0356b): a commit publishes
+/// a new source-backed package whose output is the stream route's bytes; the
+/// inverse applies to the commit's own package only.
+#[test]
+fn cross_slide_copy_family_publishes_a_source_backed_package() -> TestResult {
+    use crate::source::Package;
+    let source_bytes = source_fixture()?;
+    let destination_bytes = destination_fixture()?;
+    let streamed = publish(&source_bytes, &destination_bytes, 0, 0, 1)?;
+
+    let source = open_source(&source_bytes)?;
+    let destination = Package::from_read_at(Arc::new(OwnedSource::new(destination_bytes.clone())))?;
+    let plan = destination.plan_cross_slide_copy(&source, 0_usize, 0_usize, 1_usize)?;
+    assert_eq!(plan.insertion_position(), 1);
+    let mut edit = destination.edit_cross_slide_copy()?;
+    let copied = edit.stage(&plan)?;
+    assert_eq!(copied.insertion_position(), 1);
+    // A plan made on the destination does not stage on the staged copy.
+    assert!(matches!(edit.stage(&plan), Err(Error::PatchConflict)));
+    let commit = edit.commit()?;
+    assert!(commit.diagnostics().changed());
+    let (copied_package, patch) = commit.into_parts();
+    assert_eq!(copied_package.to_bytes()?, streamed);
+    assert_eq!(destination.to_bytes()?, destination_bytes);
+    assert_eq!(
+        copied_package.presentation()?.slide_count()?,
+        destination.presentation()?.slide_count()? + 1
+    );
+
+    // Replay onto the same destination, and the inverse onto the commit's
+    // own package; the inverse refuses any other package.
+    let replayed = destination.apply_cross_slide_copy(&patch)?.into_package();
+    assert_eq!(replayed.to_bytes()?, streamed);
+    let restored = copied_package
+        .apply_cross_slide_copy(&patch.inverse())?
+        .into_package();
+    assert_eq!(restored.to_bytes()?, destination_bytes);
+    assert!(matches!(
+        destination.apply_cross_slide_copy(&patch.inverse()),
+        Err(Error::PatchConflict)
+    ));
+    // The patch is exact-source: another opening of the same bytes is
+    // another source.
+    let reopened = Package::from_read_at(Arc::new(OwnedSource::new(destination_bytes.clone())))?;
+    assert!(matches!(
+        reopened.apply_cross_slide_copy(&patch),
+        Err(Error::PatchConflict)
+    ));
+
+    // The convenience verb plans against the staged package: copying the
+    // same named slide twice collides with the first copy.
+    let mut edit = destination.edit_cross_slide_copy()?;
+    edit.copy(&source, 0_usize, 0_usize, 1_usize)?;
+    assert!(matches!(
+        edit.copy(&source, 0_usize, 0_usize, 1_usize),
+        Err(Error::SlideCopyPlan { .. })
+    ));
+    assert_eq!(edit.commit()?.package().to_bytes()?, streamed);
+    let unchanged = destination.edit_cross_slide_copy()?.commit()?;
+    assert!(!unchanged.diagnostics().changed());
+    assert_eq!(unchanged.package().to_bytes()?, destination_bytes);
     Ok(())
 }
