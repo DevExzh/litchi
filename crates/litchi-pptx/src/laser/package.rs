@@ -40,7 +40,7 @@ pub fn load_slide_traces(
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store_slide_trace(
+pub(crate) fn store_slide_trace(
     package: &mut OpcPackage,
     slide_name: &PackURI,
     points: &[TracePoint],

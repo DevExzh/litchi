@@ -88,7 +88,7 @@ fn caller_output_limits_precede_managed_memory_admission() {
         Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, Resource,
     };
     use litchi_opc::SourceLimits;
-    use litchi_pptx::{Error, SourceBackedPresentationEditor};
+    use litchi_pptx::Error;
     use std::num::{NonZeroU64, NonZeroUsize};
 
     let input = bytes(1, false);
@@ -120,31 +120,31 @@ fn caller_output_limits_precede_managed_memory_admission() {
             );
             let source = Arc::new(OwnedSource::new(input.clone()));
             let owner = if managed {
-                SourceBackedPresentationEditor::from_read_at_with_options(
+                Package::from_read_at_with_options(
                     source,
                     litchi_pptx::OpenOptions::default()
                         .source_limits(limits)
                         .execution_context(context),
                 )
             } else {
-                SourceBackedPresentationEditor::from_read_at_with_options(
+                Package::from_read_at_with_options(
                     source,
                     litchi_pptx::OpenOptions::default().source_limits(limits),
                 )
             }
             .unwrap();
             let expected_id = owner
-                .edit_slide(0)
+                .edit()
                 .unwrap()
-                .add_text_box("retry", BOUNDS)
+                .add_text_box(0, "retry", BOUNDS)
                 .unwrap();
             // Capture first so this assertion isolates authoring admission
             // from the selected-slide read's independent memory admission.
-            let mut edit = owner.edit_slide(0).unwrap();
+            let mut edit = owner.edit().unwrap();
             let used = budget.used(Resource::Memory);
             let pressure = budget.reserve(Resource::Memory, MEMORY - used).unwrap();
             assert!(matches!(
-                edit.add_text_box(&oversized, BOUNDS),
+                edit.add_text_box(0, &oversized, BOUNDS),
                 Err(Error::Limit {
                     resource: "opened-presentation appended shape XML",
                     limit,
@@ -155,8 +155,8 @@ fn caller_output_limits_precede_managed_memory_admission() {
             assert_eq!(budget.used(Resource::Memory), used);
             // Failed policy admission consumes neither the one-operation
             // allowance nor a shape identity. A smaller retry remains valid.
-            assert_eq!(edit.add_text_box("retry", BOUNDS).unwrap(), expected_id);
-            drop(edit.commit_checked().unwrap());
+            assert_eq!(edit.add_text_box(0, "retry", BOUNDS).unwrap(), expected_id);
+            drop(edit.commit().unwrap());
             drop(owner);
             assert_eq!(budget.used(Resource::Memory), 0);
         }

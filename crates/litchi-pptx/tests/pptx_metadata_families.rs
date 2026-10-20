@@ -8,7 +8,6 @@
 //! the source package never changes, and an unchanged edit publishes the
 //! source bytes.
 
-use litchi_opc::PackURI;
 use litchi_pptx::Package;
 use litchi_pptx::presentation_properties::metadata::color_map::{Role, Slot};
 use litchi_pptx::presentation_properties::metadata::custom_show::List as CustomShows;
@@ -115,42 +114,42 @@ fn custom_show_and_section_edits_share_the_structure_graph() {
 #[test]
 fn slide_show_events_are_staged_per_slide() {
     let package = deck();
-    let slide = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+    let slide = 0_usize;
     let mut edit = package.edit_show_events().unwrap();
-    edit.set(&slide, &[Event::play(Offset::ms(5), 2)]).unwrap();
+    edit.set(slide, &[Event::play(Offset::ms(5), 2)]).unwrap();
     let after = edit.commit().unwrap().into_package();
     let events = after
         .edit_show_events()
         .unwrap()
-        .show_events(&slide)
+        .show_events(slide)
         .unwrap();
     assert_eq!(events.unwrap().len(), 1);
     assert!(
         package
             .edit_show_events()
             .unwrap()
-            .show_events(&slide)
+            .show_events(slide)
             .unwrap()
             .is_none()
     );
 
     let mut edit = after.edit_show_events().unwrap();
-    edit.update(&slide, |draft| draft.push(Event::pause(Offset::ms(9), 2)))
+    edit.update(slide, |draft| draft.push(Event::pause(Offset::ms(9), 2)))
         .unwrap();
     let extended = edit.commit().unwrap().into_package();
     let events = extended
         .edit_show_events()
         .unwrap()
-        .show_events(&slide)
+        .show_events(slide)
         .unwrap();
     assert_eq!(events.unwrap().len(), 2);
     let mut edit = extended.edit_show_events().unwrap();
-    assert!(edit.remove(&slide).unwrap().is_some());
+    assert!(edit.remove(slide).unwrap().is_some());
     let removed = edit.commit().unwrap().into_package();
     let events = removed
         .edit_show_events()
         .unwrap()
-        .show_events(&slide)
+        .show_events(slide)
         .unwrap();
     assert!(events.is_none());
 }
@@ -158,9 +157,11 @@ fn slide_show_events_are_staged_per_slide() {
 #[test]
 fn master_color_map_edits_rewrite_only_the_master_map() {
     let package = deck();
-    let master = PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap();
+    let master = package.presentation().unwrap().slide_masters().unwrap()[0]
+        .id()
+        .unwrap();
     let edit = package.edit_color_maps().unwrap();
-    let before = edit.color_map(&master).unwrap().map().unwrap();
+    let before = edit.color_map(master).unwrap().map().unwrap();
     drop(edit);
     let role = if before.color(Slot::Background1) == Role::Accent1 {
         Role::Accent2
@@ -169,7 +170,7 @@ fn master_color_map_edits_rewrite_only_the_master_map() {
     };
     let mut edit = package.edit_color_maps().unwrap();
     assert!(
-        edit.update(&master, |draft| draft.set_color(Slot::Background1, role))
+        edit.update(master, |draft| draft.set_color(Slot::Background1, role))
             .unwrap()
     );
     let commit = edit.commit().unwrap();
@@ -178,21 +179,23 @@ fn master_color_map_edits_rewrite_only_the_master_map() {
     let map = after
         .edit_color_maps()
         .unwrap()
-        .color_map(&master)
+        .color_map(master)
         .unwrap()
         .map()
         .unwrap();
     assert_eq!(map.color(Slot::Background1), role);
     assert_eq!(map.color(Slot::Text1), before.color(Slot::Text1));
 
-    let slide = PackURI::new("/ppt/slides/slide1.xml").unwrap();
-    let theme = PackURI::new("/ppt/theme/theme1.xml").unwrap();
+    let layout = package.presentation().unwrap().slide_layouts().unwrap()[0]
+        .id()
+        .unwrap();
     let mut edit = package.edit_color_maps().unwrap();
-    assert!(edit.color_map(&slide).is_ok());
+    assert!(edit.color_map(0_usize).is_ok());
+    assert!(edit.color_map(layout).is_ok());
     assert!(matches!(
-        edit.update(&theme, |_| Ok(())),
+        edit.update(litchi_pptx::slide::MasterId(1), |_| Ok(())),
         Err(litchi_pptx::Error::Refused(refusal))
-            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedTarget
+            if refusal.kind() == litchi_core::edit::RefusalKind::NotFound
     ));
 }
 
@@ -211,9 +214,5 @@ fn comment_collaboration_edits_refuse_a_missing_author() {
     assert!(!commit.diagnostics().changed());
 
     let mut edit = package.edit_comment_threading().unwrap();
-    assert!(
-        edit.remove("/ppt/slides/slide1.xml", 0, 1)
-            .unwrap()
-            .is_none()
-    );
+    assert!(edit.remove(0_usize, 0, 1).unwrap().is_none());
 }

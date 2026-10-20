@@ -17,7 +17,9 @@ pub enum Context {
     Main,
     /// A Slide container whose SlideAtom.geom is `SL_MasterTitle`.
     Title,
-    /// A Notes container whose NotesAtom.slideIdRef is zero.
+    /// A Notes container whose NotesAtom.slideIdRef is null or in the
+    /// `MasterId` domain (the notes master; a notes slide references a
+    /// presentation slide).
     Notes,
     /// A Handout container.
     Handout,

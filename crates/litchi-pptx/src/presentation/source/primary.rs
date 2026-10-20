@@ -5,8 +5,10 @@
 //! Structural revisions additionally retain one prepared OPC topology and a
 //! stable-key recipe for lazy readback and reversible publication.
 
+mod deferred;
 mod durable;
 mod insertion;
+pub mod svg;
 mod topology;
 mod topology_admission;
 mod topology_digest;
@@ -24,7 +26,7 @@ use super::{
     MAX_SOURCE_BACKED_SLIDE_BATCH, SourceBackedPresentation, SourceBackedPresentationEditor,
     SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourcePayload,
 };
-use crate::{Error, Result};
+use crate::Result;
 
 use crate::presentation::order::{
     StableSlideKey, reorder_stable_bindings, reserve_managed_output, stable_slide_key,
@@ -91,6 +93,9 @@ pub struct Package {
     overlays: Arc<[SourceBackedSlideSnapshot]>,
     topology: Option<Arc<topology::Revision>>,
     tolerance: Arc<crate::leniency::ToleranceReport>,
+    /// The deferred output of a committed non-overlay family edit (record
+    /// 0356a); reads and edits go through its materialized artifact.
+    deferred: Option<Arc<deferred::Deferred>>,
 }
 
 impl Package {
@@ -166,6 +171,7 @@ impl Package {
             overlays: Arc::from([]),
             topology: None,
             tolerance: Arc::new(inner.tolerance.clone()),
+            deferred: None,
         };
         package.check()?;
         Ok(package)
@@ -178,6 +184,10 @@ impl Package {
     ///
     /// Returns an XML error for a malformed root or attribute.
     pub fn first_slide_number(&self) -> Result<u32> {
+        let this = self.effective()?;
+        if !std::ptr::eq(this, self) {
+            return this.first_slide_number();
+        }
         crate::presentation::first_slide_number(self.root.as_bytes())
     }
 
@@ -188,6 +198,10 @@ impl Package {
 
     /// Obtain an owned read-only semantic projection.
     pub fn presentation(&self) -> Result<Presentation> {
+        let this = self.effective()?;
+        if !std::ptr::eq(this, self) {
+            return this.presentation();
+        }
         self.check()?;
         Ok(Presentation {
             package: self.clone(),
@@ -196,6 +210,10 @@ impl Package {
 
     /// Begin an isolated primary edit; dropping it leaves this package intact.
     pub fn edit(&self) -> Result<Edit> {
+        let this = self.effective()?;
+        if !std::ptr::eq(this, self) {
+            return this.edit();
+        }
         self.check()?;
         Ok(Edit {
             source: self.clone(),
@@ -215,6 +233,10 @@ impl Package {
     /// source position, so this method returns an error for that Part. Use
     /// [`Presentation::slide`] for reads from the effective revision.
     pub fn source_position(&self, position: Position) -> Result<Position> {
+        let this = self.effective()?;
+        if !std::ptr::eq(this, self) {
+            return this.source_position(position);
+        }
         self.check()?;
         let logical = position.get();
         let key = self
@@ -239,7 +261,8 @@ impl Package {
     /// that need revision equality should use [`Self::same_content`].
     #[must_use]
     pub fn same_source_owner(&self, other: &Self) -> bool {
-        self.owner.package.source_lineage() == other.owner.package.source_lineage()
+        self.same_deferred(other)
+            && self.owner.package.source_lineage() == other.owner.package.source_lineage()
             && self.owner._presentation.source_partname()
                 == other.owner._presentation.source_partname()
             && self.owner._presentation.source_data().as_bytes()
@@ -249,6 +272,9 @@ impl Package {
     /// Compare revisions of the same retained source without reading untouched parts.
     /// Independently opened sources are distinct even when their bytes match.
     pub fn same_content(&self, other: &Self) -> Result<bool> {
+        if self.deferred.is_some() || other.deferred.is_some() {
+            return Ok(self.same_deferred(other) && self.same_source_owner(other));
+        }
         self.check()?;
         other.check()?;
         let equal = self.same_source_owner(other)
@@ -294,6 +320,10 @@ impl Package {
 
     /// Replay an exact-source patch without changing this package.
     pub fn apply(&self, patch: &Patch) -> Result<Self> {
+        let this = self.effective()?;
+        if !std::ptr::eq(this, self) {
+            return this.apply(patch);
+        }
         self.check()?;
         let (source, before_root, before_order, after_root, after_order, changes) = match &patch
             .data
@@ -342,7 +372,10 @@ impl Package {
     }
 
     /// Serialize with exact no-op and raw-copy preservation of untouched members.
-    pub fn write_to(&self, writer: impl Write) -> Result<()> {
+    pub fn write_to(&self, mut writer: impl Write) -> Result<()> {
+        if let Some(result) = self.write_deferred(&mut writer) {
+            return result;
+        }
         self.check()?;
         if let Some(revision) = &self.topology {
             revision.check()?;
@@ -853,6 +886,21 @@ impl Slide {
     /// Whether the effective slide is authored as hidden.
     pub fn is_hidden(&self) -> Result<bool> {
         self.with_part(|part| crate::parts::SlidePart::from_part(part)?.is_hidden())
+    }
+
+    /// The effective slide's direct transition, when it has one (record
+    /// 0356a; the read the source-backed slide snapshot offered). A
+    /// transition inside a supported markup-compatibility owner is read
+    /// through its typed choice and fallback.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed or unsupported transition markup.
+    pub fn transition(&self) -> Result<Option<crate::transition::Transition>> {
+        self.package.check()?;
+        let transition = self.snapshot.transition();
+        self.package.check()?;
+        transition
     }
 
     /// Acquire the effective slide's selected layout snapshot.
@@ -1734,10 +1782,10 @@ impl Edit {
     }
 
     /// Set (`Some`) or clear (`None`) one effective slide's direct
-    /// transition, with the semantics of
-    /// [`super::SourceBackedSlideEdit::set_transition`] and
-    /// [`super::SourceBackedSlideEdit::clear_transition`]; it composes with
-    /// earlier staged changes and participates in source-local replay.
+    /// transition: a set replaces the direct `p:transition` (or its
+    /// supported markup-compatibility owner) and a clear removes it; it
+    /// composes with earlier staged changes and participates in source-local
+    /// replay.
     /// Returns whether the slide changed.
     ///
     /// # Errors
@@ -1848,10 +1896,7 @@ impl Edit {
                 data: PatchData::Topology(Arc::new(topology_patch)),
             };
             patch.encoded_len()?;
-            return Ok(Commit {
-                package: self.working,
-                patch,
-            });
+            return Ok(commit_of(self.working, patch));
         }
         self.changes
             .sort_unstable_by_key(|change| change.before.position);
@@ -1872,10 +1917,7 @@ impl Edit {
             },
         };
         patch.encoded_len()?;
-        Ok(Commit {
-            package: self.working,
-            patch,
-        })
+        Ok(commit_of(self.working, patch))
     }
 }
 
@@ -1960,47 +2002,17 @@ impl Patch {
     }
 }
 
-/// Content-free primary commit facts.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Diagnostics {
-    changed: bool,
-}
-impl Diagnostics {
-    /// Whether the edit changed the package's visible slide XML.
-    pub const fn changed(self) -> bool {
-        self.changed
-    }
-}
+pub use crate::Error;
+/// The bounded dimension of the source-backed primary family.
+pub use crate::opened::LimitKind;
+pub use litchi_core::edit::Diagnostics;
 
 /// A validated package, patch, and content-free diagnostics.
-#[derive(Clone)]
-pub struct Commit {
-    package: Package,
-    patch: Patch,
-}
-impl Commit {
-    /// Borrow the resulting immutable package.
-    pub const fn package(&self) -> &Package {
-        &self.package
-    }
-    /// Borrow the exact-source patch.
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-    /// Read content-free commit facts.
-    pub fn diagnostics(&self) -> Diagnostics {
-        Diagnostics {
-            changed: !self.patch.is_noop(),
-        }
-    }
-    /// Consume this commit into its package without replay or serialization.
-    pub fn into_package(self) -> Package {
-        self.package
-    }
-    /// Consume this commit into its package and patch.
-    pub fn into_parts(self) -> (Package, Patch) {
-        (self.package, self.patch)
-    }
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
+
+fn commit_of(package: Package, patch: Patch) -> Commit {
+    let changed = !patch.is_noop();
+    Commit::new(package, patch, Diagnostics::new(changed))
 }
 
 fn slide_key(slide: &Arc<super::SourceSlideData>) -> StableSlideKey {
@@ -2089,7 +2101,7 @@ macro_rules! redacted_debug {
         }
     })+ };
 }
-redacted_debug!(Package, Presentation, Slide, Edit, Patch, Commit);
+redacted_debug!(Package, Presentation, Slide, Edit, Patch);
 
 // Charge conservative input/output and escaping headroom before lowering. The
 // token follows the candidate bytes through patches and detached shape handles.

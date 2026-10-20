@@ -204,3 +204,26 @@ fn object_catalog_rejects_duplicate_and_null_ids() {
     assert!(Objects::from_records([(0, &main)]).is_err());
     assert!(Objects::from_records([(2, &main), (2, &main)]).is_err());
 }
+
+#[test]
+fn notes_master_validation_follows_real_producers() {
+    let notes = |slide_id: u32, flags: u16| {
+        let mut data = [0u8; 8];
+        data[..4].copy_from_slice(&slide_id.to_le_bytes());
+        data[4..6].copy_from_slice(&flags.to_le_bytes());
+        let notes_atom = atom(RecordType::NotesAtom, 1, &data);
+        record(
+            RecordType::Notes,
+            0x0f,
+            0,
+            wire(&notes_atom),
+            vec![notes_atom],
+        )
+    };
+    for (slide_id, flags) in [(0, 0), (0x8000_0000, 0), (0x8000_0000, 2), (0x8000_0001, 0)] {
+        assert!(validation::notes(&notes(slide_id, flags)).is_ok());
+    }
+    for (slide_id, flags) in [(0, 2), (0x100, 0), (0x7fff_ffff, 0)] {
+        assert!(validation::notes(&notes(slide_id, flags)).is_err());
+    }
+}

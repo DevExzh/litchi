@@ -6,6 +6,7 @@
 
 use crate::Error;
 
+use super::package::store;
 use super::*;
 
 const POI_AUDIO: &[u8] =

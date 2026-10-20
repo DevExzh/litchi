@@ -140,7 +140,7 @@ fn load_resource(
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store(
+pub(crate) fn store(
     package: &mut OpcPackage,
     slide_name: &PackURI,
     value: &List,

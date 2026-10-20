@@ -7,6 +7,36 @@ use crate::records::Record;
 
 const SL_MASTER_TITLE: u32 = 2;
 
+/// The first `MasterId` value (`[MS-PPT]` 2.2.16); `SlideId` values
+/// (2.2.24) lie below it.
+const FIRST_MASTER_ID: u32 = 0x8000_0000;
+
+/// Whether `slide_id` and `flags` are the `NotesAtom.slideIdRef` and
+/// `slideFlags` of a notes master.
+///
+/// `[MS-PPT]` 2.5.12 requires a null `slideIdRef` (and then null
+/// `slideFlags`) in the notes master. PowerPoint 97-2003 and 2007 write the
+/// value 0x80000000 there instead, and other producers 0x80000001: a value in
+/// the `MasterId` domain (2.2.16), never a `SlideId` (0x100..=0x7FFFFFFF),
+/// with any of the defined `SlideFlags` bits (2.5.11; `fMasterScheme` is
+/// common). A notes master therefore carries a null reference with null
+/// flags, or a `MasterId`-domain reference; a `slideIdRef` that names or
+/// could name a presentation slide (1..=0x7FFFFFFF) belongs to a notes slide.
+/// The reserved `SlideFlags` bits "MUST be ignored" and are not checked.
+pub(crate) const fn is_notes_master_atom(slide_id: u32, flags: u16) -> bool {
+    if slide_id == 0 {
+        flags & 0x0007 == 0
+    } else {
+        slide_id >= FIRST_MASTER_ID
+    }
+}
+
+/// Whether a `NotesAtom.slideIdRef` value marks a notes master rather than a
+/// notes slide (see [`is_notes_master_atom`]).
+pub(crate) const fn is_notes_master_reference(slide_id: u32) -> bool {
+    slide_id == 0 || slide_id >= FIRST_MASTER_ID
+}
+
 pub(super) fn validate(context: Context, root: &Record, limits: Limits) -> Result<()> {
     limits.validate()?;
     let mut count = 0usize;
@@ -78,9 +108,9 @@ pub(super) fn validate(context: Context, root: &Record, limits: Limits) -> Resul
         Context::Notes => {
             let atom = notes_atom
                 .ok_or_else(|| Error::Corrupted("notes master is missing its NotesAtom".into()))?;
-            if read_u32(atom, 0) != 0 || read_u16(atom, 4) != 0 {
+            if !is_notes_master_atom(read_u32(atom, 0), read_u16(atom, 4)) {
                 return corrupted(
-                    "notes master NotesAtom must have null slideIdRef and slide flags",
+                    "notes master NotesAtom must have a null or master-domain slideIdRef",
                 );
             }
         },

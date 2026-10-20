@@ -73,7 +73,7 @@ pub mod shape;
 
 pub use codec::{parse, write};
 pub use model::{Conformance, Key, List, Source, Tag, is_relationship, raw};
-pub use package::{discover, load, put, remove};
+pub use package::{discover, load};
 mod edit;
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
@@ -96,3 +96,4 @@ pub(crate) fn allocation(
 ) -> Error {
     Error::Allocation { resource, source }
 }
+pub(crate) use package::{put, remove};

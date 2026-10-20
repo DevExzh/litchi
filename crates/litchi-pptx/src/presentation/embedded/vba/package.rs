@@ -62,7 +62,11 @@ pub fn discover(package: &OpcPackage, source: &PackURI) -> Result<Option<Project
 ///
 /// Returns [`Error::Opc`] for a signed package, and an error if the output
 /// cannot be encoded or written.
-pub fn store(package: &mut OpcPackage, source: &PackURI, payload: Vec<u8>) -> Result<Project> {
+pub(crate) fn store(
+    package: &mut OpcPackage,
+    source: &PackURI,
+    payload: Vec<u8>,
+) -> Result<Project> {
     if payload.is_empty() || payload.len() > MAX_PAYLOAD_BYTES {
         return Err(Error::Limit {
             resource: "PPTX VBA payload bytes",
@@ -88,7 +92,7 @@ pub fn store(package: &mut OpcPackage, source: &PackURI, payload: Vec<u8>) -> Re
 ///
 /// Returns [`Error::Opc`] for a change to a signed package, and an error if
 /// the operation fails.
-pub fn remove(package: &mut OpcPackage, source: &PackURI) -> Result<bool> {
+pub(crate) fn remove(package: &mut OpcPackage, source: &PackURI) -> Result<bool> {
     remove_project_graph(package, source, Host::PowerPoint).map_err(map_common)
 }
 

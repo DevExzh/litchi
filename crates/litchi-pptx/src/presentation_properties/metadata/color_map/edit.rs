@@ -25,6 +25,7 @@ use super::*;
 use super::{Draft, Prepared, Snapshot};
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::part_edit::{Staged, family};
+use crate::slide::Owner;
 use crate::{Package, Result};
 
 family!("color-map");
@@ -73,11 +74,12 @@ impl Edit<'_> {
     ///
     /// Returns the operation's error, a validation or serialization error of
     /// the draft, or a changed edit of a signed package.
-    pub fn update<T>(
+    pub fn update<'o, T>(
         &mut self,
-        part_name: &PackURI,
+        owner: impl Into<Owner<'o>>,
         operation: impl FnOnce(&mut Draft) -> Result<T>,
     ) -> Result<T> {
+        let part_name = &crate::master_layout::resolve_owner(self.staged.opc(), owner.into())?;
         self.staged.update(move |opc| {
             let mut draft = source(opc, part_name)?.edit();
             let value = operation(&mut draft)?;
@@ -87,13 +89,14 @@ impl Edit<'_> {
     }
 
     /// The staged color map or color-map override of the slide master, slide
-    /// layout or slide part `part_name`.
+    /// layout or slide `owner`.
     ///
     /// # Errors
     ///
     /// Returns an error for a missing part, a part of another type, or
     /// malformed color-map markup.
-    pub fn color_map(&self, part_name: &PackURI) -> Result<Snapshot> {
+    pub fn color_map<'o>(&self, owner: impl Into<Owner<'o>>) -> Result<Snapshot> {
+        let part_name = &crate::master_layout::resolve_owner(self.staged.opc(), owner.into())?;
         source(self.staged.opc(), part_name)
     }
 

@@ -17,10 +17,11 @@ mod tests;
 pub use crate::shape::designer::{Limits, Tag, Tags};
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub use model::{Binding, Snapshot};
-pub use package::{load, load_snapshot, remove, store};
+pub use package::{load, load_snapshot};
 pub use transaction::Revision;
 
 #[cfg(test)]
 pub(crate) use package::apply_patch;
 pub(crate) use package::load_snapshot_with_limits;
+pub(crate) use package::{remove, store};
 pub(crate) use transaction::{Change, Draft, Prepared};

@@ -550,7 +550,7 @@ fn p232_scalar_patch_preserves_unknown_shape_bytes_and_inverse() {
         .unwrap();
 
     let source = package
-        .placeholder_type_extension(&layout.part_name, "Cameo")
+        .placeholder_type_extension_at(&layout.part_name, "Cameo")
         .unwrap();
     let before = source.source_xml().to_vec();
     let mut edit = source.edit();
@@ -570,7 +570,7 @@ fn p232_scalar_patch_preserves_unknown_shape_bytes_and_inverse() {
         .apply_placeholder_type_extension_slot_patch(commit.patch())
         .unwrap();
     let after = package
-        .placeholder_type_extension(&layout.part_name, "Cameo")
+        .placeholder_type_extension_at(&layout.part_name, "Cameo")
         .unwrap();
     assert_eq!(after.value(), Some(PlaceholderTypeExtension::Unknown));
     assert_ne!(after.source_xml(), before.as_slice());
@@ -579,7 +579,7 @@ fn p232_scalar_patch_preserves_unknown_shape_bytes_and_inverse() {
         .apply_placeholder_type_extension_slot_patch(&commit.patch().inverse())
         .unwrap();
     let restored = package
-        .placeholder_type_extension(&layout.part_name, "Cameo")
+        .placeholder_type_extension_at(&layout.part_name, "Cameo")
         .unwrap();
     assert_eq!(restored.value(), Some(PlaceholderTypeExtension::Cameo));
     assert_eq!(restored.source_xml(), before.as_slice());
@@ -617,7 +617,7 @@ fn p232_scalar_patch_preserves_an_inherited_alias_and_lexical_owner_bytes() {
         .unwrap();
 
     let source = package
-        .placeholder_type_extension(&layout.part_name, "Alias")
+        .placeholder_type_extension_at(&layout.part_name, "Alias")
         .unwrap();
     let before = source.source_xml().to_vec();
     let mut edit = source.edit();
@@ -627,7 +627,7 @@ fn p232_scalar_patch_preserves_an_inherited_alias_and_lexical_owner_bytes() {
         .apply_placeholder_type_extension_slot_patch(commit.patch())
         .unwrap();
     let after = package
-        .placeholder_type_extension(&layout.part_name, "Alias")
+        .placeholder_type_extension_at(&layout.part_name, "Alias")
         .unwrap();
     assert_eq!(after.value(), Some(PlaceholderTypeExtension::Unknown));
     assert!(
@@ -682,7 +682,7 @@ fn p232_scalar_patch_updates_explicit_end_tag_without_touching_opaque_siblings()
         .unwrap();
 
     let snapshot = package
-        .placeholder_type_extension(&layout.part_name, "Explicit")
+        .placeholder_type_extension_at(&layout.part_name, "Explicit")
         .unwrap();
     let before = snapshot.source_xml().to_vec();
     let mut edit = snapshot.edit();
@@ -692,7 +692,7 @@ fn p232_scalar_patch_updates_explicit_end_tag_without_touching_opaque_siblings()
         .apply_placeholder_type_extension_slot_patch(commit.patch())
         .unwrap();
     let changed = package
-        .placeholder_type_extension(&layout.part_name, "Explicit")
+        .placeholder_type_extension_at(&layout.part_name, "Explicit")
         .unwrap();
     assert!(
         std::str::from_utf8(changed.source_xml())
@@ -710,7 +710,7 @@ fn p232_scalar_patch_updates_explicit_end_tag_without_touching_opaque_siblings()
         .unwrap();
     assert_eq!(
         package
-            .placeholder_type_extension(&layout.part_name, "Explicit")
+            .placeholder_type_extension_at(&layout.part_name, "Explicit")
             .unwrap()
             .source_xml(),
         before.as_slice()
@@ -745,7 +745,7 @@ fn p232_noop_is_byte_stable_and_signature_policy_is_explicit() {
     assert!(package.opc().unwrap().is_signed());
 
     let source = package
-        .placeholder_type_extension(&layout.part_name, "Cameo")
+        .placeholder_type_extension_at(&layout.part_name, "Cameo")
         .unwrap();
     let mut noop_edit = source.clone().edit();
     noop_edit.set(PlaceholderTypeExtension::Cameo);
@@ -789,7 +789,7 @@ fn p232_patch_rejects_stale_source_and_growth_before_staging() {
         )
         .unwrap();
     let source = package
-        .placeholder_type_extension(&layout.part_name, "Cameo")
+        .placeholder_type_extension_at(&layout.part_name, "Cameo")
         .unwrap();
     let mut edit = source.clone().edit();
     edit.set(PlaceholderTypeExtension::Unknown);
@@ -892,7 +892,7 @@ fn p232_slot_add_remove_preserves_shape_bytes_and_inverse() {
         .unwrap();
 
     let absent = package
-        .placeholder_type_extension(&layout.part_name, "Slot")
+        .placeholder_type_extension_at(&layout.part_name, "Slot")
         .unwrap();
     assert_eq!(absent.value(), None);
     let before = absent.source_xml().to_vec();
@@ -911,7 +911,7 @@ fn p232_slot_add_remove_preserves_shape_bytes_and_inverse() {
         .apply_placeholder_type_extension_slot_patch(added.patch())
         .unwrap();
     let present = package
-        .placeholder_type_extension(&layout.part_name, "Slot")
+        .placeholder_type_extension_at(&layout.part_name, "Slot")
         .unwrap();
     assert_eq!(present.value(), Some(PlaceholderTypeExtension::Cameo));
 
@@ -922,7 +922,7 @@ fn p232_slot_add_remove_preserves_shape_bytes_and_inverse() {
         .apply_placeholder_type_extension_slot_patch(removed.patch())
         .unwrap();
     let restored_absent = package
-        .placeholder_type_extension(&layout.part_name, "Slot")
+        .placeholder_type_extension_at(&layout.part_name, "Slot")
         .unwrap();
     assert_eq!(restored_absent.value(), None);
 
@@ -930,7 +930,7 @@ fn p232_slot_add_remove_preserves_shape_bytes_and_inverse() {
         .apply_placeholder_type_extension_slot_patch(&removed.patch().inverse())
         .unwrap();
     let restored_present = package
-        .placeholder_type_extension(&layout.part_name, "Slot")
+        .placeholder_type_extension_at(&layout.part_name, "Slot")
         .unwrap();
     assert_eq!(
         restored_present.value(),
@@ -941,7 +941,7 @@ fn p232_slot_add_remove_preserves_shape_bytes_and_inverse() {
         .unwrap();
     assert_eq!(
         package
-            .placeholder_type_extension(&layout.part_name, "Slot")
+            .placeholder_type_extension_at(&layout.part_name, "Slot")
             .unwrap()
             .source_xml(),
         before.as_slice()
@@ -980,7 +980,7 @@ fn p232_slot_remove_inverse_restores_lexical_owner_with_opaque_variant_sibling()
         .unwrap();
 
     let present = package
-        .placeholder_type_extension(&layout.part_name, "Lexical")
+        .placeholder_type_extension_at(&layout.part_name, "Lexical")
         .unwrap();
     let before = present.source_xml().to_vec();
     let mut remove = present.edit();
@@ -991,7 +991,7 @@ fn p232_slot_remove_inverse_restores_lexical_owner_with_opaque_variant_sibling()
         .unwrap();
     assert_eq!(
         package
-            .placeholder_type_extension(&layout.part_name, "Lexical")
+            .placeholder_type_extension_at(&layout.part_name, "Lexical")
             .unwrap()
             .value(),
         None
@@ -1001,7 +1001,7 @@ fn p232_slot_remove_inverse_restores_lexical_owner_with_opaque_variant_sibling()
         .unwrap();
     assert_eq!(
         package
-            .placeholder_type_extension(&layout.part_name, "Lexical")
+            .placeholder_type_extension_at(&layout.part_name, "Lexical")
             .unwrap()
             .source_xml(),
         before.as_slice()
@@ -1028,7 +1028,7 @@ fn p232_slot_add_targets_selected_shape_when_another_shape_has_ext_lst() {
         )
         .unwrap();
     let before = package
-        .placeholder_type_extension(&layout.part_name, "Missing")
+        .placeholder_type_extension_at(&layout.part_name, "Missing")
         .unwrap();
     assert_eq!(before.value(), None);
     let mut edit = before.edit();
@@ -1039,14 +1039,14 @@ fn p232_slot_add_targets_selected_shape_when_another_shape_has_ext_lst() {
         .unwrap();
     assert_eq!(
         package
-            .placeholder_type_extension(&layout.part_name, "Missing")
+            .placeholder_type_extension_at(&layout.part_name, "Missing")
             .unwrap()
             .value(),
         Some(PlaceholderTypeExtension::Unknown)
     );
     assert_eq!(
         package
-            .placeholder_type_extension(&layout.part_name, "Existing")
+            .placeholder_type_extension_at(&layout.part_name, "Existing")
             .unwrap()
             .value(),
         Some(PlaceholderTypeExtension::Cameo)
@@ -1108,7 +1108,7 @@ fn p232_source_store_preserves_unknown_shape_bytes_on_slide_and_master() {
             .any(|w| w == b"slide-keep")
     );
     let slide = package
-        .placeholder_type_extension(&slide_uri, "SlideSlot")
+        .placeholder_type_extension_at(&slide_uri, "SlideSlot")
         .unwrap();
     assert_eq!(slide.value(), Some(PlaceholderTypeExtension::Unknown));
     let mut remove = slide.clone().edit();
@@ -1119,7 +1119,7 @@ fn p232_source_store_preserves_unknown_shape_bytes_on_slide_and_master() {
         .unwrap();
     assert_eq!(
         package
-            .placeholder_type_extension(&slide_uri, "SlideSlot")
+            .placeholder_type_extension_at(&slide_uri, "SlideSlot")
             .unwrap()
             .value(),
         None
@@ -1129,7 +1129,7 @@ fn p232_source_store_preserves_unknown_shape_bytes_on_slide_and_master() {
         .unwrap();
     assert_eq!(
         package
-            .placeholder_type_extension(&slide_uri, "SlideSlot")
+            .placeholder_type_extension_at(&slide_uri, "SlideSlot")
             .unwrap()
             .value(),
         Some(PlaceholderTypeExtension::Unknown)
@@ -1144,7 +1144,7 @@ fn p232_source_store_preserves_unknown_shape_bytes_on_slide_and_master() {
         )
         .unwrap();
     let master_source = package
-        .placeholder_type_extension(&master.part_name, "MasterSlot")
+        .placeholder_type_extension_at(&master.part_name, "MasterSlot")
         .unwrap();
     assert_eq!(master_source.value(), Some(PlaceholderTypeExtension::Cameo));
 }
@@ -1179,7 +1179,7 @@ fn p232_legacy_facade_accepts_token_uri_whitespace_without_rewriting_it() {
 
     assert_eq!(
         package
-            .placeholder_type_extension(&layout.part_name, "TokenSlot")
+            .placeholder_type_extension_at(&layout.part_name, "TokenSlot")
             .unwrap()
             .value(),
         Some(PlaceholderTypeExtension::Cameo)
@@ -1311,7 +1311,7 @@ fn p232_built_package_composes_with_placeholder_preflight() {
     let reopened = Package::from_bytes(&bytes).unwrap();
     assert_eq!(
         reopened
-            .placeholder_type_extension(&slide_uri, "Pending slide")
+            .placeholder_type_extension_at(&slide_uri, "Pending slide")
             .unwrap()
             .value(),
         Some(PlaceholderTypeExtension::Cameo)
@@ -1466,7 +1466,7 @@ fn p232_slot_rejects_mce_rewritten_owner_before_mutation() {
         .blob()
         .to_vec();
     let error = package
-        .placeholder_type_extension(&slide_uri, "Cameo")
+        .placeholder_type_extension_at(&slide_uri, "Cameo")
         .unwrap_err();
     assert!(matches!(error, crate::Error::Refused(_)));
     assert_eq!(

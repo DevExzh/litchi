@@ -71,7 +71,7 @@ pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result
 }
 
 /// Replace or create the typed recommendation.
-pub fn put(package: &mut OpcPackage, value: bool) -> Result<Option<bool>> {
+pub(crate) fn put(package: &mut OpcPackage, value: bool) -> Result<Option<bool>> {
     let previous = load(package)?;
     if previous == Some(value) {
         return Ok(previous);
@@ -130,7 +130,7 @@ pub fn put(package: &mut OpcPackage, value: bool) -> Result<Option<bool>> {
 }
 
 /// Remove the typed recommendation while retaining the owning properties part.
-pub fn remove(package: &mut OpcPackage) -> Result<Option<bool>> {
+pub(crate) fn remove(package: &mut OpcPackage) -> Result<Option<bool>> {
     let previous = load(package)?;
     let Some(previous_value) = previous else {
         return Ok(None);

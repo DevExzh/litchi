@@ -174,7 +174,7 @@ fn load_comments(
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store_presentation_comments(
+pub(crate) fn store_presentation_comments(
     package: &mut OpcPackage,
     value: &Comments,
     conformance: Conformance,
@@ -303,7 +303,7 @@ pub fn find_presentation_comment_author(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn add_presentation_comment_author(
+pub(crate) fn add_presentation_comment_author(
     package: &mut OpcPackage,
     author: Author,
     conformance: Conformance,
@@ -343,7 +343,7 @@ pub fn add_presentation_comment_author(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn update_presentation_comment_author(
+pub(crate) fn update_presentation_comment_author(
     package: &mut OpcPackage,
     author_id: u32,
     author: Author,
@@ -373,26 +373,7 @@ pub fn update_presentation_comment_author(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn replace_presentation_comment_author(
-    package: &mut OpcPackage,
-    author_id: u32,
-    author: Author,
-    conformance: Conformance,
-) -> Result<()> {
-    update_presentation_comment_author(package, author_id, author, conformance)
-}
-
-/// A change to a signed package is refused with
-/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// (ADR 0006) before anything is mutated: remove the signature explicitly
-/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
-/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
-/// no-op keeps the signature.
-///
-/// # Errors
-///
-/// Returns an error if the operation fails.
-pub fn remove_presentation_comment_author(
+pub(crate) fn remove_presentation_comment_author(
     package: &mut OpcPackage,
     author_id: u32,
     conformance: Conformance,
@@ -430,7 +411,7 @@ pub fn remove_presentation_comment_author(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn reorder_presentation_comment_authors(
+pub(crate) fn reorder_presentation_comment_authors(
     package: &mut OpcPackage,
     ordered_ids: &[u32],
     conformance: Conformance,
@@ -497,7 +478,7 @@ pub fn find_presentation_comment(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn add_presentation_comment(
+pub(crate) fn add_presentation_comment(
     package: &mut OpcPackage,
     slide_part_name: &str,
     comment: Comment,
@@ -575,7 +556,7 @@ pub fn add_presentation_comment(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn update_presentation_comment(
+pub(crate) fn update_presentation_comment(
     package: &mut OpcPackage,
     slide_part_name: &str,
     author_id: u32,
@@ -612,35 +593,7 @@ pub fn update_presentation_comment(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn replace_presentation_comment(
-    package: &mut OpcPackage,
-    slide_part_name: &str,
-    author_id: u32,
-    index: u32,
-    replacement: Comment,
-    conformance: Conformance,
-) -> Result<()> {
-    update_presentation_comment(
-        package,
-        slide_part_name,
-        author_id,
-        index,
-        replacement,
-        conformance,
-    )
-}
-
-/// A change to a signed package is refused with
-/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// (ADR 0006) before anything is mutated: remove the signature explicitly
-/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
-/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
-/// no-op keeps the signature.
-///
-/// # Errors
-///
-/// Returns an error if the operation fails.
-pub fn remove_presentation_comment(
+pub(crate) fn remove_presentation_comment(
     package: &mut OpcPackage,
     slide_part_name: &str,
     author_id: u32,
@@ -693,7 +646,7 @@ pub fn remove_presentation_comment(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn reorder_presentation_comments(
+pub(crate) fn reorder_presentation_comments(
     package: &mut OpcPackage,
     slide_part_name: &str,
     ordered_keys: &[(u32, u32)],

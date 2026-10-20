@@ -5,5 +5,7 @@ pub(super) mod record;
 
 #[cfg(test)]
 pub(super) use nested::MAX_NESTED_RECORD_DEPTH;
+pub(super) use nested::replace_or_insert_object_list;
+#[cfg(test)]
 pub(super) use nested::{external_object_list, replace_nested_record};
 pub(super) use record::{slice, type_of, u32_at};

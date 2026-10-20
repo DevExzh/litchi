@@ -35,16 +35,16 @@ fn main() -> Result<()> {
         914_400,
     );
     let package = builder.build()?;
-    let mut graph = package.opc()?.clone();
-    let conformance = style::conformance(&graph)?;
+    let conformance = style::conformance(package.opc()?)?;
     let id = Id::parse(TABLE_STYLE)?;
-    let mut styles = style::load(&graph)?.unwrap_or_else(|| List::new(conformance, id));
+    let mut styles = style::load(package.opc()?)?.unwrap_or_else(|| List::new(conformance, id));
     let mut definition = Def::new(id, "Litchi native smoke")?;
     let expected = Parts::BACKGROUND | Parts::WHOLE | Parts::FIRST_ROW;
     let _ = definition.reset_parts(expected);
     styles.add(definition)?;
-    let _ = style::put(&mut graph, styles)?;
-    let package = Package::from_opc_package(graph)?;
+    let mut edit = package.edit_styles()?;
+    let _ = edit.set(styles)?;
+    let package = edit.commit()?.into_package();
     package.save(&destination)?;
 
     let reopened = Package::open(&destination)?;

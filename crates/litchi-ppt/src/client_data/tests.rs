@@ -487,7 +487,11 @@ fn package_client_data_edits_publish_replay_and_invert_exactly() {
     assert_eq!(edit.changes().len(), 1);
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
-    assert_eq!(commit.patch().before_bytes(), source_bytes.as_slice());
+    assert_eq!(commit.patch().source_len(), source_bytes.len());
+    assert_eq!(
+        commit.patch().target_len(),
+        commit.package().to_bytes().unwrap().len()
+    );
     assert_eq!(
         kinds(commit.package()),
         vec![
@@ -527,4 +531,27 @@ fn package_client_data_edits_publish_replay_and_invert_exactly() {
         refusal_kind(Target::new(Position::new(3), Position::new(0))),
         RefusalKind::NotFound
     );
+}
+
+#[test]
+fn package_client_data_edits_admit_a_signed_package_and_refuse_a_changed_commit() {
+    use litchi_core::Position;
+
+    use crate::text_edit::Target;
+
+    let (source, _) = package_with_client_data();
+    let signed = crate::scoped::signed(&source);
+    let bytes = signed.to_bytes().unwrap();
+    let target = Target::new(Position::new(0), Position::new(0));
+
+    let no_op = signed.edit_client_data(target).unwrap().commit().unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), bytes);
+
+    let flags = ClientDataChild::new(ClientDataChildKind::ShapeFlags, vec![1]).unwrap();
+    let mut edit = signed.edit_client_data(target).unwrap();
+    edit.insert(0, flags).unwrap();
+    assert!(matches!(edit.commit(), Err(super::Error::Signed)));
+    assert_eq!(signed.to_bytes().unwrap(), bytes);
 }

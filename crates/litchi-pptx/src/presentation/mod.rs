@@ -21,20 +21,11 @@ pub mod embedded;
 pub mod media;
 
 pub use model::Presentation;
-pub use order::{
-    SourceBackedSlideOrderCommit, SourceBackedSlideOrderEdit, SourceBackedSlideOrderPatch,
-    SourceBackedSlideOrderSnapshot,
-};
+
 pub use source::{
     MAX_SOURCE_BACKED_SLIDE_BATCH, SourceBackedIntoEditorError, SourceBackedPresentation,
-    SourceBackedPresentationEditor, SourceBackedSlideBatchCommit, SourceBackedSlideBatchEdit,
-    SourceBackedSlideBatchPatch, SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit,
-    SourceBackedSlideEdit, SourceBackedSlidePatch, SourceBackedSlideSnapshot,
-    SourceBackedSvgAttachmentCommit, SourceBackedSvgAttachmentEdit, SourceBackedSvgAttachmentPatch,
-    SourceBackedSvgAttachmentSnapshot, SourceBackedSvgCommit, SourceBackedSvgEdit,
-    SourceBackedSvgPatch, SourceBackedSvgSnapshot, SourceImage, SourceImageDescriptor,
-    SourceImageTarget, SourceSlide, SourceSvgAttachment, SourceSvgAttachmentReplacement,
-    SourceSvgDescriptor, SourceSvgImage, SourceSvgReplacement,
+    SourceBackedPresentationEditor, SourceImage, SourceImageDescriptor, SourceImageTarget,
+    SourceSlide, SourceSvgDescriptor, SourceSvgImage,
 };
 pub use source_cross_copy::{SourceBackedCrossSlideCopyPlan, SourceBackedCrossSlideCopySnapshot};
 pub use source_removal::SourceBackedSlideRemovalPlan;

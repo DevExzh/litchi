@@ -61,10 +61,20 @@ pub(super) struct PersistAnimation {
     pub(super) legacy: Vec<LegacyShapeAnimation>,
 }
 
+/// The source animation model of one persisted record, kept so a commit can
+/// tell a record that a verb rewrote back to its source meaning from a net
+/// change.
+#[derive(Clone)]
+pub(super) struct SourceAnimation {
+    pub(super) extension: SlideAnimationExtension,
+    pub(super) legacy: Vec<LegacyShapeAnimation>,
+}
+
 #[derive(Clone)]
 pub(crate) struct Editor {
     pub(super) package: ObjectEditor,
     pub(super) entries: Vec<PersistAnimation>,
+    /// The source model of every entry, in `entries` order.
+    pub(super) sources: Vec<SourceAnimation>,
     pub(super) limits: EditorLimits,
-    pub(super) changed: bool,
 }

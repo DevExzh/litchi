@@ -15,4 +15,4 @@ pub mod package;
 #[cfg(test)]
 mod tests;
 
-pub use model::{Selector, Slide, SlideLayout, SlideMaster};
+pub use model::{LayoutId, MasterId, Owner, Selector, Slide, SlideLayout, SlideMaster};

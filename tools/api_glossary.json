@@ -2032,6 +2032,106 @@
           "name": "ReadonlyRecommended",
           "scope": "litchi_pptx",
           "replacement": "use ReadOnlyRecommended (record 0351 / 0356)"
+        },
+        {
+          "name": "SourceBackedSlideBatchCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideBatchEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideBatchPatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideBatchSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlidePatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideOrderCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideOrderEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideOrderPatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideOrderSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentPatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgPatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
         }
       ],
       "families": [
@@ -2067,11 +2167,24 @@
         "litchi_pptx::presentation::embedded::controls::slide",
         "litchi_pptx::presentation::embedded::ole::slide",
         "litchi_pptx::comments::collaboration::presence",
-        "litchi_pptx::comments::collaboration::threading"
+        "litchi_pptx::comments::collaboration::threading",
+        "litchi_pptx::comments",
+        "litchi_pptx::modern_comments",
+        "litchi_pptx::shape::theme",
+        "litchi_pptx::presentation::embedded::ink",
+        "litchi_pptx::presentation::embedded::ole",
+        "litchi_pptx::media_parts",
+        "litchi_pptx::chart",
+        "litchi_pptx::laser",
+        "litchi_pptx::presentation_properties::metadata::revision",
+        "litchi_pptx::presentation_properties::metadata::slide_sync",
+        "litchi_pptx::source",
+        "litchi_pptx::source::svg"
       ],
       "immutable_owners": [
         "litchi_pptx::Presentation",
-        "litchi_pptx::Package"
+        "litchi_pptx::Package",
+        "litchi_pptx::source::Package"
       ],
       "family_methods": true
     },
@@ -2662,6 +2775,106 @@
           "name": "ReadonlyRecommended",
           "scope": "litchi_pptx",
           "replacement": "use ReadOnlyRecommended (record 0351 / 0356)"
+        },
+        {
+          "name": "SourceBackedSlideBatchCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideBatchEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideBatchPatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideBatchSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlidePatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideOrderCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideOrderEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideOrderPatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideOrderSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentPatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgPatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
         }
       ],
       "families": [
@@ -2697,11 +2910,25 @@
         "litchi_pptx::presentation::embedded::controls::slide",
         "litchi_pptx::presentation::embedded::ole::slide",
         "litchi_pptx::comments::collaboration::presence",
-        "litchi_pptx::comments::collaboration::threading"
+        "litchi_pptx::comments::collaboration::threading",
+        "litchi_pptx::comments",
+        "litchi_pptx::modern_comments",
+        "litchi_pptx::shape::theme",
+        "litchi_pptx::presentation::embedded::ink",
+        "litchi_pptx::presentation::embedded::ole",
+        "litchi_pptx::media_parts",
+        "litchi_pptx::chart",
+        "litchi_pptx::laser",
+        "litchi_pptx::presentation_properties::metadata::revision",
+        "litchi_pptx::presentation_properties::metadata::slide_sync",
+        "litchi_pptx::presentation::embedded::vba",
+        "litchi_pptx::source",
+        "litchi_pptx::source::svg"
       ],
       "immutable_owners": [
         "litchi_pptx::Presentation",
-        "litchi_pptx::Package"
+        "litchi_pptx::Package",
+        "litchi_pptx::source::Package"
       ],
       "family_methods": true
     },
@@ -6381,6 +6608,11 @@
           "name": "snapshot",
           "scope": "litchi_ppt::chart::GraphPackage",
           "replacement": "GraphPackage::view"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::text_edit",
+          "replacement": "use commit.diagnostics().changed() (record 0357a)"
         }
       ],
       "families": [
@@ -6397,7 +6629,8 @@
         "litchi_ppt::client_data",
         "litchi_ppt::master::metadata",
         "litchi_ppt::master_layout",
-        "litchi_ppt::embedded::object"
+        "litchi_ppt::embedded::object",
+        "litchi_ppt::text_edit"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
@@ -7214,6 +7447,11 @@
           "name": "snapshot",
           "scope": "litchi_ppt::chart::GraphPackage",
           "replacement": "GraphPackage::view"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::text_edit",
+          "replacement": "use commit.diagnostics().changed() (record 0357a)"
         }
       ],
       "families": [
@@ -7230,7 +7468,8 @@
         "litchi_ppt::client_data",
         "litchi_ppt::master::metadata",
         "litchi_ppt::master_layout",
-        "litchi_ppt::embedded::object"
+        "litchi_ppt::embedded::object",
+        "litchi_ppt::text_edit"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",

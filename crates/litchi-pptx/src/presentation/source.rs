@@ -45,10 +45,10 @@ pub mod sections;
 
 mod svg_lifecycle;
 
-pub use svg_lifecycle::{
-    SourceBackedSvgAttachmentCommit, SourceBackedSvgAttachmentEdit, SourceBackedSvgAttachmentPatch,
-    SourceBackedSvgAttachmentSnapshot, SourceSvgAttachment, SourceSvgAttachmentReplacement,
-};
+pub(crate) use svg_lifecycle::SourceBackedSvgAttachmentPatch;
+pub use svg_lifecycle::{AttachedSvg, SvgAttachment, SvgAttachmentReplacement};
+#[cfg(test)]
+mod engine_tests;
 
 #[cfg(test)]
 thread_local! {
@@ -393,6 +393,7 @@ impl SourcePayload {
         }
     }
 
+    #[cfg(test)]
     fn is_edited(&self) -> bool {
         matches!(self, Self::Edited(_) | Self::ReservedEdit { .. })
     }
@@ -1075,6 +1076,7 @@ enum PictureQueryResult {
 /// Focused slide edits retain their existing package topology. The SVG picture
 /// transaction is the bounded exception: it may replace the two media Parts
 /// and their owning slide relationship targets as one checked closure.
+#[derive(Clone)]
 pub struct SourceBackedPresentationEditor {
     pub(super) package: SourceBackedPackage,
     // Retain the catalog validated at open so each selected slide does not
@@ -1090,7 +1092,7 @@ pub struct SourceBackedPresentationEditor {
 
 /// An immutable exact-source snapshot of one slide XML part.
 #[derive(Clone)]
-pub struct SourceBackedSlideSnapshot {
+pub(crate) struct SourceBackedSlideSnapshot {
     position: usize,
     part_uri: PackURI,
     xml: SourcePayload,
@@ -1105,7 +1107,7 @@ pub struct SourceBackedSlideSnapshot {
 }
 
 /// An isolated focused edit of one exact-source slide snapshot.
-pub struct SourceBackedSlideEdit {
+pub(crate) struct SourceBackedSlideEdit {
     source: SourceBackedSlideSnapshot,
     working: SourcePayload,
     operation_used: bool,
@@ -1114,14 +1116,18 @@ pub struct SourceBackedSlideEdit {
 
 /// A reversible, exact-source-checked one-slide XML patch.
 #[derive(Clone)]
-pub struct SourceBackedSlidePatch {
+pub(crate) struct SourceBackedSlidePatch {
     before: SourceBackedSlideSnapshot,
     after: SourceBackedSlideSnapshot,
 }
 
 /// A checked source-backed slide edit ready for publication.
-pub struct SourceBackedSlideCommit {
+pub(crate) struct SourceBackedSlideCommit {
     snapshot: SourceBackedSlideSnapshot,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the source-level engine tests")
+    )]
     patch: SourceBackedSlidePatch,
 }
 
@@ -1132,14 +1138,14 @@ pub struct SourceBackedSlideCommit {
 /// newly-added `/ppt/media/` Part URIs; the transaction keeps the relationship
 /// IDs stable and updates the slide relationship closure atomically.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SourceSvgReplacement {
+pub struct SvgReplacement {
     svg: Vec<u8>,
     raster: Vec<u8>,
     svg_part_uri: Option<PackURI>,
     raster_part_uri: Option<PackURI>,
 }
 
-impl SourceSvgReplacement {
+impl SvgReplacement {
     /// Create a replacement that retains both current media Part URIs.
     #[must_use]
     pub fn new(svg: impl Into<Vec<u8>>, raster: impl Into<Vec<u8>>) -> Self {
@@ -1177,7 +1183,7 @@ impl SourceSvgReplacement {
 }
 
 #[derive(Clone)]
-pub struct SourceBackedSvgSnapshot {
+pub struct SvgImage {
     slide: SourceBackedSlideSnapshot,
     image_position: usize,
     svg_relationship_id: String,
@@ -1193,8 +1199,8 @@ pub struct SourceBackedSvgSnapshot {
 
 /// An exact-source transaction over one embedded PPTX SVG picture and its
 /// raster compatibility fallback.
-pub struct SourceBackedSvgEdit {
-    source: SourceBackedSvgSnapshot,
+pub(crate) struct SourceBackedSvgEdit {
+    source: SvgImage,
     svg_part_uri: PackURI,
     raster_part_uri: PackURI,
     svg: SourcePayload,
@@ -1204,19 +1210,20 @@ pub struct SourceBackedSvgEdit {
 
 /// A reversible exact-source patch for one PPTX SVG picture closure.
 #[derive(Clone)]
-pub struct SourceBackedSvgPatch {
-    before: SourceBackedSvgSnapshot,
-    after: SourceBackedSvgSnapshot,
+pub(crate) struct SourceBackedSvgPatch {
+    before: SvgImage,
+    after: SvgImage,
 }
 
 /// A checked source-backed SVG picture transaction ready for publication.
-pub struct SourceBackedSvgCommit {
-    snapshot: SourceBackedSvgSnapshot,
+pub(crate) struct SourceBackedSvgCommit {
+    snapshot: SvgImage,
     patch: SourceBackedSvgPatch,
 }
 
 /// A bounded multi-slide shape-text edit borrowing its deferred source.
-pub struct SourceBackedSlideBatchEdit<'a> {
+#[cfg(test)]
+pub(crate) struct SourceBackedSlideBatchEdit<'a> {
     editor: &'a SourceBackedPresentationEditor,
     commits: Vec<SourceBackedSlideCommit>,
     text_bytes: usize,
@@ -1224,23 +1231,27 @@ pub struct SourceBackedSlideBatchEdit<'a> {
 
 /// An immutable exact-source snapshot of a selected slide set.
 #[derive(Clone)]
-pub struct SourceBackedSlideBatchSnapshot {
+#[cfg(test)]
+pub(crate) struct SourceBackedSlideBatchSnapshot {
     slides: Box<[SourceBackedSlideSnapshot]>,
 }
 
 /// A reversible, exact-source-checked multi-slide XML patch.
 #[derive(Clone)]
-pub struct SourceBackedSlideBatchPatch {
+#[cfg(test)]
+pub(crate) struct SourceBackedSlideBatchPatch {
     before: SourceBackedSlideBatchSnapshot,
     after: SourceBackedSlideBatchSnapshot,
 }
 
 /// A checked source-backed multi-slide edit ready for publication.
-pub struct SourceBackedSlideBatchCommit {
+#[cfg(test)]
+pub(crate) struct SourceBackedSlideBatchCommit {
     snapshot: SourceBackedSlideBatchSnapshot,
     patch: SourceBackedSlideBatchPatch,
 }
 
+#[cfg(test)]
 enum FastApply<T> {
     Applied(T),
     Recapture,
@@ -1919,13 +1930,14 @@ impl SourceBackedPresentationEditor {
     /// A direct transition's supported MCE owner is excluded while validating
     /// semantic shape offsets; unrelated markup-compatibility branch
     /// selection remains refused.
-    pub fn slide_snapshot(&self, position: usize) -> Result<SourceBackedSlideSnapshot> {
+    pub(crate) fn slide_snapshot(&self, position: usize) -> Result<SourceBackedSlideSnapshot> {
         self.package.check_execution()?;
         self.slide_snapshot_for(position, "slide_snapshot")
     }
 
     /// Begin an isolated focused edit of one existing slide.
-    pub fn edit_slide(&self, position: usize) -> Result<SourceBackedSlideEdit> {
+    #[cfg(test)]
+    pub(crate) fn edit_slide(&self, position: usize) -> Result<SourceBackedSlideEdit> {
         self.package.check_execution()?;
         self.slide_snapshot_for(position, "edit_slide")?
             .edit_checked()
@@ -1938,7 +1950,17 @@ impl SourceBackedPresentationEditor {
     /// branches, and ambiguous dependency closures are refused before an edit
     /// handle is returned. The slide XML remains source-backed; only the media
     /// Parts and their owning relationship targets belong to the transaction.
-    pub fn edit_svg_image(
+    #[cfg(test)]
+    pub(crate) fn edit_svg_image(
+        &self,
+        slide_position: usize,
+        image_position: usize,
+    ) -> Result<SourceBackedSvgEdit> {
+        self.svg_image_edit(slide_position, image_position)
+    }
+
+    /// The SVG picture transaction behind [`Self::edit_svg_image`].
+    pub(crate) fn svg_image_edit(
         &self,
         slide_position: usize,
         image_position: usize,
@@ -1954,7 +1976,8 @@ impl SourceBackedPresentationEditor {
     /// The edit supports at most [`MAX_SOURCE_BACKED_SLIDE_BATCH`] distinct
     /// slides and the ordinary opened-presentation aggregate text budget.
     #[must_use]
-    pub fn edit_slides(&self) -> SourceBackedSlideBatchEdit<'_> {
+    #[cfg(test)]
+    pub(crate) fn edit_slides(&self) -> SourceBackedSlideBatchEdit<'_> {
         SourceBackedSlideBatchEdit {
             editor: self,
             commits: Vec::new(),
@@ -1968,7 +1991,8 @@ impl SourceBackedPresentationEditor {
     /// raw-copies every other source ZIP member. A no-op reproduces the whole
     /// source artifact byte for byte; changed signed sources are refused by
     /// the underlying OPC publisher.
-    pub fn publish_slide_commit_to_stream<W: Write>(
+    #[cfg(test)]
+    pub(crate) fn publish_slide_commit_to_stream<W: Write>(
         self,
         writer: W,
         commit: &SourceBackedSlideCommit,
@@ -2015,11 +2039,11 @@ impl SourceBackedPresentationEditor {
     /// Parts are added only when explicitly selected by the replacement; old
     /// unreferenced media Parts are removed as part of the same dependency
     /// closure. No-op commits use the exact source publication path.
-    pub fn publish_svg_commit_to_stream<W: Write>(
+    pub(crate) fn publish_svg_commit_to_stream<W: Write>(
         self,
         writer: W,
         commit: &SourceBackedSvgCommit,
-    ) -> Result<SourceBackedSvgSnapshot> {
+    ) -> Result<SvgImage> {
         self.package.check_execution()?;
         let current = self.svg_snapshot_for(
             commit.patch.before.slide.position,
@@ -2040,21 +2064,13 @@ impl SourceBackedPresentationEditor {
         Ok(target)
     }
 
-    /// Compatibility alias naming the selected media operation explicitly.
-    pub fn publish_svg_image_commit_to_stream<W: Write>(
-        self,
-        writer: W,
-        commit: &SourceBackedSvgCommit,
-    ) -> Result<SourceBackedSvgSnapshot> {
-        self.publish_svg_commit_to_stream(writer, commit)
-    }
-
     /// Publish one exact-source-checked multi-slide commit to a stream.
     ///
     /// Only changed selected slide XML members are regenerated. Selected
     /// no-ops and every unselected member retain their raw ZIP records. An
     /// all-no-op commit reproduces the complete source artifact byte for byte.
-    pub fn publish_slide_batch_commit_to_stream<W: Write>(
+    #[cfg(test)]
+    pub(crate) fn publish_slide_batch_commit_to_stream<W: Write>(
         self,
         writer: W,
         commit: &SourceBackedSlideBatchCommit,
@@ -2121,6 +2137,7 @@ impl SourceBackedPresentationEditor {
         Ok(target)
     }
 
+    #[cfg(test)]
     fn recapture_and_apply_slide_batch(
         &self,
         patch: &SourceBackedSlideBatchPatch,
@@ -2144,6 +2161,7 @@ impl SourceBackedPresentationEditor {
         patch.apply(&current)
     }
 
+    #[cfg(test)]
     fn validate_retained_raw_slide_snapshot(
         &self,
         snapshot: SourceBackedSlideSnapshot,
@@ -2237,7 +2255,7 @@ impl SourceBackedPresentationEditor {
         slide_position: usize,
         image_position: usize,
         operation: &'static str,
-    ) -> Result<SourceBackedSvgSnapshot> {
+    ) -> Result<SvgImage> {
         let slide = self.slide_snapshot_for(slide_position, operation)?;
         self.capture_svg_snapshot(slide, image_position, operation)
     }
@@ -2247,7 +2265,7 @@ impl SourceBackedPresentationEditor {
         slide: SourceBackedSlideSnapshot,
         image_position: usize,
         operation: &'static str,
-    ) -> Result<SourceBackedSvgSnapshot> {
+    ) -> Result<SvgImage> {
         self.package.check_execution()?;
         if slide.mce != crate::presentation::transition::SlideMce::Plain {
             return Err(crate::presentation::transition::enclosed_edit_refusal(
@@ -2376,7 +2394,7 @@ impl SourceBackedPresentationEditor {
         }
         self.package.check_execution()?;
         self.package.source_version()?;
-        Ok(SourceBackedSvgSnapshot {
+        Ok(SvgImage {
             slide,
             image_position,
             svg_relationship_id: svg.id.clone(),
@@ -2449,7 +2467,7 @@ impl SourceBackedPresentationEditor {
 impl SourceBackedSlideSnapshot {
     /// Checked zero-based slide position in the presentation catalog.
     #[must_use]
-    pub const fn position(&self) -> usize {
+    pub(crate) const fn position(&self) -> usize {
         self.position
     }
 
@@ -2463,7 +2481,7 @@ impl SourceBackedSlideSnapshot {
     /// direct-slide capability. Supported PowerPoint extension transitions are
     /// read through their typed MCE choice and fallback without selecting any
     /// unrelated slide markup.
-    pub fn transition(&self) -> Result<Option<crate::transition::Transition>> {
+    pub(crate) fn transition(&self) -> Result<Option<crate::transition::Transition>> {
         self.check_execution()?;
         let mut transition = crate::presentation::transition::read_direct(self.xml.as_bytes())?;
         if let Some(transition) = transition.as_mut() {
@@ -2475,7 +2493,7 @@ impl SourceBackedSlideSnapshot {
 
     /// Start an isolated focused edit from this exact source snapshot.
     #[must_use]
-    pub fn edit(&self) -> SourceBackedSlideEdit {
+    pub(crate) fn edit(&self) -> SourceBackedSlideEdit {
         SourceBackedSlideEdit {
             source: self.clone(),
             working: self.xml.clone(),
@@ -2487,7 +2505,7 @@ impl SourceBackedSlideSnapshot {
     /// Check the retained caller execution policy before creating an edit
     /// handle. The infallible [`Self::edit`] constructor remains available for
     /// compatibility because it performs no payload I/O.
-    pub fn edit_checked(&self) -> Result<SourceBackedSlideEdit> {
+    pub(crate) fn edit_checked(&self) -> Result<SourceBackedSlideEdit> {
         self.check_execution()?;
         Ok(self.edit())
     }
@@ -2513,7 +2531,8 @@ impl SourceBackedSlideSnapshot {
 impl SourceBackedSlideEdit {
     /// Exact immutable slide snapshot against which this edit was created.
     #[must_use]
-    pub const fn source(&self) -> &SourceBackedSlideSnapshot {
+    #[cfg(test)]
+    pub(crate) const fn source(&self) -> &SourceBackedSlideSnapshot {
         &self.source
     }
 
@@ -2524,26 +2543,7 @@ impl SourceBackedSlideEdit {
     /// `p:sld@show`. Omitted fields are preserved byte-for-byte. The shared
     /// codec retains all unrelated root, shape, and opaque XML, and an equal
     /// value is an exact no-op.
-    ///
-    /// ```
-    /// # fn main() -> litchi_pptx::Result<()> {
-    /// use std::sync::Arc;
-    /// use litchi_core::OwnedSource;
-    /// use litchi_pptx::{builder::Builder, SourceBackedPresentationEditor};
-    /// let mut builder = Builder::new()?;
-    /// builder.presentation()?.add_slide()?;
-    /// let bytes = builder.build()?.to_bytes()?;
-    /// let editor = SourceBackedPresentationEditor::from_read_at(
-    ///     Arc::new(OwnedSource::new(bytes)),
-    /// )?;
-    /// let snapshot = editor.slide_snapshot(0)?;
-    /// let mut edit = snapshot.edit();
-    /// edit.set_slide_properties(Some("Roadmap"), Some(true))?;
-    /// let _commit = edit.commit_checked()?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn set_slide_properties(
+    pub(crate) fn set_slide_properties(
         &mut self,
         name: Option<&str>,
         hidden: Option<bool>,
@@ -2586,61 +2586,13 @@ impl SourceBackedSlideEdit {
         Ok(changed)
     }
 
-    /// Replace the authored `p:cSld@name` value.
-    ///
-    /// ```
-    /// # fn main() -> litchi_pptx::Result<()> {
-    /// use std::sync::Arc;
-    /// use litchi_core::OwnedSource;
-    /// use litchi_pptx::{builder::Builder, SourceBackedPresentationEditor};
-    /// let mut builder = Builder::new()?;
-    /// builder.presentation()?.add_slide()?;
-    /// let bytes = builder.build()?.to_bytes()?;
-    /// let editor = SourceBackedPresentationEditor::from_read_at(
-    ///     Arc::new(OwnedSource::new(bytes)),
-    /// )?;
-    /// let snapshot = editor.slide_snapshot(0)?;
-    /// let mut edit = snapshot.edit();
-    /// edit.set_slide_name("Roadmap")?;
-    /// let _commit = edit.commit_checked()?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn set_slide_name(&mut self, name: impl AsRef<str>) -> Result<bool> {
-        self.set_slide_properties(Some(name.as_ref()), None)
-    }
-
-    /// Set whether the slide is hidden during presentation.
-    ///
-    /// ```
-    /// # fn main() -> litchi_pptx::Result<()> {
-    /// use std::sync::Arc;
-    /// use litchi_core::OwnedSource;
-    /// use litchi_pptx::{builder::Builder, SourceBackedPresentationEditor};
-    /// let mut builder = Builder::new()?;
-    /// builder.presentation()?.add_slide()?;
-    /// let bytes = builder.build()?.to_bytes()?;
-    /// let editor = SourceBackedPresentationEditor::from_read_at(
-    ///     Arc::new(OwnedSource::new(bytes)),
-    /// )?;
-    /// let snapshot = editor.slide_snapshot(0)?;
-    /// let mut edit = snapshot.edit();
-    /// edit.set_slide_hidden(true)?;
-    /// let _commit = edit.commit_checked()?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn set_slide_hidden(&mut self, hidden: bool) -> Result<bool> {
-        self.set_slide_properties(None, Some(hidden))
-    }
-
     /// Set or replace this existing slide's direct typed transition.
     ///
     /// This operation never changes relationships or package topology. The
     /// supplied value may use the supported PowerPoint extension vocabulary
     /// and custom duration. Unknown transition effects are refused. An equal
     /// modeled value is an exact byte no-op.
-    pub fn set_transition(&mut self, value: &crate::transition::Transition) -> Result<bool> {
+    pub(crate) fn set_transition(&mut self, value: &crate::transition::Transition) -> Result<bool> {
         self.stage_transition(Some(value), "set_transition")
     }
 
@@ -2648,7 +2600,7 @@ impl SourceBackedSlideEdit {
     ///
     /// An absent direct transition is an exact byte no-op. Inherited
     /// layout/master state is not removed or rewritten.
-    pub fn clear_transition(&mut self) -> Result<bool> {
+    pub(crate) fn clear_transition(&mut self) -> Result<bool> {
         self.stage_transition(None, "clear_transition")
     }
 
@@ -2684,7 +2636,8 @@ impl SourceBackedSlideEdit {
     ///
     /// Structure, formatting, opaque XML, relationships, and every other ZIP
     /// member remain outside this edit's closure.
-    pub fn set_shape_text<'k>(
+    #[cfg(test)]
+    pub(crate) fn set_shape_text<'k>(
         &mut self,
         shape: impl Into<crate::shape::Key<'k>>,
         text: impl AsRef<str>,
@@ -2702,7 +2655,10 @@ impl SourceBackedSlideEdit {
     /// Source-backed removal keeps the slide relationship table and any now
     /// unreachable Parts intact so the exact source topology remains
     /// reversible; the eager package editor may prune that closure separately.
-    pub fn remove_shape<'k>(&mut self, shape: impl Into<crate::shape::Key<'k>>) -> Result<bool> {
+    pub(crate) fn remove_shape<'k>(
+        &mut self,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<bool> {
         self.check_execution()?;
         if self.operation_used {
             return Err(Error::refused(
@@ -2755,7 +2711,7 @@ impl SourceBackedSlideEdit {
     ///
     /// An empty batch is a no-op and does not consume the edit capability. A
     /// successful nonempty batch, including an all-equal batch, consumes it.
-    pub fn set_shape_texts(
+    pub(crate) fn set_shape_texts(
         &mut self,
         replacements: &[crate::opened::ShapeTextReplacement<'_>],
     ) -> Result<usize> {
@@ -2795,7 +2751,7 @@ impl SourceBackedSlideEdit {
     /// chunks and the aggregate selection count are bounded by the native
     /// scene shape limit.
     /// Aggregate replacement text is bounded by the slide output-byte limit.
-    pub fn set_shape_text_chunks(
+    pub(crate) fn set_shape_text_chunks(
         &mut self,
         chunks: &[&[crate::opened::ShapeTextReplacement<'_>]],
     ) -> Result<usize> {
@@ -2853,7 +2809,7 @@ impl SourceBackedSlideEdit {
     /// Only existing direct DrawingML transforms are edited. The operation
     /// retains opaque XML and applies all requested properties together.
     /// An empty batch does not consume this focused edit's operation allowance.
-    pub fn set_shape_properties(
+    pub(crate) fn set_shape_properties(
         &mut self,
         replacements: &[crate::opened::ShapePropertiesReplacement<'_>],
     ) -> Result<usize> {
@@ -2897,7 +2853,7 @@ impl SourceBackedSlideEdit {
     /// same-slide property batches in one scene read, rewrite, and read-back.
     /// Every inner slice retains the ordinary per-call property limits.
     /// Aggregate replacement text is bounded by the slide output-byte limit.
-    pub fn set_shape_property_chunks(
+    pub(crate) fn set_shape_property_chunks(
         &mut self,
         chunks: &[&[crate::opened::ShapePropertiesReplacement<'_>]],
     ) -> Result<usize> {
@@ -2954,7 +2910,7 @@ impl SourceBackedSlideEdit {
     ///
     /// See [`crate::opened::Edit::set_text_properties`]. Only the selected
     /// slide payload changes, so the source-backed proof path still applies.
-    pub fn set_text_properties(
+    pub(crate) fn set_text_properties(
         &mut self,
         edits: &[crate::opened::TextAssignment<'_>],
     ) -> Result<usize> {
@@ -3026,23 +2982,11 @@ impl SourceBackedSlideEdit {
     /// Apply several bounded batches of rich text edits to this exact source
     /// slide in one pass (record 0333); see
     /// [`crate::opened::Edit::set_text_property_chunks`].
-    pub fn set_text_property_chunks(
+    pub(crate) fn set_text_property_chunks(
         &mut self,
         chunks: &[&[crate::opened::TextAssignment<'_>]],
     ) -> Result<usize> {
         self.text_property_chunks(chunks, None)
-    }
-
-    /// [`Self::set_text_property_chunks`], returning each edit's change in
-    /// order (record 0348); see
-    /// [`crate::opened::Edit::set_text_property_chunks_per_edit`].
-    pub fn set_text_property_chunks_per_edit(
-        &mut self,
-        chunks: &[&[crate::opened::TextAssignment<'_>]],
-    ) -> Result<Vec<bool>> {
-        let mut changes = Vec::new();
-        self.text_property_chunks(chunks, Some(&mut changes))?;
-        Ok(changes)
     }
 
     pub(crate) fn text_property_chunks(
@@ -3086,7 +3030,7 @@ impl SourceBackedSlideEdit {
     /// semantically read back before the edit is published. It does not build
     /// an eager package or rewrite any related Part, so the surrounding source
     /// XML remains eligible for the source-backed durable proof path.
-    pub fn add_text_box(
+    pub(crate) fn add_text_box(
         &mut self,
         text: impl AsRef<str>,
         bounds: (i64, i64, i64, i64),
@@ -3163,12 +3107,13 @@ impl SourceBackedSlideEdit {
 
     /// Validate and freeze this isolated edit for source-backed publication.
     #[must_use]
-    pub fn commit(self) -> SourceBackedSlideCommit {
+    #[cfg(test)]
+    pub(crate) fn commit(self) -> SourceBackedSlideCommit {
         self.into_commit()
     }
 
     /// Check cancellation and freeze this isolated edit for publication.
-    pub fn commit_checked(self) -> Result<SourceBackedSlideCommit> {
+    pub(crate) fn commit_checked(self) -> Result<SourceBackedSlideCommit> {
         self.check_execution()?;
         let commit = self.into_commit();
         commit.snapshot.check_execution()?;
@@ -3179,14 +3124,9 @@ impl SourceBackedSlideEdit {
 impl SourceBackedSlidePatch {
     /// Exact immutable source required by this patch.
     #[must_use]
-    pub const fn source(&self) -> &SourceBackedSlideSnapshot {
+    #[cfg(test)]
+    pub(crate) const fn source(&self) -> &SourceBackedSlideSnapshot {
         &self.before
-    }
-
-    /// Exact immutable target produced by this patch.
-    #[must_use]
-    pub const fn target(&self) -> &SourceBackedSlideSnapshot {
-        &self.after
     }
 
     fn is_changed(&self) -> bool {
@@ -3195,19 +3135,21 @@ impl SourceBackedSlidePatch {
 
     /// Whether this patch leaves its source unchanged.
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn is_noop(&self) -> bool {
         !self.is_changed()
     }
 
     /// Return the exact inverse slide patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
         }
     }
 
+    #[cfg(test)]
     fn try_apply_fast(
         &self,
         source: &SourceBackedSlideSnapshot,
@@ -3219,7 +3161,10 @@ impl SourceBackedSlidePatch {
     }
 
     /// Apply only to the exact raw slide source captured by this patch.
-    pub fn apply(&self, source: &SourceBackedSlideSnapshot) -> Result<SourceBackedSlideSnapshot> {
+    pub(crate) fn apply(
+        &self,
+        source: &SourceBackedSlideSnapshot,
+    ) -> Result<SourceBackedSlideSnapshot> {
         self.before.check_execution()?;
         source.check_execution()?;
         if !source.same_source(&self.before) {
@@ -3236,28 +3181,32 @@ impl SourceBackedSlidePatch {
 impl SourceBackedSlideCommit {
     /// Candidate snapshot after this edit.
     #[must_use]
-    pub const fn snapshot(&self) -> &SourceBackedSlideSnapshot {
+    #[cfg(test)]
+    pub(crate) const fn snapshot(&self) -> &SourceBackedSlideSnapshot {
         &self.snapshot
     }
 
     /// Exact-source slide patch for this edit.
     #[must_use]
-    pub const fn patch(&self) -> &SourceBackedSlidePatch {
+    #[cfg(test)]
+    pub(crate) const fn patch(&self) -> &SourceBackedSlidePatch {
         &self.patch
     }
 
+    #[cfg(test)]
     fn is_changed(&self) -> bool {
         self.patch.is_changed()
     }
 
     /// The outcome of this edit or commit.
     #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
         crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 }
 
-impl SourceBackedSvgSnapshot {
+impl SvgImage {
     /// Zero-based presentation position of the owning slide.
     #[must_use]
     pub const fn slide_position(&self) -> usize {
@@ -3308,7 +3257,7 @@ impl SourceBackedSvgSnapshot {
 
     /// Start an isolated edit from this exact SVG source snapshot.
     #[must_use]
-    pub fn edit(&self) -> SourceBackedSvgEdit {
+    pub(crate) fn edit(&self) -> SourceBackedSvgEdit {
         SourceBackedSvgEdit {
             source: self.clone(),
             svg_part_uri: self.svg_part_uri.clone(),
@@ -3342,7 +3291,7 @@ impl SourceBackedSvgSnapshot {
 impl SourceBackedSvgEdit {
     /// Exact immutable source snapshot against which this edit was created.
     #[must_use]
-    pub const fn source(&self) -> &SourceBackedSvgSnapshot {
+    pub(crate) const fn source(&self) -> &SvgImage {
         &self.source
     }
 
@@ -3352,7 +3301,7 @@ impl SourceBackedSvgEdit {
     /// URIs are applied as relationship-target changes during publication. An
     /// equal payload and equal target URI is an exact no-op, retaining the
     /// original managed source allocation.
-    pub fn replace(&mut self, replacement: SourceSvgReplacement) -> Result<bool> {
+    pub(crate) fn replace(&mut self, replacement: SvgReplacement) -> Result<bool> {
         if self.operation_used {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedOperation,
@@ -3406,8 +3355,8 @@ impl SourceBackedSvgEdit {
 
     /// Validate and freeze this isolated SVG transaction.
     #[must_use]
-    pub fn commit(self) -> SourceBackedSvgCommit {
-        let snapshot = SourceBackedSvgSnapshot {
+    pub(crate) fn commit(self) -> SourceBackedSvgCommit {
+        let snapshot = SvgImage {
             slide: self.source.slide.clone(),
             image_position: self.source.image_position,
             svg_relationship_id: self.source.svg_relationship_id.clone(),
@@ -3428,7 +3377,7 @@ impl SourceBackedSvgEdit {
     }
 
     /// Check the retained execution policy and freeze this transaction.
-    pub fn commit_checked(self) -> Result<SourceBackedSvgCommit> {
+    pub(crate) fn commit_checked(self) -> Result<SourceBackedSvgCommit> {
         self.source.slide.check_execution()?;
         let commit = self.commit();
         commit.snapshot.slide.check_execution()?;
@@ -3437,16 +3386,17 @@ impl SourceBackedSvgEdit {
 }
 
 impl SourceBackedSvgPatch {
-    /// Exact immutable source required by this patch.
-    #[must_use]
-    pub const fn source(&self) -> &SourceBackedSvgSnapshot {
-        &self.before
+    /// The slide and picture positions this patch addresses.
+    pub(crate) fn location(&self) -> (usize, usize) {
+        (self.before.slide.position, self.before.image_position)
     }
 
-    /// Exact immutable target produced by this patch.
-    #[must_use]
-    pub const fn target(&self) -> &SourceBackedSvgSnapshot {
-        &self.after
+    /// The commit that publishes this patch.
+    pub(crate) fn to_commit(&self) -> SourceBackedSvgCommit {
+        SourceBackedSvgCommit {
+            snapshot: self.after.clone(),
+            patch: self.clone(),
+        }
     }
 
     fn is_changed(&self) -> bool {
@@ -3455,13 +3405,13 @@ impl SourceBackedSvgPatch {
 
     /// Whether this patch leaves its source unchanged.
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         !self.is_changed()
     }
 
     /// Return the exact inverse SVG patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -3469,7 +3419,7 @@ impl SourceBackedSvgPatch {
     }
 
     /// Apply only to the exact source snapshot captured by this patch.
-    pub fn apply(&self, source: &SourceBackedSvgSnapshot) -> Result<SourceBackedSvgSnapshot> {
+    pub(crate) fn apply(&self, source: &SvgImage) -> Result<SvgImage> {
         self.before.slide.check_execution()?;
         source.slide.check_execution()?;
         if !source.same_source(&self.before) {
@@ -3486,34 +3436,39 @@ impl SourceBackedSvgPatch {
 impl SourceBackedSvgCommit {
     /// Candidate SVG transaction snapshot after this edit.
     #[must_use]
-    pub const fn snapshot(&self) -> &SourceBackedSvgSnapshot {
+    #[cfg(test)]
+    pub(crate) const fn snapshot(&self) -> &SvgImage {
         &self.snapshot
     }
 
     /// Exact-source SVG patch for this edit.
     #[must_use]
-    pub const fn patch(&self) -> &SourceBackedSvgPatch {
+    pub(crate) const fn patch(&self) -> &SourceBackedSvgPatch {
         &self.patch
     }
 
+    #[cfg(test)]
     fn is_changed(&self) -> bool {
         self.patch.is_changed()
     }
 
     /// The outcome of this edit or commit.
     #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
         crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 }
 
+#[cfg(test)]
 impl SourceBackedSlideBatchEdit<'_> {
     /// Atomically replace visible text in one bounded shape set on one slide.
     ///
     /// A slide position may be selected only once in the outer batch. An empty
     /// shape batch is a no-op and does not select the slide. The return value
     /// is the number of shapes whose text bytes changed.
-    pub fn set_shape_texts(
+    #[cfg(test)]
+    pub(crate) fn set_shape_texts(
         &mut self,
         position: usize,
         replacements: &[crate::opened::ShapeTextReplacement<'_>],
@@ -3584,7 +3539,8 @@ impl SourceBackedSlideBatchEdit<'_> {
     }
 
     /// Validate and freeze this selected slide set for publication.
-    pub fn commit(mut self) -> Result<SourceBackedSlideBatchCommit> {
+    #[cfg(test)]
+    pub(crate) fn commit(mut self) -> Result<SourceBackedSlideBatchCommit> {
         self.editor.package.check_execution()?;
         if self.commits.is_empty() {
             return Err(Error::refused(
@@ -3631,18 +3587,22 @@ impl SourceBackedSlideBatchEdit<'_> {
     }
 }
 
+#[cfg(test)]
 impl SourceBackedSlideBatchSnapshot {
     /// Number of selected slides in this exact-source snapshot.
     #[must_use]
-    pub const fn slide_count(&self) -> usize {
+    #[cfg(test)]
+    pub(crate) const fn slide_count(&self) -> usize {
         self.slides.len()
     }
 
     /// Selected slide snapshots in ascending presentation order.
-    pub fn slides(&self) -> impl ExactSizeIterator<Item = &SourceBackedSlideSnapshot> {
+    #[cfg(test)]
+    pub(crate) fn slides(&self) -> impl ExactSizeIterator<Item = &SourceBackedSlideSnapshot> {
         self.slides.iter()
     }
 
+    #[cfg(test)]
     fn same_source(&self, other: &Self) -> bool {
         self.slides.len() == other.slides.len()
             && self
@@ -3652,6 +3612,7 @@ impl SourceBackedSlideBatchSnapshot {
                 .all(|(left, right)| left.same_source(right))
     }
 
+    #[cfg(test)]
     fn check_execution(&self) -> Result<()> {
         for slide in &self.slides {
             slide.check_execution()?;
@@ -3660,38 +3621,31 @@ impl SourceBackedSlideBatchSnapshot {
     }
 }
 
+#[cfg(test)]
 impl SourceBackedSlideBatchPatch {
     /// Exact immutable selected slide set required by this patch.
     #[must_use]
-    pub const fn source(&self) -> &SourceBackedSlideBatchSnapshot {
+    #[cfg(test)]
+    pub(crate) const fn source(&self) -> &SourceBackedSlideBatchSnapshot {
         &self.before
     }
 
-    /// Exact immutable selected slide set produced by this patch.
-    #[must_use]
-    pub const fn target(&self) -> &SourceBackedSlideBatchSnapshot {
-        &self.after
-    }
-
+    #[cfg(test)]
     fn is_changed(&self) -> bool {
         !self.before.same_source(&self.after)
     }
 
-    /// Whether this patch leaves its source unchanged.
-    #[must_use]
-    pub fn is_noop(&self) -> bool {
-        !self.is_changed()
-    }
-
     /// Return the exact inverse multi-slide patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
         }
     }
 
+    #[cfg(test)]
     fn try_apply_fast(
         &self,
         source: &SourceBackedSlideBatchSnapshot,
@@ -3703,7 +3657,8 @@ impl SourceBackedSlideBatchPatch {
     }
 
     /// Apply only to the exact selected slide set captured by this patch.
-    pub fn apply(
+    #[cfg(test)]
+    pub(crate) fn apply(
         &self,
         source: &SourceBackedSlideBatchSnapshot,
     ) -> Result<SourceBackedSlideBatchSnapshot> {
@@ -3720,26 +3675,31 @@ impl SourceBackedSlideBatchPatch {
     }
 }
 
+#[cfg(test)]
 impl SourceBackedSlideBatchCommit {
     /// Candidate selected slide set after this edit.
     #[must_use]
-    pub const fn snapshot(&self) -> &SourceBackedSlideBatchSnapshot {
+    #[cfg(test)]
+    pub(crate) const fn snapshot(&self) -> &SourceBackedSlideBatchSnapshot {
         &self.snapshot
     }
 
     /// Exact-source multi-slide patch for this edit.
     #[must_use]
-    pub const fn patch(&self) -> &SourceBackedSlideBatchPatch {
+    #[cfg(test)]
+    pub(crate) const fn patch(&self) -> &SourceBackedSlideBatchPatch {
         &self.patch
     }
 
+    #[cfg(test)]
     fn is_changed(&self) -> bool {
         self.patch.is_changed()
     }
 
     /// The outcome of this edit or commit.
     #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
         crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 }
@@ -3786,8 +3746,8 @@ fn validate_svg_media_uri(uri: &PackURI) -> Result<()> {
 
 fn build_svg_topology_plan(
     package: &SourceBackedPackage,
-    current: &SourceBackedSvgSnapshot,
-    target: &SourceBackedSvgSnapshot,
+    current: &SvgImage,
+    target: &SvgImage,
 ) -> Result<SourceTopologyPlan> {
     if !target.slide.same_source(&current.slide)
         || target.image_position != current.image_position
