@@ -22,7 +22,7 @@ use litchi_numbers::table::headers::{Count, Settings};
 use litchi_numbers::table::topology::{
     ColumnDeletion, ColumnInsertion, Error as TopologyError, RowDeletion, RowInsertion,
 };
-use litchi_numbers::{CellPosition, Package, TableSelector};
+use litchi_numbers::{At, Package, TableSelector};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -215,7 +215,7 @@ fn cleared_source(package: &Package, sheet: usize, table: usize, op: Op) -> Opti
         _ => return None,
     };
     let semantic = package.sheets()[sheet].tables().nth(table)?;
-    let positions: Vec<CellPosition> = semantic
+    let positions: Vec<At> = semantic
         .iter_cells()
         .map(|cell| cell.position())
         .filter(|position| {
@@ -835,15 +835,15 @@ fn cross_table(incoming: bool) -> TestResult<Package> {
         let row = 6 + index;
         let edit = edit
             .set_formula(
-                CellPosition::new(row as u32, 1),
+                At::new(row as u32, 1),
                 Expression::table_cell(&table, CellReference::relative(2, 1)),
             )?
             .set_formula(
-                CellPosition::new(row as u32, 2),
+                At::new(row as u32, 2),
                 Expression::table_cell(&table, CellReference::absolute(3, 2)),
             )?
             .set_formula(
-                CellPosition::new(row as u32, 3),
+                At::new(row as u32, 3),
                 sum(Expression::table_range(
                     &table,
                     CellReference::relative(1, 1),

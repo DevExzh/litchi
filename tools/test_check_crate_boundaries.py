@@ -155,7 +155,7 @@ def add_iwa_numbers_cell_comment_reader_retirement_evidence(root: Path) -> None:
         "    bytes: &[u8],\n"
         "    sheet: impl Into<SheetSelector<'sheet>>,\n"
         "    table: impl Into<TableSelector<'table>>,\n"
-        "    position: CellPosition,\n"
+        "    position: At,\n"
         ") -> Result<Option<Comment>> {\n"
         "    let _ = (bytes, sheet, table, position);\n"
         "    compatibility_package(bytes, ReadOptions::default(), WireLimits::default())\n"
@@ -166,7 +166,7 @@ def add_iwa_numbers_cell_comment_reader_retirement_evidence(root: Path) -> None:
         "    options: OpenOptions,\n"
         "    sheet: impl Into<SheetSelector<'sheet>>,\n"
         "    table: impl Into<TableSelector<'table>>,\n"
-        "    position: CellPosition,\n"
+        "    position: At,\n"
         ") -> Result<Option<Comment>> {\n"
         "    let _ = (bytes, options, sheet, table, position);\n"
         "    compatibility_package(bytes, options, WireLimits::default())\n"
@@ -176,7 +176,7 @@ def add_iwa_numbers_cell_comment_reader_retirement_evidence(root: Path) -> None:
         "    bytes: &[u8],\n"
         "    sheet: impl Into<SheetSelector<'sheet>>,\n"
         "    table: impl Into<TableSelector<'table>>,\n"
-        "    position: CellPosition,\n"
+        "    position: At,\n"
         ") -> Result<Box<[CommentReply]>> {\n"
         "    let _ = (bytes, sheet, table, position);\n"
         "    compatibility_package(bytes, ReadOptions::default(), WireLimits::default())\n"
@@ -190,7 +190,7 @@ def add_iwa_numbers_cell_comment_reader_retirement_evidence(root: Path) -> None:
         "    options: OpenOptions,\n"
         "    sheet: impl Into<SheetSelector<'sheet>>,\n"
         "    table: impl Into<TableSelector<'table>>,\n"
-        "    position: CellPosition,\n"
+        "    position: At,\n"
         ") -> Result<Box<[CommentReply]>> {\n"
         "    let _ = (bytes, options, sheet, table, position);\n"
         "    compatibility_package(bytes, options, WireLimits::default())\n"
@@ -1349,8 +1349,8 @@ def add_neutral_table_model_scaffold(
     )
     (module.parent / "coordinate.rs").write_text(
         "pub struct AddressError;\n"
-        "pub struct CellPosition;\n"
-        "pub struct CellRange;\n"
+        "pub struct At;\n"
+        "pub struct Area;\n"
         "pub enum Error {}\n"
         "pub type Result<T> = std::result::Result<T, Error>;\n",
         encoding="utf-8",
@@ -1559,13 +1559,13 @@ def add_numbers_table_cell_comment_reply_scaffold(
             "impl Package {\n"
             "    pub fn table_cell_comment_replies<'sheet, 'table>(\n"
             "        &self, sheet: impl Into<SheetSelector<'sheet>>,\n"
-            "        table: impl Into<TableSelector<'table>>, position: CellPosition,\n"
+            "        table: impl Into<TableSelector<'table>>, position: At,\n"
             "    ) -> Result<Box<[CommentReply]>, Error> { todo!() }\n"
             "    pub fn table_cell_comment_replies_a1<'sheet, 'table>(\n"
             "        &self, sheet: impl Into<SheetSelector<'sheet>>,\n"
             "        table: impl Into<TableSelector<'table>>, address: &str,\n"
             "    ) -> Result<Box<[CommentReply]>, Error> {\n"
-            "        self.table_cell_comment_replies(sheet, table, CellPosition::from_a1(address))\n"
+            "        self.table_cell_comment_replies(sheet, table, At::from_a1(address))\n"
             "    }\n"
             "}\n"
         ),
@@ -1744,7 +1744,7 @@ def add_numbers_table_cell_comment_reply_mutation_scaffold(root: Path) -> None:
         "use crate::cell::comment::{CommentReply, CommentReplyIndex};\n"
         "use crate::cell::comment::transaction::{CommentReplyCommit, CommentReplyEdit, CommentReplyPatch};\n"
         "struct CommentOwnershipCensus;\n"
-        "fn resolve_comment_reply_rooted(_: SheetSelector, _: TableSelector, _: CellPosition, _: CommentReplyIndex) {}\n"
+        "fn resolve_comment_reply_rooted(_: SheetSelector, _: TableSelector, _: At, _: CommentReplyIndex) {}\n"
         "fn comment_graph() { CommentList; comment_list_ids; cell_comment_keys; list_entries; entry_storage_ids; table_references; comment_storage; }\n"
         "fn census_comment_reply_ownership() { CommentOwnershipCensus; global; all_components; ArchiveReference; storages; reply_ids; storage_uuid; author_ids; storage_occurrences; refcount; reference_count; }\n"
         "fn copy_on_write_shared_clone_new_storage_cull() { copy_on_write; shared; clone; new_storage; cull; }\n"
@@ -1755,16 +1755,16 @@ def add_numbers_table_cell_comment_reply_mutation_scaffold(root: Path) -> None:
         "fn transaction_budget_preflight_charge() { TransactionBudget; WireBudget; budget; residual; preflight; charge; max_input; max_output; fields; work; depth; references; allocations; scratch; retained; reassembly; Snappy; ZIP; try_reserve; }\n"
         "fn strict_comment_storage_route() { CommentStorageReplyRewrite; prepare_comment_storage_reply_rewrite(); CommentStorage; visitor; execution_requirements; execute; }\n"
         "impl Package {\n"
-        "pub fn table_cell_comment_reply(&self, sheet: SheetSelector, table: TableSelector, position: CellPosition, index: CommentReplyIndex) -> Result<CommentReply, CommentReplyError> { todo!() }\n"
-        "pub fn table_cell_comment_reply_a1(&self, sheet: SheetSelector, table: TableSelector, address: &str, index: CommentReplyIndex) -> Result<CommentReply, CommentReplyError> { self.table_cell_comment_reply(sheet, table, CellPosition::from_a1(address), index) }\n"
-        "pub fn edit_table_cell_comment_replies(&self, sheet: SheetSelector, table: TableSelector, position: CellPosition) -> Result<CommentReplyEdit, CommentReplyError> { todo!() }\n"
-        "pub fn edit_table_cell_comment_replies_a1(&self, sheet: SheetSelector, table: TableSelector, address: &str) -> Result<CommentReplyEdit, CommentReplyError> { self.edit_table_cell_comment_replies(sheet, table, CellPosition::from_a1(address)) }\n"
-        "pub fn set_table_cell_comment_reply(&self, sheet: SheetSelector, table: TableSelector, position: CellPosition, index: CommentReplyIndex, value: CommentReply) -> Result<CommentReplyCommit, CommentReplyError> { todo!() }\n"
-        "pub fn set_table_cell_comment_reply_a1(&self, sheet: SheetSelector, table: TableSelector, address: &str, index: CommentReplyIndex, value: CommentReply) -> Result<CommentReplyCommit, CommentReplyError> { self.set_table_cell_comment_reply(sheet, table, CellPosition::from_a1(address), index, value) }\n"
-        "pub fn remove_table_cell_comment_reply(&self, sheet: SheetSelector, table: TableSelector, position: CellPosition, index: CommentReplyIndex) -> Result<CommentReplyCommit, CommentReplyError> { todo!() }\n"
-        "pub fn remove_table_cell_comment_reply_a1(&self, sheet: SheetSelector, table: TableSelector, address: &str, index: CommentReplyIndex) -> Result<CommentReplyCommit, CommentReplyError> { self.remove_table_cell_comment_reply(sheet, table, CellPosition::from_a1(address), index) }\n"
-        "pub fn add_table_cell_comment_reply(&self, sheet: SheetSelector, table: TableSelector, position: CellPosition, value: CommentReply) -> Result<CommentReplyCommit, CommentReplyError> { todo!() }\n"
-        "pub fn add_table_cell_comment_reply_a1(&self, sheet: SheetSelector, table: TableSelector, address: &str, value: CommentReply) -> Result<CommentReplyCommit, CommentReplyError> { self.add_table_cell_comment_reply(sheet, table, CellPosition::from_a1(address), value) }\n"
+        "pub fn table_cell_comment_reply(&self, sheet: SheetSelector, table: TableSelector, position: At, index: CommentReplyIndex) -> Result<CommentReply, CommentReplyError> { todo!() }\n"
+        "pub fn table_cell_comment_reply_a1(&self, sheet: SheetSelector, table: TableSelector, address: &str, index: CommentReplyIndex) -> Result<CommentReply, CommentReplyError> { self.table_cell_comment_reply(sheet, table, At::from_a1(address), index) }\n"
+        "pub fn edit_table_cell_comment_replies(&self, sheet: SheetSelector, table: TableSelector, position: At) -> Result<CommentReplyEdit, CommentReplyError> { todo!() }\n"
+        "pub fn edit_table_cell_comment_replies_a1(&self, sheet: SheetSelector, table: TableSelector, address: &str) -> Result<CommentReplyEdit, CommentReplyError> { self.edit_table_cell_comment_replies(sheet, table, At::from_a1(address)) }\n"
+        "pub fn set_table_cell_comment_reply(&self, sheet: SheetSelector, table: TableSelector, position: At, index: CommentReplyIndex, value: CommentReply) -> Result<CommentReplyCommit, CommentReplyError> { todo!() }\n"
+        "pub fn set_table_cell_comment_reply_a1(&self, sheet: SheetSelector, table: TableSelector, address: &str, index: CommentReplyIndex, value: CommentReply) -> Result<CommentReplyCommit, CommentReplyError> { self.set_table_cell_comment_reply(sheet, table, At::from_a1(address), index, value) }\n"
+        "pub fn remove_table_cell_comment_reply(&self, sheet: SheetSelector, table: TableSelector, position: At, index: CommentReplyIndex) -> Result<CommentReplyCommit, CommentReplyError> { todo!() }\n"
+        "pub fn remove_table_cell_comment_reply_a1(&self, sheet: SheetSelector, table: TableSelector, address: &str, index: CommentReplyIndex) -> Result<CommentReplyCommit, CommentReplyError> { self.remove_table_cell_comment_reply(sheet, table, At::from_a1(address), index) }\n"
+        "pub fn add_table_cell_comment_reply(&self, sheet: SheetSelector, table: TableSelector, position: At, value: CommentReply) -> Result<CommentReplyCommit, CommentReplyError> { todo!() }\n"
+        "pub fn add_table_cell_comment_reply_a1(&self, sheet: SheetSelector, table: TableSelector, address: &str, value: CommentReply) -> Result<CommentReplyCommit, CommentReplyError> { self.add_table_cell_comment_reply(sheet, table, At::from_a1(address), value) }\n"
         "pub fn apply_table_cell_comment_reply(&self, patch: &CommentReplyPatch) -> Result<CommentReplyCommit, CommentReplyError> { todo!() }\n"
         "}\n"
         "impl CommentReplyEdit {\n"
@@ -1845,7 +1845,7 @@ def add_numbers_cell_comment_reader_compat_mutation_scaffold(
         "    bytes: &[u8],\n"
         "    sheet: impl Into<SheetSelector<'sheet>>,\n"
         "    table: impl Into<TableSelector<'table>>,\n"
-        "    position: CellPosition,\n"
+        "    position: At,\n"
         ") -> Result<Option<Comment>> { todo!() }\n"
         f"{method_attributes}"
         "pub fn __table_cell_comment_from_bytes_for_compatibility_with_options<'sheet, 'table>(\n"
@@ -1853,14 +1853,14 @@ def add_numbers_cell_comment_reader_compat_mutation_scaffold(
         "    options: OpenOptions,\n"
         "    sheet: impl Into<SheetSelector<'sheet>>,\n"
         "    table: impl Into<TableSelector<'table>>,\n"
-        "    position: CellPosition,\n"
+        "    position: At,\n"
         ") -> Result<Option<Comment>> { todo!() }\n"
         f"{method_attributes}"
         "pub fn __table_cell_comment_replies_from_bytes_for_compatibility<'sheet, 'table>(\n"
         "    bytes: &[u8],\n"
         "    sheet: impl Into<SheetSelector<'sheet>>,\n"
         "    table: impl Into<TableSelector<'table>>,\n"
-        "    position: CellPosition,\n"
+        "    position: At,\n"
         ") -> Result<Box<[CommentReply]>> { todo!() }\n"
         f"{method_attributes}"
         "pub fn __table_cell_comment_replies_from_bytes_for_compatibility_with_options<\n"
@@ -1871,7 +1871,7 @@ def add_numbers_cell_comment_reader_compat_mutation_scaffold(
         "    options: OpenOptions,\n"
         "    sheet: impl Into<SheetSelector<'sheet>>,\n"
         "    table: impl Into<TableSelector<'table>>,\n"
-        "    position: CellPosition,\n"
+        "    position: At,\n"
         ") -> Result<Box<[CommentReply]>> { todo!() }\n"
         f"{extra_methods}"
         "}\n",
@@ -2375,10 +2375,10 @@ def add_numbers_table_cell_pop_up_menu_canonical_scaffold(root: Path) -> None:
         + "impl Package {\n"
         + "pub fn table_cell_pop_up_menu_format<'sheet, 'table, 'cell>(&self, "
         "sheet: SheetSelector<'sheet>, table: TableSelector<'table>, "
-        "position: CellPosition<'cell>) -> Result<PopUpMenu, Error> {}\n"
+        "position: At<'cell>) -> Result<PopUpMenu, Error> {}\n"
         + "pub fn edit_table_cell_pop_up_menu_format<'sheet, 'table, 'cell>(&self, "
         "sheet: SheetSelector<'sheet>, table: TableSelector<'table>, "
-        "position: CellPosition<'cell>, value: PopUpMenu) -> Result<Edit, Error> {}\n"
+        "position: At<'cell>, value: PopUpMenu) -> Result<Edit, Error> {}\n"
         + "pub fn apply_table_cell_pop_up_menu_format(&self, patch: &Patch) "
         "-> Result<Commit, Error> {}\n"
         + "}\n",
@@ -2480,10 +2480,10 @@ def add_numbers_table_cell_control_canonical_scaffold(root: Path) -> None:
         "impl Package {\n"
         "pub fn table_cell_control_format<'sheet, 'table, 'cell>(&self, "
         "sheet: SheetSelector<'sheet>, table: TableSelector<'table>, "
-        "position: CellPosition<'cell>) -> Result<Option<CellControl>, Error> {}\n"
+        "position: At<'cell>) -> Result<Option<CellControl>, Error> {}\n"
         "pub fn edit_table_cell_control_format<'sheet, 'table, 'cell>(&self, "
         "sheet: SheetSelector<'sheet>, table: TableSelector<'table>, "
-        "position: CellPosition<'cell>) -> Result<Edit, Error> {}\n"
+        "position: At<'cell>) -> Result<Edit, Error> {}\n"
         "pub fn apply_table_cell_control_format(&self, patch: &Patch) "
         "-> Result<Commit, Error> {}\n"
         "}\n",
@@ -2582,8 +2582,8 @@ def add_numbers_table_cell_number_format_canonical_scaffold(root: Path) -> None:
         + "fn budget_preflight_bounded_allocation_limit() {}\n"
         + "fn unsupported_ambiguous_cross_component_fail_closed() {}\n"
         + "impl Package {\n"
-        + "pub fn table_cell_number_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Option<Number>, Error> {}\n"
-        + "pub fn edit_table_cell_number_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Edit, Error> {}\n"
+        + "pub fn table_cell_number_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: At<'cell>) -> Result<Option<Number>, Error> {}\n"
+        + "pub fn edit_table_cell_number_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: At<'cell>) -> Result<Edit, Error> {}\n"
         + "pub fn apply_table_cell_number_format(&self, patch: &Patch) -> Result<Commit, Error> {}\n"
         + "}\n"
         + "impl Edit {\n"
@@ -2650,7 +2650,7 @@ def add_numbers_table_cell_number_format_canonical_scaffold(root: Path) -> None:
         "fn set_reset_transaction() { edit_table_cell_number_format; set; clear; reset; automatic; }\n"
         "fn exact_no_op_and_inverse_restore_bytes() { no_op; unchanged; inverse; byte_for_byte; }\n"
         "fn conflict_fail_closed() { stale; foreign; ambiguous; conflict; unsupported; malformed; }\n"
-        "fn selector_locality_reopen_readback() { SheetSelector; TableSelector; CellPosition; locality; reopen; readback; }\n",
+        "fn selector_locality_reopen_readback() { SheetSelector; TableSelector; At; locality; reopen; readback; }\n",
         encoding="utf-8",
     )
 
@@ -2728,8 +2728,8 @@ def add_numbers_table_cell_text_format_canonical_scaffold(root: Path) -> None:
         + "fn unsupported_ambiguous_cross_component_fail_closed() {}\n"
         + "fn text_format_uses_native_text_family() {}\n"
         + "impl Package {\n"
-        + "pub fn table_cell_text_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Option<Text>, Error> {}\n"
-        + "pub fn edit_table_cell_text_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Edit, Error> {}\n"
+        + "pub fn table_cell_text_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: At<'cell>) -> Result<Option<Text>, Error> {}\n"
+        + "pub fn edit_table_cell_text_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: At<'cell>) -> Result<Edit, Error> {}\n"
         + "pub fn apply_table_cell_text_format(&self, patch: &Patch) -> Result<Commit, Error> {}\n"
         + "}\n"
         + "impl Edit {\n"
@@ -2798,7 +2798,7 @@ def add_numbers_table_cell_text_format_canonical_scaffold(root: Path) -> None:
         "fn set_reset_transaction() { edit_table_cell_text_format; set; clear; reset; automatic; }\n"
         "fn exact_no_op_and_inverse_restore_bytes() { no_op; unchanged; inverse; byte_for_byte; }\n"
         "fn conflict_fail_closed() { stale; foreign; ambiguous; conflict; unsupported; malformed; }\n"
-        "fn selector_locality_reopen_readback() { SheetSelector; TableSelector; CellPosition; locality; reopen; readback; }\n",
+        "fn selector_locality_reopen_readback() { SheetSelector; TableSelector; At; locality; reopen; readback; }\n",
         encoding="utf-8",
     )
 
@@ -2859,11 +2859,11 @@ def add_numbers_table_cell_date_time_format_canonical_scaffold(root: Path) -> No
         "pub fn table_cell_date_time_format<'sheet, 'table>(&self, "
         "sheet: impl Into<SheetSelector<'sheet>>, "
         "table: impl Into<TableSelector<'table>>, "
-        "position: CellPosition) -> Result<Option<DateTime>, Error> {}\n"
+        "position: At) -> Result<Option<DateTime>, Error> {}\n"
         "pub fn edit_table_cell_date_time_format<'sheet, 'table>(&self, "
         "sheet: impl Into<SheetSelector<'sheet>>, "
         "table: impl Into<TableSelector<'table>>, "
-        "position: CellPosition) -> Result<Edit, Error> {}\n"
+        "position: At) -> Result<Edit, Error> {}\n"
         "pub fn apply_table_cell_date_time_format(&self, patch: &Patch) "
         "-> Result<Commit, Error> {}\n"
         "}\n",
@@ -2973,11 +2973,11 @@ def add_numbers_table_cell_duration_format_canonical_scaffold(root: Path) -> Non
         "impl Package {\n"
         "pub fn table_cell_duration_format<'sheet, 'table>(&self, "
         "sheet: impl Into<SheetSelector<'sheet>>, "
-        "table: impl Into<TableSelector<'table>>, position: CellPosition) "
+        "table: impl Into<TableSelector<'table>>, position: At) "
         "-> Result<Option<Duration>, Error> {}\n"
         "pub fn edit_table_cell_duration_format<'sheet, 'table>(&self, "
         "sheet: impl Into<SheetSelector<'sheet>>, "
-        "table: impl Into<TableSelector<'table>>, position: CellPosition) "
+        "table: impl Into<TableSelector<'table>>, position: At) "
         "-> Result<Edit, Error> {}\n"
         "pub fn apply_table_cell_duration_format(&self, patch: &Patch) "
         "-> Result<Commit, Error> {}\n"
@@ -3086,7 +3086,7 @@ def add_numbers_table_cell_custom_format_canonical_scaffold(root: Path) -> None:
     owner = root / boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_SOURCE
     owner.parent.mkdir(parents=True, exist_ok=True)
     owner.write_text(
-        "pub enum Path { Package, Cell { sheet: usize, table: usize, position: CellPosition } }\n"
+        "pub enum Path { Package, Cell { sheet: usize, table: usize, position: At } }\n"
         "pub enum LimitKind { PayloadBytes }\n"
         "pub struct Edit;\n"
         "pub struct Patch;\n"
@@ -3104,11 +3104,11 @@ def add_numbers_table_cell_custom_format_canonical_scaffold(root: Path) -> None:
         "impl Package {\n"
         "pub fn table_cell_custom_format<'sheet, 'table>(&self, "
         "sheet: impl Into<SheetSelector<'sheet>>, "
-        "table: impl Into<TableSelector<'table>>, position: CellPosition) "
+        "table: impl Into<TableSelector<'table>>, position: At) "
         "-> Result<Option<Custom>, Error> {}\n"
         "pub fn edit_table_cell_custom_format<'sheet, 'table>(&self, "
         "sheet: impl Into<SheetSelector<'sheet>>, "
-        "table: impl Into<TableSelector<'table>>, position: CellPosition) "
+        "table: impl Into<TableSelector<'table>>, position: At) "
         "-> Result<Edit, Error> {}\n"
         "pub fn apply_table_cell_custom_format(&self, patch: &Patch) "
         "-> Result<Commit, Error> {}\n"
@@ -3262,8 +3262,8 @@ def add_numbers_table_cell_percentage_format_canonical_scaffold(
         + "fn unsupported_ambiguous_cross_component_fail_closed() {}\n"
         + "fn shared_core_route() { native::read_display_format_with_budget(); native::rewrite_display_format(); }\n"
         + "impl Package {\n"
-        + "pub fn table_cell_percentage_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Option<Percentage>, Error> { shared_core_route(); todo!() }\n"
-        + "pub fn edit_table_cell_percentage_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Edit, Error> { shared_core_route(); todo!() }\n"
+        + "pub fn table_cell_percentage_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: At<'cell>) -> Result<Option<Percentage>, Error> { shared_core_route(); todo!() }\n"
+        + "pub fn edit_table_cell_percentage_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: At<'cell>) -> Result<Edit, Error> { shared_core_route(); todo!() }\n"
         + "pub fn apply_table_cell_percentage_format(&self, patch: &Patch) -> Result<Commit, Error> { shared_core_route(); todo!() }\n"
         + "}\n"
         + "impl Edit {\n"
@@ -3312,8 +3312,8 @@ def add_numbers_table_cell_percentage_format_canonical_scaffold(
             )
         number_owner.write_text(
             number_owner_source.replace("pub struct Edit;\n", number_route).replace(
-                "pub fn table_cell_number_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Option<Number>, Error> {}",
-                "pub fn table_cell_number_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Option<Number>, Error> { shared_core_route(); todo!() }",
+                "pub fn table_cell_number_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: At<'cell>) -> Result<Option<Number>, Error> {}",
+                "pub fn table_cell_number_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: At<'cell>) -> Result<Option<Number>, Error> { shared_core_route(); todo!() }",
             ),
             encoding="utf-8",
         )
@@ -3379,7 +3379,7 @@ def add_numbers_table_cell_percentage_format_canonical_scaffold(
         "fn set_reset_transaction() { edit_table_cell_percentage_format; set; clear; reset; automatic; }\n"
         "fn exact_no_op_and_inverse_restore_bytes() { no_op; unchanged; inverse; byte_for_byte; }\n"
         "fn conflict_fail_closed() { stale; foreign; ambiguous; conflict; unsupported; malformed; }\n"
-        "fn selector_locality_reopen_readback() { SheetSelector; TableSelector; CellPosition; locality; reopen; readback; }\n",
+        "fn selector_locality_reopen_readback() { SheetSelector; TableSelector; At; locality; reopen; readback; }\n",
         encoding="utf-8",
     )
     for fuzz_path in (
@@ -3452,8 +3452,8 @@ def add_numbers_table_cell_currency_format_canonical_scaffold(
         + "fn unsupported_ambiguous_cross_component_fail_closed() {}\n"
         + "fn shared_core_route() { native::read_currency_format_with_budget(); native::rewrite_currency_format(); }\n"
         + "impl Package {\n"
-        + "pub fn table_cell_currency_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Option<Currency>, Error> { shared_core_route(); todo!() }\n"
-        + "pub fn edit_table_cell_currency_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Edit, Error> { shared_core_route(); todo!() }\n"
+        + "pub fn table_cell_currency_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: At<'cell>) -> Result<Option<Currency>, Error> { shared_core_route(); todo!() }\n"
+        + "pub fn edit_table_cell_currency_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: At<'cell>) -> Result<Edit, Error> { shared_core_route(); todo!() }\n"
         + "pub fn apply_table_cell_currency_format(&self, patch: &Patch) -> Result<Commit, Error> { shared_core_route(); todo!() }\n"
         + "}\n"
         + "impl Edit {\n"
@@ -3524,7 +3524,7 @@ def add_numbers_table_cell_currency_format_canonical_scaffold(
         "fn currency_code_and_accounting_style_roundtrip() { CurrencyCode; CurrencyStyle; currency_code; accounting; style; }\n"
         "fn exact_no_op_and_inverse_restore_bytes() { no_op; unchanged; inverse; byte_for_byte; }\n"
         "fn conflict_fail_closed() { stale; foreign; ambiguous; conflict; unsupported; malformed; }\n"
-        "fn selector_locality_reopen_readback() { SheetSelector; TableSelector; CellPosition; locality; reopen; readback; }\n",
+        "fn selector_locality_reopen_readback() { SheetSelector; TableSelector; At; locality; reopen; readback; }\n",
         encoding="utf-8",
     )
     for fuzz_path in (
@@ -3595,8 +3595,8 @@ def add_numbers_table_cell_scientific_format_canonical_scaffold(
         + "fn unsupported_ambiguous_cross_component_fail_closed() {}\n"
         + "fn shared_core_route() { native::read_scientific_format_with_budget(); native::rewrite_scientific_format(); }\n"
         + "impl Package {\n"
-        + "pub fn table_cell_scientific_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Option<Scientific>, Error> { shared_core_route(); todo!() }\n"
-        + "pub fn edit_table_cell_scientific_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Edit, Error> { shared_core_route(); todo!() }\n"
+        + "pub fn table_cell_scientific_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: At<'cell>) -> Result<Option<Scientific>, Error> { shared_core_route(); todo!() }\n"
+        + "pub fn edit_table_cell_scientific_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: At<'cell>) -> Result<Edit, Error> { shared_core_route(); todo!() }\n"
         + "pub fn apply_table_cell_scientific_format(&self, patch: &Patch) -> Result<Commit, Error> { shared_core_route(); todo!() }\n"
         + "}\n"
         + "impl Edit {\n"
@@ -3667,7 +3667,7 @@ def add_numbers_table_cell_scientific_format_canonical_scaffold(
         "fn scientific_precision_and_exponent_roundtrip() { Scientific; decimal_places; exponent; fixed_precision; }\n"
         "fn exact_no_op_and_inverse_restore_bytes() { no_op; unchanged; inverse; byte_for_byte; }\n"
         "fn conflict_fail_closed() { stale; foreign; ambiguous; conflict; unsupported; malformed; }\n"
-        "fn selector_locality_reopen_readback() { SheetSelector; TableSelector; CellPosition; locality; reopen; readback; }\n",
+        "fn selector_locality_reopen_readback() { SheetSelector; TableSelector; At; locality; reopen; readback; }\n",
         encoding="utf-8",
     )
     for fuzz_path in (
@@ -3739,8 +3739,8 @@ def add_numbers_table_cell_fraction_format_canonical_scaffold(
         + "fn unsupported_ambiguous_cross_component_fail_closed() {}\n"
         + "fn shared_core_route() { native::read_fraction_format_with_budget(); native::rewrite_fraction_format(); }\n"
         + "impl Package {\n"
-        + "pub fn table_cell_fraction_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Option<Fraction>, Error> { shared_core_route(); todo!() }\n"
-        + "pub fn edit_table_cell_fraction_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Edit, Error> { shared_core_route(); todo!() }\n"
+        + "pub fn table_cell_fraction_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: At<'cell>) -> Result<Option<Fraction>, Error> { shared_core_route(); todo!() }\n"
+        + "pub fn edit_table_cell_fraction_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: At<'cell>) -> Result<Edit, Error> { shared_core_route(); todo!() }\n"
         + "pub fn apply_table_cell_fraction_format(&self, patch: &Patch) -> Result<Commit, Error> { shared_core_route(); todo!() }\n"
         + "}\n"
         + "impl Edit {\n"
@@ -3816,7 +3816,7 @@ def add_numbers_table_cell_fraction_format_canonical_scaffold(
         "fn fraction_accuracy_and_denominator_roundtrip() { Fraction; FractionAccuracy; fraction_accuracy; accuracy; denominator; }\n"
         "fn exact_no_op_and_inverse_restore_bytes() { no_op; unchanged; inverse; byte_for_byte; }\n"
         "fn conflict_fail_closed() { stale; foreign; ambiguous; conflict; unsupported; malformed; }\n"
-        "fn selector_locality_reopen_readback() { SheetSelector; TableSelector; CellPosition; locality; reopen; readback; }\n",
+        "fn selector_locality_reopen_readback() { SheetSelector; TableSelector; At; locality; reopen; readback; }\n",
         encoding="utf-8",
     )
     for fuzz_path in (
@@ -3855,7 +3855,7 @@ def add_scientific_format_selector_context_host(
     selector_fields = (
         "sheet: litchi_numbers::SheetSelector<'static>, "
         "table: litchi_numbers::TableSelector<'static>, "
-        "position: litchi_numbers::table::CellPosition,"
+        "position: litchi_numbers::table::At,"
         if typed_location
         else "sheet: usize, table: usize, position: usize,"
     )
@@ -3904,7 +3904,7 @@ def add_currency_format_selector_context_host(
     selector_fields = (
         "sheet: litchi_numbers::SheetSelector<'static>, "
         "table: litchi_numbers::TableSelector<'static>, "
-        "position: litchi_numbers::table::CellPosition,"
+        "position: litchi_numbers::table::At,"
         if typed_location
         else "sheet: usize, table: usize, position: usize,"
     )
@@ -37529,7 +37529,7 @@ fn rewrite_movie_title_operation(
             owner = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE
             owner.write_text(
                 owner.read_text(encoding="utf-8").replace(
-                    "CellPosition<'cell>", "MissingPosition<'cell>"
+                    "At<'cell>", "MissingPosition<'cell>"
                 ),
                 encoding="utf-8",
             )
@@ -37537,7 +37537,7 @@ fn rewrite_movie_title_operation(
                 root
             )
             self.assertTrue(
-                any("must accept selector-first CellPosition" in item for item in violations),
+                any("must accept selector-first At" in item for item in violations),
                 violations,
             )
 
@@ -39153,7 +39153,7 @@ fn rewrite_movie_title_operation(
             semantic.write_text(
                 "pub use crate::cell::{FiniteF64, Value};\n"
                 "pub use crate::cell::data_format::DataFormat;\n"
-                "pub use crate::table::{CellPosition, CellRange, Dimensions};\n"
+                "pub use crate::table::{At, Area, Dimensions};\n"
                 "pub struct State;\n"
                 "pub enum Storage { Empty, Stored }\n"
                 "pub struct Error;\n"
@@ -39567,7 +39567,7 @@ fn rewrite_movie_title_operation(
                 "column: usize, text: &str) -> Result<bool> {\n"
                 "        let source = litchi_numbers::Package::from_bytes(&self.to_bytes()?)?;\n"
                 "        let (sheet, table) = self::selectors::selector_mapping(self, table_id)?;\n"
-                "        let position = CellPosition::try_from_usize(row, column)?;\n"
+                "        let position = At::try_from_usize(row, column)?;\n"
                 "        match source.set_table_cell_comment(sheet, table, position, text) {\n"
                 "            Ok(()) => Ok(true),\n"
                 "            Err(litchi_numbers::package::comments::Error::UnsupportedDependency { .. })\n"
@@ -39642,7 +39642,7 @@ fn rewrite_movie_title_operation(
                 "column: usize, text: &str) -> Result<bool> {\n"
                 "        let source = litchi_numbers::Package::from_bytes(&self.to_bytes()?)?;\n"
                 "        let (sheet, table) = selectors::selector_mapping(self, table_id)?;\n"
-                "        let position = CellPosition::try_from_usize(row, column)?;\n"
+                "        let position = At::try_from_usize(row, column)?;\n"
                 "        match source.set_table_cell_comment(sheet, table, position, text) {\n"
                 "            Ok(()) => Ok(true),\n"
                 "            Err(_) => Ok(false),\n"
@@ -39684,7 +39684,7 @@ fn rewrite_movie_title_operation(
                 "    pub fn set_cell_comment(&mut self, table_id: u64, row: usize, "
                 "column: usize, text: impl Into<String>) -> Result<()> {\n"
                 "        let source = litchi_numbers::Package::from_bytes(&self.to_bytes()?)?;\n"
-                "        let position = CellPosition::try_from_usize(row, column)?;\n"
+                "        let position = At::try_from_usize(row, column)?;\n"
                 "        match source.set_table_cell_comment(table_id, table_id, position, text.into().as_str()) {\n"
                 "            Ok(()) => Ok(()),\n"
                 "            Err(litchi_numbers::package::comments::Error::UnsupportedDependency { .. })\n"
@@ -39722,7 +39722,7 @@ fn rewrite_movie_title_operation(
         example = root / boundaries.IWA_NUMBERS_CELL_COMMENT_CLEAR_EXAMPLE
         example.parent.mkdir(parents=True, exist_ok=True)
         example.write_text(
-            "use litchi_numbers::{SheetSelector, TableSelector, table::CellPosition};\n"
+            "use litchi_numbers::{SheetSelector, TableSelector, table::At};\n"
             "fn main() { package.clear_table_cell_comment(sheet, table, position); }\n",
             encoding="utf-8",
         )
@@ -39760,7 +39760,7 @@ fn rewrite_movie_title_operation(
             )
             violations = boundaries.audit_iwa_numbers_cell_comment_clear_retirement_source_topology(root)
             self.assertTrue(any("retired raw-ID clear" in item for item in violations))
-            for marker in ("SheetSelector", "TableSelector", "CellPosition"):
+            for marker in ("SheetSelector", "TableSelector", "At"):
                 self.assertTrue(any(marker in item for item in violations), violations)
 
     def test_iwa_numbers_table_cell_fixture_helpers_stay_test_only(self) -> None:
@@ -41334,18 +41334,18 @@ fn rewrite_movie_title_operation(
             bridge.write_text(
                 "use litchi_numbers::cell::CellControl;\n"
                 "use litchi_numbers::{Package as FocusedNumbersPackage, SheetSelector, TableSelector};\n"
-                "fn focused_cell_location() -> (FocusedNumbersPackage, SheetSelector<'static>, TableSelector<'static>, CellPosition, usize) {\n"
-                "    focused_table_location(); CellPosition::try_from_usize(0, 0).unwrap()\n"
+                "fn focused_cell_location() -> (FocusedNumbersPackage, SheetSelector<'static>, TableSelector<'static>, At, usize) {\n"
+                "    focused_table_location(); At::try_from_usize(0, 0).unwrap()\n"
                 "}\n"
                 "fn focused_control_format() {\n"
                 "    let (source, sheet, table, position, _) = focused_cell_location();\n"
                 "    source.table_cell_control_format(sheet, table, position);\n"
                 "}\n"
-                "fn focused_set_data_format(source: &FocusedNumbersPackage, sheet: SheetSelector<'static>, table: TableSelector<'static>, position: CellPosition, value: CellControl) {\n"
+                "fn focused_set_data_format(source: &FocusedNumbersPackage, sheet: SheetSelector<'static>, table: TableSelector<'static>, position: At, value: CellControl) {\n"
                 "    let commit = source.edit_table_cell_control_format(sheet, table, position).unwrap().set(value).commit();\n"
                 "    if commit.patch().is_noop() { return; }\n"
                 "}\n"
-                "fn focused_clear_data_format(source: &FocusedNumbersPackage, sheet: SheetSelector<'static>, table: TableSelector<'static>, position: CellPosition) {\n"
+                "fn focused_clear_data_format(source: &FocusedNumbersPackage, sheet: SheetSelector<'static>, table: TableSelector<'static>, position: At) {\n"
                 "    let commit = source.edit_table_cell_control_format(sheet, table, position).unwrap().clear().commit();\n"
                 "    if commit.patch().is_noop() { return; }\n"
                 "}\n"
@@ -41513,7 +41513,7 @@ fn rewrite_movie_title_operation(
             owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
             owner.write_text(
                 owner.read_text(encoding="utf-8").replace(
-                    "CellPosition<'cell>", "MissingPosition<'cell>"
+                    "At<'cell>", "MissingPosition<'cell>"
                 ),
                 encoding="utf-8",
             )
@@ -41521,7 +41521,7 @@ fn rewrite_movie_title_operation(
                 root
             )
             self.assertTrue(
-                any("must accept selector-first CellPosition" in item for item in violations),
+                any("must accept selector-first At" in item for item in violations),
                 violations,
             )
 
@@ -42505,8 +42505,8 @@ fn rewrite_movie_title_operation(
 
             compat.write_text(
                 compat.read_text(encoding="utf-8").replace(
-                    "position: CellPosition,\n",
-                    "position: CellPosition, raw: &[u8],\n",
+                    "position: At,\n",
+                    "position: At, raw: &[u8],\n",
                     1,
                 ),
                 encoding="utf-8",
@@ -42865,7 +42865,7 @@ fn rewrite_movie_title_operation(
                 "pub fn set_cell_comment_reply(&mut self, table_id: u64, row: usize, column: usize, reply_storage_object_id: u64, text: String) { set_cell_comment_reply_in_package(); }\n"
                 "#[deprecated(note=\"legacy compatibility raw-ID bridge\")]\n"
                 "pub fn remove_cell_comment_reply(&mut self, table_id: u64, row: usize, column: usize, reply_storage_object_id: u64) { remove_cell_comment_reply_in_package(); }\n"
-                "fn focused_bridge(input: &[u8]) { let package = litchi_numbers::Package::from_bytes(input); let (sheet, table) = selectors::focused_table_location(&editor, 10); let position = CellPosition::try_from_usize(0); package.table_cell_comment_reply(sheet, table, position, CommentReplyIndex::new(0)); }\n",
+                "fn focused_bridge(input: &[u8]) { let package = litchi_numbers::Package::from_bytes(input); let (sheet, table) = selectors::focused_table_location(&editor, 10); let position = At::try_from_usize(0); package.table_cell_comment_reply(sheet, table, position, CommentReplyIndex::new(0)); }\n",
                 encoding="utf-8",
             )
             tests = root / boundaries.IWA_NUMBERS_EDITOR_TEST_SOURCE
@@ -42924,7 +42924,7 @@ fn rewrite_movie_title_operation(
             host = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
             host.parent.mkdir(parents=True, exist_ok=True)
             host.write_text(
-                "fn focused_bridge(table_id: u64) { let package = litchi_numbers::Package::from_bytes(&[]); TableSelector::index(0); CellPosition::try_from_usize(0); package.add_table_cell_comment_reply(table_id, table_id, table_id, CommentReply); }\n",
+                "fn focused_bridge(table_id: u64) { let package = litchi_numbers::Package::from_bytes(&[]); TableSelector::index(0); At::try_from_usize(0); package.add_table_cell_comment_reply(table_id, table_id, table_id, CommentReply); }\n",
                 encoding="utf-8",
             )
             violations = boundaries.audit_iwa_numbers_cell_comment_reply_mutation_source_topology(root)
@@ -44834,7 +44834,7 @@ fn rewrite_movie_title_operation(
                 "fn smoke() { let _ = 1; }\n"
                 "// explicit automatic read Text; edit_table_cell_text_format; set clear reset\n"
                 '// no-op inverse byte-for-byte stale foreign ambiguous conflict unsupported malformed\n'
-                "// SheetSelector TableSelector CellPosition locality reopen readback\n"
+                "// SheetSelector TableSelector At locality reopen readback\n"
                 'const NOTE: &str = "explicit automatic read Text edit_table_cell_text_format";\n',
                 encoding="utf-8",
             )

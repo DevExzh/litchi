@@ -676,7 +676,7 @@ mod tests {
         Package,
         package::table_cells::Path as CellPath,
         table::{
-            CellPosition,
+            At,
             cells::{Change, Input},
         },
     };
@@ -691,7 +691,7 @@ mod tests {
     #[test]
     fn native_plain_text_preparation_defers_to_string_planner() {
         let source = Package::open(checked_in_fixture()).expect("native Numbers fixture opens");
-        let position = CellPosition::from_a1("C2").expect("C2 is canonical");
+        let position = At::from_a1("C2").expect("C2 is canonical");
         let (target, _report) = resolve::resolve_changed_target(&source, 0, 0, &[position])
             .expect("native rich route resolves");
         let mut transaction =
@@ -722,7 +722,7 @@ mod tests {
             "/private/tmp/litchi-numbers-cell-batch-native.wuaiMp/oracle-preserved.numbers",
         );
         let source = Package::open(oracle).expect("frozen formula-rich oracle opens");
-        let position = CellPosition::from_a1("C2").expect("C2 is canonical");
+        let position = At::from_a1("C2").expect("C2 is canonical");
         let (target, _report) = resolve::resolve_changed_target(&source, 0, 0, &[position])
             .expect("frozen formula-rich route resolves");
         let mut transaction =
@@ -765,7 +765,7 @@ mod tests {
         source
             .write_to(&mut source_bytes)
             .expect("source package serializes");
-        let position = CellPosition::from_a1("C2").expect("C2 is canonical");
+        let position = At::from_a1("C2").expect("C2 is canonical");
         let commit = source
             .edit_table_cells(0usize, 0usize)
             .expect("table edit starts")

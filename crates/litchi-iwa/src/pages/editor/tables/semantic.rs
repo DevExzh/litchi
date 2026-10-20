@@ -46,7 +46,7 @@ impl PagesTable {
     /// Borrow a materialized cell value, or return `None` for an empty cell.
     pub fn get_cell(&self, row: usize, column: usize) -> Option<&PagesCellValue> {
         let position =
-            litchi_iwa_common::table::coordinate::CellPosition::try_from_usize(row, column).ok()?;
+            litchi_iwa_common::table::coordinate::At::try_from_usize(row, column).ok()?;
         self.table_read.get(position)
     }
 
@@ -71,7 +71,7 @@ impl PagesTable {
     /// Borrow the comment attached to a materialized cell, if any.
     pub fn get_comment(&self, row: usize, column: usize) -> Option<&Comment> {
         let position =
-            litchi_iwa_common::table::coordinate::CellPosition::try_from_usize(row, column).ok()?;
+            litchi_iwa_common::table::coordinate::At::try_from_usize(row, column).ok()?;
         self.table_read.get_comment(position)
     }
 

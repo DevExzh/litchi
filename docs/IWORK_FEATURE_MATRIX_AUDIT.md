@@ -76,7 +76,7 @@ native-resaved ledger is in ADR 0008.
 The focused Custom owner now exposes
 `litchi_numbers::Package::{table_cell_custom_format, edit_table_cell_custom_format,
 apply_table_cell_custom_format}` for one existing rooted cell selected by
-`SheetSelector`, sheet-scoped `TableSelector`, and checked `CellPosition`. Its
+`SheetSelector`, sheet-scoped `TableSelector`, and checked `At`. Its
 archive-free `Custom` value covers the document-scoped Number, Text, and Date &
 Time registry entries admitted through `TN.DocumentArchive` field 9/message
 type 222 or `TN.super` field 8 → `TSA.custom_format_list` field 12; custom
@@ -101,7 +101,7 @@ The focused Duration owner now exposes
 `litchi_numbers::Package::{table_cell_duration_format,
 edit_table_cell_duration_format, apply_table_cell_duration_format}` for one
 existing rooted cell selected by `SheetSelector`, sheet-scoped `TableSelector`,
-and checked `CellPosition`. Its archive-free `Duration` value admits the three
+and checked `At`. Its archive-free `Duration` value admits the three
 native styles and automatic or custom ranges over Weeks through Milliseconds.
 The private route strictly admits native type `268`, fields 1/7/15/16/40, BNC
 value type 7/kind 4, and marker `0x0004` for a primary-only reference or

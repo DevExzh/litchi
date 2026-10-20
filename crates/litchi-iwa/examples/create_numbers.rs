@@ -6,7 +6,7 @@ use litchi_iwa::numbers::{
     NumbersEditor,
 };
 use litchi_iwa::text::{Font, TextStyle};
-use litchi_numbers::table::CellPosition;
+use litchi_numbers::table::At;
 use litchi_numbers::table::cells::{Change, Input};
 use litchi_numbers::table::topology::RowInsertion;
 use litchi_numbers::{Package, SheetSelector, TableSelector};
@@ -25,21 +25,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut changes = Vec::new();
     for (column, heading) in ["Region", "Q1", "Q2"].into_iter().enumerate() {
         changes.push(Change::set(
-            CellPosition::new(0, u32::try_from(column)?),
+            At::new(0, u32::try_from(column)?),
             Input::text(heading)?,
         ));
     }
     for (row, region, q1, q2) in [(1, "North", 120.0, 145.0), (2, "South", 98.0, 132.0)] {
         changes.extend([
-            Change::set(CellPosition::new(row, 0), Input::text(region)?),
-            Change::set(CellPosition::new(row, 1), Input::number(q1)?),
-            Change::set(CellPosition::new(row, 2), Input::number(q2)?),
+            Change::set(At::new(row, 0), Input::text(region)?),
+            Change::set(At::new(row, 1), Input::number(q1)?),
+            Change::set(At::new(row, 2), Input::number(q2)?),
         ]);
     }
     changes.extend([
-        Change::set(CellPosition::new(3, 0), Input::text("Central")?),
-        Change::set(CellPosition::new(3, 1), Input::number(105.0)?),
-        Change::set(CellPosition::new(3, 2), Input::number(139.0)?),
+        Change::set(At::new(3, 0), Input::text("Central")?),
+        Change::set(At::new(3, 1), Input::number(105.0)?),
+        Change::set(At::new(3, 2), Input::number(139.0)?),
     ]);
     editor = set_focused_table_cells(editor, changes)?;
     editor.set_table_cell_text_style(table_id, 1, 0, TextStyle::default().with_bold(true))?;

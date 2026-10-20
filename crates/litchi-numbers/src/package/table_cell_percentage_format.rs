@@ -19,7 +19,7 @@ use super::{
     table_cell_control_native as control_native, table_cell_display_format_native as native,
     table_cell_pop_up_menu as popup,
 };
-use crate::{CellPosition, SheetSelector, TableSelector, cell::data_format::Percentage};
+use crate::{At, SheetSelector, TableSelector, cell::data_format::Percentage};
 
 /// A content-free location associated with a Percentage-format operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -34,7 +34,7 @@ pub enum Path {
         /// Zero-based table position within the sheet.
         table: usize,
         /// Zero-based semantic cell coordinate.
-        position: CellPosition,
+        position: At,
     },
 }
 
@@ -392,7 +392,7 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
     ) -> Result<Option<Percentage>, Error> {
         let target = popup::resolve_cell(self, sheet, table, position).map_err(map_popup_error)?;
         let path = Path::Cell {
@@ -409,7 +409,7 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
     ) -> Result<Edit<'_>, Error> {
         let target = popup::resolve_cell(self, sheet, table, position).map_err(map_popup_error)?;
         let path = Path::Cell {

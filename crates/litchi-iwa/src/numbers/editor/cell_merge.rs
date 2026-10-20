@@ -480,7 +480,7 @@ mod tests {
     use crate::wire::{
         repeated_length_delimited_payloads, transform_length_delimited_fields_at_path,
     };
-    use litchi_numbers::table::CellPosition;
+    use litchi_numbers::table::At;
     use litchi_numbers::table::topology::{
         ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion,
     };
@@ -751,7 +751,7 @@ mod tests {
                 .table_cell_comment(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(1, 1),
+                    At::new(1, 1),
                 )
                 .unwrap()
                 .unwrap()
@@ -797,7 +797,7 @@ mod tests {
                 .table_cell_comment(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(1, 1),
+                    At::new(1, 1),
                 )
                 .unwrap()
                 .unwrap()

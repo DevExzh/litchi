@@ -148,7 +148,7 @@ fn leaf_set(package: Leaf) {
                 )
                 .unwrap()
                 .set(
-                    litchi_numbers::table::CellPosition::new(2, 1),
+                    litchi_numbers::table::At::new(2, 1),
                     litchi_numbers::table::cells::Input::number(7.5).unwrap(),
                 )
                 .unwrap();

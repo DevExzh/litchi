@@ -50,7 +50,7 @@ struct FocusedCellLocation {
     source: FocusedNumbersPackage,
     sheet: litchi_numbers::SheetSelector<'static>,
     table: litchi_numbers::TableSelector<'static>,
-    position: litchi_numbers::table::CellPosition,
+    position: litchi_numbers::table::At,
     source_len: usize,
 }
 
@@ -61,10 +61,9 @@ fn focused_cell_location(
     column: usize,
 ) -> Result<FocusedCellLocation> {
     let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
-    let position =
-        litchi_numbers::table::CellPosition::try_from_usize(row, column).map_err(|error| {
-            Error::InvalidFormat(format!("invalid Numbers cell coordinate: {error}"))
-        })?;
+    let position = litchi_numbers::table::At::try_from_usize(row, column).map_err(|error| {
+        Error::InvalidFormat(format!("invalid Numbers cell coordinate: {error}"))
+    })?;
     let (source, source_len) = if let Some(source_bytes) = editor.package.exact_source_bytes() {
         let source_len = source_bytes.len();
         (parse_focused_source(source_bytes)?, source_len)
@@ -229,7 +228,7 @@ fn focused_set_data_format(
     source: &FocusedNumbersPackage,
     sheet: litchi_numbers::SheetSelector<'static>,
     table: litchi_numbers::TableSelector<'static>,
-    position: litchi_numbers::table::CellPosition,
+    position: litchi_numbers::table::At,
     source_len: usize,
     format: &DataFormat,
 ) -> Result<Option<NumbersEditor>> {
@@ -327,7 +326,7 @@ fn focused_clear_data_format(
     source: &FocusedNumbersPackage,
     sheet: litchi_numbers::SheetSelector<'static>,
     table: litchi_numbers::TableSelector<'static>,
-    position: litchi_numbers::table::CellPosition,
+    position: litchi_numbers::table::At,
     source_len: usize,
     format: &DataFormat,
 ) -> Result<Option<NumbersEditor>> {
@@ -433,7 +432,7 @@ fn focused_cell_value(
     source: &FocusedNumbersPackage,
     sheet: litchi_numbers::SheetSelector<'static>,
     table: litchi_numbers::TableSelector<'static>,
-    position: litchi_numbers::table::CellPosition,
+    position: litchi_numbers::table::At,
 ) -> Result<Option<litchi_numbers::cell::Value>> {
     source
         .table_cell(sheet, table, position)
@@ -731,7 +730,7 @@ fn commit_focused_data_format_transition(
     source: &FocusedNumbersPackage,
     sheet: litchi_numbers::SheetSelector<'static>,
     table: litchi_numbers::TableSelector<'static>,
-    position: litchi_numbers::table::CellPosition,
+    position: litchi_numbers::table::At,
     source_len: usize,
     current: &DataFormat,
     requested: &DataFormat,
@@ -854,10 +853,9 @@ fn replace_cell_comment_with_focused_owner(
         return Ok(FocusedCommentReplacement::LegacyFallback);
     }
     let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
-    let position =
-        litchi_numbers::table::CellPosition::try_from_usize(row, column).map_err(|error| {
-            Error::InvalidFormat(format!("invalid Numbers comment coordinate: {error}"))
-        })?;
+    let position = litchi_numbers::table::At::try_from_usize(row, column).map_err(|error| {
+        Error::InvalidFormat(format!("invalid Numbers comment coordinate: {error}"))
+    })?;
     let source_bytes = editor.to_bytes()?;
     let source = FocusedNumbersPackage::from_bytes(&source_bytes).map_err(|error| {
         Error::InvalidFormat(format!(
@@ -899,7 +897,7 @@ struct FocusedCommentReplySource {
     source: FocusedNumbersPackage,
     sheet: litchi_numbers::SheetSelector<'static>,
     table: litchi_numbers::TableSelector<'static>,
-    position: litchi_numbers::table::CellPosition,
+    position: litchi_numbers::table::At,
     source_bytes: Vec<u8>,
 }
 
@@ -927,10 +925,9 @@ fn focused_comment_reply_source(
     let table = litchi_numbers::TableSelector::position(table.as_position().ok_or_else(|| {
         Error::InvalidFormat("focused Numbers comment-reply table was not positional".to_owned())
     })?);
-    let position =
-        litchi_numbers::table::CellPosition::try_from_usize(row, column).map_err(|error| {
-            Error::InvalidFormat(format!("invalid Numbers comment-reply coordinate: {error}"))
-        })?;
+    let position = litchi_numbers::table::At::try_from_usize(row, column).map_err(|error| {
+        Error::InvalidFormat(format!("invalid Numbers comment-reply coordinate: {error}"))
+    })?;
     let source_bytes = editor.to_bytes()?;
     let source = FocusedNumbersPackage::from_bytes(&source_bytes).map_err(|error| {
         Error::InvalidFormat(format!(
@@ -3127,7 +3124,7 @@ impl NumbersEditor {
     /// ID-free semantic read.
     #[deprecated(
         since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment-reply read; use litchi_numbers::Package::table_cell_comment_replies with SheetSelector, TableSelector, and CellPosition for the selector-first semantic read; reply identity remains compatibility-host scope"
+        note = "legacy raw-ID Numbers cell-comment-reply read; use litchi_numbers::Package::table_cell_comment_replies with SheetSelector, TableSelector, and At for the selector-first semantic read; reply identity remains compatibility-host scope"
     )]
     pub fn cell_comment_replies(
         &self,
@@ -3144,7 +3141,7 @@ impl NumbersEditor {
     /// this deprecated raw-ID surface remains as a compatibility fallback.
     #[deprecated(
         since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment-reply creation API; use litchi_numbers::Package::add_table_cell_comment_reply with SheetSelector, TableSelector, and CellPosition for selector-first writes; this method delegates supported graphs and retains a compatibility fallback"
+        note = "legacy raw-ID Numbers cell-comment-reply creation API; use litchi_numbers::Package::add_table_cell_comment_reply with SheetSelector, TableSelector, and At for selector-first writes; this method delegates supported graphs and retains a compatibility fallback"
     )]
     pub fn add_cell_comment_reply(
         &mut self,
@@ -3179,7 +3176,7 @@ impl NumbersEditor {
     /// this deprecated raw-ID surface remains as a compatibility fallback.
     #[deprecated(
         since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment-reply replacement API; use litchi_numbers::Package::set_table_cell_comment_reply with SheetSelector, TableSelector, CellPosition, and CommentReplyIndex for selector-first writes; this method delegates supported graphs and retains a compatibility fallback"
+        note = "legacy raw-ID Numbers cell-comment-reply replacement API; use litchi_numbers::Package::set_table_cell_comment_reply with SheetSelector, TableSelector, At, and CommentReplyIndex for selector-first writes; this method delegates supported graphs and retains a compatibility fallback"
     )]
     pub fn set_cell_comment_reply(
         &mut self,
@@ -3229,7 +3226,7 @@ impl NumbersEditor {
     /// this deprecated raw-ID surface remains as a compatibility fallback.
     #[deprecated(
         since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment-reply removal API; use litchi_numbers::Package::remove_table_cell_comment_reply with SheetSelector, TableSelector, CellPosition, and CommentReplyIndex for selector-first writes; this method delegates supported graphs and retains a compatibility fallback"
+        note = "legacy raw-ID Numbers cell-comment-reply removal API; use litchi_numbers::Package::remove_table_cell_comment_reply with SheetSelector, TableSelector, At, and CommentReplyIndex for selector-first writes; this method delegates supported graphs and retains a compatibility fallback"
     )]
     pub fn remove_cell_comment_reply(
         &mut self,
@@ -3277,7 +3274,7 @@ mod focused_custom_tests {
         Custom, DateTime as CustomDateTime, DateTimePattern, Name, Number as CustomNumber,
         NumberPattern, Text as CustomText,
     };
-    use litchi_numbers::{CellPosition, SheetSelector, TableSelector};
+    use litchi_numbers::{At, SheetSelector, TableSelector};
     use prost::Message as _;
 
     fn custom_number(name: &str, pattern: &str) -> Custom {
@@ -3485,7 +3482,7 @@ mod focused_custom_tests {
                 .edit_table_cell_custom_format(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(1, 1),
+                    At::new(1, 1),
                 )
                 .expect("focused replacement clear edit")
                 .clear()
@@ -3520,7 +3517,7 @@ mod focused_custom_tests {
             .table_cell(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(1, 1),
+                At::new(1, 1),
             )
             .expect("native Text cell")
             .storage()
@@ -3544,7 +3541,7 @@ mod focused_custom_tests {
                 .table_cell(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(1, 1)
+                    At::new(1, 1)
                 )
                 .expect("reopened Text cell")
                 .storage()
@@ -3573,7 +3570,7 @@ mod focused_custom_tests {
                 .table_cell_custom_format(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(1, 1)
+                    At::new(1, 1)
                 )
                 .expect("Text reset format"),
             None
@@ -3583,7 +3580,7 @@ mod focused_custom_tests {
                 .table_cell(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(1, 1)
+                    At::new(1, 1)
                 )
                 .expect("Text reset cell")
                 .storage()
@@ -3656,7 +3653,7 @@ mod focused_custom_tests {
             "../../../../../../test-data/iwork/synthetic/numbers/custom-focused.numbers"
         );
         let source = FocusedNumbersPackage::from_bytes(source_bytes).expect("focused source");
-        let position = CellPosition::new(0, 0);
+        let position = At::new(0, 0);
         let before_value = source
             .table_cell(SheetSelector::index(0), TableSelector::index(0), position)
             .expect("original focused cell")
@@ -3732,7 +3729,7 @@ mod focused_custom_tests {
                 .table_cell_custom_format(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(0, 1),
+                    At::new(0, 1),
                 )
                 .expect("shared registry custom")
                 .is_some()
@@ -3817,7 +3814,7 @@ mod focused_custom_tests {
                 .table_cell_custom_format(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(0, 1),
+                    At::new(0, 1),
                 )
                 .expect("shared registry after clear")
                 .is_some()
@@ -3838,7 +3835,7 @@ mod focused_custom_tests {
         let source_bytes = include_bytes!(
             "../../../../../../test-data/iwork/synthetic/numbers/custom-focused.numbers"
         );
-        let position = CellPosition::new(0, 0);
+        let position = At::new(0, 0);
         let source = FocusedNumbersPackage::from_bytes(source_bytes).expect("focused source");
         let before_value = source
             .table_cell(SheetSelector::index(0), TableSelector::index(0), position)
@@ -3880,7 +3877,7 @@ mod focused_custom_tests {
                 .table_cell_custom_format(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(0, 1),
+                    At::new(0, 1),
                 )
                 .expect("shared registry after focused reset")
                 .is_some()
@@ -3960,7 +3957,7 @@ mod focused_custom_tests {
                 .table_cell(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(0, 0),
+                    At::new(0, 0),
                 )
                 .expect("builder replacement cell")
                 .storage()
@@ -4044,7 +4041,7 @@ mod focused_custom_tests {
                 .table_cell(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(0, 0),
+                    At::new(0, 0),
                 )
                 .expect("builder clear cell")
                 .storage()
@@ -4173,7 +4170,7 @@ mod focused_custom_tests {
                         .table_cell(
                             SheetSelector::index(0),
                             TableSelector::index(0),
-                            CellPosition::new(0, 0),
+                            At::new(0, 0),
                         )
                         .unwrap_or_else(|error| panic!(
                             "{label}: focused cell read failed: {error}"

@@ -1,7 +1,7 @@
 //! Create a source-built Numbers workbook with cells across sparse tile boundaries.
 
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
-use litchi_numbers::table::CellPosition;
+use litchi_numbers::table::At;
 use litchi_numbers::table::cells::{Change, Input};
 use litchi_numbers::{Package, SheetSelector, TableSelector};
 
@@ -15,16 +15,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     editor = set_focused_table_cells(
         editor,
-        [Change::set(
-            CellPosition::new(256, 1),
-            Input::number(257.0)?,
-        )],
+        [Change::set(At::new(256, 1), Input::number(257.0)?)],
     )?;
     editor = set_focused_table_cells(
         editor,
         [
-            Change::set(CellPosition::new(0, 0), Input::text("First tile")?),
-            Change::set(CellPosition::new(256, 0), Input::text("Boundary")?),
+            Change::set(At::new(0, 0), Input::text("First tile")?),
+            Change::set(At::new(256, 0), Input::text("Boundary")?),
         ],
     )?;
     editor.save(output)?;

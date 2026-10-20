@@ -4,7 +4,7 @@ use std::error::Error;
 
 use litchi_iwa::{keynote::KeynoteEditor, pages::PagesEditor};
 use litchi_iwa_common::table::{
-    cell::value::Value, coordinate::CellPosition, merge::Region, read::TableRead,
+    cell::value::Value, coordinate::At, merge::Region, read::TableRead,
 };
 
 const PAGES: &[u8] = include_bytes!("../../../test-data/iwork/pages/body-table-read-native.pages");
@@ -62,7 +62,7 @@ fn native_pages_selector_adapter_preserves_semantics_and_source() -> TestResult 
         assert_eq!(read.comment_count(), legacy.comment_count());
         for (position, comment) in legacy.iter_comments() {
             let actual = read
-                .get_comment(CellPosition::try_from_usize(position.0, position.1)?)
+                .get_comment(At::try_from_usize(position.0, position.1)?)
                 .expect("every native comment survives focused readback");
             assert_eq!(actual, comment);
             assert_eq!(

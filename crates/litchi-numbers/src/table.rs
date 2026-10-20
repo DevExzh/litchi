@@ -39,9 +39,7 @@ pub mod topology;
 use crate::cell::Value;
 use crate::selector::TableSelector;
 
-pub use litchi_iwa_common::table::coordinate::{
-    AddressError, CellPosition, CellRange, Error as CoordinateError,
-};
+pub use litchi_iwa_common::table::coordinate::{AddressError, Area, At, Error as CoordinateError};
 pub use litchi_iwa_common::table::model::{
     Cell, Dimensions, Error, Grid, GridBudget, GridIter, InsertError, InsertResult, Result, View,
 };
@@ -124,7 +122,7 @@ impl Table {
 
     /// Borrows a materialized value at a coordinate.
     #[must_use]
-    pub fn get(&self, position: CellPosition) -> Option<&Value> {
+    pub fn get(&self, position: At) -> Option<&Value> {
         self.0.get(position)
     }
 
@@ -140,12 +138,12 @@ impl Table {
 
     /// Returns the compact stored/missing view for a coordinate.
     #[must_use]
-    pub fn view(&self, position: CellPosition) -> View<'_> {
+    pub fn view(&self, position: At) -> View<'_> {
         self.0.view(position)
     }
 
     /// Iterates over sparse cells in row-major order within a range.
-    pub fn cells(&self, range: CellRange) -> Result<impl Iterator<Item = &Cell> + '_> {
+    pub fn cells(&self, range: Area) -> Result<impl Iterator<Item = &Cell> + '_> {
         self.0.cells(range)
     }
 
@@ -191,7 +189,7 @@ impl Table {
     }
 
     /// Creates a dense view only when it fits the caller's budget.
-    pub fn grid(&self, range: CellRange, budget: GridBudget) -> Result<Grid<'_>> {
+    pub fn grid(&self, range: Area, budget: GridBudget) -> Result<Grid<'_>> {
         self.0.grid(range, budget)
     }
 
@@ -256,7 +254,7 @@ impl Builder {
 
     /// Borrows a materialized value at a coordinate.
     #[must_use]
-    pub fn get(&self, position: CellPosition) -> Option<&Value> {
+    pub fn get(&self, position: At) -> Option<&Value> {
         self.0.get(position)
     }
 
@@ -281,7 +279,7 @@ impl Builder {
     /// Replaces or inserts one checked sparse value.
     pub fn set(
         &mut self,
-        position: CellPosition,
+        position: At,
         value: Value,
     ) -> std::result::Result<(), InsertError<Value>> {
         self.0.set(position, value)

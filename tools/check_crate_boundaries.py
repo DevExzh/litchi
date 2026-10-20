@@ -9669,7 +9669,7 @@ NUMBERS_TABLE_CELL_NUMBER_FORMAT_INTEGRATION_MARKERS = {
         re.IGNORECASE,
     ),
     "selector/locality verification": re.compile(
-        r"(?:SheetSelector|TableSelector|CellPosition|locality|reopen|readback)",
+        r"(?:SheetSelector|TableSelector|(?-i:\bAt\b)|locality|reopen|readback)",
         re.IGNORECASE,
     ),
 }
@@ -9995,7 +9995,7 @@ NUMBERS_TABLE_CELL_TEXT_FORMAT_INTEGRATION_MARKERS = {
         re.IGNORECASE,
     ),
     "selector/locality verification": re.compile(
-        r"(?:SheetSelector|TableSelector|CellPosition|locality|reopen|readback)",
+        r"(?:SheetSelector|TableSelector|(?-i:\bAt\b)|locality|reopen|readback)",
         re.IGNORECASE,
     ),
 }
@@ -10879,7 +10879,7 @@ NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_INTEGRATION_MARKERS = {
         re.IGNORECASE,
     ),
     "selector/locality verification": re.compile(
-        r"(?:SheetSelector|TableSelector|CellPosition|locality|reopen|readback)",
+        r"(?:SheetSelector|TableSelector|(?-i:\bAt\b)|locality|reopen|readback)",
         re.IGNORECASE,
     ),
 }
@@ -11211,7 +11211,7 @@ NUMBERS_TABLE_CELL_CURRENCY_FORMAT_INTEGRATION_MARKERS = {
         re.IGNORECASE,
     ),
     "selector/locality verification": re.compile(
-        r"(?:SheetSelector|TableSelector|CellPosition|locality|reopen|readback)",
+        r"(?:SheetSelector|TableSelector|(?-i:\bAt\b)|locality|reopen|readback)",
         re.IGNORECASE,
     ),
 }
@@ -11533,7 +11533,7 @@ NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_INTEGRATION_MARKERS = {
         re.IGNORECASE,
     ),
     "selector/locality verification": re.compile(
-        r"(?:SheetSelector|TableSelector|CellPosition|locality|reopen|readback)",
+        r"(?:SheetSelector|TableSelector|(?-i:\bAt\b)|locality|reopen|readback)",
         re.IGNORECASE,
     ),
 }
@@ -11863,7 +11863,7 @@ NUMBERS_TABLE_CELL_FRACTION_FORMAT_INTEGRATION_MARKERS = {
         re.IGNORECASE,
     ),
     "selector/locality verification": re.compile(
-        r"(?:SheetSelector|TableSelector|CellPosition|locality|reopen|readback)",
+        r"(?:SheetSelector|TableSelector|(?-i:\bAt\b)|locality|reopen|readback)",
         re.IGNORECASE,
     ),
 }
@@ -13100,7 +13100,7 @@ NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_ACTIVATION = re.compile(
 NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_REQUIRED_MARKERS = {
     "rooted selector graph": re.compile(
         r"(?i)\b(?:rooted|resolve[_ -]?(?:comment|reply)|SheetSelector|"
-        r"TableSelector|CellPosition|CommentReplyIndex)\b"
+        r"TableSelector|(?-i:At)|CommentReplyIndex)\b"
     ),
     "comment list and cell references": re.compile(
         r"(?i)\b(?:CommentList|comment[_ -]?list[_ -]?ids|cell[_ -]?comment[_ -]?keys|"
@@ -15043,27 +15043,27 @@ IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PUBLIC_SIGNATURES = {
     "__table_cell_comment_from_bytes_for_compatibility": (
         "pub fn __table_cell_comment_from_bytes_for_compatibility<'sheet, 'table>("
         " bytes: &[u8], sheet: impl Into<SheetSelector<'sheet>>, "
-        "table: impl Into<TableSelector<'table>>, position: CellPosition, ) "
+        "table: impl Into<TableSelector<'table>>, position: At, ) "
         "-> Result<Option<Comment>>"
     ),
     "__table_cell_comment_from_bytes_for_compatibility_with_options": (
         "pub fn __table_cell_comment_from_bytes_for_compatibility_with_options<"
         "'sheet, 'table>( bytes: &[u8], options: OpenOptions, "
         "sheet: impl Into<SheetSelector<'sheet>>, "
-        "table: impl Into<TableSelector<'table>>, position: CellPosition, ) "
+        "table: impl Into<TableSelector<'table>>, position: At, ) "
         "-> Result<Option<Comment>>"
     ),
     "__table_cell_comment_replies_from_bytes_for_compatibility": (
         "pub fn __table_cell_comment_replies_from_bytes_for_compatibility<'sheet, "
         "'table>( bytes: &[u8], sheet: impl Into<SheetSelector<'sheet>>, "
-        "table: impl Into<TableSelector<'table>>, position: CellPosition, ) "
+        "table: impl Into<TableSelector<'table>>, position: At, ) "
         "-> Result<Box<[CommentReply]>>"
     ),
     "__table_cell_comment_replies_from_bytes_for_compatibility_with_options": (
         "pub fn __table_cell_comment_replies_from_bytes_for_compatibility_with_options<"
         " 'sheet, 'table, >( bytes: &[u8], options: OpenOptions, "
         "sheet: impl Into<SheetSelector<'sheet>>, "
-        "table: impl Into<TableSelector<'table>>, position: CellPosition, ) "
+        "table: impl Into<TableSelector<'table>>, position: At, ) "
         "-> Result<Box<[CommentReply]>>"
     ),
 }
@@ -15076,7 +15076,7 @@ IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_TEST_SOURCE = Path(
 IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_SEAM_MARKERS = (
     re.compile(r"\bSheetSelector\b"),
     re.compile(r"\bTableSelector\b"),
-    re.compile(r"\bCellPosition\b"),
+    re.compile(r"\bAt\b"),
     re.compile(
         r"\b(?:physical_package|compatibility_package|PhysicalPackage|"
         r"PackageContext)\b"
@@ -29481,7 +29481,7 @@ def audit_numbers_table_cell_pop_up_menu_facade_source_topology(
             )
             continue
         if method != "apply_table_cell_pop_up_menu_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if not re.search(rf"\b{selector}\b", declaration):
                     violations.append(
                         "focused litchi-numbers popup-menu Package method "
@@ -30127,7 +30127,7 @@ def audit_numbers_table_cell_number_format_facade_source_topology(
             continue
         declaration, line_number = record
         if method != "apply_table_cell_number_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Number-format Package method "
@@ -30625,7 +30625,7 @@ def audit_iwa_numbers_table_cell_number_format_source_topology(
                         "litchi-iwa Numbers Number-format compatibility method must "
                         f"delegate to focused Package {method}: {path.relative_to(root)}:{line_number}"
                     )
-                for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+                for selector in ("SheetSelector", "TableSelector", "At"):
                     if re.search(rf"\b{re.escape(selector)}\b", route) is None:
                         violations.append(
                             "litchi-iwa Numbers Number-format compatibility route is "
@@ -31179,7 +31179,7 @@ def audit_numbers_table_cell_text_format_facade_source_topology(
             continue
         declaration, line_number = record
         if method != "apply_table_cell_text_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Text-format Package method "
@@ -31752,7 +31752,7 @@ def audit_numbers_table_cell_date_time_format_facade_source_topology(
                 f"unexpected signature {method}: {owner_path.relative_to(root)}:{line_number}"
             )
         if method != "apply_table_cell_date_time_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Date & Time-format Package method "
@@ -32302,7 +32302,7 @@ def audit_numbers_table_cell_duration_format_facade_source_topology(
                 f"unexpected signature {method}: {owner_path.relative_to(root)}:{line_number}"
             )
         if method != "apply_table_cell_duration_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Duration-format Package method "
@@ -32885,7 +32885,7 @@ def audit_numbers_table_cell_custom_format_facade_source_topology(
                 f"{owner_path.relative_to(root)}:{line_number}"
             )
         if method != "apply_table_cell_custom_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Custom-format Package method "
@@ -32894,7 +32894,7 @@ def audit_numbers_table_cell_custom_format_facade_source_topology(
                     )
             selector_positions = [
                 declaration.find(selector)
-                for selector in ("SheetSelector", "TableSelector", "CellPosition")
+                for selector in ("SheetSelector", "TableSelector", "At")
             ]
             receiver_position = declaration.find("&self")
             if (
@@ -34544,7 +34544,7 @@ def audit_numbers_table_cell_percentage_format_facade_source_topology(
             continue
         declaration, line_number = record
         if method != "apply_table_cell_percentage_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Percentage-format Package method "
@@ -35133,7 +35133,7 @@ def audit_numbers_table_cell_percentage_format_facade_source_topology(
             continue
         declaration, line_number = record
         if method != "apply_table_cell_percentage_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Percentage-format Package method "
@@ -35547,7 +35547,7 @@ def audit_numbers_table_cell_currency_format_facade_source_topology(
             continue
         declaration, line_number = record
         if method != "apply_table_cell_currency_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Currency-format Package method "
@@ -35969,7 +35969,7 @@ def audit_numbers_table_cell_fraction_format_facade_source_topology(
             continue
         declaration, line_number = record
         if method != "apply_table_cell_fraction_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Fraction-format Package method "
@@ -36432,7 +36432,7 @@ def audit_iwa_numbers_table_cell_percentage_format_source_topology(
                         "litchi-iwa Numbers Percentage-format compatibility method must "
                         f"delegate to focused Package {method}: {path.relative_to(root)}:{line_number}"
                     )
-                for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+                for selector in ("SheetSelector", "TableSelector", "At"):
                     if re.search(rf"\b{re.escape(selector)}\b", route_text) is None:
                         violations.append(
                             "litchi-iwa Numbers Percentage-format compatibility route is "
@@ -36645,7 +36645,7 @@ def audit_numbers_table_cell_scientific_format_facade_source_topology(
             continue
         declaration, line_number = record
         if method != "apply_table_cell_scientific_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
                     violations.append(
                         "focused litchi-numbers Scientific-format Package method "
@@ -37108,7 +37108,7 @@ def audit_iwa_numbers_table_cell_percentage_format_source_topology(
                         "litchi-iwa Numbers Percentage-format compatibility method must "
                         f"delegate to focused Package {method}: {path.relative_to(root)}:{line_number}"
                     )
-                for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+                for selector in ("SheetSelector", "TableSelector", "At"):
                     if re.search(rf"\b{re.escape(selector)}\b", route_text) is None:
                         violations.append(
                             "litchi-iwa Numbers Percentage-format compatibility route is "
@@ -37330,7 +37330,7 @@ def audit_iwa_numbers_table_cell_scientific_format_source_topology(
                         "litchi-iwa Numbers Scientific-format compatibility method must "
                         f"delegate to focused Package {method}: {path.relative_to(root)}:{line_number}"
                     )
-                for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+                for selector in ("SheetSelector", "TableSelector", "At"):
                     if re.search(rf"\b{re.escape(selector)}\b", route_text) is None:
                         violations.append(
                             "litchi-iwa Numbers Scientific-format compatibility route is "
@@ -37578,7 +37578,7 @@ def audit_iwa_numbers_table_cell_currency_format_source_topology(
                         "litchi-iwa Numbers Currency-format compatibility method must "
                         f"delegate to focused Package {method}: {path.relative_to(root)}:{line_number}"
                     )
-                for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+                for selector in ("SheetSelector", "TableSelector", "At"):
                     if re.search(rf"\b{re.escape(selector)}\b", route_text) is None:
                         violations.append(
                             "litchi-iwa Numbers Currency-format compatibility route is "
@@ -38114,7 +38114,7 @@ def audit_iwa_numbers_table_cell_control_bridge_source_topology(
     The compatibility ``NumbersEditor`` still exposes the historical generic
     data-format entry point.  Interactive controls must nevertheless enter
     ``litchi-numbers::Package`` through ``SheetSelector``/
-    ``TableSelector``/``CellPosition`` and the unified control transaction;
+    ``TableSelector``/``At`` and the unified control transaction;
     this prevents a future split-control change from quietly reintroducing a
     raw-ID per-kind writer.  This audit deliberately reads only the Numbers
     bridge.  Shared cell-data-format code and Pages/Keynote adapters remain
@@ -38235,7 +38235,7 @@ def audit_iwa_numbers_table_cell_control_bridge_source_topology(
                         f"{IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
                     )
 
-    for marker in ("SheetSelector", "TableSelector", "CellPosition"):
+    for marker in ("SheetSelector", "TableSelector", "At"):
         if marker not in source:
             violations.append(
                 "Numbers cell-control selector bridge must expose typed "
@@ -38543,7 +38543,7 @@ def audit_numbers_table_cell_control_facade_source_topology(
             )
             continue
         if method != "apply_table_cell_control_format":
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for selector in ("SheetSelector", "TableSelector", "At"):
                 if not re.search(rf"\b{selector}\b", declaration):
                     violations.append(
                         "focused litchi-numbers cell-control Package method "
@@ -40161,8 +40161,8 @@ def audit_iwa_numbers_cell_comment_delegation_source_topology(
         ("SheetSelector::index", r"\bSheetSelector[ \t\r\n]*::[ \t\r\n]*index\b"),
         ("TableSelector::index", r"\bTableSelector[ \t\r\n]*::[ \t\r\n]*index\b"),
         (
-            "CellPosition::try_from_usize",
-            r"\bCellPosition[ \t\r\n]*::[ \t\r\n]*try_from_usize\b",
+            "At::try_from_usize",
+            r"\bAt[ \t\r\n]*::[ \t\r\n]*try_from_usize\b",
         ),
     )
     for label, pattern in selector_requirements:
@@ -40216,7 +40216,7 @@ def audit_iwa_numbers_cell_comment_delegation_source_topology(
             "focused error as legacy-compatible"
         )
 
-    # The focused owner accepts only semantic selectors and CellPosition. A
+    # The focused owner accepts only semantic selectors and At. A
     # native table/object identifier in the actual method argument list would
     # bypass the scoped mapping even if a selector helper exists elsewhere.
     if focused_call is not None:
@@ -40282,7 +40282,7 @@ def audit_iwa_numbers_cell_comment_clear_retirement_source_topology(
         required = (
             "SheetSelector",
             "TableSelector",
-            "CellPosition",
+            "At",
             IWA_NUMBERS_CELL_COMMENT_CLEAR_FOCUSED_METHOD,
         )
         for marker in required:
@@ -40358,8 +40358,8 @@ def audit_iwa_numbers_cell_comment_reply_mutation_source_topology(
             ("SheetSelector::index", r"\bSheetSelector\s*::\s*index\b"),
             ("TableSelector::index", r"\bTableSelector\s*::\s*index\b"),
             (
-                "CellPosition::try_from_usize",
-                r"\bCellPosition\s*::\s*try_from_usize\b",
+                "At::try_from_usize",
+                r"\bAt\s*::\s*try_from_usize\b",
             ),
         ):
             if re.search(pattern, route) is None and not (
@@ -49842,10 +49842,10 @@ def audit_numbers_table_cell_comment_reply_facade_source_topology(
                     f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
                 )
         if method == "table_cell_comment_replies":
-            if re.search(r"\bCellPosition\b", declaration) is None:
+            if re.search(r"\bAt\b", declaration) is None:
                 violations.append(
                     "focused litchi-numbers comment-reply Package method "
-                    f"{method} must accept selector-first CellPosition: "
+                    f"{method} must accept selector-first At: "
                     f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
                 )
         if re.search(r"\bCommentReply\b", declaration) is None:
@@ -49879,11 +49879,11 @@ def audit_numbers_table_cell_comment_reply_facade_source_topology(
                         f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
                     )
                 if re.search(
-                    r"\bCellPosition[ \t\r\n]*::[ \t\r\n]*from_a1\b", body_code
+                    r"\bAt[ \t\r\n]*::[ \t\r\n]*from_a1\b", body_code
                 ) is None:
                     violations.append(
                         "focused litchi-numbers comment-reply A1 method must construct "
-                        "CellPosition from A1: "
+                        "At from A1: "
                         f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
                     )
 
@@ -50267,11 +50267,11 @@ def audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
         if (
             method != "apply_table_cell_comment_reply"
             and not method.endswith("_a1")
-            and re.search(r"\bCellPosition\b", declaration) is None
+            and re.search(r"\bAt\b", declaration) is None
         ):
             violations.append(
                 "focused Numbers comment-reply mutation Package method "
-                f"{method} must accept selector-first CellPosition: {location(path, line_number)}"
+                f"{method} must accept selector-first At: {location(path, line_number)}"
             )
         if method in {"table_cell_comment_reply", "set_table_cell_comment_reply", "remove_table_cell_comment_reply"} and re.search(
             r"\bCommentReplyIndex\b", declaration
@@ -50290,7 +50290,7 @@ def audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
             if body is None or re.search(r"from_a1", _mask_rust_non_code(body)) is None:
                 violations.append(
                     "focused Numbers comment-reply mutation A1 method "
-                    f"{method} must construct CellPosition from A1: {location(path, line_number)}"
+                    f"{method} must construct At from A1: {location(path, line_number)}"
                 )
         if not any(re.search(rf"\b{re.escape(name)}\b", declaration) for name in method_result_names[method]):
             violations.append(
@@ -70055,7 +70055,7 @@ NEUTRAL_TABLE_COORDINATE_SOURCE = NEUTRAL_TABLE_SOURCE_ROOT / "coordinate.rs"
 NEUTRAL_TABLE_MODEL_SOURCE = NEUTRAL_TABLE_SOURCE_ROOT / "model.rs"
 NEUTRAL_TABLE_REQUIRED_EXPORTS = {
     NEUTRAL_TABLE_VALUE_SOURCE: frozenset({"FiniteF64", "FiniteF64Error", "Type", "Update", "Value"}),
-    NEUTRAL_TABLE_COORDINATE_SOURCE: frozenset({"AddressError", "CellPosition", "CellRange", "Error", "Result"}),
+    NEUTRAL_TABLE_COORDINATE_SOURCE: frozenset({"AddressError", "At", "Area", "Error", "Result"}),
     NEUTRAL_TABLE_MODEL_SOURCE: frozenset({"Builder", "Cell", "Dimensions", "Error", "Grid", "Table", "View"}),
 }
 NEUTRAL_TABLE_REQUIRED_MODULES = {
@@ -71922,7 +71922,7 @@ def audit_neutral_table_model_source_topology(root: Path = ROOT) -> list[str]:
         ),
         (
             Path("crates/litchi-numbers/src/table/coordinate.rs"),
-            frozenset({"AddressError", "CellPosition", "CellRange", "Error", "Result"}),
+            frozenset({"AddressError", "At", "Area", "Error", "Result"}),
         ),
         (
             Path("crates/litchi-numbers/src/table.rs"),

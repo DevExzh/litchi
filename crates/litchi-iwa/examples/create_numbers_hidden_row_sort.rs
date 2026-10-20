@@ -8,7 +8,7 @@ use litchi_iwa::numbers::{
     NumbersTableSortOrder, NumbersTableSortRule,
 };
 use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
-use litchi_numbers::table::CellPosition;
+use litchi_numbers::table::At;
 use litchi_numbers::table::cells::{Change, Input};
 use litchi_numbers::{Package, SheetSelector, TableSelector};
 
@@ -26,16 +26,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor = set_focused_table_cells(
         editor,
         [
-            Change::set(CellPosition::new(0, 0), Input::text("Region")?),
-            Change::set(CellPosition::new(0, 1), Input::text("Q1")?),
-            Change::set(CellPosition::new(1, 0), Input::text("North")?),
-            Change::set(CellPosition::new(1, 1), Input::number(120.0)?),
-            Change::set(CellPosition::new(2, 0), Input::text("South")?),
-            Change::set(CellPosition::new(2, 1), Input::number(98.0)?),
-            Change::set(CellPosition::new(3, 0), Input::text("Central")?),
-            Change::set(CellPosition::new(3, 1), Input::number(105.0)?),
-            Change::set(CellPosition::new(4, 0), Input::text("Total")?),
-            Change::set(CellPosition::new(4, 1), Input::number(323.0)?),
+            Change::set(At::new(0, 0), Input::text("Region")?),
+            Change::set(At::new(0, 1), Input::text("Q1")?),
+            Change::set(At::new(1, 0), Input::text("North")?),
+            Change::set(At::new(1, 1), Input::number(120.0)?),
+            Change::set(At::new(2, 0), Input::text("South")?),
+            Change::set(At::new(2, 1), Input::number(98.0)?),
+            Change::set(At::new(3, 0), Input::text("Central")?),
+            Change::set(At::new(3, 1), Input::number(105.0)?),
+            Change::set(At::new(4, 0), Input::text("Total")?),
+            Change::set(At::new(4, 1), Input::number(323.0)?),
         ],
     )?;
     editor = set_focused_table_headers(

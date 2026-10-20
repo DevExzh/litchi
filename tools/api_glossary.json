@@ -8263,6 +8263,37 @@
       "families": []
     },
     {
+      "id": "iwa-common",
+      "package": "litchi-iwa-common",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "CellPosition",
+          "scope": "litchi_iwa_common",
+          "replacement": "use table::coordinate::At; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "CellRange",
+          "scope": "litchi_iwa_common",
+          "replacement": "use table::coordinate::Area; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "Position",
+          "scope": "litchi_iwa_common::table::model",
+          "replacement": "use At; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0352)",
+          "recursive": false
+        },
+        {
+          "name": "Range",
+          "scope": "litchi_iwa_common::table::model",
+          "replacement": "use Area; grid coordinates are not selectors (ADR 0034 §8, record 0352)",
+          "recursive": false
+        }
+      ],
+      "families": []
+    },
+    {
       "id": "numbers-minimal",
       "features": [],
       "package": "litchi-numbers",
@@ -8811,26 +8842,36 @@
         {
           "name": "Position",
           "scope": "litchi_numbers",
-          "replacement": "use litchi_numbers::CellPosition; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
+          "replacement": "use litchi_numbers::At; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
           "recursive": false
         },
         {
           "name": "Range",
           "scope": "litchi_numbers",
-          "replacement": "use litchi_numbers::CellRange; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
+          "replacement": "use litchi_numbers::Area; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
           "recursive": false
         },
         {
           "name": "Position",
           "scope": "litchi_numbers::table",
-          "replacement": "use litchi_numbers::table::CellPosition; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
+          "replacement": "use litchi_numbers::table::At; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
           "recursive": false
         },
         {
           "name": "Range",
           "scope": "litchi_numbers::table",
-          "replacement": "use litchi_numbers::table::CellRange; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
+          "replacement": "use litchi_numbers::table::Area; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
           "recursive": false
+        },
+        {
+          "name": "CellPosition",
+          "scope": "litchi_numbers",
+          "replacement": "use litchi_numbers::At; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "CellRange",
+          "scope": "litchi_numbers",
+          "replacement": "use litchi_numbers::Area; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
         }
       ],
       "families": [
@@ -9419,26 +9460,36 @@
         {
           "name": "Position",
           "scope": "litchi_numbers",
-          "replacement": "use litchi_numbers::CellPosition; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
+          "replacement": "use litchi_numbers::At; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
           "recursive": false
         },
         {
           "name": "Range",
           "scope": "litchi_numbers",
-          "replacement": "use litchi_numbers::CellRange; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
+          "replacement": "use litchi_numbers::Area; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
           "recursive": false
         },
         {
           "name": "Position",
           "scope": "litchi_numbers::table",
-          "replacement": "use litchi_numbers::table::CellPosition; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
+          "replacement": "use litchi_numbers::table::At; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
           "recursive": false
         },
         {
           "name": "Range",
           "scope": "litchi_numbers::table",
-          "replacement": "use litchi_numbers::table::CellRange; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
+          "replacement": "use litchi_numbers::table::Area; `Position` is the selector word and grid coordinates are not selectors (ADR 0034 §8, record 0300)",
           "recursive": false
+        },
+        {
+          "name": "CellPosition",
+          "scope": "litchi_numbers",
+          "replacement": "use litchi_numbers::At; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "CellRange",
+          "scope": "litchi_numbers",
+          "replacement": "use litchi_numbers::Area; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
         }
       ],
       "families": [
@@ -9514,6 +9565,16 @@
           "scope": "litchi",
           "replacement": "open Pages, Keynote and Numbers packages and package directories with `litchi::open` (`File::Pages`, `File::Keynote`, `File::Numbers`; record 0306)",
           "recursive": false
+        },
+        {
+          "name": "CellPosition",
+          "scope": "litchi",
+          "replacement": "use litchi::numbers::At; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "CellRange",
+          "scope": "litchi",
+          "replacement": "use litchi::numbers::Area; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
         }
       ],
       "families": [],
@@ -10362,6 +10423,16 @@
           "scope": "litchi_pages::Document",
           "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2, record 0299)",
           "recursive": false
+        },
+        {
+          "name": "CellPosition",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_iwa_common::table::coordinate::At; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "CellRange",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_iwa_common::table::coordinate::Area; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
         }
       ],
       "families": [
@@ -11682,6 +11753,26 @@
           "scope": "litchi_keynote::slide::media::playback",
           "replacement": "the family lives in slide::audio::position / slide::movie::{geometry, playback} (record 0298)",
           "recursive": false
+        },
+        {
+          "name": "CellPosition",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::At (or slide::table::cells::At); grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "CellPositionError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::AtError; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "CellPositionNotFound",
+          "scope": "litchi_keynote",
+          "replacement": "use slide::table::number_format::transaction::Error::CellNotFound; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "CellRange",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_iwa_common::table::coordinate::Area; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
         }
       ],
       "families": [
@@ -13012,6 +13103,26 @@
           "scope": "litchi_keynote::slide::media::playback",
           "replacement": "the family lives in slide::audio::position / slide::movie::{geometry, playback} (record 0298)",
           "recursive": false
+        },
+        {
+          "name": "CellPosition",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::At (or slide::table::cells::At); grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "CellPositionError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::AtError; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "CellPositionNotFound",
+          "scope": "litchi_keynote",
+          "replacement": "use slide::table::number_format::transaction::Error::CellNotFound; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "CellRange",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_iwa_common::table::coordinate::Area; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
         }
       ],
       "families": [

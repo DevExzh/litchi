@@ -3,7 +3,7 @@
 //!
 //! The package adapter owns the native table-model, tile, BNC, and format-list
 //! graph. Public callers select a slide and table semantically and pass the
-//! checked [`crate::slide::table::number_format::CellPosition`] coordinate;
+//! checked [`crate::slide::table::number_format::At`] coordinate;
 //! native object identifiers and list keys never cross this module's public
 //! boundary.
 
@@ -19,7 +19,7 @@ use std::fmt;
 use std::mem::size_of;
 use std::sync::Arc;
 
-use crate::slide::table::number_format::CellPosition;
+use crate::slide::table::number_format::At;
 use crate::slide::table::number_format::{
     DecimalPlaces, FixedDecimalPlaces, NegativeStyle, Number, ThousandsSeparator,
 };
@@ -97,7 +97,7 @@ pub enum Path {
     Cell {
         slide: Position,
         table: Position,
-        position: CellPosition,
+        position: At,
     },
 }
 
@@ -142,7 +142,7 @@ pub enum Error {
     #[error("the selected Keynote slide has no table at position {position:?}")]
     TablePositionNotFound { position: Position },
     #[error("the selected Keynote table has no cell at position {position:?}")]
-    CellPositionNotFound { position: CellPosition },
+    CellNotFound { position: At },
     #[error("the selected Keynote table is locked")]
     Locked,
     #[error("the selected Keynote table-cell Number format is not a Number format")]
@@ -374,7 +374,7 @@ impl Commit {
 struct CellSelection {
     path: Path,
     target: core::Target,
-    position: CellPosition,
+    position: At,
     tile: core::ObjectLocation,
     tile_message_index: usize,
     format: core::ObjectLocation,
@@ -405,7 +405,7 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
-        position: CellPosition,
+        position: At,
     ) -> Result<Option<Number>, Error> {
         let mut budget = core::Budget::new(self).map_err(map_core_error)?;
         Ok(select_cell(self, slide.into(), table.into(), position, &mut budget)?.before)
@@ -417,7 +417,7 @@ impl Package {
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
-        position: CellPosition,
+        position: At,
     ) -> Result<Edit<'_>, Error> {
         let mut budget = core::Budget::new(self).map_err(map_core_error)?;
         let selection = select_cell(self, slide.into(), table.into(), position, &mut budget)?;
@@ -481,12 +481,12 @@ fn select_cell(
     package: &Package,
     slide: SlideSelector<'_>,
     table: TableSelector,
-    position: CellPosition,
+    position: At,
     budget: &mut core::Budget,
 ) -> Result<CellSelection, Error> {
     let target = core::select_table(package, slide, table, budget).map_err(map_core_error)?;
     if position.row() >= target.rows || position.column() >= target.columns {
-        return Err(Error::CellPositionNotFound { position });
+        return Err(Error::CellNotFound { position });
     }
 
     let model_payload = core::model_payload(package, &target).map_err(map_core_error)?;
@@ -514,7 +514,7 @@ fn select_cell(
     let tile_identifier = tile_matches
         .next()
         .map(|(_, identifier)| *identifier)
-        .ok_or(Error::CellPositionNotFound { position })?;
+        .ok_or(Error::CellNotFound { position })?;
     if tile_matches.next().is_some() || tile_identifier == target.model.identifier {
         return Err(Error::InvalidSource);
     }
@@ -1690,9 +1690,9 @@ fn same_target(left: &CellSelection, right: &CellSelection) -> bool {
         && left.format_message_index == right.format_message_index
 }
 
-fn map_cell_wire_error(error: CellWireError, position: CellPosition) -> Error {
+fn map_cell_wire_error(error: CellWireError, position: At) -> Error {
     match error {
-        CellWireError::Missing => Error::CellPositionNotFound { position },
+        CellWireError::Missing => Error::CellNotFound { position },
         CellWireError::Unsupported => Error::UnsupportedDependency,
         CellWireError::Invalid => Error::InvalidSource,
     }
@@ -2577,7 +2577,7 @@ fn same_central_directory_record(left: &[u8], right: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        CellPosition, DecimalPlaces, Error, FixedDecimalPlaces, NegativeStyle, Number, Package,
+        At, DecimalPlaces, Error, FixedDecimalPlaces, NegativeStyle, Number, Package,
         ThousandsSeparator,
     };
     use crate::slide::table::TableSelector;
@@ -2596,12 +2596,9 @@ mod tests {
 
     #[test]
     fn semantic_values_are_archive_free_and_checked() {
-        assert_eq!(
-            CellPosition::from_a1("B2").unwrap(),
-            CellPosition::new(1, 1)
-        );
-        assert_eq!(CellPosition::new(1, 1).to_string(), "B2");
-        assert!(CellPosition::from_a1("A0").is_err());
+        assert_eq!(At::from_a1("B2").unwrap(), At::new(1, 1));
+        assert_eq!(At::new(1, 1).to_string(), "B2");
+        assert!(At::from_a1("A0").is_err());
         assert!(FixedDecimalPlaces::new(31).is_err());
         assert_eq!(
             fixed_number(2, ThousandsSeparator::Shown).decimal_places(),
@@ -2623,7 +2620,7 @@ mod tests {
         let source = Package::from_bytes(&bytes).expect("native Keynote fixture reopens");
         let slide = SlideSelector::position(Position::new(0));
         let table = TableSelector::position(Position::new(0));
-        let position = CellPosition::new(1, 1);
+        let position = At::new(1, 1);
         let before = source
             .slide_table_cell_number_format(slide, table, position)
             .expect("fixture cell Number format is readable");

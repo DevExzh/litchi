@@ -292,7 +292,7 @@ pub(crate) fn test_set_cells(
     native_id: u64,
     updates: impl IntoIterator<Item = TableCellUpdate>,
 ) -> Result<usize> {
-    use litchi_numbers::table::CellPosition;
+    use litchi_numbers::table::At;
 
     let (sheet, table) = test_cell_selectors(editor, native_id)?;
     let source = litchi_numbers::Package::from_bytes(&editor.to_bytes()?)
@@ -301,7 +301,7 @@ pub(crate) fn test_set_cells(
         .edit_table_cells(sheet, table)
         .map_err(|error| Error::ParseError(error.to_string()))?;
     for update in updates {
-        let position = CellPosition::try_from_usize(update.row, update.column)
+        let position = At::try_from_usize(update.row, update.column)
             .map_err(|error| Error::ParseError(error.to_string()))?;
         edit = match test_cell_input(update.value)? {
             Some(input) => edit.set(position, input),

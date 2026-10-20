@@ -4,7 +4,7 @@ use litchi_iwa::numbers::{
     NumbersDocumentBuilder, NumbersEditor, NumbersTableSortColumnIndex, NumbersTableSortDirection,
     NumbersTableSortOrder, NumbersTableSortRule,
 };
-use litchi_numbers::table::CellPosition;
+use litchi_numbers::table::At;
 use litchi_numbers::table::cells::{Change, Input};
 use litchi_numbers::{Package, SheetSelector, TableSelector};
 
@@ -20,16 +20,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor = set_focused_table_cells(
         editor,
         [
-            Change::set(CellPosition::new(0, 0), Input::text("Name")?),
-            Change::set(CellPosition::new(0, 1), Input::text("Marker")?),
-            Change::set(CellPosition::new(1, 0), Input::text("zebra")?),
-            Change::set(CellPosition::new(1, 1), Input::text("last")?),
-            Change::set(CellPosition::new(2, 0), Input::text("apple")?),
-            Change::set(CellPosition::new(2, 1), Input::text("first apple")?),
-            Change::set(CellPosition::new(3, 0), Input::text("banana")?),
-            Change::set(CellPosition::new(3, 1), Input::text("middle")?),
-            Change::set(CellPosition::new(4, 0), Input::text("apple")?),
-            Change::set(CellPosition::new(4, 1), Input::text("second apple")?),
+            Change::set(At::new(0, 0), Input::text("Name")?),
+            Change::set(At::new(0, 1), Input::text("Marker")?),
+            Change::set(At::new(1, 0), Input::text("zebra")?),
+            Change::set(At::new(1, 1), Input::text("last")?),
+            Change::set(At::new(2, 0), Input::text("apple")?),
+            Change::set(At::new(2, 1), Input::text("first apple")?),
+            Change::set(At::new(3, 0), Input::text("banana")?),
+            Change::set(At::new(3, 1), Input::text("middle")?),
+            Change::set(At::new(4, 0), Input::text("apple")?),
+            Change::set(At::new(4, 1), Input::text("second apple")?),
         ],
     )?;
     let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(

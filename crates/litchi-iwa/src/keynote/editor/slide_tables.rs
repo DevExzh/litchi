@@ -109,7 +109,7 @@ pub struct KeynoteSlideTable {
 
 impl KeynoteSlideTable {
     pub fn get_cell(&self, row: usize, column: usize) -> Option<&KeynoteTableCellValue> {
-        let position = litchi_numbers::CellPosition::try_from_usize(row, column).ok()?;
+        let position = litchi_numbers::At::try_from_usize(row, column).ok()?;
         self.table_read.get(position)
     }
 
@@ -135,7 +135,7 @@ impl KeynoteSlideTable {
 
     /// Borrow the comment attached to a materialized cell, if any.
     pub fn get_comment(&self, row: usize, column: usize) -> Option<&Comment> {
-        let position = litchi_numbers::CellPosition::try_from_usize(row, column).ok()?;
+        let position = litchi_numbers::At::try_from_usize(row, column).ok()?;
         self.table_read.get_comment(position)
     }
 

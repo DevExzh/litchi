@@ -9,7 +9,7 @@ use litchi::numbers::{
     Package, Error as PackageError, SheetSelector,
     TableSelector,
     cell::data_format::pop_up_menu::{InitialSelection, Item, PopUpMenu, transaction::Patch},
-    table::CellPosition,
+    table::At,
 };
 
 const MAX_INPUT_BYTES: u64 = 512 * 1024;
@@ -89,7 +89,7 @@ fn split_component_package() -> Option<&'static Package> {
 fn exercise_package(package: &Package, data: &[u8]) {
     let sheet = SheetSelector::index(0);
     let table = TableSelector::index(0);
-    let position = CellPosition::new(
+    let position = At::new(
         u32::from(read_u16(data, 0) % 8),
         u32::from(read_u16(data, 2) % 8),
     );
@@ -187,7 +187,7 @@ fn exercise_package(package: &Package, data: &[u8]) {
     // model when the source has a writable number cell at this coordinate.
     // Sparse or non-number cells are valid refusals, so this branch remains
     // observational and never turns an unsupported source into a failure.
-    let other_position = CellPosition::new(position.row().saturating_add(1), position.column());
+    let other_position = At::new(position.row().saturating_add(1), position.column());
     if other_position != position
         && let Ok(second_edit) =
             commit
@@ -251,9 +251,9 @@ fn exercise_split_component_source(data: &[u8]) {
     let Some(package) = split_component_package() else {
         return;
     };
-    let popup_position = CellPosition::new(4, 0);
-    let create_position = CellPosition::new(0, 1);
-    let sibling_position = CellPosition::new(1, 1);
+    let popup_position = At::new(4, 0);
+    let create_position = At::new(0, 1);
+    let sibling_position = At::new(1, 1);
     let desired = menu(data);
 
     if let Ok(Some(before)) = package.table_cell_pop_up_menu_format(
@@ -270,7 +270,7 @@ fn exercise_split_component_source(data: &[u8]) {
 
 fn exercise_split_existing_popup(
     package: &Package,
-    position: CellPosition,
+    position: At,
     before: PopUpMenu,
     desired: PopUpMenu,
     data: &[u8],
@@ -346,8 +346,8 @@ fn exercise_split_existing_popup(
 
 fn exercise_split_create_reuse(
     package: &Package,
-    create_position: CellPosition,
-    sibling_position: CellPosition,
+    create_position: At,
+    sibling_position: At,
     desired: PopUpMenu,
     data: &[u8],
 ) {
@@ -511,7 +511,7 @@ fn exercise_split_reopened_replay(
     source_bytes: &[u8],
     target_bytes: &[u8],
     patch: &Patch,
-    position: CellPosition,
+    position: At,
     touched_components: usize,
 ) {
     let source = Package::from_bytes_with_options(source_bytes, options())
@@ -630,7 +630,7 @@ fn exercise_split_corruption_probes(data: &[u8]) {
                     observe_result(package.table_cell_pop_up_menu_format(
                         SheetSelector::index(0),
                         TableSelector::index(0),
-                        CellPosition::new(4, 0),
+                        At::new(4, 0),
                     ));
                     black_box(package_bytes(&package));
                 },

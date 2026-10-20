@@ -93,7 +93,7 @@ fn set_numbers_cell_control(
     control: CellControl,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let source = litchi_numbers::Package::from_bytes(&editor.to_bytes()?)?;
-    let position = litchi_numbers::CellPosition::try_from_usize(row, column)?;
+    let position = litchi_numbers::At::try_from_usize(row, column)?;
     let commit = source
         .edit_table_cell_control_format(
             litchi_numbers::SheetSelector::index(0),
@@ -133,7 +133,7 @@ fn set_numbers_cells(
 fn numbers_cell_change(
     update: litchi_numbers::cell::Update,
 ) -> Result<litchi_numbers::table::cells::Change, Box<dyn std::error::Error>> {
-    let position = litchi_numbers::CellPosition::try_from_usize(update.row, update.column)?;
+    let position = litchi_numbers::At::try_from_usize(update.row, update.column)?;
     let change = match update.value {
         CellValue::Empty => litchi_numbers::table::cells::Change::clear(position),
         CellValue::Text(value) => litchi_numbers::table::cells::Change::set(

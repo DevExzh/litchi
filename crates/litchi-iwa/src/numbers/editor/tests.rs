@@ -18,7 +18,7 @@ use litchi_numbers::cell::data_format::number::{
 use litchi_numbers::cell::data_format::numeral_system::{
     Base, FixedPlaces, NegativeStyle as NumeralSystemNegativeStyle, Places,
 };
-use litchi_numbers::table::CellPosition;
+use litchi_numbers::table::At;
 use litchi_numbers::table::lock::State as FocusedTableLockState;
 use litchi_numbers::table::sort::Order as FocusedSortOrder;
 use litchi_numbers::{Package as FocusedNumbersPackage, SheetSelector, TableSelector};
@@ -269,7 +269,7 @@ fn focused_test_cell_value(editor: &NumbersEditor, row: usize, column: usize) ->
         .table_cell(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::try_from_usize(row, column).unwrap(),
+            At::try_from_usize(row, column).unwrap(),
         )
         .unwrap()
         .storage()
@@ -291,7 +291,7 @@ fn focused_cell_comment_from_path(
     path: FocusedCommentReadPath,
 ) -> crate::Result<Option<litchi_numbers::cell::comment::Comment>> {
     let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
-    let position = CellPosition::try_from_usize(row, column).map_err(|error| {
+    let position = At::try_from_usize(row, column).map_err(|error| {
         Error::InvalidFormat(format!("invalid Numbers comment coordinate: {error}"))
     })?;
     let bytes = editor.to_bytes()?;
@@ -345,7 +345,7 @@ fn focused_cell_comment_replies_from_path(
     path: FocusedCommentReadPath,
 ) -> crate::Result<Box<[litchi_numbers::cell::comment::CommentReply]>> {
     let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
-    let position = CellPosition::try_from_usize(row, column).map_err(|error| {
+    let position = At::try_from_usize(row, column).map_err(|error| {
         Error::InvalidFormat(format!("invalid Numbers comment coordinate: {error}"))
     })?;
     let bytes = editor.to_bytes()?;
@@ -3886,7 +3886,7 @@ fn focused_cell_edit_round_trips_through_legacy_host_reader() {
     let editor = NumbersEditor::open(fixture).unwrap();
     let source_bytes = editor.to_bytes().unwrap();
     let source = FocusedNumbersPackage::from_bytes(&source_bytes).unwrap();
-    let position = litchi_numbers::table::CellPosition::new(1, 2);
+    let position = litchi_numbers::table::At::new(1, 2);
     let commit = source
         .set_table_cell(
             SheetSelector::index(0),
@@ -3927,7 +3927,7 @@ fn focused_number_format_edit_round_trips_through_legacy_host_writer() {
     let table_id = editor.tables().unwrap().remove(0).id();
     let source_bytes = editor.to_bytes().unwrap();
     let source = FocusedNumbersPackage::from_bytes(&source_bytes).unwrap();
-    let position = CellPosition::new(2, 1);
+    let position = At::new(2, 1);
     let number = Number::new(
         DecimalPlaces::fixed(2).unwrap(),
         NegativeStyle::MinusSign,
@@ -4310,7 +4310,7 @@ fn exact_number_to_currency_matches_focused_stages_and_preserves_value() {
         .unwrap();
     let source_bytes = editor.to_bytes().unwrap();
     let source = FocusedNumbersPackage::from_bytes(&source_bytes).unwrap();
-    let position = CellPosition::new(2, 1);
+    let position = At::new(2, 1);
     let before_value = source
         .table_cell(SheetSelector::index(0), TableSelector::index(0), position)
         .unwrap()
@@ -4636,7 +4636,7 @@ fn builder_empty_table_accepts_focused_commit_apply_and_inverse() {
         .unwrap();
     let source = FocusedNumbersPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let before = bytes(&source);
-    let position = litchi_numbers::table::CellPosition::new(1, 1);
+    let position = litchi_numbers::table::At::new(1, 1);
     let commit = source
         .edit_table_cells(SheetSelector::index(0), TableSelector::index(0))
         .unwrap()
