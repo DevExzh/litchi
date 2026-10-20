@@ -41,7 +41,7 @@ impl Package {
     /// Returns an error for dirty facade state, invalid ownership, malformed
     /// Ink anchors/payloads, or exhausted resource budgets.
     pub fn ink(&self) -> Result<Snapshot> {
-        self.ink_with_limits(Limits::default())
+        self.ink_bounded(self.semantic_limits().ink_value())
     }
 
     /// Inventory InkML using an explicit finite resource policy.
@@ -50,9 +50,9 @@ impl Package {
     ///
     /// Returns an error for invalid limits, dirty state, malformed package/XML
     /// content, or exceeded limits. A failed inventory never changes the package.
-    pub fn ink_with_limits(&self, limits: Limits) -> Result<Snapshot> {
+    pub(crate) fn ink_bounded(&self, limits: Limits) -> Result<Snapshot> {
         let limits = limits.validate()?;
-        self.ensure_story_opc_current("ink_with_limits")?;
+        self.ensure_story_opc_current("ink_bounded")?;
         load(self.opc_package(), limits)
     }
 }

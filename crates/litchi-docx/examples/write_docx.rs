@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         subject: Some("Round-trip demo".to_owned()),
         ..Metadata::default()
     });
-    let mut pkg = metadata.commit()?.into_package();
+    let pkg = metadata.commit()?.into_package();
 
     // Save to a tempfile (with .docx extension so reopen path-detection is unambiguous).
     let tmp = NamedTempFile::with_suffix(".docx")?;

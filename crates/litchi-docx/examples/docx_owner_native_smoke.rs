@@ -63,7 +63,12 @@ fn create_glossary_docx(directory: &Path) -> Result<()> {
     };
     let mut catalog = Catalog::new();
     catalog.add(Entry::new("Litchi AutoText", body.into_bytes())?.with_props(props)?)?;
-    let _ = package.put_glossary(catalog, GlossaryConformance::Transitional)?;
+    let _ = {
+        let mut edit = package.edit_glossary();
+        let value = edit.put(catalog, GlossaryConformance::Transitional)?;
+        package = edit.commit()?.into_package();
+        value
+    };
     package.save(&destination)?;
 
     verify_glossary_docx(&destination)
@@ -115,7 +120,12 @@ fn create_docx(directory: &Path) -> Result<()> {
     let mut quote = Div::new(quote_id);
     quote.set_block_quote(true);
     settings.add(quote)?;
-    let _ = package.put_web(settings, conformance)?;
+    let _ = {
+        let mut edit = package.edit_web();
+        let value = edit.put(settings, conformance)?;
+        package = edit.commit()?.into_package();
+        value
+    };
     package.save(&destination)?;
 
     let reopened = Package::open(&destination)?;

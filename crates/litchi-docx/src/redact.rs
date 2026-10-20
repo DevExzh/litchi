@@ -298,11 +298,11 @@ impl Plan {
         if crate::paragraph::extract_word_text(self.source.document_xml())?
             != crate::paragraph::extract_word_text(&rewritten)?
         {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "external_hyperlink_redaction",
-                reason: "redaction changed visible main-document text",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "external_hyperlink_redaction",
+                "redaction changed visible main-document text",
+            ));
         }
         let retained_count = self
             .source
@@ -444,11 +444,11 @@ fn build_inventory(
             litchi_opc::constants::relationship_type::HYPERLINK
                 | litchi_opc::constants::relationship_type::STRICT_HYPERLINK
         ) {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "external_hyperlink_redaction",
-                reason: "main document has an external relationship outside the hyperlink closure",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "external_hyperlink_redaction",
+                "main document has an external relationship outside the hyperlink closure",
+            ));
         }
         inventory.push(ExternalHyperlinkRelationship {
             relationship_id: relationship.id().to_owned(),
@@ -601,9 +601,9 @@ fn is_mce_namespace(namespace: &ResolveResult<'_>) -> bool {
 }
 
 fn unsafe_closure<T>(reason: &'static str) -> Result<T> {
-    Err(Error::UnsafeEdit {
-        format: "DOCX",
-        operation: "external_hyperlink_redaction",
+    Err(Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "external_hyperlink_redaction",
         reason,
-    })
+    ))
 }

@@ -15,7 +15,7 @@ mod validation;
 mod tests;
 
 pub use model::{Ligatures, NumForm, NumSpacing, OnOff, OpenType, StyleSet, StyleSetId};
-pub use transaction::{Commit, Patch, Snapshot, Transaction};
+pub use transaction::Snapshot;
 
 /// Rewrite a complete run fragment through the private codec boundary.
 pub(crate) fn rewrite(xml: &[u8], value: &OpenType) -> crate::Result<Vec<u8>> {

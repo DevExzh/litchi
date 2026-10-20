@@ -189,7 +189,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn add_custom_xml(&mut self, store: NewStore) -> Result<CustomXmlItem> {
+    pub(crate) fn add_custom_xml(&mut self, store: NewStore) -> Result<CustomXmlItem> {
         custom_xml::validate_content_type(&store.content_type)?;
         custom_xml::validate_payload(&store.xml)?;
         let props = CustomXmlProps {
@@ -271,7 +271,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn set_custom_xml(&mut self, id: &str, xml: Vec<u8>) -> Result<()> {
+    pub(crate) fn set_custom_xml(&mut self, id: &str, xml: Vec<u8>) -> Result<()> {
         custom_xml::validate_payload(&xml)?;
         self.mutate_custom_xml(
             id,
@@ -288,7 +288,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn replace_custom_xml(&mut self, id: &str, replacement: NewStore) -> Result<()> {
+    pub(crate) fn replace_custom_xml(&mut self, id: &str, replacement: NewStore) -> Result<()> {
         custom_xml::validate_content_type(&replacement.content_type)?;
         custom_xml::validate_payload(&replacement.xml)?;
         if !replacement.id.eq_ignore_ascii_case(id) {
@@ -363,7 +363,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn remove_custom_xml(&mut self, id: &str) -> Result<bool> {
+    pub(crate) fn remove_custom_xml(&mut self, id: &str) -> Result<bool> {
         self.ensure_story_opc_current("remove_custom_xml")?;
         let present = custom_xml::discover(&self.opc)?.iter().any(|item| {
             item.props()
@@ -461,7 +461,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn add_bibliography_source(
+    pub(crate) fn add_bibliography_source(
         &mut self,
         source: crate::bibliography::BibliographySourceBuilder,
     ) -> Result<String> {
@@ -492,7 +492,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn remove_bibliography_source(&mut self, tag: &str) -> Result<bool> {
+    pub(crate) fn remove_bibliography_source(&mut self, tag: &str) -> Result<bool> {
         let Some((item_id, xml)) = self.bibliography_store_item()? else {
             return Ok(false);
         };
@@ -511,7 +511,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn replace_bibliography_source(
+    pub(crate) fn replace_bibliography_source(
         &mut self,
         tag: &str,
         source: crate::bibliography::BibliographySourceBuilder,
@@ -536,7 +536,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn order_custom_xml(&mut self, ordered_ids: &[String]) -> Result<()> {
+    pub(crate) fn order_custom_xml(&mut self, ordered_ids: &[String]) -> Result<()> {
         self.ensure_story_opc_current("order_custom_xml")?;
         let current = main_store_order(&self.opc)?;
         validate_requested_order(&current, ordered_ids)?;
@@ -561,7 +561,7 @@ impl Package {
     /// Returns an error if the operation cannot be completed.
     pub fn custom_xml_bindings(&self) -> Result<Vec<Binding>> {
         let limits = PackageLimits::default();
-        let stories = self.story_inventory_with_limits(limits.stories)?;
+        let stories = self.story_inventory_bounded(limits.stories)?;
         let mut bindings = Vec::new();
         visit_bindings(
             &stories,
@@ -588,13 +588,11 @@ impl Package {
         Ok(bindings)
     }
 
-    fn refuse_signed_custom_xml_change(&self, operation: &'static str) -> Result<()> {
+    fn refuse_signed_custom_xml_change(&self, _operation: &'static str) -> Result<()> {
         if self.is_signed() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "signed Custom XML changes require explicit Package::unsign before mutation",
-            });
+            return Err(Error::Opc(
+                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
+            ));
         }
         Ok(())
     }
@@ -730,7 +728,7 @@ fn visit_bindings(
 ) -> Result<()> {
     let mut controls = 0usize;
     for story in stories.stories() {
-        let inventory = Inventory::parse_with_limits(story.source(), &limits.controls)?;
+        let inventory = Inventory::parse(story.source(), &limits.controls)?;
         controls = controls
             .checked_add(inventory.occurrences().len())
             .ok_or_else(|| Error::InvalidFormat("content-control count overflow".into()))?;

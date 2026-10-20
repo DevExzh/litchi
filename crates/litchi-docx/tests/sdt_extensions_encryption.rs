@@ -1,3 +1,7 @@
+#![allow(
+    clippy::redundant_closure_call,
+    reason = "raw OPC test edits stage one closure over the edit's graph"
+)]
 #![cfg(feature = "encryption")]
 
 use litchi_docx::content_control::{Checksum, Limits, PackageChecksumStatus};
@@ -31,14 +35,23 @@ fn encrypted_source(payload: &[u8]) -> Package {
     )
     .into_bytes();
     let mut package = Package::new().unwrap();
-    package.add_custom_xml(store(payload)).unwrap();
+    package = {
+        let mut edit = package.edit_custom_xml();
+        edit.add(store(payload)).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     let main = PackURI::new("/word/document.xml").unwrap();
-    package
-        .edit_opc(|opc| {
-            opc.get_part_mut(&main)?.set_blob(source);
-            Ok::<_, Error>(())
-        })
+    package = {
+        let mut edit = package.edit_opc();
+        (|opc: &mut litchi_opc::OpcPackage| -> litchi_docx::Result<_> {
+            {
+                opc.get_part_mut(&main)?.set_blob(source);
+                Ok::<_, Error>(())
+            }
+        })(edit.package_mut())
         .unwrap();
+        edit.commit().unwrap().into_package()
+    };
     package
 }
 
@@ -61,11 +74,8 @@ fn assert_encrypted_payload(package: &Package, expected: &[u8]) {
         expected
     );
     assert!(matches!(
-        package.verify_content_control_checksums(),
-        Err(Error::UnsafeEdit {
-            operation: "verify_content_control_checksums",
-            ..
-        })
+            package.verify_content_control_checksums(),
+            Err(Error::Refused(refusal)) if refusal.operation() == "verify_content_control_checksums"
     ));
 }
 
@@ -82,43 +92,45 @@ fn encrypted_set_and_replace_reencrypt_with_current_checksums() {
     let set_payload = b"<root>encrypted-set</root>";
     let replacement_payload = b"<root>encrypted-replacement</root>";
 
-    let mut package = encrypted_source(initial);
+    let package = encrypted_source(initial);
     package
         .save_encrypted(&source_path, "initial-password", Mode::Agile)
         .unwrap();
     let encrypted_source = std::fs::read(&source_path).unwrap();
 
-    let mut opened = Package::open_with_password(&source_path, "initial-password").unwrap();
+    let opened = Package::open_with_password(&source_path, "initial-password").unwrap();
     assert!(matches!(
-        opened.set_custom_xml(ITEM, set_payload.to_vec()),
-        Err(Error::UnsafeEdit {
-            operation: "set_custom_xml",
-            ..
-        })
+            {
+                let mut edit = opened.edit_custom_xml();
+                edit.set(ITEM, set_payload.to_vec()).map(|_| ()).and_then(|()| edit.commit().map(|_| ()))
+            },
+            Err(Error::Refused(refusal)) if refusal.operation() == "set_custom_xml"
     ));
     assert_encrypted_payload(&opened, initial);
     assert_eq!(std::fs::read(&source_path).unwrap(), encrypted_source);
     opened.save_plain(&set_plain_path).unwrap();
 
     let mut plaintext = Package::open(&set_plain_path).unwrap();
-    plaintext
-        .set_custom_xml(ITEM, set_payload.to_vec())
-        .unwrap();
+    plaintext = {
+        let mut edit = plaintext.edit_custom_xml();
+        edit.set(ITEM, set_payload.to_vec()).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     assert_matching(&plaintext, set_payload);
     plaintext
         .save_encrypted(&set_path, "set-password", Mode::Agile)
         .unwrap();
-    let mut reopened = Package::open_with_password(&set_path, "set-password").unwrap();
+    let reopened = Package::open_with_password(&set_path, "set-password").unwrap();
     assert_encrypted_payload(&reopened, set_payload);
 
     let mut refused_replacement = store(replacement_payload);
     refused_replacement.content_type = "application/vnd.litchi.encrypted+xml".to_owned();
     assert!(matches!(
-        reopened.replace_custom_xml(ITEM, refused_replacement),
-        Err(Error::UnsafeEdit {
-            operation: "replace_custom_xml",
-            ..
-        })
+            {
+                let mut edit = reopened.edit_custom_xml();
+                edit.replace(ITEM, refused_replacement).map(|_| ()).and_then(|()| edit.commit().map(|_| ()))
+            },
+            Err(Error::Refused(refusal)) if refusal.operation() == "replace_custom_xml"
     ));
     assert_encrypted_payload(&reopened, set_payload);
     reopened.save_plain(&replace_plain_path).unwrap();
@@ -130,12 +142,16 @@ fn encrypted_set_and_replace_reencrypt_with_current_checksums() {
     replacement
         .schemas
         .push("urn:encrypted:replacement".to_owned());
-    plaintext.replace_custom_xml(ITEM, replacement).unwrap();
+    plaintext = {
+        let mut edit = plaintext.edit_custom_xml();
+        edit.replace(ITEM, replacement).unwrap();
+        edit.commit().unwrap().into_package()
+    };
     assert_matching(&plaintext, replacement_payload);
     plaintext
         .save_encrypted(&replaced_path, "replacement-password", Mode::Agile)
         .unwrap();
-    let mut final_package =
+    let final_package =
         Package::open_with_password(&replaced_path, "replacement-password").unwrap();
     assert_encrypted_payload(&final_package, replacement_payload);
     final_package.save_plain(&final_plain_path).unwrap();

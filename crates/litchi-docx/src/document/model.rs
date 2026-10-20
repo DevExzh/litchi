@@ -42,6 +42,8 @@ pub struct Document {
     /// Interior mutability keeps the lazy read facades on `&self` (and the
     /// document `Send + Sync`) while still accumulating their repairs.
     pub(super) tolerance: std::sync::Mutex<crate::leniency::ToleranceReport>,
+    /// The semantic read budgets of the package the projection came from.
+    pub(super) limits: Arc<crate::SemanticLimits>,
 }
 
 /// A picture watermark discovered in a document header, with its media part
@@ -154,11 +156,13 @@ impl Document {
         part: DocumentPart<'static>,
         opc: Arc<OpcPackage>,
         tolerance: crate::leniency::ToleranceReport,
+        limits: Arc<crate::SemanticLimits>,
     ) -> Self {
         Self {
             part,
             opc,
             tolerance: std::sync::Mutex::new(tolerance),
+            limits,
         }
     }
 

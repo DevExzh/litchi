@@ -1,3 +1,4 @@
+use super::package::apply_patch;
 use super::*;
 use crate::color::Theme;
 use litchi_opc::packuri::PackURI;

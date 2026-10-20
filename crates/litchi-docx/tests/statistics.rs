@@ -9,7 +9,7 @@ fn reopened_document_statistics_use_the_concrete_metrics_owner() {
         document.add_paragraph_with_text("alpha beta");
         document.add_paragraph();
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
     package.write_to(&mut bytes).unwrap();

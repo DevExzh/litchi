@@ -21,7 +21,7 @@ fn main() -> ExampleResult<()> {
             "It creates a new package, writes paragraphs, saves the document, and reopens it for read-back verification.",
         );
     }
-    let mut pkg = builder.build()?;
+    let pkg = builder.build()?;
     println!("✓ Created package and populated document content");
 
     println!("\nTest 2: Saving package...");

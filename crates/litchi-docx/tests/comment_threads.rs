@@ -92,7 +92,7 @@ fn a_reply_is_threaded_and_resolution_is_recorded() {
     );
 
     // The inverse of the first commit removes both comments and the part.
-    let restored = package.apply(&inverse).unwrap();
+    let restored = package.apply(&inverse).unwrap().into_package();
     assert!(restored.document().unwrap().comments().unwrap().is_empty());
     assert!(
         restored

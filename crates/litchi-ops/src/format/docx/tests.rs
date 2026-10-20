@@ -448,7 +448,7 @@ fn editor_refuses_alternate_content_on_both_owners() {
             matches!(
                 error.leaf(),
                 Source::DocxTransaction(litchi_docx::document::Error::Document(
-                    litchi_docx::Error::UnsafeEdit { .. }
+                    litchi_docx::Error::Refused(_)
                 ))
             ),
             "{error:?}"
@@ -493,7 +493,7 @@ fn transaction_errors_are_classified_and_typed() {
             },
             Code::LimitExceeded,
         ),
-        (TransactionError::PatchConflict, Code::IoError),
+        (TransactionError::PatchConflict, Code::InvalidInput),
         (
             TransactionError::SemanticPrecondition,
             Code::InvalidArgument,

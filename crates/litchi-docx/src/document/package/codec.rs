@@ -57,19 +57,14 @@ impl Document {
     /// Header and footer relationship IDs remain inert and no target part is
     /// resolved or read.
     pub fn section_inventory(&self) -> Result<crate::section::Inventory> {
-        self.section_inventory_with_limits(&crate::section::Limits::default())
+        self.section_inventory_bounded(self.limits.sections_value())
     }
 
-    /// Capture the section inventory with caller-provided semantic limits.
-    ///
-    /// Column-model repairs ([`crate::leniency::SectionDefect`]) carried by
-    /// the inventory are merged into [`Document::tolerance_report`].
-    pub fn section_inventory_with_limits(
+    pub(crate) fn section_inventory_bounded(
         &self,
         limits: &crate::section::Limits,
     ) -> Result<crate::section::Inventory> {
-        let inventory =
-            crate::section::Inventory::parse_with_limits(self.part.xml_bytes(), limits)?;
+        let inventory = crate::section::Inventory::parse(self.part.xml_bytes(), limits)?;
         self.merge_tolerance(inventory.tolerance_report());
         Ok(inventory)
     }

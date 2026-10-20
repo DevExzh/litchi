@@ -831,7 +831,8 @@ fn glossary_references_and_limits_are_failure_atomic() {
         .unwrap();
     assert!(
         open(&source)
-            .story_text_snapshot_with_limits(alpha_by_name(), limits)
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(limits))
+            .story_text_snapshot(alpha_by_name())
             .is_err()
     );
 
@@ -839,14 +840,18 @@ fn glossary_references_and_limits_are_failure_atomic() {
         source_backed::StoryTextLimits::new(4096, 1, 10_000, 64, 4096, 4096, 4096).unwrap();
     assert!(
         open(&fixture(Dialect::Transitional, Mutation::TwoParagraphs))
-            .story_text_snapshot_with_limits(alpha_by_name(), paragraph_limits)
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_text(paragraph_limits)
+            )
+            .story_text_snapshot(alpha_by_name())
             .is_err()
     );
     let output_limits =
         source_backed::StoryTextLimits::new(4096, 8, 10_000, 64, 1, 4096, 4096).unwrap();
     assert!(
         open(&fixture(Dialect::Transitional, Mutation::Valid))
-            .story_text_snapshot_with_limits(alpha_by_name(), output_limits)
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(output_limits))
+            .story_text_snapshot(alpha_by_name())
             .unwrap()
             .extract_text()
             .is_err()
@@ -855,7 +860,8 @@ fn glossary_references_and_limits_are_failure_atomic() {
         source_backed::StoryTextLimits::new(1, 8, 10_000, 64, 4096, 4096, 4096).unwrap();
     assert!(
         open(&source)
-            .story_text_snapshot_with_limits(alpha_by_name(), xml_limits)
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(xml_limits))
+            .story_text_snapshot(alpha_by_name())
             .is_err()
     );
     let entry_limits = source_backed::StoryTextLimits::default()
@@ -863,7 +869,8 @@ fn glossary_references_and_limits_are_failure_atomic() {
         .unwrap();
     assert!(
         open(&source)
-            .story_text_snapshot_with_limits(alpha_by_name(), entry_limits)
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(entry_limits))
+            .story_text_snapshot(alpha_by_name())
             .is_err()
     );
 
@@ -871,7 +878,8 @@ fn glossary_references_and_limits_are_failure_atomic() {
     let limits = source_backed::StoryTextLimits::new(4096, 2, 10_000, 64, 4096, 1, 4096).unwrap();
     let package = open(&source);
     let snapshot = package
-        .story_text_snapshot_with_limits(alpha_by_name(), limits)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(limits))
+        .story_text_snapshot(alpha_by_name())
         .unwrap();
     let mut edit = snapshot.edit().unwrap();
     assert!(edit.replace_paragraph_text(Position::new(0), "one").is_ok());
@@ -897,7 +905,8 @@ fn glossary_quote_namespace_wrapper_has_exact_and_one_under_boundaries() {
         source_backed::StoryTextLimits::new(16 * 1024, 8, 10_000, 64, wrapper_bytes, 4096, 4096)
             .unwrap();
     let snapshot = open(&source)
-        .story_text_snapshot_with_limits(alpha_by_name(), exact)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(exact))
+        .story_text_snapshot(alpha_by_name())
         .unwrap();
     assert!(snapshot.edit().is_ok());
 
@@ -912,7 +921,8 @@ fn glossary_quote_namespace_wrapper_has_exact_and_one_under_boundaries() {
     )
     .unwrap();
     let snapshot = open(&source)
-        .story_text_snapshot_with_limits(alpha_by_name(), one_under)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(one_under))
+        .story_text_snapshot(alpha_by_name())
         .unwrap();
     assert!(matches!(
         snapshot.edit(),
@@ -1095,7 +1105,8 @@ fn glossary_batch_does_not_charge_unselected_entry_paragraphs() {
     ])
     .unwrap();
     let snapshot = open(&source)
-        .glossary_text_batch_snapshot_with_limits(selected, limits)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(limits))
+        .glossary_text_batch_snapshot(selected)
         .unwrap();
     assert_eq!(snapshot.entry_count().unwrap(), 2);
     assert_eq!(snapshot.extract_text(0).unwrap().as_deref(), Some("target"));
@@ -1328,13 +1339,17 @@ fn glossary_batch_noop_inverse_and_limits_are_atomic() {
         .unwrap();
     assert!(
         open(&source)
-            .glossary_text_batch_snapshot_with_limits(glossary_triplet(), count_limited)
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(count_limited))
+            .glossary_text_batch_snapshot(glossary_triplet())
             .is_err()
     );
     let replacement_limited =
         source_backed::StoryTextLimits::new(16 * 1024, 8, 10_000, 64, 32 * 1024, 1, 4096).unwrap();
     let snapshot = open(&source)
-        .glossary_text_batch_snapshot_with_limits(glossary_triplet(), replacement_limited)
+        .with_semantic_limits(
+            litchi_docx::SemanticLimits::default().story_text(replacement_limited),
+        )
+        .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
     let mut edit = snapshot.edit().unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "one")
@@ -1347,7 +1362,9 @@ fn glossary_batch_noop_inverse_and_limits_are_atomic() {
     let output_limited =
         source_backed::StoryTextLimits::new(16 * 1024, 8, 10_000, 64, 1, 4096, 4096).unwrap();
     assert!(matches!(
-        open(&source).glossary_text_batch_snapshot_with_limits(glossary_triplet(), output_limited),
+        open(&source)
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(output_limited))
+            .glossary_text_batch_snapshot(glossary_triplet()),
         Err(source_backed::StoryTextError::Limit {
             resource: "glossary batch entry bytes",
             maximum: 1,
@@ -1382,7 +1399,10 @@ fn glossary_batch_rejects_repeated_targets_and_aggregate_limits() {
     let replacement_limited =
         source_backed::StoryTextLimits::new(16 * 1024, 8, 10_000, 64, 32 * 1024, 8, 5).unwrap();
     let snapshot = open(&source)
-        .glossary_text_batch_snapshot_with_limits(glossary_triplet(), replacement_limited)
+        .with_semantic_limits(
+            litchi_docx::SemanticLimits::default().story_text(replacement_limited),
+        )
+        .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
     let mut edit = snapshot.edit().unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "one")
@@ -1396,7 +1416,9 @@ fn glossary_batch_rejects_repeated_targets_and_aggregate_limits() {
         .with_secondary_entry_limits(3, 1, 256)
         .unwrap();
     assert!(matches!(
-        open(&source).glossary_text_batch_snapshot_with_limits(glossary_triplet(), entry_limited),
+        open(&source)
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(entry_limited))
+            .glossary_text_batch_snapshot(glossary_triplet()),
         Err(source_backed::StoryTextError::Limit { .. })
     ));
 
@@ -1405,7 +1427,8 @@ fn glossary_batch_rejects_repeated_targets_and_aggregate_limits() {
         source_backed::StoryTextLimits::new(16 * 1024, 8, 10_000, 64, glossary_bytes - 1, 8, 4096)
             .unwrap();
     let snapshot = open(&source)
-        .glossary_text_batch_snapshot_with_limits(glossary_triplet(), output_limited)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(output_limited))
+        .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
     let mut edit = snapshot.edit().unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "x".repeat(512))

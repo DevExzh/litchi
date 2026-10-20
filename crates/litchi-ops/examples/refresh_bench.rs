@@ -218,7 +218,7 @@ fn main() {
     let file = litchi_ops::open_bytes_with(source.clone(), &eager).expect("document");
     let options = Options::new();
     {
-        let mut leaf = leaf_toc(&package);
+        let leaf = leaf_toc(&package);
         let unified = file.refresh(&options).expect("refresh");
         let leaf_file = litchi_ops::open_bytes_with(leaf.to_bytes().expect("leaf bytes"), &eager)
             .expect("leaf file");

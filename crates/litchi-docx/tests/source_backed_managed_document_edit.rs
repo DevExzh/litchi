@@ -382,12 +382,8 @@ fn is_artifact_mismatch(error: &TransactionError) -> bool {
 
 fn is_protection_refusal(error: &TransactionError) -> bool {
     matches!(
-        error,
-        TransactionError::Document(Error::UnsafeEdit {
-            operation: "changed document publication",
-            reason: "document or write protection, or tracked revisions, is enabled",
-            ..
-        })
+            error,
+            TransactionError::Document(Error::Refused(refusal)) if refusal.operation() == "changed document publication" && refusal.reason() == "document or write protection, or tracked revisions, is enabled"
     )
 }
 
@@ -401,23 +397,17 @@ fn is_mixed_dialect_refusal(error: &TransactionError) -> bool {
 
 fn is_mce_policy_refusal(error: &TransactionError) -> bool {
     matches!(
-        error,
-        TransactionError::Document(Error::UnsafeEdit {
-            operation: "changed document publication",
-            reason: "markup-compatibility projection or unknown source policy is not admitted",
-            ..
-        })
+            error,
+            TransactionError::Document(Error::Refused(refusal)) if refusal.operation() == "changed document publication" && refusal.reason() == "markup-compatibility projection or unknown source policy is not admitted"
     )
 }
 
 fn is_settings_policy_refusal(error: &TransactionError) -> bool {
     matches!(
         error,
-        TransactionError::Document(Error::UnsafeEdit {
-            operation: "changed document publication",
-            ..
-        }) | TransactionError::Document(Error::InvalidFormat(_))
-    )
+        TransactionError::Document(Error::Refused(refusal))
+            if refusal.operation() == "changed document publication"
+    ) || matches!(error, TransactionError::Document(Error::InvalidFormat(_)))
 }
 
 fn is_literal_namespace_refusal(error: &TransactionError) -> bool {
@@ -440,12 +430,8 @@ fn is_dtd_policy_refusal(error: &TransactionError) -> bool {
 
 fn is_mce_document_refusal(error: &TransactionError) -> bool {
     matches!(
-        error,
-        TransactionError::Document(Error::UnsafeEdit {
-            operation: "source-backed document read",
-            reason: "markup-compatibility preprocessing would require an unbudgeted owned payload",
-            ..
-        })
+            error,
+            TransactionError::Document(Error::Refused(refusal)) if refusal.operation() == "source-backed document read" && refusal.reason() == "markup-compatibility preprocessing would require an unbudgeted owned payload"
     )
 }
 
@@ -712,11 +698,8 @@ fn managed_paragraph_and_nested_run_mutations_refuse_without_state_change() {
     for value in [None, Some(Collapsed::Disabled)] {
         let result = paragraph.set_collapsed(value);
         assert!(matches!(
-            result,
-            Err(Error::UnsafeEdit {
-                operation: "paragraph.set_collapsed",
-                ..
-            })
+                    result,
+                    Err(Error::Refused(refusal)) if refusal.operation() == "paragraph.set_collapsed"
         ));
         assert_eq!(paragraph.collapsed().unwrap(), before_collapsed);
     }
@@ -733,11 +716,8 @@ fn managed_paragraph_and_nested_run_mutations_refuse_without_state_change() {
     assert!(before_symbols.is_empty());
     let result = nested_run.set_symbols(Symbols::default());
     assert!(matches!(
-        result,
-        Err(Error::UnsafeEdit {
-            operation: "run.set_symbols",
-            ..
-        })
+            result,
+            Err(Error::Refused(refusal)) if refusal.operation() == "run.set_symbols"
     ));
     assert_eq!(nested_run.symbols().unwrap(), before_symbols);
 
@@ -815,11 +795,8 @@ fn managed_hyperlink_nested_run_retains_source_after_package_drop_and_refuses_mu
     let before_symbols = nested_run.symbols().unwrap();
     let result = nested_run.set_symbols(Symbols::default());
     assert!(matches!(
-        result,
-        Err(Error::UnsafeEdit {
-            operation: "run.set_symbols",
-            ..
-        })
+            result,
+            Err(Error::Refused(refusal)) if refusal.operation() == "run.set_symbols"
     ));
     assert_eq!(nested_run.symbols().unwrap(), before_symbols);
 
@@ -977,7 +954,7 @@ fn managed_signed_noop_and_equal_setter_preserve_exact_source() {
     let result = edit.replace_paragraph_text(Position::new(0), "changed");
     assert!(matches!(
         result,
-        Err(TransactionError::Document(Error::UnsafeEdit { .. }))
+        Err(TransactionError::Document(Error::Refused(_)))
     ));
     drop(edit);
     drop(package);
@@ -1050,14 +1027,11 @@ fn managed_revision_dispositions_are_refused_like_revision_text_replacement() {
             )
             .map(|_| ())
             .unwrap_err();
-        let TransactionError::Document(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "replace_revision_text",
-            reason: expected_reason,
-        }) = reference
-        else {
+        let TransactionError::Document(Error::Refused(refusal)) = reference else {
             panic!("managed revision text replacement must be refused: {reference:?}");
         };
+        assert_eq!(refusal.operation(), "replace_revision_text");
+        let expected_reason = refusal.reason();
 
         let attempts = [
             (
@@ -1093,13 +1067,9 @@ fn managed_revision_dispositions_are_refused_like_revision_text_replacement() {
         ];
         for (expected_operation, result) in attempts {
             match result {
-                Err(TransactionError::Document(Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation,
-                    reason,
-                })) => {
-                    assert_eq!(operation, expected_operation, "signed = {signed}");
-                    assert_eq!(reason, expected_reason, "signed = {signed}");
+                Err(TransactionError::Document(Error::Refused(refusal))) => {
+                    assert_eq!(refusal.operation(), expected_operation, "signed = {signed}");
+                    assert_eq!(refusal.reason(), expected_reason, "signed = {signed}");
                 },
                 other => panic!(
                     "managed {expected_operation} must be refused like revision text replacement \

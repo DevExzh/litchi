@@ -9,6 +9,7 @@
 //! under the font module without compatibility aliases or format prefixes.
 
 mod codec;
+mod edit;
 mod model;
 pub mod open_type;
 mod package;
@@ -16,12 +17,12 @@ mod package;
 mod tests;
 
 pub use codec::{parse, write};
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub use model::{
     Charset, Conformance, Embed, Family, Font, FontKey, Key, License, Pitch, Resource, Signature,
     Style, Table, deobfuscate, obfuscate, raw,
 };
 pub use open_type::{
-    Commit, Ligatures, NumForm, NumSpacing, OnOff, OpenType, Patch, Snapshot, StyleSet, StyleSetId,
-    Transaction,
+    Ligatures, NumForm, NumSpacing, OnOff, OpenType, Snapshot, StyleSet, StyleSetId,
 };
 pub use package::{put, read, remove, validate_usage};

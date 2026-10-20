@@ -1179,7 +1179,7 @@ impl Edit<Package> {
         let committed = self.inner.commit()?;
         let diagnostics = committed.diagnostics();
         let (_, patch) = committed.into_parts();
-        let package = self.package.apply(&patch)?;
+        let package = self.package.apply(&patch)?.into_package();
         Ok(Commit {
             package,
             patch,
@@ -1251,6 +1251,14 @@ impl<P> std::fmt::Debug for Commit<P> {
 }
 
 impl<P> Commit<P> {
+    pub(crate) const fn from_parts(package: P, patch: Patch, diagnostics: Diagnostics) -> Self {
+        Self {
+            package,
+            patch,
+            diagnostics,
+        }
+    }
+
     /// Borrow the immutable published package.
     #[must_use]
     pub const fn package(&self) -> &P {

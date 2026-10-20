@@ -205,7 +205,7 @@ fn protected_docx_security() -> Result<(), Box<dyn Error>> {
         Ok(_) => return Err("protected DOCX publication unexpectedly succeeded".into()),
         Err(error) => error,
     };
-    assert!(matches!(error, litchi_docx::Error::UnsafeEdit { .. }));
+    assert!(matches!(error, litchi_docx::Error::Refused(_)));
     assert!(output.is_empty());
     Ok(())
 }

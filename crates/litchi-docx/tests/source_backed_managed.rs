@@ -221,10 +221,16 @@ fn managed_document_read_retains_budgeted_part_data_and_supports_selective_queri
     assert_eq!(document.paragraph_count().unwrap(), 2);
     assert!(document.revisions().unwrap().is_empty());
     assert!(matches!(
-        document.revisions_with_limits(litchi_docx::revision::Limits {
-            max_source_bytes: 0,
-            ..litchi_docx::revision::Limits::default()
-        }),
+        package
+            .with_semantic_limits(litchi_docx::SemanticLimits::default().revisions(
+                litchi_docx::revision::Limits {
+                    max_source_bytes: 0,
+                    ..litchi_docx::revision::Limits::default()
+                }
+            ))
+            .document()
+            .unwrap()
+            .revisions(),
         Err(Error::RevisionLimit {
             resource: "source bytes",
             ..
@@ -240,11 +246,8 @@ fn managed_document_read_retains_budgeted_part_data_and_supports_selective_queri
 
     let error = document.paragraphs().unwrap_err();
     assert!(matches!(
-        error,
-        Error::UnsafeEdit {
-            operation: "document paragraphs",
-            ..
-        }
+            error,
+            Error::Refused(refusal) if refusal.operation() == "document paragraphs"
     ));
     cancellation_source.cancel();
     assert!(matches!(
@@ -399,10 +402,6 @@ fn managed_revisions_query_is_admitted_and_charged_like_extract_text() {
     };
     assert!(is_memory_limit(&revisions), "{revisions:?}");
     assert_eq!(revisions.to_string(), text.to_string());
-    let with_limits = document
-        .revisions_with_limits(litchi_docx::revision::Limits::default())
-        .unwrap_err();
-    assert_eq!(with_limits.to_string(), text.to_string());
 
     drop(short);
     assert_eq!(document.revisions().unwrap().len(), 8);

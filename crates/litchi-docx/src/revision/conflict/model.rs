@@ -370,21 +370,12 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Parse a conflict-markup XML source using default bounded limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn from_xml(source: impl Into<Vec<u8>>) -> Result<Self> {
-        Self::from_xml_with_limits(source, Limits::default())
-    }
-
     /// Parse a conflict-markup XML source using explicit bounded limits.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn from_xml_with_limits(source: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
+    pub fn from_xml(source: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
         Self::from_arc_with_limits(Arc::from(source.into().into_boxed_slice()), limits)
     }
 
@@ -451,8 +442,8 @@ impl Snapshot {
 
     /// Start a failure-atomic conflict-markup edit.
     #[must_use]
-    pub fn edit(&self) -> super::transaction::Transaction {
-        super::transaction::Transaction::new(self.clone())
+    pub(crate) fn edit(&self) -> super::transaction::Draft {
+        super::transaction::Draft::new(self.clone())
     }
 
     pub(crate) fn with_binding(mut self, binding: Binding) -> Self {

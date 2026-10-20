@@ -257,11 +257,11 @@ impl Run {
     /// Returns an error if the operation cannot be completed.
     pub fn set_open_type(&mut self, value: OpenType) -> Result<&mut Self> {
         if self.is_managed() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "run.set_open_type",
-                reason: "managed run views cannot detach source-owned XML",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "run.set_open_type",
+                "managed run views cannot detach source-owned XML",
+            ));
         }
         let _parser_admission = self.parser_admission()?;
         let rewritten = crate::font::open_type::rewrite(self.xml_bytes(), &value)?;

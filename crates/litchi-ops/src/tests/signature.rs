@@ -342,7 +342,7 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
             let count = edit.source().paragraph_count();
             edit.insert_paragraph(Position::new(count), MARKER).unwrap();
             let commit = edit.commit().unwrap();
-            let mut package = package.apply(commit.patch()).unwrap();
+            let package = package.apply(commit.patch()).unwrap().into_package();
             let mut output = Vec::new();
             package.write_to(&mut output).unwrap();
             (output, MARKER.to_owned())
@@ -554,7 +554,7 @@ fn assert_exact_noop(input: &Input) {
 
             let package = litchi_docx::Package::from_reader(Cursor::new(bytes)).unwrap();
             let commit = package.edit().unwrap().commit().unwrap();
-            let mut package = package.apply(commit.patch()).unwrap();
+            let package = package.apply(commit.patch()).unwrap().into_package();
             let mut output = Vec::new();
             package.write_to(&mut output).unwrap();
             assert_eq!(&output, bytes, "{label}: eager no-op");

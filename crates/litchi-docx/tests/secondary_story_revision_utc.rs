@@ -1,7 +1,7 @@
 use litchi_docx::Package;
+use litchi_docx::SectionProperties;
 use litchi_docx::header_footer::Kind;
 use litchi_docx::section::Start;
-use litchi_docx::writer::SectionProperties;
 use std::io::Cursor;
 
 const WORD: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -32,12 +32,12 @@ fn header_and_footer_revision_utc_survive_package_save_and_reopen() {
             .set_footer_part(Kind::Primary, "utc-footer", footer_xml.as_str())
             .unwrap();
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
     package.write_to(&mut bytes).unwrap();
     let original_bytes = bytes.into_inner();
-    let mut reopened = Package::from_reader(Cursor::new(original_bytes.as_slice())).unwrap();
+    let reopened = Package::from_reader(Cursor::new(original_bytes.as_slice())).unwrap();
     let document = reopened.document().unwrap();
 
     let header = document.headers().unwrap().into_iter().next().unwrap();

@@ -277,7 +277,11 @@ impl Table {
     ///
     /// # Errors
     /// Returns an error for malformed revision XML or an exceeded resource limit.
-    pub fn revisions_with_limits(&self, limits: crate::revision::Limits) -> Result<Vec<Revision>> {
+    #[cfg(test)]
+    pub(crate) fn revisions_bounded(
+        &self,
+        limits: crate::revision::Limits,
+    ) -> Result<Vec<Revision>> {
         let revisions = crate::revision::parse_revisions_with_limits(
             self.xml_bytes(),
             self.xml_data.namespace_bindings(),
@@ -506,7 +510,11 @@ impl Row {
     ///
     /// # Errors
     /// Returns an error for malformed revision XML or an exceeded resource limit.
-    pub fn revisions_with_limits(&self, limits: crate::revision::Limits) -> Result<Vec<Revision>> {
+    #[cfg(test)]
+    pub(crate) fn revisions_bounded(
+        &self,
+        limits: crate::revision::Limits,
+    ) -> Result<Vec<Revision>> {
         let revisions = crate::revision::parse_revisions_with_limits(
             self.xml_bytes(),
             self.xml_data.namespace_bindings(),
@@ -712,7 +720,11 @@ impl Cell {
     ///
     /// # Errors
     /// Returns an error for malformed revision XML or an exceeded resource limit.
-    pub fn revisions_with_limits(&self, limits: crate::revision::Limits) -> Result<Vec<Revision>> {
+    #[cfg(test)]
+    pub(crate) fn revisions_bounded(
+        &self,
+        limits: crate::revision::Limits,
+    ) -> Result<Vec<Revision>> {
         let revisions = crate::revision::parse_revisions_with_limits(
             self.xml_bytes(),
             self.xml_data.namespace_bindings(),

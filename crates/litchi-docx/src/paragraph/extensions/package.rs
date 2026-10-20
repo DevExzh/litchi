@@ -1,10 +1,10 @@
 //! Paragraph, row, and mutable-writer integration for extension attributes.
 
+use crate::builder::{Paragraph as DraftParagraph, Row as DraftRow};
 use crate::error::Result;
 use crate::paragraph::Paragraph;
 use crate::paragraph::model::XmlData;
 use crate::table::Row;
-use crate::writer::{MutableParagraph, MutableRow};
 
 use super::codec::{parse_paragraph, parse_row};
 use super::model::{Extensions, Id, Ids};
@@ -100,7 +100,7 @@ impl Row {
     }
 }
 
-impl MutableParagraph {
+impl DraftParagraph {
     /// Borrow the paragraph's detached Word 2010 extension state.
     #[must_use]
     pub fn extensions(&self) -> &Extensions {
@@ -157,7 +157,7 @@ impl MutableParagraph {
     }
 }
 
-impl MutableRow {
+impl DraftRow {
     /// Return the row's detached Word 2010 identifier pair.
     #[must_use]
     pub fn extension_ids(&self) -> Ids {

@@ -1,7 +1,5 @@
 //! Package graph access, signatures, and transactional low-level edits.
 
-#[cfg(feature = "sign")]
-use super::super::model::PackURI;
 use super::super::model::{
     CustomProps, CustomPropsHost, Error, OpcPackage, Package, Result, Slot, embedded,
     validate_document_main_content_type,
@@ -17,6 +15,21 @@ impl Package {
     /// been materialized into the OPC graph.
     pub(crate) fn ensure_conflict_opc_current(&self, operation: &'static str) -> Result<()> {
         self.ensure_story_opc_current(operation)
+    }
+
+    /// The semantic read budgets this package keeps (record 0355).
+    #[must_use]
+    pub fn semantic_limits(&self) -> &crate::SemanticLimits {
+        &self.semantic_limits
+    }
+
+    /// The same package under other semantic read budgets. O(1): every part
+    /// is shared.
+    #[must_use]
+    pub fn with_semantic_limits(&self, limits: crate::SemanticLimits) -> Self {
+        let mut next = self.clone();
+        next.semantic_limits = std::sync::Arc::new(limits);
+        next
     }
 
     /// Get the underlying OPC package.
@@ -64,8 +77,10 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn sign(&mut self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<PackURI> {
-        self.opc.sign(signer)
+    pub fn sign(&self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<Self> {
+        let mut next = self.clone();
+        next.opc.sign(signer)?;
+        Ok(next)
     }
 
     /// Add a signature with explicit authoring resource bounds.
@@ -75,11 +90,13 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn sign_with(
-        &mut self,
+        &self,
         signer: &litchi_sign::Signer,
         limits: &litchi_sign::Limits,
-    ) -> litchi_opc::sign::Result<PackURI> {
-        self.opc.sign_with(signer, limits)
+    ) -> litchi_opc::sign::Result<Self> {
+        let mut next = self.clone();
+        next.opc.sign_with(signer, limits)?;
+        Ok(next)
     }
 
     /// Atomically replace all signatures with one signature.
@@ -88,8 +105,10 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn resign(&mut self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<PackURI> {
-        self.opc.resign(signer)
+    pub fn resign(&self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<Self> {
+        let mut next = self.clone();
+        next.opc.resign(signer)?;
+        Ok(next)
     }
 
     /// Atomically replace signatures with explicit authoring resource bounds.
@@ -99,11 +118,13 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn resign_with(
-        &mut self,
+        &self,
         signer: &litchi_sign::Signer,
         limits: &litchi_sign::Limits,
-    ) -> litchi_opc::sign::Result<PackURI> {
-        self.opc.resign_with(signer, limits)
+    ) -> litchi_opc::sign::Result<Self> {
+        let mut next = self.clone();
+        next.opc.resign_with(signer, limits)?;
+        Ok(next)
     }
 
     /// Remove all package signatures.
@@ -113,9 +134,13 @@ impl Package {
     /// (mail merge, glossary, web settings, fonts, Ribbon, document patches,
     /// and edited core or custom properties at a managed save) is refused
     /// until this is called.
-    pub fn unsign(&mut self) -> &mut Self {
-        self.opc.unsign();
-        self
+    ///
+    /// Returns the unsigned package; this package keeps its signature.
+    #[must_use]
+    pub fn unsign(&self) -> Self {
+        let mut next = self.clone();
+        next.opc.unsign();
+        next
     }
 
     /// Discover inert embedded-object and embedded-package relationships
@@ -205,16 +230,6 @@ impl Package {
         crate::textbox::load_text_boxes(self.opc.main_document_part()?.blob())
     }
 
-    /// Deterministically store an already coherent classic-chart graph.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn store_chart_graph(&mut self, graph: &crate::chart::Graph) -> Result<()> {
-        let document = self.opc.main_document_part()?.partname().clone();
-        crate::chart::store(&mut self.opc, &document, graph)
-    }
-
     /// Transactionally edit the current plaintext OPC graph.
     ///
     /// The closure receives a structural candidate whose built-in part payloads
@@ -236,7 +251,10 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn edit_opc<T>(&mut self, edit: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
+    pub(crate) fn edit_opc_in_place<T>(
+        &mut self,
+        edit: impl FnOnce(&mut OpcPackage) -> Result<T>,
+    ) -> Result<T> {
         self.edit_opc_candidate("edit_opc", true, edit)
     }
 
@@ -260,21 +278,11 @@ impl Package {
         edit: impl FnOnce(&mut OpcPackage) -> Result<T>,
     ) -> Result<T> {
         self.ensure_opc_current(operation)?;
-        #[cfg(feature = "automatic-fonts")]
-        if raw && self.font_embedding.is_some() {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "raw OPC editing cannot honor an automatic font policy; use the managed font facade",
-            });
-        }
 
         if !raw && (self.opc.is_signed() || self.opc.requires_signature_edit_policy()) {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation,
-                reason: "changed signed content requires explicit Package::unsign before publication",
-            });
+            return Err(Error::Opc(
+                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
+            ));
         }
         let mut candidate = self.opc.clone();
         let value = edit(&mut candidate)?;
@@ -290,11 +298,6 @@ impl Package {
         self.opc = candidate;
         self.properties = properties.into();
         self.custom_props = custom_props.into();
-        self.custom_props_dirty = false;
-        self.mutable_doc = None;
-        if raw {
-            self.raw_edit_committed = true;
-        }
         Ok(value)
     }
 }

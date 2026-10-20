@@ -2,106 +2,74 @@
 //!
 //! This module provides the writer API for creating and modifying Word documents.
 
-pub mod bookmark;
-pub mod comment;
-pub mod content_control;
-pub mod doc;
-pub mod field;
-pub mod hyperlink;
-pub mod image;
-pub mod note;
-pub mod ole_object;
-pub mod paragraph;
+pub(crate) mod bookmark;
+pub(crate) mod comment;
+pub(crate) mod content_control;
+pub(crate) mod doc;
+pub(crate) mod field;
+pub(crate) mod hyperlink;
+pub(crate) mod image;
+pub(crate) mod note;
+pub(crate) mod ole_object;
+pub(crate) mod paragraph;
 pub(crate) mod relmap;
-pub mod revision;
-pub mod run;
-pub mod section;
-pub mod smart_tag;
-pub mod smartart;
-pub mod style;
-pub mod table;
-pub mod textbox;
-pub mod theme;
-pub mod toc;
-pub mod vml_shape;
-pub mod watermark;
+pub(crate) mod revision;
+pub(crate) mod run;
+pub(crate) mod section;
+pub(crate) mod smart_tag;
+pub(crate) mod smartart;
+pub(crate) mod style;
+pub(crate) mod table;
+pub(crate) mod textbox;
+pub(crate) mod theme;
+pub(crate) mod toc;
+pub(crate) mod vml_shape;
+pub(crate) mod watermark;
 
 // Re-export main document type
-pub use doc::{MutableDocument, Protection};
+pub use doc::Protection;
 
-// Re-export note types
 pub use note::Note;
 
-// Re-export section types
 pub use section::borders::{Art, Border, Borders, Color, Display, OffsetFrom, Style, ZOrder};
 pub use section::{
     ChapterSep, EndnotePos, Endnotes, FootnotePos, Footnotes, GridType, LineNumberRestart,
     NoteNumberRestart, PageNumberFormat, PageOrientation, SectionColumn, SectionColumns,
-    SectionDocumentGrid, SectionHeaderFooterPart, SectionHeaderFooterReference, SectionPaperSource,
-    SectionProperties, SectionTextDirection, SectionVerticalAlignment,
+    SectionDocumentGrid, SectionHeaderFooterPart, SectionHeaderFooterReference,
+    SectionLineNumbering, SectionPageNumbering, SectionPaperSource, SectionProperties,
+    SectionTextDirection, SectionVerticalAlignment,
 };
 
-// Re-export smart-tag types
-pub use smart_tag::{MutableSmartTag, MutableSmartTagAttribute};
+pub use image::ImageFormat;
 
-// Re-export hyperlink types
-pub use hyperlink::MutableHyperlink;
+pub use paragraph::ListType;
 
-// Re-export image types
-pub use image::{ImageFormat, MutableInlineImage};
-
-// Re-export paragraph types
-pub use paragraph::{ListType, MutableParagraph};
-
-// Re-export run types
 pub use revision::{
-    CellRevisionKind, ConflictKind, MutableConflict, MutableCustomXmlConflictRange,
-    MutableRevision, RevisionContentControl, RevisionKind, RevisionMetadata, RowRevisionKind,
-    TableCellMergeRevisionState,
+    CellRevisionKind, ConflictKind, RevisionContentControl, RevisionKind, RevisionMetadata,
+    RowRevisionKind, TableCellMergeRevisionState,
 };
-pub use run::{MutableRun, RunContent};
+pub use run::RunContent;
 
-// Re-export table types
-pub use table::{CellProperties, MutableCell, MutableRow, MutableTable, TableBorder, TableBorders};
+pub use table::{CellProperties, TableBorder, TableBorders};
 
-// Re-export text-box authoring types
-pub use textbox::MutableTextBox;
+pub use ole_object::MAX_OLE_PAYLOAD_BYTES;
 
-// Re-export embedded-object authoring types
-pub use ole_object::{MAX_OLE_PAYLOAD_BYTES, MutableOleObject};
+pub use smartart::MAX_SMART_ARTS;
 
-// Re-export SmartArt authoring types
-pub use smartart::{MAX_SMART_ARTS, MutableSmartArt};
+pub use vml_shape::{VmlShapeKind, VmlShapePosition};
 
-// Re-export VML shape authoring types
-pub use vml_shape::{MutableVmlShape, VmlShapeKind, VmlShapePosition};
+pub use comment::{Date, DateError, MAX_DATE_BYTES};
 
-// Re-export comment types
-pub use comment::MutableComment;
+pub use field::{BibliographyFieldSpec, BibliographyFilter, CitationFieldSpec, CitationSource};
 
-// Re-export bookmark types
-pub use bookmark::MutableBookmark;
+pub use style::generate_styles_xml;
 
-// Re-export field types
-pub use field::{
-    BibliographyFieldSpec, BibliographyFilter, CitationFieldSpec, CitationSource, MutableField,
-};
+pub use content_control::{Checksum, ContentControlType, DataBinding, FormattingAllowed};
 
-// Re-export style types
-pub use style::{MutableStyle, generate_styles_xml};
+pub use theme::ColorScheme;
 
-// Re-export content control types
-pub use content_control::{
-    Checksum, ContentControlType, DataBinding, FormattingAllowed, MutableContentControl,
-};
-
-// Re-export theme types
-pub use theme::{ColorScheme, MutableTheme};
-
-// Re-export watermark types
 pub use watermark::{
     ImageWatermark, ImageWatermarkAnchor, MAX_WATERMARK_IMAGE_BYTES, Watermark, WatermarkLayout,
 };
 
-// Re-export TOC types
 pub use toc::TableOfContents;
