@@ -269,18 +269,6 @@ impl Edit {
         self.package.model()
     }
 
-    /// Materialize and validate the staged candidate.
-    /// # Errors
-    ///
-    /// Returns an error if the staged bytes no longer satisfy the stream
-    /// grammar or the bound Revision Log closure.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        if self.candidate.as_ref() == self.source.bytes() {
-            return Ok(self.source.clone());
-        }
-        self.parse_candidate(Arc::clone(&self.candidate))
-    }
-
     /// Change one user name while retaining its GUID, timestamp, and reserved byte.
     /// # Errors
     ///
@@ -394,10 +382,7 @@ impl Edit {
         } = self;
         if candidate.as_ref() == source.bytes() {
             let patch = Patch::new(source.clone(), source.clone());
-            return Ok(Commit {
-                snapshot: source,
-                patch,
-            });
+            return Ok(Commit::new(source, patch, Diagnostics::UNCHANGED));
         }
         let snapshot = Snapshot {
             fingerprint: fingerprint(&candidate),
@@ -408,7 +393,8 @@ impl Edit {
             package,
         };
         let patch = Patch::new(source, snapshot.clone());
-        Ok(Commit { snapshot, patch })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn replace_candidate(&mut self, candidate: Vec<u8>) -> Result<()> {
@@ -426,24 +412,6 @@ impl Edit {
         self.candidate = bytes;
         self.package = Arc::new(package);
         Ok(())
-    }
-
-    fn parse_candidate(&self, bytes: Arc<[u8]>) -> Result<Snapshot> {
-        let package = if let Some(guids) = &self.package.revision_guids {
-            Package::parse_with_revision_guids_and_source(
-                &bytes,
-                self.package.limits,
-                Arc::clone(guids),
-                self.package.revision_log_source.clone(),
-            )?
-        } else {
-            Package::parse(&bytes, self.package.limits)?
-        };
-        Ok(Snapshot {
-            fingerprint: fingerprint(&bytes),
-            bytes,
-            package: Arc::new(package),
-        })
     }
 }
 
@@ -578,56 +546,12 @@ impl Patch {
     }
 }
 
-/// A successful edit publication containing its snapshot and reversible patch.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    /// Whether publication changed any stream byte.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Resulting immutable snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Reversible source-checked patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the publication into its snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Consume the publication into its patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    /// Consume the publication into exact stream bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.snapshot.finish()
-    }
-
-    /// Consume the publication into both artifacts.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 fn copy_bytes(bytes: &[u8], context: &'static str) -> Result<Arc<[u8]>> {
     let mut owned = Vec::new();

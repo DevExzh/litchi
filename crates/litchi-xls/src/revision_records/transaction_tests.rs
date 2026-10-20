@@ -109,10 +109,10 @@ fn snapshot_noop_preserves_exact_stream_and_fingerprint() {
     assert_eq!(snapshot.finish(), bytes);
     assert_eq!(snapshot.bytes(), bytes.as_slice());
     let commit = snapshot.edit().commit().unwrap();
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
     assert_eq!(commit.patch().source_fingerprint(), snapshot.fingerprint());
-    assert_eq!(commit.snapshot().finish(), bytes);
+    assert_eq!(commit.package().finish(), bytes);
 }
 
 #[test]
@@ -125,9 +125,9 @@ fn revision_flags_edit_is_typed_and_preserves_opaque_bytes() {
         .unwrap();
     let commit = transaction.commit().unwrap();
 
-    assert!(commit.changed());
-    assert_eq!(commit.snapshot().revision_log().headers().len(), 1);
-    match &commit.snapshot().revision_log().headers()[0].revisions()[0] {
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.package().revision_log().headers().len(), 1);
+    match &commit.package().revision_log().headers()[0].revisions()[0] {
         Revision::RenSheet(sheet) => {
             assert!(sheet.header().is_accepted());
             assert!(sheet.header().is_undo_action());
@@ -136,12 +136,12 @@ fn revision_flags_edit_is_typed_and_preserves_opaque_bytes() {
     }
     assert!(
         commit
-            .snapshot()
+            .package()
             .bytes()
             .windows(3)
             .any(|window| window == [0xA1, 0xB2, 0xC3])
     );
-    assert_eq!(commit.patch().apply(&snapshot).unwrap(), *commit.snapshot());
+    assert_eq!(commit.patch().apply(&snapshot).unwrap(), *commit.package());
 }
 
 #[test]
@@ -150,26 +150,31 @@ fn header_name_edit_supports_unicode_and_exact_noop() {
     let mut transaction = snapshot.edit();
     transaction.set_header_user_name(0, "Élodie").unwrap();
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(
-        commit.snapshot().revision_log().headers()[0]
+        commit.package().revision_log().headers()[0]
             .head()
             .user_name(),
         "Élodie"
     );
 
-    let mut noop = commit.snapshot().edit();
+    let mut noop = commit.package().edit();
     noop.set_header_user_name(0, "Élodie").unwrap();
     let noop_commit = noop.commit().unwrap();
-    assert!(!noop_commit.changed());
-    assert_eq!(noop_commit.snapshot().bytes(), commit.snapshot().bytes());
+    assert!(!noop_commit.diagnostics().changed());
+    assert_eq!(noop_commit.package().bytes(), commit.package().bytes());
 }
 
 #[test]
 fn invalid_edits_are_failure_atomic() {
     let snapshot = Snapshot::parse(source_stream()).unwrap();
     let mut transaction = snapshot.edit();
-    let before = transaction.snapshot().unwrap().finish();
+    let before = transaction
+        .clone()
+        .commit()
+        .map(litchi_core::edit::Commit::into_package)
+        .unwrap()
+        .finish();
 
     assert!(transaction.set_revision_accepted(999, true).is_err());
     assert!(transaction.set_header_user_name(4, "Nobody").is_err());
@@ -178,7 +183,15 @@ fn invalid_edits_are_failure_atomic() {
             .set_header_user_name(0, &"x".repeat(55))
             .is_err()
     );
-    assert_eq!(transaction.snapshot().unwrap().finish(), before);
+    assert_eq!(
+        transaction
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
+            .unwrap()
+            .finish(),
+        before
+    );
 }
 
 #[test]

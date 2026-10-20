@@ -18,7 +18,7 @@ pub use model::{
     RevisionRecordHeader, RevisionType, RrInsertSh, RrTabId, RrdChgCell, RrdConflict, RrdHead,
     RrdInfo, RrdInsDel, RrdMove, RrdRenSheet, RrdUserView, ShortDtr, UsrExcl,
 };
-pub use transaction::{Commit, Edit, Patch, RevisionFlags, Snapshot};
+pub use transaction::{Commit, Diagnostics, Edit, Patch, RevisionFlags, Snapshot};
 
 pub(crate) use codec::{
     CONTINUE_RECORD_TYPE, EOF_RECORD_TYPE, FILE_LOCK_RECORD_TYPE, NOTE_RECORD_TYPE,

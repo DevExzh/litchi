@@ -13,7 +13,7 @@ mod model;
 mod package;
 pub mod publication;
 
-pub use edit::{Commit, Edit, Patch, Snapshot};
+pub use edit::{Commit, Diagnostics, Edit, Patch, Snapshot};
 pub use model::{Limits, UserCheck, UserEntry, UserGuid, UserNames};
 pub use publication::{
     Commit as PackageCommit, Edit as PackageEdit, Patch as PackagePatch,

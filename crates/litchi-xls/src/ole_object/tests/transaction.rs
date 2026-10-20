@@ -2,7 +2,7 @@
 
 use super::super::{
     CheckState, EmbeddedObjectDraft, EmbeddedPayload, FormControl, FtCblsData, FtCf, FtCmo,
-    FtPictFmla, FtPioGrbit, Limits, ObjSubrecord, ObjectMetadataEdit, OleObjectRecord,
+    FtPictFmla, FtPioGrbit, Limits, ObjSubrecord, ObjectMetadataChange, OleObjectRecord,
 };
 use super::super::{Edit, Snapshot};
 use litchi_cfb::{OleFile, OleWriter};
@@ -388,9 +388,9 @@ fn snapshot_and_noop_commit_preserve_exact_cfb_bytes() {
 
     assert_eq!(snapshot.finish(), input);
     let commit = snapshot.edit().commit().unwrap();
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
-    assert_eq!(commit.snapshot().finish(), input);
+    assert_eq!(commit.package().finish(), input);
     assert_eq!(commit.patch().apply(&snapshot).unwrap().finish(), input);
 }
 
@@ -403,11 +403,24 @@ fn invalid_control_edit_is_failure_atomic() {
     )
     .unwrap();
     let mut transaction = snapshot.edit();
-    let before = transaction.snapshot().unwrap().finish();
+    let before = transaction
+        .clone()
+        .commit()
+        .map(litchi_core::edit::Commit::into_package)
+        .unwrap()
+        .finish();
 
     let result = transaction.add_form_control(0, checkbox_control(7, 0xB2));
     assert!(result.is_err());
-    assert_eq!(transaction.snapshot().unwrap().finish(), before);
+    assert_eq!(
+        transaction
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
+            .unwrap()
+            .finish(),
+        before
+    );
     assert_eq!(transaction.form_controls(0).unwrap().len(), 1);
 }
 
@@ -423,9 +436,9 @@ fn valid_control_edit_publishes_typed_patch_and_keeps_unknowns() {
     transaction.add_form_control(0, authored).unwrap();
     let commit = transaction.commit().unwrap();
 
-    assert!(commit.changed());
-    assert_eq!(commit.snapshot().form_controls(0).unwrap().len(), 2);
-    let output = commit.snapshot().finish();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.package().form_controls(0).unwrap().len(), 2);
+    let output = commit.package().finish();
     assert!(
         output
             .windows(existing.len())
@@ -453,12 +466,12 @@ fn empty_object_metadata_edit_preserves_exact_bytes() {
     let mut transaction = snapshot.edit();
 
     transaction
-        .update_object_metadata(0, 7, ObjectMetadataEdit::new())
+        .update_object_metadata(0, 7, ObjectMetadataChange::new())
         .unwrap();
     let commit = transaction.commit().unwrap();
 
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().finish(), input);
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().finish(), input);
 }
 
 #[test]
@@ -471,7 +484,7 @@ fn object_metadata_edit_changes_typed_fields_and_preserves_unknown_payload() {
         .update_object_metadata(
             0,
             7,
-            ObjectMetadataEdit::new()
+            ObjectMetadataChange::new()
                 .with_object_id(9)
                 .with_common_flags(0xA55A)
                 .with_picture_flags(FtPioGrbit {
@@ -480,7 +493,7 @@ fn object_metadata_edit_changes_typed_fields_and_preserves_unknown_payload() {
         )
         .unwrap();
     let commit = transaction.commit().unwrap();
-    let object = &commit.snapshot().objects(0).unwrap()[0];
+    let object = &commit.package().objects(0).unwrap()[0];
 
     assert_eq!(object.object_id(), 9);
     assert!(
@@ -500,7 +513,7 @@ fn object_metadata_edit_changes_typed_fields_and_preserves_unknown_payload() {
     }));
     assert_eq!(object.storage_position(), Some(0x2A));
 
-    let mut ole = OleFile::open(Cursor::new(commit.snapshot().finish())).unwrap();
+    let mut ole = OleFile::open(Cursor::new(commit.package().finish())).unwrap();
     assert_eq!(
         ole.open_stream(&["MBD0000002A", "Payload"]).unwrap(),
         b"raw embedded payload"
@@ -513,11 +526,16 @@ fn metadata_edit_rejects_stale_identity_and_invalid_flags_atomically() {
     let input = object_workbook_cfb(&source, b"raw embedded payload");
     let snapshot = Snapshot::open(input, Limits::default()).unwrap();
     let mut transaction = snapshot.edit();
-    let before = transaction.snapshot().unwrap().finish();
+    let before = transaction
+        .clone()
+        .commit()
+        .map(litchi_core::edit::Commit::into_package)
+        .unwrap()
+        .finish();
 
     assert!(
         transaction
-            .update_object_metadata(0, 8, ObjectMetadataEdit::new().with_common_flags(0xAAAA),)
+            .update_object_metadata(0, 8, ObjectMetadataChange::new().with_common_flags(0xAAAA),)
             .is_err()
     );
     assert!(
@@ -525,11 +543,19 @@ fn metadata_edit_rejects_stale_identity_and_invalid_flags_atomically() {
             .update_object_metadata(
                 0,
                 7,
-                ObjectMetadataEdit::new().with_picture_flags(FtPioGrbit { raw: 0x0012 }),
+                ObjectMetadataChange::new().with_picture_flags(FtPioGrbit { raw: 0x0012 }),
             )
             .is_err()
     );
-    assert_eq!(transaction.snapshot().unwrap().finish(), before);
+    assert_eq!(
+        transaction
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
+            .unwrap()
+            .finish(),
+        before
+    );
 }
 
 #[test]
@@ -538,14 +564,19 @@ fn metadata_edit_rejects_storage_class_transition_atomically() {
     let input = object_workbook_cfb(&source, b"raw embedded payload");
     let snapshot = Snapshot::open(input, Limits::default()).unwrap();
     let mut transaction = snapshot.edit();
-    let before = transaction.snapshot().unwrap().finish();
+    let before = transaction
+        .clone()
+        .commit()
+        .map(litchi_core::edit::Commit::into_package)
+        .unwrap()
+        .finish();
 
     assert!(
         transaction
             .update_object_metadata(
                 0,
                 7,
-                ObjectMetadataEdit::new().with_picture_flags(FtPioGrbit { raw: 0x020A }),
+                ObjectMetadataChange::new().with_picture_flags(FtPioGrbit { raw: 0x020A }),
             )
             .is_err()
     );
@@ -554,7 +585,7 @@ fn metadata_edit_rejects_storage_class_transition_atomically() {
             .update_object_metadata(
                 0,
                 7,
-                ObjectMetadataEdit::new().with_picture_flags(FtPioGrbit { raw: 0x0288 }),
+                ObjectMetadataChange::new().with_picture_flags(FtPioGrbit { raw: 0x0288 }),
             )
             .is_err()
     );
@@ -563,11 +594,19 @@ fn metadata_edit_rejects_storage_class_transition_atomically() {
             .update_object_metadata(
                 0,
                 7,
-                ObjectMetadataEdit::new().with_picture_flags(FtPioGrbit { raw: 0x0228 }),
+                ObjectMetadataChange::new().with_picture_flags(FtPioGrbit { raw: 0x0228 }),
             )
             .is_err()
     );
-    assert_eq!(transaction.snapshot().unwrap().finish(), before);
+    assert_eq!(
+        transaction
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
+            .unwrap()
+            .finish(),
+        before
+    );
     assert_eq!(
         transaction.objects(0).unwrap()[0].storage_name().as_deref(),
         Some("MBD0000002A")
@@ -587,7 +626,7 @@ fn metadata_patch_rejects_stale_snapshot_without_mutation() {
     let stale_before = stale.finish();
     let mut transaction = snapshot.edit();
     transaction
-        .update_object_metadata(0, 7, ObjectMetadataEdit::new().with_common_flags(0xA55A))
+        .update_object_metadata(0, 7, ObjectMetadataChange::new().with_common_flags(0xA55A))
         .unwrap();
     let commit = transaction.commit().unwrap();
 
@@ -608,15 +647,15 @@ fn add_embedded_payload_binds_obj_and_mbd_and_preserves_opaque_streams() {
         .add_embedded_payload(0, draft)
         .expect("typed embedded payload should publish");
     let commit = transaction.commit().expect("commit should validate");
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(
-        commit.snapshot().objects(0).unwrap()[0]
+        commit.package().objects(0).unwrap()[0]
             .storage_name()
             .as_deref(),
         Some("MBD0000002A")
     );
     assert!(matches!(
-        commit.snapshot().objects(0).unwrap()[0]
+        commit.package().objects(0).unwrap()[0]
             .subrecords
             .iter()
             .find_map(|value| match value {
@@ -629,7 +668,7 @@ fn add_embedded_payload_binds_obj_and_mbd_and_preserves_opaque_streams() {
             ..
         })
     ));
-    let formula = commit.snapshot().objects(0).unwrap()[0]
+    let formula = commit.package().objects(0).unwrap()[0]
         .subrecords
         .iter()
         .find_map(|value| match value {
@@ -648,7 +687,7 @@ fn add_embedded_payload_binds_obj_and_mbd_and_preserves_opaque_streams() {
     );
     assert_eq!(formula.formula.len() % 2, 0);
 
-    let mut ole = OleFile::open(Cursor::new(commit.snapshot().finish())).expect("CFB should open");
+    let mut ole = OleFile::open(Cursor::new(commit.package().finish())).expect("CFB should open");
     assert_eq!(
         ole.open_stream(&["UnrelatedRootStream"]).unwrap(),
         b"retain me"
@@ -666,7 +705,7 @@ fn add_embedded_payload_binds_obj_and_mbd_and_preserves_opaque_streams() {
         .patch()
         .apply(&snapshot)
         .expect("patch source should match");
-    assert_eq!(applied.finish(), commit.snapshot().finish());
+    assert_eq!(applied.finish(), commit.package().finish());
     assert_eq!(
         commit.patch().inverse().apply(&applied).unwrap().finish(),
         input
@@ -684,7 +723,7 @@ fn replacing_with_the_original_embedded_payload_is_an_exact_noop() {
     add.add_embedded_payload(0, draft)
         .expect("typed embedded payload should publish");
     let added_commit = add.commit().expect("add should commit");
-    let added = added_commit.snapshot();
+    let added = added_commit.package();
 
     let mut replace = added.edit();
     replace
@@ -695,9 +734,9 @@ fn replacing_with_the_original_embedded_payload_is_an_exact_noop() {
         )
         .expect("same payload should be accepted");
     let commit = replace.commit().expect("no-op replacement should commit");
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
-    assert_eq!(commit.snapshot().finish(), added.finish());
+    assert_eq!(commit.package().finish(), added.finish());
 }
 
 #[test]
@@ -716,14 +755,14 @@ fn replace_embedded_payload_retains_identity_and_replaces_only_selected_storage(
         )
         .expect("replacement should publish");
     let commit = transaction.commit().expect("commit should validate");
-    let object = &commit.snapshot().objects(0).unwrap()[0];
+    let object = &commit.package().objects(0).unwrap()[0];
     assert_eq!(object.object_id(), 7);
     assert_eq!(object.storage_name().as_deref(), Some("MBD0000002A"));
     assert!(object.subrecords.iter().any(|value| {
         matches!(value, ObjSubrecord::Unknown { kind: 0x7777, data } if data == &[0xB1, 0xA5])
     }));
 
-    let mut ole = OleFile::open(Cursor::new(commit.snapshot().finish())).expect("CFB should open");
+    let mut ole = OleFile::open(Cursor::new(commit.package().finish())).expect("CFB should open");
     assert_eq!(
         ole.open_stream(&["MBD0000002A", "OpaqueStorage", "Payload"])
             .unwrap(),
@@ -747,14 +786,14 @@ fn remove_embedded_payload_removes_unreferenced_storage_and_is_reversible() {
         .remove_embedded_payload(0, 7)
         .expect("embedded object should be removable");
     let commit = transaction.commit().expect("commit should validate");
-    assert!(commit.snapshot().objects(0).unwrap().is_empty());
-    let mut ole = OleFile::open(Cursor::new(commit.snapshot().finish())).expect("CFB should open");
+    assert!(commit.package().objects(0).unwrap().is_empty());
+    let mut ole = OleFile::open(Cursor::new(commit.package().finish())).expect("CFB should open");
     assert!(ole.open_stream(&["MBD0000002A"]).is_err());
     assert_eq!(
         commit
             .patch()
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .unwrap()
             .finish(),
         input
@@ -773,21 +812,21 @@ fn removing_one_of_two_shared_mbd_references_keeps_storage_until_last_owner() {
         .remove_embedded_payload(0, 7)
         .expect("first owner should be removable");
     let first_commit = first.commit().expect("first removal should commit");
-    assert_eq!(first_commit.snapshot().objects(0).unwrap().len(), 1);
-    let mut first_ole = OleFile::open(Cursor::new(first_commit.snapshot().finish()))
+    assert_eq!(first_commit.package().objects(0).unwrap().len(), 1);
+    let mut first_ole = OleFile::open(Cursor::new(first_commit.package().finish()))
         .expect("first result should be a CFB");
     assert_eq!(
         first_ole.open_stream(&["MBD0000002A", "Payload"]).unwrap(),
         b"shared payload"
     );
 
-    let mut second = first_commit.snapshot().edit();
+    let mut second = first_commit.package().edit();
     second
         .remove_embedded_payload(0, 8)
         .expect("last owner should be removable");
     let second_commit = second.commit().expect("second removal should commit");
-    assert!(second_commit.snapshot().objects(0).unwrap().is_empty());
-    let mut second_ole = OleFile::open(Cursor::new(second_commit.snapshot().finish()))
+    assert!(second_commit.package().objects(0).unwrap().is_empty());
+    let mut second_ole = OleFile::open(Cursor::new(second_commit.package().finish()))
         .expect("second result should be a CFB");
     assert!(second_ole.open_stream(&["MBD0000002A"]).is_err());
 }
@@ -831,7 +870,12 @@ fn embedded_payload_api_rejects_dde_and_invalid_payloads_atomically() {
     )
     .expect("DDE object should remain readable");
     let mut transaction = snapshot.edit();
-    let before = transaction.snapshot().unwrap().finish();
+    let before = transaction
+        .clone()
+        .commit()
+        .map(litchi_core::edit::Commit::into_package)
+        .unwrap()
+        .finish();
     assert!(transaction.remove_embedded_payload(0, 7).is_err());
     assert!(
         transaction
@@ -842,7 +886,15 @@ fn embedded_payload_api_rejects_dde_and_invalid_payloads_atomically() {
             )
             .is_err()
     );
-    assert_eq!(transaction.snapshot().unwrap().finish(), before);
+    assert_eq!(
+        transaction
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
+            .unwrap()
+            .finish(),
+        before
+    );
 }
 
 #[test]
@@ -854,7 +906,12 @@ fn add_embedded_payload_rejects_duplicate_object_or_storage_identity_atomically(
     )
     .expect("workbook should open");
     let mut transaction = snapshot.edit();
-    let before = transaction.snapshot().unwrap().finish();
+    let before = transaction
+        .clone()
+        .commit()
+        .map(litchi_core::edit::Commit::into_package)
+        .unwrap()
+        .finish();
 
     let same_object = EmbeddedObjectDraft::new(
         7,
@@ -863,7 +920,15 @@ fn add_embedded_payload_rejects_duplicate_object_or_storage_identity_atomically(
     )
     .unwrap();
     assert!(transaction.add_embedded_payload(0, same_object).is_err());
-    assert_eq!(transaction.snapshot().unwrap().finish(), before);
+    assert_eq!(
+        transaction
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
+            .unwrap()
+            .finish(),
+        before
+    );
 
     let same_storage = EmbeddedObjectDraft::new(
         8,
@@ -872,7 +937,15 @@ fn add_embedded_payload_rejects_duplicate_object_or_storage_identity_atomically(
     )
     .unwrap();
     assert!(transaction.add_embedded_payload(0, same_storage).is_err());
-    assert_eq!(transaction.snapshot().unwrap().finish(), before);
+    assert_eq!(
+        transaction
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
+            .unwrap()
+            .finish(),
+        before
+    );
 }
 
 #[test]
@@ -888,11 +961,32 @@ fn malformed_opaque_obj_is_lossless_but_blocks_unproven_identity_edits() {
     let payload = EmbeddedPayload::new(embedded_payload(b"new", b"unknown")).unwrap();
     let draft = EmbeddedObjectDraft::new(9, 0x2B, payload).unwrap();
     let mut transaction = snapshot.edit();
-    let before = transaction.snapshot().unwrap().finish();
+    let before = transaction
+        .clone()
+        .commit()
+        .map(litchi_core::edit::Commit::into_package)
+        .unwrap()
+        .finish();
     assert!(transaction.add_embedded_payload(0, draft).is_err());
-    assert_eq!(transaction.snapshot().unwrap().finish(), before);
+    assert_eq!(
+        transaction
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
+            .unwrap()
+            .finish(),
+        before
+    );
     assert!(transaction.remove_embedded_payload(0, 7).is_err());
-    assert_eq!(transaction.snapshot().unwrap().finish(), before);
+    assert_eq!(
+        transaction
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
+            .unwrap()
+            .finish(),
+        before
+    );
 }
 
 #[test]
@@ -915,7 +1009,12 @@ fn duplicate_opaque_mbd_identity_within_one_sheet_blocks_topology_edits() {
     let snapshot = Snapshot::open(input.clone(), Limits::default())
         .expect("oversized opaque records should remain byte-preserved");
     let mut transaction = snapshot.edit();
-    let before = transaction.snapshot().unwrap().finish();
+    let before = transaction
+        .clone()
+        .commit()
+        .map(litchi_core::edit::Commit::into_package)
+        .unwrap()
+        .finish();
     let draft = EmbeddedObjectDraft::new(
         11,
         0x2C,
@@ -924,7 +1023,15 @@ fn duplicate_opaque_mbd_identity_within_one_sheet_blocks_topology_edits() {
     .unwrap();
     assert!(transaction.add_embedded_payload(0, draft).is_err());
     assert!(transaction.remove_embedded_payload(0, 7).is_err());
-    assert_eq!(transaction.snapshot().unwrap().finish(), before);
+    assert_eq!(
+        transaction
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
+            .unwrap()
+            .finish(),
+        before
+    );
 }
 
 #[test]
@@ -937,7 +1044,12 @@ fn add_embedded_payload_preflights_target_limit_before_payload_capture() {
     let snapshot = Snapshot::open(object_workbook_cfb(&source, b"source payload"), limits)
         .expect("one existing target should fit the configured limit");
     let mut transaction = snapshot.edit();
-    let before = transaction.snapshot().unwrap().finish();
+    let before = transaction
+        .clone()
+        .commit()
+        .map(litchi_core::edit::Commit::into_package)
+        .unwrap()
+        .finish();
     let payload = EmbeddedPayload::new(embedded_payload(b"new", b"unknown")).unwrap();
     let draft = EmbeddedObjectDraft::new(8, 0x2B, payload).unwrap();
     let error = transaction
@@ -946,7 +1058,15 @@ fn add_embedded_payload_preflights_target_limit_before_payload_capture() {
     assert!(
         matches!(error, crate::error::Error::InvalidData(message) if message.contains("object limit"))
     );
-    assert_eq!(transaction.snapshot().unwrap().finish(), before);
+    assert_eq!(
+        transaction
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
+            .unwrap()
+            .finish(),
+        before
+    );
 }
 
 #[test]
@@ -969,9 +1089,22 @@ fn embedded_payload_api_refuses_protected_outer_and_nested_cfb() {
     let draft = EmbeddedObjectDraft::new(7, 0x2A, payload).unwrap();
     let snapshot = Snapshot::open(workbook_cfb(&[]), Limits::default()).unwrap();
     let mut transaction = snapshot.edit();
-    let before = transaction.snapshot().unwrap().finish();
+    let before = transaction
+        .clone()
+        .commit()
+        .map(litchi_core::edit::Commit::into_package)
+        .unwrap()
+        .finish();
     assert!(transaction.add_embedded_payload(0, draft).is_err());
-    assert_eq!(transaction.snapshot().unwrap().finish(), before);
+    assert_eq!(
+        transaction
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
+            .unwrap()
+            .finish(),
+        before
+    );
 }
 
 #[test]
@@ -985,7 +1118,12 @@ fn embedded_payload_api_refuses_nested_pidssi_and_encryption() {
         let payload = EmbeddedPayload::new(bytes).expect("nested CFB should parse");
         let draft = EmbeddedObjectDraft::new(7, 0x2A, payload).unwrap();
         let mut transaction = snapshot.edit();
-        let before = transaction.snapshot().unwrap().finish();
+        let before = transaction
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
+            .unwrap()
+            .finish();
         let error = transaction
             .add_embedded_payload(0, draft)
             .expect_err("nested protection must refuse publication");
@@ -995,7 +1133,15 @@ fn embedded_payload_api_refuses_nested_pidssi_and_encryption() {
                 | crate::error::Error::PatchConflict { .. }
                 | crate::error::Error::Internal(_)
         ));
-        assert_eq!(transaction.snapshot().unwrap().finish(), before);
+        assert_eq!(
+            transaction
+                .clone()
+                .commit()
+                .map(litchi_core::edit::Commit::into_package)
+                .unwrap()
+                .finish(),
+            before
+        );
     }
 }
 
@@ -1054,12 +1200,25 @@ fn embedded_payload_publication_applies_common_count_size_and_depth_limits() {
         let snapshot = Snapshot::open(workbook_cfb(&[]), limits)
             .unwrap_or_else(|error| panic!("{name} workbook should open: {error:?}"));
         let mut transaction = snapshot.edit();
-        let before = transaction.snapshot().unwrap().finish();
+        let before = transaction
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
+            .unwrap()
+            .finish();
         assert!(
             transaction.add_embedded_payload(0, draft).is_err(),
             "{name} should be enforced by workbook publication"
         );
-        assert_eq!(transaction.snapshot().unwrap().finish(), before);
+        assert_eq!(
+            transaction
+                .clone()
+                .commit()
+                .map(litchi_core::edit::Commit::into_package)
+                .unwrap()
+                .finish(),
+            before
+        );
     }
 }
 
@@ -1077,14 +1236,27 @@ fn embedded_payload_publication_bounds_wide_storage_siblings_before_capture() {
     let draft = EmbeddedObjectDraft::new(9, 0x2A, payload).unwrap();
     let snapshot = Snapshot::open(workbook_cfb(&[]), limits).unwrap();
     let mut transaction = snapshot.edit();
-    let before = transaction.snapshot().unwrap().finish();
+    let before = transaction
+        .clone()
+        .commit()
+        .map(litchi_core::edit::Commit::into_package)
+        .unwrap()
+        .finish();
     let error = transaction
         .add_embedded_payload(0, draft)
         .expect_err("wide sibling directories must be bounded before capture");
     assert!(
         matches!(error, crate::error::Error::InvalidData(message) if message.contains("storage count"))
     );
-    assert_eq!(transaction.snapshot().unwrap().finish(), before);
+    assert_eq!(
+        transaction
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
+            .unwrap()
+            .finish(),
+        before
+    );
 }
 
 #[test]

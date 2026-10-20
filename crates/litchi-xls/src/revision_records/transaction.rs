@@ -182,18 +182,6 @@ impl Edit {
         self.before()
     }
 
-    /// Parses the current candidate without publishing it.
-    /// # Errors
-    ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        if self.candidate.as_slice() == self.source.bytes() {
-            Ok(self.source.clone())
-        } else {
-            Snapshot::parse(&self.candidate)
-        }
-    }
-
     /// Replaces the accepted and undo-action bits of one revision.
     ///
     /// `revision_id` is unique within a valid shared-workbook revision
@@ -292,14 +280,12 @@ impl Edit {
         let source = self.source;
         if self.candidate.as_slice() == source.bytes() {
             let patch = Patch::new(source.clone(), source.clone());
-            return Ok(Commit {
-                snapshot: source,
-                patch,
-            });
+            return Ok(Commit::new(source, patch, Diagnostics::UNCHANGED));
         }
         let snapshot = Snapshot::parse(self.candidate)?;
         let patch = Patch::new(source, snapshot.clone());
-        Ok(Commit { snapshot, patch })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn replace_candidate(&mut self, candidate: Vec<u8>) -> Result<()> {
@@ -312,51 +298,12 @@ impl Edit {
     }
 }
 
-/// A successful publication containing the typed result and its reversible
-/// source-checked patch.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    /// Whether publication changed any stream byte.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Returns the post-edit snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Returns the reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consumes the publication into its snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Consumes the publication into its patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    /// Consumes the publication into exact stream bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.snapshot.finish()
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// A source-checked, reversible replacement of one complete Revision Log
 /// stream.

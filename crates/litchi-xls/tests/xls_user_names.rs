@@ -394,7 +394,7 @@ fn workbook_reads_user_names_lazily_and_reopens_after_stream_edit() {
 
     let mut edit = source.edit();
     edit.set_user_name(0, "Élodie").unwrap();
-    let target = edit.commit().unwrap().into_snapshot();
+    let target = edit.commit().unwrap().into_package();
     let reopened_bytes = workbook_container(target.finish(), revision_log_stream(guid));
     let mut reopened_workbook = Reader::new(Cursor::new(reopened_bytes)).unwrap();
     let reopened = reopened_workbook

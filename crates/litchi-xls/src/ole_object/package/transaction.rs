@@ -2,7 +2,7 @@
 
 use super::super::codec::{parse_subrecords, ranges, u32_at};
 use super::super::semantic::{
-    EmbeddedObjectDraft, EmbeddedPayload, FormControl, ObjectMetadataEdit, OleObjectRecord,
+    EmbeddedObjectDraft, EmbeddedPayload, FormControl, ObjectMetadataChange, OleObjectRecord,
     validate_compound_file_for_publication,
 };
 use super::super::validation::validate_picture_formula;
@@ -385,7 +385,7 @@ impl Editor {
         &mut self,
         worksheet: usize,
         object_id: u16,
-        edit: ObjectMetadataEdit,
+        edit: ObjectMetadataChange,
     ) -> Result<()> {
         let object = self
             .sheets

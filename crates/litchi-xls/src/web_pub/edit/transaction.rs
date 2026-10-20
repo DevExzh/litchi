@@ -7,7 +7,7 @@ use crate::{Error, Result};
 
 use super::super::codec::rewrite_preserving_source;
 use super::super::model::{WebPageType, WebPub, WebPubRange};
-use super::model::{Commit, Patch, Snapshot};
+use super::model::{Commit, Diagnostics, Patch, Snapshot};
 
 /// A detached transaction over bounded BIFF8 web-publication metadata.
 ///
@@ -58,15 +58,6 @@ impl Edit {
     #[must_use]
     pub const fn web_publication(&self) -> &WebPub {
         self.publication()
-    }
-
-    /// Materializes the current candidate as a validated immutable snapshot.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        if self.candidate.as_slice() == self.source.bytes() {
-            Ok(self.source.clone())
-        } else {
-            Snapshot::parse(&self.candidate)
-        }
     }
 
     /// Replaces the page behavior while retaining all other wire fields.
@@ -175,11 +166,12 @@ impl Edit {
         let source = self.source;
         if self.candidate.as_slice() == source.bytes() {
             let patch = Patch::new(source.clone(), source.clone());
-            return Ok(Commit::new(source, patch));
+            return Ok(Commit::new(source, patch, Diagnostics::UNCHANGED));
         }
         let snapshot = Snapshot::parse_shared(Arc::from(self.candidate.into_boxed_slice()))?;
         let patch = Patch::new(source, snapshot.clone());
-        Ok(Commit::new(snapshot, patch))
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn replace(&mut self, replacement: WebPub) -> Result<&mut Self> {

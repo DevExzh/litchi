@@ -107,7 +107,7 @@ impl Patch {
 
     /// Whether this patch changes no chart-area bytes.
     #[must_use]
-    pub const fn is_empty(self) -> bool {
+    pub const fn is_noop(self) -> bool {
         self.change.is_none()
     }
 
@@ -127,7 +127,7 @@ impl Patch {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn apply(self, source: Snapshot) -> Result<Commit> {
         let Some(change) = self.change else {
-            return Ok(Commit::new(source, self));
+            return Ok(Commit::new(source, self, Diagnostics::UNCHANGED));
         };
         if source != change.before_snapshot() {
             return Err(Error::PatchConflict {
@@ -135,31 +135,17 @@ impl Patch {
                 reason: "chart-area patch source does not match the snapshot",
             });
         }
-        Ok(Commit::new(change.after_snapshot(), self))
+        Ok(Commit::new(
+            change.after_snapshot(),
+            self,
+            Diagnostics::CHANGED,
+        ))
     }
 }
 
-/// Published result of a chart-area transaction.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published chart-area edit: the new snapshot, its patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    pub(crate) const fn new(snapshot: Snapshot, patch: Patch) -> Self {
-        Self { snapshot, patch }
-    }
-
-    /// Returns the post-edit snapshot.
-    #[must_use]
-    pub const fn snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Returns the reversible semantic patch.
-    #[must_use]
-    pub const fn patch(self) -> Patch {
-        self.patch
-    }
-}
+/// Content-free diagnostics of one chart-area commit.
+pub use litchi_core::edit::Diagnostics;

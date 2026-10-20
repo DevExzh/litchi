@@ -7,5 +7,5 @@
 mod model;
 mod transaction;
 
-pub use model::{Commit, Patch, Snapshot};
+pub use model::{Commit, Diagnostics, Patch, Snapshot};
 pub use transaction::Edit;

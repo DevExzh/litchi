@@ -4,9 +4,9 @@ use crate::error::Result;
 
 use super::super::package::Editor;
 use super::super::{
-    EmbeddedObjectDraft, EmbeddedPayload, FormControl, ObjectMetadataEdit, OleObjectRecord,
+    EmbeddedObjectDraft, EmbeddedPayload, FormControl, ObjectMetadataChange, OleObjectRecord,
 };
-use super::{Commit, Patch, Snapshot};
+use super::{Commit, Diagnostics, Patch, Snapshot};
 
 /// A detached transaction over typed XLS OLE objects and form controls.
 ///
@@ -31,14 +31,6 @@ impl Edit {
     #[must_use]
     pub fn before(&self) -> &Snapshot {
         &self.source
-    }
-
-    /// Materializes the current candidate as a validated immutable snapshot.
-    /// # Errors
-    ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        Snapshot::open(self.editor.clone().finish()?, self.source.limits())
     }
 
     /// Returns the current worksheet count without materializing the CFB.
@@ -152,7 +144,7 @@ impl Edit {
         &mut self,
         worksheet: usize,
         object_id: u16,
-        edit: ObjectMetadataEdit,
+        edit: ObjectMetadataChange,
     ) -> Result<()> {
         self.with_candidate(|editor| editor.update_object_metadata(worksheet, object_id, edit))
     }
@@ -200,7 +192,8 @@ impl Edit {
         } else {
             Snapshot::open(after, before.limits())?
         };
-        Ok(Commit::new(snapshot, patch))
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn with_candidate<F>(&mut self, edit: F) -> Result<()>

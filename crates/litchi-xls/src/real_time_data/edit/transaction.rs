@@ -7,7 +7,7 @@ use crate::{Error, Result};
 
 use super::super::model::{Cell, Record, UnknownRecord, Value};
 use super::super::package::Package;
-use super::{Commit, Patch, Snapshot};
+use super::{Commit, Diagnostics, Patch, Snapshot};
 
 /// A detached transaction over inert RTD topics, cached values, and subscriber
 /// cells.  The source snapshot is never modified.
@@ -61,18 +61,6 @@ impl Edit {
     #[must_use]
     pub fn unknown_records(&self) -> impl Iterator<Item = UnknownRecord<'_>> + '_ {
         self.package.unknown_records(&self.candidate)
-    }
-
-    /// Materialize the staged candidate as a validated immutable snapshot.
-    /// # Errors
-    ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        if self.candidate.as_slice() == self.source.bytes() {
-            Ok(self.source.clone())
-        } else {
-            Snapshot::parse(&self.candidate)
-        }
     }
 
     /// Replace one typed RTD record by semantic collection index.
@@ -194,11 +182,12 @@ impl Edit {
         let source = self.source;
         if self.candidate.as_slice() == source.bytes() {
             let patch = Patch::new(source.clone(), source.clone());
-            return Ok(Commit::new(source, patch));
+            return Ok(Commit::new(source, patch, Diagnostics::UNCHANGED));
         }
         let snapshot = Snapshot::parse_shared(Arc::from(self.candidate.into_boxed_slice()))?;
         let patch = Patch::new(source, snapshot.clone());
-        Ok(Commit::new(snapshot, patch))
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn replace_candidate(

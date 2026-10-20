@@ -8,7 +8,7 @@ use crate::{Error, Result};
 use super::super::codec::{encode_external_name, encode_supporting_book};
 use super::super::model::{Name, NameBody, SupportingBook};
 use super::super::package::Package;
-use super::{Commit, Patch, Snapshot};
+use super::{Commit, Diagnostics, Patch, Snapshot};
 
 /// A detached transaction over inert supporting-book, external-name, and
 /// external-cache metadata.
@@ -44,15 +44,6 @@ impl Edit {
     #[must_use]
     pub fn links(&self) -> &crate::external_link::Links {
         self.package.links()
-    }
-
-    /// Materializes the current candidate as a validated immutable snapshot.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        if self.candidate.as_slice() == self.source.bytes() {
-            Ok(self.source.clone())
-        } else {
-            Snapshot::parse(&self.candidate)
-        }
     }
 
     /// Replaces one external or DDE/OLE supporting-book target string.
@@ -247,11 +238,12 @@ impl Edit {
         let source = self.source;
         if self.candidate.as_slice() == source.bytes() {
             let patch = Patch::new(source.clone(), source.clone());
-            return Ok(Commit::new(source, patch));
+            return Ok(Commit::new(source, patch, Diagnostics::UNCHANGED));
         }
         let snapshot = Snapshot::parse_shared(Arc::from(self.candidate.into_boxed_slice()))?;
         let patch = Patch::new(source, snapshot.clone());
-        Ok(Commit::new(snapshot, patch))
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn replace_record(

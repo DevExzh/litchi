@@ -270,7 +270,7 @@ impl Edit {
     pub fn commit(self) -> Result<Commit> {
         let Self { source, user_names } = self;
         let user_names_commit = user_names.commit()?;
-        if !user_names_commit.changed() {
+        if !user_names_commit.diagnostics().changed() {
             return Ok(Commit {
                 patch: Patch::new(source.bytes_shared(), source.bytes_shared()),
                 snapshot: source,
@@ -278,7 +278,7 @@ impl Edit {
         }
 
         let replacement =
-            Arc::<[u8]>::from(user_names_commit.snapshot().finish().into_boxed_slice());
+            Arc::<[u8]>::from(user_names_commit.package().finish().into_boxed_slice());
         let mut package = PackageEditor::open(
             source.bytes().to_vec(),
             Targets::default(),

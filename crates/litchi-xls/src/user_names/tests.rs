@@ -46,7 +46,7 @@ fn timestamp_edit_preserves_nul_in_inert_user_name() {
         ShortDtr::parse(USR_INFO_RECORD_TYPE, &[0xEA, 0x07, 2, 3, 4, 5, 6, 2]).unwrap(),
     )
     .unwrap();
-    let target = edit.commit().unwrap().into_snapshot();
+    let target = edit.commit().unwrap().into_package();
     assert_eq!(target.users()[0].user_name().as_bytes(), b"A\0lice");
 }
 
@@ -77,17 +77,17 @@ fn metadata_edit_is_source_checked_and_reversible() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
-    assert_eq!(commit.patch().apply(&source).unwrap(), *commit.snapshot());
-    assert_eq!(commit.patch().revert(commit.snapshot()).unwrap(), source);
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.patch().apply(&source).unwrap(), *commit.package());
+    assert_eq!(commit.patch().revert(commit.package()).unwrap(), source);
     assert_eq!(
-        commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+        commit.patch().inverse().apply(commit.package()).unwrap(),
         source
     );
-    assert_eq!(commit.snapshot().users()[0].user_name(), "Élodie");
-    assert_eq!(commit.snapshot().users()[0].string_flags(), 0x02);
-    assert_eq!(commit.snapshot().model().user_record_sizes()[255], 0x1234);
-    assert_eq!(commit.snapshot().model().user_check().reserved(), 0xF2F1);
+    assert_eq!(commit.package().users()[0].user_name(), "Élodie");
+    assert_eq!(commit.package().users()[0].string_flags(), 0x02);
+    assert_eq!(commit.package().model().user_record_sizes()[255], 0x1234);
+    assert_eq!(commit.package().model().user_check().reserved(), 0xF2F1);
 }
 
 #[test]
@@ -96,16 +96,16 @@ fn semantic_revert_is_an_exact_noop_and_invalid_edit_is_atomic() {
     let source = Snapshot::parse_with_revision_guids(&bytes, &[guid]).unwrap();
     let mut edit = source.edit();
     edit.set_user_name(0, "Bob").unwrap();
-    assert!(edit.clone().commit().unwrap().changed());
+    assert!(edit.clone().commit().unwrap().diagnostics().changed());
     edit.set_user_name(0, "Alice").unwrap();
     let noop = edit.commit().unwrap();
-    assert!(!noop.changed());
-    assert_eq!(noop.snapshot(), &source);
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.package(), &source);
 
     let mut rejected = source.edit();
     assert!(rejected.set_user_name(0, "").is_err());
     assert_eq!(rejected.users()[0].user_name(), "Alice");
-    assert!(!rejected.commit().unwrap().changed());
+    assert!(!rejected.commit().unwrap().diagnostics().changed());
 }
 
 #[test]
@@ -117,7 +117,7 @@ fn collection_edit_updates_cusr_and_cbusr() {
     let another = UserEntry::new(8, guid, opened_at(), "Bob").unwrap();
     let mut edit = source.edit();
     edit.push(another.clone()).unwrap();
-    let added = edit.commit().unwrap().into_snapshot();
+    let added = edit.commit().unwrap().into_package();
     assert_eq!(added.user_count(), 2);
     assert_eq!(added.users()[1].user_name(), "Bob");
 
@@ -127,7 +127,7 @@ fn collection_edit_updates_cusr_and_cbusr() {
     assert_eq!(
         append_commit
             .patch()
-            .revert(append_commit.snapshot())
+            .revert(append_commit.package())
             .unwrap(),
         source
     );
@@ -135,14 +135,14 @@ fn collection_edit_updates_cusr_and_cbusr() {
         append_commit
             .patch()
             .inverse()
-            .apply(append_commit.snapshot())
+            .apply(append_commit.package())
             .unwrap(),
         source
     );
 
     let mut remove = added.edit();
     assert_eq!(remove.remove(0).unwrap().user_name(), "Alice");
-    let removed = remove.commit().unwrap().into_snapshot();
+    let removed = remove.commit().unwrap().into_package();
     assert_eq!(removed.user_count(), 1);
     assert_eq!(removed.users()[0].user_name(), "Bob");
     assert_eq!(removed.model().user_record_sizes()[1], 0);
