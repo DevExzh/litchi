@@ -30,9 +30,16 @@
 //! ([`TextRuns`](crate::text_edit::TextRuns) and the source-backed
 //! [`SourceSnapshot`](crate::text_edit::SourceSnapshot) reader) and the typed
 //! [`Error`](crate::text_edit::Error)/[`Refusal`](crate::text_edit::Refusal).
+//!
+//! The source-backed same-length splice is a scoped family since record
+//! 0357a: [`Package::edit_text`](crate::Package::edit_text) returns a
+//! [`text_edit::Edit`](crate::text_edit::Edit) whose commit publishes a new
+//! package over the composed overlay source without materializing it, and
+//! [`Package::apply_text`](crate::Package::apply_text) replays its
+//! [`text_edit::Patch`](crate::text_edit::Patch).
 #![allow(
     dead_code,
-    reason = "crate-private native text owners (record 0357): the whole-artifact and source-backed transactions keep their tests until a Package-level route promotes them"
+    reason = "crate-private native text owners (record 0357): the whole-artifact transaction and the source-backed splice owner behind text_edit::Edit keep their full surface exercised by the unit tests"
 )]
 
 use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
@@ -54,12 +61,14 @@ use litchi_cfb::{
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 
+mod family;
 mod readback;
 #[cfg(test)]
 mod readback_tests;
 pub(crate) mod runs;
 mod source_range;
 
+pub use family::{Commit, Diagnostics, Edit, LimitKind, Patch};
 pub use runs::{CharacterRun, RunFormat, TextLink, TextRuns};
 
 const PPT_HEADER_LEN: usize = 8;
@@ -223,6 +232,12 @@ pub enum Error {
     /// The immutable positional source or sequential overlay publisher
     /// rejected a source-backed operation.
     Source(OverlayError),
+    /// A [`Patch`] was made from a package with another exact source
+    /// artifact fingerprint (record 0357a).
+    PatchConflict,
+    /// A changed text splice would invalidate the package signature
+    /// (record 0357a).
+    Signed,
 }
 
 impl fmt::Display for Error {
@@ -231,6 +246,11 @@ impl fmt::Display for Error {
             Self::Package(error) => error.fmt(formatter),
             Self::Refused(refusal) => refusal.fmt(formatter),
             Self::Source(error) => error.fmt(formatter),
+            Self::PatchConflict => formatter
+                .write_str("PPT text patch source does not match the exact package receiving it"),
+            Self::Signed => {
+                formatter.write_str("changed PPT text writes require explicit signature removal")
+            },
         }
     }
 }
@@ -239,7 +259,7 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Package(error) => Some(error),
-            Self::Refused(_) => None,
+            Self::Refused(_) | Self::PatchConflict | Self::Signed => None,
             Self::Source(error) => Some(error),
         }
     }
@@ -1978,7 +1998,7 @@ impl Transaction {
     ///
     /// Returns an error if package publication or source-checked readback
     /// fails, or a typed refusal for an unsafe replacement.
-    pub(crate) fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<RecordCommit> {
         self.commit_verified().map(|(commit, _)| commit)
     }
 
@@ -1987,14 +2007,14 @@ impl Transaction {
     /// 0264).
     pub(crate) fn commit_verified(
         self,
-    ) -> Result<(Commit, Option<(u32, crate::slide::PatchedShapes)>)> {
+    ) -> Result<(RecordCommit, Option<(u32, crate::slide::PatchedShapes)>)> {
         let replacement = self
             .replacement
             .unwrap_or_else(|| self.resolved.text.clone());
         if replacement == self.resolved.text {
-            let patch = Patch::new(self.source.clone(), self.source.clone(), None);
+            let patch = RecordPatch::new(self.source.clone(), self.source.clone(), None);
             return Ok((
-                Commit {
+                RecordCommit {
                     snapshot: self.source,
                     patch,
                     replaced_slide_persist_id: None,
@@ -2049,9 +2069,9 @@ impl Transaction {
             before_text: self.resolved.text,
             after_text: replacement,
         };
-        let patch = Patch::new(self.source, snapshot.clone(), Some(change));
+        let patch = RecordPatch::new(self.source, snapshot.clone(), Some(change));
         Ok((
-            Commit {
+            RecordCommit {
                 snapshot,
                 patch,
                 replaced_slide_persist_id: Some(self.resolved.slide_persist_id),
@@ -2063,13 +2083,13 @@ impl Transaction {
 
 /// A published snapshot and its reversible source-checked patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Commit {
+pub(crate) struct RecordCommit {
     snapshot: Snapshot,
-    patch: Patch,
+    patch: RecordPatch,
     replaced_slide_persist_id: Option<u32>,
 }
 
-impl Commit {
+impl RecordCommit {
     /// The immutable committed package.
     #[must_use]
     pub(crate) const fn snapshot(&self) -> &Snapshot {
@@ -2078,13 +2098,13 @@ impl Commit {
 
     /// The source-checked patch that produced this snapshot.
     #[must_use]
-    pub(crate) const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &RecordPatch {
         &self.patch
     }
 
     /// Consumes the commit into its snapshot and patch.
     #[must_use]
-    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, RecordPatch) {
         (self.snapshot, self.patch)
     }
 
@@ -2188,13 +2208,13 @@ impl RootPublication {
 
 /// A reversible in-memory patch authorized by exact package bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Patch {
+pub(crate) struct RecordPatch {
     before: Snapshot,
     after: Snapshot,
     change: Option<Change>,
 }
 
-impl Patch {
+impl RecordPatch {
     fn new(before: Snapshot, after: Snapshot, change: Option<Change>) -> Self {
         Self {
             before,

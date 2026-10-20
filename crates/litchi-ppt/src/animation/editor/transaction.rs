@@ -6,7 +6,7 @@ use super::super::{
     write_extended_time_node,
 };
 use super::semantic::{
-    Editor, EditorLimits, LegacyShapeAnimation, PersistAnimation, Scope, Timeline,
+    Editor, EditorLimits, LegacyShapeAnimation, PersistAnimation, Scope, SourceAnimation, Timeline,
 };
 use super::validation::{validate_extension, validate_limits};
 use crate::consts::RecordType;
@@ -20,6 +20,9 @@ use super::semantic::{ESCHER_CLIENT_DATA, ESCHER_SP, ESCHER_SP_CONTAINER};
 impl Editor {
     /// Opens an animation editor over the persisted records of a package.
     ///
+    /// A signed package opens for staging and reading; [`Self::into_net_bytes`]
+    /// refuses to publish a net change of it.
+    ///
     /// # Errors
     ///
     /// Returns an error if `limits` is invalid, the package or one of its
@@ -27,7 +30,7 @@ impl Editor {
     /// configured limits.
     pub(crate) fn open(bytes: Vec<u8>, limits: EditorLimits) -> Result<Self> {
         validate_limits(limits)?;
-        let package = ObjectEditor::open_records(bytes)?;
+        let package = ObjectEditor::open_records_admitting_signature(bytes)?;
         let ids = package.persist_ids();
         if ids.len() > limits.max_persist_records {
             return invalid("persisted-record count exceeds animation editor limit");
@@ -69,17 +72,48 @@ impl Editor {
                 legacy,
             });
         }
+        let sources = entries
+            .iter()
+            .map(|entry| SourceAnimation {
+                extension: entry.extension.clone(),
+                legacy: entry.legacy.clone(),
+            })
+            .collect();
         Ok(Self {
             package,
             entries,
+            sources,
             limits,
-            changed: false,
         })
     }
 
-    /// Whether any staging verb rewrote a persisted record.
-    pub(crate) fn has_net_change(&self) -> bool {
-        self.changed
+    /// The package bytes with every net record change, or `None` when the
+    /// staged records equal the source.
+    ///
+    /// A staged record whose bytes equal its source record is no change. A
+    /// staged record whose animation model (timeline, build list and legacy
+    /// shape animations) equals the source model was rewritten back to its
+    /// source meaning: the source record is kept, byte for byte, instead of
+    /// a re-encoding of it. Only the remaining records are published.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a record cannot be read or the rewritten package
+    /// cannot be serialized (a net change of a signed source is refused).
+    pub(crate) fn into_net_bytes(mut self) -> Result<Option<Vec<u8>>> {
+        for (entry, source) in self.entries.iter().zip(&self.sources) {
+            if !self.package.is_record_staged(entry.persist_id) {
+                continue;
+            }
+            let same_bytes = self.package.source_record(entry.persist_id)? == entry.record;
+            if same_bytes || source.same_as(entry) {
+                self.package.unstage_record(entry.persist_id);
+            }
+        }
+        if !self.package.has_staged_records() {
+            return Ok(None);
+        }
+        self.package.finish().map(Some)
     }
 
     /// Whether the slide or main master `persist_id` owns shape `shape_id`.
@@ -425,18 +459,8 @@ impl Editor {
                 .legacy
                 .sort_by_key(|value| value.shape_id);
         }
-        candidate.changed = true;
         *self = candidate;
         Ok(())
-    }
-
-    /// Serialize the rewritten package bytes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the rewritten package cannot be serialized.
-    pub(crate) fn into_bytes(self) -> Result<Vec<u8>> {
-        self.package.finish()
     }
 
     fn entry_mut(&mut self, persist_id: u32) -> Result<&mut PersistAnimation> {
@@ -483,8 +507,28 @@ impl Editor {
         self.entries[index].record = record;
         self.entries[index].extension_payload = Some(payload);
         self.entries[index].extension = reparsed;
-        self.changed = true;
         Ok(())
+    }
+}
+
+impl SourceAnimation {
+    /// Whether `entry` carries this source animation model: the same
+    /// timeline and build list, and the same legacy shape animations
+    /// (compared by shape id and serialized `AnimationInfo`; an animation
+    /// that cannot be serialized compares unequal).
+    fn same_as(&self, entry: &PersistAnimation) -> bool {
+        let encoded = |value: &LegacyShapeAnimation| {
+            write_animation_info(&value.animation)
+                .ok()
+                .map(|bytes| (value.shape_id, bytes.0))
+        };
+        let mut source = self.legacy.iter().map(encoded).collect::<Option<Vec<_>>>();
+        let mut staged = entry.legacy.iter().map(encoded).collect::<Option<Vec<_>>>();
+        if let (Some(source), Some(staged)) = (source.as_mut(), staged.as_mut()) {
+            source.sort();
+            staged.sort();
+        }
+        self.extension == entry.extension && source.is_some() && source == staged
     }
 }
 

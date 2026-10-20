@@ -5,8 +5,11 @@ use crate::embedded::object::editor::Result;
 use crate::package::Error;
 
 const EX_OBJ_LIST: u16 = 1033;
+const DOCUMENT: u16 = 1000;
+const DOCUMENT_ATOM: u16 = 1001;
 pub(crate) const MAX_NESTED_RECORD_DEPTH: usize = 256;
 
+#[cfg(test)]
 pub(crate) fn replace_nested_record(
     record: &[u8],
     target: u16,
@@ -66,6 +69,46 @@ fn replace_nested_record_at_depth(
     Ok(Some(output))
 }
 
+/// Replace the `ExObjListContainer` of the `DocumentContainer` `document`
+/// with `list`, or insert `list` when the document has none.
+///
+/// `[MS-PPT]` 2.4.1 orders the `DocumentContainer` children `documentAtom`,
+/// then the optional `exObjList`, then `documentTextInfo` and the rest, so a
+/// new list is inserted directly after the `DocumentAtom`, where `PowerPoint`
+/// writes it.
+pub(crate) fn replace_or_insert_object_list(document: &[u8], list: &[u8]) -> Result<Vec<u8>> {
+    if let Some(replaced) = replace_nested_record_at_depth(document, EX_OBJ_LIST, list, 0)? {
+        return Ok(replaced);
+    }
+    let version = u16::from_le_bytes([document[0], document[1]]) & 0xF;
+    if version != 0xF || record::type_of(document)? != DOCUMENT {
+        return Err(Error::Corrupted(
+            "the live persisted document is not a DocumentContainer".into(),
+        ));
+    }
+    let atom = record::slice(document, 8)?;
+    if record::type_of(atom)? != DOCUMENT_ATOM {
+        return Err(Error::Corrupted(
+            "DocumentContainer does not start with a DocumentAtom".into(),
+        ));
+    }
+    let split = 8 + atom.len();
+    let payload_len = document
+        .len()
+        .checked_sub(8)
+        .and_then(|len| len.checked_add(list.len()))
+        .and_then(|len| u32::try_from(len).ok())
+        .ok_or_else(|| Error::Corrupted("PPT record payload exceeds u32".into()))?;
+    let mut output = Vec::with_capacity(document.len() + list.len());
+    output.extend_from_slice(&document[..4]);
+    output.extend_from_slice(&payload_len.to_le_bytes());
+    output.extend_from_slice(&document[8..split]);
+    output.extend_from_slice(list);
+    output.extend_from_slice(&document[split..]);
+    Ok(output)
+}
+
+#[cfg(test)]
 pub(crate) const fn external_object_list() -> u16 {
     EX_OBJ_LIST
 }

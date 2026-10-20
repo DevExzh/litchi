@@ -2778,6 +2778,12 @@
    "series": "docx_w1_contract:docx:file_(batch|edit)_1k_paragraph_text_sets",
    "explanation": "Record 0355 §5: pre-existing (base and head equal, 1.46 s). Each item's path resolution reloads the staged body (docx::nav::load_body, 58% of instructions in a 300×300 callgrind probe), so the cost is O(paragraphs × items), about 1.5 µs per paragraph per item. Follow-up 0355-P1: cache the body navigation across the items of one batch.",
    "disposition": "follow-up"
+  },
+  {
+   "record": "0357a",
+   "series": "scoped_patch:scoped_commit_external_media_path:after-before",
+   "explanation": "Record 0357a §5: the record-sized patch costs one SHA-256 of the 54,784-byte target per changed commit (about 21 µs of 217 µs), the minimum an exact, source-checked inverse needs; in exchange a retained patch is 15,360 instead of 98,304 bytes and the 1k-patch run's peak RSS falls from 110,910 to 19,758 KiB. Follow-up 0357a-F1: compute the target digest lazily on first apply of the inverse.",
+   "disposition": "follow-up"
   }
  ],
  "evidence_without_rows": [

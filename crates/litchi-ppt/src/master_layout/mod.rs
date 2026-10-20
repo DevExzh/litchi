@@ -19,7 +19,7 @@ mod model;
     reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
 )]
 mod transaction;
-mod validation;
+pub(crate) mod validation;
 
 #[cfg(test)]
 mod tests;

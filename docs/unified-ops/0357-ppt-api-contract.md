@@ -49,13 +49,16 @@ All families share the crate-private plumbing in
   keeps its bytes and the slide list is unchanged;
 - an exact no-op commit returns the source package (byte-identical,
   signatures kept); a changed commit of a signed package is `Error::Signed`;
-- a family patch is exact and whole-artifact (source and target bytes),
-  `inverse` swaps them, and `apply_x` refuses any other package with
-  `Error::PatchConflict`;
+- a family patch is exact and record-sized since
+  [0357a](0357a-ppt-record-sized-patches.md) (endpoint length and SHA-256
+  plus the changed 512-byte ranges; it was whole-artifact source and target
+  bytes), `inverse` swaps the endpoints, and `apply_x` refuses any other
+  package with `Error::PatchConflict`;
 - `family!("noun")` declares `Diagnostics` (`litchi_core::edit`), `Commit =
   litchi_core::edit::Commit<Package, Patch>`, `LimitKind` (no caller-selected
   dimension), `Error {Package, Refused, PatchConflict, Signed}`, `Result` and
-  `Patch {is_noop, inverse, before_bytes, after_bytes}`.
+  `Patch {is_noop, inverse, source_len, target_len, changed_bytes}`
+  (`before_bytes`/`after_bytes` until 0357a).
 
 | Family | Entry | Was |
 |---|---|---|
@@ -89,6 +92,12 @@ Duplicates of the primary edit became crate-private instead of families
   with the vocabulary the primary verbs take and the typed errors;
 - `client_anchor` (`set_shape_anchor`), `document_structure` (slide moves,
   inserts, removals), `package::property_set` (behind `package::metadata`).
+
+[0357a §7](0357a-ppt-record-sized-patches.md#7-follow-up-restoring-the-routes-record-0357-made-crate-private)
+restores public routes for the durable, history, composition and three-way
+surfaces (on `package::edit`), the source-backed text splice (the
+`text_edit` family) and the master and custom-table-style edits (primary
+`Edit` verbs).
 
 Drafts: `chart::PackageEditor` became the value draft `chart::GraphPackage`
 (`chart::Snapshot` → `chart::View`, `edit_package` → `draft_package`); a chart
@@ -237,23 +246,29 @@ into_package_editor, finish}` and `snapshot` on every family `Edit`.
 
 ## 9. Gaps and follow-ups
 
-- The source-backed same-length text splice (`text_edit::SourceTransaction`,
-  streaming publication without materializing the package) and the
-  slide-order durable patches, history, composition and three-way planning
-  have no public route now; they keep their unit tests (moved into
-  `slide_order::durable_tests`). A Package-level promotion is a follow-up.
-- `document_structure`'s master reordering and custom-table-style placement
-  and `client_data`-independent anchor sub-fields have no public route
-  beyond the primary edit's verbs.
-- Animation: an edit that stages a change and then reverts it publishes a
-  changed package (the editor tracks rewritten records, not net equality);
-  a signed package is refused at `edit_animations()`.
-- `edit_objects()` refuses a deck without an external-object list and a
-  signed deck at the start (the object publisher cannot open them).
-- Master editing: the existing master validator refuses the notes master of
-  13 of 25 corpus decks; no corpus deck has a title master.
-- The scoped family patches carry whole-artifact bytes (as `package::metadata`
-  did); a record-sized durable patch is a follow-up.
+- Closed by [0357a §7](0357a-ppt-record-sized-patches.md#7-follow-up-restoring-the-routes-record-0357-made-crate-private):
+  the slide-order durable patches, history, composition and three-way
+  planning are `package::edit::Patch::{to_durable, join}`,
+  `Package::{apply_durable, plan_three_way}` and inverse plus `apply`
+  (§7.1). The source-backed same-length text splice is the registered
+  `text_edit` family (`Package::{edit_text, apply_text}`), publishing a new
+  `Package` over the composed overlay source without materializing it
+  (§7.2). `document_structure`'s master reordering, custom-table-style
+  placement and `fNonOutlineData` are `package::edit::Edit` verbs (§7.3).
+- `client_data`-independent anchor sub-fields have no public route beyond
+  the primary edit's verbs. Master-order, custom-table-style and
+  `fNonOutlineData` changes have no durable patch vocabulary
+  (`to_durable` refuses them).
+- Closed by [0357a §6](0357a-ppt-record-sized-patches.md#6-follow-up-closing-the-0357-9-family-gaps):
+  a reverted animation change publishing a changed package, the signed-deck
+  refusal of `edit_animations()` and `edit_objects()`, `edit_objects()`
+  refusing a deck without an external-object list, the master validator
+  refusing real notes masters (13 corpus decks), and the missing
+  title-master fixture.
+- The scoped family patches carried whole-artifact bytes; record
+  [0357a](0357a-ppt-record-sized-patches.md) made them record-sized
+  byte-range diffs. `package::metadata::Patch` and `package::edit::Patch`
+  still carry whole-artifact bytes.
 - For W5: `litchi-ole-common`, `litchi-crypto` and `litchi-ograph` were not
   changed; none of their banned names reaches the PPT surface (the
   crate-wide bans pass).

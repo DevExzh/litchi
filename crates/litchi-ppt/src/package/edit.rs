@@ -10,6 +10,7 @@
 //! call succeeds keeps the canonical transaction failure-atomic.
 
 use super::{Error as PackageError, OpenOptions, Package};
+pub use crate::document_structure::CustomTableStylesPlacement;
 pub use crate::external_media::Playback;
 use crate::slide_order;
 pub use crate::slide_order::{
@@ -124,6 +125,9 @@ pub enum Error {
     PatchConflict,
     /// A changed write would invalidate the package signature.
     Signed,
+    /// A durable patch could not be built within the selected bounds
+    /// (record 0357a).
+    Durable(litchi_core::patch::PatchError),
 }
 
 impl From<PackageError> for Error {
@@ -175,6 +179,7 @@ impl fmt::Debug for Error {
                 .finish(),
             Self::PatchConflict => formatter.write_str("Error::PatchConflict"),
             Self::Signed => formatter.write_str("Error::Signed"),
+            Self::Durable(_) => formatter.write_str("Error::Durable(..)"),
         }
     }
 }
@@ -206,6 +211,7 @@ impl fmt::Display for Error {
             Self::PatchConflict => formatter.write_str(
                 "PPT package patch source does not match the exact package receiving it",
             ),
+            Self::Durable(_) => formatter.write_str("PPT durable patch conversion failed"),
         }
     }
 }
@@ -215,6 +221,7 @@ impl std::error::Error for Error {
         match self {
             Self::Package(error) => Some(error),
             Self::Native(error) => Some(error),
+            Self::Durable(error) => Some(error),
             Self::InvalidLimit { .. } | Self::Limit { .. } | Self::PatchConflict | Self::Signed => {
                 None
             },
@@ -228,7 +235,11 @@ impl Error {
     pub const fn limit_kind(&self) -> Option<LimitKind> {
         match self {
             Self::InvalidLimit { kind, .. } | Self::Limit { kind, .. } => Some(*kind),
-            Self::Package(_) | Self::Native(_) | Self::PatchConflict | Self::Signed => None,
+            Self::Package(_)
+            | Self::Native(_)
+            | Self::PatchConflict
+            | Self::Signed
+            | Self::Durable(_) => None,
         }
     }
 
@@ -242,7 +253,11 @@ impl Error {
                 maximum,
                 ..
             } => Some((*value, *maximum)),
-            Self::Package(_) | Self::Native(_) | Self::PatchConflict | Self::Signed => None,
+            Self::Package(_)
+            | Self::Native(_)
+            | Self::PatchConflict
+            | Self::Signed
+            | Self::Durable(_) => None,
         }
     }
 }
@@ -284,6 +299,8 @@ impl Diagnostics {
 pub struct Patch {
     inner: slide_order::Patch,
     operation_count: usize,
+    /// Built by a durable replay: exact bytes, no semantic operations.
+    replayed: bool,
 }
 
 impl fmt::Debug for Patch {
@@ -303,6 +320,7 @@ impl Patch {
         Self {
             inner,
             operation_count,
+            replayed: false,
         }
     }
 
@@ -333,7 +351,121 @@ impl Patch {
     /// Return the exact inverse patch.
     #[must_use]
     pub fn inverse(&self) -> Self {
-        Self::from_native(self.inner.inverse(), self.operation_count)
+        Self {
+            inner: self.inner.inverse(),
+            operation_count: self.operation_count,
+            replayed: self.replayed,
+        }
+    }
+
+    /// Convert this patch to the shared durable patch envelope
+    /// (`litchi_core::patch`), replayed by [`Package::apply_durable`].
+    ///
+    /// The operations carry semantic zero-based positions, the SHA-256 of
+    /// the exact artifacts they bind and a content-free order fingerprint;
+    /// native slide and persist identifiers are never serialized.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Durable`] when `limits` cannot hold the operations, and
+    /// [`slide_order::Refusal::UnsupportedPatch`] for a changed patch that a
+    /// durable replay produced (it keeps the exact bytes, not the
+    /// operations; convert the durable patch that was replayed instead) or
+    /// one that reorders masters, edits the custom table-style atom or sets
+    /// `fNonOutlineData` (those have no durable vocabulary).
+    pub fn to_durable(
+        &self,
+        limits: litchi_core::patch::PatchLimits,
+    ) -> Result<litchi_core::patch::Patch<litchi_core::patch::Reversible>> {
+        if self.replayed && !self.is_noop() {
+            return Err(Error::Native(slide_order::Error::Refused(
+                slide_order::Refusal::UnsupportedPatch {
+                    reason: "a replayed durable patch keeps no semantic operations",
+                },
+            )));
+        }
+        if self.inner.has_document_changes() {
+            return Err(Error::Native(slide_order::Error::Refused(
+                slide_order::Refusal::UnsupportedPatch {
+                    reason: "master order, custom table styles and fNonOutlineData have no durable form",
+                },
+            )));
+        }
+        self.inner.to_durable(limits).map_err(Error::Durable)
+    }
+
+    /// Join an independently prepared patch over the same exact source.
+    ///
+    /// Both patches must consist only of slide moves, and the slide
+    /// positions they permute must be disjoint, so the two commute. The
+    /// joined patch applies `self`'s moves, then `other`'s, and counts the
+    /// operations of both. This is the composition of independently
+    /// prepared moves (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::PatchConflict`] when the patches start from different
+    /// packages; [`slide_order::Refusal::UnsupportedPatch`] (kind
+    /// `UnsupportedOperation`) for a patch with other operations or for
+    /// overlapping moves.
+    pub fn join(&self, other: &Self) -> Result<Self> {
+        if self.before() != other.before() {
+            return Err(Error::PatchConflict);
+        }
+        if self.replayed || other.replayed {
+            return Err(Error::Native(slide_order::Error::Refused(
+                slide_order::Refusal::UnsupportedPatch {
+                    reason: "a replayed durable patch keeps no semantic operations",
+                },
+            )));
+        }
+        let operation_count = self
+            .operation_count
+            .checked_add(other.operation_count)
+            .ok_or(Error::Limit {
+                kind: LimitKind::Operations,
+                observed: usize::MAX,
+                maximum: MAX_OPERATIONS,
+            })?;
+        let inner = self.inner.join(&other.inner)?;
+        Ok(Self::from_native(inner, operation_count))
+    }
+}
+
+/// One semantic target written by both patches of a [`ThreeWayPlan`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Conflict {
+    target: String,
+}
+
+impl Conflict {
+    /// Stable semantic target written by both patches, such as
+    /// `slide-id:256/transition-visual` or `slide-list/position:1`.
+    #[must_use]
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+}
+
+/// Read-only three-way plan of two patches made from one exact package.
+///
+/// It lists the semantic targets both patches write; a clean plan has none.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ThreeWayPlan {
+    conflicts: Vec<Conflict>,
+}
+
+impl ThreeWayPlan {
+    /// Whether the two patches write no common semantic target.
+    #[must_use]
+    pub fn is_clean(&self) -> bool {
+        self.conflicts.is_empty()
+    }
+
+    /// The common semantic targets, sorted.
+    #[must_use]
+    pub fn conflicts(&self) -> &[Conflict] {
+        &self.conflicts
     }
 }
 
@@ -643,6 +775,115 @@ impl Edit {
         })
     }
 
+    /// Move one main or title master to a final zero-based position in the
+    /// document's master list (record 0357a).
+    ///
+    /// Slides, notes and title masters reference a master by its `masterId`,
+    /// which is unchanged, so every reference keeps its master.
+    ///
+    /// # Errors
+    ///
+    /// [`slide_order::Refusal::ElementNotFound`] for a position outside the
+    /// master list; [`Error::Signed`] for a change on a signed package.
+    pub fn move_master(&mut self, from: Position, destination: Position) -> Result<()> {
+        self.stage(1, |inner| inner.move_master(from, destination))
+    }
+
+    /// Move the master whose `masterId` is `master_id` to a final position
+    /// (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`slide_order::Refusal::ElementNotFound`] when no master has that id.
+    pub fn move_master_id(&mut self, master_id: u32, destination: Position) -> Result<()> {
+        self.stage(1, |inner| inner.move_master_id(master_id, destination))
+    }
+
+    /// Reorder the master list: it becomes `order`, each entry a current
+    /// master position (record 0357a). The identity order is a no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`slide_order::Refusal::InvalidElementValue`] unless `order` is a
+    /// permutation of the master positions.
+    pub fn reorder_masters(&mut self, order: &[Position]) -> Result<()> {
+        let order: Vec<usize> = order.iter().map(|position| position.get()).collect();
+        self.stage(1, |inner| inner.reorder_masters(&order))
+    }
+
+    /// Insert a `RoundTripCustomTableStyles12Atom` (its complete record
+    /// bytes: the 8-byte header and the payload) before or after the
+    /// `EndDocumentAtom` (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`slide_order::Refusal::InvalidElementValue`] for bytes that are not
+    /// exactly one such atom; [`slide_order::Refusal::UnsupportedElement`]
+    /// when the document already has one.
+    pub fn insert_custom_table_styles(
+        &mut self,
+        atom: &[u8],
+        placement: CustomTableStylesPlacement,
+    ) -> Result<()> {
+        let record = custom_table_styles_record(atom)?;
+        self.stage(1, |inner| {
+            inner.insert_custom_table_styles(record, placement)
+        })
+    }
+
+    /// Remove the custom table-style atom; returns its complete record bytes
+    /// (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`slide_order::Refusal::ElementNotFound`] when the document has none.
+    pub fn remove_custom_table_styles(&mut self) -> Result<Vec<u8>> {
+        let record = self.stage(1, slide_order::Transaction::remove_custom_table_styles)?;
+        encode_atom(&record)
+    }
+
+    /// Replace the custom table-style atom in place with `atom` (its complete
+    /// record bytes); returns the previous atom's bytes (record 0357a). An
+    /// equal atom is a no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`slide_order::Refusal::ElementNotFound`] when the document has none;
+    /// [`slide_order::Refusal::InvalidElementValue`] for bytes that are not
+    /// exactly one such atom.
+    pub fn replace_custom_table_styles(&mut self, atom: &[u8]) -> Result<Vec<u8>> {
+        let record = custom_table_styles_record(atom)?;
+        let before = self.stage(1, |inner| inner.replace_custom_table_styles(record))?;
+        encode_atom(&before)
+    }
+
+    /// Move the custom table-style atom before or after the
+    /// `EndDocumentAtom` (record 0357a). Its current placement is a no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`slide_order::Refusal::ElementNotFound`] when the document has none.
+    pub fn move_custom_table_styles(
+        &mut self,
+        placement: CustomTableStylesPlacement,
+    ) -> Result<()> {
+        self.stage(1, |inner| inner.move_custom_table_styles(placement))
+    }
+
+    /// Set one slide's `SlidePersistAtom.fNonOutlineData` flag ([MS-PPT]
+    /// 2.4.14.5; record 0357a). It does not hide the slide; that is
+    /// [`Self::set_slide_hidden`].
+    ///
+    /// # Errors
+    ///
+    /// [`slide_order::Refusal::SlideNotFound`] for a position outside the
+    /// slide list.
+    pub fn set_slide_non_outline_data(&mut self, position: Position, present: bool) -> Result<()> {
+        self.stage(1, |inner| {
+            inner.set_slide_non_outline_data(position, present)
+        })
+    }
+
     /// Publish this edit as a new immutable package.
     pub fn commit(self) -> Result<Commit> {
         self.commit_with(slide_order::Transaction::commit)
@@ -763,6 +1004,80 @@ impl Package {
         })
     }
 
+    /// Replay a durable patch (see [`Patch::to_durable`]) on this package.
+    ///
+    /// Each operation checks its own preconditions (the exact artifact
+    /// SHA-256 of structural operations, the before value of property
+    /// operations). The commit's patch is exact (`apply`, `inverse`) and
+    /// counts the durable operations; it keeps no semantic operations of its
+    /// own. An empty durable patch publishes this package unchanged.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Native`] for another format, malformed operations or failed
+    /// preconditions, [`Error::Signed`] for a changed replay on a signed
+    /// package, and [`Error::Package`] for an encrypted package.
+    pub fn apply_durable<Mode>(&self, patch: &litchi_core::patch::Patch<Mode>) -> Result<Commit> {
+        if self.is_encrypted() {
+            return Err(Error::Package(PackageError::EncryptionPolicy));
+        }
+        let expected = self.source_version().map_err(Error::Package)?;
+        let bytes = self.to_encrypted_bytes().map_err(Error::Package)?;
+        ensure_source_version(self, expected)?;
+        let replay = (|| {
+            let source = slide_order::Snapshot::from_bytes_with_options(bytes, open_options(self))?;
+            let target = source.apply_durable(patch)?;
+            Ok::<_, slide_order::Error>((source, target))
+        })();
+        ensure_source_version(self, expected)?;
+        let (source, target) = replay?;
+        let operation_count = patch.operations().len();
+        let changed = source.bytes() != target.bytes();
+        let package = if changed {
+            package_from_bytes(self, target.bytes())?
+        } else {
+            self.clone()
+        };
+        ensure_source_version(self, expected)?;
+        let mut patch =
+            Patch::from_native(slide_order::Patch::exact(source, target), operation_count);
+        patch.replayed = true;
+        Ok(Commit {
+            package,
+            patch,
+            diagnostics: Diagnostics::new(changed, operation_count),
+        })
+    }
+
+    /// Plan two patches made from this exact package against each other
+    /// without applying either.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::PatchConflict`] when either patch starts from another
+    /// package.
+    pub fn plan_three_way(&self, left: &Patch, right: &Patch) -> Result<ThreeWayPlan> {
+        if self.is_encrypted() {
+            return Err(Error::Package(PackageError::EncryptionPolicy));
+        }
+        let expected = self.source_version().map_err(Error::Package)?;
+        let bytes = self.to_encrypted_bytes().map_err(Error::Package)?;
+        ensure_source_version(self, expected)?;
+        if left.before() != bytes || right.before() != bytes {
+            return Err(Error::PatchConflict);
+        }
+        let native = slide_order::ThreeWayPlan::new(&left.inner, &right.inner);
+        Ok(ThreeWayPlan {
+            conflicts: native
+                .conflicts()
+                .iter()
+                .map(|conflict| Conflict {
+                    target: conflict.target().to_owned(),
+                })
+                .collect(),
+        })
+    }
+
     fn apply_package(&self, patch: &Patch) -> Result<Self> {
         if self.is_encrypted() {
             return Err(Error::Package(PackageError::EncryptionPolicy));
@@ -813,6 +1128,27 @@ impl Package {
         ensure_source_version(donor, donor_expected)?;
         Ok(plan?)
     }
+}
+
+/// Parse exactly one record from `atom` (the custom table-style verbs).
+fn custom_table_styles_record(atom: &[u8]) -> Result<crate::Record> {
+    let invalid = || {
+        Error::Native(slide_order::Error::Refused(
+            slide_order::Refusal::InvalidElementValue {
+                element: "custom table styles",
+                reason: "the bytes are not exactly one record",
+            },
+        ))
+    };
+    let (record, consumed) = crate::Record::parse(atom, 0).map_err(|_error| invalid())?;
+    if consumed != atom.len() {
+        return Err(invalid());
+    }
+    Ok(record)
+}
+
+fn encode_atom(record: &crate::Record) -> Result<Vec<u8>> {
+    crate::document_structure::encode_record(record, false).map_err(Error::Package)
 }
 
 fn open_options(source: &Package) -> OpenOptions<'static> {

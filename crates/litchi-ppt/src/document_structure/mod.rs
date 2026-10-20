@@ -9,6 +9,7 @@ mod model;
 mod transaction;
 mod validation;
 
+pub(crate) use codec::encode_record;
 pub use model::{CustomTableStylesPlacement, DocumentStructure, Limits, Master, Slide};
 #[allow(
     unused_imports,

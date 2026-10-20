@@ -2367,7 +2367,11 @@ mod tests {
         assert_eq!(edit.changes().len(), 2);
         let commit = edit.commit().unwrap();
         assert!(commit.diagnostics().changed());
-        assert_eq!(commit.patch().before_bytes(), source_bytes.as_slice());
+        assert_eq!(commit.patch().source_len(), source_bytes.len());
+        assert_eq!(
+            commit.patch().target_len(),
+            commit.package().to_bytes().unwrap().len()
+        );
         let published = read(commit.package()).unwrap();
         assert_eq!(published.get(4), Some(&replacement));
         assert!(published.get(5).is_none());

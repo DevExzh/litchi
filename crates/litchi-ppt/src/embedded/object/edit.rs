@@ -7,13 +7,16 @@
 //! [`Patch`] onto the exact package it was made from. Dropping an [`Edit`]
 //! discards it. Storages stay inert: nothing is loaded, activated or run.
 //!
+//! A presentation without an external-object list starts from an empty one;
+//! the first committed object creates the `ExObjListContainer` (with its
+//! `ExObjListAtom` identifier seed) in the live document.
+//!
 //! ```
 //! let package = litchi_ppt::Package::new()?;
-//! // A presentation without an external-object list has no object to edit.
-//! assert!(matches!(
-//!     package.edit_objects(),
-//!     Err(litchi_ppt::embedded::object::Error::Refused(_))
-//! ));
+//! let edit = package.edit_objects()?;
+//! assert!(edit.objects().objects.is_empty());
+//! // Nothing staged: the commit is the source package unchanged.
+//! assert!(!edit.commit()?.diagnostics().changed());
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
@@ -63,19 +66,16 @@ fn staging(operation: &'static str) -> impl FnOnce(PackageError) -> Failure {
 impl Edit {
     fn new(package: &Package) -> Result<Self> {
         let base = Base::capture(package)?;
-        let source = package.presentation()?.ole_objects()?.ok_or_else(|| {
-            scoped::unsupported_target(
-                "embedded_object.edit",
-                "the presentation has no external-object list",
-            )
-        })?;
-        let inner = match Editor::open(base.bytes().to_vec(), source.clone()) {
-            Ok(inner) => inner,
-            // The record publisher refuses the signature storages any write
-            // would invalidate; report the signature, not the storage.
-            Err(_) if base.is_signed()? => return Err(Error::Signed),
-            Err(error) => return Err(scoped::publication("embedded_object.edit")(error).into()),
-        };
+        // A document without an `ExObjListContainer` edits an empty list; a
+        // committed change inserts the container ([MS-PPT] 2.4.1).
+        let source = package
+            .presentation()?
+            .ole_objects()?
+            .unwrap_or_else(Collection::empty);
+        // A signed package opens for staging; only a changed commit is
+        // refused, since it would invalidate the signature.
+        let inner = Editor::open_admitting_signature(base.bytes().to_vec(), source.clone())
+            .map_err(scoped::publication("embedded_object.edit"))?;
         Ok(Self {
             base,
             source,
@@ -180,9 +180,10 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Refused`] when the package holds content the
-    /// publisher cannot preserve and [`Error::Package`] when the result
-    /// cannot be republished.
+    /// Returns [`Error::Signed`] for a changed write to a signed package,
+    /// [`Error::Refused`] when the package holds content the publisher
+    /// cannot preserve and [`Error::Package`] when the result cannot be
+    /// republished.
     pub fn commit(self) -> Result<Commit> {
         let Self {
             base,
@@ -195,9 +196,13 @@ impl Edit {
         {
             return Ok(super::published(base.unchanged()));
         }
-        let after = inner
-            .finish()
-            .map_err(scoped::publication("embedded_object.commit"))?;
+        let after = match inner.finish() {
+            Ok(bytes) => bytes,
+            // The record publisher refuses a changed write of a signed
+            // package; report the signature.
+            Err(_) if base.is_signed()? => return Err(Error::Signed),
+            Err(error) => return Err(scoped::publication("embedded_object.commit")(error).into()),
+        };
         Ok(super::published(base.publish(after)?))
     }
 }
@@ -208,9 +213,9 @@ impl Package {
     /// # Errors
     ///
     /// Returns [`Error::Package`] for an encrypted presentation or one whose
-    /// object list cannot be read, [`Error::Signed`] for a signed one, and
-    /// [`Error::Refused`] with [`RefusalKind::UnsupportedTarget`] when the
-    /// live document has no external-object list.
+    /// object list cannot be read. A presentation without an external-object
+    /// list edits an empty one; a signed presentation opens, and its changed
+    /// commit is [`Error::Signed`].
     pub fn edit_objects(&self) -> Result<Edit> {
         Edit::new(self)
     }
