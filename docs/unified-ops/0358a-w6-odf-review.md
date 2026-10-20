@@ -1,8 +1,9 @@
 # 0358a — W6 review: source-backed ODF families, no lost capability
 
 - Status: implemented on `uo2/w6-odf` after record
-  [0358](0358-w6-odf-contract.md), merged with trunk `7f36f7b909`
-  (`81e4e8705c`, which carries records 0356a and 0357a).
+  [0358](0358-w6-odf-contract.md), merged with trunk twice: `7f36f7b909`
+  (`81e4e8705c`, records 0356a and 0357a) and `ff0f1fa036` (`129c3861a4`,
+  the 0358 merge and records 0356b and 0357b).
 - Date: 2026-10-20.
 - Input: the coordinator's review of 0358 (five items, the owner's
   no-exceptions/no-loss direction); the source-backed family shape of
@@ -178,7 +179,10 @@ Behavior differences, all on purpose:
 | `81e4e8705c` | merge trunk `7f36f7b909` (0356a, 0357a) |
 | `0a86513faf` | ops: `--features odf-objects` builds on its own |
 | `e4a0614f5d` | content-free refusals; durable/history/merge layout edits; package routes for the removed part patches; their tests |
-| TBD | source-backed families (ODS, ODP), owners' `write_to`/`save`, gate, consumers, probe, this record |
+| `77ab7cab8a` | source-backed families (ODS, ODP), the owners' `write_to`/`save`, the ODT element-named refusals, gate, consumers, `odf_source_backed_probe` |
+| `a04f5683cf` | this record (draft), A-B-B-A evidence, `p0358a` bench-matrix rows |
+| `129c3861a4` | merge trunk `ff0f1fa036` (0358 merged, 0356b, 0357b) |
+| this commit | record, rustfmt of `kept.rs`, the side-workspace lock files (trunk's 0357b `sha2` dependency of litchi-ppt) |
 
 ## 6. Performance
 
@@ -273,4 +277,30 @@ route of both probes (the two misses carry this explanation).
 
 ## 8. Gates
 
-TBD
+All on the merged head `129c3861a4` (plus this commit's formatting and
+lock-file updates), one heavy command at a time (`CARGO_BUILD_JOBS=6`,
+`RUST_TEST_THREADS=8`). The performance runs of §6 used `77ab7cab8a`.
+
+| Command | Exit |
+|---|---|
+| `cargo fmt --all --check` | 0 (after formatting `kept.rs`) |
+| `cargo clippy -p litchi-{odf-common,odt,odp,odg,odc,odi,odm,oth,odb,odf-formula,odf} -p litchi-ops -p litchi -p litchi-py -p litchi-cli --all-targets --all-features -- -D warnings` | 0 |
+| `cargo clippy -p litchi-ods --all-features --all-targets -- -D warnings` | 0 |
+| `cargo clippy -p litchi-ops --no-default-features [--features odt\|ods\|odp\|odg\|odc\|odi\|odm\|oth\|odb\|odf-formula\|odf-objects] -- -D warnings` (none and each) | 0 |
+| `cargo test --no-fail-fast --all-features -p` each ODF crate and `litchi-odf` (litchi-ods `--all-targets`), plus `-p litchi-ods --doc` | 0 (4,533 passed) |
+| `cargo test -p litchi-ops --all-features` (lib, every integration test in chunks of 20, doc) and `cargo test -p litchi --all-features` | 0 (0 failed) |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p` the ODF crates | 0 |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` | 0 (44 profiles, 3,101 banned names, 452 families, 71 immutable owners) |
+| `python3 tools/check_crate_boundaries.py`; `python3 tools/non_iwork_gate.py verify` | 0; 0 |
+| `crates/pyo3-litchi/tests/run_tests.sh` | 0 |
+| `cd tools/perf-baseline && cargo check --locked --all-targets`; `cd tools/native-resave && cargo check --locked --all-features`; the three ODF fuzz crates `cargo check --offline --all-targets` | 0; 0 (both after the lock-file update); 0 |
+| `python3 -m unittest tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate tools.test_check_api_glossary` | 0 (1,296 tests) |
+| `python3 tools/officecli_capability_delta.py --check`; `python3 tools/officecli_corpus.py --check`; `python3 tools/unified_bench_matrix.py --check`; `python3 tools/check_feature_matrix.py`; `python3 tools/check_feature_matrix.py --ops` | 0; 0; 0; 0; 0 |
+
+The ODF debt inventory (`tools/api_debt_inventory.py` over the eleven
+crates' rustdoc JSON) has 11 rows, none a source-backed family: the nine
+`metadata::Commit` aliases of `litchi_core::edit::Commit` it cannot see
+through (the gate checks them in `litchi-core`) and the two
+`litchi_core::SubEdit` composition aliases of ODB and ODG. The 0289
+fidelity report changed in three rows, the restored element names of
+§4; no capability, code or golden otherwise changed.

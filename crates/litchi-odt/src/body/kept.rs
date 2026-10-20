@@ -410,8 +410,10 @@ fn refusal(_root: Kind, element: &str, _what: &str) -> Error {
         "table:table-row" => reason!("table:table-row"),
         "table:table-cell" => reason!("table:table-cell"),
         "table:covered-table-cell" => reason!("table:covered-table-cell"),
-        _ => "an ODT text set would replace a non-text element: set the text of the runs around it, \
-              or remove it first (record 0304)",
+        _ => {
+            "an ODT text set would replace a non-text element: set the text of the runs around it, \
+              or remove it first (record 0304)"
+        },
     };
     Error::Refused(litchi_core::edit::Refusal::new(
         litchi_core::edit::RefusalKind::UnsupportedContent,
