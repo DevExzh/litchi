@@ -499,8 +499,8 @@ impl Snapshot {
 
     /// Start an isolated atomic semantic edit.
     #[must_use]
-    pub fn edit(&self) -> transaction::Editor {
-        transaction::Editor::open(self.clone())
+    pub(crate) fn edit(&self) -> transaction::RecordEdit {
+        transaction::RecordEdit::open(self.clone())
     }
 }
 
