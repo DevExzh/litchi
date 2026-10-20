@@ -897,7 +897,8 @@ fn source_adoption_rejects_a_revision_from_an_independently_opened_owner() {
         Ok(_) => panic!("independently opened source owner was adopted"),
         Err(error) => error,
     };
-    assert_eq!(error.code(), Code::IoError);
+    // A revision of another base is the caller's input (record 0351).
+    assert_eq!(error.code(), Code::InvalidInput);
     assert!(matches!(
         error.leaf(),
         Source::Pptx(pptx::Error::PatchConflict)

@@ -228,10 +228,11 @@ pub(super) fn map_error(error: Error) -> Error {
 }
 
 fn unsafe_edit(reason: &'static str) -> Error {
-    Error::UnsafeEdit {
-        operation: "insert_slide",
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "insert_slide",
         reason,
-    }
+    )
 }
 
 fn registered_layout(

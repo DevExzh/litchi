@@ -426,7 +426,7 @@ fn serialized(package: &mut Package) -> TestResult<Vec<u8>> {
 }
 
 fn assert_unsafe_edit(error: Error) {
-    assert!(matches!(error, Error::UnsafeEdit { .. }));
+    assert!(matches!(error, Error::PatchConflict | Error::Refused(_)));
 }
 
 fn with_eocd_comment(mut bytes: Vec<u8>, comment: &[u8]) -> TestResult<Vec<u8>> {

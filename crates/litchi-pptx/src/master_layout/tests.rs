@@ -1470,7 +1470,7 @@ fn p232_slot_rejects_mce_rewritten_owner_before_mutation() {
     let error = package
         .placeholder_type_extension_slot_snapshot(&slide_uri, "Cameo")
         .unwrap_err();
-    assert!(matches!(error, crate::Error::UnsafeEdit { .. }));
+    assert!(matches!(error, crate::Error::Refused(_)));
     assert_eq!(
         package.opc().unwrap().get_part(&slide_uri).unwrap().blob(),
         before.as_slice()

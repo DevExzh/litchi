@@ -151,7 +151,7 @@ pub(crate) fn normalize_shape_removal_pair(
     } else {
         match shape_reference_ids(&normalized_candidate) {
             Ok(references) => references.into_iter().max().unwrap_or(0),
-            Err(Error::UnsafeEdit { .. }) => return Ok(None),
+            Err(Error::Refused(_)) => return Ok(None),
             Err(error) => return Err(error),
         }
     };
@@ -170,7 +170,7 @@ pub(crate) fn normalize_shape_removal_pair(
     // direction is not a proof; the caller may still prove its inverse.
     match validate_shape_removal_dependencies(candidate, &removed_ids) {
         Ok(()) => {},
-        Err(Error::UnsafeEdit { .. }) => return Ok(None),
+        Err(Error::Refused(_)) => return Ok(None),
         Err(error) => return Err(error),
     }
     Ok(Some(if forward {

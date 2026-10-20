@@ -75,13 +75,13 @@ fn other_edits_on_a_slide_with_enclosed_markup_compatibility_stay_refused() {
     let mut edit = source.edit().unwrap();
     let error = edit.set_shape_text(0, 1_usize, "changed").unwrap_err();
     assert!(
-        matches!(error, Error::UnsafeEdit { reason, .. } if reason.contains("markup-compatibility")),
+        matches!(error, Error::Refused(refusal) if refusal.reason().contains("markup-compatibility")),
         "{error:?}"
     );
     let error = edit
         .set_slide_properties(Position::new(0), Some("renamed"), None)
         .unwrap_err();
-    assert!(matches!(error, Error::UnsafeEdit { .. }), "{error:?}");
+    assert!(matches!(error, Error::Refused(_)), "{error:?}");
     assert!(edit.commit().unwrap().into_parts().1.is_noop());
 }
 

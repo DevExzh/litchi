@@ -1095,7 +1095,7 @@ fn malformed_shared_svg_detach_cannot_commit() {
     assert!(edit.detach().unwrap());
     assert!(matches!(
         edit.commit(),
-        Err(Error::Invalid(_)) | Err(Error::Relationship(_)) | Err(Error::UnsafeEdit { .. })
+        Err(Error::Invalid(_)) | Err(Error::Relationship(_)) | Err(Error::Refused(_))
     ));
 }
 
@@ -1128,7 +1128,7 @@ fn attach_rejects_existing_svg_owner_shared_id_and_unsafe_targets_before_publica
     let mce = mce_extension_package();
     assert!(matches!(
         open_editor(&mce).edit_svg_attachment(0, 0),
-        Err(Error::Invalid(_)) | Err(Error::Relationship(_)) | Err(Error::UnsafeEdit { .. })
+        Err(Error::Invalid(_)) | Err(Error::Relationship(_)) | Err(Error::Refused(_))
     ));
 
     let transition_mce = unrelated_transition_mce_package();

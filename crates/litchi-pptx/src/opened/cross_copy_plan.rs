@@ -812,32 +812,20 @@ pub(crate) fn apply_plan(
     let (source_revision, source_digests) =
         super::model::package_fingerprint_with_memo(source, live.source)?;
     if source_revision != plan.source_revision {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_plan",
-            reason: "the complete source package graph changed after cross-slide planning",
-        });
+        return Err(Error::PatchConflict);
     }
     let (destination_revision, destination_digests) =
         super::model::package_fingerprint_with_memo(destination, live.destination)?;
     if destination_revision != plan.destination_revision {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_plan",
-            reason: "the complete destination package graph changed after cross-slide planning",
-        });
+        return Err(Error::PatchConflict);
     }
     let source_physical_revision = physical_package_fingerprint(source, limits)?;
     if source_physical_revision != plan.source_physical_revision {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_plan",
-            reason: "the serialized source package changed after cross-slide planning",
-        });
+        return Err(Error::PatchConflict);
     }
     let destination_physical_revision = physical_package_fingerprint(destination, limits)?;
     if destination_physical_revision != plan.destination_physical_revision {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_plan",
-            reason: "the serialized destination package changed after cross-slide planning",
-        });
+        return Err(Error::PatchConflict);
     }
     if plan.patch.copied_media == CopiedMedia::SourceCompressed
         && !holds_only_built_in_parts(destination)
@@ -892,10 +880,7 @@ pub(crate) fn apply_plan(
         || fresh.target_physical_revision != plan.target_physical_revision
         || fresh.patch != plan.patch
     {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_plan",
-            reason: "the durable cross-slide plan does not match a freshly proven candidate",
-        });
+        return Err(Error::PatchConflict);
     }
     let (mut candidate, snapshot, rebuilt) = validate_application_candidate(
         destination,
@@ -909,10 +894,7 @@ pub(crate) fn apply_plan(
     if published_archive_revision(&candidate, limits, rebuilt, fresh.target_physical_revision)?
         != plan.target_physical_revision
     {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_plan",
-            reason: "the published candidate has an unexpected serialized package revision",
-        });
+        return Err(Error::PatchConflict);
     }
     if normalized {
         adopt_destination_save_options(&mut candidate, destination);
@@ -935,32 +917,20 @@ pub(crate) fn apply_patch(
     let (source_revision, source_digests) =
         super::model::package_fingerprint_with_memo(source, live.source)?;
     if source_revision != patch.source_revision {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_patch",
-            reason: "the complete source package graph differs from the cross-slide patch source",
-        });
+        return Err(Error::PatchConflict);
     }
     let (destination_revision, destination_digests) =
         super::model::package_fingerprint_with_memo(destination, live.destination)?;
     if destination_revision != patch.destination_revision {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_patch",
-            reason: "the complete destination package graph differs from the cross-slide patch source",
-        });
+        return Err(Error::PatchConflict);
     }
     let source_physical_revision = physical_package_fingerprint(source, limits)?;
     if source_physical_revision != patch.source_physical_revision {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_patch",
-            reason: "the serialized source package differs from the cross-slide patch source",
-        });
+        return Err(Error::PatchConflict);
     }
     let destination_physical_revision = physical_package_fingerprint(destination, limits)?;
     if destination_physical_revision != patch.destination_physical_revision {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_patch",
-            reason: "the serialized destination package differs from the cross-slide patch source",
-        });
+        return Err(Error::PatchConflict);
     }
     let source_snapshot = super::model::capture_with_revision_and_digests_and_mce(
         source,
@@ -1073,10 +1043,7 @@ pub(crate) fn apply_patch(
         }
     };
     let (candidate, reopened, normalized, candidate_digests) =
-        candidate.ok_or(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_patch",
-            reason: "the durable cross-slide patch does not match a freshly proven candidate",
-        })?;
+        candidate.ok_or(Error::PatchConflict)?;
     let (mut candidate, snapshot, rebuilt) = validate_application_candidate(
         destination,
         candidate,
@@ -1089,10 +1056,7 @@ pub(crate) fn apply_patch(
     if published_archive_revision(&candidate, limits, rebuilt, patch.target_physical_revision)?
         != patch.target_physical_revision
     {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_cross_slide_copy_patch",
-            reason: "the published candidate has an unexpected serialized package revision",
-        });
+        return Err(Error::PatchConflict);
     }
     if normalized {
         adopt_destination_save_options(&mut candidate, destination);

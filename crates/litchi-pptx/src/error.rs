@@ -170,6 +170,26 @@ pub enum SlideOrderRefusal {
     ModifyVerifier,
 }
 
+impl SlideCopyRefusal {
+    /// The refusal kind litchi-ops classifies this reason by (record 0351).
+    #[must_use]
+    pub const fn kind(self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SignedPackage | Self::ProtectedPresentation => RefusalKind::Protected,
+            Self::CallerDefinedPart => RefusalKind::UnsupportedOperation,
+            Self::MarkupCompatibility
+            | Self::UnknownSemanticSurface
+            | Self::SharedOwner
+            | Self::UnsupportedRelationship
+            | Self::DependencyCycle
+            | Self::AmbiguousTopology
+            | Self::GlobalTableStyle
+            | Self::UnknownPhysicalMember => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
 impl std::fmt::Display for SlideCopyRefusal {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
@@ -185,6 +205,30 @@ impl std::fmt::Display for SlideCopyRefusal {
             Self::UnknownPhysicalMember => "unknown physical package member",
             Self::CallerDefinedPart => "caller-defined destination part",
         })
+    }
+}
+
+impl SlideRemovalRefusal {
+    /// The refusal kind litchi-ops classifies this reason by (record 0351).
+    ///
+    /// [`Self::FinalSlide`] is an invalid value: the selection would leave
+    /// the presentation without slides. litchi-ops reports it as
+    /// `invalid_argument`, the code every format uses for deleting the final
+    /// slide.
+    #[must_use]
+    pub const fn kind(self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SignedPackage | Self::ProtectedPresentation => RefusalKind::Protected,
+            Self::FinalSlide => RefusalKind::InvalidValue,
+            Self::MacroEnabledPackage
+            | Self::MarkupCompatibility
+            | Self::UnknownSemanticSurface
+            | Self::SharedOwner
+            | Self::UnsupportedRelationship
+            | Self::AmbiguousTopology
+            | Self::UnknownPhysicalMember => RefusalKind::UnsupportedContent,
+        }
     }
 }
 
@@ -205,6 +249,27 @@ impl std::fmt::Display for SlideRemovalRefusal {
     }
 }
 
+impl SlideOrderRefusal {
+    /// The refusal kind litchi-ops classifies this reason by (record 0351).
+    ///
+    /// [`Self::AmbiguousBindings`] is unsupported content; litchi-ops
+    /// reports it as `corrupt_file`, because ambiguous slide bindings are a
+    /// malformed source rather than a route limitation.
+    #[must_use]
+    pub const fn kind(self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::ModifyVerifier => RefusalKind::Protected,
+            Self::MarkupCompatibility
+            | Self::Sections
+            | Self::ViewProperties
+            | Self::PresentationProperties
+            | Self::PositionalOwner
+            | Self::AmbiguousBindings => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
 impl std::fmt::Display for SlideOrderRefusal {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
@@ -216,6 +281,22 @@ impl std::fmt::Display for SlideOrderRefusal {
             Self::AmbiguousBindings => "ambiguous slide-order bindings",
             Self::ModifyVerifier => "presentation modify verifier",
         })
+    }
+}
+
+impl ShapeTransferRefusal {
+    /// The refusal kind litchi-ops classifies this reason by (record 0351).
+    #[must_use]
+    pub const fn kind(self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::NestedShape | Self::MissingIdentity | Self::UnresolvedConnectorEndpoint => {
+                RefusalKind::UnsupportedTarget
+            },
+            Self::ContentPart | Self::UnknownExtensionShape | Self::UnclassifiedGraphicFrame => {
+                RefusalKind::UnsupportedContent
+            },
+        }
     }
 }
 
@@ -475,19 +556,26 @@ pub enum Error {
     #[error("invalid PresentationML URI: {0}")]
     Uri(String),
 
-    /// A lossless facade operation cannot safely expose or replace a graph.
-    #[error("unsafe PPTX edit during {operation}: {reason}")]
-    UnsafeEdit {
-        /// Operation that requested the edit.
-        operation: &'static str,
-        /// Reason the bounded facade rejected it.
-        reason: &'static str,
-    },
+    /// A well-formed request this route refuses (record 0351): the kind
+    /// classifies it, the operation and reason are static text.
+    #[error("PPTX {0}")]
+    Refused(litchi_core::edit::Refusal),
 
-    /// A patch's base does not match the package it is applied to: it was
-    /// created against different exact source bytes or another revision.
+    /// A patch or staged plan does not match the package it is applied to:
+    /// it was made against different exact source bytes or another revision
+    /// (record 0351).
     #[error("PPTX patch base does not match the target package")]
     PatchConflict,
+
+    /// A broken internal invariant: state the crate itself should have
+    /// provided is missing or inconsistent.
+    #[error("PPTX {operation} internal invariant failed: {reason}")]
+    Internal {
+        /// Operation that detected the broken invariant.
+        operation: &'static str,
+        /// The invariant that failed.
+        reason: &'static str,
+    },
 
     /// An owning ingress route was given a policy only a positional-source
     /// owner can honor.
@@ -559,6 +647,31 @@ pub enum Error {
     /// Writing into the requested text sink failed.
     #[error("could not encode PresentationML text")]
     Write,
+}
+
+impl Error {
+    /// A refusal of `operation` for `reason`, classified by `kind`.
+    pub(crate) const fn refused(
+        kind: litchi_core::edit::RefusalKind,
+        operation: &'static str,
+        reason: &'static str,
+    ) -> Self {
+        Self::Refused(litchi_core::edit::Refusal::new(kind, operation, reason))
+    }
+
+    /// A broken internal invariant.
+    pub(crate) const fn internal(operation: &'static str, reason: &'static str) -> Self {
+        Self::Internal { operation, reason }
+    }
+
+    /// The refusal this error carries, when it is one.
+    #[must_use]
+    pub const fn refusal(&self) -> Option<&litchi_core::edit::Refusal> {
+        match self {
+            Self::Refused(refusal) => Some(refusal),
+            _ => None,
+        }
+    }
 }
 
 impl From<quick_xml::Error> for Error {

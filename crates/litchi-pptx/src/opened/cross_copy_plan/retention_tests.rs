@@ -420,7 +420,7 @@ fn retention_changes_no_apply_verdict() -> Result<()> {
         ))
     };
     assert_eq!(drift(&retained)?, drift(&unretained)?);
-    assert!(drift(&retained)?.contains("UnsafeEdit"));
+    assert!(drift(&retained)?.contains("PatchConflict"));
 
     // Rejecting route 2: a foreign source package.
     let foreign_source = owned_slides(&["foreign"])?;
@@ -432,7 +432,7 @@ fn retention_changes_no_apply_verdict() -> Result<()> {
         ))
     };
     assert_eq!(foreign(&retained)?, foreign(&unretained)?);
-    assert!(foreign(&retained)?.contains("UnsafeEdit"));
+    assert!(foreign(&retained)?.contains("PatchConflict"));
 
     // Rejecting route 3: a source whose own bytes drifted after planning.
     let mut stale_source = |plan: &CrossSlideCopyPlan| -> Result<String> {
@@ -455,7 +455,7 @@ fn retention_changes_no_apply_verdict() -> Result<()> {
         ))
     };
     assert_eq!(stale_source(&retained)?, stale_source(&unretained)?);
-    assert!(stale_source(&retained)?.contains("UnsafeEdit"));
+    assert!(stale_source(&retained)?.contains("PatchConflict"));
 
     // Rejecting route 4: borrowed graph-only ingress carries no physical
     // provenance and is refused before any candidate is built.

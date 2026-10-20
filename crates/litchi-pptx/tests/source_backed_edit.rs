@@ -761,7 +761,7 @@ fn multi_slide_batch_rejects_empty_duplicate_over_bound_and_stale_sets() {
     .unwrap();
     assert!(matches!(
         editor.edit_slides().commit(),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
     let mut edit = editor.edit_slides();
     for position in 0..MAX_SOURCE_BACKED_SLIDE_BATCH {
@@ -778,7 +778,7 @@ fn multi_slide_batch_rejects_empty_duplicate_over_bound_and_stale_sets() {
     ));
     assert!(matches!(
         edit.set_shape_texts(0, &[ShapeTextReplacement::named("Title", "duplicate")]),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
     let commit = edit.commit().unwrap();
 
@@ -935,7 +935,7 @@ fn batch_preflight_is_atomic_and_duplicate_identity_is_typed() {
     );
     assert!(matches!(
         edit.set_shape_texts(&[ShapeTextReplacement::at(0, "again")]),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
 }
 
@@ -990,7 +990,7 @@ fn empty_and_all_equal_batch_preserve_signed_source_exactly() {
     );
     assert!(matches!(
         edit.set_shape_text("Title", "changed"),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
     let commit = edit.commit();
     assert!(!commit.diagnostics().changed());
@@ -1061,10 +1061,7 @@ fn mce_limits_strict_and_partial_sink_are_checked() {
     let mce = fixture("", mce_slide_xml(), false);
     let editor =
         SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(mce))).unwrap();
-    assert!(matches!(
-        editor.edit_slide(0),
-        Err(Error::UnsafeEdit { .. })
-    ));
+    assert!(matches!(editor.edit_slide(0), Err(Error::Refused(_))));
 
     let strict =
         fixture_with_presentation_namespace(STRICT_PML, "", shape_xml(STRICT_PML, "before"), false);
@@ -1085,7 +1082,7 @@ fn mce_limits_strict_and_partial_sink_are_checked() {
     assert!(edit.set_shape_text("Title", "after").unwrap());
     assert!(matches!(
         edit.set_shape_text("Other", "changed"),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
 
     let limits = SourceLimits::builder()
@@ -1557,7 +1554,7 @@ fn transition_extension_prefix_collision_refuses_without_changing_source() {
         edit.set_transition(&Transition::new(TransitionKind::Morph(
             litchi_pptx::transition::Morph::ByWord
         ))),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
     let commit = edit.commit();
     assert!(!commit.diagnostics().changed());
@@ -1729,10 +1726,7 @@ fn direct_transition_semantic_noop_shares_signed_source_exactly() {
     let mut edit = editor.edit_slide(0).unwrap();
     let requested = direct_transition(TransitionKind::Push(Side::Left));
     assert!(!edit.set_transition(&requested).unwrap());
-    assert!(matches!(
-        edit.clear_transition(),
-        Err(Error::UnsafeEdit { .. })
-    ));
+    assert!(matches!(edit.clear_transition(), Err(Error::Refused(_))));
     let commit = edit.commit();
     assert!(!commit.diagnostics().changed());
     let replayed = commit.patch().apply(commit.patch().source()).unwrap();
@@ -1786,12 +1780,9 @@ fn direct_transition_rejects_unsafe_sources_and_supports_typed_extensions() {
         let mut edit = editor.edit_slide(0).unwrap();
         assert!(matches!(
             edit.set_transition(&Transition::new(TransitionKind::Fade { black: None })),
-            Err(Error::UnsafeEdit { .. })
+            Err(Error::Refused(_))
         ));
-        assert!(matches!(
-            edit.clear_transition(),
-            Err(Error::UnsafeEdit { .. })
-        ));
+        assert!(matches!(edit.clear_transition(), Err(Error::Refused(_))));
     }
 
     let protected = r#"<p:modifyVerifier cryptAlgorithmSid="14" spinCount="1" saltData="AA==" hashData="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="/>"#;
@@ -1802,7 +1793,7 @@ fn direct_transition_rejects_unsafe_sources_and_supports_typed_extensions() {
     let mut edit = editor.edit_slide(0).unwrap();
     assert!(matches!(
         edit.set_transition(&Transition::new(TransitionKind::Fade { black: None })),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
     assert!(!edit.clear_transition().unwrap());
 

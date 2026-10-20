@@ -55,7 +55,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::UnsafeEdit`] for a second title placeholder on the
+    /// Returns [`Error::Refused`] for a second title placeholder on the
     /// slide, an error for an unknown slide, invalid text, malformed slide
     /// or layout XML, or an exhausted shape-ID space. A failure leaves the
     /// edit unchanged.
@@ -163,10 +163,11 @@ impl Edit {
         let part = self.working.get_part(&selected.part_name)?;
         let edge = crate::opened::remove_plan::removal_layout_edge(part.rels())?;
         if edge.target_query().is_some() || edge.target_fragment().is_some() {
-            return Err(Error::UnsafeEdit {
-                operation: "set_slide_layout",
-                reason: "the slide's layout target contains a query or fragment",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "set_slide_layout",
+                "the slide's layout target contains a query or fragment",
+            ));
         }
         if edge.target_partname()? == layout {
             return Ok(false);
@@ -196,10 +197,11 @@ impl Edit {
             .map(|placeholder| (kind_of(placeholder), placeholder.index()))
             .collect();
         if is_title(kind) && used.iter().any(|(found, _)| found.is_some_and(is_title)) {
-            return Err(Error::UnsafeEdit {
-                operation: "add_placeholder",
-                reason: "the slide already has a title placeholder",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                "add_placeholder",
+                "the slide already has a title placeholder",
+            ));
         }
         let shape_id = super::next_shape_id(&scene, "placeholder")?;
         let position = scene.len();

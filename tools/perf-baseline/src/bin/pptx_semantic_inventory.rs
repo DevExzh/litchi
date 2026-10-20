@@ -325,10 +325,10 @@ fn image_target(target: &SourceImageTarget) -> AnyResult<ImageTargetInventory> {
 
 fn image_inventory_error(error: &litchi_pptx::Error) -> AnyResult<ImageInventoryError> {
     let (kind, operation, reason) = match error {
-        litchi_pptx::Error::UnsafeEdit { operation, reason } => (
-            "unsafe_edit",
-            Some((*operation).to_owned()),
-            Some((*reason).to_owned()),
+        litchi_pptx::Error::Refused(refusal) => (
+            "refused",
+            Some(refusal.operation().to_owned()),
+            Some(refusal.reason().to_owned()),
         ),
         litchi_pptx::Error::MarkupCompatibility(_) => ("markup_compatibility", None, None),
         litchi_pptx::Error::Limit { .. } => ("limit", None, None),

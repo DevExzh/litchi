@@ -441,10 +441,11 @@ fn snapshot_from_source_for_key<'a>(
     limits.check_source(source.len())?;
     let scene = Scene::read(source.as_slice())?;
     if scene.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "load_p232_placeholder_patch",
-            reason: "markup compatibility rewrote the owner; no source-preserving patch policy is available",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "load_p232_placeholder_patch",
+            "markup compatibility rewrote the owner; no source-preserving patch policy is available",
+        ));
     }
     let shape = scene.shape(key)?;
     let placeholder = shape
@@ -483,10 +484,11 @@ fn snapshot_from_source(
 ) -> Result<Snapshot> {
     let scene = Scene::read(source.as_slice())?;
     if scene.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "stage_p232_placeholder_patch",
-            reason: "markup compatibility rewrote the owner; no source-preserving patch policy is available",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "stage_p232_placeholder_patch",
+            "markup compatibility rewrote the owner; no source-preserving patch policy is available",
+        ));
     }
     let shape = scene.at(shape_index)?;
     let placeholder = shape
@@ -1067,10 +1069,11 @@ fn prepare_placeholder_shape_source(
     limits.check_source(source.len())?;
     let scene = Scene::read(source)?;
     if scene.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "store_placeholder_shape",
-            reason: "markup compatibility rewrote the owner; source-preserving shape authoring is unavailable",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "store_placeholder_shape",
+            "markup compatibility rewrote the owner; source-preserving shape authoring is unavailable",
+        ));
     }
 
     let mut patched = if let Some((shape_index, shape)) = find_placeholder_shape(&scene, spec)? {
@@ -1109,10 +1112,11 @@ fn prepare_placeholder_shape_source(
     limits.check_source(patched.len())?;
     let final_scene = Scene::read(&patched)?;
     if final_scene.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "store_placeholder_shape",
-            reason: "staged owner requires markup compatibility rewriting",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "store_placeholder_shape",
+            "staged owner requires markup compatibility rewriting",
+        ));
     }
     let (_, shape) = find_placeholder_shape(&final_scene, spec)?
         .ok_or_else(|| invalid("authored placeholder shape did not round-trip"))?;
@@ -1206,10 +1210,11 @@ fn patch_existing_shape_fields(
 ) -> Result<Vec<u8>> {
     let scene = Scene::read(source)?;
     if scene.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "store_placeholder_shape",
-            reason: "staged owner requires markup compatibility rewriting",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "store_placeholder_shape",
+            "staged owner requires markup compatibility rewriting",
+        ));
     }
     let shape = scene.at(shape_index)?;
     let span = shape.span()?.range(scene.xml().len())?;
@@ -1629,10 +1634,11 @@ fn slot_snapshot_from_source_for_key<'a>(
     limits.check_source(source.len())?;
     let scene = Scene::read(source.as_slice())?;
     if scene.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "load_p232_placeholder_slot",
-            reason: "markup compatibility rewrote the owner; no source-preserving patch policy is available",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "load_p232_placeholder_slot",
+            "markup compatibility rewrote the owner; no source-preserving patch policy is available",
+        ));
     }
     let shape = scene.shape(key)?;
     let placeholder = shape
@@ -1668,10 +1674,11 @@ fn slot_snapshot_from_source(
 ) -> Result<SlotSnapshot> {
     let scene = Scene::read(source.as_slice())?;
     if scene.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "stage_p232_placeholder_slot",
-            reason: "markup compatibility rewrote the owner; no source-preserving patch policy is available",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "stage_p232_placeholder_slot",
+            "markup compatibility rewrote the owner; no source-preserving patch policy is available",
+        ));
     }
     let shape = scene.at(shape_index)?;
     let placeholder = shape

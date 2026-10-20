@@ -160,10 +160,11 @@ impl PropertiesEdit {
     /// Returns an error if the operation fails.
     pub fn commit(self) -> Result<PropertiesCommit> {
         if self.changed && self.snapshot.occurrence_count() > 1 {
-            return Err(Error::UnsafeEdit {
-                operation: "commit_shape_designer_properties",
-                reason: "the selected shape has multiple matching Designer properties extensions",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "commit_shape_designer_properties",
+                "the selected shape has multiple matching Designer properties extensions",
+            ));
         }
         if let EditState::Set(value) = &self.state {
             validate_properties(value, self.snapshot.limits)?;
@@ -283,10 +284,7 @@ pub(crate) fn apply_properties(
     let part = package.get_part(&snapshot.owner)?;
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
     if part.blob() != original {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_shape_designer_properties",
-            reason: "the selected slide changed during Designer properties staging",
-        });
+        return Err(Error::PatchConflict);
     }
     if staged == original {
         return Ok(snapshot);
@@ -310,10 +308,7 @@ fn validate_current_source(package: &OpcPackage, snapshot: &PropertiesSnapshot) 
     let part = package.get_part(&snapshot.owner)?;
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
     if part.blob() != snapshot.source.as_slice() {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_shape_designer_properties",
-            reason: "the selected slide changed after Designer properties were loaded",
-        });
+        return Err(Error::PatchConflict);
     }
     Ok(())
 }
@@ -674,10 +669,11 @@ fn stage(
 ) -> Result<Vec<u8>> {
     let located = locate(source, shape.clone(), limits)?;
     if located.property_exts.len() > 1 {
-        return Err(Error::UnsafeEdit {
-            operation: "stage_shape_designer_properties",
-            reason: "the selected shape has multiple matching Designer properties extensions",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "stage_shape_designer_properties",
+            "the selected shape has multiple matching Designer properties extensions",
+        ));
     }
     let occurrence = located.property_exts.first();
     let current = occurrence.and_then(|occurrence| occurrence.properties.as_ref());
@@ -693,10 +689,10 @@ fn stage(
         (None, Some(value)) => insert_properties(source, &located, value, inner_extensions, limits),
         (None, None) => fallible_copy_vec(source, "Designer no-op output"),
         (Some(current), None) => {
-            let occurrence = occurrence.ok_or(Error::UnsafeEdit {
-                operation: "stage_shape_designer_properties",
-                reason: "current Designer properties have no outer occurrence",
-            })?;
+            let occurrence = occurrence.ok_or(Error::internal(
+                "stage_shape_designer_properties",
+                "current Designer properties have no outer occurrence",
+            ))?;
             remove_properties_xml(source, &located, occurrence, current, limits)
         },
     }

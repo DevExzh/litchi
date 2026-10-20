@@ -1189,7 +1189,7 @@ fn cross_slide_copy_rejects_layout_mismatch_and_stale_or_forged_publication() ->
     let foreign_source = opened_plain_slides_package(2)?;
     assert!(matches!(
         destination.apply_cross_slide_copy_plan(&foreign_source, &plan),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::PatchConflict)
     ));
     assert_eq!(part_states(&destination), before);
     let destination_slide = destination_snapshot
@@ -1209,7 +1209,7 @@ fn cross_slide_copy_rejects_layout_mismatch_and_stale_or_forged_publication() ->
     let stale_before = part_states(&destination);
     assert!(matches!(
         destination.apply_cross_slide_copy_plan(&source, &plan),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::PatchConflict)
     ));
     assert_eq!(part_states(&destination), stale_before);
 
@@ -1221,7 +1221,7 @@ fn cross_slide_copy_rejects_layout_mismatch_and_stale_or_forged_publication() ->
         Package::from_reader(std::io::Cursor::new(clean_destination_bytes))?;
     assert!(matches!(
         forged_destination.apply_cross_slide_copy_patch(&source, &forged),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::PatchConflict)
     ));
     Ok(())
 }
@@ -2663,10 +2663,7 @@ fn slide_copy_application_refuses_stale_complete_graph() -> Result<()> {
     let before_apply = part_states(&package);
     assert!(matches!(
         package.apply_slide_copy_plan(&plan),
-        Err(Error::UnsafeEdit {
-            operation: "apply_slide_copy_plan",
-            ..
-        })
+        Err(Error::PatchConflict)
     ));
     assert_eq!(part_states(&package), before_apply);
     Ok(())
@@ -3260,10 +3257,7 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
     let before_apply = part_states(&stale);
     assert!(matches!(
         stale.apply_slide_removal_plan(&plan),
-        Err(Error::UnsafeEdit {
-            operation: "apply_slide_removal_plan",
-            ..
-        })
+        Err(Error::PatchConflict)
     ));
     assert_eq!(part_states(&stale), before_apply);
 
@@ -3291,10 +3285,7 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
     let before_apply = part_states(&inbound_stale);
     assert!(matches!(
         inbound_stale.apply_slide_removal_patch(&durable),
-        Err(Error::UnsafeEdit {
-            operation: "apply_slide_removal_patch",
-            ..
-        })
+        Err(Error::PatchConflict)
     ));
     assert_eq!(part_states(&inbound_stale), before_apply);
     assert!(inbound_stale.opc.contains_part(&selected));
@@ -3368,10 +3359,7 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
     let before_apply = part_states(&patch_stale);
     assert!(matches!(
         patch_stale.apply_slide_removal_patch(&patch),
-        Err(Error::UnsafeEdit {
-            operation: "apply_slide_removal_patch",
-            ..
-        })
+        Err(Error::PatchConflict)
     ));
     assert_eq!(part_states(&patch_stale), before_apply);
     Ok(())

@@ -334,7 +334,6 @@ impl Edit {
         let published = super::remove_plan::apply_patch(
             &mut self.working,
             plan.patch(),
-            "remove_slide",
             self.source.physical_source_provenance,
         )?;
         self.slides = published.slides;
@@ -1160,7 +1159,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::UnsafeEdit`] for a slide without a notes page, and
+    /// Returns [`Error::Refused`] for a slide without a notes page, and
     /// the errors of [`Self::set_text_properties`]. A failed batch leaves
     /// the transaction unchanged.
     pub fn set_notes_text_properties<'s>(
@@ -1176,10 +1175,11 @@ impl Edit {
                 .iter()
                 .find(|note| note.owner() == selected_slide.part_name.as_str())
         }) else {
-            return Err(Error::UnsafeEdit {
-                operation: "set_notes_text_properties",
-                reason: "the slide has no notes page",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                "set_notes_text_properties",
+                "the slide has no notes page",
+            ));
         };
         let part_name = PackURI::new(note.part())
             .map_err(|_error| invalid("opened-presentation notes part name is invalid"))?;
@@ -1246,10 +1246,11 @@ impl Edit {
                 .iter()
                 .find(|note| note.owner() == selected_slide.part_name.as_str())
         }) else {
-            return Err(Error::UnsafeEdit {
-                operation: "set_notes_text_properties",
-                reason: "the slide has no notes page",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                "set_notes_text_properties",
+                "the slide has no notes page",
+            ));
         };
         let part_name = PackURI::new(note.part())
             .map_err(|_error| invalid("opened-presentation notes part name is invalid"))?;
@@ -1272,7 +1273,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::UnsafeEdit`] when a notes page must be created but
+    /// Returns [`Error::Refused`] when a notes page must be created but
     /// the presentation has no single notes master or is strict, and an
     /// error when the notes graph has an unsupported dependency or the
     /// replacement is malformed or unbounded. A failure leaves the edit

@@ -24,10 +24,11 @@ use crate::{Error, Result};
 const MAX_PLACEHOLDERS: usize = 256;
 
 fn unsupported(reason: &'static str) -> Error {
-    Error::UnsafeEdit {
-        operation: "insert_slide",
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "insert_slide",
         reason,
-    }
+    )
 }
 
 /// One placeholder a new slide instantiates, with the `p:ph` attributes the

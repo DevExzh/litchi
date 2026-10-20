@@ -433,10 +433,11 @@ impl Package {
             return Ok(());
         }
         let Some(presentation) = self.mutable_pres.clone() else {
-            return Err(Error::UnsafeEdit {
-                operation: "save",
-                reason: "the lossless facade cannot publish an opened package's mutable graph",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "save",
+                "the lossless facade cannot publish an opened package's mutable graph",
+            ));
         };
         // Materializing the mutable presentation rewrites parts of the graph,
         // so the retained payload-digest memo is released first.

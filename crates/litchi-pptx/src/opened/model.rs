@@ -1225,7 +1225,7 @@ pub(super) fn blobs_equal(left: &dyn litchi_opc::Part, right: &dyn litchi_opc::P
     std::ptr::eq(left, right) || left == right
 }
 
-pub(super) fn relationships_equal(
+pub(crate) fn relationships_equal(
     left: &litchi_opc::Relationships,
     right: &litchi_opc::Relationships,
 ) -> bool {

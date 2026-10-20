@@ -2416,10 +2416,10 @@ impl SourceBackedPresentationEditor {
         self.package.check_execution()?;
         let SourceBackedSlideSnapshot { closure, xml, .. } = snapshot;
         let SourcePayload::Original(raw) = xml else {
-            return Err(Error::UnsafeEdit {
+            return Err(Error::internal(
                 operation,
-                reason: "publication raw snapshot must retain original source bytes",
-            });
+                "publication raw snapshot must retain original source bytes",
+            ));
         };
         let part = SourcePart::from_binding(&closure.slide.slide, raw)?;
         #[cfg(test)]
@@ -2818,10 +2818,11 @@ impl SourceBackedSlideEdit {
             return Ok(false);
         }
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
-                operation: "set_slide_properties",
-                reason: "source-backed slide edits support one atomic semantic operation",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "set_slide_properties",
+                "source-backed slide edits support one atomic semantic operation",
+            ));
         }
         let reservation = reserve_source_slide_properties(
             self.context.as_ref(),
@@ -2922,10 +2923,11 @@ impl SourceBackedSlideEdit {
     ) -> Result<bool> {
         self.check_execution()?;
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
                 operation,
-                reason: "source-backed slide edits support one atomic semantic operation",
-            });
+                "source-backed slide edits support one atomic semantic operation",
+            ));
         }
         let (xml, changed) = crate::presentation::transition::stage(
             self.working.as_bytes(),
@@ -2967,10 +2969,11 @@ impl SourceBackedSlideEdit {
     pub fn remove_shape<'k>(&mut self, shape: impl Into<crate::shape::Key<'k>>) -> Result<bool> {
         self.check_execution()?;
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
-                operation: "remove_shape",
-                reason: "source-backed slide edits support one atomic semantic operation",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "remove_shape",
+                "source-backed slide edits support one atomic semantic operation",
+            ));
         }
         let reservation = reserve_source_shape_removal(
             self.context.as_ref(),
@@ -3026,10 +3029,11 @@ impl SourceBackedSlideEdit {
             return Ok(0);
         }
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
-                operation: "set_shape_texts",
-                reason: "source-backed slide edits support one atomic shape text operation",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "set_shape_texts",
+                "source-backed slide edits support one atomic shape text operation",
+            ));
         }
         let (xml, changed) = crate::opened::stage_shape_texts(
             self.working.as_bytes(),
@@ -3071,10 +3075,11 @@ impl SourceBackedSlideEdit {
             return Ok(0);
         }
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
-                operation: "set_shape_text_chunks",
-                reason: "source-backed slide edits support one atomic shape text operation",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "set_shape_text_chunks",
+                "source-backed slide edits support one atomic shape text operation",
+            ));
         }
         let admission = crate::opened::admit_shape_text_chunks(
             chunks,
@@ -3122,10 +3127,11 @@ impl SourceBackedSlideEdit {
             return Ok(0);
         }
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
-                operation: "set_shape_properties",
-                reason: "source-backed slide edits support one atomic semantic operation",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "set_shape_properties",
+                "source-backed slide edits support one atomic semantic operation",
+            ));
         }
         let reservation = reserve_source_shape_properties(
             self.context.as_ref(),
@@ -3171,10 +3177,11 @@ impl SourceBackedSlideEdit {
             return Ok(0);
         }
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
-                operation: "set_shape_property_chunks",
-                reason: "source-backed slide edits support one atomic semantic operation",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "set_shape_property_chunks",
+                "source-backed slide edits support one atomic semantic operation",
+            ));
         }
         let admission = crate::opened::admit_shape_property_chunks(
             chunks,
@@ -3218,10 +3225,11 @@ impl SourceBackedSlideEdit {
             return Ok(0);
         }
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
-                operation: "set_text_properties",
-                reason: "source-backed slide edits support one atomic semantic operation",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "set_text_properties",
+                "source-backed slide edits support one atomic semantic operation",
+            ));
         }
         let (xml, changed) = crate::opened::stage_text_properties(
             self.working.as_bytes(),
@@ -3250,16 +3258,18 @@ impl SourceBackedSlideEdit {
         self.check_execution()?;
         self.refuse_enclosed("text_structure")?;
         if matches!(body, crate::opened::TextBody::Notes { .. }) {
-            return Err(Error::UnsafeEdit {
-                operation: "text_structure",
-                reason: "source-backed slide edits do not stage notes pages",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "text_structure",
+                "source-backed slide edits do not stage notes pages",
+            ));
         }
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
-                operation: "text_structure",
-                reason: "source-backed slide edits support one atomic semantic operation",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "text_structure",
+                "source-backed slide edits support one atomic semantic operation",
+            ));
         }
         let xml = crate::opened::stage_text_structure(
             self.working.as_bytes(),
@@ -3310,10 +3320,11 @@ impl SourceBackedSlideEdit {
             return Ok(0);
         }
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
-                operation: "set_text_properties",
-                reason: "source-backed slide edits support one atomic semantic operation",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "set_text_properties",
+                "source-backed slide edits support one atomic semantic operation",
+            ));
         }
         let (xml, changed) = crate::opened::stage_text_property_chunks(
             self.working.as_bytes(),
@@ -3344,10 +3355,11 @@ impl SourceBackedSlideEdit {
         self.check_execution()?;
         self.refuse_enclosed("add_text_box")?;
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
-                operation: "add_text_box",
-                reason: "source-backed slide edits support one atomic semantic operation",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "add_text_box",
+                "source-backed slide edits support one atomic semantic operation",
+            ));
         }
         let text = text.as_ref();
         crate::opened::validate_text_box_input(text, bounds)?;
@@ -3603,10 +3615,11 @@ impl SourceBackedSvgEdit {
     /// original managed source allocation.
     pub fn replace(&mut self, replacement: SourceSvgReplacement) -> Result<bool> {
         if self.operation_used {
-            return Err(Error::UnsafeEdit {
-                operation: "replace_svg_image",
-                reason: "source-backed SVG edits support one atomic replacement",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "replace_svg_image",
+                "source-backed SVG edits support one atomic replacement",
+            ));
         }
         let svg_part_uri = replacement
             .svg_part_uri
@@ -3781,10 +3794,11 @@ impl SourceBackedSlideBatchEdit<'_> {
             .iter()
             .any(|commit| commit.snapshot.position == position)
         {
-            return Err(Error::UnsafeEdit {
-                operation: "set_shape_texts",
-                reason: "a source-backed slide batch may select each slide only once",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "set_shape_texts",
+                "a source-backed slide batch may select each slide only once",
+            ));
         }
         if self.commits.len() >= MAX_SOURCE_BACKED_SLIDE_BATCH {
             return Err(Error::Limit {
@@ -3834,10 +3848,11 @@ impl SourceBackedSlideBatchEdit<'_> {
     pub fn commit(mut self) -> Result<SourceBackedSlideBatchCommit> {
         self.editor.package.check_execution()?;
         if self.commits.is_empty() {
-            return Err(Error::UnsafeEdit {
-                operation: "commit_slide_batch",
-                reason: "a source-backed slide batch requires at least one selected slide",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "commit_slide_batch",
+                "a source-backed slide batch requires at least one selected slide",
+            ));
         }
         self.commits
             .sort_unstable_by_key(|commit| commit.snapshot.position);
@@ -5334,10 +5349,11 @@ fn validate_blip_attributes(
         }
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         if is_mce_namespace(&namespace) {
-            return Err(Error::UnsafeEdit {
-                operation: "picture relationship parsing",
-                reason: "markup-compatibility attributes are refused",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "picture relationship parsing",
+                "markup-compatibility attributes are refused",
+            ));
         }
         // Extracted p:pic fragments omit ancestor namespace declarations; the
         // full-package caller validates the inherited relationship binding.
@@ -5644,10 +5660,11 @@ fn validate_full_slide_picture_relationships(
             // direct-owner/MCE rules; this relationship pass only rejects a
             // document type declaration, which cannot be preserved safely.
             Event::DocType(_) => {
-                return Err(Error::UnsafeEdit {
-                    operation: "source-backed picture inventory",
-                    reason: "DOCTYPE content is refused",
-                });
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "source-backed picture inventory",
+                    "DOCTYPE content is refused",
+                ));
             },
             Event::PI(_) => {},
             Event::Eof => break,
@@ -5681,10 +5698,11 @@ fn validate_full_slide_blip_attributes(
         let key = attribute.key.as_ref();
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         if is_mce_namespace(&namespace) {
-            return Err(Error::UnsafeEdit {
-                operation: "source-backed picture inventory",
-                reason: "markup-compatibility attributes are refused",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "source-backed picture inventory",
+                "markup-compatibility attributes are refused",
+            ));
         }
         let relationship_namespace = match &namespace {
             ResolveResult::Bound(Namespace(value))
@@ -7783,9 +7801,9 @@ mod tests {
         )));
         let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
         let result = presentation.slide(0).unwrap().images();
-        assert!(matches!(result, Err(Error::UnsafeEdit { .. })));
+        assert!(matches!(result, Err(Error::Refused(_))));
         let result = presentation.slide(0).unwrap().image(0);
-        assert!(matches!(result, Err(Error::UnsafeEdit { .. })));
+        assert!(matches!(result, Err(Error::Refused(_))));
 
         let source = Arc::new(PictureCountingSource::new(picture_pptx(
             &picture_slide(r#"<a:blip r:embed="rIdImage"/>"#),

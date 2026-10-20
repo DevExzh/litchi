@@ -408,10 +408,7 @@ fn insertion_refuses_dangling_xml_bindings_ranges_and_unknown_extensions() {
             let mut edit = source.edit().unwrap();
             assert!(matches!(
                 edit.insert_slide(Position::new(0), &layout(&source)),
-                Err(Error::UnsafeEdit {
-                    operation: "insert_slide",
-                    ..
-                })
+                Err(Error::Refused(refusal)) if refusal.operation() == "insert_slide"
             ));
             assert_eq!(
                 edit.commit().unwrap().into_package().to_bytes().unwrap(),

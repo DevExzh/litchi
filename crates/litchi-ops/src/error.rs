@@ -1303,7 +1303,9 @@ impl Classify for litchi_pptx::Error {
             },
             Self::Opc(error) => error.classify(),
             Self::Io(error) => error.classify(),
-            Self::PatchConflict => Class::of(Code::IoError),
+            // A patch for another base: the caller supplied it (record 0351).
+            Self::PatchConflict => Class::of(Code::InvalidInput),
+            Self::Refused(refusal) => refusal.classify(),
             Self::UnsupportedOpenPolicy { .. } => Class::of(Code::InvalidArgument),
             Self::EditLimit { .. } => Class::of(Code::LimitExceeded),
             // The core-properties reader reports its OPC failures, among them
@@ -1317,27 +1319,25 @@ impl Classify for litchi_pptx::Error {
             Self::NameNotFound(_) | Self::SlideNameNotFound(_) | Self::SlideLayoutNameNotFound(_) | Self::FontNotFound(_) => {
                 Class::of(Code::NotFound)
             },
+            // The typed refusals classify by kind (record 0351); ambiguous
+            // slide bindings are a malformed source, and removing the final
+            // slide is the argument error every format reports for it.
             Self::SlideOrderPlan { kind, .. } => match kind {
-                litchi_pptx::SlideOrderRefusal::ModifyVerifier => {
-                    Class::of(Code::DocumentProtected)
-                },
                 litchi_pptx::SlideOrderRefusal::AmbiguousBindings => Class::of(Code::CorruptFile),
-                _ => Class::of(Code::UnsupportedCapability),
+                _ => kind.kind().classify(),
             },
             Self::SlideRemovalPlan { kind, .. } => match kind {
                 litchi_pptx::SlideRemovalRefusal::SignedPackage => {
                     Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION)
                 },
-                litchi_pptx::SlideRemovalRefusal::ProtectedPresentation => {
-                    Class::of(Code::DocumentProtected)
-                },
                 litchi_pptx::SlideRemovalRefusal::FinalSlide => {
                     Class::of(Code::InvalidArgument)
                 },
-                _ => Class::of(Code::UnsupportedCapability),
+                _ => kind.kind().classify(),
             },
-            Self::UnsafeEdit { .. } => Class::of(Code::UnsupportedCapability),
-            Self::Allocation { .. } => Class::of(Code::InternalError),
+            Self::SlideCopyPlan { kind, .. } => kind.kind().classify(),
+            Self::ShapeTransfer { kind, .. } => kind.kind().classify(),
+            Self::Allocation { .. } | Self::Internal { .. } => Class::of(Code::InternalError),
             _ => Class::of(Code::CorruptFile),
         }
     }

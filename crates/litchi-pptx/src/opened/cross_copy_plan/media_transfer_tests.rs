@@ -213,7 +213,10 @@ fn image_parts(plan: &CrossSlideCopyPlan) -> Vec<&crate::opened::SlideCopyPart> 
 }
 
 fn assert_unsafe_edit(error: &Error) {
-    assert!(matches!(error, Error::UnsafeEdit { .. }), "{error:?}");
+    assert!(
+        matches!(error, Error::PatchConflict | Error::Refused(_)),
+        "{error:?}"
+    );
 }
 
 #[test]

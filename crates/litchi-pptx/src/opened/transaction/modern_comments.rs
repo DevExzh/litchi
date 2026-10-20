@@ -182,10 +182,11 @@ impl Edit {
         change: &ModernCommentChange<'_>,
     ) -> Result<bool> {
         if reply.is_some() && change.resolved.is_some() {
-            return Err(Error::UnsafeEdit {
-                operation: "set_modern_comment_at",
-                reason: "resolution is a thread-level state; a reply has none",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                "set_modern_comment_at",
+                "resolution is a thread-level state; a reply has none",
+            ));
         }
         let selected = self.resolve_slide(slide.into())?;
         let mut candidate = self.working.clone();

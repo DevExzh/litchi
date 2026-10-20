@@ -1582,7 +1582,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// As the eager verb, and [`Error::UnsafeEdit`] for a notes-page body.
+    /// As the eager verb, and [`Error::Refused`] for a notes-page body.
     pub fn insert_paragraph(
         &mut self,
         slide: impl Into<Position>,
@@ -1605,7 +1605,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// As the eager verb, and [`Error::UnsafeEdit`] for a notes-page body.
+    /// As the eager verb, and [`Error::Refused`] for a notes-page body.
     pub fn remove_paragraph(
         &mut self,
         slide: impl Into<Position>,
@@ -1626,7 +1626,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// As the eager verb, and [`Error::UnsafeEdit`] for a notes-page body.
+    /// As the eager verb, and [`Error::Refused`] for a notes-page body.
     pub fn insert_run(
         &mut self,
         slide: impl Into<Position>,
@@ -1651,7 +1651,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// As the eager verb, and [`Error::UnsafeEdit`] for a notes-page body.
+    /// As the eager verb, and [`Error::Refused`] for a notes-page body.
     pub fn remove_run(
         &mut self,
         slide: impl Into<Position>,

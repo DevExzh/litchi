@@ -434,34 +434,23 @@ impl Snapshot {
 pub(crate) fn apply_patch(
     package: &mut OpcPackage,
     patch: &SlideRemovalPatch,
-    operation: &'static str,
     physical_source_provenance: bool,
 ) -> Result<Snapshot> {
     if super::model::package_fingerprint(package)? != patch.source_revision {
-        return Err(Error::UnsafeEdit {
-            operation,
-            reason: "the complete package graph differs from the slide-removal patch source",
-        });
+        return Err(Error::PatchConflict);
     }
-    let (direction, slide_name) =
-        patch
-            .patch
-            .exact_slide_removal_change()
-            .ok_or(Error::UnsafeEdit {
-                operation,
-                reason: "the durable patch is not an exact presentation-and-slide change",
-            })?;
+    let (direction, slide_name) = patch
+        .patch
+        .exact_slide_removal_change()
+        .ok_or(Error::PatchConflict)?;
     let slide_name = slide_name.clone();
     match direction {
         SinglePartChange::Remove => {
             let source =
                 super::model::capture(package, patch.patch.limits(), physical_source_provenance)?;
-            let proof = replan_exact_removal(&source, &slide_name, operation)?;
+            let proof = replan_exact_removal(&source, &slide_name)?;
             if !patch.has_same_semantics(proof.patch()) {
-                return Err(Error::UnsafeEdit {
-                    operation,
-                    reason: "the durable patch does not match a freshly proven slide removal",
-                });
+                return Err(Error::PatchConflict);
             }
             super::patch::apply_exact_revision(
                 package,
@@ -478,12 +467,9 @@ pub(crate) fn apply_patch(
                 patch.target_revision,
                 physical_source_provenance,
             )?;
-            let proof = replan_exact_removal(&restored, &slide_name, operation)?;
+            let proof = replan_exact_removal(&restored, &slide_name)?;
             if !patch.inverse().has_same_semantics(proof.patch()) {
-                return Err(Error::UnsafeEdit {
-                    operation,
-                    reason: "the durable inverse does not restore a freshly removable slide",
-                });
+                return Err(Error::PatchConflict);
             }
             *package = candidate;
             Ok(restored)
@@ -499,19 +485,12 @@ impl SlideRemovalPatch {
     }
 }
 
-fn replan_exact_removal(
-    snapshot: &Snapshot,
-    slide_name: &PackURI,
-    operation: &'static str,
-) -> Result<SlideRemovalPlan> {
+fn replan_exact_removal(snapshot: &Snapshot, slide_name: &PackURI) -> Result<SlideRemovalPlan> {
     let position = snapshot
         .slides()
         .iter()
         .position(|slide| slide.part_name() == slide_name)
-        .ok_or(Error::UnsafeEdit {
-            operation,
-            reason: "the durable patch slide is not owned by the presentation",
-        })?;
+        .ok_or(Error::PatchConflict)?;
     snapshot.plan_slide_removal(position)
 }
 

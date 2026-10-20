@@ -161,10 +161,11 @@ impl Edit {
         let xml = owner.blob().to_vec();
         let scene = crate::shape::Scene::read(&xml)?;
         if scene.is_rewritten() {
-            return Err(crate::Error::UnsafeEdit {
-                operation: "set_hyperlink",
-                reason: "hyperlink edits do not select markup-compatibility branches",
-            });
+            return Err(crate::Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "set_hyperlink",
+                "hyperlink edits do not select markup-compatibility branches",
+            ));
         }
         let shape = scene.shape(key)?;
         // A picture's and a group's click lives on its `p:cNvPr` alone: a

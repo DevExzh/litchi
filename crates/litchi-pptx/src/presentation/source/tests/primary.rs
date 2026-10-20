@@ -400,7 +400,7 @@ fn valid_mce_reads_remain_available_and_processed_scenes_keep_managed_charge() {
     let mut edit = source.edit().unwrap();
     assert!(matches!(
         edit.set_shape_text(0, 0_usize, "unsupported"),
-        Err(Error::UnsafeEdit { .. })
+        Err(Error::Refused(_))
     ));
     assert!(edit.commit().unwrap().patch().is_noop());
     drop((scene, source));

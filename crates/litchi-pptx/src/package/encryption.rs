@@ -229,10 +229,11 @@ impl Package {
     ) -> Result<()> {
         self.ensure_graph_current("write_reencrypted")?;
         if self.mutable_pres.is_some() {
-            return Err(Error::UnsafeEdit {
-                operation: "write_reencrypted",
-                reason: "immutable publication requires an already-opened package",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "write_reencrypted",
+                "immutable publication requires an already-opened package",
+            ));
         }
         let mode =
             self.encryption

@@ -270,10 +270,11 @@ impl Package {
     /// Returns an error if the operation fails.
     pub(crate) fn authoring_presentation(&mut self) -> Result<&mut MutablePresentation> {
         self.ensure_plain_mutation("authoring_presentation")?;
-        self.mutable_pres.as_mut().ok_or(Error::UnsafeEdit {
-            operation: "authoring_presentation",
-            reason: "the lossless facade cannot hydrate an opened package into the mutable writer",
-        })
+        self.mutable_pres.as_mut().ok_or(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "authoring_presentation",
+            "the lossless facade cannot hydrate an opened package into the mutable writer",
+        ))
     }
 
     /// Capture one immutable transaction root for a canonical presentation.
@@ -301,10 +302,11 @@ impl Package {
     ) -> Result<crate::opened::Snapshot> {
         self.ensure_graph_current("opened_presentation")?;
         if self.mutable_pres.is_some() {
-            return Err(Error::UnsafeEdit {
-                operation: "opened_presentation",
-                reason: "finish the builder before starting a package transaction",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "opened_presentation",
+                "finish the builder before starting a package transaction",
+            ));
         }
         let mut snapshot = match self.part_digest_memo() {
             Some(parent) => crate::opened::capture_with_parent_digests(
@@ -375,17 +377,15 @@ impl Package {
     ) -> Result<crate::opened::Snapshot> {
         self.ensure_graph_current("apply_slide_copy_plan")?;
         if self.mutable_pres.is_some() {
-            return Err(Error::UnsafeEdit {
-                operation: "apply_slide_copy_plan",
-                reason: "slide-copy plans require an already-opened package",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "apply_slide_copy_plan",
+                "slide-copy plans require an already-opened package",
+            ));
         }
         self.ensure_plain_mutation("apply_slide_copy_plan")?;
         if crate::opened::package_fingerprint(&self.opc)? != plan.source_revision() {
-            return Err(Error::UnsafeEdit {
-                operation: "apply_slide_copy_plan",
-                reason: "the complete package graph changed after slide-copy planning",
-            });
+            return Err(Error::PatchConflict);
         }
         let mut snapshot =
             crate::opened::apply(&mut self.opc, plan.patch(), self.physical_source_provenance)?;
@@ -431,16 +431,18 @@ impl Package {
         self.ensure_graph_current("apply_cross_slide_copy_plan")?;
         source.ensure_graph_current("apply_cross_slide_copy_plan")?;
         if self.mutable_pres.is_some() {
-            return Err(Error::UnsafeEdit {
-                operation: "apply_cross_slide_copy_plan",
-                reason: "cross-slide plans require an already-opened destination package",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "apply_cross_slide_copy_plan",
+                "cross-slide plans require an already-opened destination package",
+            ));
         }
         if source.mutable_pres.is_some() {
-            return Err(Error::UnsafeEdit {
-                operation: "apply_cross_slide_copy_plan",
-                reason: "cross-slide plans require an already-opened source package",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "apply_cross_slide_copy_plan",
+                "cross-slide plans require an already-opened source package",
+            ));
         }
         if !source.physical_source_provenance || !self.physical_source_provenance {
             return Err(Error::SlideCopyPlan {
@@ -497,16 +499,18 @@ impl Package {
         self.ensure_graph_current("apply_cross_slide_copy_patch")?;
         source.ensure_graph_current("apply_cross_slide_copy_patch")?;
         if self.mutable_pres.is_some() {
-            return Err(Error::UnsafeEdit {
-                operation: "apply_cross_slide_copy_patch",
-                reason: "cross-slide patches require an already-opened destination package",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "apply_cross_slide_copy_patch",
+                "cross-slide patches require an already-opened destination package",
+            ));
         }
         if source.mutable_pres.is_some() {
-            return Err(Error::UnsafeEdit {
-                operation: "apply_cross_slide_copy_patch",
-                reason: "cross-slide patches require an already-opened source package",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "apply_cross_slide_copy_patch",
+                "cross-slide patches require an already-opened source package",
+            ));
         }
         if !source.physical_source_provenance || !self.physical_source_provenance {
             return Err(Error::SlideCopyPlan {
@@ -552,16 +556,16 @@ impl Package {
     ) -> Result<crate::opened::Snapshot> {
         self.ensure_graph_current("apply_slide_removal_plan")?;
         if self.mutable_pres.is_some() {
-            return Err(Error::UnsafeEdit {
-                operation: "apply_slide_removal_plan",
-                reason: "slide-removal plans require an already-opened package",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "apply_slide_removal_plan",
+                "slide-removal plans require an already-opened package",
+            ));
         }
         self.ensure_plain_mutation("apply_slide_removal_plan")?;
         let mut snapshot = crate::opened::apply_removal_patch(
             &mut self.opc,
             plan.patch(),
-            "apply_slide_removal_plan",
             self.physical_source_provenance,
         )?;
         // Like every other publication, adopt the published snapshot's memo,
@@ -585,16 +589,16 @@ impl Package {
     ) -> Result<crate::opened::Snapshot> {
         self.ensure_graph_current("apply_slide_removal_patch")?;
         if self.mutable_pres.is_some() {
-            return Err(Error::UnsafeEdit {
-                operation: "apply_slide_removal_patch",
-                reason: "slide-removal patches require an already-opened package",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "apply_slide_removal_patch",
+                "slide-removal patches require an already-opened package",
+            ));
         }
         self.ensure_plain_mutation("apply_slide_removal_patch")?;
         let mut snapshot = crate::opened::apply_removal_patch(
             &mut self.opc,
             patch,
-            "apply_slide_removal_patch",
             self.physical_source_provenance,
         )?;
         snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
@@ -609,10 +613,11 @@ impl Package {
         self.ensure_graph_current("same_content")?;
         other.ensure_graph_current("same_content")?;
         if self.mutable_pres.is_some() || other.mutable_pres.is_some() {
-            return Err(Error::UnsafeEdit {
-                operation: "same_content",
-                reason: "comparison requires already-opened packages",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "same_content",
+                "comparison requires already-opened packages",
+            ));
         }
         let left =
             crate::opened::package_fingerprint_with_memo(&self.opc, self.part_digest_memo())?.0;
@@ -625,10 +630,11 @@ impl Package {
     pub fn write_to(&self, writer: impl std::io::Write) -> Result<()> {
         self.ensure_graph_current("write_to")?;
         if self.mutable_pres.is_some() {
-            return Err(Error::UnsafeEdit {
-                operation: "write_to",
-                reason: "publication requires an already-opened package",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "write_to",
+                "publication requires an already-opened package",
+            ));
         }
         #[cfg(feature = "encryption")]
         self.encryption
@@ -656,10 +662,11 @@ impl Package {
     pub fn apply(&self, patch: &crate::opened::Patch) -> Result<Self> {
         self.ensure_graph_current("apply")?;
         if self.mutable_pres.is_some() {
-            return Err(Error::UnsafeEdit {
-                operation: "apply",
-                reason: "presentation patches require an already-opened package",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "apply",
+                "presentation patches require an already-opened package",
+            ));
         }
         if !patch.is_noop() {
             super::signature::refuse_signed_change(&self.opc)?;
@@ -2390,10 +2397,11 @@ impl Package {
 
     pub(super) fn ensure_graph_current(&self, operation: &'static str) -> Result<()> {
         if self.is_modified() {
-            return Err(Error::UnsafeEdit {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
                 operation,
-                reason: super::codec::STALE_PRESENTATION_GRAPH_REASON,
-            });
+                super::codec::STALE_PRESENTATION_GRAPH_REASON,
+            ));
         }
         Ok(())
     }
@@ -2411,62 +2419,73 @@ impl Package {
     }
 
     fn resolve_slide_identity(&self, key: crate::slide::Selector<'_>) -> Result<(PackURI, u32)> {
-        let presentation = self.presentation()?;
-        let references = presentation.slide_references()?;
-        match key {
-            crate::slide::Selector::Position(position) => {
-                let index = position.get();
-                let reference = references.get(index).ok_or(Error::SlideIndexOutOfBounds {
-                    index,
-                    len: references.len(),
-                })?;
-                let slide = presentation
-                    .slide(index)?
-                    .ok_or(Error::SlideIndexOutOfBounds {
-                        index,
-                        len: references.len(),
-                    })?;
-                Ok((slide.part().part().partname().clone(), reference.id()))
-            },
-            crate::slide::Selector::Name(name) => {
-                let slides = presentation.slides()?;
-                let mut selected = None;
-                let mut matches = 0usize;
-                for (reference, slide) in references.iter().zip(slides) {
-                    if slide.name()? == name {
-                        matches = matches.saturating_add(1);
-                        selected = Some((slide.part().part().partname().clone(), reference.id()));
-                    }
-                }
-                match (matches, selected) {
-                    (0, _) => Err(Error::SlideNameNotFound(name.into_owned())),
-                    (1, Some(value)) => Ok(value),
-                    _ => Err(Error::AmbiguousSlideName {
-                        name: name.into_owned(),
-                        matches,
-                    }),
-                }
-            },
-        }
+        resolve_slide_identity(&self.opc, key)
     }
 
     fn resolve_slide(&self, key: crate::slide::Selector<'_>) -> Result<PackURI> {
-        let presentation = self.presentation()?;
-        match key {
-            crate::slide::Selector::Position(position) => {
-                let index = position.get();
-                let length = presentation.slide_count()?;
-                let slide = presentation
-                    .slide(index)?
-                    .ok_or(Error::SlideIndexOutOfBounds { index, len: length })?;
-                Ok(slide.part().part().partname().clone())
-            },
-            crate::slide::Selector::Name(name) => {
-                let slide = presentation
-                    .find_slide(name.as_ref())?
-                    .ok_or_else(|| Error::SlideNameNotFound(name.into_owned()))?;
-                Ok(slide.part().part().partname().clone())
-            },
-        }
+        resolve_slide(&self.opc, key)
+    }
+}
+
+pub(crate) fn resolve_slide_identity(
+    opc: &OpcPackage,
+    key: crate::slide::Selector<'_>,
+) -> Result<(PackURI, u32)> {
+    let presentation = Presentation::new(PresentationPart::from_package(opc)?, opc);
+    let references = presentation.slide_references()?;
+    match key {
+        crate::slide::Selector::Position(position) => {
+            let index = position.get();
+            let reference = references.get(index).ok_or(Error::SlideIndexOutOfBounds {
+                index,
+                len: references.len(),
+            })?;
+            let slide = presentation
+                .slide(index)?
+                .ok_or(Error::SlideIndexOutOfBounds {
+                    index,
+                    len: references.len(),
+                })?;
+            Ok((slide.part().part().partname().clone(), reference.id()))
+        },
+        crate::slide::Selector::Name(name) => {
+            let slides = presentation.slides()?;
+            let mut selected = None;
+            let mut matches = 0usize;
+            for (reference, slide) in references.iter().zip(slides) {
+                if slide.name()? == name {
+                    matches = matches.saturating_add(1);
+                    selected = Some((slide.part().part().partname().clone(), reference.id()));
+                }
+            }
+            match (matches, selected) {
+                (0, _) => Err(Error::SlideNameNotFound(name.into_owned())),
+                (1, Some(value)) => Ok(value),
+                _ => Err(Error::AmbiguousSlideName {
+                    name: name.into_owned(),
+                    matches,
+                }),
+            }
+        },
+    }
+}
+
+pub(crate) fn resolve_slide(opc: &OpcPackage, key: crate::slide::Selector<'_>) -> Result<PackURI> {
+    let presentation = Presentation::new(PresentationPart::from_package(opc)?, opc);
+    match key {
+        crate::slide::Selector::Position(position) => {
+            let index = position.get();
+            let length = presentation.slide_count()?;
+            let slide = presentation
+                .slide(index)?
+                .ok_or(Error::SlideIndexOutOfBounds { index, len: length })?;
+            Ok(slide.part().part().partname().clone())
+        },
+        crate::slide::Selector::Name(name) => {
+            let slide = presentation
+                .find_slide(name.as_ref())?
+                .ok_or_else(|| Error::SlideNameNotFound(name.into_owned()))?;
+            Ok(slide.part().part().partname().clone())
+        },
     }
 }

@@ -323,10 +323,11 @@ fn typed_transform_is_valid(shape: crate::shape::Shape<'_>) -> bool {
 
 fn refuse_rewritten_scene(scene: &crate::shape::Scene<'_>) -> Result<()> {
     if scene.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "rewrite_shape_bounds",
-            reason: "markup-compatibility branch selection is not authorable lexically",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "rewrite_shape_bounds",
+            "markup-compatibility branch selection is not authorable lexically",
+        ));
     }
     Ok(())
 }
