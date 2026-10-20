@@ -31,7 +31,7 @@ const MAX_NAME_CHARS: usize = 256;
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn add(
+pub(crate) fn add(
     package: &mut OpcPackage,
     slide_part_name: &str,
     kind: Kind,

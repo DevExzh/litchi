@@ -108,8 +108,7 @@ impl Edit<'_> {
     /// A change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     /// (ADR 0006) before anything is mutated: remove the signature explicitly
-    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
-    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// first with [`Package::unsign`](crate::Package::unsign). An exact
     /// no-op keeps the signature.
     ///
     /// # Errors
@@ -127,8 +126,7 @@ impl Edit<'_> {
     /// A change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     /// (ADR 0006) before anything is mutated: remove the signature explicitly
-    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
-    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// first with [`Package::unsign`](crate::Package::unsign). An exact
     /// no-op keeps the signature.
     ///
     /// # Errors

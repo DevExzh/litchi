@@ -101,7 +101,7 @@ pub(crate) fn preflight_add_slide_layout(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn add_slide_master(package: &mut OpcPackage) -> Result<AuthoredSlideMaster> {
+pub(crate) fn add_slide_master(package: &mut OpcPackage) -> Result<AuthoredSlideMaster> {
     let mut candidate = package.clone();
     let result = add_slide_master_inner(&mut candidate)?;
     *package = candidate;
@@ -188,7 +188,7 @@ fn add_slide_master_inner(package: &mut OpcPackage) -> Result<AuthoredSlideMaste
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn add_slide_layout(
+pub(crate) fn add_slide_layout(
     package: &mut OpcPackage,
     master_part_name: &PackURI,
     kind: SlideLayoutKind,
@@ -293,7 +293,7 @@ fn add_slide_layout_inner(
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store_placeholder_shape(
+pub(crate) fn store_placeholder_shape(
     package: &mut OpcPackage,
     part_name: &PackURI,
     spec: &PlaceholderSpec,
@@ -317,7 +317,10 @@ pub fn store_placeholder_shape(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn remove_slide_layout(package: &mut OpcPackage, layout_part_name: &PackURI) -> Result<()> {
+pub(crate) fn remove_slide_layout(
+    package: &mut OpcPackage,
+    layout_part_name: &PackURI,
+) -> Result<()> {
     let layout_uri = layout_part_name.clone();
     let layout_part = package.get_part(&layout_uri)?;
     if layout_part.content_type() != ct::PML_SLIDE_LAYOUT {

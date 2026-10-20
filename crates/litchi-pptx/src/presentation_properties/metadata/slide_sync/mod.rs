@@ -8,4 +8,7 @@ mod model;
 mod package;
 
 pub use model::{DateTime, Offset, Part, Properties};
-pub use package::{CONTENT_TYPE, RELATIONSHIP_TYPE, load, store};
+pub use package::{CONTENT_TYPE, RELATIONSHIP_TYPE, load};
+
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};

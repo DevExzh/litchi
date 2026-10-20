@@ -6,7 +6,7 @@
 
 mod codec;
 mod model;
-mod package;
+pub(crate) mod package;
 mod summary;
 #[cfg(test)]
 mod tests;
@@ -19,7 +19,7 @@ pub use model::{
     Resource, Transform, Trim,
 };
 pub(crate) use package::store_with;
-pub use package::{load, load as load_slide_media, store, store as store_slide_media};
+pub use package::{load, load as load_slide_media};
 pub use summary::{Summary, summary};
 
 // These are crate-private seams shared by the XML and package layers and by
@@ -31,8 +31,8 @@ pub(crate) use codec::{bounded, document_conformance, validate_id, xml_error};
 pub(crate) use package::resource_uri;
 pub(crate) use package::{parse_time, validate_value};
 
+use crate::Result;
 use crate::time::{Offset, ParseError as TimeParseError};
-use crate::{Error, Result};
 use litchi_drawingml::coordinate::{Coordinate, Extent, ParseError as CoordinateParseError};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
@@ -83,3 +83,6 @@ pub(crate) fn output_limit(maximum: usize) -> Error {
 pub(crate) fn coordinate_error(error: CoordinateParseError, name: &str) -> Error {
     invalid(format!("invalid media transform {name}: {error}"))
 }
+
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};

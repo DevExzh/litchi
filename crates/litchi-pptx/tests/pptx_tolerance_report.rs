@@ -1039,24 +1039,22 @@ fn comment_index_zero_and_duplicate_keys_are_kept_and_recorded() {
 
     // The edit functions load strictly and refuse to rewrite the graph.
     assert!(load_presentation_comments_strict(opc).is_err());
-    let mut editable = opc.clone();
-    let before = editable
+    let before = opc
         .get_part(&PackURI::new(COMMENT1).unwrap())
         .unwrap()
         .blob()
         .to_vec();
+    let editable = Package::from_opc_package(opc.clone()).unwrap();
+    let mut edit = editable.edit_comments().unwrap();
     assert!(
-        litchi_pptx::comments::remove_presentation_comment(
-            &mut editable,
-            "/ppt/slides/slide1.xml",
-            0,
-            1,
-            litchi_pptx::Conformance::Transitional,
-        )
-        .is_err()
+        edit.remove(0_usize, 0, 1, litchi_pptx::Conformance::Transitional)
+            .is_err()
     );
+    let unchanged = edit.commit().unwrap().into_package();
     assert_eq!(
-        editable
+        unchanged
+            .opc()
+            .unwrap()
             .get_part(&PackURI::new(COMMENT1).unwrap())
             .unwrap()
             .blob(),
@@ -1386,19 +1384,14 @@ fn feature_readers_skip_and_record_processing_instructions() {
     assert_eq!(located(&report), [instruction_at("/ppt/presProps.xml")]);
     // The math edit transaction loads strictly and refuses the part (it
     // accepts the conformant one).
-    let mut clean = Package::from_bytes(SHAPES).unwrap().opc().unwrap().clone();
-    litchi_pptx::presentation_properties::put_math_to_package(
-        &mut clean,
-        litchi_pptx::presentation_properties::math::Properties::default(),
-    )
-    .unwrap();
-    let mut opc = package.opc().unwrap().clone();
+    let clean = Package::from_bytes(SHAPES).unwrap();
+    let mut edit = clean.edit_math_properties().unwrap();
+    edit.set(litchi_pptx::presentation_properties::math::Properties::default())
+        .unwrap();
+    let mut edit = package.edit_math_properties().unwrap();
     assert!(
-        litchi_pptx::presentation_properties::put_math_to_package(
-            &mut opc,
-            litchi_pptx::presentation_properties::math::Properties::default(),
-        )
-        .is_err()
+        edit.set(litchi_pptx::presentation_properties::math::Properties::default())
+            .is_err()
     );
 
     // Chart inspection, through a part that also carries MCE markup.

@@ -16,10 +16,7 @@ pub mod read_only_recommended;
 pub mod metadata;
 
 pub use model::*;
-pub use package::{
-    load_from_package, load_from_package_with_tolerance, load_math_from_package,
-    put_math_to_package, remove_math_from_package,
-};
+pub use package::{load_from_package, load_from_package_with_tolerance, load_math_from_package};
 
 pub(crate) const P_NS: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 pub(crate) const P_STRICT: &str = "http://purl.oclc.org/ooxml/presentationml/main";
@@ -50,3 +47,4 @@ pub(crate) const MAX_DEPTH: usize = 128;
 pub(crate) const MAX_NODES: usize = 100_000;
 pub(crate) const MAX_STRING: usize = 1024 * 1024;
 pub(crate) const MAX_EXTENSIONS: usize = 1024;
+pub(crate) use package::{put_math_to_package, remove_math_from_package};

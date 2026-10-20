@@ -9,7 +9,7 @@
 //! Run with: cargo run --example pptx_charts_demo --features ooxml
 
 use litchi_pptx::Package;
-use litchi_pptx::chart::{self, Chart, Series, Type as ChartType, encode as encode_chart};
+use litchi_pptx::chart::{Chart, Series, Type as ChartType, encode as encode_chart};
 
 const X: i64 = 914_400;
 const Y: i64 = 1_600_000;
@@ -201,17 +201,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // current writer, so the package graph remains the source of truth.
     let mut package = builder.build()?;
     let relationship_ids = {
-        let mut opc_edit = package.edit_opc()?;
-        let value = opc_edit.update(|opc| {
-            let mut ids = Vec::with_capacity(charts.len());
-            for (index, value) in charts.iter().enumerate() {
-                let slide_name = format!("/ppt/slides/slide{}.xml", index + 2);
-                ids.push(chart::add(opc, &slide_name, value)?);
-            }
-            Ok(ids)
-        })?;
-        package = opc_edit.commit()?.into_package();
-        value
+        let mut edit = package.edit_charts()?;
+        let mut ids = Vec::with_capacity(charts.len());
+        for (index, value) in charts.iter().enumerate() {
+            // Slide `index + 2` of the deck, zero-based.
+            ids.push(edit.add(index + 1, value)?);
+        }
+        package = edit.commit()?.into_package();
+        ids
     };
 
     let bytes = package.to_bytes()?;

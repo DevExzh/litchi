@@ -192,6 +192,55 @@ pub(crate) trait InPlace {
             &mut litchi_pptx::presentation::embedded::ole::slide::Edit<'_>,
         ) -> Result<T>,
     ) -> Result<T>;
+    fn edit_comments_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(&mut litchi_pptx::comments::Edit<'_>) -> Result<T>,
+    ) -> Result<T>;
+    fn edit_modern_comments_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(&mut litchi_pptx::modern_comments::Edit<'_>) -> Result<T>,
+    ) -> Result<T>;
+    fn edit_themes_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(&mut litchi_pptx::shape::theme::Edit<'_>) -> Result<T>,
+    ) -> Result<T>;
+    fn edit_ink_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(&mut litchi_pptx::presentation::embedded::ink::Edit<'_>) -> Result<T>,
+    ) -> Result<T>;
+    fn edit_media_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(&mut litchi_pptx::media_parts::Edit<'_>) -> Result<T>,
+    ) -> Result<T>;
+    fn edit_charts_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(&mut litchi_pptx::chart::Edit<'_>) -> Result<T>,
+    ) -> Result<T>;
+    fn edit_laser_traces_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(&mut litchi_pptx::laser::Edit<'_>) -> Result<T>,
+    ) -> Result<T>;
+    fn edit_ole_objects_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(&mut litchi_pptx::presentation::embedded::ole::Edit<'_>) -> Result<T>,
+    ) -> Result<T>;
+    fn edit_revision_info_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(
+            &mut litchi_pptx::presentation_properties::metadata::revision::Edit<'_>,
+        ) -> Result<T>,
+    ) -> Result<T>;
+    fn edit_slide_sync_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(
+            &mut litchi_pptx::presentation_properties::metadata::slide_sync::Edit<'_>,
+        ) -> Result<T>,
+    ) -> Result<T>;
+    #[cfg(feature = "vba-inspection")]
+    fn edit_vba_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(&mut litchi_pptx::presentation::embedded::vba::Edit<'_>) -> Result<T>,
+    ) -> Result<T>;
 }
 
 impl InPlace for Package {
@@ -552,6 +601,98 @@ impl InPlace for Package {
     ) -> Result<T> {
         let package = self;
         in_place!(package, edit_slide_ole_objects, |edit| operation(&mut edit))
+    }
+    fn edit_comments_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(&mut litchi_pptx::comments::Edit<'_>) -> Result<T>,
+    ) -> Result<T> {
+        let package = self;
+        in_place!(package, edit_comments, |edit| operation(&mut edit))
+    }
+
+    fn edit_modern_comments_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(&mut litchi_pptx::modern_comments::Edit<'_>) -> Result<T>,
+    ) -> Result<T> {
+        let package = self;
+        in_place!(package, edit_modern_comments, |edit| operation(&mut edit))
+    }
+
+    fn edit_themes_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(&mut litchi_pptx::shape::theme::Edit<'_>) -> Result<T>,
+    ) -> Result<T> {
+        let package = self;
+        in_place!(package, edit_themes, |edit| operation(&mut edit))
+    }
+
+    fn edit_ink_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(&mut litchi_pptx::presentation::embedded::ink::Edit<'_>) -> Result<T>,
+    ) -> Result<T> {
+        let package = self;
+        in_place!(package, edit_ink, |edit| operation(&mut edit))
+    }
+
+    fn edit_media_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(&mut litchi_pptx::media_parts::Edit<'_>) -> Result<T>,
+    ) -> Result<T> {
+        let package = self;
+        in_place!(package, edit_media, |edit| operation(&mut edit))
+    }
+
+    fn edit_charts_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(&mut litchi_pptx::chart::Edit<'_>) -> Result<T>,
+    ) -> Result<T> {
+        let package = self;
+        in_place!(package, edit_charts, |edit| operation(&mut edit))
+    }
+
+    fn edit_laser_traces_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(&mut litchi_pptx::laser::Edit<'_>) -> Result<T>,
+    ) -> Result<T> {
+        let package = self;
+        in_place!(package, edit_laser_traces, |edit| operation(&mut edit))
+    }
+
+    fn edit_ole_objects_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(&mut litchi_pptx::presentation::embedded::ole::Edit<'_>) -> Result<T>,
+    ) -> Result<T> {
+        let package = self;
+        in_place!(package, edit_ole_objects, |edit| operation(&mut edit))
+    }
+
+    fn edit_revision_info_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(
+            &mut litchi_pptx::presentation_properties::metadata::revision::Edit<'_>,
+        ) -> Result<T>,
+    ) -> Result<T> {
+        let package = self;
+        in_place!(package, edit_revision_info, |edit| operation(&mut edit))
+    }
+
+    fn edit_slide_sync_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(
+            &mut litchi_pptx::presentation_properties::metadata::slide_sync::Edit<'_>,
+        ) -> Result<T>,
+    ) -> Result<T> {
+        let package = self;
+        in_place!(package, edit_slide_sync, |edit| operation(&mut edit))
+    }
+
+    #[cfg(feature = "vba-inspection")]
+    fn edit_vba_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(&mut litchi_pptx::presentation::embedded::vba::Edit<'_>) -> Result<T>,
+    ) -> Result<T> {
+        let package = self;
+        in_place!(package, edit_vba, |edit| operation(&mut edit))
     }
 }
 

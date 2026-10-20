@@ -129,7 +129,7 @@ pub fn load(package: &OpcPackage) -> Result<Vec<Part>> {
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store(package: &mut OpcPackage, value: &Part) -> Result<()> {
+pub(crate) fn store(package: &mut OpcPackage, value: &Part) -> Result<()> {
     validate_ncname(&value.relationship_id)?;
     let slide_name = &value.slide_part_name;
     let part_name = &value.part_name;

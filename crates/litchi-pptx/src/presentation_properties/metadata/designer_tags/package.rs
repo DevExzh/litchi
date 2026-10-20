@@ -89,7 +89,7 @@ pub(crate) fn load_snapshot_with_limits(
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store(package: &mut OpcPackage, slide_id: u32, value: &Tags) -> Result<Option<Tags>> {
+pub(crate) fn store(package: &mut OpcPackage, slide_id: u32, value: &Tags) -> Result<Option<Tags>> {
     let limits = Limits::default();
     let value = codec::clone_tags(value, limits)?;
     let snapshot = load_snapshot(package, slide_id)?;
@@ -115,7 +115,7 @@ pub fn store(package: &mut OpcPackage, slide_id: u32, value: &Tags) -> Result<Op
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn remove(package: &mut OpcPackage, slide_id: u32) -> Result<Option<Tags>> {
+pub(crate) fn remove(package: &mut OpcPackage, slide_id: u32) -> Result<Option<Tags>> {
     let snapshot = load_snapshot(package, slide_id)?;
     let previous = snapshot
         .tags()?

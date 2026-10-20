@@ -139,15 +139,11 @@ pub use comments::collaboration::{
     load_presence, load_presence_snapshot, load_threading, load_threading_snapshot,
 };
 pub use comments::{
-    Author, Comment, Comments, Conformance, List, add_presentation_comment,
-    add_presentation_comment_author, find_presentation_comment, find_presentation_comment_author,
-    load_presentation_comments, load_presentation_comments_strict,
-    load_presentation_comments_with_tolerance, parse_comment_authors, parse_slide_comments,
-    parse_slide_comments_strict, parse_slide_comments_with_tolerance, remove_presentation_comment,
-    remove_presentation_comment_author, reorder_presentation_comment_authors,
-    reorder_presentation_comments, replace_presentation_comment,
-    replace_presentation_comment_author, store_presentation_comments, update_presentation_comment,
-    update_presentation_comment_author, write_comment_authors, write_slide_comments,
+    Author, Comment, Comments, Conformance, List, find_presentation_comment,
+    find_presentation_comment_author, load_presentation_comments,
+    load_presentation_comments_strict, load_presentation_comments_with_tolerance,
+    parse_comment_authors, parse_slide_comments, parse_slide_comments_strict,
+    parse_slide_comments_with_tolerance, write_comment_authors, write_slide_comments,
 };
 pub use error::{
     DurablePatchFormat, Error, Result, ShapeTransferRefusal, SlideCopyRefusal, SlideOrderRefusal,
@@ -178,7 +174,7 @@ pub use master_layout::{
 };
 pub use media_parts::{
     Bookmark, Data, ExtensionList, Fade, Picture, Poster, Resource, Transform, Trim,
-    load_slide_media, parse_slide_media, store_slide_media, write_slide_media_pictures,
+    load_slide_media, parse_slide_media, write_slide_media_pictures,
 };
 pub use modern_comments::*;
 pub use open_options::{OpenOptions, OpenPolicy};

@@ -19,10 +19,10 @@ pub use model::{
     AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID, PlaceholderKind,
     PlaceholderSpec, SlideLayoutKind,
 };
-pub use package::{
-    add_slide_layout, add_slide_master, remove_slide_layout, store_placeholder_shape,
-    validate_master_layout_graph,
-};
+pub use package::validate_master_layout_graph;
 
-pub(crate) use package::{preflight_add_slide_layout, resolve_owner};
+pub(crate) use package::{
+    add_slide_layout, add_slide_master, preflight_add_slide_layout, remove_slide_layout,
+    resolve_master, resolve_owner, store_placeholder_shape,
+};
 pub(crate) use placeholder::preflight_store_placeholder_shape;

@@ -2003,7 +2003,17 @@
         "litchi_pptx::presentation::embedded::controls::slide",
         "litchi_pptx::presentation::embedded::ole::slide",
         "litchi_pptx::comments::collaboration::presence",
-        "litchi_pptx::comments::collaboration::threading"
+        "litchi_pptx::comments::collaboration::threading",
+        "litchi_pptx::comments",
+        "litchi_pptx::modern_comments",
+        "litchi_pptx::shape::theme",
+        "litchi_pptx::presentation::embedded::ink",
+        "litchi_pptx::presentation::embedded::ole",
+        "litchi_pptx::media_parts",
+        "litchi_pptx::chart",
+        "litchi_pptx::laser",
+        "litchi_pptx::presentation_properties::metadata::revision",
+        "litchi_pptx::presentation_properties::metadata::slide_sync"
       ],
       "immutable_owners": [
         "litchi_pptx::Presentation",
@@ -2633,7 +2643,18 @@
         "litchi_pptx::presentation::embedded::controls::slide",
         "litchi_pptx::presentation::embedded::ole::slide",
         "litchi_pptx::comments::collaboration::presence",
-        "litchi_pptx::comments::collaboration::threading"
+        "litchi_pptx::comments::collaboration::threading",
+        "litchi_pptx::comments",
+        "litchi_pptx::modern_comments",
+        "litchi_pptx::shape::theme",
+        "litchi_pptx::presentation::embedded::ink",
+        "litchi_pptx::presentation::embedded::ole",
+        "litchi_pptx::media_parts",
+        "litchi_pptx::chart",
+        "litchi_pptx::laser",
+        "litchi_pptx::presentation_properties::metadata::revision",
+        "litchi_pptx::presentation_properties::metadata::slide_sync",
+        "litchi_pptx::presentation::embedded::vba"
       ],
       "immutable_owners": [
         "litchi_pptx::Presentation",
