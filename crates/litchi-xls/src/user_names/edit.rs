@@ -1,5 +1,6 @@
 //! Immutable snapshots and source-checked edits for `User Names`.
 
+use litchi_core::edit::RefusalKind;
 use std::fmt;
 use std::mem::size_of;
 use std::sync::Arc;
@@ -129,11 +130,11 @@ impl Snapshot {
         ensure_source_bound(&bytes, limits)?;
         ensure_revision_log_bound(&revision_log, limits)?;
         if revision_guids.len() > limits.max_revision_guids {
-            return Err(Error::UnsafeEdit(format!(
-                "Revision Log contains {} GUIDs; maximum is {}",
-                revision_guids.len(),
-                limits.max_revision_guids
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit user names",
+                "the Revision Log exceeds its GUID limit",
+            ));
         }
         Self::parse_shared_with_revision_guids_and_limits_and_source(
             bytes,
@@ -303,9 +304,11 @@ impl Edit {
     /// Returns an error when the index or new name is invalid.
     pub fn set_user_name(&mut self, index: usize, name: impl Into<String>) -> Result<&mut Self> {
         let current = self.users().get(index).cloned().ok_or_else(|| {
-            Error::UnsafeEdit(format!(
-                "User Names index {index} is outside the collection"
-            ))
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit user names",
+                "User Names index is outside the collection",
+            )
         })?;
         let updated = current.with_user_name(name)?;
         if updated == current {
@@ -328,9 +331,11 @@ impl Edit {
         opened_at: crate::revision_records::ShortDtr,
     ) -> Result<&mut Self> {
         let current = self.users().get(index).cloned().ok_or_else(|| {
-            Error::UnsafeEdit(format!(
-                "User Names index {index} is outside the collection"
-            ))
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit user names",
+                "User Names index is outside the collection",
+            )
         })?;
         let updated = current.with_opened_at(opened_at);
         if updated == current {
@@ -526,9 +531,10 @@ impl Patch {
             || source.package.revision_guids != self.source_revision_guids
             || source.package.revision_log_source != self.source_revision_log_source
         {
-            return Err(Error::UnsafeEdit(
-                "User Names patch source does not match its base snapshot".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit user names",
+                reason: "User Names patch source does not match its base snapshot",
+            });
         }
         if self.is_noop() {
             Ok(source.clone())
@@ -554,9 +560,10 @@ impl Patch {
             || target.package.revision_guids != self.target_revision_guids
             || target.package.revision_log_source != self.target_revision_log_source
         {
-            return Err(Error::UnsafeEdit(
-                "User Names patch target does not match its committed snapshot".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit user names",
+                reason: "User Names patch target does not match its committed snapshot",
+            });
         }
         if self.is_noop() {
             Ok(target.clone())
@@ -650,43 +657,44 @@ fn copy_bytes(bytes: &[u8], context: &'static str) -> Result<Arc<[u8]>> {
 
 fn ensure_source_bound(bytes: &[u8], limits: Limits) -> Result<()> {
     if bytes.len() > limits.max_stream_bytes {
-        return Err(Error::UnsafeEdit(format!(
-            "User Names stream has {} bytes; maximum is {}",
-            bytes.len(),
-            limits.max_stream_bytes
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit user names",
+            "the User Names stream exceeds its byte limit",
+        ));
     }
     Ok(())
 }
 
 fn ensure_revision_log_bound(bytes: &[u8], limits: Limits) -> Result<()> {
     if bytes.len() > limits.max_stream_bytes {
-        return Err(Error::UnsafeEdit(format!(
-            "Revision Log stream has {} bytes; maximum is {}",
-            bytes.len(),
-            limits.max_stream_bytes
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit user names",
+            "the Revision Log stream exceeds its byte limit",
+        ));
     }
     Ok(())
 }
 
 fn copy_guids(guids: &[[u8; 16]], limits: Limits) -> Result<Arc<[UserGuid]>> {
     if guids.len() > limits.max_revision_guids {
-        return Err(Error::UnsafeEdit(format!(
-            "Revision Log contains {} GUIDs; maximum is {}",
-            guids.len(),
-            limits.max_revision_guids
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit user names",
+            "the Revision Log exceeds its GUID limit",
+        ));
     }
     let byte_count = guids
         .len()
         .checked_mul(size_of::<UserGuid>())
         .ok_or(Error::Allocation("sizing Revision Log GUID closure"))?;
     if byte_count > limits.max_stream_bytes {
-        return Err(Error::UnsafeEdit(format!(
-            "Revision Log GUID closure requires {byte_count} bytes; maximum is {}",
-            limits.max_stream_bytes
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit user names",
+            "the Revision Log GUID closure exceeds the stream byte limit",
+        ));
     }
     let mut owned = Vec::new();
     owned

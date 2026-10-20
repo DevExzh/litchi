@@ -268,7 +268,13 @@ fn remove_refuses_the_last_tab_and_referenced_tabs() {
     let source = Snapshot::from_bytes(fixture("SimpleWithPrintArea.xls")).unwrap();
     let mut edit = source.edit();
     let refusal = edit.remove_sheet(Selector::Name("Sheet1"));
-    assert!(matches!(refusal, Err(Error::UnsafeEdit(_))), "{refusal:?}");
+    assert!(
+        matches!(
+            refusal,
+            Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
+        ),
+        "{refusal:?}"
+    );
     assert!(edit.tab_change.is_none());
     // Sheet2 is unreferenced; the name keeps its scope and target.
     let mut edit = source.edit();
@@ -329,9 +335,10 @@ fn three_dimensional_ranges_follow_or_refuse_tab_moves() {
         source.edit().insert_sheet(Position::new(2), "Inside"),
     ];
     assert!(
-        refusals
-            .iter()
-            .all(|result| matches!(result, Err(Error::UnsafeEdit(_)))),
+        refusals.iter().all(|result| matches!(
+            result,
+            Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
+        )),
         "{refusals:?}"
     );
 }

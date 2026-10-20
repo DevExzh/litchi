@@ -13,6 +13,7 @@ use crate::protection::{
     PROTECT_TYPE, SCENPROTECT_TYPE, WINPROTECT_TYPE, WRITEPROTECT_TYPE,
 };
 use litchi_cfb::OleFile;
+use litchi_core::edit::RefusalKind;
 use litchi_ole_common::object::{Edit as ObjectEditor, Target, Targets};
 use litchi_ole_common::property_set::document_summary::DIGITAL_SIGNATURE;
 use litchi_ole_common::property_set::{Binding, PropertySetReader};
@@ -59,8 +60,10 @@ impl OpaqueObjectIdentity {
 
     fn require_topology_proof(&self) -> Result<()> {
         if self.ambiguous {
-            return Err(Error::UnsafeEdit(
-                "an opaque Obj has an unproven identity; the requested object-topology edit is refused".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedContent,
+                "edit OLE objects",
+                "an opaque Obj has an unproven identity; the requested object-topology edit is refused",
             ));
         }
         Ok(())
@@ -82,8 +85,10 @@ impl OpaqueObjectIdentity {
 
     fn check_storage_rewrite(&self, storage: &str) -> Result<()> {
         if self.ambiguous || self.storages.contains(storage) {
-            return Err(Error::UnsafeEdit(
-                "an opaque Obj may alias the selected storage; payload rewrite is refused".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedContent,
+                "edit OLE objects",
+                "an opaque Obj may alias the selected storage; payload rewrite is refused",
             ));
         }
         Ok(())
@@ -298,8 +303,10 @@ impl Editor {
                 .any(|value| value.storage_name().as_deref() == Some(&storage))
         {
             if candidate.opaque_identity.storages.contains(&storage) {
-                return Err(Error::UnsafeEdit(
-                    "removing the selected Obj would orphan an opaque MBD/LNK reference".into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedContent,
+                    "edit OLE objects",
+                    "removing the selected Obj would orphan an opaque MBD/LNK reference",
                 ));
             }
             let target = target_for_storage(storage)?;
@@ -350,9 +357,10 @@ impl Editor {
             return Ok(());
         }
         if candidate.opaque_identity.present {
-            return Err(Error::UnsafeEdit(
-                "reordering typed Obj records with opaque Obj records is not source-complete"
-                    .into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedContent,
+                "edit OLE objects",
+                "reordering typed Obj records with opaque Obj records is not source-complete",
             ));
         }
         let mut remaining = sheet.clone();
@@ -628,8 +636,10 @@ fn reject_document_summary_signature<R: std::io::Read + std::io::Seek>(
                 .iter()
                 .any(|section| section.property(DIGITAL_SIGNATURE).is_some())
             {
-                return Err(Error::UnsafeEdit(
-                    "DocumentSummaryInformation contains PIDDSI DigitalSignature; refusing a rewrite".into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "edit OLE objects",
+                    "DocumentSummaryInformation contains PIDDSI DigitalSignature; refusing a rewrite",
                 ));
             }
         },
@@ -672,9 +682,11 @@ fn reject_protected_workbook(input: &[u8]) -> Result<()> {
             _ => false,
         };
         if active {
-            return Err(Error::UnsafeEdit(format!(
-                "BIFF protection record 0x{kind:04X} is active"
-            )));
+            return Err(Error::refused(
+                RefusalKind::Protected,
+                "edit OLE objects",
+                "BIFF protection record is active",
+            ));
         }
     }
     Ok(())

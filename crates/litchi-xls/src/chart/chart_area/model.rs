@@ -130,9 +130,10 @@ impl Patch {
             return Ok(Commit::new(source, self));
         };
         if source != change.before_snapshot() {
-            return Err(Error::UnsafeEdit(
-                "chart-area patch source does not match the snapshot".into(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit chart",
+                reason: "chart-area patch source does not match the snapshot",
+            });
         }
         Ok(Commit::new(change.after_snapshot(), self))
     }

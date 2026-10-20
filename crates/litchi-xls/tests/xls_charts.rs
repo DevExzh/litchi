@@ -41,7 +41,7 @@ fn workbook() -> Vec<u8> {
 
 fn assert_unsupported<T>(result: Result<T, Error>) {
     match result {
-        Err(Error::Graph(litchi_ograph::Error::Refused(refusal))) => {
+        Err(Error::Refused(refusal)) => {
             assert_eq!(refusal.operation(), "author");
             assert!(!refusal.reason().is_empty());
         },
@@ -52,7 +52,7 @@ fn assert_unsupported<T>(result: Result<T, Error>) {
 
 fn assert_unsupported_mutation<T>(result: Result<T, Error>) {
     match result {
-        Err(Error::Graph(litchi_ograph::Error::Refused(refusal))) => {
+        Err(Error::Refused(refusal)) => {
             assert!(!refusal.operation().is_empty());
             assert!(!refusal.reason().is_empty());
         },

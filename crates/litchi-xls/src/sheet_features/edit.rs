@@ -18,6 +18,7 @@ use super::stream::{
 };
 use super::{Area, FeatureSet};
 use crate::Package;
+use litchi_core::edit::RefusalKind;
 
 pub use super::PageBreak;
 pub use encode::{HyperlinkSpec as Hyperlink, StyleSpec as Style, ValidationSpec as Validation};
@@ -47,12 +48,8 @@ pub enum Error {
     Package(crate::package::Error),
     /// The source records are malformed, or a value is outside BIFF8 bounds.
     Records(crate::Error),
-    /// An authored value is invalid.
-    Invalid(&'static str),
-    /// The source has a shape this editor does not rewrite.
-    Unsupported(&'static str),
-    /// The addressed feature does not exist.
-    Missing(&'static str),
+    /// A well-formed request this route refuses, classified by kind.
+    Refused(litchi_core::edit::Refusal),
     /// A bound was exceeded.
     Limit {
         /// The dimension.
@@ -71,9 +68,7 @@ impl fmt::Display for Error {
         match self {
             Self::Package(error) => error.fmt(formatter),
             Self::Records(error) => error.fmt(formatter),
-            Self::Invalid(message) | Self::Unsupported(message) | Self::Missing(message) => {
-                formatter.write_str(message)
-            },
+            Self::Refused(refusal) => refusal.fmt(formatter),
             Self::Limit {
                 kind,
                 observed,
@@ -108,12 +103,20 @@ impl From<crate::package::Error> for Error {
 impl From<crate::Error> for Error {
     fn from(error: crate::Error) -> Self {
         match error {
-            crate::Error::UnsafeEdit(_) => {
-                Self::Unsupported("the source records are not rewritten")
-            },
+            crate::Error::Refused(refusal) => Self::Refused(refusal),
+            crate::Error::PatchConflict { .. } => Self::PatchConflict,
             other => Self::Records(other),
         }
     }
+}
+
+/// A content-free refusal of a worksheet-feature edit.
+pub(crate) const fn refused(kind: RefusalKind, reason: &'static str) -> Error {
+    Error::Refused(litchi_core::edit::Refusal::new(
+        kind,
+        "edit sheet features",
+        reason,
+    ))
 }
 
 /// The result type of the family.
@@ -344,7 +347,10 @@ impl Edit {
     /// outside the grid.
     pub fn set_column_breaks(&mut self, sheet: usize, breaks: &[PageBreak]) -> Result<()> {
         if breaks.iter().any(|item| item.index > 255) {
-            return Err(Error::Invalid("a column break is outside the BIFF8 grid"));
+            return Err(refused(
+                RefusalKind::InvalidValue,
+                "a column break is outside the BIFF8 grid",
+            ));
         }
         self.set_breaks(sheet, VERTICAL_PAGE_BREAKS, breaks, LAST_ROW)
     }
@@ -371,7 +377,8 @@ impl Edit {
             .iter()
             .any(|item| item.min > item.max || item.index == 0)
         {
-            return Err(Error::Invalid(
+            return Err(refused(
+                RefusalKind::InvalidValue,
                 "a page break span is reversed or before the first cell",
             ));
         }
@@ -383,7 +390,7 @@ impl Edit {
             Vec::new()
         } else {
             encode::page_breaks(kind, &breaks)
-                .map_err(|_| Error::Invalid("too many page breaks"))?
+                .map_err(|_| refused(RefusalKind::InvalidValue, "too many page breaks"))?
         };
         match existing {
             Some(index) => self.replace(&layout, index, index + 1, &bytes),
@@ -427,7 +434,7 @@ impl Edit {
     pub fn add_hyperlink(&mut self, sheet: usize, link: &HyperlinkSpec) -> Result<usize> {
         self.step()?;
         let bytes = encode::hyperlink(link)
-            .map_err(|_| Error::Invalid("the hyperlink cannot be encoded"))?;
+            .map_err(|_| refused(RefusalKind::InvalidValue, "the hyperlink cannot be encoded"))?;
         let (_, layout) = self.sheet(sheet)?;
         let count = Self::hyperlink_units(&layout).len();
         let at = layout.hyperlinks_insert();
@@ -448,11 +455,12 @@ impl Edit {
     ) -> Result<()> {
         self.step()?;
         let bytes = encode::hyperlink(link)
-            .map_err(|_| Error::Invalid("the hyperlink cannot be encoded"))?;
+            .map_err(|_| refused(RefusalKind::InvalidValue, "the hyperlink cannot be encoded"))?;
         let (_, layout) = self.sheet(sheet)?;
-        let (first, end) = *Self::hyperlink_units(&layout)
-            .get(index)
-            .ok_or(Error::Missing("the hyperlink does not exist"))?;
+        let (first, end) = *Self::hyperlink_units(&layout).get(index).ok_or(refused(
+            RefusalKind::NotFound,
+            "the hyperlink does not exist",
+        ))?;
         self.replace(&layout, first, end, &bytes)
     }
 
@@ -464,9 +472,10 @@ impl Edit {
     pub fn remove_hyperlink(&mut self, sheet: usize, index: usize) -> Result<()> {
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
-        let (first, end) = *Self::hyperlink_units(&layout)
-            .get(index)
-            .ok_or(Error::Missing("the hyperlink does not exist"))?;
+        let (first, end) = *Self::hyperlink_units(&layout).get(index).ok_or(refused(
+            RefusalKind::NotFound,
+            "the hyperlink does not exist",
+        ))?;
         self.replace(&layout, first, end, &[])
     }
 
@@ -490,7 +499,10 @@ impl Edit {
         let record = layout.records[dval];
         let mut payload = record.payload(&self.stream).to_vec();
         if payload.len() < 18 {
-            return Err(Error::Unsupported("the DVal record is malformed"));
+            return Err(refused(
+                RefusalKind::UnsupportedOperation,
+                "the DVal record is malformed",
+            ));
         }
         payload[14..18].copy_from_slice(&u32::try_from(count).unwrap_or(u32::MAX).to_le_bytes());
         let bytes = stream::record(DVAL, &payload)?;
@@ -504,8 +516,12 @@ impl Edit {
     /// Returns [`Error::Invalid`] for a validation outside its BIFF8 bounds.
     pub fn add_validation(&mut self, sheet: usize, spec: &ValidationSpec) -> Result<usize> {
         self.step()?;
-        let bytes = encode::validation(spec)
-            .map_err(|_| Error::Invalid("the validation cannot be encoded"))?;
+        let bytes = encode::validation(spec).map_err(|_| {
+            refused(
+                RefusalKind::InvalidValue,
+                "the validation cannot be encoded",
+            )
+        })?;
         let (_, layout) = self.sheet(sheet)?;
         let (dval, rules) = Self::validation_records(&layout);
         let position = rules.len();
@@ -538,13 +554,18 @@ impl Edit {
         spec: &ValidationSpec,
     ) -> Result<()> {
         self.step()?;
-        let bytes = encode::validation(spec)
-            .map_err(|_| Error::Invalid("the validation cannot be encoded"))?;
+        let bytes = encode::validation(spec).map_err(|_| {
+            refused(
+                RefusalKind::InvalidValue,
+                "the validation cannot be encoded",
+            )
+        })?;
         let (_, layout) = self.sheet(sheet)?;
         let (_, rules) = Self::validation_records(&layout);
-        let at = *rules
-            .get(index)
-            .ok_or(Error::Missing("the validation does not exist"))?;
+        let at = *rules.get(index).ok_or(refused(
+            RefusalKind::NotFound,
+            "the validation does not exist",
+        ))?;
         self.replace(&layout, at, at + 1, &bytes)
     }
 
@@ -558,13 +579,20 @@ impl Edit {
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
         let (dval, rules) = Self::validation_records(&layout);
-        let at = *rules
-            .get(index)
-            .ok_or(Error::Missing("the validation does not exist"))?;
-        let dval = dval.ok_or(Error::Unsupported("a Dv record has no DVal"))?;
+        let at = *rules.get(index).ok_or(refused(
+            RefusalKind::NotFound,
+            "the validation does not exist",
+        ))?;
+        let dval = dval.ok_or(refused(
+            RefusalKind::UnsupportedOperation,
+            "a Dv record has no DVal",
+        ))?;
         if rules.len() == 1 {
             if at != dval + 1 {
-                return Err(Error::Unsupported("the DVal block is not contiguous"));
+                return Err(refused(
+                    RefusalKind::UnsupportedOperation,
+                    "the DVal block is not contiguous",
+                ));
             }
             return self.replace(&layout, dval, at + 1, &[]);
         }
@@ -667,17 +695,20 @@ impl Edit {
     pub fn set_format(&mut self, sheet: usize, index: usize, format: &Format) -> Result<()> {
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
-        let (first, end, future, identifier) = *self
-            .format_units(&layout)
-            .get(index)
-            .ok_or(Error::Missing("the conditional format does not exist"))?;
+        let (first, end, future, identifier) =
+            *self.format_units(&layout).get(index).ok_or(refused(
+                RefusalKind::NotFound,
+                "the conditional format does not exist",
+            ))?;
         if end - first != 2 {
-            return Err(Error::Unsupported(
+            return Err(refused(
+                RefusalKind::UnsupportedOperation,
                 "a conditional format with several rules is replaced only as a whole",
             ));
         }
         if !future && self.extended(&layout, identifier) {
-            return Err(Error::Unsupported(
+            return Err(refused(
+                RefusalKind::UnsupportedOperation,
                 "a conditional format a CFEx record extends is not rewritten",
             ));
         }
@@ -700,10 +731,11 @@ impl Edit {
     pub fn set_format_ranges(&mut self, sheet: usize, index: usize, ranges: &[Area]) -> Result<()> {
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
-        let (first, end, future, identifier) = *self
-            .format_units(&layout)
-            .get(index)
-            .ok_or(Error::Missing("the conditional format does not exist"))?;
+        let (first, end, future, identifier) =
+            *self.format_units(&layout).get(index).ok_or(refused(
+                RefusalKind::NotFound,
+                "the conditional format does not exist",
+            ))?;
         let rules = u16::try_from(end - first - 1).unwrap_or(u16::MAX);
         let header = layout.records[first].payload(&self.stream);
         let tough = if future {
@@ -712,8 +744,12 @@ impl Edit {
             header.get(2)
         }
         .is_some_and(|flags| flags & 1 != 0);
-        let body = encode::cond_fmt_header(ranges, rules, identifier, tough)
-            .map_err(|_| Error::Invalid("the conditional-format ranges are invalid"))?;
+        let body = encode::cond_fmt_header(ranges, rules, identifier, tough).map_err(|_| {
+            refused(
+                RefusalKind::InvalidValue,
+                "the conditional-format ranges are invalid",
+            )
+        })?;
         let bytes = if future {
             let mut payload = header[..4].to_vec();
             payload.extend_from_slice(&body[4..12]);
@@ -740,10 +776,11 @@ impl Edit {
     pub fn remove_format(&mut self, sheet: usize, index: usize) -> Result<()> {
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
-        let (first, end, future, identifier) = *self
-            .format_units(&layout)
-            .get(index)
-            .ok_or(Error::Missing("the conditional format does not exist"))?;
+        let (first, end, future, identifier) =
+            *self.format_units(&layout).get(index).ok_or(refused(
+                RefusalKind::NotFound,
+                "the conditional format does not exist",
+            ))?;
         // CFEx records of a classic format (and a CF12 that follows one) go
         // first, from the end, so the format's own indexes stay valid.
         if !future {
@@ -789,7 +826,8 @@ impl Edit {
         self.step()?;
         if let Some(area) = area {
             if area.last_column > 255 || area.last_column - area.first_column > 255 {
-                return Err(Error::Invalid(
+                return Err(refused(
+                    RefusalKind::InvalidValue,
                     "the auto-filter range is outside the BIFF8 grid",
                 ));
             }
@@ -859,7 +897,8 @@ impl Edit {
             .iter()
             .rposition(|record| matches!(record.kind, stream::LBL | stream::EXTERN_SHEET))
             .map(|index| globals.records[index].end)
-            .ok_or(Error::Unsupported(
+            .ok_or(refused(
+                RefusalKind::UnsupportedOperation,
                 "the workbook globals have no ExternSheet",
             ))?;
         stream::splice(&mut self.stream, at, at, &name)?;
@@ -871,8 +910,12 @@ impl Edit {
     /// flag says whether the globals changed.
     fn internal_xti(&mut self, sheet: usize) -> Result<(u16, bool)> {
         let globals = Globals::parse(&self.stream)?;
-        let sheet_u16 = u16::try_from(sheet)
-            .map_err(|_| Error::Invalid("the sheet position exceeds 16 bits"))?;
+        let sheet_u16 = u16::try_from(sheet).map_err(|_| {
+            refused(
+                RefusalKind::InvalidValue,
+                "the sheet position exceeds 16 bits",
+            )
+        })?;
         let books: Vec<usize> = globals
             .records
             .iter()
@@ -893,7 +936,8 @@ impl Edit {
                     .get(index + 1)
                     .is_some_and(|next| next.kind == stream::CONTINUE)
                 {
-                    return Err(Error::Unsupported(
+                    return Err(refused(
+                        RefusalKind::UnsupportedOperation,
                         "a continued ExternSheet is not rewritten",
                     ));
                 }
@@ -909,7 +953,10 @@ impl Edit {
                     }
                 }
                 if count >= 1_370 {
-                    return Err(Error::Unsupported("the ExternSheet record is full"));
+                    return Err(refused(
+                        RefusalKind::UnsupportedOperation,
+                        "the ExternSheet record is full",
+                    ));
                 }
                 let mut grown = payload.to_vec();
                 grown[0..2].copy_from_slice(&u16::try_from(count + 1).unwrap_or(0).to_le_bytes());
@@ -949,11 +996,15 @@ impl Edit {
                     .iter()
                     .position(|record| following.contains(&record.kind))
                     .map(|index| globals.records[index].start)
-                    .ok_or(Error::Unsupported("the workbook globals have no EOF"))?;
+                    .ok_or(refused(
+                        RefusalKind::UnsupportedOperation,
+                        "the workbook globals have no EOF",
+                    ))?;
                 stream::splice(&mut self.stream, at, at, &bytes)?;
                 Ok((0, true))
             },
-            _ => Err(Error::Unsupported(
+            _ => Err(refused(
+                RefusalKind::UnsupportedOperation,
                 "a workbook with only external references takes no new filter name",
             )),
         }
@@ -1042,9 +1093,18 @@ fn cf12_priority(payload: &[u8]) -> Option<u16> {
 pub fn compile_formula(formula: &str) -> Result<Vec<u8>> {
     let tokens = crate::writer::FormulaTokenizer::extended()
         .tokenize(formula)
-        .map_err(|_| Error::Invalid("the formula cannot be encoded as BIFF8 tokens"))?;
-    crate::writer::formula::encode_ptg_tokens_by_arity(&tokens)
-        .map_err(|_| Error::Invalid("the formula cannot be encoded as BIFF8 tokens"))
+        .map_err(|_| {
+            refused(
+                RefusalKind::InvalidValue,
+                "the formula cannot be encoded as BIFF8 tokens",
+            )
+        })?;
+    crate::writer::formula::encode_ptg_tokens_by_arity(&tokens).map_err(|_| {
+        refused(
+            RefusalKind::InvalidValue,
+            "the formula cannot be encoded as BIFF8 tokens",
+        )
+    })
 }
 
 /// Apply a patch to the exact package it was made from.
@@ -1152,7 +1212,12 @@ impl Threshold {
 
 impl Format {
     fn encode(&self, identifier: u16, priority: u16) -> Result<Vec<u8>> {
-        let invalid = |_| Error::Invalid("the conditional format cannot be encoded");
+        let invalid = |_| {
+            refused(
+                RefusalKind::InvalidValue,
+                "the conditional format cannot be encoded",
+            )
+        };
         match &self.rule {
             FormatRule::CellIs { operator, formulas } if !self.stop_if_true => {
                 encode::classic_format(
@@ -1211,7 +1276,10 @@ impl Format {
                     },
                     FormatRule::ColorScale(points) => {
                         if !(2..=3).contains(&points.len()) {
-                            return Err(Error::Invalid("a color scale has two or three points"));
+                            return Err(refused(
+                                RefusalKind::InvalidValue,
+                                "a color scale has two or three points",
+                            ));
                         }
                         cf12.ct = 3;
                         cf12.template = 2;
@@ -1245,7 +1313,8 @@ impl Format {
                         show_value,
                     } => {
                         if min_length >= max_length || *max_length > 100 {
-                            return Err(Error::Invalid(
+                            return Err(refused(
+                                RefusalKind::InvalidValue,
                                 "a data bar's lengths must rise to at most 100",
                             ));
                         }

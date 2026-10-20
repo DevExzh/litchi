@@ -73,7 +73,7 @@ fn transaction_is_source_checked_and_reversible() {
     );
     assert!(matches!(
         patch.apply(Snapshot::try_new(target).expect("diverged source")),
-        Err(Error::UnsafeEdit(_))
+        Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
     ));
 }
 

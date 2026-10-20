@@ -1651,9 +1651,11 @@ impl Classify for litchi_xls::Error {
             Self::InvalidPassword => {
                 Class::suggest(Code::InvalidArgument, WRONG_PASSWORD_SUGGESTION)
             },
+            Self::Refused(refusal) => refusal.classify(),
+            Self::PatchConflict { .. } => Class::of(Code::InvalidInput),
+            Self::Internal(_) => Class::of(Code::InternalError),
             Self::UnsupportedEncryption(_)
             | Self::UnsupportedFeature(_)
-            | Self::UnsafeEdit(_)
             | Self::SourceBoundWorksheetMutation { .. } => Class::of(Code::UnsupportedCapability),
             Self::UnsupportedBiffVersion(_) => Class::of(Code::UnsupportedFormat),
             Self::StringTooLong { .. } | Self::TooMany { .. } | Self::RecordTooLong { .. } => {

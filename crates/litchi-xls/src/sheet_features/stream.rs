@@ -16,6 +16,7 @@
 //! `DBCell` offsets are relative to their own record and never move.
 
 use crate::{Error, Result};
+use litchi_core::edit::RefusalKind;
 
 pub(super) const BOF: u16 = 0x0809;
 pub(super) const EOF: u16 = 0x000a;
@@ -218,8 +219,10 @@ impl Globals {
         let mut bounds = Vec::new();
         for record in &records {
             if record.kind == FILE_PASS {
-                return Err(Error::UnsafeEdit(
-                    "an encrypted XLS workbook's worksheet features are not edited".into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "edit sheet features",
+                    "an encrypted XLS workbook's worksheet features are not edited",
                 ));
             }
             if record.kind == BOUND_SHEET {
@@ -358,7 +361,11 @@ impl Sheet {
             .rposition(|record| after.contains(&record.kind))
             .map(|index| index + 1)
             .ok_or_else(|| {
-                Error::UnsafeEdit("a worksheet without WsBool takes no page breaks".into())
+                Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "edit sheet features",
+                    "a worksheet without WsBool takes no page breaks",
+                )
             })
     }
 
@@ -404,8 +411,13 @@ pub(super) fn splice(
     let moved = |offset: usize| offset >= end;
     let shift = |offset: usize| -> Result<u32> {
         let value = i64::try_from(offset).unwrap_or(i64::MAX) + delta;
-        u32::try_from(value)
-            .map_err(|_| Error::UnsafeEdit("a stream offset moves outside 32 bits".into()))
+        u32::try_from(value).map_err(|_| {
+            Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit sheet features",
+                "a stream offset moves outside 32 bits",
+            )
+        })
     };
     // Collect fixed-width field patches against the source positions first.
     let mut patches: Vec<(usize, u32)> = Vec::new();

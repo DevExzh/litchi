@@ -588,8 +588,8 @@ fn broad_patch_cannot_widen_a_narrow_same_bytes_destination() {
     assert_eq!(narrow.inner.cfb_limits, cfb_limits);
     let mut history = narrow.history(HistoryLimits::new(2, 1024 * 1024));
     assert!(
-        matches!(broad_commit.record_in(&mut history), Err(Error::UnsafeEdit(message))
-        if message.contains("source profiles"))
+        matches!(broad_commit.record_in(&mut history), Err(Error::PatchConflict { reason, .. })
+        if reason.contains("source profiles"))
     );
     assert_eq!(history.current().bytes(), narrow.bytes());
     assert_eq!(history.current().inner.limits, limits);
@@ -968,11 +968,11 @@ fn source_backed_numeric_publication_preserves_protection_refusal_reasons() {
     for (worksheet, expected) in [
         (
             false,
-            "Unsafe edit refused: protected or shared workbooks are not eligible for source-backed numeric edits",
+            "edit cells refused (protected): protected or shared workbooks are not eligible for source-backed numeric edits",
         ),
         (
             true,
-            "Unsafe edit refused: protected worksheets are not eligible for source-backed numeric edits",
+            "edit cells refused (protected): protected worksheets are not eligible for source-backed numeric edits",
         ),
     ] {
         let source = Snapshot::from_bytes(protected_package(worksheet)).unwrap();
@@ -991,11 +991,11 @@ fn source_backed_numeric_plan_preserves_protection_refusal_reasons() {
     for (worksheet, expected) in [
         (
             false,
-            "Unsafe edit refused: protected or shared workbooks are not eligible for source-backed numeric edits",
+            "edit cells refused (protected): protected or shared workbooks are not eligible for source-backed numeric edits",
         ),
         (
             true,
-            "Unsafe edit refused: protected worksheets are not eligible for source-backed numeric edits",
+            "edit cells refused (protected): protected worksheets are not eligible for source-backed numeric edits",
         ),
     ] {
         let source = Snapshot::from_bytes(protected_package(worksheet)).unwrap();
@@ -1842,7 +1842,7 @@ fn canonical_formula_resource_matching_refuses_rgb_extra_atomically() {
         &ANCILLARY_MEMORY_TOKENS,
     )
     .expect_err("canonical resource matching must refuse source-bound RgbExtra");
-    assert!(matches!(error, Error::UnsafeEdit(message) if message.contains("RgbExtra")));
+    assert!(matches!(error, Error::Refused(refusal) if refusal.reason().contains("RgbExtra")));
     assert_eq!(source.bytes(), before.as_slice());
 }
 
@@ -3039,7 +3039,7 @@ fn snapshot_open_first_error_matrix_is_frozen() {
             ),
             (
                 "globals-no-xf".to_string(),
-                "Unsafe edit refused: opened-workbook transaction requires at least one XF resource"
+                "edit cells refused (unsupported_content): opened-workbook transaction requires at least one XF resource"
                     .to_string()
             ),
             (
@@ -3072,12 +3072,12 @@ fn snapshot_open_first_error_matrix_is_frozen() {
             ),
             (
                 "worksheet-bof-missing".to_string(),
-                "Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader"
+                "edit cells refused (unsupported_content): a worksheet was not published by the complete XLS reader"
                     .to_string()
             ),
             (
                 "stray-string-after-formula".to_string(),
-                "Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader"
+                "edit cells refused (unsupported_content): a worksheet was not published by the complete XLS reader"
                     .to_string()
             ),
             (
@@ -3195,7 +3195,7 @@ fn source_backed_numeric_target_verification_agrees_with_an_independent_parse() 
     assert_eq!(format!("{kept:?}"), format!("{complete:?}"));
     assert!(matches!(
         validated.kept_cell(0, 3, 3),
-        Err(Error::UnsafeEdit(message)) if message.contains("not asked to keep")
+        Err(Error::Internal(reason)) if reason.contains("not asked to keep")
     ));
 }
 

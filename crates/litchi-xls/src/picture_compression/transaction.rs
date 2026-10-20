@@ -27,9 +27,10 @@ impl Patch {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn apply(&self, target: &mut Snapshot) -> Result<()> {
         if target != &self.before {
-            return Err(Error::UnsafeEdit(
-                "CompressPictures snapshot changed since the patch was prepared".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit picture compression",
+                reason: "CompressPictures snapshot changed since the patch was prepared",
+            });
         }
         self.after.validate()?;
         *target = self.after.clone();

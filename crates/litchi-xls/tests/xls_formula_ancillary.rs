@@ -481,13 +481,13 @@ fn row_and_column_shift_refuse_rgb_extra_atomically() {
     let mut rows = source.edit();
     assert!(matches!(
         rows.insert_rows(Selector::Position(Position::new(0)), 0, 1),
-        Err(Error::UnsafeEdit(_))
+        Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
     ));
 
     let mut columns = source.edit();
     assert!(matches!(
         columns.insert_columns(Selector::Position(Position::new(0)), 0, 1),
-        Err(Error::UnsafeEdit(_))
+        Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
     ));
     assert_eq!(source.bytes(), before.as_slice());
 }

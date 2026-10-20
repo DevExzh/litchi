@@ -194,9 +194,10 @@ impl Patch {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.fingerprint() != self.source_fingerprint || source.bytes() != self.before() {
-            return Err(Error::UnsafeEdit(
-                "RealTimeData patch source does not match its base snapshot".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit real-time data",
+                reason: "RealTimeData patch source does not match its base snapshot",
+            });
         }
         if self.is_noop() {
             Ok(source.clone())
@@ -211,9 +212,10 @@ impl Patch {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn revert(&self, target: &Snapshot) -> Result<Snapshot> {
         if target.fingerprint() != self.target_fingerprint || target.bytes() != self.after() {
-            return Err(Error::UnsafeEdit(
-                "RealTimeData patch target does not match its committed snapshot".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit real-time data",
+                reason: "RealTimeData patch target does not match its committed snapshot",
+            });
         }
         if self.is_noop() {
             Ok(target.clone())

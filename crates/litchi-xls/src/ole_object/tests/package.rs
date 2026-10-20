@@ -292,7 +292,9 @@ fn workbook_reader_rejects_filepass_and_active_biff_protection_before_editing() 
             matches!(
                 error,
                 Error::PasswordProtected
-                    | Error::UnsafeEdit(_)
+                    | Error::Refused(_)
+                    | Error::PatchConflict { .. }
+                    | Error::Internal(_)
                     | Error::InvalidRecord { .. }
                     | Error::InvalidLength { .. }
             ),
@@ -329,7 +331,9 @@ fn workbook_reader_refuses_pidssi_digital_signature() {
         Limits::default(),
     )
     .expect_err("a stale PIDDSI signature must not be rewritten");
-    assert!(matches!(error, Error::UnsafeEdit(message) if message.contains("DigitalSignature")));
+    assert!(
+        matches!(error, Error::Refused(refusal) if refusal.reason().contains("DigitalSignature"))
+    );
 }
 
 #[test]

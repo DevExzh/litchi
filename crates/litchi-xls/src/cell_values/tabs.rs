@@ -22,6 +22,7 @@
 use super::{Error, Result};
 use litchi_biff::Records;
 use litchi_core::binary;
+use litchi_core::edit::RefusalKind;
 
 const BOF: u16 = 0x0809;
 const EOF: u16 = 0x000a;
@@ -343,8 +344,10 @@ pub(super) fn rewrite(
                 return Err(Error::WorksheetNotFound("removed tab position".into()));
             }
             if old_count == 1 {
-                return Err(Error::UnsafeEdit(
-                    "a workbook must retain at least one tab".into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "edit cells",
+                    "a workbook must retain at least one tab",
                 ));
             }
             for index in (0..old_count).filter(|index| index != position) {
@@ -356,8 +359,10 @@ pub(super) fn rewrite(
                 Error::InvalidData("tab insertion requires an empty worksheet template".into())
             })?;
             if *position > old_count {
-                return Err(Error::UnsafeEdit(
-                    "worksheet insertion position is outside the tab catalog".into(),
+                return Err(Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit cells",
+                    "worksheet insertion position is outside the tab catalog",
                 ));
             }
             for index in 0..old_count {
@@ -385,8 +390,10 @@ pub(super) fn rewrite(
         },
     }
     if plan.is_empty() || plan.len() > usize::from(u16::MAX) {
-        return Err(Error::UnsafeEdit(
-            "tab catalog size is outside BIFF8 bounds".into(),
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit cells",
+            "tab catalog size is outside BIFF8 bounds",
         ));
     }
     let mut old_to_new = vec![None; old_count];
@@ -398,8 +405,10 @@ pub(super) fn rewrite(
 
     // A removed tab must not be the only visible tab.
     if !plan.iter().any(|planned| planned.state == 0) {
-        return Err(Error::UnsafeEdit(
-            "a workbook must retain a visible tab".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "a workbook must retain a visible tab",
         ));
     }
 
@@ -443,8 +452,10 @@ pub(super) fn rewrite(
             },
             RR_TAB_ID => {
                 if followed_by_continue {
-                    return Err(Error::UnsafeEdit(
-                        "continued RRTabId records are not remapped".into(),
+                    return Err(Error::refused(
+                        RefusalKind::UnsupportedOperation,
+                        "edit cells",
+                        "continued RRTabId records are not remapped",
                     ));
                 }
                 let rewritten = remap_rr_tab_ids(payload, old_count, &plan)?;
@@ -461,8 +472,10 @@ pub(super) fn rewrite(
             },
             EXTERN_SHEET => {
                 if followed_by_continue {
-                    return Err(Error::UnsafeEdit(
-                        "continued ExternSheet records are not remapped".into(),
+                    return Err(Error::refused(
+                        RefusalKind::UnsupportedOperation,
+                        "edit cells",
+                        "continued ExternSheet records are not remapped",
                     ));
                 }
                 let rewritten =
@@ -480,8 +493,10 @@ pub(super) fn rewrite(
             },
             EXT_SST => {
                 if followed_by_continue {
-                    return Err(Error::UnsafeEdit(
-                        "continued ExtSST records are not remapped".into(),
+                    return Err(Error::refused(
+                        RefusalKind::UnsupportedOperation,
+                        "edit cells",
+                        "continued ExtSST records are not remapped",
                     ));
                 }
                 ext_sst_output = Some(output.len());
@@ -499,7 +514,11 @@ pub(super) fn rewrite(
     if let (Some(at), Some((old, new))) = (ext_sst_output, sst_shift) {
         shift_ext_sst(&mut output, at, old, new)?;
     } else if ext_sst_output.is_some() {
-        return Err(Error::UnsafeEdit("ExtSST has no SST owner".into()));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedTarget,
+            "edit cells",
+            "ExtSST has no SST owner",
+        ));
     }
 
     for (slot, planned) in plan.iter().enumerate() {
@@ -687,22 +706,30 @@ fn remap_extern_sheet(
             });
         }
         if insert_index.is_some_and(|insert| first < insert && insert <= last) {
-            return Err(Error::UnsafeEdit(
-                "a worksheet cannot be inserted inside an existing 3-D reference range".into(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit cells",
+                "a worksheet cannot be inserted inside an existing 3-D reference range",
             ));
         }
         let mut minimum = usize::MAX;
         let mut maximum = 0;
         for mapped in &old_to_new[first..=last] {
             let new = mapped.ok_or_else(|| {
-                Error::UnsafeEdit("a formula or name still references the removed tab".into())
+                Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "edit cells",
+                    "a formula or name still references the removed tab",
+                )
             })?;
             minimum = minimum.min(new);
             maximum = maximum.max(new);
         }
         if maximum - minimum != last - first {
-            return Err(Error::UnsafeEdit(
-                "the tab order would make a 3-D reference range noncontiguous".into(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit cells",
+                "the tab order would make a 3-D reference range noncontiguous",
             ));
         }
         let to_u16 = |value: usize| {
@@ -730,7 +757,13 @@ fn remap_lbl(payload: &mut [u8], old_to_new: &[Option<usize>]) -> Result<()> {
         .get(scope - 1)
         .copied()
         .flatten()
-        .ok_or_else(|| Error::UnsafeEdit("the removed tab owns a sheet-scoped name".into()))?;
+        .ok_or_else(|| {
+            Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "the removed tab owns a sheet-scoped name",
+            )
+        })?;
     let scope = u16::try_from(new + 1)
         .map_err(|_error| Error::InvalidData("Lbl tab scope exceeds u16".into()))?;
     payload[8..10].copy_from_slice(&scope.to_le_bytes());
@@ -761,7 +794,13 @@ fn shift_ext_sst(output: &mut [u8], at: usize, old_sst: usize, new_sst: usize) -
         let after = i64::from(before)
             .checked_add(delta)
             .and_then(|value| u32::try_from(value).ok())
-            .ok_or_else(|| Error::UnsafeEdit("ExtSST offset relocation overflows".into()))?;
+            .ok_or_else(|| {
+                Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit cells",
+                    "ExtSST offset relocation overflows",
+                )
+            })?;
         output[offset..offset + 4].copy_from_slice(&after.to_le_bytes());
     }
     Ok(())
@@ -794,7 +833,13 @@ fn adjust_index_offsets(stream: &mut [u8], delta: i64) -> Result<()> {
         let after = i64::from(before)
             .checked_add(delta)
             .and_then(|value| u32::try_from(value).ok())
-            .ok_or_else(|| Error::UnsafeEdit("Index offset relocation overflows".into()))?;
+            .ok_or_else(|| {
+                Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit cells",
+                    "Index offset relocation overflows",
+                )
+            })?;
         stream[offset..offset + 4].copy_from_slice(&after.to_le_bytes());
     }
     Ok(())
@@ -823,8 +868,10 @@ fn select_window2(stream: &mut [u8]) -> Result<()> {
 /// Refuse removing a tab whose dependencies this rewrite cannot close.
 pub(super) fn certify_removal(workbook: &[u8], catalog: &[Tab], tab: &Tab) -> Result<()> {
     if tab.kind != 0 {
-        return Err(Error::UnsafeEdit(
-            "only ordinary worksheet tabs can be removed".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "only ordinary worksheet tabs can be removed",
         ));
     }
     let stream = &workbook[tab.start..tab.end];
@@ -837,18 +884,21 @@ pub(super) fn certify_removal(workbook: &[u8], catalog: &[Tab], tab: &Tab) -> Re
         .map(|payload| binary::read_u16_le_at(payload, 2))
         .transpose()?;
     if substream != Some(WORKSHEET_SUBSTREAM) {
-        return Err(Error::UnsafeEdit(
-            "only ordinary worksheet tabs can be removed".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "only ordinary worksheet tabs can be removed",
         ));
     }
-    if let Some(record) = records
+    if records
         .iter()
-        .find(|record| matches!(record.kind, MSO_DRAWING | OBJ | SX_VIEW))
+        .any(|record| matches!(record.kind, MSO_DRAWING | OBJ | SX_VIEW))
     {
-        return Err(Error::UnsafeEdit(format!(
-            "worksheet removal cannot close drawing or pivot record 0x{:04X}",
-            record.kind
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedTarget,
+            "edit cells",
+            "worksheet removal cannot close drawing or pivot record",
+        ));
     }
     // Pivot data connections name their source sheet by text anywhere in the
     // workbook; their closure is not rewritten here.
@@ -860,14 +910,15 @@ pub(super) fn certify_removal(workbook: &[u8], catalog: &[Tab], tab: &Tab) -> Re
             .map(|other| &workbook[other.start..other.end]),
     );
     for substream in substreams {
-        if let Some(record) = raw_records_until_eof(substream)?
+        if raw_records_until_eof(substream)?
             .iter()
-            .find(|record| matches!(record.kind, DCON_REF | DCON_NAME | DCON_BIN))
+            .any(|record| matches!(record.kind, DCON_REF | DCON_NAME | DCON_BIN))
         {
-            return Err(Error::UnsafeEdit(format!(
-                "worksheet removal cannot close pivot data connection record 0x{:04X}",
-                record.kind
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit cells",
+                "worksheet removal cannot close pivot data connection record",
+            ));
         }
     }
     Ok(())

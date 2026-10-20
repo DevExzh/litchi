@@ -40,6 +40,7 @@ use litchi_cfb::{
 };
 use litchi_cfb::{OleFileLimits, SharedOleFileLimits, consts::STGTY_STORAGE};
 use litchi_core::binary;
+use litchi_core::edit::RefusalKind;
 pub use litchi_core::patch::HistoryLimits;
 use litchi_core::patch::{
     BlobBundle, BlobLimits, DiagnosticFingerprint, Patch as CorePatch, PatchLimits, PatchOperation,
@@ -312,13 +313,14 @@ impl StyleIndex {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::UnsafeEdit`] if the resource does not exist.
+    /// Returns [`Error::Refused`] if the resource does not exist.
     pub fn new(snapshot: &Snapshot, index: u16) -> Result<Self> {
         if usize::from(index) >= snapshot.inner.xf_records.len() {
-            return Err(Error::UnsafeEdit(format!(
-                "BIFF8 XF index {index} is outside the workbook's {} resources",
-                snapshot.inner.xf_records.len()
-            )));
+            return Err(Error::refused(
+                RefusalKind::NotFound,
+                "edit cells",
+                "the BIFF8 XF index is outside the workbook resources",
+            ));
         }
         Ok(Self(index))
     }
@@ -503,18 +505,19 @@ impl CellIndex {
             .get(start + 1)
             .is_some_and(|candidate| candidate.reference == reference);
         if duplicate {
-            return Err(Error::UnsafeEdit(format!(
-                "cell ({}, {}) has duplicate BIFF8 Number records",
-                reference.row(),
-                reference.column()
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedContent,
+                "edit cells",
+                "a cell has duplicate BIFF8 Number records",
+            ));
         }
-        let entry = entries
-            .get(item.entry)
-            .ok_or_else(|| Error::UnsafeEdit("worksheet coordinate index is stale".into()))?;
+        let entry = entries.get(item.entry).ok_or(Error::PatchConflict {
+            operation: "edit cells",
+            reason: "worksheet coordinate index is stale",
+        })?;
         if entry.cell.reference != reference {
-            return Err(Error::UnsafeEdit(
-                "worksheet coordinate index disagrees with its source inventory".into(),
+            return Err(Error::Internal(
+                "worksheet coordinate index disagrees with its source inventory",
             ));
         }
         Ok(Some(item.entry))
@@ -588,27 +591,32 @@ impl SourcePolicyFacts {
 
     fn require(self) -> Result<()> {
         if !self.public_worksheet_coverage {
-            return Err(Error::UnsafeEdit(
-                "source-backed numeric source lost public worksheet coverage".into(),
+            return Err(Error::Internal(
+                "source-backed numeric source lost public worksheet coverage",
             ));
         }
         match self.protection {
             SourceProtectionPolicy::Unprotected => {},
             SourceProtectionPolicy::WorkbookOrShared => {
-                return Err(Error::UnsafeEdit(
-                    "protected or shared workbooks are not eligible for source-backed numeric edits"
-                        .into(),
+                return Err(Error::refused(
+                    RefusalKind::Protected,
+                    "edit cells",
+                    "protected or shared workbooks are not eligible for source-backed numeric edits",
                 ));
             },
             SourceProtectionPolicy::Worksheet => {
-                return Err(Error::UnsafeEdit(
-                    "protected worksheets are not eligible for source-backed numeric edits".into(),
+                return Err(Error::refused(
+                    RefusalKind::Protected,
+                    "edit cells",
+                    "protected worksheets are not eligible for source-backed numeric edits",
                 ));
             },
         }
         if !self.macro_free_workbook {
-            return Err(Error::UnsafeEdit(
-                "macro-bearing XLS sources are not eligible for source-backed numeric edits".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "macro-bearing XLS sources are not eligible for source-backed numeric edits",
             ));
         }
         Ok(())
@@ -646,13 +654,14 @@ impl NumericTargetVerification<'_> {
         target_workbook_stream: &[u8],
     ) -> Result<()> {
         if target_bytes != self.expected_bytes {
-            return Err(Error::UnsafeEdit(
-                "source-backed numeric target changed during complete reopen".into(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit cells",
+                reason: "source-backed numeric target changed during complete reopen",
+            });
         }
         if self.source.inner.workbook_path != target_workbook_path {
-            return Err(Error::UnsafeEdit(
-                "source-backed numeric publication changed the Workbook owner".into(),
+            return Err(Error::Internal(
+                "source-backed numeric publication changed the Workbook owner",
             ));
         }
         require_public_worksheet_coverage(workbook, &self.source.inner.sheets)?;
@@ -1129,9 +1138,11 @@ impl Snapshot {
                     .filter(|(_, sheet)| caseless_eq(&sheet.name, name));
                 let found = matches.next().map(|(index, _)| index);
                 if matches.next().is_some() {
-                    return Err(Error::UnsafeEdit(format!(
-                        "worksheet name {name:?} is ambiguous"
-                    )));
+                    return Err(Error::refused(
+                        RefusalKind::InvalidValue,
+                        "edit cells",
+                        "worksheet name is ambiguous",
+                    ));
                 }
                 Ok(found)
             },
@@ -2166,9 +2177,11 @@ impl Edit {
             .cell_count()
             .ok_or_else(|| Error::InvalidData("scalar transfer area overflows usize".into()))?;
         if cell_count > MAX_SCALAR_TRANSFER_CELLS {
-            return Err(Error::UnsafeEdit(format!(
-                "cross-workbook scalar transfer contains {cell_count} cells; limit is {MAX_SCALAR_TRANSFER_CELLS}"
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "the cross-workbook scalar transfer exceeds its cell limit",
+            ));
         }
 
         ensure_scalar_transfer_container(donor, source_sheet)?;
@@ -2188,14 +2201,17 @@ impl Edit {
             .filter(|entry| source_range.contains(entry.cell.reference))
         {
             if source_cells.len() >= cell_count {
-                return Err(Error::UnsafeEdit(
-                    "cross-workbook scalar transfer source inventory exceeds its checked range"
-                        .into(),
+                return Err(Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit cells",
+                    "cross-workbook scalar transfer source inventory exceeds its checked range",
                 ));
             }
             if entry.cell.style != source_style {
-                return Err(Error::UnsafeEdit(
-                    "cross-workbook scalar transfer refuses source XF remapping".into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "edit cells",
+                    "cross-workbook scalar transfer refuses source XF remapping",
                 ));
             }
             if !matches!(entry.cell.storage, Storage::Number | Storage::Blank) {
@@ -2212,9 +2228,11 @@ impl Edit {
                 .checked_add(value_bytes.saturating_add(32))
                 .ok_or_else(|| Error::InvalidData("scalar transfer size overflows usize".into()))?;
             if estimated_bytes > MAX_SCALAR_TRANSFER_BYTES {
-                return Err(Error::UnsafeEdit(format!(
-                    "cross-workbook scalar transfer exceeds {MAX_SCALAR_TRANSFER_BYTES} staged bytes"
-                )));
+                return Err(Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit cells",
+                    "the cross-workbook scalar transfer exceeds its staged byte limit",
+                ));
             }
             push_bounded(
                 &mut source_cells,
@@ -2230,11 +2248,11 @@ impl Edit {
         source_cells.sort_unstable_by_key(|(reference, _, _)| *reference);
         for duplicate in source_cells.windows(2) {
             if duplicate[0].0 == duplicate[1].0 {
-                return Err(Error::UnsafeEdit(format!(
-                    "cell ({}, {}) has duplicate BIFF8 owners",
-                    duplicate[0].0.row(),
-                    duplicate[0].0.column()
-                )));
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedContent,
+                    "edit cells",
+                    "a cell has duplicate BIFF8 owners",
+                ));
             }
         }
         let source_cell_count = source_cells.len();
@@ -2249,9 +2267,10 @@ impl Edit {
             .filter(|(_, entry)| target_range.contains(entry.cell.reference))
         {
             if target_cells.len() >= cell_count {
-                return Err(Error::UnsafeEdit(
-                    "cross-workbook scalar transfer target inventory exceeds its checked range"
-                        .into(),
+                return Err(Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit cells",
+                    "cross-workbook scalar transfer target inventory exceeds its checked range",
                 ));
             }
             push_bounded(
@@ -2264,11 +2283,11 @@ impl Edit {
         target_cells.sort_unstable_by_key(|(reference, _)| *reference);
         for duplicate in target_cells.windows(2) {
             if duplicate[0].0 == duplicate[1].0 {
-                return Err(Error::UnsafeEdit(format!(
-                    "cell ({}, {}) has duplicate BIFF8 target owners",
-                    duplicate[0].0.row(),
-                    duplicate[0].0.column()
-                )));
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedContent,
+                    "edit cells",
+                    "a cell has duplicate BIFF8 target owners",
+                ));
             }
         }
 
@@ -2283,18 +2302,20 @@ impl Edit {
                 .binary_search_by_key(&source_reference, |(reference, _, _)| *reference)
                 .ok()
             else {
-                return Err(Error::UnsafeEdit(
-                    "cross-workbook scalar transfer target range is occupied by an unrelated cell"
-                        .into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedTarget,
+                    "edit cells",
+                    "cross-workbook scalar transfer target range is occupied by an unrelated cell",
                 ));
             };
             let source_storage = source_cells[source_index].1;
             if !matches!(target_entry.cell.storage, Storage::Number | Storage::Blank)
                 || target_entry.cell.storage != source_storage
             {
-                return Err(Error::UnsafeEdit(
-                    "cross-workbook scalar transfer would change a BIFF cell record width or family"
-                        .into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedContent,
+                    "edit cells",
+                    "cross-workbook scalar transfer would change a BIFF cell record width or family",
                 ));
             }
         }
@@ -2352,9 +2373,10 @@ impl Edit {
                 (Storage::Blank, Value::Blank, Some(entry))
                     if entry.cell.storage == Storage::Blank => {},
                 _ => {
-                    return Err(Error::UnsafeEdit(
-                        "cross-workbook scalar transfer source value is not representable in the target slot"
-                            .into(),
+                    return Err(Error::refused(
+                        RefusalKind::UnsupportedTarget,
+                        "edit cells",
+                        "cross-workbook scalar transfer source value is not representable in the target slot",
                     ));
                 },
             }
@@ -2429,7 +2451,10 @@ impl Edit {
             .sheets
             .get(sheet)
             .map(|item| item.workbook_index)
-            .ok_or_else(|| Error::UnsafeEdit("target worksheet inventory is stale".into()))
+            .ok_or(Error::PatchConflict {
+                operation: "edit cells",
+                reason: "target worksheet inventory is stale",
+            })
     }
 
     /// Sets an existing scalar cell through a storage-aware,
@@ -2505,13 +2530,17 @@ impl Edit {
             ) || matches!(&value, Value::FormulaCache(FormulaCache::String(_))))
         {
             let Value::FormulaCache(cache) = &value else {
-                return Err(Error::UnsafeEdit(
-                    "Formula storage accepts only cached formula results".into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "edit cells",
+                    "Formula storage accepts only cached formula results",
                 ));
             };
             if !valid_formula_cache(cache) {
-                return Err(Error::UnsafeEdit(
-                    "formula cache is not representable in BIFF8".into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedTarget,
+                    "edit cells",
+                    "formula cache is not representable in BIFF8",
                 ));
             }
             return self.stage_structural(StructuralChange::Cell {
@@ -2592,8 +2621,10 @@ impl Edit {
                 Error::UnsupportedFeature("an absent BIFF8 cell is already clear".into())
             })?;
         if entries[entry_index].cell.storage != Storage::Blank {
-            return Err(Error::UnsafeEdit(
-                "removing this cell requires a whole row-block rewrite".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "removing this cell requires a whole row-block rewrite",
             ));
         }
         self.stage(sheet_index, entry_index, Storage::Blank, Value::Blank)
@@ -2645,8 +2676,10 @@ impl Edit {
                 .filter(|candidate| candidate.as_str() == text.as_str())
                 .count();
             if occurrences != 1 || !self.has_rich_shared_string(&text, &formatting_runs) {
-                return Err(Error::UnsafeEdit(
-                    "rich SST reuse requires one exact formatting identity".into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "edit cells",
+                    "rich SST reuse requires one exact formatting identity",
                 ));
             }
             let mut staged = self.clone();
@@ -2709,15 +2742,19 @@ impl Edit {
             .unique_entry_index(reference)?
             .is_some()
         {
-            return Err(Error::UnsafeEdit(
-                "authored Formula target is occupied".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit cells",
+                "authored Formula target is occupied",
             ));
         }
         let parsed = crate::writer::FormulaTokenizer::new().tokenize(expression)?;
         let tokens = crate::writer::formula::encode_ptg_tokens(&parsed)?;
         if tokens.is_empty() || tokens.len() > MAX_FORMULA_TOKEN_BYTES {
-            return Err(Error::UnsafeEdit(
-                "authored Formula token bytes are empty or exceed the BIFF8 record limit".into(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit cells",
+                "authored Formula token bytes are empty or exceed the BIFF8 record limit",
             ));
         }
         self.stage_resource(ResourceChange::FormulaCell {
@@ -2783,8 +2820,10 @@ impl Edit {
             );
         };
         if cell.storage == Storage::Formula {
-            return Err(Error::UnsafeEdit(
-                "existing Formula records require a dependency-aware formula rewrite".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "existing Formula records require a dependency-aware formula rewrite",
             ));
         }
         if expression.is_empty() {
@@ -2795,8 +2834,10 @@ impl Edit {
         let parsed = crate::writer::FormulaTokenizer::new().tokenize(expression)?;
         let tokens = crate::writer::formula::encode_ptg_tokens(&parsed)?;
         if tokens.is_empty() || tokens.len() > MAX_FORMULA_TOKEN_BYTES {
-            return Err(Error::UnsafeEdit(
-                "authored Formula token bytes are empty or exceed the BIFF8 record limit".into(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit cells",
+                "authored Formula token bytes are empty or exceed the BIFF8 record limit",
             ));
         }
         let mut staged = self.clone();
@@ -2884,8 +2925,10 @@ impl Edit {
             .is_some()
             && !self.staged_formula_removal(sheet, reference)
         {
-            return Err(Error::UnsafeEdit(
-                "BIFF8 cell insertion target is occupied".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit cells",
+                "BIFF8 cell insertion target is occupied",
             ));
         }
         if let Value::Text(text) = &value
@@ -2922,11 +2965,19 @@ impl Edit {
         let sheet = self.require_sheet(selector, "cell removal")?;
         let entry = self.source.inner.sheets[sheet]
             .unique_entry_index(reference)?
-            .ok_or_else(|| Error::UnsafeEdit("BIFF8 cell removal target is absent".into()))?;
+            .ok_or_else(|| {
+                Error::refused(
+                    RefusalKind::NotFound,
+                    "edit cells",
+                    "BIFF8 cell removal target is absent",
+                )
+            })?;
         let cell = &self.source.inner.sheets[sheet].entries[entry].cell;
         if cell.storage == Storage::Formula {
-            return Err(Error::UnsafeEdit(
-                "formula records require a wider dependency rewrite".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "formula records require a wider dependency rewrite",
             ));
         }
         self.stage_structural(StructuralChange::Cell {
@@ -2952,7 +3003,13 @@ impl Edit {
         let sheet = self.require_sheet(selector, "cell style edit")?;
         let entry = self.source.inner.sheets[sheet]
             .unique_entry_index(reference)?
-            .ok_or_else(|| Error::UnsafeEdit("BIFF8 style target is absent".into()))?;
+            .ok_or_else(|| {
+                Error::refused(
+                    RefusalKind::NotFound,
+                    "edit cells",
+                    "BIFF8 style target is absent",
+                )
+            })?;
         let cell = &self.source.inner.sheets[sheet].entries[entry].cell;
         self.stage_structural(StructuralChange::Cell {
             sheet,
@@ -3010,7 +3067,13 @@ impl Edit {
         };
         let payload = self
             .effective_xf_payload(base)
-            .ok_or_else(|| Error::UnsafeEdit("cell XF resource is absent".into()))?
+            .ok_or_else(|| {
+                Error::refused(
+                    RefusalKind::NotFound,
+                    "edit cells",
+                    "cell XF resource is absent",
+                )
+            })?
             .to_vec();
         let palette = if change.fill_foreground.is_some() || change.fill_background.is_some() {
             format::workbook_palette(&self.source.inner.workbook_stream)?
@@ -3069,7 +3132,13 @@ impl Edit {
         self.require_effective_style(source)?;
         let payload = self
             .effective_xf_payload(source)
-            .ok_or_else(|| Error::UnsafeEdit("source XF resource is absent".into()))?
+            .ok_or_else(|| {
+                Error::refused(
+                    RefusalKind::NotFound,
+                    "edit cells",
+                    "source XF resource is absent",
+                )
+            })?
             .to_vec();
         self.author_style(&payload)
     }
@@ -3105,7 +3174,13 @@ impl Edit {
             .checked_add(pending)
             .and_then(|value| u16::try_from(value).ok())
             .map(StyleIndex)
-            .ok_or_else(|| Error::UnsafeEdit("new XF index exceeds u16".into()))?;
+            .ok_or_else(|| {
+                Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit cells",
+                    "new XF index exceeds u16",
+                )
+            })?;
         self.stage_resource(ResourceChange::ExtendedFormat {
             index,
             payload: retained,
@@ -3226,7 +3301,7 @@ impl Edit {
     fn require_effective_style(&self, style: StyleIndex) -> Result<()> {
         self.effective_xf_payload(style)
             .map(|_| ())
-            .ok_or_else(|| Error::UnsafeEdit(format!("XF index {} is not staged", style.get())))
+            .ok_or(Error::Internal("XF index is not staged"))
     }
 
     fn effective_xf_count(&self) -> usize {
@@ -3281,8 +3356,10 @@ impl Edit {
         match &change {
             ResourceChange::SharedString { text, insert } => {
                 if self.has_shared_string(text) == *insert {
-                    return Err(Error::UnsafeEdit(
-                        "shared-string resource outcome is already present".into(),
+                    return Err(Error::refused(
+                        RefusalKind::InvalidValue,
+                        "edit cells",
+                        "shared-string resource outcome is already present",
                     ));
                 }
                 if *insert {
@@ -3300,14 +3377,18 @@ impl Edit {
             } => {
                 let present = self.has_rich_shared_string(text, formatting_runs);
                 if present == *insert {
-                    return Err(Error::UnsafeEdit(
-                        "rich shared-string resource outcome is already present".into(),
+                    return Err(Error::refused(
+                        RefusalKind::InvalidValue,
+                        "edit cells",
+                        "rich shared-string resource outcome is already present",
                     ));
                 }
                 if *insert {
                     if self.has_shared_string(text) {
-                        return Err(Error::UnsafeEdit(
-                            "rich SST text is already present in the effective SST".into(),
+                        return Err(Error::refused(
+                            RefusalKind::InvalidValue,
+                            "edit cells",
+                            "rich SST text is already present in the effective SST",
                         ));
                     }
                     validate_rich_text(self, text, formatting_runs)?;
@@ -3326,21 +3407,27 @@ impl Edit {
                 let count = self.effective_xf_count();
                 if *insert {
                     if usize::from(index.get()) != count {
-                        return Err(Error::UnsafeEdit(
-                            "new XF index is not the next effective resource".into(),
+                        return Err(Error::refused(
+                            RefusalKind::UnsupportedOperation,
+                            "edit cells",
+                            "new XF index is not the next effective resource",
                         ));
                     }
                     validate_xf_payload(payload)?;
                     if !self.has_xf_dependency(payload) {
-                        return Err(Error::UnsafeEdit(
-                            "new XF resource dependencies are not effective".into(),
+                        return Err(Error::refused(
+                            RefusalKind::UnsupportedOperation,
+                            "edit cells",
+                            "new XF resource dependencies are not effective",
                         ));
                     }
                 } else if usize::from(index.get()).checked_add(1) != Some(count)
                     || self.effective_xf_payload(*index) != Some(payload.as_slice())
                 {
-                    return Err(Error::UnsafeEdit(
-                        "XF removal is not the exact effective tail resource".into(),
+                    return Err(Error::refused(
+                        RefusalKind::UnsupportedOperation,
+                        "edit cells",
+                        "XF removal is not the exact effective tail resource",
                     ));
                 }
             },
@@ -3359,8 +3446,10 @@ impl Edit {
                 if self.structural_index.axis(*sheet).is_some()
                     || (self.structural_index.cell(*sheet, *reference).is_some() && !replaced)
                 {
-                    return Err(Error::UnsafeEdit(
-                        "authored Formula cannot overlap another structural worksheet edit".into(),
+                    return Err(Error::refused(
+                        RefusalKind::UnsupportedOperation,
+                        "edit cells",
+                        "authored Formula cannot overlap another structural worksheet edit",
                     ));
                 }
                 if tokens.is_empty() || tokens.len() > MAX_FORMULA_TOKEN_BYTES {
@@ -3373,24 +3462,38 @@ impl Edit {
                     .iter()
                     .any(|resource| formula_resource_cell(resource) == Some((*sheet, *reference)))
                 {
-                    return Err(Error::UnsafeEdit(
-                        "authored Formula target already has a staged owner".into(),
+                    return Err(Error::refused(
+                        RefusalKind::UnsupportedTarget,
+                        "edit cells",
+                        "authored Formula target already has a staged owner",
                     ));
                 }
-                let sheet_data = self.source.inner.sheets.get(*sheet).ok_or_else(|| {
-                    Error::UnsafeEdit("authored Formula sheet dependency is stale".into())
-                })?;
+                let sheet_data =
+                    self.source
+                        .inner
+                        .sheets
+                        .get(*sheet)
+                        .ok_or(Error::PatchConflict {
+                            operation: "edit cells",
+                            reason: "authored Formula sheet dependency is stale",
+                        })?;
                 let current = sheet_data
                     .unique_entry_index(*reference)?
                     .map(|index| &sheet_data.entries[index]);
                 if *insert && current.is_some() && !replaced {
-                    return Err(Error::UnsafeEdit(
-                        "authored Formula insertion target is occupied".into(),
+                    return Err(Error::refused(
+                        RefusalKind::UnsupportedTarget,
+                        "edit cells",
+                        "authored Formula insertion target is occupied",
                     ));
                 }
                 if !*insert {
                     let entry = current.ok_or_else(|| {
-                        Error::UnsafeEdit("authored Formula inverse target is absent".into())
+                        Error::refused(
+                            RefusalKind::NotFound,
+                            "edit cells",
+                            "authored Formula inverse target is absent",
+                        )
                     })?;
                     if !authored_formula_record_matches(
                         &self.source,
@@ -3399,9 +3502,10 @@ impl Edit {
                         *style,
                         tokens,
                     )? {
-                        return Err(Error::UnsafeEdit(
-                            "authored Formula inverse record dependency is stale".into(),
-                        ));
+                        return Err(Error::PatchConflict {
+                            operation: "edit cells",
+                            reason: "authored Formula inverse record dependency is stale",
+                        });
                     }
                 }
             },
@@ -3479,9 +3583,11 @@ impl Edit {
             .enumerate()
             .any(|(index, item)| index != sheet && caseless_eq(&item.name, name))
         {
-            return Err(Error::UnsafeEdit(format!(
-                "worksheet name {name:?} would be ambiguous"
-            )));
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit cells",
+                "worksheet name would be ambiguous",
+            ));
         }
         let before = self.source.inner.sheets[sheet].name.clone();
         if before == name {
@@ -3598,9 +3704,10 @@ impl Edit {
     fn sheet_stream(&self, sheet: usize) -> Result<&[u8]> {
         let workbook_index = self.source.inner.sheets[sheet].workbook_index;
         let catalog = tabs::catalog(&self.source.inner.workbook_stream)?;
-        let tab = catalog
-            .get(workbook_index)
-            .ok_or_else(|| Error::UnsafeEdit("worksheet tab position is stale".into()))?;
+        let tab = catalog.get(workbook_index).ok_or(Error::PatchConflict {
+            operation: "edit cells",
+            reason: "worksheet tab position is stale",
+        })?;
         self.source
             .inner
             .workbook_stream
@@ -3631,8 +3738,10 @@ impl Edit {
         self.require_no_tab_change()?;
         let sheet = self.require_sheet(selector, context)?;
         if self.structural_index.axis(sheet).is_some() {
-            return Err(Error::UnsafeEdit(
-                "a row or column layout change cannot follow an axis shift of its worksheet".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "a row or column layout change cannot follow an axis shift of its worksheet",
             ));
         }
         Ok(sheet)
@@ -3757,8 +3866,10 @@ impl Edit {
         self.require_tab_edit(false)?;
         let catalog = tabs::catalog(&self.source.inner.workbook_stream)?;
         if order.len() != catalog.len() {
-            return Err(Error::UnsafeEdit(
-                "a tab reorder must name every catalog tab exactly once".into(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit cells",
+                "a tab reorder must name every catalog tab exactly once",
             ));
         }
         let mut positions = Vec::new();
@@ -3806,13 +3917,17 @@ impl Edit {
             .iter()
             .any(|tab| crate::sheet_name::equivalent(&tab.name, name))
         {
-            return Err(Error::UnsafeEdit(
-                "the inserted worksheet name would be ambiguous".into(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit cells",
+                "the inserted worksheet name would be ambiguous",
             ));
         }
         if position.get() > catalog.len() {
-            return Err(Error::UnsafeEdit(
-                "worksheet insertion position is outside the tab catalog".into(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit cells",
+                "worksheet insertion position is outside the tab catalog",
             ));
         }
         let template = tabs::empty_worksheet_template()?;
@@ -3866,8 +3981,10 @@ impl Edit {
 
     fn require_no_tab_change(&self) -> Result<()> {
         if self.tab_change.is_some() {
-            return Err(Error::UnsafeEdit(
-                "a worksheet tab-structure change must be the only operation of its edit".into(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit cells",
+                "a worksheet tab-structure change must be the only operation of its edit",
             ));
         }
         Ok(())
@@ -3880,18 +3997,24 @@ impl Edit {
             || !self.resource_changes.is_empty()
             || !self.layout_changes.is_empty()
         {
-            return Err(Error::UnsafeEdit(
-                "a worksheet tab-structure change must be the only operation of its edit".into(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit cells",
+                "a worksheet tab-structure change must be the only operation of its edit",
             ));
         }
         if self.source.inner.source_policy.protection == SourceProtectionPolicy::WorkbookOrShared {
-            return Err(Error::UnsafeEdit(
-                "protected or shared workbook structure cannot change its tabs".into(),
+            return Err(Error::refused(
+                RefusalKind::Protected,
+                "edit cells",
+                "protected or shared workbook structure cannot change its tabs",
             ));
         }
         if creates_or_destroys && !self.source.inner.source_policy.macro_free_workbook {
-            return Err(Error::UnsafeEdit(
-                "adding or removing tabs would desynchronize the workbook's macro project".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "adding or removing tabs would desynchronize the workbook's macro project",
             ));
         }
         Ok(())
@@ -3937,8 +4060,10 @@ impl Edit {
             ));
         }
         if insert && start.checked_add(count).is_none() {
-            return Err(Error::UnsafeEdit(
-                "row insertion exceeds the BIFF8 grid".into(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit cells",
+                "row insertion exceeds the BIFF8 grid",
             ));
         }
         let sheet = self.require_sheet(selector, "row operation")?;
@@ -3972,8 +4097,10 @@ impl Edit {
             ));
         }
         if insert && start.checked_add(count).is_none() {
-            return Err(Error::UnsafeEdit(
-                "column insertion exceeds the BIFF8 grid".into(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit cells",
+                "column insertion exceeds the BIFF8 grid",
             ));
         }
         let sheet = self.require_sheet(selector, "column operation")?;
@@ -4004,8 +4131,10 @@ impl Edit {
             .iter()
             .any(|layout| layout.sheet() == operation_sheet_index(&change))
         {
-            return Err(Error::UnsafeEdit(
-                "an axis shift cannot follow a row or column layout change of its worksheet".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "an axis shift cannot follow a row or column layout change of its worksheet",
             ));
         }
         let sheet = operation_sheet_index(&change);
@@ -4035,13 +4164,17 @@ impl Edit {
                     }
             })
         }) {
-            return Err(Error::UnsafeEdit(
-                "structural worksheet edit overlaps an authored Formula".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "structural worksheet edit overlaps an authored Formula",
             ));
         }
         if self.structural_index.overlaps(&change) {
-            return Err(Error::UnsafeEdit(
-                "overlapping structural operations must be prepared and joined separately".into(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit cells",
+                "overlapping structural operations must be prepared and joined separately",
             ));
         }
         let fixed_overlap = match &change {
@@ -4054,8 +4187,10 @@ impl Edit {
             StructuralChange::RenameSheet { .. } => false,
         };
         if fixed_overlap {
-            return Err(Error::UnsafeEdit(
-                "fixed-width and structural operations overlap in one worksheet".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "fixed-width and structural operations overlap in one worksheet",
             ));
         }
         let observed = self
@@ -4098,8 +4233,10 @@ impl Edit {
             before: None,
             after: None,
         }) {
-            return Err(Error::UnsafeEdit(
-                "fixed-width and structural operations overlap in one worksheet".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "fixed-width and structural operations overlap in one worksheet",
             ));
         }
         if let Some(change_index) = self.fixed_index.first(sheet_index, reference) {
@@ -4427,7 +4564,11 @@ fn resolve_tab(catalog: &[tabs::Tab], selector: Selector<'_>) -> Result<usize> {
                 .map(|(index, _)| index)
                 .ok_or_else(|| Error::WorksheetNotFound("tab catalog name".into()))?;
             if matches.next().is_some() {
-                return Err(Error::UnsafeEdit("tab catalog name is ambiguous".into()));
+                return Err(Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit cells",
+                    "tab catalog name is ambiguous",
+                ));
             }
             Ok(found)
         },
@@ -4460,8 +4601,8 @@ fn commit_tab_change(source: Snapshot, change: tabs::TabChange) -> Result<Commit
             .zip(&target_names)
             .any(|(tab, name)| tab.name != *name)
     {
-        return Err(Error::UnsafeEdit(
-            "worksheet tab structure failed catalog readback".into(),
+        return Err(Error::Internal(
+            "worksheet tab structure failed catalog readback",
         ));
     }
     let patch = Patch::new(
@@ -4516,8 +4657,10 @@ fn scalar_default_style(snapshot: &Snapshot) -> Result<StyleIndex> {
 
 fn push_bounded<T>(items: &mut Vec<T>, item: T, limit: usize, context: &'static str) -> Result<()> {
     if items.len() >= limit {
-        return Err(Error::UnsafeEdit(
-            "cross-workbook scalar transfer inventory exceeds its checked bound".into(),
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit cells",
+            "cross-workbook scalar transfer inventory exceeds its checked bound",
         ));
     }
     items
@@ -4538,8 +4681,10 @@ fn inverse_target_reference(
     target: Reference,
 ) -> Result<Reference> {
     if target.row() < anchor.row() || target.column() < anchor.column() {
-        return Err(Error::UnsafeEdit(
-            "target cell precedes the scalar transfer anchor".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "target cell precedes the scalar transfer anchor",
         ));
     }
     let source_row = u32::from(source.start().row())
@@ -4550,8 +4695,10 @@ fn inverse_target_reference(
         .ok_or_else(|| Error::InvalidCellReference("source column overflows BIFF8".into()))?;
     let reference = Reference::new(source_row, source_column)?;
     if !source.contains(reference) {
-        return Err(Error::UnsafeEdit(
-            "target cell lies outside the scalar transfer source range".into(),
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit cells",
+            "target cell lies outside the scalar transfer source range",
         ));
     }
     Ok(reference)
@@ -4571,8 +4718,10 @@ fn ensure_transfer_has_no_staged_target_overlap(
             })
         })
     {
-        return Err(Error::UnsafeEdit(
-            "cross-workbook scalar transfer overlaps a staged target operation".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "cross-workbook scalar transfer overlaps a staged target operation",
         ));
     }
     Ok(())
@@ -4598,28 +4747,38 @@ fn ensure_scalar_transfer_container(snapshot: &Snapshot, sheet: usize) -> Result
             kind if transfer_unsafe_record(kind)
                 || transfer_protected_record(kind, record.payload()) =>
             {
-                return Err(Error::UnsafeEdit(format!(
-                    "cross-workbook scalar transfer refuses protected or dependency BIFF record 0x{kind:04X}"
-                )));
+                return Err(Error::refused(
+                    RefusalKind::Protected,
+                    "edit cells",
+                    "cross-workbook scalar transfer refuses protected or dependency BIFF record",
+                ));
             },
             kind if !transfer_known_global_record(kind) => {
-                return Err(Error::UnsafeEdit(format!(
-                    "cross-workbook scalar transfer refuses unknown global BIFF record 0x{kind:04X}"
-                )));
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedContent,
+                    "edit cells",
+                    "cross-workbook scalar transfer refuses unknown global BIFF record",
+                ));
             },
             _ => {},
         }
     }
     let position = bound_sheet_position.ok_or_else(|| {
-        Error::UnsafeEdit("selected worksheet has no unambiguous BoundSheet owner".into())
+        Error::refused(
+            RefusalKind::UnsupportedTarget,
+            "edit cells",
+            "selected worksheet has no unambiguous BoundSheet owner",
+        )
     })?;
     let start = usize::try_from(position)
         .map_err(|_error| Error::InvalidData("BoundSheet position does not fit usize".into()))?;
-    let worksheet = snapshot
-        .inner
-        .workbook_stream
-        .get(start..)
-        .ok_or_else(|| Error::UnsafeEdit("BoundSheet owner lies outside Workbook".into()))?;
+    let worksheet = snapshot.inner.workbook_stream.get(start..).ok_or_else(|| {
+        Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "BoundSheet owner lies outside Workbook",
+        )
+    })?;
     let mut worksheet_records = Records::new(worksheet);
     let first = worksheet_records
         .next()
@@ -4630,18 +4789,22 @@ fn ensure_scalar_transfer_container(snapshot: &Snapshot, sheet: usize) -> Result
         let record = record_result?;
         let kind = record.kind().get();
         if transfer_unsafe_record(kind) || transfer_protected_record(kind, record.payload()) {
-            return Err(Error::UnsafeEdit(format!(
-                "cross-workbook scalar transfer refuses protected, dependency, drawing, or unsupported BIFF record 0x{kind:04X}"
-            )));
+            return Err(Error::refused(
+                RefusalKind::Protected,
+                "edit cells",
+                "cross-workbook scalar transfer refuses protected, dependency, drawing, or unsupported BIFF record",
+            ));
         }
         if kind == EOF {
             found_eof = true;
             break;
         }
         if !transfer_known_worksheet_record(kind) {
-            return Err(Error::UnsafeEdit(format!(
-                "cross-workbook scalar transfer refuses unknown worksheet BIFF record 0x{kind:04X}"
-            )));
+            return Err(Error::refused(
+                RefusalKind::NotFound,
+                "edit cells",
+                "cross-workbook scalar transfer refuses unknown worksheet BIFF record",
+            ));
         }
     }
     if !found_eof {
@@ -4886,16 +5049,18 @@ impl Commit {
     /// without changing the history.
     pub fn record_in(self, history: &mut History) -> Result<Vec<Snapshot>> {
         if history.current().bytes() != self.patch.before() {
-            return Err(Error::UnsafeEdit(
-                "XLS cell history current snapshot does not match commit base".into(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit cells",
+                reason: "XLS cell history current snapshot does not match commit base",
+            });
         }
         if history.current().inner.limits != self.snapshot.inner.limits
             || history.current().inner.cfb_limits != self.snapshot.inner.cfb_limits
         {
-            return Err(Error::UnsafeEdit(
-                "XLS cell history source profiles do not match commit profiles".into(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit cells",
+                reason: "XLS cell history source profiles do not match commit profiles",
+            });
         }
         let weight = u64::try_from(self.patch.before.len())
             .ok()
@@ -4905,9 +5070,13 @@ impl Commit {
                     .and_then(|after| before.checked_add(after))
             })
             .ok_or_else(|| Error::InvalidData("XLS history weight overflow".into()))?;
-        history
-            .record(self.snapshot, weight)
-            .map_err(|error| Error::UnsafeEdit(error.to_string()))
+        history.record(self.snapshot, weight).map_err(|_error| {
+            Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "the cell edit history cannot record this commit",
+            )
+        })
     }
 
     /// Returns the reopened target snapshot.
@@ -5707,11 +5876,12 @@ impl TransferPlan {
     ///
     /// Returns the first retained refusal or a typed commit/reopen error.
     pub fn execute(&self, target: &Snapshot) -> Result<Commit> {
-        if let Some(refusal) = self.refusals.first() {
-            return Err(Error::UnsafeEdit(format!(
-                "semantic transfer is not executable at {}: {}",
-                refusal.target, refusal.reason
-            )));
+        if !self.refusals.is_empty() {
+            return Err(Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit cells",
+                "a target of the semantic transfer is not executable",
+            ));
         }
         self.patch.apply(target)
     }
@@ -5744,7 +5914,11 @@ fn append_structural_semantic(
                     .unique_entry_index(*reference)?
                     .map(|index| &sheet_data.entries[index])
                     .ok_or_else(|| {
-                        Error::UnsafeEdit("Formula dependency owner is absent".into())
+                        Error::refused(
+                            RefusalKind::NotFound,
+                            "edit cells",
+                            "Formula dependency owner is absent",
+                        )
                     })?;
                 append_formula_dependency(snapshot, entry, &mut preconditions)?;
             }
@@ -5772,8 +5946,10 @@ fn append_structural_semantic(
         } => {
             let end = start.saturating_add(*count);
             if !insert && snapshot.inner.sheets[*sheet].any_rows(*start, end.saturating_sub(1)) {
-                return Err(Error::UnsafeEdit(
-                    "durable row deletion is refused when the deleted span contains cells".into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "edit cells",
+                    "durable row deletion is refused when the deleted span contains cells",
                 ));
             }
             (
@@ -5800,9 +5976,10 @@ fn append_structural_semantic(
         } => {
             let end = start.saturating_add(*count);
             if !insert && snapshot.inner.sheets[*sheet].any_columns(*start, end.saturating_sub(1)) {
-                return Err(Error::UnsafeEdit(
-                    "durable column deletion is refused when the deleted span contains cells"
-                        .into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "edit cells",
+                    "durable column deletion is refused when the deleted span contains cells",
                 ));
             }
             (
@@ -5854,7 +6031,13 @@ fn append_structural_semantic(
             let entry = sheet_data
                 .unique_entry_index(*reference)?
                 .map(|index| &sheet_data.entries[index])
-                .ok_or_else(|| Error::UnsafeEdit("Formula dependency owner is absent".into()))?;
+                .ok_or_else(|| {
+                    Error::refused(
+                        RefusalKind::NotFound,
+                        "edit cells",
+                        "Formula dependency owner is absent",
+                    )
+                })?;
             append_formula_dependency(snapshot, entry, &mut inverse_preconditions)?;
         }
         if let StructuralChange::Cell {
@@ -5943,9 +6126,14 @@ fn append_resource_semantic(
             tokens,
             insert,
         } => {
-            let sheet_data = snapshot.inner.sheets.get(*sheet).ok_or_else(|| {
-                Error::UnsafeEdit("Formula semantic sheet dependency is stale".into())
-            })?;
+            let sheet_data = snapshot
+                .inner
+                .sheets
+                .get(*sheet)
+                .ok_or(Error::PatchConflict {
+                    operation: "edit cells",
+                    reason: "Formula semantic sheet dependency is stale",
+                })?;
             (
                 format!(
                     "sheet/{}/formula/{}/{}",
@@ -5980,7 +6168,10 @@ fn append_resource_semantic(
             .inner
             .sheets
             .get(*sheet)
-            .ok_or_else(|| Error::UnsafeEdit("Formula semantic sheet dependency is stale".into()))?
+            .ok_or(Error::PatchConflict {
+                operation: "edit cells",
+                reason: "Formula semantic sheet dependency is stale",
+            })?
             .name
             .clone();
         preconditions.insert(
@@ -6006,7 +6197,10 @@ fn append_resource_semantic(
             .inner
             .sheets
             .get(*sheet)
-            .ok_or_else(|| Error::UnsafeEdit("Formula semantic sheet dependency is stale".into()))?
+            .ok_or(Error::PatchConflict {
+                operation: "edit cells",
+                reason: "Formula semantic sheet dependency is stale",
+            })?
             .name
             .clone();
         inverse_preconditions.insert(
@@ -6142,9 +6336,10 @@ fn authored_formula_record_matches(
     let (source_tokens, source_extra) = crate::formula_metadata::formula_payload_parts(payload)?;
     if !source_extra.is_empty() {
         crate::formula_metadata::validate_formula_extra(source_tokens, source_extra)?;
-        return Err(Error::UnsafeEdit(
-            "Formula resource matching refuses a source Formula with RgbExtra ancillary bytes"
-                .into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "Formula resource matching refuses a source Formula with RgbExtra ancillary bytes",
         ));
     }
     Ok(snapshot
@@ -6168,9 +6363,10 @@ fn verify_formula_dependency(
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| Error::InvalidData("Formula patch has no token dependency".into()))?;
     if formula_dependency_fingerprint(snapshot, entry)? != expected {
-        return Err(Error::UnsafeEdit(
-            "Formula token dependency is stale".into(),
-        ));
+        return Err(Error::PatchConflict {
+            operation: "edit cells",
+            reason: "Formula token dependency is stale",
+        });
     }
     Ok(())
 }
@@ -6196,7 +6392,13 @@ fn effective_xf_fingerprint(
             | ResourceChange::ExtendedFormat { .. }
             | ResourceChange::FormulaCell { .. } => None,
         })
-        .ok_or_else(|| Error::UnsafeEdit("structural cell XF dependency is absent".into()))
+        .ok_or_else(|| {
+            Error::refused(
+                RefusalKind::NotFound,
+                "edit cells",
+                "structural cell XF dependency is absent",
+            )
+        })
 }
 
 fn preflight_semantic(source: &Snapshot, patch: &SemanticPatch) -> Result<()> {
@@ -6437,9 +6639,10 @@ fn apply_tab_semantic(
             .zip(&catalog)
             .any(|(name, tab)| name.as_str() != Some(tab.name.as_str()))
     {
-        return Err(Error::UnsafeEdit(
-            "tab patch precondition does not match the workbook tab catalog".into(),
-        ));
+        return Err(Error::PatchConflict {
+            operation: "edit cells",
+            reason: "tab patch precondition does not match the workbook tab catalog",
+        });
     }
     let name = || {
         operation
@@ -6478,26 +6681,29 @@ fn apply_tab_semantic(
                 .get(position)
                 .ok_or_else(|| Error::WorksheetNotFound("tab patch position".into()))?;
             if tab.name != name()? {
-                return Err(Error::UnsafeEdit(
-                    "tab removal precondition names another tab".into(),
-                ));
+                return Err(Error::PatchConflict {
+                    operation: "edit cells",
+                    reason: "tab removal precondition names another tab",
+                });
             }
             if let Some(fingerprint) = operation.preconditions.get("fingerprint") {
                 if fingerprint.as_str()
                     != Some(tabs::fingerprint(&source.inner.workbook_stream, tab).as_str())
                 {
-                    return Err(Error::UnsafeEdit(
-                        "tab removal precondition does not match the tab content".into(),
-                    ));
+                    return Err(Error::PatchConflict {
+                        operation: "edit cells",
+                        reason: "tab removal precondition does not match the tab content",
+                    });
                 }
             } else if operation.preconditions.get("empty") == Some(&serde_json::Value::Bool(true)) {
                 let empty = source
                     .resolve_sheet(Selector::Position(Position::new(position)))?
                     .is_some_and(|sheet| source.inner.sheets[sheet].entries.is_empty());
                 if !empty {
-                    return Err(Error::UnsafeEdit(
-                        "tab removal precondition requires an empty worksheet".into(),
-                    ));
+                    return Err(Error::PatchConflict {
+                        operation: "edit cells",
+                        reason: "tab removal precondition requires an empty worksheet",
+                    });
                 }
             } else {
                 return Err(Error::InvalidData(
@@ -6645,9 +6851,10 @@ fn apply_layout_semantic(
     match (operation.op.as_str(), axis) {
         ("row.layout", Some("row")) => {
             if layout::row_state(stream, index)? != parse_row_state(expected)? {
-                return Err(Error::UnsafeEdit(
-                    "row layout patch precondition is stale".into(),
-                ));
+                return Err(Error::PatchConflict {
+                    operation: "edit cells",
+                    reason: "row layout patch precondition is stale",
+                });
             }
             let after = parse_row_state(&operation.value)?;
             transaction.stage_row_layout(selector, index, |state| *state = after)
@@ -6656,9 +6863,10 @@ fn apply_layout_semantic(
             let column = u8::try_from(index)
                 .map_err(|_error| Error::InvalidData("layout patch column exceeds u8".into()))?;
             if layout::column_state(stream, column)? != parse_column_state(expected)? {
-                return Err(Error::UnsafeEdit(
-                    "column layout patch precondition is stale".into(),
-                ));
+                return Err(Error::PatchConflict {
+                    operation: "edit cells",
+                    reason: "column layout patch precondition is stale",
+                });
             }
             let after = parse_column_state(&operation.value)?;
             transaction.stage_column_layout(selector, column, |state| *state = after)
@@ -6680,11 +6888,11 @@ fn verify_layout_readback(snapshot: &Snapshot, changes: &[&layout::LayoutChange]
             .inner
             .sheets
             .get(change.sheet())
-            .ok_or_else(|| Error::UnsafeEdit("layout worksheet disappeared".into()))?
+            .ok_or(Error::Internal("layout worksheet disappeared"))?
             .workbook_index;
         let tab = catalog
             .get(workbook_index)
-            .ok_or_else(|| Error::UnsafeEdit("layout worksheet tab disappeared".into()))?;
+            .ok_or(Error::Internal("layout worksheet tab disappeared"))?;
         let stream = &snapshot.inner.workbook_stream[tab.start..tab.end];
         let matches = match change {
             layout::LayoutChange::Row { row, after, .. } => {
@@ -6700,8 +6908,8 @@ fn verify_layout_readback(snapshot: &Snapshot, changes: &[&layout::LayoutChange]
             },
         };
         if !matches {
-            return Err(Error::UnsafeEdit(
-                "row or column layout failed semantic readback".into(),
+            return Err(Error::Internal(
+                "row or column layout failed semantic readback",
             ));
         }
     }
@@ -6724,9 +6932,10 @@ fn apply_sst_semantic(transaction: &mut Edit, operation: &PatchOperation) -> Res
         .and_then(serde_json::Value::as_bool)
         .ok_or_else(|| Error::InvalidData("SST resource has no presence precondition".into()))?;
     if transaction.has_shared_string(text) != expected {
-        return Err(Error::UnsafeEdit(
-            "SST resource precondition is stale".into(),
-        ));
+        return Err(Error::PatchConflict {
+            operation: "edit cells",
+            reason: "SST resource precondition is stale",
+        });
     }
     transaction.stage_resource(ResourceChange::SharedString {
         text: text.to_string(),
@@ -6787,9 +6996,10 @@ fn apply_rich_sst_semantic(transaction: &mut Edit, operation: &PatchOperation) -
             Error::InvalidData("rich SST resource has no presence precondition".into())
         })?;
     if transaction.has_rich_shared_string(text, &formatting_runs) != expected {
-        return Err(Error::UnsafeEdit(
-            "rich SST resource precondition is stale".into(),
-        ));
+        return Err(Error::PatchConflict {
+            operation: "edit cells",
+            reason: "rich SST resource precondition is stale",
+        });
     }
     transaction.stage_resource(ResourceChange::RichSharedString {
         text: text.to_string(),
@@ -6826,9 +7036,10 @@ fn apply_xf_semantic(transaction: &mut Edit, operation: &PatchOperation) -> Resu
         .effective_xf_payload(index)
         .is_some_and(|candidate| candidate == payload.as_slice());
     if present != expected {
-        return Err(Error::UnsafeEdit(
-            "XF resource precondition is stale".into(),
-        ));
+        return Err(Error::PatchConflict {
+            operation: "edit cells",
+            reason: "XF resource precondition is stale",
+        });
     }
     transaction.stage_resource(ResourceChange::ExtendedFormat {
         index,
@@ -6890,11 +7101,18 @@ fn apply_formula_semantic(
     let actual_xf = transaction
         .effective_xf_payload(style)
         .map(bytes_hex)
-        .ok_or_else(|| Error::UnsafeEdit("Formula XF resource is absent".into()))?;
+        .ok_or_else(|| {
+            Error::refused(
+                RefusalKind::NotFound,
+                "edit cells",
+                "Formula XF resource is absent",
+            )
+        })?;
     if actual_xf != expected_xf {
-        return Err(Error::UnsafeEdit(
-            "Formula XF resource dependency is stale".into(),
-        ));
+        return Err(Error::PatchConflict {
+            operation: "edit cells",
+            reason: "Formula XF resource dependency is stale",
+        });
     }
     let expected = operation
         .preconditions
@@ -6904,18 +7122,19 @@ fn apply_formula_semantic(
             Error::InvalidData("Formula resource has no presence precondition".into())
         })?;
     let reference = Reference::new(u32::from(row), u32::from(column))?;
-    let sheet_data =
-        source.inner.sheets.get(sheet).ok_or_else(|| {
-            Error::UnsafeEdit("Formula semantic sheet dependency is stale".into())
-        })?;
+    let sheet_data = source.inner.sheets.get(sheet).ok_or(Error::PatchConflict {
+        operation: "edit cells",
+        reason: "Formula semantic sheet dependency is stale",
+    })?;
     let current = sheet_data
         .unique_entry_index(reference)?
         .map(|index| &sheet_data.entries[index]);
     let replaced = transaction.staged_removal(sheet, reference);
     if !expected && current.is_some() && !replaced {
-        return Err(Error::UnsafeEdit(
-            "Formula insertion precondition target is occupied".into(),
-        ));
+        return Err(Error::PatchConflict {
+            operation: "edit cells",
+            reason: "Formula insertion precondition target is occupied",
+        });
     }
     let present = match current {
         Some(_) if replaced => false,
@@ -6923,9 +7142,10 @@ fn apply_formula_semantic(
         None => false,
     };
     if present != expected {
-        return Err(Error::UnsafeEdit(
-            "Formula resource precondition is stale".into(),
-        ));
+        return Err(Error::PatchConflict {
+            operation: "edit cells",
+            reason: "Formula resource precondition is stale",
+        });
     }
     transaction.stage_resource(ResourceChange::FormulaCell {
         sheet,
@@ -6969,9 +7189,13 @@ fn apply_fixed_semantic(
     let (sheet_position, reference) = parse_semantic_target(&operation.target)?;
     let sheet_index = verify_semantic_sheet(source, sheet_names, sheet_position, operation)?;
     let sheet = &source.inner.sheets[sheet_index];
-    let entry_index = sheet
-        .unique_entry_index(reference)?
-        .ok_or_else(|| Error::UnsafeEdit("semantic patch cell is absent".into()))?;
+    let entry_index = sheet.unique_entry_index(reference)?.ok_or_else(|| {
+        Error::refused(
+            RefusalKind::NotFound,
+            "edit cells",
+            "semantic patch cell is absent",
+        )
+    })?;
     let cell = &sheet.entries[entry_index].cell;
     let expected = operation
         .preconditions
@@ -6979,9 +7203,10 @@ fn apply_fixed_semantic(
         .ok_or_else(|| Error::InvalidData("cell patch has no state precondition".into()))?;
     let (expected_storage, expected_value) = parse_cell_state(expected)?;
     if cell.storage != expected_storage || !values_equal(&cell.value, &expected_value) {
-        return Err(Error::UnsafeEdit(
-            "semantic patch cell precondition is stale".into(),
-        ));
+        return Err(Error::PatchConflict {
+            operation: "edit cells",
+            reason: "semantic patch cell precondition is stale",
+        });
     }
     verify_formula_dependency(source, &sheet.entries[entry_index], operation)?;
     let (storage, value) = parse_cell_state(&operation.value)?;
@@ -7046,9 +7271,10 @@ fn apply_structural_cell_semantic(
         .ok_or_else(|| Error::InvalidData("structural cell patch has no state".into()))?;
     let expected = parse_optional_cell_state(expected)?;
     if !optional_cell_states_equal(current.as_ref(), expected.as_ref()) {
-        return Err(Error::UnsafeEdit(
-            "structural cell patch precondition is stale".into(),
-        ));
+        return Err(Error::PatchConflict {
+            operation: "edit cells",
+            reason: "structural cell patch precondition is stale",
+        });
     }
     if let Some(index) = sheet.unique_entry_index(reference)?.filter(|_| !vacated) {
         let entry = &sheet.entries[index];
@@ -7066,11 +7292,18 @@ fn apply_structural_cell_semantic(
         let actual_xf = transaction
             .effective_xf_payload(*style)
             .map(bytes_hex)
-            .ok_or_else(|| Error::UnsafeEdit("structural cell XF resource is absent".into()))?;
+            .ok_or_else(|| {
+                Error::refused(
+                    RefusalKind::NotFound,
+                    "edit cells",
+                    "structural cell XF resource is absent",
+                )
+            })?;
         if actual_xf != expected_xf {
-            return Err(Error::UnsafeEdit(
-                "structural cell XF resource dependency is stale".into(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit cells",
+                reason: "structural cell XF resource dependency is stale",
+            });
         }
     }
     match (current, after) {
@@ -7190,16 +7423,23 @@ fn verify_semantic_sheet(
 ) -> Result<usize> {
     let sheet_index = source
         .resolve_sheet(Selector::Position(Position::new(sheet_position)))?
-        .ok_or_else(|| Error::UnsafeEdit("semantic patch worksheet is absent".into()))?;
+        .ok_or_else(|| {
+            Error::refused(
+                RefusalKind::NotFound,
+                "edit cells",
+                "semantic patch worksheet is absent",
+            )
+        })?;
     let expected_name = operation
         .preconditions
         .get("sheet_name")
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| Error::InvalidData("patch has no sheet-name precondition".into()))?;
     if sheet_names.get(sheet_index).map(String::as_str) != Some(expected_name) {
-        return Err(Error::UnsafeEdit(
-            "semantic patch worksheet identity is stale".into(),
-        ));
+        return Err(Error::PatchConflict {
+            operation: "edit cells",
+            reason: "semantic patch worksheet identity is stale",
+        });
     }
     Ok(sheet_index)
 }
@@ -7375,13 +7615,14 @@ impl Patch {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::UnsafeEdit`] for a stale source, or a typed package
+    /// Returns [`Error::PatchConflict`] for a stale source, or a typed package
     /// validation error if the retained target can no longer be reopened.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.bytes() != self.before() {
-            return Err(Error::UnsafeEdit(
-                "XLS cell-value patch source does not match its base snapshot".into(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit cells",
+                reason: "XLS cell-value patch source does not match its base snapshot",
+            });
         }
         if self.is_noop() {
             return Ok(source.clone());
@@ -7512,8 +7753,8 @@ fn commit_source_backed_numeric_plan(transaction: Edit) -> Result<SourceBackedPl
         .source_version()
         .map_err(source_backed_overlay_error)?;
     if source_version != source.inner.source_version {
-        return Err(Error::UnsafeEdit(
-            "source-backed numeric plan lost its source lineage".into(),
+        return Err(Error::Internal(
+            "source-backed numeric plan lost its source lineage",
         ));
     }
     require_macro_free_container(&publisher)?;
@@ -7642,8 +7883,8 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
         .source_version()
         .map_err(source_backed_overlay_error)?;
     if source_version != source.inner.source_version {
-        return Err(Error::UnsafeEdit(
-            "source-backed numeric publication lost its source lineage".into(),
+        return Err(Error::Internal(
+            "source-backed numeric publication lost its source lineage",
         ));
     }
     require_macro_free_container(&publisher)?;
@@ -7747,49 +7988,68 @@ fn fixed_numeric_splice(source: &Snapshot, change: &Change) -> Result<SameLength
         .inner
         .sheets
         .get(change.sheet)
-        .ok_or_else(|| Error::UnsafeEdit("source-backed numeric worksheet is stale".into()))?;
+        .ok_or(Error::PatchConflict {
+            operation: "edit cells",
+            reason: "source-backed numeric worksheet is stale",
+        })?;
     let entry = sheet
         .entries
         .get(change.entry)
-        .ok_or_else(|| Error::UnsafeEdit("source-backed numeric cell is stale".into()))?;
+        .ok_or(Error::PatchConflict {
+            operation: "edit cells",
+            reason: "source-backed numeric cell is stale",
+        })?;
     if entry.cell.storage != change.storage
         || !matches!(
             change.storage,
             Storage::Number | Storage::Rk | Storage::MulRk
         )
     {
-        return Err(Error::UnsafeEdit(
-            "source-backed numeric edit changed its BIFF storage family".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "source-backed numeric edit changed its BIFF storage family",
         ));
     }
     if entry.cell.reference != change.reference {
-        return Err(Error::UnsafeEdit(
-            "source-backed numeric edit changed its BIFF cell reference".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "source-backed numeric edit changed its BIFF cell reference",
         ));
     }
     let Value::Number(value) = change.value else {
-        return Err(Error::UnsafeEdit(
-            "source-backed numeric edit has a nonnumeric replacement".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "source-backed numeric edit has a nonnumeric replacement",
         ));
     };
     let width = match change.storage {
         Storage::Number => 8,
         Storage::Rk | Storage::MulRk => 4,
         Storage::BoolErr | Storage::Blank | Storage::LabelSst | Storage::Formula => {
-            return Err(Error::UnsafeEdit(
-                "source-backed numeric edit has an unsupported storage family".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "source-backed numeric edit has an unsupported storage family",
             ));
         },
     };
     let kind = binary::read_u16_le_at(&source.inner.workbook_stream, entry.kind_offset)?;
     if kind != storage_record_kind(entry.cell.storage) {
-        return Err(Error::UnsafeEdit(
-            "source-backed numeric record family is stale".into(),
-        ));
+        return Err(Error::PatchConflict {
+            operation: "edit cells",
+            reason: "source-backed numeric record family is stale",
+        });
     }
-    let start = entry
-        .value_offset
-        .ok_or_else(|| Error::UnsafeEdit("numeric cell has no fixed-width value field".into()))?;
+    let start = entry.value_offset.ok_or_else(|| {
+        Error::refused(
+            RefusalKind::UnsupportedTarget,
+            "edit cells",
+            "numeric cell has no fixed-width value field",
+        )
+    })?;
     let end = start
         .checked_add(width)
         .ok_or_else(|| Error::InvalidData("numeric splice range overflows usize".into()))?;
@@ -7799,8 +8059,10 @@ fn fixed_numeric_splice(source: &Snapshot, change: &Change) -> Result<SameLength
         .get(start..end)
         .ok_or_else(|| Error::InvalidData("numeric splice range is outside Workbook".into()))?;
     let Value::Number(source_value) = entry.cell.value else {
-        return Err(Error::UnsafeEdit(
-            "source cell does not contain a fixed-width numeric value".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "source cell does not contain a fixed-width numeric value",
         ));
     };
     let decoded_source_value = match change.storage {
@@ -7817,15 +8079,18 @@ fn fixed_numeric_splice(source: &Snapshot, change: &Change) -> Result<SameLength
             crate::utils::rk_to_f64(u32::from_le_bytes(raw))
         },
         Storage::BoolErr | Storage::Blank | Storage::LabelSst | Storage::Formula => {
-            return Err(Error::UnsafeEdit(
-                "source cell does not contain a fixed-width numeric value".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "source cell does not contain a fixed-width numeric value",
             ));
         },
     };
     if decoded_source_value.to_bits() != source_value.to_bits() {
-        return Err(Error::UnsafeEdit(
-            "source-backed numeric field failed its exact semantic precondition".into(),
-        ));
+        return Err(Error::PatchConflict {
+            operation: "edit cells",
+            reason: "source-backed numeric field failed its exact semantic precondition",
+        });
     }
     let expected = source_bytes.to_vec();
     let replacement = match change.storage {
@@ -7846,8 +8111,10 @@ fn fixed_numeric_splice(source: &Snapshot, change: &Change) -> Result<SameLength
             .to_le_bytes()
             .to_vec(),
         Storage::BoolErr | Storage::Blank | Storage::LabelSst | Storage::Formula => {
-            return Err(Error::UnsafeEdit(
-                "source-backed numeric edit has an unsupported storage family".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "source-backed numeric edit has an unsupported storage family",
             ));
         },
     };
@@ -7869,8 +8136,8 @@ fn materialize_numeric_plan(plan: &ValidatedOverlayPlan, capacity: usize) -> Res
     plan.write_to(&mut bytes)
         .map_err(source_backed_overlay_error)?;
     if bytes.len() != capacity {
-        return Err(Error::UnsafeEdit(
-            "source-backed numeric publication changed CFB artifact length".into(),
+        return Err(Error::Internal(
+            "source-backed numeric publication changed CFB artifact length",
         ));
     }
     Ok(bytes)
@@ -7891,7 +8158,11 @@ fn source_backed_overlay_error(error: OverlayError) -> Error {
         OverlayError::Ole(error) => Error::Cfb(error),
         OverlayError::Io(error) => Error::Io(error),
         OverlayError::Allocation { resource, .. } => Error::Allocation(resource),
-        other => Error::UnsafeEdit(format!("source-backed numeric overlay refused: {other}")),
+        _ => Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "source-backed numeric overlay refused",
+        ),
     }
 }
 
@@ -7934,11 +8205,15 @@ fn workbook_protection_policy<R: Read + Seek>(
 fn require_unprotected_workbook<R: Read + Seek>(workbook: &ValidationWorkbook<R>) -> Result<()> {
     match workbook_protection_policy(workbook)? {
         SourceProtectionPolicy::Unprotected => Ok(()),
-        SourceProtectionPolicy::WorkbookOrShared => Err(Error::UnsafeEdit(
-            "protected or shared workbooks are not eligible for source-backed numeric edits".into(),
+        SourceProtectionPolicy::WorkbookOrShared => Err(Error::refused(
+            RefusalKind::Protected,
+            "edit cells",
+            "protected or shared workbooks are not eligible for source-backed numeric edits",
         )),
-        SourceProtectionPolicy::Worksheet => Err(Error::UnsafeEdit(
-            "protected worksheets are not eligible for source-backed numeric edits".into(),
+        SourceProtectionPolicy::Worksheet => Err(Error::refused(
+            RefusalKind::Protected,
+            "edit cells",
+            "protected worksheets are not eligible for source-backed numeric edits",
         )),
     }
 }
@@ -7961,8 +8236,10 @@ fn require_macro_free_workbook<R: Read + Seek>(workbook: &ValidationWorkbook<R>)
     if workbook_is_macro_free(workbook) {
         Ok(())
     } else {
-        Err(Error::UnsafeEdit(
-            "macro-bearing XLS sources are not eligible for source-backed numeric edits".into(),
+        Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "macro-bearing XLS sources are not eligible for source-backed numeric edits",
         ))
     }
 }
@@ -7971,8 +8248,10 @@ fn require_macro_free_container(publisher: &SourceBackedOverlayPublisher) -> Res
     if publisher.shared().directory_entries().any(|entry| {
         entry.entry_type == STGTY_STORAGE && entry.name.eq_ignore_ascii_case("_VBA_PROJECT_CUR")
     }) {
-        return Err(Error::UnsafeEdit(
-            "macro-bearing XLS CFB storage is not eligible for source-backed numeric edits".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "macro-bearing XLS CFB storage is not eligible for source-backed numeric edits",
         ));
     }
     Ok(())
@@ -8088,8 +8367,10 @@ fn parse_workbook_stream(
         });
     }
     if xf_records.is_empty() {
-        return Err(Error::UnsafeEdit(
-            "opened-workbook transaction requires at least one XF resource".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedContent,
+            "edit cells",
+            "opened-workbook transaction requires at least one XF resource",
         ));
     }
     if let Some(cell) = sheets
@@ -8586,9 +8867,11 @@ fn target_storage(source: Storage, value: &Value, shared_strings: &[String]) -> 
             Storage::Formula
         },
         _ => {
-            return Err(Error::UnsafeEdit(format!(
-                "value {value:?} is not representable in the fixed-width {source:?} slot"
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit cells",
+                "value is not representable in the fixed-width slot",
+            ));
         },
     };
     Ok(target)
@@ -8602,8 +8885,8 @@ fn storage_for_new_value(value: &Value, shared_strings: &[String]) -> Result<Sto
         Value::Text(text) if shared_strings.iter().any(|candidate| candidate == text) => {
             Ok(Storage::LabelSst)
         },
-        Value::Text(_) => Err(Error::UnsafeEdit(
-            "new BIFF8 text is absent from the effective workbook SST".into(),
+        Value::Text(_) => Err(Error::Internal(
+            "new BIFF8 text is absent from the effective workbook SST",
         )),
         Value::Number(_) => Err(Error::UnsupportedFeature(
             "BIFF8 Number insertion requires a normal IEEE-754 value or positive zero".into(),
@@ -8629,15 +8912,24 @@ fn validate_rich_text(
     text: &str,
     formatting_runs: &[crate::records::SharedStringFormatRun],
 ) -> Result<()> {
-    let character_count = u16::try_from(text.encode_utf16().count())
-        .map_err(|_error| Error::UnsafeEdit("rich shared string exceeds u16 characters".into()))?;
+    let character_count = u16::try_from(text.encode_utf16().count()).map_err(|_error| {
+        Error::refused(
+            RefusalKind::InvalidValue,
+            "edit cells",
+            "rich shared string exceeds u16 characters",
+        )
+    })?;
     if text.is_empty() || formatting_runs.is_empty() {
         return Err(Error::InvalidData(
             "rich shared string requires text and formatting runs".into(),
         ));
     }
     u16::try_from(formatting_runs.len()).map_err(|_error| {
-        Error::UnsafeEdit("rich shared string has too many formatting runs".into())
+        Error::refused(
+            RefusalKind::InvalidValue,
+            "edit cells",
+            "rich shared string has too many formatting runs",
+        )
     })?;
     let mut previous = None;
     for run in formatting_runs {
@@ -8671,10 +8963,11 @@ fn validate_rich_text(
             )
             .any(|payload| binary::read_u16_le_at(payload, 0).ok() == Some(run.font_index));
         if !font_is_effective {
-            return Err(Error::UnsafeEdit(format!(
-                "rich shared-string font {} is not used by an effective XF",
-                run.font_index
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "rich shared-string font is not used by an effective XF",
+            ));
         }
         previous = Some(run.character_index);
     }
@@ -8804,8 +9097,10 @@ fn carry_fixed_numeric_inventory(
     changes: &[Change],
 ) -> Result<Vec<SheetData>> {
     if snapshot.inner.workbook_stream.len() != workbook.len() {
-        return Err(Error::UnsafeEdit(
-            "fixed-width numeric edit changed the Workbook stream length".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "fixed-width numeric edit changed the Workbook stream length",
         ));
     }
 
@@ -8822,10 +9117,15 @@ fn carry_fixed_numeric_inventory(
             .sheets
             .get(change.sheet)
             .and_then(|sheet| sheet.entries.get(change.entry))
-            .ok_or_else(|| Error::UnsafeEdit("fixed-width numeric dependency is stale".into()))?;
+            .ok_or(Error::PatchConflict {
+                operation: "edit cells",
+                reason: "fixed-width numeric dependency is stale",
+            })?;
         if entry.cell.storage != change.storage {
-            return Err(Error::UnsafeEdit(
-                "fixed-width numeric edit changed its BIFF record family".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedContent,
+                "edit cells",
+                "fixed-width numeric edit changed its BIFF record family",
             ));
         }
         let width = match (&change.storage, &change.value) {
@@ -8835,22 +9135,30 @@ fn carry_fixed_numeric_inventory(
             },
             (Storage::Rk | Storage::MulRk, Value::Number(value)) => {
                 let encoded = encode_rk(*value).ok_or_else(|| {
-                    Error::UnsafeEdit(
-                        "numeric replacement is not exactly representable as RK".into(),
+                    Error::refused(
+                        RefusalKind::UnsupportedTarget,
+                        "edit cells",
+                        "numeric replacement is not exactly representable as RK",
                     )
                 })?;
                 require_numeric_field(workbook, entry, &encoded.to_le_bytes())?;
                 4
             },
             _ => {
-                return Err(Error::UnsafeEdit(
-                    "inventory reuse requires unchanged Number, RK, or MulRk storage".into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "edit cells",
+                    "inventory reuse requires unchanged Number, RK, or MulRk storage",
                 ));
             },
         };
-        let start = entry
-            .value_offset
-            .ok_or_else(|| Error::UnsafeEdit("numeric cell has no value field".into()))?;
+        let start = entry.value_offset.ok_or_else(|| {
+            Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit cells",
+                "numeric cell has no value field",
+            )
+        })?;
         let end = start
             .checked_add(width)
             .ok_or_else(|| Error::InvalidData("numeric value range overflow".into()))?;
@@ -8866,20 +9174,26 @@ fn carry_fixed_numeric_inventory(
     let mut cursor = 0;
     for field in &fields {
         if field.start < cursor {
-            return Err(Error::UnsafeEdit(
-                "fixed-width numeric edit fields overlap".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "fixed-width numeric edit fields overlap",
             ));
         }
         if source.get(cursor..field.start) != workbook.get(cursor..field.start) {
-            return Err(Error::UnsafeEdit(
-                "fixed-width numeric edit changed bytes outside its value fields".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "fixed-width numeric edit changed bytes outside its value fields",
             ));
         }
         cursor = field.end;
     }
     if source.get(cursor..) != workbook.get(cursor..) {
-        return Err(Error::UnsafeEdit(
-            "fixed-width numeric edit changed bytes outside its value fields".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "fixed-width numeric edit changed bytes outside its value fields",
         ));
     }
 
@@ -8895,15 +9209,19 @@ fn carry_fixed_numeric_inventory(
 }
 
 fn require_numeric_field(workbook: &[u8], entry: &Entry, expected: &[u8]) -> Result<()> {
-    let start = entry
-        .value_offset
-        .ok_or_else(|| Error::UnsafeEdit("numeric cell has no value field".into()))?;
+    let start = entry.value_offset.ok_or_else(|| {
+        Error::refused(
+            RefusalKind::UnsupportedTarget,
+            "edit cells",
+            "numeric cell has no value field",
+        )
+    })?;
     let end = start
         .checked_add(expected.len())
         .ok_or_else(|| Error::InvalidData("numeric value range overflow".into()))?;
     if workbook.get(start..end) != Some(expected) {
-        return Err(Error::UnsafeEdit(
-            "fixed-width numeric field failed exact encoded readback".into(),
+        return Err(Error::Internal(
+            "fixed-width numeric field failed exact encoded readback",
         ));
     }
     Ok(())
@@ -8919,10 +9237,11 @@ fn require_public_worksheet_coverage<R: Read + Seek>(
             .and_then(crate::SheetMetadata::parsed_worksheet_index)
             .is_none()
         {
-            return Err(Error::UnsafeEdit(format!(
-                "worksheet at tab position {} was not published by the complete XLS reader",
-                sheet.workbook_index
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedContent,
+                "edit cells",
+                "a worksheet was not published by the complete XLS reader",
+            ));
         }
     }
     Ok(())
@@ -8941,7 +9260,10 @@ fn numeric_readback_cells(snapshot: &Snapshot, changes: &[Change]) -> Result<Kep
             .inner
             .sheets
             .get(change.sheet)
-            .ok_or_else(|| Error::UnsafeEdit("edited worksheet is stale".into()))?;
+            .ok_or(Error::PatchConflict {
+                operation: "edit cells",
+                reason: "edited worksheet is stale",
+            })?;
         cells.push((
             sheet.workbook_index,
             change.reference.row(),
@@ -8961,37 +9283,43 @@ fn verify_public_numeric_readback<R: Read + Seek>(
             continue;
         }
         let source_sheet = &snapshot.inner.sheets[change.sheet];
-        let metadata = workbook.sheet(source_sheet.workbook_index).ok_or_else(|| {
-            Error::UnsafeEdit("edited worksheet disappeared from public readback".into())
-        })?;
-        let worksheet_index = metadata.parsed_worksheet_index().ok_or_else(|| {
-            Error::UnsafeEdit("edited tab is not a public worksheet on readback".into())
-        })?;
+        let metadata = workbook
+            .sheet(source_sheet.workbook_index)
+            .ok_or(Error::Internal(
+                "edited worksheet disappeared from public readback",
+            ))?;
+        let worksheet_index = metadata.parsed_worksheet_index().ok_or(Error::Internal(
+            "edited tab is not a public worksheet on readback",
+        ))?;
         let cell = workbook
             .kept_cell(
                 worksheet_index,
                 change.reference.row(),
                 u16::from(change.reference.column()),
             )?
-            .ok_or_else(|| {
-                Error::UnsafeEdit("edited cell is absent from public readback".into())
-            })?;
+            .ok_or(Error::Internal(
+                "edited cell is absent from public readback",
+            ))?;
         let Value::Number(expected) = change.value else {
-            return Err(Error::UnsafeEdit(
-                "inventory reuse received a nonnumeric value".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "inventory reuse received a nonnumeric value",
             ));
         };
         let actual = match cell.value() {
             CellValue::Float(value) | CellValue::DateTime(value) => *value,
             _ => {
-                return Err(Error::UnsafeEdit(
-                    "edited numeric cell has a nonnumeric public value".into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "edit cells",
+                    "edited numeric cell has a nonnumeric public value",
                 ));
             },
         };
         if actual.to_bits() != expected.to_bits() {
-            return Err(Error::UnsafeEdit(
-                "edited numeric cell failed independent public readback".into(),
+            return Err(Error::Internal(
+                "edited numeric cell failed independent public readback",
             ));
         }
     }
@@ -9257,16 +9585,24 @@ fn write_cell_value(
     if change.storage == Storage::Blank {
         return Ok(());
     }
-    let offset = entry
-        .value_offset
-        .ok_or_else(|| Error::UnsafeEdit("cell storage has no editable value field".into()))?;
+    let offset = entry.value_offset.ok_or_else(|| {
+        Error::refused(
+            RefusalKind::UnsupportedTarget,
+            "edit cells",
+            "cell storage has no editable value field",
+        )
+    })?;
     match (&change.storage, &change.value) {
         (Storage::Number, Value::Number(value)) => {
             write_field(workbook, offset, &value.to_le_bytes())
         },
         (Storage::Rk | Storage::MulRk, Value::Number(value)) => {
             let encoded = encode_rk(*value).ok_or_else(|| {
-                Error::UnsafeEdit("numeric replacement is not exactly representable as RK".into())
+                Error::refused(
+                    RefusalKind::UnsupportedTarget,
+                    "edit cells",
+                    "numeric replacement is not exactly representable as RK",
+                )
             })?;
             write_field(workbook, offset, &encoded.to_le_bytes())
         },
@@ -9280,9 +9616,7 @@ fn write_cell_value(
             let index = shared_strings
                 .iter()
                 .position(|candidate| candidate == text)
-                .ok_or_else(|| {
-                    Error::UnsafeEdit("replacement text is absent from the SST".into())
-                })?;
+                .ok_or(Error::Internal("replacement text is absent from the SST"))?;
             let index = u32::try_from(index)
                 .map_err(|_error| Error::InvalidData("SST index exceeds u32".into()))?;
             write_field(workbook, offset, &index.to_le_bytes())
@@ -9290,9 +9624,7 @@ fn write_cell_value(
         (Storage::Formula, Value::FormulaCache(cache)) => {
             write_field(workbook, offset, &encode_formula_cache(cache))
         },
-        _ => Err(Error::UnsafeEdit(
-            "staged value and target storage disagree".into(),
-        )),
+        _ => Err(Error::Internal("staged value and target storage disagree")),
     }
 }
 
@@ -9321,7 +9653,11 @@ fn write_field(workbook: &mut [u8], offset: usize, bytes: &[u8]) -> Result<()> {
 
 fn update_sst_total(workbook: &mut [u8], offset: Option<usize>, delta: i64) -> Result<()> {
     let offset = offset.ok_or_else(|| {
-        Error::UnsafeEdit("RK/LabelSst conversion requires an existing SST header".into())
+        Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "RK/LabelSst conversion requires an existing SST header",
+        )
     })?;
     let current = binary::read_u32_le_at(workbook, offset)?;
     let updated = i64::from(current)
@@ -9647,11 +9983,11 @@ fn unique_entry_index(entries: &[Entry], reference: Reference) -> Result<Option<
             continue;
         }
         if found.replace(index).is_some() {
-            return Err(Error::UnsafeEdit(format!(
-                "cell ({}, {}) has duplicate BIFF8 Number records",
-                reference.row(),
-                reference.column()
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedContent,
+                "edit cells",
+                "a cell has duplicate BIFF8 Number records",
+            ));
         }
     }
     Ok(found)
@@ -9659,17 +9995,18 @@ fn unique_entry_index(entries: &[Entry], reference: Reference) -> Result<Option<
 
 fn verify_readback(snapshot: &Snapshot, changes: &[Change]) -> Result<()> {
     for change in changes {
-        let sheet =
-            snapshot.inner.sheets.get(change.sheet).ok_or_else(|| {
-                Error::UnsafeEdit("edited worksheet disappeared on readback".into())
-            })?;
+        let sheet = snapshot
+            .inner
+            .sheets
+            .get(change.sheet)
+            .ok_or(Error::Internal("edited worksheet disappeared on readback"))?;
         let entry = sheet
             .unique_entry_index(change.reference)?
-            .ok_or_else(|| Error::UnsafeEdit("edited cell was not found on readback".into()))?;
+            .ok_or(Error::Internal("edited cell was not found on readback"))?;
         let cell = &sheet.entries[entry].cell;
         if cell.storage != change.storage || !values_equal(&cell.value, &change.value) {
-            return Err(Error::UnsafeEdit(
-                "edited cell value failed semantic readback".into(),
+            return Err(Error::Internal(
+                "edited cell value failed semantic readback",
             ));
         }
     }
@@ -9702,9 +10039,11 @@ fn verify_structural_readback(
                 after,
                 ..
             } => {
-                let sheet_data = snapshot.inner.sheets.get(*sheet).ok_or_else(|| {
-                    Error::UnsafeEdit("structurally edited worksheet disappeared".into())
-                })?;
+                let sheet_data = snapshot
+                    .inner
+                    .sheets
+                    .get(*sheet)
+                    .ok_or(Error::Internal("structurally edited worksheet disappeared"))?;
                 let actual = sheet_data
                     .unique_entry_index(*reference)?
                     .map(|index| &sheet_data.entries[index])
@@ -9718,9 +10057,7 @@ fn verify_structural_readback(
                         && values_equal(value, found_value)
                         && style == &found_style => {},
                     _ => {
-                        return Err(Error::UnsafeEdit(
-                            "structural cell failed semantic readback".into(),
-                        ));
+                        return Err(Error::Internal("structural cell failed semantic readback"));
                     },
                 }
             },
@@ -9762,9 +10099,7 @@ fn verify_structural_readback(
                     .map(|item| item.name.as_str())
                     != Some(after.as_str())
                 {
-                    return Err(Error::UnsafeEdit(
-                        "worksheet rename failed semantic readback".into(),
-                    ));
+                    return Err(Error::Internal("worksheet rename failed semantic readback"));
                 }
             },
         }
@@ -9782,8 +10117,8 @@ fn verify_resource_readback(snapshot: &Snapshot, changes: &[ResourceChange]) -> 
                     .iter()
                     .any(|candidate| candidate == text);
                 if present != *insert {
-                    return Err(Error::UnsafeEdit(
-                        "shared-string resource failed semantic readback".into(),
+                    return Err(Error::Internal(
+                        "shared-string resource failed semantic readback",
                     ));
                 }
             },
@@ -9812,8 +10147,8 @@ fn verify_resource_readback(snapshot: &Snapshot, changes: &[ResourceChange]) -> 
                                     })
                         });
                 if present != *insert {
-                    return Err(Error::UnsafeEdit(
-                        "rich shared-string resource failed semantic readback".into(),
+                    return Err(Error::Internal(
+                        "rich shared-string resource failed semantic readback",
                     ));
                 }
             },
@@ -9824,9 +10159,9 @@ fn verify_resource_readback(snapshot: &Snapshot, changes: &[ResourceChange]) -> 
                 tokens,
                 insert,
             } => {
-                let sheet_data = snapshot.inner.sheets.get(*sheet).ok_or_else(|| {
-                    Error::UnsafeEdit("Formula readback sheet dependency is stale".into())
-                })?;
+                let sheet_data = snapshot.inner.sheets.get(*sheet).ok_or(Error::Internal(
+                    "Formula readback sheet dependency is stale",
+                ))?;
                 let current = sheet_data
                     .unique_entry_index(*reference)?
                     .map(|index| &sheet_data.entries[index]);
@@ -9837,9 +10172,7 @@ fn verify_resource_readback(snapshot: &Snapshot, changes: &[ResourceChange]) -> 
                     None => false,
                 };
                 if present != *insert {
-                    return Err(Error::UnsafeEdit(
-                        "Formula resource failed semantic readback".into(),
-                    ));
+                    return Err(Error::Internal("Formula resource failed semantic readback"));
                 }
             },
             ResourceChange::ExtendedFormat {
@@ -9853,9 +10186,7 @@ fn verify_resource_readback(snapshot: &Snapshot, changes: &[ResourceChange]) -> 
                     .get(usize::from(index.get()))
                     .is_some_and(|candidate| candidate == payload);
                 if present != *insert {
-                    return Err(Error::UnsafeEdit(
-                        "XF resource failed semantic readback".into(),
-                    ));
+                    return Err(Error::Internal("XF resource failed semantic readback"));
                 }
             },
         }
@@ -9939,13 +10270,15 @@ fn verify_shifted_cells(
         let found = after_sheet
             .unique_entry_index(reference)?
             .and_then(|index| after_sheet.entries.get(index))
-            .ok_or_else(|| Error::UnsafeEdit("shifted cell disappeared on readback".into()))?;
+            .ok_or(Error::Internal("shifted cell disappeared on readback"))?;
         if found.cell.storage != entry.cell.storage
             || found.cell.style != entry.cell.style
             || !values_equal(&found.cell.value, &entry.cell.value)
         {
-            return Err(Error::UnsafeEdit(
-                "shifted cell changed storage, style, or value".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "shifted cell changed storage, style, or value",
             ));
         }
     }

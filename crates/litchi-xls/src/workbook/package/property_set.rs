@@ -361,9 +361,10 @@ impl Patch {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.bytes() != self.before() {
-            return Err(crate::error::Error::UnsafeEdit(
-                "XLS property-set patch source does not match its base snapshot".to_string(),
-            ));
+            return Err(crate::error::Error::PatchConflict {
+                operation: "edit workbook",
+                reason: "XLS property-set patch source does not match its base snapshot",
+            });
         }
         if self.is_noop() {
             return Ok(source.clone());
@@ -377,9 +378,10 @@ impl Patch {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn revert(&self, replacement: &Snapshot) -> Result<Snapshot> {
         if replacement.bytes() != self.after() {
-            return Err(crate::error::Error::UnsafeEdit(
-                "XLS property-set patch replacement does not match its target snapshot".to_string(),
-            ));
+            return Err(crate::error::Error::PatchConflict {
+                operation: "edit workbook",
+                reason: "XLS property-set patch replacement does not match its target snapshot",
+            });
         }
         Snapshot::from_bytes(self.before.to_vec())
     }

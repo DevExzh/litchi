@@ -186,7 +186,11 @@ fn shared_guid_parse_precharges_source_and_guid_limits() {
     let guid_bound = Limits::default().with_max_revision_guids(0);
     let error = Snapshot::parse_shared_with_revision_guids_and_limits(source, &[guid], guid_bound)
         .unwrap_err();
-    assert!(error.to_string().contains("Revision Log contains"));
+    assert!(
+        error
+            .to_string()
+            .contains("Revision Log exceeds its GUID limit")
+    );
 }
 
 #[test]

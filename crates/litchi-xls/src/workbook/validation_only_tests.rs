@@ -1238,7 +1238,7 @@ fn kept_cell_refuses_a_position_kept_on_a_different_tab() {
         assert!(
             matches!(
                 validated.kept_cell(worksheet, row, column),
-                Err(crate::Error::UnsafeEdit(message)) if message.contains("not asked to keep")
+                Err(crate::Error::Internal(reason)) if reason.contains("not asked to keep")
             ),
             "worksheet {worksheet} ({row}, {column})"
         );

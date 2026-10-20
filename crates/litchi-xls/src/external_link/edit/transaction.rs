@@ -1,5 +1,6 @@
 //! Failure-atomic metadata edits over one external-link snapshot.
 
+use litchi_core::edit::RefusalKind;
 use std::sync::Arc;
 
 use crate::{Error, Result};
@@ -71,14 +72,18 @@ impl Edit {
             .get(book_index)
             .cloned()
             .ok_or_else(|| {
-                Error::UnsafeEdit(format!(
-                    "supporting-book index {book_index} is outside the external-link collection"
-                ))
+                Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit external links",
+                    "supporting-book index is outside the external-link collection",
+                )
             })?;
         let current = supporting_book_target(&book).ok_or_else(|| {
-            Error::UnsafeEdit(format!(
-                "supporting-book {book_index} does not own editable target metadata"
-            ))
+            Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit external links",
+                "supporting-book does not own editable target metadata",
+            )
         })?;
         if current == target {
             return Ok(self);
@@ -103,19 +108,25 @@ impl Edit {
             .get(book_index)
             .cloned()
             .ok_or_else(|| {
-                Error::UnsafeEdit(format!(
-                    "supporting-book index {book_index} is outside the external-link collection"
-                ))
+                Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit external links",
+                    "supporting-book index is outside the external-link collection",
+                )
             })?;
         let SupportingBook::ExternalWorkbook(workbook) = &book else {
-            return Err(Error::UnsafeEdit(format!(
-                "supporting-book {book_index} does not own external sheet names"
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit external links",
+                "supporting-book does not own external sheet names",
+            ));
         };
         let sheet = workbook.sheets().get(sheet_index).ok_or_else(|| {
-            Error::UnsafeEdit(format!(
-                "sheet index {sheet_index} is outside supporting book {book_index}"
-            ))
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit external links",
+                "sheet index is outside supporting book",
+            )
         })?;
         if sheet.name() == name {
             return Ok(self);
@@ -136,9 +147,11 @@ impl Edit {
             .get(name_index)
             .and_then(name_value)
             .ok_or_else(|| {
-                Error::UnsafeEdit(format!(
-                    "external-name index {name_index} is outside the external-link collection"
-                ))
+                Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit external links",
+                    "external-name index is outside the external-link collection",
+                )
             })?;
         if current == name {
             return Ok(self);
@@ -166,19 +179,25 @@ impl Edit {
             .supporting_books()
             .get(book_index)
             .ok_or_else(|| {
-                Error::UnsafeEdit(format!(
-                    "supporting-book index {book_index} is outside the external-link collection"
-                ))
+                Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit external links",
+                    "supporting-book index is outside the external-link collection",
+                )
             })?;
         let SupportingBook::ExternalWorkbook(workbook) = book else {
-            return Err(Error::UnsafeEdit(format!(
-                "supporting-book {book_index} does not own external cache sheets"
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit external links",
+                "supporting-book does not own external cache sheets",
+            ));
         };
         let sheet = workbook.sheets().get(sheet_index).ok_or_else(|| {
-            Error::UnsafeEdit(format!(
-                "sheet index {sheet_index} is outside supporting book {book_index}"
-            ))
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit external links",
+                "sheet index is outside supporting book",
+            )
         })?;
         let cache = self.package.cache_record(book_index, sheet_index)?;
         if sheet.cache_valid() == valid {
@@ -186,23 +205,35 @@ impl Edit {
         }
         let magnitude = cache.declared.unsigned_abs();
         if !valid && magnitude == 0 {
-            return Err(Error::UnsafeEdit(
-                "a zero-cardinality XCT cannot represent an invalid cache".into(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit external links",
+                "a zero-cardinality XCT cannot represent an invalid cache",
             ));
         }
         let declared = if valid {
             i16::try_from(magnitude).map_err(|_error| {
-                Error::UnsafeEdit("XCT cache cardinality does not fit signed BIFF8 count".into())
+                Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit external links",
+                    "XCT cache cardinality does not fit signed BIFF8 count",
+                )
             })?
         } else {
             -i16::try_from(magnitude).map_err(|_error| {
-                Error::UnsafeEdit("XCT cache cardinality does not fit signed BIFF8 count".into())
+                Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit external links",
+                    "XCT cache cardinality does not fit signed BIFF8 count",
+                )
             })?
         };
         let mut replacement = cache.record.payload(&self.candidate).to_vec();
         if replacement.len() != 4 {
-            return Err(Error::UnsafeEdit(
-                "selected XCT record is not owned by the parsed cache model".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit external links",
+                "selected XCT record is not owned by the parsed cache model",
             ));
         }
         replacement[..2].copy_from_slice(&declared.to_le_bytes());

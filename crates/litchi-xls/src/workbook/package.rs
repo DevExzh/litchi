@@ -22,6 +22,7 @@ use crate::sheet_metadata::SheetMetadata;
 use crate::source_limits::{SourceLimitKind, SourceLimits};
 use litchi_biff::Records;
 use litchi_cfb::{OleFile, OleFileLimits};
+use litchi_core::edit::RefusalKind;
 use litchi_ole_common::property_set::{
     PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
 };
@@ -601,16 +602,20 @@ impl<R: Read + Seek> Reader<R> {
         };
         let revision_len = self.ole_file.stream_len(&[revision_name.as_str()])?;
         if revision_len > max_stream_bytes {
-            return Err(Error::UnsafeEdit(format!(
-                "Revision Log stream has {revision_len} bytes; maximum is {max_stream_bytes}"
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit workbook",
+                "the Revision Log stream exceeds its byte limit",
+            ));
         }
 
         let stream_len = self.ole_file.stream_len(&[name.as_str()])?;
         if stream_len > max_stream_bytes {
-            return Err(Error::UnsafeEdit(format!(
-                "User Names stream has {stream_len} bytes; maximum is {max_stream_bytes}"
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit workbook",
+                "the User Names stream exceeds its byte limit",
+            ));
         }
         let data = Arc::<[u8]>::from(
             self.ole_file

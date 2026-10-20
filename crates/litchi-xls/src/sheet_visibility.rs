@@ -27,6 +27,7 @@ use litchi_cfb::{
     SameLengthStreamSplice, StreamSpliceLimits, ValidatedOverlayPlan,
 };
 use litchi_core::binary;
+use litchi_core::edit::RefusalKind;
 use litchi_core::{Position, ReadAt, SourceVersion};
 use litchi_ole_common::object::{Edit as PackageEditor, Limits, Targets};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
@@ -187,9 +188,11 @@ impl Snapshot {
                 });
                 let found = matches.next().map(|(index, _)| index);
                 if matches.next().is_some() {
-                    return Err(Error::UnsafeEdit(format!(
-                        "worksheet name {name:?} is ambiguous"
-                    )));
+                    return Err(Error::refused(
+                        RefusalKind::InvalidValue,
+                        "edit sheet visibility",
+                        "worksheet name is ambiguous",
+                    ));
                 }
                 Ok(found)
             },
@@ -318,9 +321,11 @@ impl Edit {
             return Ok(self);
         }
         if self.changes.len() >= MAX_VISIBILITY_CHANGES {
-            return Err(Error::UnsafeEdit(format!(
-                "worksheet visibility transaction exceeds its {MAX_VISIBILITY_CHANGES}-owner limit"
-            )));
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit sheet visibility",
+                "the worksheet visibility edit exceeds its owner limit",
+            ));
         }
         self.changes
             .try_reserve(1)
@@ -386,17 +391,23 @@ impl Edit {
         require_final_visible_worksheet(&self.source, &self.changes)?;
         let mut workbook = self.source.inner.workbook_stream.to_vec();
         for change in &self.changes {
-            let entry =
-                self.source.inner.sheets.get(change.sheet).ok_or_else(|| {
-                    Error::UnsafeEdit("worksheet visibility owner is stale".into())
+            let entry = self
+                .source
+                .inner
+                .sheets
+                .get(change.sheet)
+                .ok_or(Error::PatchConflict {
+                    operation: "edit sheet visibility",
+                    reason: "worksheet visibility owner is stale",
                 })?;
             let field = workbook.get_mut(entry.visibility_offset).ok_or_else(|| {
                 Error::InvalidData("BoundSheet8 visibility field is outside Workbook".into())
             })?;
             if *field != encode_visibility(change.before) {
-                return Err(Error::UnsafeEdit(
-                    "BoundSheet8 visibility precondition is stale".into(),
-                ));
+                return Err(Error::PatchConflict {
+                    operation: "edit sheet visibility",
+                    reason: "BoundSheet8 visibility precondition is stale",
+                });
             }
             *field = encode_visibility(change.after);
         }
@@ -425,8 +436,8 @@ impl Edit {
                 .map(|entry| entry.visibility)
                 != Some(change.after)
             {
-                return Err(Error::UnsafeEdit(
-                    "worksheet visibility failed semantic readback".into(),
+                return Err(Error::Internal(
+                    "worksheet visibility failed semantic readback",
                 ));
             }
         }
@@ -477,9 +488,15 @@ impl Edit {
             .try_reserve_exact(effective.len())
             .map_err(|_error| Error::Allocation("staging source-backed visibility splices"))?;
         for change in &effective {
-            let entry = self.source.inner.sheets.get(change.sheet).ok_or_else(|| {
-                Error::UnsafeEdit("source-backed worksheet visibility owner is stale".into())
-            })?;
+            let entry = self
+                .source
+                .inner
+                .sheets
+                .get(change.sheet)
+                .ok_or(Error::PatchConflict {
+                    operation: "edit sheet visibility",
+                    reason: "source-backed worksheet visibility owner is stale",
+                })?;
             let field = self
                 .source
                 .inner
@@ -490,9 +507,10 @@ impl Edit {
                 })?;
             let before = encode_visibility(change.before);
             if *field != before {
-                return Err(Error::UnsafeEdit(
-                    "BoundSheet8 visibility precondition is stale".into(),
-                ));
+                return Err(Error::PatchConflict {
+                    operation: "edit sheet visibility",
+                    reason: "BoundSheet8 visibility precondition is stale",
+                });
             }
             let offset = u64::try_from(entry.visibility_offset).map_err(|_error| {
                 Error::InvalidData("BoundSheet8 visibility offset exceeds u64".into())
@@ -832,8 +850,10 @@ impl Patch {
         let max = usize::try_from(limits.max_total_size)
             .map_err(|_error| Error::InvalidData("package limit exceeds usize".into()))?;
         if before_len > max || after_len > max {
-            return Err(Error::UnsafeEdit(
-                "worksheet visibility patch artifact exceeds package bounds".into(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit sheet visibility",
+                "worksheet visibility patch artifact exceeds package bounds",
             ));
         }
         let before = Snapshot::from_bytes(bytes[body_start..before_end].to_vec())?;
@@ -897,9 +917,10 @@ impl Patch {
     /// Returns a stale-source or complete-reopen validation error.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.bytes() != self.before() {
-            return Err(Error::UnsafeEdit(
-                "worksheet visibility patch source does not match its base snapshot".into(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit sheet visibility",
+                reason: "worksheet visibility patch source does not match its base snapshot",
+            });
         }
         if self.is_noop() {
             return Ok(source.clone());
@@ -942,8 +963,10 @@ fn select_workbook_path(package: &PackageEditor) -> Result<Vec<String>> {
         (false, false) => Err(Error::InvalidData(
             "XLS package has no Workbook or Book stream".into(),
         )),
-        (true, true) => Err(Error::UnsafeEdit(
-            "XLS package has ambiguous Workbook and Book streams".into(),
+        (true, true) => Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit sheet visibility",
+            "XLS package has ambiguous Workbook and Book streams",
         )),
     }
 }
@@ -1021,15 +1044,19 @@ fn parse_directory(workbook: &[u8]) -> Result<Vec<SheetEntry>> {
         return Err(Error::Eof("Workbook globals EOF"));
     }
     if sheets.is_empty() {
-        return Err(Error::UnsafeEdit(
-            "worksheet visibility owner requires a BoundSheet8 directory".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit sheet visibility",
+            "worksheet visibility owner requires a BoundSheet8 directory",
         ));
     }
     let mut positions = std::collections::HashSet::new();
     for sheet in &sheets {
         if !positions.insert(sheet.substream_offset) {
-            return Err(Error::UnsafeEdit(
-                "duplicate BoundSheet8 substream owner".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedContent,
+                "edit sheet visibility",
+                "duplicate BoundSheet8 substream owner",
             ));
         }
         let offset = usize::try_from(sheet.substream_offset)
@@ -1072,8 +1099,10 @@ fn require_unprotected<R: Read + Seek>(workbook: &ValidationWorkbook<R>) -> Resu
         || protection.write_protected()
         || protection.file_sharing().is_some()
     {
-        return Err(Error::UnsafeEdit(
-            "protected or shared workbooks are not eligible for visibility edits".into(),
+        return Err(Error::refused(
+            RefusalKind::Protected,
+            "edit sheet visibility",
+            "protected or shared workbooks are not eligible for visibility edits",
         ));
     }
     for metadata in workbook.sheets() {
@@ -1086,8 +1115,10 @@ fn require_unprotected<R: Read + Seek>(workbook: &ValidationWorkbook<R>) -> Resu
             || protection.scenarios_protected()
             || protection.has_password()
         {
-            return Err(Error::UnsafeEdit(
-                "protected worksheets are not eligible for visibility edits".into(),
+            return Err(Error::refused(
+                RefusalKind::Protected,
+                "edit sheet visibility",
+                "protected worksheets are not eligible for visibility edits",
             ));
         }
     }
@@ -1099,8 +1130,8 @@ fn require_public_readback<R: Read + Seek>(
     sheets: &[SheetEntry],
 ) -> Result<()> {
     if workbook.sheets().len() != sheets.len() {
-        return Err(Error::UnsafeEdit(
-            "BoundSheet8 directory is incomplete on public readback".into(),
+        return Err(Error::Internal(
+            "BoundSheet8 directory is incomplete on public readback",
         ));
     }
     for (metadata, sheet) in workbook.sheets().iter().zip(sheets) {
@@ -1109,16 +1140,17 @@ fn require_public_readback<R: Read + Seek>(
             || metadata.kind() != sheet.kind
             || metadata.visibility() != sheet.visibility
         {
-            return Err(Error::UnsafeEdit(
-                "BoundSheet8 owner failed exact public readback".into(),
+            return Err(Error::Internal(
+                "BoundSheet8 owner failed exact public readback",
             ));
         }
         if sheet.kind == SheetKind::WorksheetOrDialog && metadata.parsed_worksheet_index().is_none()
         {
-            return Err(Error::UnsafeEdit(format!(
-                "worksheet at tab position {} was not published by the complete XLS reader",
-                sheet.position
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedContent,
+                "edit sheet visibility",
+                "a worksheet was not published by the complete XLS reader",
+            ));
         }
     }
     Ok(())
@@ -1130,8 +1162,10 @@ fn require_visible_worksheet(sheets: &[SheetEntry]) -> Result<()> {
     }) {
         Ok(())
     } else {
-        Err(Error::UnsafeEdit(
-            "an XLS workbook must retain at least one visible worksheet".into(),
+        Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit sheet visibility",
+            "an XLS workbook must retain at least one visible worksheet",
         ))
     }
 }
@@ -1153,8 +1187,10 @@ fn require_final_visible_worksheet(source: &Snapshot, changes: &[Change]) -> Res
     {
         Ok(())
     } else {
-        Err(Error::UnsafeEdit(
-            "visibility batch would hide every worksheet".into(),
+        Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit sheet visibility",
+            "visibility batch would hide every worksheet",
         ))
     }
 }
@@ -1164,8 +1200,10 @@ fn certify_workbook_transition(before: &Snapshot, after: &Snapshot) -> Result<()
         || before.inner.sheets.len() != after.inner.sheets.len()
         || before.workbook_stream().len() != after.workbook_stream().len()
     {
-        return Err(Error::UnsafeEdit(
-            "visibility patch changes the Workbook owner inventory".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit sheet visibility",
+            "visibility patch changes the Workbook owner inventory",
         ));
     }
     let mut allowed = Vec::new();
@@ -1176,14 +1214,18 @@ fn certify_workbook_transition(before: &Snapshot, after: &Snapshot) -> Result<()
             || left.visibility_offset != right.visibility_offset
             || left.substream_offset != right.substream_offset
         {
-            return Err(Error::UnsafeEdit(
-                "visibility patch changes a BoundSheet8 owner identity".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit sheet visibility",
+                "visibility patch changes a BoundSheet8 owner identity",
             ));
         }
         if left.visibility != right.visibility {
             if left.kind != SheetKind::WorksheetOrDialog {
-                return Err(Error::UnsafeEdit(
-                    "visibility patch targets a non-worksheet owner".into(),
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "edit sheet visibility",
+                    "visibility patch targets a non-worksheet owner",
                 ));
             }
             allowed
@@ -1196,14 +1238,18 @@ fn certify_workbook_transition(before: &Snapshot, after: &Snapshot) -> Result<()
             || after.workbook_stream().get(right.visibility_offset)
                 != Some(&encode_visibility(right.visibility))
         {
-            return Err(Error::UnsafeEdit(
-                "visibility patch contains a noncanonical BoundSheet8.hsState byte".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedContent,
+                "edit sheet visibility",
+                "visibility patch contains a noncanonical BoundSheet8.hsState byte",
             ));
         }
     }
     if allowed.len() > MAX_VISIBILITY_CHANGES {
-        return Err(Error::UnsafeEdit(
-            "visibility patch exceeds its worksheet-owner limit".into(),
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit sheet visibility",
+            "visibility patch exceeds its worksheet-owner limit",
         ));
     }
     allowed.sort_unstable();
@@ -1224,8 +1270,10 @@ fn certify_workbook_transition(before: &Snapshot, after: &Snapshot) -> Result<()
             allowed_index += 1;
         }
         if allowed.get(allowed_index) != Some(&offset) {
-            return Err(Error::UnsafeEdit(
-                "visibility patch changes Workbook bytes outside BoundSheet8.hsState".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit sheet visibility",
+                "visibility patch changes Workbook bytes outside BoundSheet8.hsState",
             ));
         }
     }
@@ -1239,8 +1287,10 @@ fn compare_other_streams(before: &Snapshot, after: &Snapshot) -> Result<()> {
         || root_identity(&left) != root_identity(&right)
         || directory_catalog(&left)? != directory_catalog(&right)?
     {
-        return Err(Error::UnsafeEdit(
-            "visibility patch changes the CFB directory or root metadata".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit sheet visibility",
+            "visibility patch changes the CFB directory or root metadata",
         ));
     }
     let mut left_paths = left.list_streams();
@@ -1248,8 +1298,10 @@ fn compare_other_streams(before: &Snapshot, after: &Snapshot) -> Result<()> {
     left_paths.sort();
     right_paths.sort();
     if left_paths != right_paths {
-        return Err(Error::UnsafeEdit(
-            "visibility patch changes the CFB stream catalog".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit sheet visibility",
+            "visibility patch changes the CFB stream catalog",
         ));
     }
     for path in left_paths {
@@ -1258,8 +1310,10 @@ fn compare_other_streams(before: &Snapshot, after: &Snapshot) -> Result<()> {
         }
         let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
         if left.open_stream(&refs)? != right.open_stream(&refs)? {
-            return Err(Error::UnsafeEdit(
-                "visibility patch changes an unrelated CFB stream".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit sheet visibility",
+                "visibility patch changes an unrelated CFB stream",
             ));
         }
     }
@@ -1314,7 +1368,11 @@ fn overlay_to_error(error: OverlayError) -> Error {
     match error {
         OverlayError::Ole(error) => Error::Cfb(error),
         OverlayError::Io(error) => Error::Io(error),
-        other => Error::UnsafeEdit(format!("source-backed visibility overlay refused: {other}")),
+        _ => Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit sheet visibility",
+            "source-backed visibility overlay refused",
+        ),
     }
 }
 
@@ -1361,20 +1419,19 @@ fn verify_source_backed_candidate(
         .map_err(|_error| Error::Allocation("retaining source-backed sheet readback"))?;
     sheets.extend(source.inner.sheets.iter().cloned());
     for change in changes {
-        let sheet = sheets.get_mut(change.sheet).ok_or_else(|| {
-            Error::UnsafeEdit("source-backed worksheet disappeared during readback".into())
-        })?;
+        let sheet = sheets.get_mut(change.sheet).ok_or(Error::Internal(
+            "source-backed worksheet disappeared during readback",
+        ))?;
         sheet.visibility = change.after;
     }
     require_public_readback(&workbook, &sheets)?;
     for change in changes {
-        let metadata = workbook.sheets().get(change.sheet).ok_or_else(|| {
-            Error::UnsafeEdit("source-backed worksheet disappeared during readback".into())
-        })?;
+        let metadata = workbook.sheets().get(change.sheet).ok_or(Error::Internal(
+            "source-backed worksheet disappeared during readback",
+        ))?;
         if metadata.visibility() != change.after {
-            return Err(Error::UnsafeEdit(
-                "source-backed worksheet visibility readback disagreed with the staged state"
-                    .into(),
+            return Err(Error::Internal(
+                "source-backed worksheet visibility readback disagreed with the staged state",
             ));
         }
     }
@@ -1397,8 +1454,10 @@ fn directory_catalog(ole: &OleFile<Cursor<&[u8]>>) -> Result<Vec<(Vec<String>, u
         let refs = parent.iter().map(String::as_str).collect::<Vec<_>>();
         for entry in ole.list_directory_entries(&refs)? {
             if catalog.len() >= maximum {
-                return Err(Error::UnsafeEdit(
-                    "CFB directory catalog exceeds visibility patch bounds".into(),
+                return Err(Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit sheet visibility",
+                    "CFB directory catalog exceeds visibility patch bounds",
                 ));
             }
             let mut path = parent.clone();

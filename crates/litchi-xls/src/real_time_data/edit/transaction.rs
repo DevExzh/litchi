@@ -1,5 +1,6 @@
 //! Failure-atomic semantic edits over one RTD stream snapshot.
 
+use litchi_core::edit::RefusalKind;
 use std::sync::Arc;
 
 use crate::{Error, Result};
@@ -80,9 +81,11 @@ impl Edit {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn replace(&mut self, index: usize, value: Record) -> Result<&mut Self> {
         let current = self.records().get(index).ok_or_else(|| {
-            Error::UnsafeEdit(format!(
-                "RealTimeData index {index} is outside the staged collection"
-            ))
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit real-time data",
+                "RealTimeData index is outside the staged collection",
+            )
         })?;
         if current == &value {
             return Ok(self);
@@ -113,9 +116,11 @@ impl Edit {
         edit: impl FnOnce(&mut Record) -> Result<()>,
     ) -> Result<&mut Self> {
         let mut value = self.records().get(index).cloned().ok_or_else(|| {
-            Error::UnsafeEdit(format!(
-                "RealTimeData index {index} is outside the staged collection"
-            ))
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit real-time data",
+                "RealTimeData index is outside the staged collection",
+            )
         })?;
         edit(&mut value)?;
         self.replace(index, value)
@@ -170,9 +175,11 @@ impl Edit {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove(&mut self, index: usize) -> Result<Record> {
         let removed = self.records().get(index).cloned().ok_or_else(|| {
-            Error::UnsafeEdit(format!(
-                "RealTimeData index {index} is outside the staged collection"
-            ))
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit real-time data",
+                "RealTimeData index is outside the staged collection",
+            )
         })?;
         let candidate = self.package.remove_real_time_data(&self.candidate, index)?;
         self.replace_candidate(candidate, None)?;
@@ -205,8 +212,8 @@ impl Edit {
         if let Some((index, expected)) = expected
             && package.real_time_data().get(index) != Some(&expected)
         {
-            return Err(Error::UnsafeEdit(
-                "RealTimeData publication changed the staged record".to_string(),
+            return Err(Error::Internal(
+                "RealTimeData publication changed the staged record",
             ));
         }
         self.candidate = candidate;

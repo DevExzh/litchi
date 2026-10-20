@@ -153,9 +153,10 @@ impl Patch {
     /// Applies this patch only to its exact source snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.fingerprint() != self.source_fingerprint || source.bytes() != self.before() {
-            return Err(Error::UnsafeEdit(
-                "external-link patch source does not match its base snapshot".into(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit external links",
+                reason: "external-link patch source does not match its base snapshot",
+            });
         }
         if self.is_noop() {
             Ok(source.clone())
@@ -167,9 +168,10 @@ impl Patch {
     /// Applies the exact inverse replacement to its committed target.
     pub fn revert(&self, target: &Snapshot) -> Result<Snapshot> {
         if target.fingerprint() != self.target_fingerprint || target.bytes() != self.after() {
-            return Err(Error::UnsafeEdit(
-                "external-link patch target does not match its committed snapshot".into(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit external links",
+                reason: "external-link patch target does not match its committed snapshot",
+            });
         }
         if self.is_noop() {
             Ok(target.clone())

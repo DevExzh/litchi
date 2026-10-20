@@ -78,7 +78,7 @@ fn coordinate_index_preserves_source_order_and_refuses_duplicates() {
     let duplicate_index = CellIndex::from_entries(&duplicate_entries).unwrap();
     assert!(matches!(
         duplicate_index.unique_entry_index(&duplicate_entries, Reference { row: 2, column: 4 }),
-        Err(Error::UnsafeEdit(_))
+        Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
     ));
 }
 

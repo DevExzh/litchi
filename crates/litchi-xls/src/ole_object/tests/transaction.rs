@@ -989,7 +989,12 @@ fn embedded_payload_api_refuses_nested_pidssi_and_encryption() {
         let error = transaction
             .add_embedded_payload(0, draft)
             .expect_err("nested protection must refuse publication");
-        assert!(matches!(error, crate::error::Error::UnsafeEdit(_)));
+        assert!(matches!(
+            error,
+            crate::error::Error::Refused(_)
+                | crate::error::Error::PatchConflict { .. }
+                | crate::error::Error::Internal(_)
+        ));
         assert_eq!(transaction.snapshot().unwrap().finish(), before);
     }
 }

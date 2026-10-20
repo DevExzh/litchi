@@ -1,5 +1,6 @@
 //! Workbook/container hosting and transactional chart edits.
 
+use litchi_core::edit::RefusalKind;
 #[cfg(test)]
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -47,7 +48,7 @@ const UNSUPPORTED_EMBEDDED_MUTATION_REASON: &str = "embedded XLS chart mutation 
 pub(crate) fn unsupported_authoring<T>() -> Result<T> {
     Err(
         litchi_ograph::Error::Refused(litchi_core::edit::Refusal::new(
-            litchi_core::edit::RefusalKind::UnsupportedContent,
+            RefusalKind::UnsupportedContent,
             "author",
             UNSUPPORTED_AUTHORING_REASON,
         ))
@@ -58,7 +59,7 @@ pub(crate) fn unsupported_authoring<T>() -> Result<T> {
 pub(crate) fn unsupported_embedded_mutation<T>() -> Result<T> {
     Err(
         litchi_ograph::Error::Refused(litchi_core::edit::Refusal::new(
-            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            RefusalKind::UnsupportedOperation,
             "embedded XLS chart drawing",
             UNSUPPORTED_EMBEDDED_MUTATION_REASON,
         ))
@@ -1296,8 +1297,10 @@ fn patch_chart_stream(
     limits: Limits,
 ) -> Result<Vec<u8>> {
     if start > end || end > input.len() || replacement.len() != end.saturating_sub(start) {
-        return Err(Error::UnsafeEdit(
-            "chart-area replacement changed the source stream allocation".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit chart",
+            "chart-area replacement changed the source stream allocation",
         ));
     }
     let mut output = input.to_vec();

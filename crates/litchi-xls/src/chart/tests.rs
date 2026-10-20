@@ -238,10 +238,7 @@ mod chart_tests {
     #[test]
     fn public_authoring_refuses_atomically_with_typed_error() {
         fn assert_unsupported(error: Error) {
-            assert!(matches!(
-                error,
-                Error::Graph(litchi_ograph::Error::Refused(_))
-            ));
+            assert!(matches!(error, Error::Refused(_)));
         }
 
         let original = build_workbook_fixture(Chart::default(), Limits::default()).unwrap();
@@ -280,7 +277,7 @@ mod chart_tests {
                     index: 0,
                 })
                 .expect_err("embedded removal must be refused"),
-            Error::Graph(litchi_ograph::Error::Refused(_))
+            Error::Refused(_)
         ));
         assert_eq!(removed.finish().unwrap(), original);
     }
@@ -321,7 +318,7 @@ mod chart_tests {
         });
         assert!(matches!(
             serialize_chart(&chart, Limits::default()),
-            Err(Error::UnsafeEdit(_))
+            Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
         ));
     }
 
@@ -426,7 +423,7 @@ mod chart_tests {
         .expect("absolute chart range");
         assert!(matches!(
             chart.set_formula(0, Role::Values, transposed),
-            Err(Error::UnsafeEdit(_))
+            Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
         ));
         assert_eq!(chart, original);
 
@@ -457,7 +454,7 @@ mod chart_tests {
         assert_eq!(chart, original);
         assert!(matches!(
             chart.set_cache(CacheKind::Values, 0, 99, 0, Value::Blank),
-            Err(Error::UnsafeEdit(_))
+            Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
         ));
         assert_eq!(chart, original);
     }
@@ -586,7 +583,7 @@ mod chart_tests {
         graph_change.title = Some("unsafe graph edit".into());
         assert!(matches!(
             patch_chart_data(&source, &old, &graph_change, limits),
-            Err(Error::UnsafeEdit(_))
+            Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
         ));
     }
 
@@ -613,7 +610,7 @@ mod chart_tests {
                 Role::Values,
                 formula,
             ),
-            Err(Error::Graph(litchi_ograph::Error::Refused(_)))
+            Err(Error::Refused(_))
         ));
         assert_eq!(editor.finish().unwrap(), original);
     }

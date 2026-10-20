@@ -6,6 +6,7 @@
 //! is reopened through the normal XLS reader and the Revision Log dependency
 //! check before a commit is returned.
 
+use litchi_core::edit::RefusalKind;
 use std::fmt;
 use std::io::Cursor;
 use std::sync::Arc;
@@ -63,9 +64,10 @@ impl Snapshot {
         // The preflight and the common owner inspect the same immutable input;
         // keep the exact spelling selected by the owner for the replacement.
         if user_names_path != expected_path {
-            return Err(Error::UnsafeEdit(
-                "User Names stream path changed between CFB validation passes".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit user names",
+                reason: "User Names stream path changed between CFB validation passes",
+            });
         }
         let bytes = Arc::<[u8]>::from(package.finish()?.into_boxed_slice());
         let user_names = parse_user_names(&bytes, limits)?;
@@ -403,9 +405,10 @@ impl Patch {
     /// package reopen.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.bytes() != self.before() {
-            return Err(Error::UnsafeEdit(
-                "User Names package patch source does not match its base snapshot".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit user names",
+                reason: "User Names package patch source does not match its base snapshot",
+            });
         }
         if self.is_noop() {
             return Ok(source.clone());
@@ -421,9 +424,10 @@ impl Patch {
     /// package reopen.
     pub fn revert(&self, target: &Snapshot) -> Result<Snapshot> {
         if target.bytes() != self.after() {
-            return Err(Error::UnsafeEdit(
-                "User Names package patch target does not match its committed snapshot".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit user names",
+                reason: "User Names package patch target does not match its committed snapshot",
+            });
         }
         if self.is_noop() {
             return Ok(target.clone());
@@ -452,15 +456,19 @@ fn preflight_user_names(bytes: &[u8], limits: UserNamesLimits) -> Result<Vec<Str
     let revision_path = find_revision_log_path(&ole)?;
     let revision_len = ole.stream_len(&[revision_path[0].as_str()])?;
     if revision_len > maximum {
-        return Err(Error::UnsafeEdit(format!(
-            "Revision Log stream has {revision_len} bytes; maximum is {maximum}"
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit user names",
+            "the Revision Log stream exceeds its byte limit",
+        ));
     }
     let stream_len = ole.stream_len(&[path[0].as_str()])?;
     if stream_len > maximum {
-        return Err(Error::UnsafeEdit(format!(
-            "User Names stream has {stream_len} bytes; maximum is {maximum}"
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit user names",
+            "the User Names stream exceeds its byte limit",
+        ));
     }
     Ok(path)
 }

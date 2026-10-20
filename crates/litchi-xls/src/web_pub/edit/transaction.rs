@@ -1,5 +1,6 @@
 //! Failure-atomic semantic edits over one inert `WebPub` snapshot.
 
+use litchi_core::edit::RefusalKind;
 use std::sync::Arc;
 
 use crate::{Error, Result};
@@ -128,8 +129,10 @@ impl Edit {
     /// Replaces the source name when this record already carries `srcName`.
     pub fn set_source_name(&mut self, value: impl Into<String>) -> Result<&mut Self> {
         if self.publication.source_name.is_none() {
-            return Err(Error::UnsafeEdit(
-                "this WebPub source does not carry editable srcName metadata".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit web publishing",
+                "this WebPub source does not carry editable srcName metadata",
             ));
         }
         let mut replacement = self.publication.clone();
@@ -140,8 +143,10 @@ impl Edit {
     /// Replaces the range when this record already carries `ref8`.
     pub fn set_range(&mut self, value: WebPubRange) -> Result<&mut Self> {
         if self.publication.range.is_none() {
-            return Err(Error::UnsafeEdit(
-                "this WebPub source does not carry editable ref8 metadata".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit web publishing",
+                "this WebPub source does not carry editable ref8 metadata",
             ));
         }
         let mut replacement = self.publication.clone();
@@ -153,8 +158,10 @@ impl Edit {
     /// `crtID`.
     pub fn set_chart_shape_id(&mut self, value: u32) -> Result<&mut Self> {
         if self.publication.chart_shape_id.is_none() {
-            return Err(Error::UnsafeEdit(
-                "this WebPub source does not carry editable crtID metadata".into(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit web publishing",
+                "this WebPub source does not carry editable crtID metadata",
             ));
         }
         let mut replacement = self.publication.clone();

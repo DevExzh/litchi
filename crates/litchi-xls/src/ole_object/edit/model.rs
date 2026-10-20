@@ -155,9 +155,10 @@ impl Patch {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.source.as_ref() != self.before.as_ref() {
-            return Err(Error::UnsafeEdit(
-                "OLE-object patch source does not match its base snapshot".into(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit OLE objects",
+                reason: "OLE-object patch source does not match its base snapshot",
+            });
         }
         if self.is_noop() {
             return Ok(source.clone());
