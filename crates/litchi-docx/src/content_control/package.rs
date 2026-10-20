@@ -606,14 +606,22 @@ impl PackageDraft {
             return Ok(value.clone());
         }
         if self.crc_memo.len() >= self.base.limits.max_crc_parts {
-            return Err(invalid("unique CRC part limit exceeded"));
+            return Err(Error::ContentControlLimit {
+                kind: crate::content_control::LimitKind::UniqueCrcPart,
+                actual: (self.crc_memo.len()).saturating_add(1),
+                maximum: self.base.limits.max_crc_parts,
+            });
         }
         let crc_bytes = self
             .crc_bytes
             .checked_add(data.len())
             .ok_or_else(|| invalid("aggregate CRC byte count overflow"))?;
         if crc_bytes > self.base.limits.max_crc_bytes {
-            return Err(invalid("aggregate CRC byte limit exceeded"));
+            return Err(Error::ContentControlLimit {
+                kind: crate::content_control::LimitKind::AggregateCrcByte,
+                actual: crc_bytes,
+                maximum: self.base.limits.max_crc_bytes,
+            });
         }
         self.crc_memo
             .try_reserve(1)
@@ -667,7 +675,11 @@ impl PackageDraft {
                     .checked_add(commit.snapshot().source().len())
                     .ok_or_else(|| invalid("aggregate content-control output overflow"))?;
                 if output > self.base.limits.max_output_bytes {
-                    return Err(invalid("aggregate content-control output limit exceeded"));
+                    return Err(Error::ContentControlLimit {
+                        kind: crate::content_control::LimitKind::Output,
+                        actual: output,
+                        maximum: self.base.limits.max_output_bytes,
+                    });
                 }
             }
             commits.push(commit);
@@ -705,7 +717,11 @@ impl PackageDraft {
             return Ok(false);
         }
         if self.mutations.len() >= self.base.limits.max_mutations {
-            return Err(invalid("content-control mutation limit exceeded"));
+            return Err(Error::ContentControlLimit {
+                kind: crate::content_control::LimitKind::Mutation,
+                actual: (self.mutations.len()).saturating_add(1),
+                maximum: self.base.limits.max_mutations,
+            });
         }
         self.mutations
             .try_reserve(1)
@@ -1042,13 +1058,21 @@ fn verify(snapshot: &PackageSnapshot, require_matches: Option<bool>) -> Result<V
                                 value.clone()
                             } else {
                                 if memo.len() >= snapshot.limits.max_crc_parts {
-                                    return Err(invalid("unique CRC part limit exceeded"));
+                                    return Err(Error::ContentControlLimit {
+                                        kind: crate::content_control::LimitKind::UniqueCrcPart,
+                                        actual: (memo.len()).saturating_add(1),
+                                        maximum: snapshot.limits.max_crc_parts,
+                                    });
                                 }
                                 total = total
                                     .checked_add(store.data.len())
                                     .ok_or_else(|| invalid("aggregate CRC byte count overflow"))?;
                                 if total > snapshot.limits.max_crc_bytes {
-                                    return Err(invalid("aggregate CRC byte limit exceeded"));
+                                    return Err(Error::ContentControlLimit {
+                                        kind: crate::content_control::LimitKind::AggregateCrcByte,
+                                        actual: total,
+                                        maximum: snapshot.limits.max_crc_bytes,
+                                    });
                                 }
                                 let value =
                                     Checksum::compute(&store.data, &snapshot.limits.controls)?;
@@ -1312,7 +1336,11 @@ fn preflight_custom_xml_graph(package: &OpcPackage, limits: &PackageLimits) -> R
             }
             if !parts.contains(&part) {
                 if parts.len() >= limits.max_crc_parts {
-                    return Err(invalid("unique Custom XML payload limit exceeded"));
+                    return Err(Error::ContentControlLimit {
+                        kind: crate::content_control::LimitKind::UniqueCustomXmlPayload,
+                        actual: (parts.len()).saturating_add(1),
+                        maximum: limits.max_crc_parts,
+                    });
                 }
                 payload_bytes = payload_bytes
                     .checked_add(data.blob().len())

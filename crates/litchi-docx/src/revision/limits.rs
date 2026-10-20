@@ -1,5 +1,6 @@
 //! Finite resource policy for tracked-revision readback.
 
+use super::LimitKind;
 use crate::{Error, Result};
 
 /// Resource ceilings for one paragraph, table, row, or cell revision read.
@@ -56,21 +57,29 @@ impl Limits {
     /// Returns a counted revision limit error for a ceiling above its hard cap.
     pub fn validate(self) -> Result<Self> {
         for (resource, value, maximum) in [
-            ("source bytes", self.max_source_bytes, 256 * 1024 * 1024),
-            ("events", self.max_events, 16_000_000),
-            ("depth", self.max_depth, 128),
-            ("records", self.max_revisions, 1_000_000),
-            ("metadata bytes", self.max_metadata_bytes, 64 * 1024 * 1024),
-            ("text bytes", self.max_text_bytes, 256 * 1024 * 1024),
-            ("value bytes", self.max_value_bytes, 1024 * 1024),
-            ("attributes", self.max_attributes, 4096),
             (
-                "inherited namespaces",
+                LimitKind::SourceBytes,
+                self.max_source_bytes,
+                256 * 1024 * 1024,
+            ),
+            (LimitKind::Events, self.max_events, 16_000_000),
+            (LimitKind::Depth, self.max_depth, 128),
+            (LimitKind::Records, self.max_revisions, 1_000_000),
+            (
+                LimitKind::MetadataBytes,
+                self.max_metadata_bytes,
+                64 * 1024 * 1024,
+            ),
+            (LimitKind::TextBytes, self.max_text_bytes, 256 * 1024 * 1024),
+            (LimitKind::ValueBytes, self.max_value_bytes, 1024 * 1024),
+            (LimitKind::Attributes, self.max_attributes, 4096),
+            (
+                LimitKind::InheritedNamespaces,
                 self.max_inherited_namespaces,
                 65_536,
             ),
             (
-                "inherited namespace bytes",
+                LimitKind::InheritedNamespaceBytes,
                 self.max_inherited_namespace_bytes,
                 16 * 1024 * 1024,
             ),
@@ -81,10 +90,10 @@ impl Limits {
     }
 }
 
-pub(super) fn check(resource: &'static str, actual: usize, maximum: usize) -> Result<()> {
+pub(super) fn check(resource: LimitKind, actual: usize, maximum: usize) -> Result<()> {
     if actual > maximum {
         Err(Error::RevisionLimit {
-            resource,
+            kind: resource,
             actual,
             maximum,
         })
@@ -94,13 +103,13 @@ pub(super) fn check(resource: &'static str, actual: usize, maximum: usize) -> Re
 }
 
 pub(super) fn charge(
-    resource: &'static str,
+    resource: LimitKind,
     used: &mut usize,
     additional: usize,
     maximum: usize,
 ) -> Result<()> {
     let actual = used.checked_add(additional).ok_or(Error::RevisionLimit {
-        resource,
+        kind: resource,
         actual: usize::MAX,
         maximum,
     })?;

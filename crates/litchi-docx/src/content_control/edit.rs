@@ -14,7 +14,9 @@ use super::package::PackageDraft;
 use super::{Checksum, FormattingAllowed};
 use crate::package::family::{Staged, graph_family};
 
-graph_family!("content-control");
+graph_family!("content-control", own_limits);
+
+pub use super::limit::LimitKind;
 
 /// Options of a content-control edit (record 0355a).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

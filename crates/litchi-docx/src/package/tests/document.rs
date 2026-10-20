@@ -1305,7 +1305,7 @@ fn document_revision_queries_cover_final_sections_grids_and_numbering_after_reop
             .unwrap()
             .revisions(),
         Err(Error::RevisionLimit {
-            resource: "records",
+            kind: crate::revision::LimitKind::Records,
             ..
         })
     ));
@@ -1349,7 +1349,7 @@ fn document_revision_queries_cover_final_sections_grids_and_numbering_after_reop
             .unwrap()
             .revisions(),
         Err(Error::RevisionLimit {
-            resource: "records",
+            kind: crate::revision::LimitKind::Records,
             ..
         })
     ));

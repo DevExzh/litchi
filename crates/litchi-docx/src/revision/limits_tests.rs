@@ -1,3 +1,4 @@
+use super::LimitKind;
 use super::{Limits, RevisionType, parse_revisions_with_limits};
 use crate::{Error, Paragraph};
 
@@ -102,7 +103,7 @@ fn public_revision_limits_accept_exact_budgets_and_report_each_resource() {
     ] {
         assert!(
             matches!(super::Reader::new(limits).paragraph(&paragraph),
-            Err(Error::RevisionLimit { resource: actual, .. }) if actual == resource),
+            Err(Error::RevisionLimit { kind: actual, .. }) if actual.as_str() == resource),
             "{resource}"
         );
     }
@@ -222,7 +223,7 @@ fn nested_revision_metadata_and_text_are_retained_in_source_order_and_charged() 
         })
         .paragraph(&paragraph),
         Err(Error::RevisionLimit {
-            resource: "text bytes",
+            kind: LimitKind::TextBytes,
             actual: 23,
             maximum: 22
         })
@@ -282,7 +283,7 @@ fn metadata_namespace_and_decoded_byte_limits_are_contextual() {
             }
         ),
         Err(Error::RevisionLimit {
-            resource: "inherited namespaces",
+            kind: LimitKind::InheritedNamespaces,
             ..
         })
     ));
@@ -307,7 +308,7 @@ fn metadata_namespace_and_decoded_byte_limits_are_contextual() {
             }
         ),
         Err(Error::RevisionLimit {
-            resource: "inherited namespace bytes",
+            kind: LimitKind::InheritedNamespaceBytes,
             ..
         })
     ));
@@ -326,7 +327,7 @@ fn empty_elements_and_metadata_markers_cannot_bypass_depth_or_content_checks() {
             }
         ),
         Err(Error::RevisionLimit {
-            resource: "depth",
+            kind: LimitKind::Depth,
             actual: 2,
             maximum: 1
         })
@@ -349,21 +350,21 @@ fn every_table_read_facade_applies_the_record_limit() {
     assert!(matches!(
         super::Reader::new(limits).table(&crate::Table::new(marker.clone())),
         Err(Error::RevisionLimit {
-            resource: "records",
+            kind: LimitKind::Records,
             ..
         })
     ));
     assert!(matches!(
         super::Reader::new(limits).row(&crate::Row::new(marker.clone())),
         Err(Error::RevisionLimit {
-            resource: "records",
+            kind: LimitKind::Records,
             ..
         })
     ));
     assert!(matches!(
         super::Reader::new(limits).cell(&crate::Cell::new(marker)),
         Err(Error::RevisionLimit {
-            resource: "records",
+            kind: LimitKind::Records,
             ..
         })
     ));

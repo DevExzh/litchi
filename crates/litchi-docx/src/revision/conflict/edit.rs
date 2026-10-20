@@ -14,7 +14,9 @@ use litchi_opc::PackURI;
 use super::transaction::{Draft, Operation};
 use crate::package::family::{Staged, graph_family};
 
-graph_family!("conflict-markup");
+graph_family!("conflict-markup", own_limits);
+
+pub use super::limit::LimitKind;
 
 /// Options of a conflict-markup edit (record 0355a).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

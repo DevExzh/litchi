@@ -78,7 +78,11 @@ impl Table {
                     .checked_add(part.blob().len())
                     .ok_or_else(|| invalid("embedded-font size overflow"))?;
                 if total > MAX_ALL_FONTS {
-                    return Err(invalid("embedded fonts exceed total size limit"));
+                    return Err(Error::FontLimit {
+                        kind: crate::font::LimitKind::EmbeddedFontBytes,
+                        actual: total,
+                        maximum: MAX_ALL_FONTS,
+                    });
                 }
                 if part.rels().iter().next().is_some() {
                     return Err(invalid(format!(
@@ -858,7 +862,11 @@ fn directly_used_font_names(package: &OpcPackage) -> Result<HashSet<String>> {
                 {
                     nodes += 1;
                     if nodes > MAX_NODES {
-                        return Err(invalid("font-usage XML node limit exceeded"));
+                        return Err(Error::FontLimit {
+                            kind: crate::font::LimitKind::XmlNode,
+                            actual: nodes,
+                            maximum: MAX_NODES,
+                        });
                     }
                     for attribute in element.checked_attributes() {
                         let attribute = attribute.map_err(xml_error)?;

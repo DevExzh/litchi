@@ -8,6 +8,7 @@
 )]
 //! Story discovery and failure-atomic package publication.
 
+use super::LimitKind;
 use super::model::{Binding, Source};
 use super::transaction::{DraftCommit, DraftPatch};
 use super::{Limits, Snapshot};
@@ -348,31 +349,31 @@ impl Aggregate {
             self.story_bytes,
             value.story_bytes,
             limits.max_total_story_bytes,
-            "story byte",
+            LimitKind::TotalStoryBytes,
         )?;
         self.conflicts = checked_total(
             self.conflicts,
             value.conflicts,
             limits.max_total_conflicts,
-            "conflict element",
+            LimitKind::TotalConflicts,
         )?;
         self.ranges = checked_total(
             self.ranges,
             value.ranges,
             limits.max_total_ranges,
-            "conflict range",
+            LimitKind::TotalRanges,
         )?;
         self.metadata_bytes = checked_total(
             self.metadata_bytes,
             value.metadata_bytes,
             limits.max_total_metadata_bytes,
-            "metadata byte",
+            LimitKind::TotalMetadataBytes,
         )?;
         self.text_segments = checked_total(
             self.text_segments,
             value.text_segments,
             limits.max_total_text_segments,
-            "text segment",
+            LimitKind::TotalTextSegments,
         )?;
         Ok(())
     }
@@ -474,19 +475,14 @@ fn source_blob(source: Source) -> Result<Arc<Vec<u8>>> {
     }
 }
 
-fn checked_total(
-    total: usize,
-    added: usize,
-    limit: usize,
-    resource: &'static str,
-) -> Result<usize> {
-    let total = total
-        .checked_add(added)
-        .ok_or_else(|| invalid(format!("DOCX conflict aggregate {resource} count overflow")))?;
+fn checked_total(total: usize, added: usize, limit: usize, kind: LimitKind) -> Result<usize> {
+    let total = total.checked_add(added).unwrap_or(usize::MAX);
     if total > limit {
-        return Err(invalid(format!(
-            "DOCX conflict aggregate {resource} count exceeds {limit}"
-        )));
+        return Err(Error::ConflictLimit {
+            kind,
+            actual: total,
+            maximum: limit,
+        });
     }
     Ok(total)
 }

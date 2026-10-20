@@ -11,7 +11,9 @@ use super::transaction::Transaction as Draft;
 use super::{Graph, Resource};
 use crate::package::family::{Staged, graph_family};
 
-graph_family!("chart");
+graph_family!("chart", own_limits);
+
+pub use super::limit::LimitKind;
 
 /// A staged chart-graph change over one package snapshot. The source is
 /// never changed: [`Self::commit`] publishes a new package, and dropping the

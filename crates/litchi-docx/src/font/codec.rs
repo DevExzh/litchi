@@ -86,7 +86,19 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
             Event::Start(e) => {
                 count += 1;
                 if count > MAX_NODES || stack.len() >= MAX_DEPTH {
-                    return Err(invalid("font-table XML resource limit exceeded"));
+                    return Err(if count > MAX_NODES {
+                        Error::FontLimit {
+                            kind: crate::font::LimitKind::XmlStructure,
+                            actual: count,
+                            maximum: MAX_NODES,
+                        }
+                    } else {
+                        Error::FontLimit {
+                            kind: crate::font::LimitKind::XmlStructure,
+                            actual: (stack.len()).saturating_add(1),
+                            maximum: MAX_DEPTH,
+                        }
+                    });
                 }
                 let parent = scopes
                     .last()
@@ -98,7 +110,19 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
             Event::Empty(e) => {
                 count += 1;
                 if count > MAX_NODES || stack.len() >= MAX_DEPTH {
-                    return Err(invalid("font-table XML resource limit exceeded"));
+                    return Err(if count > MAX_NODES {
+                        Error::FontLimit {
+                            kind: crate::font::LimitKind::XmlStructure,
+                            actual: count,
+                            maximum: MAX_NODES,
+                        }
+                    } else {
+                        Error::FontLimit {
+                            kind: crate::font::LimitKind::XmlStructure,
+                            actual: (stack.len()).saturating_add(1),
+                            maximum: MAX_DEPTH,
+                        }
+                    });
                 }
                 let parent = scopes
                     .last()
@@ -219,7 +243,11 @@ fn attach(n: Node, stack: &mut [Node], root: &mut Option<Node>) -> Result<()> {
 fn append_text(stack: &mut [Node], v: &str) -> Result<()> {
     if let Some(n) = stack.last_mut() {
         if n.text.len().saturating_add(v.len()) > MAX_TEXT {
-            return Err(invalid("font-table text limit exceeded"));
+            return Err(Error::FontLimit {
+                kind: crate::font::LimitKind::Text,
+                actual: n.text.len().saturating_add(v.len()),
+                maximum: MAX_TEXT,
+            });
         }
         n.text.push_str(v);
     } else if !v.trim().is_empty() {

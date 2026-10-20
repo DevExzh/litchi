@@ -448,7 +448,7 @@ fn row_resource_limits_are_limit_exceeded() {
         );
         check(
             litchi_docx::Error::RevisionLimit {
-                resource: "revisions",
+                kind: litchi_docx::revision::LimitKind::Records,
                 actual: 11,
                 maximum: 10,
             }

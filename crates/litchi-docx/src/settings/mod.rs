@@ -18,6 +18,7 @@ mod compatibility;
 mod document;
 mod editing;
 pub mod extensions;
+mod limit;
 mod model;
 mod notes;
 mod smart_tags;
@@ -53,6 +54,7 @@ pub use extensions::{
     DocumentId, Extension, Extensions, Guid, MAX_EXTENSIONS, MAX_OPAQUE_BYTES, OnOff,
     OpaqueExtension, WORD_2010_NAMESPACE, WORD_2012_NAMESPACE,
 };
+pub use limit::LimitKind;
 pub use model::*;
 pub use notes::*;
 pub use smart_tags::*;

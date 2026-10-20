@@ -47,7 +47,11 @@ struct Limits {
 
 pub(crate) fn validate_graph_value(graph: &Graph) -> Result<()> {
     if graph.charts.len() > MAX_CHARTS {
-        return Err(limit("chart count"));
+        return Err(Error::ChartLimit {
+            kind: crate::chart::LimitKind::Count,
+            actual: graph.charts.len(),
+            maximum: MAX_CHARTS,
+        });
     }
     let mut total = 0usize;
     let mut document_ids = HashSet::new();
@@ -66,11 +70,28 @@ pub(crate) fn validate_graph_value(graph: &Graph) -> Result<()> {
             return Err(invalid("chart resource part names collide"));
         }
         let scan = scan_chart_xml(&chart.data, graph.conformance)?;
-        add_total(&mut total, chart.data.len(), MAX_CHART_XML, "chart bytes")?;
+        add_total(
+            &mut total,
+            chart.data.len(),
+            MAX_CHART_XML,
+            crate::chart::LimitKind::Bytes,
+        )?;
         if chart.styles.len() > super::model::MAX_COMPANIONS
             || chart.color_styles.len() > super::model::MAX_COMPANIONS
         {
-            return Err(limit("chart companion count"));
+            return Err(if chart.styles.len() > super::model::MAX_COMPANIONS {
+                Error::ChartLimit {
+                    kind: crate::chart::LimitKind::CompanionCount,
+                    actual: chart.styles.len(),
+                    maximum: super::model::MAX_COMPANIONS,
+                }
+            } else {
+                Error::ChartLimit {
+                    kind: crate::chart::LimitKind::CompanionCount,
+                    actual: chart.color_styles.len(),
+                    maximum: super::model::MAX_COMPANIONS,
+                }
+            });
         }
         let mut ids = HashSet::new();
         for (resources, content_type, root, label) in [
@@ -100,7 +121,7 @@ pub(crate) fn validate_graph_value(graph: &Graph) -> Result<()> {
                     &mut total,
                     resource.data.len(),
                     MAX_COMPANION_XML,
-                    "chart companion bytes",
+                    crate::chart::LimitKind::CompanionBytes,
                 )?;
             }
         }
@@ -122,7 +143,7 @@ pub(crate) fn validate_graph_value(graph: &Graph) -> Result<()> {
                 &mut total,
                 workbook.data.len(),
                 MAX_WORKBOOK_BYTES,
-                "embedded workbook bytes",
+                crate::chart::LimitKind::EmbeddedWorkbookBytes,
             )?;
             Some(workbook.relationship_id.as_str())
         } else {
@@ -148,11 +169,19 @@ pub(crate) fn document_references(xml: &[u8]) -> Result<(Conformance, Vec<String
 
 fn scan_document_xml(xml: &[u8], conformance: Conformance) -> Result<Vec<String>> {
     if xml.len() > MAX_DOCUMENT_XML {
-        return Err(limit("document XML bytes"));
+        return Err(Error::ChartLimit {
+            kind: crate::chart::LimitKind::DocumentXmlBytes,
+            actual: xml.len(),
+            maximum: MAX_DOCUMENT_XML,
+        });
     }
     let processed = process_ooxml(xml)?;
     if processed.len() > MAX_DOCUMENT_XML {
-        return Err(limit("processed document XML bytes"));
+        return Err(Error::ChartLimit {
+            kind: crate::chart::LimitKind::ProcessedDocumentXmlBytes,
+            actual: processed.len(),
+            maximum: MAX_DOCUMENT_XML,
+        });
     }
     let mut reader = NsReader::from_reader(processed.as_ref());
     reader.config_mut().trim_text(false);
@@ -238,13 +267,21 @@ fn scan_document_xml(xml: &[u8], conformance: Conformance) -> Result<Vec<String>
 
 pub(crate) fn scan_chart_xml(xml: &[u8], conformance: Conformance) -> Result<ChartScan> {
     if xml.len() > MAX_CHART_XML {
-        return Err(limit("chart XML bytes"));
+        return Err(Error::ChartLimit {
+            kind: crate::chart::LimitKind::XmlBytes,
+            actual: xml.len(),
+            maximum: MAX_CHART_XML,
+        });
     }
     litchi_drawingml::chart::reader::read(Cursor::new(xml))
         .map_err(|error| invalid(format!("DrawingML chart schema: {error}")))?;
     let processed = process_ooxml(xml)?;
     if processed.len() > MAX_CHART_XML {
-        return Err(limit("processed chart XML bytes"));
+        return Err(Error::ChartLimit {
+            kind: crate::chart::LimitKind::ProcessedChartXmlBytes,
+            actual: processed.len(),
+            maximum: MAX_CHART_XML,
+        });
     }
     let mut reader = NsReader::from_reader(processed.as_ref());
     reader.config_mut().trim_text(false);
@@ -355,11 +392,19 @@ pub(crate) fn validate_companion_xml(
     label: &str,
 ) -> Result<()> {
     if xml.len() > max {
-        return Err(limit("companion XML bytes"));
+        return Err(Error::ChartLimit {
+            kind: crate::chart::LimitKind::CompanionXmlBytes,
+            actual: xml.len(),
+            maximum: max,
+        });
     }
     let processed = process_ooxml(xml)?;
     if processed.len() > max {
-        return Err(limit("processed companion XML bytes"));
+        return Err(Error::ChartLimit {
+            kind: crate::chart::LimitKind::ProcessedCompanionXmlBytes,
+            actual: processed.len(),
+            maximum: max,
+        });
     }
     let result = match root_name {
         "chartStyle" => litchi_drawingml::chart::style::parse(processed.as_ref()).map(|_| ()),
@@ -390,7 +435,11 @@ fn element_info(
         }
         limits.attributes += 1;
         if limits.attributes > MAX_ATTRIBUTES {
-            return Err(limit("XML attribute count"));
+            return Err(Error::ChartLimit {
+                kind: crate::chart::LimitKind::XmlAttributeCount,
+                actual: limits.attributes,
+                maximum: MAX_ATTRIBUTES,
+            });
         }
         let (namespace, name) = reader.resolver().resolve_attribute(item.key);
         // `resolved` maps an unbound name to the empty namespace, and a bound
@@ -410,9 +459,17 @@ fn element_info(
         limits.attribute_bytes = limits
             .attribute_bytes
             .checked_add(namespace.len() + name.len() + value.len())
-            .ok_or_else(|| limit("XML attribute bytes"))?;
+            .ok_or(Error::ChartLimit {
+                kind: crate::chart::LimitKind::XmlAttributeBytes,
+                actual: usize::MAX,
+                maximum: MAX_ATTRIBUTE_BYTES,
+            })?;
         if limits.attribute_bytes > MAX_ATTRIBUTE_BYTES {
-            return Err(limit("XML attribute bytes"));
+            return Err(Error::ChartLimit {
+                kind: crate::chart::LimitKind::XmlAttributeBytes,
+                actual: limits.attribute_bytes,
+                maximum: MAX_ATTRIBUTE_BYTES,
+            });
         }
         if !expanded_names.insert(expanded_name) {
             return Err(invalid("duplicate expanded XML attribute"));
@@ -445,7 +502,19 @@ fn attr<'a>(attrs: &'a [ResolvedAttribute], namespace: &str, name: &str) -> Opti
 fn structure(limits: &mut Limits, depth: usize) -> Result<()> {
     limits.nodes += 1;
     if limits.nodes > MAX_NODES || depth > MAX_DEPTH {
-        return Err(limit("XML structure"));
+        return Err(if limits.nodes > MAX_NODES {
+            Error::ChartLimit {
+                kind: crate::chart::LimitKind::XmlStructure,
+                actual: limits.nodes,
+                maximum: MAX_NODES,
+            }
+        } else {
+            Error::ChartLimit {
+                kind: crate::chart::LimitKind::XmlStructure,
+                actual: depth,
+                maximum: MAX_DEPTH,
+            }
+        });
     }
     Ok(())
 }
@@ -538,16 +607,26 @@ pub(crate) fn add_total(
     total: &mut usize,
     size: usize,
     individual: usize,
-    label: &str,
+    kind: crate::chart::LimitKind,
 ) -> Result<()> {
     if size > individual {
-        return Err(limit(label));
+        return Err(Error::ChartLimit {
+            kind,
+            actual: size,
+            maximum: individual,
+        });
     }
-    *total = total
-        .checked_add(size)
-        .ok_or_else(|| limit("aggregate bytes"))?;
+    *total = total.checked_add(size).ok_or(Error::ChartLimit {
+        kind: crate::chart::LimitKind::AggregateBytes,
+        actual: usize::MAX,
+        maximum: MAX_TOTAL_BYTES,
+    })?;
     if *total > MAX_TOTAL_BYTES {
-        return Err(limit("aggregate bytes"));
+        return Err(Error::ChartLimit {
+            kind: crate::chart::LimitKind::AggregateBytes,
+            actual: *total,
+            maximum: MAX_TOTAL_BYTES,
+        });
     }
     Ok(())
 }
@@ -571,10 +650,6 @@ fn xml_error(error: impl std::fmt::Display) -> Error {
 
 pub(crate) fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
-}
-
-pub(crate) fn limit(label: &str) -> Error {
-    invalid(format!("DOCX chart {label} limit exceeded"))
 }
 
 #[cfg(test)]

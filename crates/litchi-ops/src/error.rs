@@ -1228,6 +1228,18 @@ impl Classify for litchi_docx::Error {
             Self::Io(error) => error.classify(),
             Self::InkLimit { .. }
             | Self::AltChunkLimit { .. }
+            | Self::GlossaryLimit { .. }
+            | Self::ContentControlLimit { .. }
+            | Self::ConflictLimit { .. }
+            | Self::ChartLimit { .. }
+            | Self::FontLimit { .. }
+            | Self::BibliographyLimit { .. }
+            | Self::WebLimit { .. }
+            | Self::StoryLimit { .. }
+            | Self::NumberingLimit { .. }
+            | Self::MailMergeLimit { .. }
+            | Self::StylesWithEffectsLimit { .. }
+            | Self::SettingsLimit { .. }
             | Self::RevisionLimit { .. }
             | Self::BlockReadLimit { .. }
             | Self::ExternalHyperlinkDetachmentLimit { .. }

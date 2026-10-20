@@ -37,9 +37,11 @@ pub(crate) fn is_attached_template_relationship(value: &str) -> bool {
 pub(crate) fn extract_document_variables(part: &dyn Part) -> Result<Variables> {
     let limit = crate::variables::MAX_DOCUMENT_VARIABLE_XML_BYTES;
     if part.blob().len() > limit {
-        return Err(Error::InvalidFormat(format!(
-            "settings XML exceeds the {limit} byte document-variable limit"
-        )));
+        return Err(Error::SettingsLimit {
+            kind: crate::settings::LimitKind::DocumentVariableXmlBytes,
+            actual: part.blob().len(),
+            maximum: limit,
+        });
     }
     let xml = litchi_ooxml_common::mce::process_part(part)?;
     crate::parse_variables(xml.as_ref())
