@@ -450,7 +450,8 @@
         "litchi_docx::styles::effects",
         "litchi_docx::task_panes",
         "litchi_docx::web",
-        "litchi_docx::package::story"
+        "litchi_docx::package::story",
+        "litchi_docx::alt"
       ],
       "immutable_owners": [
         "litchi_docx::Document",
@@ -807,7 +808,8 @@
         "litchi_docx::task_panes",
         "litchi_docx::vba",
         "litchi_docx::web",
-        "litchi_docx::package::story"
+        "litchi_docx::package::story",
+        "litchi_docx::alt"
       ],
       "immutable_owners": [
         "litchi_docx::Document",

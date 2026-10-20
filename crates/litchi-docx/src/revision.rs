@@ -77,6 +77,87 @@ mod limits;
 #[cfg(test)]
 mod limits_tests;
 pub use limits::Limits;
+
+/// A revision reader under explicit budgets (record 0355a): the
+/// configurable form of `Paragraph::revisions`, `Table::revisions`,
+/// `Row::revisions` and `Cell::revisions`, which read under
+/// [`Limits::default`]. [`Reader::for_package`] takes the budgets a package
+/// was opened with ([`crate::SemanticLimits::revisions`]).
+///
+/// ```
+/// use litchi_docx::revision::{Limits, Reader};
+///
+/// let mut builder = litchi_docx::Builder::new()?;
+/// builder.document()?.add_paragraph_with_text("plain");
+/// let package = builder.build()?;
+/// let paragraph = package.document()?.paragraphs()?.remove(0);
+/// let reader = Reader::new(Limits { max_revisions: 0, ..Limits::default() });
+/// assert!(reader.paragraph(&paragraph)?.is_empty());
+/// assert!(Reader::for_package(&package).paragraph(&paragraph)?.is_empty());
+/// # Ok::<(), litchi_docx::Error>(())
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Reader {
+    limits: Limits,
+}
+
+impl Reader {
+    /// A reader under `limits`.
+    #[must_use]
+    pub const fn new(limits: Limits) -> Self {
+        Self { limits }
+    }
+
+    /// A reader under the revision budgets `package` was opened with.
+    #[must_use]
+    pub fn for_package(package: &crate::Package) -> Self {
+        Self::new(package.semantic_limits().revisions_value())
+    }
+
+    /// The reader's budgets.
+    #[must_use]
+    pub const fn limits(&self) -> Limits {
+        self.limits
+    }
+
+    /// The paragraph's revisions in source order; nested annotations keep
+    /// their own metadata and affected text.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed revision XML or an exceeded budget
+    /// ([`crate::Error::RevisionLimit`]).
+    pub fn paragraph(&self, paragraph: &crate::Paragraph) -> Result<SmallVec<[Revision; 4]>> {
+        paragraph.revisions_bounded(self.limits)
+    }
+
+    /// The table's revisions, its rows and cells included.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::paragraph`].
+    pub fn table(&self, table: &crate::Table) -> Result<Vec<Revision>> {
+        table.revisions_bounded(self.limits)
+    }
+
+    /// The row's revisions, its cells included.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::paragraph`].
+    pub fn row(&self, row: &crate::Row) -> Result<Vec<Revision>> {
+        row.revisions_bounded(self.limits)
+    }
+
+    /// The cell's revisions.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::paragraph`].
+    pub fn cell(&self, cell: &crate::Cell) -> Result<Vec<Revision>> {
+        cell.revisions_bounded(self.limits)
+    }
+}
 use limits::{charge, check};
 
 /// Type of tracked change.

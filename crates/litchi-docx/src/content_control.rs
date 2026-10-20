@@ -69,7 +69,7 @@ mod snapshot;
 mod transaction;
 
 pub use authoring::{AuthoredProperties, AuthoringView, NamespaceRequirements, write_sdt_pr};
-pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub use edit::{Commit, Diagnostics, Edit, EditOptions, Error, LimitKind, Patch};
 pub use model::{
     BindingFlavor, Checksum, ChecksumStatus, ChecksumValue, DataBinding,
     FORMATTING_ALLOWED_NAMESPACE, FormattingAllowed, Inventory, Limits, Lock, Occurrence,

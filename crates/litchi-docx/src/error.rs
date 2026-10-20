@@ -158,6 +158,17 @@ pub enum Error {
         source: TryReserveError,
     },
 
+    /// An alternative-format anchor budget is exhausted (record 0355a).
+    #[error("DOCX alternative-format {kind} limit exceeded: {observed} > {maximum}")]
+    AltChunkLimit {
+        /// Bounded resource.
+        kind: crate::alt::LimitKind,
+        /// Observed or requested value.
+        observed: usize,
+        /// Maximum accepted value.
+        maximum: usize,
+    },
+
     /// A block read exceeded a finite resource ceiling.
     #[error("DOCX block {resource} limit exceeded: {actual} > {maximum}")]
     BlockReadLimit {

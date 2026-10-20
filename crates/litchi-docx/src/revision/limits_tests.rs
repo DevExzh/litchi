@@ -38,7 +38,10 @@ fn public_revision_limits_accept_exact_budgets_and_report_each_resource() {
         max_inherited_namespaces: 0,
         max_inherited_namespace_bytes: 0,
     };
-    assert_eq!(paragraph.revisions_bounded(exact).unwrap()[0].text(), "x");
+    assert_eq!(
+        super::Reader::new(exact).paragraph(&paragraph).unwrap()[0].text(),
+        "x"
+    );
     for (resource, limits) in [
         (
             "source bytes",
@@ -98,7 +101,7 @@ fn public_revision_limits_accept_exact_budgets_and_report_each_resource() {
         ),
     ] {
         assert!(
-            matches!(paragraph.revisions_bounded(limits),
+            matches!(super::Reader::new(limits).paragraph(&paragraph),
             Err(Error::RevisionLimit { resource: actual, .. }) if actual == resource),
             "{resource}"
         );
@@ -203,7 +206,7 @@ fn nested_revision_metadata_and_text_are_retained_in_source_order_and_charged() 
         max_text_bytes: 23,
         ..Limits::default()
     };
-    let revisions = paragraph.revisions_bounded(exact).unwrap();
+    let revisions = super::Reader::new(exact).paragraph(&paragraph).unwrap();
     assert_eq!(revisions.len(), 2);
     assert_eq!(
         (revisions[0].id(), revisions[0].text()),
@@ -213,10 +216,11 @@ fn nested_revision_metadata_and_text_are_retained_in_source_order_and_charged() 
     assert_eq!(revisions[1].author(), Some("B"));
     assert_eq!(revisions[1].date_utc(), Some("2026-01-02T00:00:00Z"));
     assert!(matches!(
-        paragraph.revisions_bounded(Limits {
+        super::Reader::new(Limits {
             max_text_bytes: 22,
             ..exact
-        }),
+        })
+        .paragraph(&paragraph),
         Err(Error::RevisionLimit {
             resource: "text bytes",
             actual: 23,
@@ -343,21 +347,21 @@ fn every_table_read_facade_applies_the_record_limit() {
         ..Limits::default()
     };
     assert!(matches!(
-        crate::Table::new(marker.clone()).revisions_bounded(limits),
+        super::Reader::new(limits).table(&crate::Table::new(marker.clone())),
         Err(Error::RevisionLimit {
             resource: "records",
             ..
         })
     ));
     assert!(matches!(
-        crate::Row::new(marker.clone()).revisions_bounded(limits),
+        super::Reader::new(limits).row(&crate::Row::new(marker.clone())),
         Err(Error::RevisionLimit {
             resource: "records",
             ..
         })
     ));
     assert!(matches!(
-        crate::Cell::new(marker).revisions_bounded(limits),
+        super::Reader::new(limits).cell(&crate::Cell::new(marker)),
         Err(Error::RevisionLimit {
             resource: "records",
             ..

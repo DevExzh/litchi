@@ -896,7 +896,11 @@ impl Package {
     /// Returns an error if the operation cannot be completed.
     pub fn verify_content_control_checksums(&self) -> Result<Vec<ChecksumEntry>> {
         self.ensure_story_opc_current("verify_content_control_checksums")?;
-        PackageSnapshot::capture(self.opc_package(), PackageLimits::default())?.verify_checksums()
+        PackageSnapshot::capture(
+            self.opc_package(),
+            self.semantic_limits().content_controls_value().clone(),
+        )?
+        .verify_checksums()
     }
 
     /// Publish a prepared package transaction.

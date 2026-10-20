@@ -1227,6 +1227,7 @@ impl Classify for litchi_docx::Error {
             Self::Opc(error) => error.classify(),
             Self::Io(error) => error.classify(),
             Self::InkLimit { .. }
+            | Self::AltChunkLimit { .. }
             | Self::RevisionLimit { .. }
             | Self::BlockReadLimit { .. }
             | Self::ExternalHyperlinkDetachmentLimit { .. }

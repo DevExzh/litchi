@@ -22,6 +22,6 @@ pub use model::{
     AttributeSpan, Conflict, Id, Inventory, Kind, Limits, Metadata, Range, Scope, Snapshot, Span,
 };
 
-pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub use edit::{Commit, Diagnostics, Edit, EditOptions, Error, LimitKind, Patch};
 pub use package::Story;
 pub use transaction::Operation;
