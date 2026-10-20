@@ -181,3 +181,31 @@ fn authored_chart_parts_must_be_compact_xml() {
     let spaced = CHART.replacen("><", "> <", 1);
     assert!(Part::from_xml(spaced).is_err());
 }
+
+/// Record 0358a: the removed inventory transaction's chart edits on the
+/// package route, with a durable, reversible, mergeable patch.
+#[test]
+fn package_chart_edits_have_durable_patches() -> Result<()> {
+    let bytes = package(false)?;
+    let package = crate::Package::from_bytes(&bytes)
+        .map_err(|error| litchi_core::Error::InvalidFormat(error.to_string()))?;
+    let mut edit = package
+        .edit()
+        .map_err(|error| litchi_core::Error::InvalidFormat(error.to_string()))?;
+    edit.replace_chart("Chart A", Part::from_xml(CHART.replace("kept", "durable"))?)?;
+    let commit = edit
+        .commit()
+        .map_err(|error| litchi_core::Error::InvalidFormat(error.to_string()))?;
+    let wire = commit.patch().to_durable_bytes()?;
+    let patch = crate::edit::Patch::from_durable_bytes(&wire)?;
+    let replayed = package
+        .apply(&patch)
+        .map_err(|error| litchi_core::Error::InvalidFormat(error.to_string()))?;
+    assert_eq!(replayed.package().as_bytes(), commit.package().as_bytes());
+    let restored = commit
+        .package()
+        .apply(&patch.inverse())
+        .map_err(|error| litchi_core::Error::InvalidFormat(error.to_string()))?;
+    assert_eq!(restored.package().as_bytes(), bytes.as_slice());
+    Ok(())
+}

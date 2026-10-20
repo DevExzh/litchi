@@ -300,10 +300,11 @@ impl<'source> SourceEdit<'source> {
         self.before.check_source()?;
         let commit = commit_result?;
         if commit.changed() && self.before.is_signed()? {
-            return Err(Error::Unsupported(
-                "signed-source refusal: changed ODS DDE metadata requires explicit unsign/resign policy"
-                    .to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::Protected,
+                "ods.model.dde.source_backed",
+                "signed-source refusal: changed ODS DDE metadata requires explicit unsign/resign policy",
+            )));
         }
         self.before.check_source()?;
         let target = SourceSnapshot {
@@ -381,8 +382,12 @@ impl<'source> SourceCommit<'source> {
                 .is_signed()
                 .map_err(SourceContentPublicationError::Core)?
         {
-            return Err(SourceContentPublicationError::Core(Error::Unsupported(
-                "signed-source refusal: changed ODS DDE metadata cannot be published".to_string(),
+            return Err(SourceContentPublicationError::Core(Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::Protected,
+                    "ods.model.dde.source_backed",
+                    "signed-source refusal: changed ODS DDE metadata cannot be published",
+                ),
             )));
         }
         self.snapshot.owner.write_sheet_metadata_content(
@@ -492,9 +497,11 @@ impl<'source> SourcePatch<'source> {
             ));
         }
         if self.changed() && snapshot.is_signed()? {
-            return Err(Error::Unsupported(
-                "signed-source refusal: changed ODS DDE patch cannot be applied".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::Protected,
+                "ods.model.dde.source_backed",
+                "signed-source refusal: changed ODS DDE patch cannot be applied",
+            )));
         }
         if !self.changed() {
             snapshot.check_source()?;

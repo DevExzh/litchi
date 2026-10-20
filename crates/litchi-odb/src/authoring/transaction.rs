@@ -213,9 +213,12 @@ impl<'source> Edit<'source> {
         let catalog = source.catalog()?.to_owned();
         let query = owned_query(&catalog, name)?.clone();
         let semantics = query.command_semantics()?;
-        if let crate::QueryDependencySupport::Unsupported(reason) = semantics.dependency_support() {
-            return Err(Error::Unsupported(format!(
-                "ODB query dependency closure is unsupported: {reason:?}"
+        if let crate::QueryDependencySupport::Unsupported(_reason) = semantics.dependency_support()
+        {
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB query dependency closure is unsupported",
             )));
         }
         let mut dependencies = semantics
@@ -523,9 +526,11 @@ impl<'source> Edit<'source> {
         active_content: crate::ActiveContentDisposition,
     ) -> Result<()> {
         if source.protection_status()?.is_encrypted() {
-            return Err(Error::Unsupported(
-                "ODB component payload transfer from an encrypted donor is refused".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB component payload transfer from an encrypted donor is refused",
+            )));
         }
         let Some(source_href) = component.href() else {
             if destination_href.is_some() {
@@ -567,18 +572,22 @@ impl<'source> Edit<'source> {
         if additions.is_empty() && directories.is_empty() {
             return invalid("ODB linked component package payload does not exist");
         }
-        if let crate::ComponentTransferSupport::Refused(reason) =
+        if let crate::ComponentTransferSupport::Refused(_reason) =
             crate::package::Snapshot::payload_transfer_support(&additions)
         {
-            return Err(Error::Unsupported(format!(
-                "ODB component payload transfer is refused: {reason:?}"
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB component payload transfer is refused",
             )));
         }
         let active_dependencies =
             crate::package::Snapshot::payload_active_content_count(&additions)?;
         if active_dependencies > 0 && active_content == crate::ActiveContentDisposition::Refuse {
-            return Err(Error::Unsupported(format!(
-                "ODB component payload has {active_dependencies} active-content dependencies"
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB component payload has active-content dependencies",
             )));
         }
         for addition in additions {
@@ -785,9 +794,11 @@ impl<'source> Edit<'source> {
             return invalid("ODB table replacement cannot change declaration kind");
         }
         if table.name() != name {
-            return Err(Error::Unsupported(
-                "ODB table replacement cannot rename; use rename_table first".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB table replacement cannot rename; use rename_table first",
+            )));
         }
         let prefix = prefixes(&self.content)?.database;
         replace_span(
@@ -822,9 +833,11 @@ impl<'source> Edit<'source> {
             })
             .collect::<Vec<_>>();
         if !incoming.is_empty() && disposition == crate::DependencyDisposition::Refuse {
-            return Err(Error::Unsupported(
-                "ODB table removal requires an incoming-relation disposition".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB table removal requires an incoming-relation disposition",
+            )));
         }
         if disposition == crate::DependencyDisposition::Cascade {
             let mut edits = incoming
@@ -936,9 +949,11 @@ impl<'source> Edit<'source> {
         let site = find_named_child(&nodes, table_site, column_element(table_site), name)?
             .ok_or_else(|| Error::InvalidFormat("ODB column does not exist".to_string()))?;
         if column.name() != name {
-            return Err(Error::Unsupported(
-                "ODB column replacement cannot rename; use rename_column first".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB column replacement cannot rename; use rename_column first",
+            )));
         }
         let prefix = prefixes(&self.content)?.database;
         let fragment = serialize_column(&column, table_site.local == "table-definition", &prefix);
@@ -969,9 +984,11 @@ impl<'source> Edit<'source> {
             .ok_or_else(|| Error::InvalidFormat("ODB column does not exist".to_string()))?;
         let dependents = column_dependents(&nodes, table_site, table, name);
         if !dependents.is_empty() && disposition == crate::DependencyDisposition::Refuse {
-            return Err(Error::Unsupported(
-                "ODB column removal requires a key/index dependency disposition".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB column removal requires a key/index dependency disposition",
+            )));
         }
         if disposition == crate::DependencyDisposition::Cascade {
             let mut edits = dependents
@@ -1867,9 +1884,11 @@ impl<'source> Edit<'source> {
                 crate::SignaturePolicy::PreserveExactOnly
             )
         {
-            return Err(Error::Unsupported(
-                "ODB signature policy permits exact no-ops only".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::Protected,
+                "odb.authoring.transaction",
+                "ODB signature policy permits exact no-ops only",
+            )));
         }
         if protection.is_encrypted()
             && matches!(
@@ -1877,9 +1896,11 @@ impl<'source> Edit<'source> {
                 crate::EncryptionPolicy::PreserveExactOnly
             )
         {
-            return Err(Error::Unsupported(
-                "ODB encryption policy permits exact no-ops only".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB encryption policy permits exact no-ops only",
+            )));
         }
         let typed_publication = self
             .changes
@@ -2385,7 +2406,11 @@ fn prefixes(source: &str) -> Result<Prefixes> {
         .find(|node| node.namespace == NamespaceKind::Database)
         .and_then(|node| qname_prefix(source, node));
     let database = database.ok_or_else(|| {
-        Error::Unsupported("ODB editing requires a prefixed database namespace".to_string())
+        Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odb.authoring.transaction",
+            "ODB editing requires a prefixed database namespace",
+        ))
     })?;
     let xlink = nodes
         .iter()
@@ -2408,7 +2433,11 @@ fn prefixes(source: &str) -> Result<Prefixes> {
                 })
         })
         .ok_or_else(|| {
-            Error::Unsupported("ODB editing requires a bound xlink namespace".to_string())
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odb.authoring.transaction",
+                "ODB editing requires a bound xlink namespace",
+            ))
         })?
         .to_owned();
     Ok(Prefixes { database, xlink })
@@ -3181,17 +3210,21 @@ fn ensure_removable_subtree(
                     .get(current.start_tag.end..current.full.end)
                     .is_some_and(|inner| inner.contains("<!--") || inner.contains("<?")))
         {
-            return Err(Error::Unsupported(
-                "ODB settings edit would discard unknown XML".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "odb.authoring.transaction",
+                "ODB settings edit would discard unknown XML",
+            )));
         }
         for child in nodes.iter().filter(|child| child.parent == Some(id)) {
             if child.namespace != NamespaceKind::Database
                 || !known_children.contains(&child.local.as_str())
             {
-                return Err(Error::Unsupported(
-                    "ODB settings edit would discard unknown XML".to_string(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "odb.authoring.transaction",
+                    "ODB settings edit would discard unknown XML",
+                )));
             }
             check.push(child.id);
         }
@@ -5478,8 +5511,12 @@ fn has_column(table: &Table, name: &str) -> bool {
     table.columns().iter().any(|column| column.name() == name)
 }
 
-fn dependency_refusal<T>(message: &str) -> Result<T> {
-    Err(Error::Unsupported(message.to_owned()))
+fn dependency_refusal<T>(reason: &'static str) -> Result<T> {
+    Err(Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "odb.authoring.transaction",
+        reason,
+    )))
 }
 
 fn extension_target(namespace: &str, local: &str) -> String {

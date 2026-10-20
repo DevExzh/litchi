@@ -124,7 +124,7 @@ impl From<Error> for CoreError {
                 scope: Arc::from("ods-dde"),
             }),
             Error::ExecutionLimit(limit) => CoreError::ResourceLimit(limit),
-            Error::Cancelled => CoreError::Unsupported("ODS DDE operation cancelled".to_string()),
+            Error::Cancelled => CoreError::Other("ODS DDE operation cancelled".to_string()),
             Error::InvalidXml(message) => CoreError::InvalidFormat(message),
             Error::InvalidStructure(message) => CoreError::InvalidFormat(message),
             Error::PositionOverflow => {

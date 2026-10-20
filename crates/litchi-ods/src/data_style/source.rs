@@ -216,9 +216,11 @@ impl<'a> SourceEntry<'a> {
     /// every unselected byte.  The result is checked before allocation.
     pub(crate) fn patch_metadata(&self, patch: &Patch, max_output: usize) -> Result<Vec<u8>> {
         if !self.owner().is_mutable() {
-            return Err(Error::Unsupported(
-                "ODS common data styles are read-only".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.data_style.source",
+                "ODS common data styles are read-only",
+            )));
         }
         self.source_slice(&self.range, "data-style source range")?;
         patch_metadata(self, patch, max_output)
@@ -2376,7 +2378,7 @@ fn parse_body_attributes(
             b"display-factor" => {
                 let parsed = match Double::from_lexical(&value) {
                     Ok(value) => value,
-                    Err(Error::Unsupported(_)) => {
+                    Err(Error::Unsupported(_) | Error::Refused(_)) => {
                         opaque = true;
                         continue;
                     },
@@ -2485,7 +2487,7 @@ fn parse_body_attributes(
 fn parse_i64_or_opaque(value: &str, label: &str, opaque: &mut bool) -> Result<Option<i64>> {
     match super::parse_integer(value, label) {
         Ok(value) => Ok(Some(value)),
-        Err(Error::Unsupported(_)) => {
+        Err(Error::Unsupported(_) | Error::Refused(_)) => {
             *opaque = true;
             Ok(None)
         },
@@ -2496,7 +2498,7 @@ fn parse_i64_or_opaque(value: &str, label: &str, opaque: &mut bool) -> Result<Op
 fn parse_positive_or_opaque(value: &str, label: &str, opaque: &mut bool) -> Result<Option<u64>> {
     match super::parse_positive(value, label) {
         Ok(value) => Ok(Some(value)),
-        Err(Error::Unsupported(_)) => {
+        Err(Error::Unsupported(_) | Error::Refused(_)) => {
             *opaque = true;
             Ok(None)
         },

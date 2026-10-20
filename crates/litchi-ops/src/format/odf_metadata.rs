@@ -236,7 +236,10 @@ fn staging(error: litchi_odf_common::Error, format: FileFormat) -> Error {
 }
 
 fn staging_core(error: litchi_core::Error, format: FileFormat) -> Error {
-    let code = if matches!(error, litchi_core::Error::Unsupported(_)) {
+    let code = if matches!(
+        error,
+        litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_)
+    ) {
         Code::UnsupportedCapability
     } else {
         Code::InvalidValue

@@ -416,6 +416,25 @@ impl Document {
             .map_or_else(|| Ok(Vec::new()), |styles| read(styles.xml_content()))
     }
 
+    /// The advanced-layout read view of `styles.xml` (master pages, page
+    /// layouts, section layouts), from which master-page and section-layout
+    /// transfers to another document are prepared (record 0358a).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the document has no `styles.xml` or it holds
+    /// malformed layout owners.
+    pub fn layouts(&self) -> Result<crate::header_footer::Snapshot> {
+        let styles = self.state.styles.as_ref().ok_or_else(|| {
+            litchi_core::Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::NotFound,
+                "odt.document.layouts",
+                "the document has no styles.xml",
+            ))
+        })?;
+        crate::header_footer::Snapshot::parse(styles.xml_content().to_owned())
+    }
+
     /// Parse automatic page layouts, their properties, and header/footer styles.
     pub fn page_layouts(&self) -> Result<Vec<PageLayout>> {
         self.state.styles.as_ref().map_or_else(

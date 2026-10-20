@@ -1131,6 +1131,7 @@ impl Classify for litchi_core::Error {
             | Self::ZipError(_) => Class::of(Code::CorruptFile),
             Self::ResourceLimit(_) => Class::of(Code::LimitExceeded),
             Self::Unsupported(_) => Class::of(Code::UnsupportedCapability),
+            Self::Refused(refusal) => refusal.classify(),
             Self::Allocation { .. } | Self::Committed(_) | Self::Other(_) => {
                 Class::of(Code::InternalError)
             },

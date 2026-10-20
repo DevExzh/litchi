@@ -695,10 +695,11 @@ fn direct_notes(page: &str) -> Result<Option<&str>> {
                 let local = element.local_name().as_ref().to_vec();
                 let inherited = inherited_fragment_namespace(namespace, element.name().as_ref());
                 if stack.len() == 1 && !is_modeled_direct_page_child(inherited.as_deref(), &local) {
-                    return Err(CoreError::Unsupported(
-                        "flat ODP page has an unsupported direct child; replacement refused"
-                            .to_string(),
-                    ));
+                    return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odp.authoring.flat",
+                        "flat ODP page has an unsupported direct child; replacement refused",
+                    )));
                 }
                 stack.push((inherited, local, start));
             },
@@ -707,10 +708,11 @@ fn direct_notes(page: &str) -> Result<Option<&str>> {
                 let local_name = element.local_name();
                 let local = local_name.as_ref();
                 if stack.len() == 1 && !is_modeled_direct_page_child(inherited.as_deref(), local) {
-                    return Err(CoreError::Unsupported(
-                        "flat ODP page has an unsupported direct child; replacement refused"
-                            .to_string(),
-                    ));
+                    return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odp.authoring.flat",
+                        "flat ODP page has an unsupported direct child; replacement refused",
+                    )));
                 }
                 if stack.len() == 1 && is(inherited.as_deref(), local, PRESENTATION, b"notes") {
                     if notes.is_some() {
@@ -807,9 +809,11 @@ fn validate_compact_xml(xml: &str, bounds: Bounds) -> Result<()> {
     )
     .map_err(|source| invalid_error(format!("invalid flat ODP XML audit limits: {source}")))?;
     let _report = audit::verify(xml.as_bytes(), limits).map_err(|source| match source {
-        audit::Error::NotCompact(_) => {
-            CoreError::Unsupported(format!("flat ODP XML is not compact: {source}"))
-        },
+        audit::Error::NotCompact(_) => CoreError::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odp.authoring.flat",
+            "flat ODP XML is not compact",
+        )),
         audit::Error::Limit { .. }
         | audit::Error::Encoding { .. }
         | audit::Error::Malformed { .. }

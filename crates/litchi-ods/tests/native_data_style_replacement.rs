@@ -27,7 +27,10 @@ fn native_scientific_style_cannot_be_discarded_by_legacy_decimal_replacement() -
     let error = edit
         .replace_style_graph(&graph)
         .expect_err("a scientific body is outside the legacy decimal replacement envelope");
-    assert!(matches!(error, Error::Unsupported(_)), "{error}");
+    assert!(
+        matches!(error, Error::Unsupported(_) | Error::Refused(_)),
+        "{error}"
+    );
     assert_eq!(edit.as_bytes(), FORMATS);
     let commit = edit.commit()?;
     assert!(!commit.diagnostics().changed());

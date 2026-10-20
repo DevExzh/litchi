@@ -97,11 +97,11 @@ fn map_sheet_metadata_execution(error: litchi_core::ExecutionError) -> litchi_co
             litchi_core::Error::ResourceLimit(value)
         },
         litchi_core::ExecutionError::Cancelled => {
-            litchi_core::Error::Unsupported("ODS metadata operation cancelled".to_string())
+            litchi_core::Error::Other("ODS metadata operation cancelled".to_string())
         },
-        other => litchi_core::Error::Unsupported(format!(
-            "ODS metadata execution policy rejected operation: {other}"
-        )),
+        _other => litchi_core::Error::Other(
+            "ODS metadata execution policy rejected operation".to_string(),
+        ),
     }
 }
 
@@ -447,9 +447,12 @@ impl Workbook {
             .into_iter()
             .any(|path| litchi_odf_common::core::package::is_signature_owner_path(&path))
         {
-            return Err(litchi_core::Error::Unsupported(
-                "signed-source refusal: changed ODS DDE metadata requires explicit unsign/resign policy"
-                    .to_string(),
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::Protected,
+                    "ods.facade",
+                    "signed-source refusal: changed ODS DDE metadata requires explicit unsign/resign policy",
+                ),
             ));
         }
         Ok(())
@@ -564,9 +567,12 @@ impl Workbook {
             .into_iter()
             .any(|path| litchi_odf_common::core::package::is_signature_owner_path(&path));
         if signed {
-            return Err(litchi_core::Error::Unsupported(
-                "signed-source refusal: changed ODS sheet metadata requires explicit unsign/resign policy"
-                    .to_string(),
+            return Err(litchi_core::Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::Protected,
+                    "ods.facade",
+                    "signed-source refusal: changed ODS sheet metadata requires explicit unsign/resign policy",
+                ),
             ));
         }
         Ok(())

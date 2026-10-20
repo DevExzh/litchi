@@ -245,7 +245,10 @@ fn signature_owner_refuses_changed_dde_but_retains_exact_noops() {
             .expect("signed fixture"),
     );
     let error = ordinary.edit_dde(|edit| edit.set_sheet_source("Data", replacement_source()));
-    assert!(matches!(error, Err(Error::Unsupported(_))));
+    assert!(matches!(
+        error,
+        Err(Error::Unsupported(_) | Error::Refused(_))
+    ));
     assert_eq!(ordinary.workbook().content_xml(), CONTENT);
     ordinary.edit_dde(|_| Ok(())).expect("signed no-op");
 

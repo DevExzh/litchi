@@ -1744,12 +1744,21 @@ impl Edit {
     /// Stage one structural document verb.
     fn document_operation(
         &mut self,
-        name: &'static str,
+        apply: impl Fn(&mut MutableDocument) -> Result<OperationResult> + Send + Sync + 'static,
+    ) -> Result<&mut Self> {
+        self.document_operation_at("/package".to_owned(), apply)
+    }
+
+    /// Stage one structural document verb writing only `scope`, so joined
+    /// and three-way merged edits of disjoint layout owners compose.
+    fn document_operation_at(
+        &mut self,
+        scope: String,
         apply: impl Fn(&mut MutableDocument) -> Result<OperationResult> + Send + Sync + 'static,
     ) -> Result<&mut Self> {
         self.push(Operation::Document {
-            name,
             apply: Arc::new(apply),
+            scope: Arc::from(scope),
         })
     }
 
@@ -1872,10 +1881,11 @@ impl Edit {
                     OperationResult::Unit
                 },
                 Operation::RestoreSnapshot => {
-                    return Err(CoreError::Unsupported(
-                        "snapshot restoration is available only through patch application"
-                            .to_string(),
-                    ));
+                    return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odt.transaction",
+                        "snapshot restoration is available only through patch application",
+                    )));
                 },
                 Operation::InsertParagraph { index, text } => {
                     let mut mutable = MutableDocument::from_document(document)?;
@@ -2388,9 +2398,11 @@ impl Edit {
                     let current = Package::from_document(&document)?;
                     let plan = crate::package::resource_gc::plan(current, candidates)?;
                     if !plan.is_applicable() {
-                        return Err(CoreError::Unsupported(
-                            "ODT embedded-resource GC replay contains a typed refusal".to_string(),
-                        ));
+                        return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                            litchi_core::edit::RefusalKind::UnsupportedOperation,
+                            "odt.transaction",
+                            "ODT embedded-resource GC replay contains a typed refusal",
+                        )));
                     }
                     let bytes = plan.apply_to_package(document.transaction_package())?;
                     document.replace_transaction_bytes(bytes)?;
@@ -2872,8 +2884,10 @@ enum Operation {
     /// A structural document verb; consecutive document operations share one
     /// working document.
     Document {
-        name: &'static str,
         apply: DocumentStep,
+        /// The effect path the step writes (`/package` when it may rewrite
+        /// any part; one layout owner for the layout verbs).
+        scope: Arc<str>,
     },
     /// `count` staged structural body edits; the edits themselves live in
     /// [`Edit::body`] and are applied together, before every other
@@ -3756,10 +3770,11 @@ impl TransferPlan {
                     );
                 },
                 _ => {
-                    return Err(CoreError::Unsupported(
-                        "ODT cross-document transfer refuses this source-local operation"
-                            .to_string(),
-                    ));
+                    return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odt.transaction",
+                        "ODT cross-document transfer refuses this source-local operation",
+                    )));
                 },
             }
         }
@@ -4022,9 +4037,14 @@ impl DurablePatch {
         if operations.is_empty() {
             operations.push(Operation::Noop);
         }
+        // Structural document verbs have no semantic wire vocabulary; a patch
+        // holding one is carried as the exact target artifact (record 0358a).
         let restoring = operations
             .iter()
-            .all(|operation| matches!(operation, Operation::RestoreSnapshot));
+            .all(|operation| matches!(operation, Operation::RestoreSnapshot))
+            || operations
+                .iter()
+                .any(|operation| matches!(operation, Operation::Document { .. }));
         if restoring {
             let target_blob = forward_blobs
                 .insert(patch.after.as_bytes())
@@ -4600,16 +4620,15 @@ fn semantic_patch_operation(
             format!("/package/scripts/{path}"),
             Value::Null,
         ),
-        Operation::Document { name, .. } => {
-            return Err(CoreError::Unsupported(format!(
-                "the ODT document operation `{name}` has no semantic durable patch form"
+        Operation::RestoreSnapshot
+        | Operation::Annotation(_)
+        | Operation::Body { .. }
+        | Operation::Document { .. } => {
+            return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odt.transaction",
+                "this ODT operation has not migrated to the semantic durable vocabulary",
             )));
-        },
-        Operation::RestoreSnapshot | Operation::Annotation(_) | Operation::Body { .. } => {
-            return Err(CoreError::Unsupported(
-                "this ODT operation has not migrated to the semantic durable vocabulary"
-                    .to_string(),
-            ));
         },
     };
     PatchOperation::new(
@@ -5499,9 +5518,11 @@ fn rdf_triple_value(triple: &crate::rdf::Triple) -> Result<Value> {
         crate::rdf::Subject::Iri(value) => ("iri", value),
         crate::rdf::Subject::BlankNode(value) => ("blank", value),
         _ => {
-            return Err(CoreError::Unsupported(
-                "unsupported RDF subject variant".to_string(),
-            ));
+            return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odt.transaction",
+                "unsupported RDF subject variant",
+            )));
         },
     };
     let object = match &triple.object {
@@ -5520,9 +5541,11 @@ fn rdf_triple_value(triple: &crate::rdf::Triple) -> Result<Value> {
             "value": value,
         }),
         _ => {
-            return Err(CoreError::Unsupported(
-                "unsupported RDF object variant".to_string(),
-            ));
+            return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odt.transaction",
+                "unsupported RDF object variant",
+            )));
         },
     };
     Ok(serde_json::json!({
@@ -5886,9 +5909,11 @@ fn embedded_resource_value(
                 litchi_odf_common::embedded::Root::OpenDocument => "open-document",
                 litchi_odf_common::embedded::Root::MathMl => "mathml",
                 _ => {
-                    return Err(CoreError::Unsupported(
-                        "unsupported embedded XML root".to_string(),
-                    ));
+                    return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "odt.transaction",
+                        "unsupported embedded XML root",
+                    )));
                 },
             };
             serde_json::json!({"blob": blob.as_hex(), "root": root, "type": "inline-xml"})
@@ -6331,7 +6356,7 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
         match operation {
             Operation::Noop => {},
             // A structural document verb may rewrite any part.
-            Operation::Document { .. } => writes.push("/package".to_string()),
+            Operation::Document { scope, .. } => writes.push(scope.to_string()),
             Operation::Body { .. } => writes.push("/body".to_string()),
             Operation::Annotation(_) => writes.push("/body/annotations".to_string()),
             Operation::InsertParagraph { index, .. } | Operation::RemoveParagraph { index } => {
@@ -6755,13 +6780,16 @@ fn invalid_numeric_reference() -> CoreError {
 
 fn ensure_editable_envelope(snapshot: &Package) -> Result<()> {
     match envelope_kind(snapshot)? {
-        EnvelopeKind::Encrypted => Err(CoreError::Unsupported(
-            "packaged ODT transactions preserve encrypted snapshots only as exact no-ops"
-                .to_string(),
-        )),
-        EnvelopeKind::Signed => Err(CoreError::Unsupported(
-            "packaged ODT transactions preserve signed snapshots only as exact no-ops".to_string(),
-        )),
+        EnvelopeKind::Encrypted => Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "odt.transaction",
+            "packaged ODT transactions preserve encrypted snapshots only as exact no-ops",
+        ))),
+        EnvelopeKind::Signed => Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::Protected,
+            "odt.transaction",
+            "packaged ODT transactions preserve signed snapshots only as exact no-ops",
+        ))),
         EnvelopeKind::Plain => Ok(()),
     }
 }

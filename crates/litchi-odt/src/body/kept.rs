@@ -287,10 +287,12 @@ fn is_marker(ns: Ns, local: &[u8]) -> bool {
     }
 }
 
-fn refusal(root: Kind, element: &str, what: &str) -> Error {
-    Error::Unsupported(format!(
-        "an ODT {root:?} text set would replace {element} ({what}): set the text of the \
-         runs around it, or remove it first (record 0304)"
+fn refusal(_root: Kind, _element: &str, _what: &str) -> Error {
+    Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "odt.body.set_text",
+        "an ODT text set would replace a non-text element: set the text of the runs around it, \
+         or remove it first (record 0304)",
     ))
 }
 
@@ -454,7 +456,7 @@ mod tests {
         let body = "<text:p>Page <text:page-number>3</text:page-number></text:p>";
         let error = set(body, Kind::Paragraph, "x").unwrap_err();
         assert!(
-            matches!(&error, Error::Unsupported(message) if message.contains("text:page-number"))
+            matches!(&error, Error::Refused(refusal) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
         );
         // A field that shows nothing is kept.
         let body = "<text:p>Page <text:page-number></text:page-number></text:p>";
@@ -480,7 +482,9 @@ mod tests {
         let nested = "<table:table><table:table-row><table:table-cell>\
              <table:table/><text:p>x</text:p></table:table-cell></table:table-row></table:table>";
         let error = set(nested, Kind::Cell, "y").unwrap_err();
-        assert!(matches!(&error, Error::Unsupported(message) if message.contains("table:table")));
+        assert!(
+            matches!(&error, Error::Refused(refusal) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+        );
     }
 
     #[test]
@@ -488,7 +492,9 @@ mod tests {
         let body =
             r#"<text:p>See <text:a xlink:href="https://example.com/">this</text:a></text:p>"#;
         let error = set(body, Kind::Paragraph, "x").unwrap_err();
-        assert!(matches!(&error, Error::Unsupported(message) if message.contains("text:a")));
+        assert!(
+            matches!(&error, Error::Refused(refusal) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+        );
         // The hyperlink's own text is set.
         let (text, _) = set(body, Kind::Hyperlink, "that").unwrap();
         assert_eq!(text, "that");
@@ -500,6 +506,8 @@ mod tests {
              <text:list><text:list-item><text:p>b</text:p></text:list-item></text:list>\
              </text:list-item></text:list>";
         let error = set(body, Kind::ListItem, "y").unwrap_err();
-        assert!(matches!(&error, Error::Unsupported(message) if message.contains("text:list")));
+        assert!(
+            matches!(&error, Error::Refused(refusal) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+        );
     }
 }

@@ -125,6 +125,7 @@ impl From<litchi_core::Error> for Error {
                     None => Self::Core(litchi_core::Error::ResourceLimit(limit)),
                 }
             },
+            litchi_core::Error::Refused(refusal) => Self::Refused(refusal),
             other => Self::Core(other),
         }
     }
@@ -170,7 +171,7 @@ impl From<Error> for litchi_core::Error {
                 }),
             }),
             invalid @ Error::InvalidLimit { .. } => Self::InvalidFormat(invalid.to_string()),
-            refused @ Error::Refused(_) => Self::Unsupported(refused.to_string()),
+            Error::Refused(refusal) => Self::Refused(refusal),
             conflict @ Error::PatchConflict { .. } => Self::InvalidFormat(conflict.to_string()),
             signed @ Error::Signed => Self::Unsupported(signed.to_string()),
         }
@@ -230,7 +231,7 @@ mod tests {
         );
         assert!(matches!(
             litchi_core::Error::from(Error::Signed),
-            litchi_core::Error::Unsupported(_)
+            litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_)
         ));
     }
 

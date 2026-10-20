@@ -1402,7 +1402,10 @@ fn ordinary_signed_facades_refuse_changed_metadata_publication() {
     let error = signed
         .edit_sheet_metadata(|edit| edit.set_consolidation(Some(options("average"))))
         .expect_err("ordinary signed metadata edit");
-    assert!(matches!(error, litchi_core::Error::Unsupported(_)));
+    assert!(matches!(
+        error,
+        litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_)
+    ));
     assert_eq!(signed.workbook().content_xml(), before);
 
     let unsigned = spreadsheet(&content);

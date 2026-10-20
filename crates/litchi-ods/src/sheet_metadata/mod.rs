@@ -1436,11 +1436,27 @@ impl Edit {
             .cell_for_selector_with_budget(&selector, selector_budget)?
         {
             index::PhysicalCell::Missing if allow_missing => Ok(()),
-            index::PhysicalCell::Missing => Err(Error::InvalidFormat("ODS metadata cell selector did not match a physical cell".to_string())),
-            index::PhysicalCell::ImplicitCovered { .. } => Err(Error::Unsupported("UnsupportedImplicitCoveredCell: ODS metadata cannot materialize an implicit covered cell".to_string())),
+            index::PhysicalCell::Missing => Err(Error::InvalidFormat(
+                "ODS metadata cell selector did not match a physical cell".to_string(),
+            )),
+            index::PhysicalCell::ImplicitCovered { .. } => {
+                Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "ods.sheet_metadata",
+                    "UnsupportedImplicitCoveredCell: ODS metadata cannot materialize an implicit covered cell",
+                )))
+            },
             index::PhysicalCell::Stored(index) => {
-                let cell = self.before.catalog.cells.get(index).ok_or_else(|| Error::InvalidFormat("ODS metadata cell index disappeared".to_string()))?;
-                if !cell.sequence_valid || cell.unsupported_child || cell.direct_owner_count > 0 { return Err(Error::Unsupported("ODS metadata cell owner is opaque or has an ambiguous insertion anchor".to_string())); }
+                let cell = self.before.catalog.cells.get(index).ok_or_else(|| {
+                    Error::InvalidFormat("ODS metadata cell index disappeared".to_string())
+                })?;
+                if !cell.sequence_valid || cell.unsupported_child || cell.direct_owner_count > 0 {
+                    return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "ods.sheet_metadata",
+                        "ODS metadata cell owner is opaque or has an ambiguous insertion anchor",
+                    )));
+                }
                 Ok(())
             },
         }
@@ -1526,10 +1542,11 @@ impl Edit {
             if context.limits() != self.before.context.limits()
                 || !same_budget_lineage(&self.before.context, context)?
             {
-                return Err(Error::Unsupported(
-                    "ODS metadata commit context does not match the snapshot execution lineage"
-                        .to_string(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "ods.sheet_metadata",
+                    "ODS metadata commit context does not match the snapshot execution lineage",
+                )));
             }
         }
         if self.is_no_op() {
@@ -1769,7 +1786,11 @@ impl<'source> SourceMetadataEdit<'source> {
         self.before.check_source()?;
         let commit = self.inner.commit(context)?;
         if commit.changed() && self.before.is_signed()? {
-            return Err(Error::Unsupported("signed-source refusal: changed ODS sheet metadata requires explicit unsign/resign policy".to_string()));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::Protected,
+                "ods.sheet_metadata",
+                "signed-source refusal: changed ODS sheet metadata requires explicit unsign/resign policy",
+            )));
         }
         self.before.check_source()?;
         Ok(SourceMetadataCommit {
@@ -1849,8 +1870,12 @@ impl<'source> SourceMetadataCommit<'source> {
                 .is_signed()
                 .map_err(SourceContentPublicationError::Core)?
         {
-            return Err(SourceContentPublicationError::Core(Error::Unsupported(
-                "signed-source refusal: changed ODS sheet metadata cannot be published".to_string(),
+            return Err(SourceContentPublicationError::Core(Error::Refused(
+                litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::Protected,
+                    "ods.sheet_metadata",
+                    "signed-source refusal: changed ODS sheet metadata cannot be published",
+                ),
             )));
         }
         self.snapshot.owner.write_sheet_metadata_content(
@@ -1947,10 +1972,11 @@ impl<'source> SourceMetadataPatch<'source> {
             ));
         }
         if self.changed() && snapshot.is_signed()? {
-            return Err(Error::Unsupported(
-                "signed-source refusal: changed ODS sheet metadata patch cannot be applied"
-                    .to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::Protected,
+                "ods.sheet_metadata",
+                "signed-source refusal: changed ODS sheet metadata patch cannot be applied",
+            )));
         }
         if !self.changed() {
             return Ok(SourceMetadataCommit {
@@ -2066,9 +2092,11 @@ fn preflight_render_memory(
             .catalog
             .cell_for_selector_with_budget(&selector, &mut selector_budget)?;
         let index::PhysicalCell::Stored(cell_index) = physical else {
-            return Err(Error::Unsupported(
-                "UnsupportedImplicitCoveredCell: metadata edit has no physical owner".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.sheet_metadata",
+                "UnsupportedImplicitCoveredCell: metadata edit has no physical owner",
+            )));
         };
         let cell = before
             .catalog
@@ -2076,10 +2104,11 @@ fn preflight_render_memory(
             .get(cell_index)
             .ok_or_else(|| invalid("ODS metadata cell index disappeared"))?;
         if !cell.sequence_valid || cell.unsupported_child || cell.direct_owner_count > 0 {
-            return Err(Error::Unsupported(
-                "ODS metadata cell owner is opaque or has an ambiguous insertion anchor"
-                    .to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "ods.sheet_metadata",
+                "ODS metadata cell owner is opaque or has an ambiguous insertion anchor",
+            )));
         }
         let span = before
             .catalog
@@ -2297,7 +2326,7 @@ fn render_candidate(
         let replacement = match (&catalog.consolidation, edit.staged_consolidation()) {
             (Some(record), Some(value)) => {
                 if !record.canonical {
-                    return Err(Error::Unsupported(
+                    return Err(Error::Other(
                         "ODS consolidation owner requires lexical preservation".to_string(),
                     ));
                 }
@@ -2307,7 +2336,7 @@ fn render_candidate(
             },
             (Some(record), None) => {
                 if !record.canonical {
-                    return Err(Error::Unsupported(
+                    return Err(Error::Other(
                         "ODS consolidation owner requires lexical preservation".to_string(),
                     ));
                 }
@@ -2346,7 +2375,7 @@ fn render_candidate(
         render_step(context, 1)?;
         if let Some(record) = &catalog.labels {
             if !record.canonical {
-                return Err(Error::Unsupported(
+                return Err(Error::Other(
                     "ODS label-ranges owner requires lexical preservation".to_string(),
                 ));
             }
@@ -2387,19 +2416,22 @@ fn render_candidate(
         let selector = key.selector();
         let physical = catalog.cell_for_selector_with_budget(&selector, &mut selector_budget)?;
         let index::PhysicalCell::Stored(cell_index) = physical else {
-            return Err(Error::Unsupported(
-                "UnsupportedImplicitCoveredCell: metadata edit has no physical owner".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.sheet_metadata",
+                "UnsupportedImplicitCoveredCell: metadata edit has no physical owner",
+            )));
         };
         let cell = catalog
             .cells
             .get(cell_index)
             .ok_or_else(|| invalid("ODS metadata cell index disappeared"))?;
         if !cell.sequence_valid || cell.unsupported_child || cell.direct_owner_count > 0 {
-            return Err(Error::Unsupported(
-                "ODS metadata cell owner is opaque or has an ambiguous insertion anchor"
-                    .to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "ods.sheet_metadata",
+                "ODS metadata cell owner is opaque or has an ambiguous insertion anchor",
+            )));
         }
         let row = catalog
             .rows
@@ -2535,9 +2567,11 @@ fn render_candidate(
     let mut previous_end = 0usize;
     for operation in &operations {
         if operation.range.start < previous_end {
-            return Err(Error::Unsupported(
-                "ODS metadata operations overlap".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.sheet_metadata",
+                "ODS metadata operations overlap",
+            )));
         }
         previous_end = operation.range.end;
     }
@@ -2751,9 +2785,11 @@ fn render_repeated_cell_change(
         .ok_or_else(|| invalid("ODS metadata cell source range is invalid"))?;
     if cell.column_repeat <= 1 {
         if targets.len() > 1 {
-            return Err(Error::Unsupported(
-                "ODS metadata has multiple edits for one logical cell".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.sheet_metadata",
+                "ODS metadata has multiple edits for one logical cell",
+            )));
         }
         let target = targets
             .first()
@@ -2796,9 +2832,11 @@ fn render_repeated_cell_change(
             .last()
             .is_some_and(|previous| previous.offset == target.column_offset)
         {
-            return Err(Error::Unsupported(
-                "ODS metadata has multiple edits for one logical repeated cell".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.sheet_metadata",
+                "ODS metadata has multiple edits for one logical repeated cell",
+            )));
         }
         variants.push(CellVariant {
             offset: target.column_offset,
@@ -3135,7 +3173,7 @@ fn render_cell_direct(
             .as_ref()
             .is_some_and(|owner| owner.opaque || !owner.canonical)
     {
-        return Err(Error::Unsupported(
+        return Err(Error::Other(
             "ODS cell-range-source owner requires lexical preservation".to_string(),
         ));
     }
@@ -3145,7 +3183,7 @@ fn render_cell_direct(
             .as_ref()
             .is_some_and(|owner| owner.opaque || !owner.canonical)
     {
-        return Err(Error::Unsupported(
+        return Err(Error::Other(
             "ODS detective owner requires lexical preservation".to_string(),
         ));
     }
@@ -3227,9 +3265,11 @@ fn expand_empty_cell(
     context: &ExecutionContext,
 ) -> Result<String> {
     if cell.source_owner.is_some() || cell.detective_owner.is_some() {
-        return Err(Error::Unsupported(
-            "ODS empty metadata cell has an unexpected direct owner".to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "ods.sheet_metadata",
+            "ODS empty metadata cell has an unexpected direct owner",
+        )));
     }
     let opening_len = opening_end(raw)?;
     let opening = raw
@@ -3276,9 +3316,9 @@ fn direct_owner_replacement(
     match (owner, replacement) {
         (Some(owner), Some(value)) => {
             if owner.opaque || !owner.canonical {
-                return Err(Error::Unsupported(format!(
-                    "ODS {local} owner requires lexical preservation"
-                )));
+                return Err(Error::Other(
+                    "ODS owner requires lexical preservation".to_string(),
+                ));
             }
             let local_start = owner
                 .raw
@@ -3294,9 +3334,9 @@ fn direct_owner_replacement(
         },
         (Some(owner), None) => {
             if owner.opaque || !owner.canonical {
-                return Err(Error::Unsupported(format!(
-                    "ODS {local} owner requires lexical preservation"
-                )));
+                return Err(Error::Other(
+                    "ODS owner requires lexical preservation".to_string(),
+                ));
             }
             let local_start = owner
                 .raw
@@ -3312,9 +3352,11 @@ fn direct_owner_replacement(
         },
         (None, Some(value)) => {
             if cell.unsupported_child || !cell.sequence_valid {
-                return Err(Error::Unsupported(
-                    "ODS metadata cell insertion anchor is ambiguous".to_string(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "ods.sheet_metadata",
+                    "ODS metadata cell insertion anchor is ambiguous",
+                )));
             }
             let anchor = cell_insertion_anchor(before, cell, local)?;
             Ok((anchor..anchor, Some(value), priority))
@@ -3778,16 +3820,20 @@ fn top_level_anchor(before: &Snapshot, local: &str) -> Result<ByteRange<usize>> 
             } else if local == "label-ranges" && saw_table {
                 break;
             } else {
-                return Err(Error::Unsupported(
-                    "ODS metadata insertion anchor is ambiguous around an unsupported spreadsheet child".to_string(),
-                ));
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "ods.sheet_metadata",
+                    "ODS metadata insertion anchor is ambiguous around an unsupported spreadsheet child",
+                )));
             }
         } else if local == "label-ranges" && saw_table {
             break;
         } else {
-            return Err(Error::Unsupported(
-                "ODS metadata insertion anchor is ambiguous around an unsupported spreadsheet child".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.sheet_metadata",
+                "ODS metadata insertion anchor is ambiguous around an unsupported spreadsheet child",
+            )));
         }
     }
     let start = match local {
@@ -3904,11 +3950,9 @@ fn map_execution(error: litchi_core::ExecutionError) -> Error {
     match error {
         litchi_core::ExecutionError::ResourceLimit(value) => Error::ResourceLimit(value),
         litchi_core::ExecutionError::Cancelled => {
-            Error::Unsupported("ODS metadata operation cancelled".to_string())
+            Error::Other("ODS metadata operation cancelled".to_string())
         },
-        other => Error::Unsupported(format!(
-            "ODS metadata execution policy rejected operation: {other}"
-        )),
+        _other => Error::Other("ODS metadata execution policy rejected operation".to_string()),
     }
 }
 
