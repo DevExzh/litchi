@@ -14,7 +14,7 @@
     reason = "each verb documents the raw operation it stages"
 )]
 
-use litchi_opc::PackURI;
+use crate::slide::Selector;
 
 use super::ListDraft;
 #[allow(
@@ -71,11 +71,12 @@ impl Edit<'_> {
     ///
     /// Returns the operation's error, a validation or serialization error of
     /// the draft, or a changed edit of a signed package.
-    pub fn update<T>(
+    pub fn update<'s, T>(
         &mut self,
-        slide_part_name: &PackURI,
+        slide: impl Into<Selector<'s>>,
         operation: impl FnOnce(&mut ListDraft) -> Result<T>,
     ) -> Result<T> {
+        let slide_part_name = &crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         self.staged.update(move |opc| {
             let mut draft = load_snapshot(opc, slide_part_name)?
                 .ok_or_else(|| {
@@ -97,7 +98,8 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn show_events(&self, slide_part_name: &PackURI) -> Result<Option<Vec<Event>>> {
+    pub fn show_events<'s>(&self, slide: impl Into<Selector<'s>>) -> Result<Option<Vec<Event>>> {
+        let slide_part_name = &crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         load(self.staged.opc(), slide_part_name)
     }
 
@@ -106,14 +108,14 @@ impl Edit<'_> {
     /// A change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     /// (ADR 0006) before anything is mutated: remove the signature explicitly
-    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
-    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// first with [`Package::unsign`](crate::Package::unsign). An exact
     /// no-op keeps the signature.
     ///
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.
-    pub fn set(&mut self, slide_part_name: &PackURI, events: &[Draft]) -> Result<()> {
+    pub fn set<'s>(&mut self, slide: impl Into<Selector<'s>>, events: &[Draft]) -> Result<()> {
+        let slide_part_name = &crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         self.staged
             .update(move |opc| package::store(opc, slide_part_name, events))
     }
@@ -124,14 +126,14 @@ impl Edit<'_> {
     /// A change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     /// (ADR 0006) before anything is mutated: remove the signature explicitly
-    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
-    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+    /// first with [`Package::unsign`](crate::Package::unsign). An exact
     /// no-op keeps the signature.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn remove(&mut self, slide_part_name: &PackURI) -> Result<Option<Snapshot>> {
+    pub fn remove<'s>(&mut self, slide: impl Into<Selector<'s>>) -> Result<Option<Snapshot>> {
+        let slide_part_name = &crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         self.staged
             .update(move |opc| package::remove(opc, slide_part_name))
     }

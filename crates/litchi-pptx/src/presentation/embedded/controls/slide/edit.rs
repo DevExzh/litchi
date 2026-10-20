@@ -69,12 +69,15 @@ impl Edit<'_> {
     ///
     /// Returns the operation's error, a validation or serialization error of
     /// the draft, or a changed edit of a signed package.
-    pub fn update<T>(
+    pub fn update<'s, T>(
         &mut self,
-        slide_index: usize,
-        control_index: usize,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        control: litchi_core::Position,
         operation: impl FnOnce(&mut Draft) -> Result<T>,
     ) -> Result<T> {
+        let (slide_index, _) =
+            crate::package::resolve_slide_position(self.staged.opc(), slide.into())?;
+        let control_index = control.get();
         self.staged.update(move |opc| {
             let mut draft = {
                 let name = crate::package::resolve_slide(opc, slide_index.into())?;

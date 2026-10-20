@@ -21,13 +21,8 @@ pub use collaboration::{
 pub use model::{Author, Comment, Comments, Conformance, List};
 pub(crate) use package::reattribute_presentation_comment;
 pub use package::{
-    add_presentation_comment, add_presentation_comment_author, find_presentation_comment,
-    find_presentation_comment_author, load_presentation_comments,
+    find_presentation_comment, find_presentation_comment_author, load_presentation_comments,
     load_presentation_comments_strict, load_presentation_comments_with_tolerance,
-    remove_presentation_comment, remove_presentation_comment_author,
-    reorder_presentation_comment_authors, reorder_presentation_comments,
-    replace_presentation_comment, replace_presentation_comment_author, store_presentation_comments,
-    update_presentation_comment, update_presentation_comment_author,
 };
 pub use part::{AuthorListPart, ListPart};
 
@@ -60,6 +55,13 @@ pub(crate) const MAX_SLIDES: usize = 100_000;
 pub(crate) const MAX_COMMENTS_PER_SLIDE: usize = 65_536;
 pub(crate) const MAX_TOTAL_COMMENTS: usize = 1_000_000;
 
-pub(crate) fn invalid(message: impl Into<String>) -> crate::Error {
-    crate::Error::Invalid(message.into())
+pub(crate) fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
+
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub(crate) use package::{
+    add_presentation_comment, add_presentation_comment_author, remove_presentation_comment,
+    store_presentation_comments, update_presentation_comment,
+};

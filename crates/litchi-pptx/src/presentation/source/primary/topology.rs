@@ -1284,6 +1284,7 @@ fn package_from_revision(package: &Package, revision: Revision) -> Result<Packag
         overlays: Arc::from([]),
         topology: Some(Arc::new(revision)),
         tolerance: Arc::clone(&package.tolerance),
+        deferred: None,
     };
     candidate.check()?;
     Ok(candidate)
@@ -1302,6 +1303,7 @@ fn package_as_physical(package: &Package) -> Result<Package> {
         overlays: Arc::from([]),
         topology: None,
         tolerance: Arc::clone(&package.tolerance),
+        deferred: None,
     };
     candidate.check()?;
     Ok(candidate)

@@ -1849,19 +1849,21 @@ pub struct Edit<'a> {
 
 impl crate::Package {
     /// The optional p232 type extension of the placeholder `key` in the
-    /// slide, master or layout part `owner`.
+    /// slide, layout or master `owner`.
     ///
     /// # Errors
     ///
     /// Returns an error for a missing or foreign owner part, a shape that is
     /// not a placeholder, markup this route cannot read losslessly, or an
     /// owner beyond the default bounds.
-    pub fn placeholder_type_extension<'a>(
+    pub fn placeholder_type_extension<'o, 'a>(
         &self,
-        owner: &PackURI,
+        owner: impl Into<crate::slide::Owner<'o>>,
         key: impl Into<Key<'a>>,
     ) -> Result<Snapshot> {
-        load_slot_snapshot(self.opc()?, owner, key)
+        let opc = self.opc()?;
+        let owner = super::package::resolve_owner(opc, owner.into())?;
+        load_slot_snapshot(opc, &owner, key)
     }
 
     /// Start a placeholder type-extension edit.
@@ -1901,13 +1903,13 @@ impl Edit<'_> {
     /// Returns an error for a missing or foreign owner, a shape that is not
     /// a placeholder, markup this route cannot edit losslessly, an owner
     /// beyond the default bounds, or a changed edit of a signed package.
-    pub fn set<'k>(
+    pub fn set<'o, 'k>(
         &mut self,
-        owner: &PackURI,
+        owner: impl Into<crate::slide::Owner<'o>>,
         key: impl Into<Key<'k>>,
         value: PlaceholderTypeExtension,
     ) -> Result<bool> {
-        self.stage(owner, key.into(), Some(value))
+        self.stage(owner.into(), key.into(), Some(value))
     }
 
     /// Remove the complete p232 type extension of the placeholder `key` in
@@ -1916,17 +1918,22 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// As [`Self::set`].
-    pub fn remove<'k>(&mut self, owner: &PackURI, key: impl Into<Key<'k>>) -> Result<bool> {
-        self.stage(owner, key.into(), None)
+    pub fn remove<'o, 'k>(
+        &mut self,
+        owner: impl Into<crate::slide::Owner<'o>>,
+        key: impl Into<Key<'k>>,
+    ) -> Result<bool> {
+        self.stage(owner.into(), key.into(), None)
     }
 
     fn stage(
         &mut self,
-        owner: &PackURI,
+        owner: crate::slide::Owner<'_>,
         key: Key<'_>,
         value: Option<PlaceholderTypeExtension>,
     ) -> Result<bool> {
-        let mut draft = load_slot_snapshot(self.staged.opc(), owner, key)?.edit();
+        let owner = super::package::resolve_owner(self.staged.opc(), owner)?;
+        let mut draft = load_slot_snapshot(self.staged.opc(), &owner, key)?.edit();
         draft.set_optional(value);
         let staged = draft.commit()?;
         if staged.is_noop() {

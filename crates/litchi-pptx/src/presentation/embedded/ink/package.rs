@@ -93,7 +93,7 @@ pub fn load_slide(
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store_slide(
+pub(crate) fn store_slide(
     package: &mut OpcPackage,
     slide_name: &PackURI,
     inkml: &[u8],

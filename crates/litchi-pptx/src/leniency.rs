@@ -72,7 +72,7 @@
 //!   stamped with the owner part name when read through a part view.
 //! * A slide transition ([`crate::transition::Transition`], from
 //!   [`crate::transition::read`] or
-//!   [`crate::SourceBackedSlideSnapshot::transition`]) carries the repairs
+//!   [`crate::source::Slide::transition`]) carries the repairs
 //!   its read applied in
 //!   [`crate::transition::Transition::tolerance_report`]; the snapshot
 //!   stamps its slide part name. The report shares the value's retained

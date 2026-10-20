@@ -22,7 +22,7 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
-pub use codec::{load, put, remove};
+pub use codec::load;
 mod edit;
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
@@ -35,3 +35,4 @@ pub(crate) use codec::{selected_raw_span, selected_raw_span_for_shape};
 // `tag::package` uses this narrow lexical seam while discovering package-level
 // tag anchors. The implementation remains private to the tag subsystem.
 pub(crate) use codec::attribute_value_span;
+pub(crate) use codec::{put, remove};

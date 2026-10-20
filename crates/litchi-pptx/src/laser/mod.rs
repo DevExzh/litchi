@@ -10,4 +10,7 @@ mod package;
 
 pub use codec::{LASER_TRACE_EXTENSION_URI, read, read_with, validate, write, write_to};
 pub use model::{Conformance, Limits, Trace, TracePoint};
-pub use package::{load_slide_traces, store_slide_trace};
+pub use package::load_slide_traces;
+
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};

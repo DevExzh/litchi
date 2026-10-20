@@ -9,15 +9,15 @@
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::comments::{
     Author as CommentAuthor, Comment, Comments, Conformance as CommentConformance,
-    List as CommentList, store_presentation_comments,
+    List as CommentList,
 };
 use litchi_pptx::media_parts::{
     Conformance as MediaConformance, Kind as MediaKind, List as MediaList, Picture, Resource,
-    Transform, store as store_slide_media,
+    Transform,
 };
 use litchi_pptx::presentation::media::{Format as MediaFormat, Kind as AuthoringMediaKind};
 use litchi_pptx::presentation_properties::metadata::sections::{List as SectionList, Section};
-use litchi_pptx::{Error, Result};
+use litchi_pptx::{Error, Package, Result};
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
 use std::fs;
@@ -57,13 +57,11 @@ fn main() -> std::result::Result<(), Box<dyn StdError>> {
 
     let mut package = builder.build()?;
     {
+        package = store_comments(&package)?;
         let mut opc_edit = package.edit_opc()?;
-        opc_edit.update(move |opc| {
-            store_comments(opc)?;
-            store_sections(opc, &sections.to_xml()?)?;
-            store_media(opc, media)
-        })?;
+        opc_edit.update(move |opc| store_sections(opc, &sections.to_xml()?))?;
         package = opc_edit.commit()?.into_package();
+        package = store_media(&package, media)?;
     }
 
     let output_path = "pptx_features_demo.pptx";
@@ -355,7 +353,7 @@ fn build_sections() -> SectionList {
     sections
 }
 
-fn store_comments(opc: &mut OpcPackage) -> Result<()> {
+fn store_comments(package: &Package) -> Result<Package> {
     let mut author = CommentAuthor::new(1, "Litchi Demo", "LD");
     author.last_index = 5;
     let comments = Comments {
@@ -402,10 +400,13 @@ fn store_comments(opc: &mut OpcPackage) -> Result<()> {
             },
         ],
     };
-    store_presentation_comments(opc, &comments, CommentConformance::Transitional)
+    let mut edit = package.edit_comments()?;
+    edit.set(&comments, CommentConformance::Transitional)?;
+    Ok(edit.commit()?.into_package())
 }
 
-fn store_media(opc: &mut OpcPackage, media: Vec<MediaAttachment>) -> Result<()> {
+fn store_media(package: &Package, media: Vec<MediaAttachment>) -> Result<Package> {
+    let mut edit = package.edit_media()?;
     let mut by_slide = BTreeMap::<usize, Vec<MediaAttachment>>::new();
     for attachment in media {
         by_slide
@@ -448,16 +449,14 @@ fn store_media(opc: &mut OpcPackage, media: Vec<MediaAttachment>) -> Result<()> 
             });
             resource_index += 1;
         }
-        let slide_name =
-            PackURI::new(format!("/ppt/slides/slide{slide}.xml")).map_err(Error::Uri)?;
-        store_slide_media(
-            opc,
-            &slide_name,
+        // `slide` is one-based.
+        edit.set(
+            slide - 1,
             &MediaList { pictures },
             MediaConformance::Transitional,
         )?;
     }
-    Ok(())
+    Ok(edit.commit()?.into_package())
 }
 
 fn store_sections(opc: &mut OpcPackage, fragment: &str) -> Result<()> {

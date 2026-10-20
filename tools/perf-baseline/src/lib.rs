@@ -51048,26 +51048,27 @@ fn publish_pptx_source_edit<W: Write>(
     source: Arc<dyn ReadAt>,
     writer: &mut W,
 ) -> Result<usize, Box<dyn Error>> {
-    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(source)?;
+    let presentation = litchi_pptx::SourceBackedPresentation::from_read_at(source)?;
+    let package = litchi_pptx::source::Package::from_presentation(&presentation)?;
     let target_slide = PPTX_SOURCE_SLIDE_COUNT / 2;
-    let mut edit = editor.edit_slide(target_slide)?;
-    if !edit.set_shape_text(0, semantic_pptx_text(target_slide, 0, true))? {
+    let mut edit = package.edit()?;
+    if !edit.set_shape_text(target_slide, 0_usize, semantic_pptx_text(target_slide, 0, true))? {
         return Err("PPTX source edit unexpectedly reported no change".into());
     }
-    let commit = edit.commit();
+    let commit = edit.commit()?;
     if !commit.diagnostics().changed() {
         return Err("PPTX source edit produced an unchanged commit".into());
     }
-    let replayed = commit.patch().apply(commit.patch().source())?;
-    if commit.patch().inverse().apply(&replayed).is_err() {
+    let replayed = package.apply(commit.patch())?;
+    if replayed.apply(&commit.patch().inverse()).is_err() {
         return Err("PPTX source edit inverse rejected its candidate".into());
     }
-    let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-    let published = editor.publish_slide_commit_to_stream(writer, &commit)?;
-    if commit.patch().inverse().apply(&published).is_err()
-        || commit.patch().apply(&published).is_ok()
+    let materializations = usize::try_from(presentation.cache_diagnostics().successful_loads)?;
+    commit.package().write_to(&mut *writer)?;
+    if commit.package().apply(&commit.patch().inverse()).is_err()
+        || commit.package().apply(commit.patch()).is_ok()
     {
-        return Err("PPTX source edit published a different slide snapshot".into());
+        return Err("PPTX source edit published a different slide revision".into());
     }
     Ok(materializations)
 }
@@ -51178,25 +51179,27 @@ fn publish_pptx_batch_edit<W: Write>(
         .collect::<Vec<_>>();
     let replacements = pptx_batch_replacements(&texts);
     if source_backed {
-        let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(source)?;
-        let mut edit = editor.edit_slide(target_slide)?;
-        if edit.set_shape_texts(&replacements)? != PPTX_SOURCE_TEXT_BOXES_PER_SLIDE {
+        let presentation = litchi_pptx::SourceBackedPresentation::from_read_at(source)?;
+        let package = litchi_pptx::source::Package::from_presentation(&presentation)?;
+        let mut edit = package.edit()?;
+        if edit.set_shape_texts(target_slide, &replacements)? != PPTX_SOURCE_TEXT_BOXES_PER_SLIDE {
             return Err("PPTX source-backed batch changed an unexpected shape count".into());
         }
-        let commit = edit.commit();
+        let commit = edit.commit()?;
         if !commit.diagnostics().changed() {
             return Err("PPTX source-backed batch produced an unchanged commit".into());
         }
-        let replayed = commit.patch().apply(commit.patch().source())?;
-        if commit.patch().inverse().apply(&replayed).is_err() {
+        let replayed = package.apply(commit.patch())?;
+        if replayed.apply(&commit.patch().inverse()).is_err() {
             return Err("PPTX source-backed batch inverse rejected its candidate".into());
         }
-        let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-        let published = editor.publish_slide_commit_to_stream(writer, &commit)?;
-        if commit.patch().inverse().apply(&published).is_err()
-            || commit.patch().apply(&published).is_ok()
+        let materializations =
+            usize::try_from(presentation.cache_diagnostics().successful_loads)?;
+        commit.package().write_to(&mut *writer)?;
+        if commit.package().apply(&commit.patch().inverse()).is_err()
+            || commit.package().apply(commit.patch()).is_ok()
         {
-            return Err("PPTX source-backed batch published another snapshot".into());
+            return Err("PPTX source-backed batch published another revision".into());
         }
         Ok(materializations)
     } else {
@@ -51337,8 +51340,9 @@ fn publish_pptx_multi_slide_batch_edit<W: Write>(
     source_backed: bool,
 ) -> Result<usize, Box<dyn Error>> {
     if source_backed {
-        let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(source)?;
-        let mut edit = editor.edit_slides();
+        let presentation = litchi_pptx::SourceBackedPresentation::from_read_at(source)?;
+        let package = litchi_pptx::source::Package::from_presentation(&presentation)?;
+        let mut edit = package.edit()?;
         for slide_position in pptx_multi_slide_positions() {
             let texts = (0..PPTX_SOURCE_TEXT_BOXES_PER_SLIDE)
                 .map(|shape| semantic_pptx_text(slide_position, shape, true))
@@ -51356,16 +51360,17 @@ fn publish_pptx_multi_slide_batch_edit<W: Write>(
         if !commit.diagnostics().changed() {
             return Err("PPTX source-backed multi-slide batch produced no changes".into());
         }
-        let replayed = commit.patch().apply(commit.patch().source())?;
-        if commit.patch().inverse().apply(&replayed).is_err() {
+        let replayed = package.apply(commit.patch())?;
+        if replayed.apply(&commit.patch().inverse()).is_err() {
             return Err("PPTX source-backed multi-slide inverse rejected its candidate".into());
         }
-        let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-        let published = editor.publish_slide_batch_commit_to_stream(writer, &commit)?;
-        if commit.patch().inverse().apply(&published).is_err()
-            || commit.patch().apply(&published).is_ok()
+        let materializations =
+            usize::try_from(presentation.cache_diagnostics().successful_loads)?;
+        commit.package().write_to(&mut *writer)?;
+        if commit.package().apply(&commit.patch().inverse()).is_err()
+            || commit.package().apply(commit.patch()).is_ok()
         {
-            return Err("PPTX source-backed multi-slide published another snapshot".into());
+            return Err("PPTX source-backed multi-slide published another revision".into());
         }
         return Ok(materializations);
     }

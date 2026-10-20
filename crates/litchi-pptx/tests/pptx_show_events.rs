@@ -67,7 +67,9 @@ fn event_owner_ignores_events_under_other_extensions() {
 fn store(opc: &mut OpcPackage, slide: &PackURI, events: &[Draft]) -> Result<()> {
     let package = Package::from_opc_package(opc.clone())?;
     let mut edit = package.edit_show_events()?;
-    edit.set(slide, events)?;
+    // Every fixture here has one slide.
+    assert_eq!(slide.as_str(), "/ppt/slides/slide1.xml");
+    edit.set(0_usize, events)?;
     *opc = edit.commit()?.into_package().opc()?.clone();
     Ok(())
 }

@@ -66,7 +66,7 @@ pub fn load_modern_comment_changes(package: &OpcPackage) -> Result<Vec<ChangeCom
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn update_modern_comment_changes<F>(package: &mut OpcPackage, update: F) -> Result<bool>
+pub(crate) fn update_modern_comment_changes<F>(package: &mut OpcPackage, update: F) -> Result<bool>
 where
     F: FnOnce(&mut Vec<ChangeCommand>),
 {

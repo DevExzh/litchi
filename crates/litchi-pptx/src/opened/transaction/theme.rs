@@ -65,7 +65,7 @@ impl Edit {
         }
         let before = self.working.get_part(&name)?.blob_arc();
         let mut candidate = self.working.clone();
-        crate::shape::theme::put_colors(&mut candidate, name.as_str(), colors)?;
+        crate::shape::theme::package::put_colors(&mut candidate, name.as_str(), colors)?;
         let changed = candidate.get_part(&name)?.blob() != before.as_slice();
         if changed {
             self.working = candidate;
@@ -93,7 +93,7 @@ impl Edit {
         }
         let before = self.working.get_part(&name)?.blob_arc();
         let mut candidate = self.working.clone();
-        crate::shape::theme::put_fonts(&mut candidate, name.as_str(), fonts)?;
+        crate::shape::theme::package::put_fonts(&mut candidate, name.as_str(), fonts)?;
         let changed = candidate.get_part(&name)?.blob() != before.as_slice();
         if changed {
             self.working = candidate;

@@ -141,7 +141,7 @@ pub fn load(package: &OpcPackage, owner: &PackURI) -> Result<Option<Source>> {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Option<List>> {
+pub(crate) fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Option<List>> {
     let (owner_name, layout, attached, anchor_uses) = {
         let owner = package.get_part(owner)?;
         let layout = scan_owner_source(owner.blob(), owner.content_type())?;
@@ -299,7 +299,7 @@ pub fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Opti
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn remove(package: &mut OpcPackage, owner: &PackURI) -> Result<Option<List>> {
+pub(crate) fn remove(package: &mut OpcPackage, owner: &PackURI) -> Result<Option<List>> {
     let (owner_name, layout, attached, owner_xml, retain_relationship, orphan) = {
         let owner = package.get_part(owner)?;
         let layout = scan_owner_source(owner.blob(), owner.content_type())?;

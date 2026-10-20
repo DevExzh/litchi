@@ -17,7 +17,7 @@ const LOCAL_CHANGES_INFORMATION: &[u8] =
 
 #[test]
 fn package_and_presentation_manage_local_revision_and_changes_information() {
-    let mut opc = base_opc();
+    let opc = base_opc();
     assert_eq!(revision::load(&opc).unwrap(), None);
     assert_eq!(changes::load(&opc).unwrap(), None);
 
@@ -32,12 +32,11 @@ fn package_and_presentation_manage_local_revision_and_changes_information() {
         changes_information: changes::Info::parse(LOCAL_CHANGES_INFORMATION).unwrap(),
     };
 
-    revision::store(&mut opc, &revision_part).unwrap();
-    assert!(matches!(
-        revision::store(&mut opc, &revision_part),
-        Err(Error::Invalid(_))
-    ));
     let package = Package::from_opc_package(opc).unwrap();
+    let mut edit = package.edit_revision_info().unwrap();
+    edit.set(&revision_part).unwrap();
+    assert!(matches!(edit.set(&revision_part), Err(Error::Invalid(_))));
+    let package = edit.commit().unwrap().into_package();
     let mut edit = package.edit_changes_info().unwrap();
     edit.set(&changes_part).unwrap();
     assert!(matches!(edit.set(&changes_part), Err(Error::Invalid(_))));

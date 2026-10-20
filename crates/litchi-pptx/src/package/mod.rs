@@ -16,4 +16,6 @@ mod test_seams;
 mod tests;
 
 pub use model::Package;
-pub(crate) use model::{OpenedOwnerState, resolve_slide, resolve_slide_identity};
+pub(crate) use model::{
+    OpenedOwnerState, resolve_slide, resolve_slide_identity, resolve_slide_position,
+};
