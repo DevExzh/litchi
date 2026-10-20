@@ -3604,7 +3604,7 @@ fn patch_client_anchor(
         },
         _ => {
             return Err(Error::refused(
-                RefusalKind::UnsupportedTarget,
+                RefusalKind::UnsupportedContent,
                 "edit cells",
                 "a position-locked drawing anchor is not shiftable without row and column sizes",
             ));
