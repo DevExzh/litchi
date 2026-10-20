@@ -142,11 +142,11 @@ pub use save::SaveError;
 pub(crate) mod families {
     pub(crate) mod chart_arrangement {
         pub use super::super::chart_arrangement::{
-            Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+            Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
         };
     }
     pub(crate) mod chart_data {
-        pub use super::super::chart_data::{Error, LimitKind};
+        pub use super::super::chart_data::{Error, LimitKind, Refusal};
         pub use super::super::chart_data_edit::{Commit, Diagnostics, Edit, Patch};
     }
     pub(crate) mod chart_metadata {
@@ -154,7 +154,7 @@ pub(crate) mod families {
     }
     pub(crate) mod image_adjustments {
         pub use super::super::image_adjustments::{
-            Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+            Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
         };
     }
 }
@@ -252,7 +252,7 @@ pub enum PayloadLimitKind {
 #[non_exhaustive]
 pub enum ResourceError {
     /// A finite native-payload resource ceiling was exceeded.
-    LimitExceeded {
+    Limit {
         /// Resource that exceeded its ceiling.
         kind: PayloadLimitKind,
         /// Observed or requested amount.
@@ -412,7 +412,7 @@ impl Error {
                     kind,
                     observed,
                     limit,
-                } => Some(ResourceError::LimitExceeded {
+                } => Some(ResourceError::Limit {
                     kind: match kind {
                         litchi_iwa_common::LimitKind::InputBytes => PayloadLimitKind::InputBytes,
                         litchi_iwa_common::LimitKind::Fields => PayloadLimitKind::Fields,
@@ -2169,7 +2169,7 @@ fn map_sheet_preflight_error(
     consumed_references: usize,
 ) -> Error {
     match error {
-        names::Error::LimitExceeded {
+        names::Error::Limit {
             kind,
             observed,
             maximum,
@@ -2539,7 +2539,7 @@ mod tests {
             });
             assert_eq!(
                 error.resource_error(),
-                Some(ResourceError::LimitExceeded {
+                Some(ResourceError::Limit {
                     kind: normalized,
                     observed: 9,
                     maximum: 8,

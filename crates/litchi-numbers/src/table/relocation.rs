@@ -8,5 +8,5 @@
 
 /// Exact-source table-relocation transaction values.
 pub use crate::package::table_relocation::{
-    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
 };

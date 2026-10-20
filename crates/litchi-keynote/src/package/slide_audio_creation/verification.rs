@@ -874,7 +874,7 @@ fn verify_metadata(
 
 fn preserve_resource_error(error: SlideAudioCreationError) -> SlideAudioCreationError {
     match error {
-        error @ (SlideAudioCreationError::LimitExceeded { .. }
+        error @ (SlideAudioCreationError::Limit { .. }
         | SlideAudioCreationError::Allocation { .. }) => error,
         _ => SlideAudioCreationError::Verification,
     }

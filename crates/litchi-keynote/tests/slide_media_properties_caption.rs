@@ -587,7 +587,9 @@ fn caption_style_witness_mutations_reject_without_source_rewrite() -> TestResult
         assert!(matches!(
             result,
             Err(SlideMediaPropertiesError::InvalidSource)
-                | Err(SlideMediaPropertiesError::UnsupportedDependency)
+                | Err(SlideMediaPropertiesError::Refused(
+                    litchi_keynote::slide::media::properties::Refusal::UnsupportedDependency
+                ))
         ));
         assert_eq!(exact_bytes(&package)?, hostile);
     }

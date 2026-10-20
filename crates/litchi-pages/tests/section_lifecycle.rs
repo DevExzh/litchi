@@ -108,19 +108,27 @@ fn refusals_are_typed() -> TestResult {
     let package = Package::open(fixture("basic.pages"))?;
     assert_eq!(
         package.edit_section_lifecycle().remove(0).err(),
-        Some(Error::InitialSection)
+        Some(Error::Refused(
+            litchi_pages::section::lifecycle::Refusal::InitialSection
+        ))
     );
     assert_eq!(
         package.edit_section_lifecycle().remove(5).err(),
-        Some(Error::SectionNotFound)
+        Some(Error::Refused(
+            litchi_pages::section::lifecycle::Refusal::SectionNotFound
+        ))
     );
     assert_eq!(
         package.edit_section_lifecycle().add(0, Some("a\0b")).err(),
-        Some(Error::InvalidName)
+        Some(Error::Refused(
+            litchi_pages::section::lifecycle::Refusal::InvalidName
+        ))
     );
     assert_eq!(
         package.edit_section_lifecycle().commit().err(),
-        Some(Error::NoStagedOperation)
+        Some(Error::Refused(
+            litchi_pages::section::lifecycle::Refusal::NoStagedOperation
+        ))
     );
     let added = package.edit_section_lifecycle().add(0, None)?.commit()?;
     assert_eq!(
@@ -130,10 +138,17 @@ fn refusals_are_typed() -> TestResult {
             .add(1, None)?
             .commit()
             .err(),
-        Some(Error::EmptySection)
+        Some(Error::Refused(
+            litchi_pages::section::lifecycle::Refusal::EmptySection
+        ))
     );
     let staged = package.edit_section_lifecycle().add(0, None)?;
-    assert_eq!(staged.remove(0).err(), Some(Error::OperationAlreadyStaged));
+    assert_eq!(
+        staged.remove(0).err(),
+        Some(Error::Refused(
+            litchi_pages::section::lifecycle::Refusal::OperationAlreadyStaged
+        ))
+    );
     Ok(())
 }
 
@@ -169,10 +184,16 @@ fn every_corpus_document_adds_and_removes_a_section_or_refuses_typed() -> TestRe
                 added += 1;
             },
             Err(
-                error @ (Error::EmptySection
-                | Error::UnsupportedContent
-                | Error::UnsupportedSource
-                | Error::UnsupportedDependency),
+                error @ (Error::Refused(litchi_pages::section::lifecycle::Refusal::EmptySection)
+                | Error::Refused(
+                    litchi_pages::section::lifecycle::Refusal::UnsupportedContent,
+                )
+                | Error::Refused(
+                    litchi_pages::section::lifecycle::Refusal::UnsupportedSource,
+                )
+                | Error::Refused(
+                    litchi_pages::section::lifecycle::Refusal::UnsupportedDependency,
+                )),
             ) => refused.push((path.file_name().map(|name| name.to_owned()), error)),
             Err(error) => panic!("{}: {error:?}", path.display()),
         }

@@ -123,7 +123,9 @@ fn compatibility_package(bytes: &[u8], options: Profile) -> Result<Package> {
         .map_err(map_package_error)?;
     let source = components
         .physical()
-        .ok_or(Error::UnsupportedSource)?
+        .ok_or(Error::Refused(
+            crate::package::comments::Refusal::UnsupportedSource,
+        ))?
         .__source_owner();
     let document =
         crate::Workbook::from_sheets_with_limits(Vec::new(), crate::SemanticLimits::DEFAULT)
@@ -159,7 +161,9 @@ fn resolve_compatibility_comment(
         column,
     };
     if position.row() >= native.rows || position.column() >= native.columns {
-        return Err(Error::OutOfBounds { path });
+        return Err(Error::Refused(
+            crate::package::comments::Refusal::OutOfBounds { path },
+        ));
     }
     super::resolve_comment_native_compatibility(
         source,
@@ -182,7 +186,9 @@ fn resolve_sheet_position(source: &Package, selector: SheetSelector<'_>) -> Resu
             root.sheet_references()
                 .get(index)
                 .map(|_| index)
-                .ok_or(Error::SheetNotFound)
+                .ok_or(Error::Refused(
+                    crate::package::comments::Refusal::SheetNotFound,
+                ))
         },
         SheetSelector::Name(name) => {
             let mut found = None;
@@ -192,7 +198,9 @@ fn resolve_sheet_position(source: &Package, selector: SheetSelector<'_>) -> Resu
                     return Err(invalid_source());
                 }
             }
-            found.ok_or(Error::SheetNotFound)
+            found.ok_or(Error::Refused(
+                crate::package::comments::Refusal::SheetNotFound,
+            ))
         },
     }
 }
@@ -207,7 +215,9 @@ fn resolve_table_position(
         TableSelector::Position(index) => {
             let index = index.get();
             if index >= table_count {
-                return Err(Error::TableNotFound);
+                return Err(Error::Refused(
+                    crate::package::comments::Refusal::TableNotFound,
+                ));
             }
             Ok(index)
         },
@@ -235,7 +245,9 @@ fn resolve_table_position(
             if table_position != table_count {
                 return Err(invalid_source());
             }
-            found.ok_or(Error::TableNotFound)
+            found.ok_or(Error::Refused(
+                crate::package::comments::Refusal::TableNotFound,
+            ))
         },
     }
 }
@@ -253,14 +265,14 @@ fn bounded_table_count(source: &Package, sheet_position: usize) -> Result<usize>
     let mut references = 0usize;
     let mut tables = 0usize;
     visit_drawable_payloads(message.type_, &message.data, |payload| {
-        references = references.checked_add(1).ok_or(Error::LimitExceeded {
+        references = references.checked_add(1).ok_or(Error::Limit {
             kind: super::LimitKind::References,
             observed: usize::MAX,
             maximum: maximum_references,
             path: Path::Package,
         })?;
         if references > maximum_references {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: super::LimitKind::References,
                 observed: references,
                 maximum: maximum_references,
@@ -389,7 +401,9 @@ fn root_sheet_identifier(source: &Package, sheet_position: usize) -> Result<u64>
     root.sheet_references()
         .get(sheet_position)
         .map(|reference| reference.identifier())
-        .ok_or(Error::SheetNotFound)
+        .ok_or(Error::Refused(
+            crate::package::comments::Refusal::SheetNotFound,
+        ))
 }
 
 fn resolve_sheet_target(source: &Package, sheet_identifier: u64) -> Result<SheetTarget> {
@@ -462,7 +476,7 @@ fn table_name_for_payload<'source>(
 
 fn map_table_info_codec_error(error: table_info_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: super::LimitKind::WireFields,
             observed,
             maximum,
@@ -471,31 +485,27 @@ fn map_table_info_codec_error(error: table_info_codec::DecodeError) -> Error {
     }
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
-            table_info_codec::WireResourceLimit::Bytes { observed, maximum } => {
-                Error::LimitExceeded {
-                    kind: super::LimitKind::WireBytes,
-                    observed: observed.unwrap_or(usize::MAX),
-                    maximum: maximum.unwrap_or(usize::MAX),
-                    path: Path::Package,
-                }
+            table_info_codec::WireResourceLimit::Bytes { observed, maximum } => Error::Limit {
+                kind: super::LimitKind::WireBytes,
+                observed: observed.unwrap_or(usize::MAX),
+                maximum: maximum.unwrap_or(usize::MAX),
+                path: Path::Package,
             },
-            table_info_codec::WireResourceLimit::Nesting { observed, maximum } => {
-                Error::LimitExceeded {
-                    kind: super::LimitKind::WireWork,
-                    observed: observed
-                        .map(|value| usize::try_from(value).unwrap_or(usize::MAX))
-                        .unwrap_or(usize::MAX),
-                    maximum: maximum
-                        .map(|value| usize::try_from(value).unwrap_or(usize::MAX))
-                        .unwrap_or(usize::MAX),
-                    path: Path::Package,
-                }
+            table_info_codec::WireResourceLimit::Nesting { observed, maximum } => Error::Limit {
+                kind: super::LimitKind::WireWork,
+                observed: observed
+                    .map(|value| usize::try_from(value).unwrap_or(usize::MAX))
+                    .unwrap_or(usize::MAX),
+                maximum: maximum
+                    .map(|value| usize::try_from(value).unwrap_or(usize::MAX))
+                    .unwrap_or(usize::MAX),
+                path: Path::Package,
             },
             _ => invalid_source(),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: super::LimitKind::WireWork,
             observed,
             maximum,
@@ -526,14 +536,18 @@ fn sheet_name(source: &Package, target: SheetTarget) -> Result<&str> {
 
 fn map_header_error(error: table_headers::Error) -> Error {
     match error {
-        table_headers::Error::SheetNotFound => Error::SheetNotFound,
-        table_headers::Error::TableNotFound => Error::TableNotFound,
-        table_headers::Error::LimitExceeded {
+        table_headers::Error::Refused(table_headers::Refusal::SheetNotFound) => {
+            Error::Refused(crate::package::comments::Refusal::SheetNotFound)
+        },
+        table_headers::Error::Refused(table_headers::Refusal::TableNotFound) => {
+            Error::Refused(crate::package::comments::Refusal::TableNotFound)
+        },
+        table_headers::Error::Limit {
             kind,
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_header_limit_kind(kind),
             observed: usize_from_u64(observed),
             maximum: usize_from_u64(maximum),
@@ -576,7 +590,7 @@ fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::Archive(error) => map_archive_error(error),
         PackageError::Common(error) => super::map_wire_error(error, Path::Package),
-        PackageError::InputTooLarge { observed, maximum } => Error::LimitExceeded {
+        PackageError::InputTooLarge { observed, maximum } => Error::Limit {
             kind: super::LimitKind::InputBytes,
             observed: usize_from_u64(observed),
             maximum: usize_from_u64(maximum),
@@ -587,7 +601,7 @@ fn map_package_error(error: PackageError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_semantic_limit_kind(kind),
             observed,
             maximum,
@@ -603,7 +617,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 ArchiveLimitKind::InputBytes => super::LimitKind::InputBytes,
                 ArchiveLimitKind::OutputBytes => super::LimitKind::OutputBytes,
@@ -628,7 +642,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 CoreLimitKind::ArchiveBytes
                 | CoreLimitKind::ObjectBytes
@@ -687,7 +701,7 @@ const fn invalid_source() -> Error {
 }
 
 fn table_limit_exceeded(maximum: usize) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind: super::LimitKind::References,
         observed: maximum.saturating_add(1),
         maximum,

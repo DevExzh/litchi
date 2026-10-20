@@ -800,7 +800,7 @@ fn run_caption_apply_with_options(
 
 fn assert_caption_limit(result: Result<Vec<u8>, ChartCaptionError>, label: &str) -> TestResult<()> {
     assert!(
-        matches!(result, Err(ChartCaptionError::LimitExceeded { .. })),
+        matches!(result, Err(ChartCaptionError::Limit { .. })),
         "{label} did not return a bounded limit error: {result:?}"
     );
     Ok(())
@@ -1425,7 +1425,10 @@ fn assert_graph_change_rejected(source: &[u8]) -> TestResult<()> {
         .and_then(|edit| edit.commit());
     assert!(matches!(
         result,
-        Err(ChartCaptionError::InvalidSource | ChartCaptionError::UnsupportedDependency)
+        Err(ChartCaptionError::InvalidSource
+            | ChartCaptionError::Refused(
+                litchi_keynote::chart::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1442,7 +1445,10 @@ fn assert_graph_or_ingress_rejected(source: &[u8]) -> TestResult<()> {
         .and_then(|edit| edit.commit());
     assert!(matches!(
         result,
-        Err(ChartCaptionError::InvalidSource | ChartCaptionError::UnsupportedDependency)
+        Err(ChartCaptionError::InvalidSource
+            | ChartCaptionError::Refused(
+                litchi_keynote::chart::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1455,7 +1461,10 @@ fn assert_caption_graph_rejected(source: &[u8]) -> TestResult<()> {
     };
     assert!(matches!(
         package.slide_chart_caption(0usize, 0usize),
-        Err(ChartCaptionError::InvalidSource | ChartCaptionError::UnsupportedDependency)
+        Err(ChartCaptionError::InvalidSource
+            | ChartCaptionError::Refused(
+                litchi_keynote::chart::caption::Refusal::UnsupportedDependency
+            ))
     ));
     let result = package
         .edit_slide_chart_caption(0usize, 0usize)
@@ -1463,7 +1472,10 @@ fn assert_caption_graph_rejected(source: &[u8]) -> TestResult<()> {
         .and_then(|edit| edit.commit());
     assert!(matches!(
         result,
-        Err(ChartCaptionError::InvalidSource | ChartCaptionError::UnsupportedDependency)
+        Err(ChartCaptionError::InvalidSource
+            | ChartCaptionError::Refused(
+                litchi_keynote::chart::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1477,7 +1489,10 @@ fn assert_replacement_rejected(source: &[u8]) -> TestResult<()> {
         .and_then(|edit| edit.commit());
     assert!(matches!(
         result,
-        Err(ChartCaptionError::InvalidSource | ChartCaptionError::UnsupportedDependency)
+        Err(ChartCaptionError::InvalidSource
+            | ChartCaptionError::Refused(
+                litchi_keynote::chart::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1663,7 +1678,10 @@ fn semantic_noop_skips_changed_only_caption_ownership_guards() -> TestResult<()>
         .commit();
     assert!(matches!(
         changed,
-        Err(ChartCaptionError::InvalidSource | ChartCaptionError::UnsupportedDependency)
+        Err(ChartCaptionError::InvalidSource
+            | ChartCaptionError::Refused(
+                litchi_keynote::chart::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1674,11 +1692,15 @@ fn semantic_selectors_report_missing_and_ambiguous_charts() -> TestResult<()> {
     let package = Package::from_bytes(&synthetic_package()?)?;
     assert!(matches!(
         package.slide_chart_caption(0usize, ChartSelector::name("Missing")),
-        Err(ChartCaptionError::ChartNameNotFound)
+        Err(ChartCaptionError::Refused(
+            litchi_keynote::chart::caption::Refusal::ChartNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_chart_caption(Position::new(9), 0usize),
-        Err(ChartCaptionError::SlidePositionNotFound { .. })
+        Err(ChartCaptionError::Refused(
+            litchi_keynote::chart::caption::Refusal::SlidePositionNotFound { .. }
+        ))
     ));
 
     let source = synthetic_package()?;
@@ -1691,7 +1713,9 @@ fn semantic_selectors_report_missing_and_ambiguous_charts() -> TestResult<()> {
     let duplicate = Package::from_bytes(&replace_document_stream(&source, archive)?)?;
     assert!(matches!(
         duplicate.slide_chart_caption(0usize, ChartSelector::name("Revenue")),
-        Err(ChartCaptionError::AmbiguousSelector)
+        Err(ChartCaptionError::Refused(
+            litchi_keynote::chart::caption::Refusal::AmbiguousSelector
+        ))
     ));
     Ok(())
 }
@@ -1710,7 +1734,9 @@ fn shared_storage_and_wrong_parent_are_rejected_atomically() -> TestResult<()> {
     let shared = Package::from_bytes(&shared_bytes)?;
     assert!(matches!(
         shared.slide_chart_caption(0usize, 0usize),
-        Err(ChartCaptionError::UnsupportedDependency)
+        Err(ChartCaptionError::Refused(
+            litchi_keynote::chart::caption::Refusal::UnsupportedDependency
+        ))
     ));
     assert_eq!(exact_bytes(&shared)?, shared_bytes);
 
@@ -2221,7 +2247,9 @@ fn canonical_standin_and_shared_or_aliased_graphs_are_rejected() -> TestResult<(
     let package = Package::from_bytes(&shared)?;
     assert!(matches!(
         package.slide_chart_caption(0usize, 0usize),
-        Err(ChartCaptionError::UnsupportedDependency)
+        Err(ChartCaptionError::Refused(
+            litchi_keynote::chart::caption::Refusal::UnsupportedDependency
+        ))
     ));
     assert_graph_change_rejected(&shared)?;
 
@@ -2672,7 +2700,7 @@ fn caption_reference_varint_growth_is_source_preserving_and_output_bounded() -> 
     assert!(
         matches!(
             &result,
-            Err(ChartCaptionError::LimitExceeded {
+            Err(ChartCaptionError::Limit {
                 kind: ChartCaptionLimitKind::OutputBytes,
                 ..
             })

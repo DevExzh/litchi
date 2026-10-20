@@ -105,7 +105,9 @@ fn reader_matches_package_for_name_and_position() -> TestResult {
     );
     assert_eq!(
         reader.body_table_merges(BodyTableSelector::name("missing")),
-        Err(BodyTableMergesError::TableNotFound)
+        Err(BodyTableMergesError::Refused(
+            litchi_pages::table::merge::transaction::Refusal::TableNotFound
+        ))
     );
     assert_eq!(package.body_table_merges(0usize)?, expected());
     Ok(())
@@ -139,7 +141,7 @@ fn reader_accepts_an_inclusive_input_limit_and_rejects_one_below() -> TestResult
 
     assert!(matches!(
         MergeReader::from_bytes_with_options(NATIVE, options(input_bytes - 1)?),
-        Err(BodyTableMergesError::LimitExceeded {
+        Err(BodyTableMergesError::Limit {
             kind: litchi_pages::table::merge::transaction::LimitKind::InputBytes,
             observed,
             maximum,
@@ -154,11 +156,15 @@ fn reader_preserves_empty_body_and_table_miss_semantics() -> TestResult {
 
     assert_eq!(
         reader.body_table_merges(0usize),
-        Err(BodyTableMergesError::TableNotFound)
+        Err(BodyTableMergesError::Refused(
+            litchi_pages::table::merge::transaction::Refusal::TableNotFound
+        ))
     );
     assert_eq!(
         reader.body_table_merges(BodyTableSelector::name("missing")),
-        Err(BodyTableMergesError::TableNotFound)
+        Err(BodyTableMergesError::Refused(
+            litchi_pages::table::merge::transaction::Refusal::TableNotFound
+        ))
     );
     Ok(())
 }
@@ -300,7 +306,7 @@ fn shared_catalog_reader_rejects_one_below_component_payload_budget() -> TestRes
 
     assert!(matches!(
         reader.body_table_merges(0usize),
-        Err(BodyTableMergesError::LimitExceeded {
+        Err(BodyTableMergesError::Limit {
             kind: litchi_pages::table::merge::transaction::LimitKind::TotalPayloadBytes,
             observed,
             maximum,

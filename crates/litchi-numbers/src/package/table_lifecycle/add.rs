@@ -105,7 +105,9 @@ pub(super) struct Request<'n> {
 /// Validate the requested size.
 pub(super) fn check_size(rows: u32, columns: u32) -> Result<(), Error> {
     if rows == 0 || columns == 0 || u64::from(rows) + u64::from(columns) > MAX_TABLE_UIDS {
-        return Err(Error::InvalidSize { rows, columns });
+        return Err(Error::Refused(
+            crate::package::table_lifecycle::Refusal::InvalidSize { rows, columns },
+        ));
     }
     Ok(())
 }
@@ -622,14 +624,20 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
         &document.messages[document_index].data,
         &[DOCUMENT_SIDEBAR_FIELD],
     )?;
-    let sheet = *sheets.get(request.sheet).ok_or(Error::SheetNotFound)?;
-    let (template_sheet, template_info) = template(&working)?.ok_or(Error::NoTemplate)?;
+    let sheet = *sheets.get(request.sheet).ok_or(Error::Refused(
+        crate::package::table_lifecycle::Refusal::SheetNotFound,
+    ))?;
+    let (template_sheet, template_info) = template(&working)?.ok_or(Error::Refused(
+        crate::package::table_lifecycle::Refusal::NoTemplate,
+    ))?;
 
     // The template's drawable, model and owned storage.
     let info_object = working.object(template_info)?.clone();
     let info_component = working.locate(template_info)?.ok_or(Error::InvalidSource)?;
     if info_object.messages.len() != 1 {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::package::table_lifecycle::Refusal::UnsupportedSource,
+        ));
     }
     let model = single_reference(&info_object.messages[0].data, 2)?.ok_or(Error::InvalidSource)?;
     let model_object = working.object(model)?.clone();
@@ -637,7 +645,9 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
     if model_object.messages.len() != 1
         || model_object.messages[0].type_ != TABLE_MODEL_MESSAGE_TYPE
     {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::package::table_lifecycle::Refusal::UnsupportedSource,
+        ));
     }
     let owned = owned_storage(&model_object.messages[0].data)?;
 
@@ -657,7 +667,9 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
     for (identifier, role) in &owned {
         let object = working.object(*identifier)?.clone();
         if object.messages.len() != 1 {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::package::table_lifecycle::Refusal::UnsupportedSource,
+            ));
         }
         let component = working.locate(*identifier)?.ok_or(Error::InvalidSource)?;
         let data = empty_storage(

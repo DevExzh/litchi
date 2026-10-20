@@ -102,7 +102,7 @@ impl Edit<'_> {
             .map_err(super::map_core_error)?;
         validate_region(&self.selection.target, region)?;
         if self.after.len() >= WireLimits::MAX_FIELDS {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::PayloadItems,
                 observed: self.after.len() as u64 + 1,
                 maximum: WireLimits::MAX_FIELDS as u64,
@@ -113,7 +113,9 @@ impl Edit<'_> {
             .work(self.after.len())
             .map_err(super::map_core_error)?;
         if self.after.iter().any(|existing| existing.overlaps(region)) {
-            return Err(Error::InvalidRegion);
+            return Err(Error::Refused(
+                crate::slide::table::merge::transaction::Refusal::InvalidRegion,
+            ));
         }
         self.selection
             .budget
@@ -441,7 +443,9 @@ fn clone_regions(
 
 fn validate_region(target: &slide_table_core::Target, region: Region) -> Result<(), Error> {
     if region.end_row() >= target.rows || region.end_column() >= target.columns {
-        return Err(Error::InvalidRegion);
+        return Err(Error::Refused(
+            crate::slide::table::merge::transaction::Refusal::InvalidRegion,
+        ));
     }
     Ok(())
 }
@@ -453,7 +457,7 @@ fn normalize_regions(
     budget: &mut slide_table_core::Budget,
 ) -> Result<Vec<Region>, Error> {
     if desired.len() > WireLimits::MAX_FIELDS {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::PayloadItems,
             observed: desired.len() as u64,
             maximum: WireLimits::MAX_FIELDS as u64,
@@ -486,7 +490,9 @@ fn normalize_regions(
             continue;
         }
         if normalized.iter().any(|existing| existing.overlaps(*region)) {
-            return Err(Error::InvalidRegion);
+            return Err(Error::Refused(
+                crate::slide::table::merge::transaction::Refusal::InvalidRegion,
+            ));
         }
         normalized.push(*region);
     }
@@ -607,7 +613,9 @@ fn rewrite_merges(
         .find(|entry| entry.name() == selection.target.model.component.as_ref())
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::slide::table::merge::transaction::Refusal::UnsupportedSource,
+        ));
     }
     let physical_limits = source.state.options.archive();
     let archive_limits = physical_limits
@@ -871,7 +879,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::References => LimitKind::References,
                 _ => LimitKind::WireWork,
@@ -884,7 +892,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 PayloadLimitKind::Bytes => LimitKind::InputBytes,
                 PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -906,7 +914,7 @@ fn map_archive_error(error: ArchiveError) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 ArchiveLimitKind::InputBytes => LimitKind::InputBytes,
                 ArchiveLimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -932,7 +940,7 @@ fn map_native_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
@@ -1040,14 +1048,18 @@ mod tests {
         let mut duplicate_edit = package.edit_slide_table_merges(0, 0).expect("select table");
         assert!(matches!(
             duplicate_edit.merge(existing),
-            Err(Error::InvalidRegion)
+            Err(Error::Refused(
+                crate::slide::table::merge::transaction::Refusal::InvalidRegion
+            ))
         ));
 
         let outside = Region::new(4, 2, 1, 2).expect("checked region");
         let mut outside_edit = package.edit_slide_table_merges(0, 0).expect("select table");
         assert!(matches!(
             outside_edit.merge(outside),
-            Err(Error::InvalidRegion)
+            Err(Error::Refused(
+                crate::slide::table::merge::transaction::Refusal::InvalidRegion
+            ))
         ));
     }
 
@@ -1081,7 +1093,7 @@ mod tests {
             .expect_err("archive inventory must exceed the constrained budget");
         assert!(matches!(
             error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::Allocations,
                 ..
             }

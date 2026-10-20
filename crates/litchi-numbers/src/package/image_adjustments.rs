@@ -100,6 +100,38 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source graph or payload is malformed.
+    #[error("the Numbers image-adjustment source is invalid")]
+    InvalidSource,
+    /// A finite operation budget was exceeded.
+    #[error(
+        "Numbers image-adjustment {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    /// A required temporary allocation could not be reserved.
+    #[error("could not allocate {amount} units for Numbers image adjustments")]
+    Allocation { amount: usize },
+    /// The reopened candidate did not retain the requested semantic value.
+    #[error("the edited Numbers image adjustments failed semantic verification")]
+    Verification,
+    /// The patch was created from another exact package artifact.
+    #[error("the Numbers image-adjustment patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The package does not retain an exact physical source suitable for edits.
     #[error("this Numbers source does not support physical image-adjustment edits")]
     UnsupportedSource,
@@ -121,27 +153,31 @@ pub enum Error {
     /// No image matched the requested source-order position.
     #[error("the selected Numbers sheet has no image at position {position:?}")]
     ImagePositionNotFound { position: Position },
-    /// The source graph or payload is malformed.
-    #[error("the Numbers image-adjustment source is invalid")]
-    InvalidSource,
-    /// A finite operation budget was exceeded.
-    #[error(
-        "Numbers image-adjustment {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    /// A required temporary allocation could not be reserved.
-    #[error("could not allocate {amount} units for Numbers image adjustments")]
-    Allocation { amount: usize },
-    /// The reopened candidate did not retain the requested semantic value.
-    #[error("the edited Numbers image adjustments failed semantic verification")]
-    Verification,
-    /// The patch was created from another exact package artifact.
-    #[error("the Numbers image-adjustment patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. } | Self::EmptySheetName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SheetNameNotFound { .. }
+            | Self::SheetPositionNotFound { .. }
+            | Self::ImagePositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[cfg(feature = "internal-iwork-source")]
@@ -237,7 +273,7 @@ fn preflight_sheet_drawables(
             kind: litchi_iwa_common::LimitKind::MaterializedCells,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::References,
             observed: observed as u64,
             maximum: limit as u64,
@@ -670,7 +706,7 @@ impl ImageBudget {
     ) -> Result<(), Error> {
         let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -688,7 +724,7 @@ impl ImageBudget {
     ) -> Result<(), Error> {
         let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -721,7 +757,7 @@ impl ImageBudget {
             LimitKind::WireWork,
         )?;
         if depth > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
@@ -752,7 +788,7 @@ impl ImageBudget {
         )?;
         let depth = report.max_depth();
         if depth > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
@@ -782,7 +818,7 @@ impl ImageBudget {
         )?;
         let depth = report.max_depth();
         if depth > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
@@ -918,7 +954,7 @@ impl ImageBudget {
         )?;
         let depth = usize::try_from(report.max_depth()).unwrap_or(usize::MAX);
         if depth > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
@@ -947,7 +983,7 @@ impl ImageBudget {
         )?;
         let depth = usize::try_from(requirements.max_depth).unwrap_or(usize::MAX);
         if depth > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
@@ -1041,7 +1077,7 @@ impl Package {
             });
         }
         if !catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         reopen_target_patch(self, patch, &mut budget)
     }
@@ -1059,9 +1095,9 @@ fn select_image_with_budget(
     let sheet_reference = document
         .sheet_references()
         .get(sheet_position.get())
-        .ok_or(Error::SheetPositionNotFound {
+        .ok_or(Error::Refused(Refusal::SheetPositionNotFound {
             position: sheet_position,
-        })?;
+        }))?;
     let sheet_identifier = sheet_reference.identifier();
     if sheet_identifier == 0 || sheet_reference.deprecated_is_external() == Some(true) {
         return Err(Error::InvalidSource);
@@ -1126,7 +1162,7 @@ fn select_image_with_budget(
             continue;
         };
         if require_editable && resolved.component_index != resolved_sheet.component_index {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let info = validate_selected_image_metadata(object, message_index, budget)?;
         let metadata = image_metadata(message.data.as_slice(), budget)?;
@@ -1146,9 +1182,9 @@ fn select_image_with_budget(
         }
         image_count = image_count.checked_add(1).ok_or(Error::InvalidSource)?;
     }
-    let entry = selected.ok_or(Error::ImagePositionNotFound {
+    let entry = selected.ok_or(Error::Refused(Refusal::ImagePositionNotFound {
         position: requested,
-    })?;
+    }))?;
     let image_component = package
         .state
         .components
@@ -1195,7 +1231,7 @@ fn resolve_sheet_position(
     match selector {
         SheetSelector::Name(name) => {
             if name.is_empty() {
-                return Err(Error::EmptySheetName);
+                return Err(Error::Refused(Refusal::EmptySheetName));
             }
             let mut matches = package
                 .workbook_ref()
@@ -1203,19 +1239,19 @@ fn resolve_sheet_position(
                 .iter()
                 .filter(|sheet| sheet.name() == name);
             let Some(sheet) = matches.next() else {
-                return Err(Error::SheetNameNotFound);
+                return Err(Error::Refused(Refusal::SheetNameNotFound));
             };
             if matches.next().is_some() {
-                return Err(Error::AmbiguousSelector);
+                return Err(Error::Refused(Refusal::AmbiguousSelector));
             }
             Ok(Position::new(sheet.index()))
         },
         SheetSelector::Position(index) => {
             let index = index.get();
             if package.workbook_ref().sheets().get(index).is_none() {
-                return Err(Error::SheetPositionNotFound {
+                return Err(Error::Refused(Refusal::SheetPositionNotFound {
                     position: Position::new(index),
-                });
+                }));
             }
             Ok(Position::new(index))
         },
@@ -1716,7 +1752,7 @@ fn commit_edit(
         });
     }
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let candidate = rewrite_image(source, selection, after, &mut budget)?;
     let target_catalog = physical_catalog(&candidate)?;
@@ -1784,7 +1820,7 @@ fn rewrite_image(
         .find(|entry| entry.name() == selection.component_name.as_ref())
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let component = source
         .state
@@ -1844,7 +1880,7 @@ fn rewrite_image(
     let compressed_bound =
         SnappyStream::maximum_compressed_len(encoded_bound).map_err(map_core_error)?;
     if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireBytes,
             observed: compressed_bound as u64,
             maximum: snappy_limits.max_compressed_stream() as u64,
@@ -2020,7 +2056,7 @@ fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
         .state
         .components
         .physical()
-        .ok_or(Error::UnsupportedSource)
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))
 }
 
 fn rewritten_archive_bound(
@@ -2298,7 +2334,7 @@ fn package_reopen_requirements(
         .state
         .components
         .physical()
-        .ok_or(Error::UnsupportedSource)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
     let components = package.state.components.catalog();
     let entries = physical.package().iter();
     let mut allocations = 3usize; // SourceCatalog, component storage, and Package state.
@@ -2377,7 +2413,7 @@ fn map_package_error(error: PackageError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::References => LimitKind::References,
                 _ => LimitKind::WireWork,
@@ -2392,11 +2428,11 @@ fn map_package_error(error: PackageError) -> Error {
 
 fn map_names_error(error: super::names::Error) -> Error {
     match error {
-        super::names::Error::LimitExceeded {
+        super::names::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::names::LimitKind::PayloadReferences => LimitKind::References,
                 super::names::LimitKind::WireBytes
@@ -2423,7 +2459,7 @@ fn map_common_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
@@ -2458,7 +2494,7 @@ fn map_codec_error(error: codec::DecodeError) -> Error {
             | codec::DecodeLimit::Scratch => LimitKind::WireWork,
             _ => LimitKind::WireWork,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -2477,7 +2513,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             observed,
             maximum,
             kind,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes
                 | litchi_iwa_archive::LimitKind::CompressedEntryBytes
@@ -2505,7 +2541,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::ArchiveBytes
                 | litchi_iwa_core::LimitKind::ObjectBytes
@@ -2912,7 +2948,7 @@ mod graph_tests {
         tight.max_input = source.len();
         assert!(matches!(
             sheet_drawable_identifiers(2, &source, &mut tight),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: super::LimitKind::WireBytes,
                 ..
             })

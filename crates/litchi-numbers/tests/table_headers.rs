@@ -139,11 +139,15 @@ fn selector_bounds_and_public_values_are_checked_and_thread_safe() -> TestResult
     let package = Package::open(fixture_path())?;
     assert!(matches!(
         package.table_header_settings("missing", 0usize),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::headers::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_header_settings(0usize, "missing"),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::headers::transaction::Refusal::TableNotFound
+        ))
     ));
     assert_eq!(Count::new(1)?, Count::ONE);
     assert!(Count::new(0).is_err());
@@ -182,7 +186,12 @@ fn native_manager_backed_count_change_refuses_without_publication() -> TestResul
         .set(requested)
         .commit()
         .expect_err("rooted HeaderNameMgr count dependency must refuse publication");
-    assert!(matches!(error, Error::UnsupportedDependency { .. }));
+    assert!(matches!(
+        error,
+        Error::Refused(
+            litchi_numbers::table::headers::transaction::Refusal::UnsupportedDependency { .. }
+        )
+    ));
     assert_eq!(package.exact_bytes(), source);
     Ok(())
 }
@@ -208,9 +217,11 @@ fn locked_table_allows_exact_header_noop_and_refuses_change() -> TestResult<()> 
         .expect_err("locked table must refuse a changed header transaction");
     assert!(matches!(
         error,
-        Error::TableLocked {
-            path: Path::Table { sheet: 0, table: 0 }
-        }
+        Error::Refused(
+            litchi_numbers::table::headers::transaction::Refusal::TableLocked {
+                path: Path::Table { sheet: 0, table: 0 }
+            }
+        )
     ));
     Ok(())
 }
@@ -370,10 +381,12 @@ fn synthetic_bounds_and_dependency_role_aliases_fail_atomically() -> TestResult<
             .edit_table_headers(0usize, 0usize)?
             .set(invalid_bounds)
             .commit(),
-        Err(Error::InvalidSettings {
-            path: Path::Table { sheet: 0, table: 0 },
-            ..
-        })
+        Err(Error::Refused(
+            litchi_numbers::table::headers::transaction::Refusal::InvalidSettings {
+                path: Path::Table { sheet: 0, table: 0 },
+                ..
+            }
+        ))
     ));
     assert_eq!(package.exact_bytes(), base_bytes);
 
@@ -478,7 +491,7 @@ fn inverse_apply_preflights_the_retained_target_work_before_reopen() -> TestResu
         .expect_err("retained inverse target must be included in transaction work");
     assert!(matches!(
         error,
-        Error::LimitExceeded {
+        Error::Limit {
             kind: LimitKind::TransactionWork,
             observed: actual,
             maximum: limit,
@@ -497,7 +510,10 @@ fn assert_invalid_change_preserves(bytes: &[u8], settings: Settings) -> TestResu
             .edit_table_headers(0usize, 0usize)?
             .set(settings)
             .commit(),
-        Err(Error::InvalidSource { .. }) | Err(Error::UnsupportedDependency { .. })
+        Err(Error::InvalidSource { .. })
+            | Err(Error::Refused(
+                litchi_numbers::table::headers::transaction::Refusal::UnsupportedDependency { .. }
+            ))
     ));
     assert_eq!(package.exact_bytes(), source);
     Ok(())

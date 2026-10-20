@@ -14,8 +14,7 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    At, Package, Error as PackageError,
-    SheetSelector, TableSelector,
+    At, Error as PackageError, Package, SheetSelector, TableSelector,
     cell::data_format::FixedDecimalPlaces,
     cell::data_format::percentage::{
         DecimalPlaces, NegativeStyle, Percentage, ThousandsSeparator,
@@ -71,18 +70,35 @@ fuzz_target!(|data: &[u8]| {
 fn options() -> litchi::numbers::OpenOptions {
     static OPTIONS: OnceLock<litchi::numbers::OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = litchi::numbers::SourceLimits::builder().max_input_bytes(MAX_INPUT_BYTES).and_then(|b| b.max_members(MAX_ENTRIES)).and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES)).and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES)).and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES)).and_then(|b| b.build())
-        .unwrap_or_else(|error| unreachable!("valid percentage-format archive limits: {error}"));
-        let semantic =
-            litchi::numbers::SemanticLimits::builder().max_objects(MAX_OBJECTS).and_then(|b| b.max_sheets(MAX_SHEETS)).and_then(|b| b.max_tables(MAX_TABLES)).and_then(|b| b.max_references(MAX_REFERENCES)).and_then(|b| b.build())
-                .unwrap_or_else(|error| {
-                    unreachable!("valid percentage-format semantic limits: {error}")
-                })
-                .to_builder().max_materialized_cells(MAX_MATERIALIZED_CELLS).and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES)).and_then(|b| b.build())
-                .unwrap_or_else(|error| {
-                    unreachable!("valid percentage-format projection limits: {error}")
-                });
-        litchi::numbers::OpenOptions::new().source_limits(archive).semantic_limits(semantic)
+        let archive = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|b| b.max_members(MAX_ENTRIES))
+            .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| {
+                unreachable!("valid percentage-format archive limits: {error}")
+            });
+        let semantic = litchi::numbers::SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|b| b.max_sheets(MAX_SHEETS))
+            .and_then(|b| b.max_tables(MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| {
+                unreachable!("valid percentage-format semantic limits: {error}")
+            })
+            .to_builder()
+            .max_materialized_cells(MAX_MATERIALIZED_CELLS)
+            .and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| {
+                unreachable!("valid percentage-format projection limits: {error}")
+            });
+        litchi::numbers::OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -116,7 +132,7 @@ fn exercise_wrong_family(package: &Package) {
         NATIVE_POSITION,
     );
     assert!(
-        matches!(read, Err(PercentageError::WrongFormatFamily { .. })),
+        matches!(read, Err(PercentageError::Refused(litchi::numbers::cell::data_format::percentage::transaction::Refusal::WrongFormatFamily { .. }))),
         "native Number cell must be refused by the Percentage API: {read:?}"
     );
     let edit = package.edit_table_cell_percentage_format(
@@ -125,7 +141,7 @@ fn exercise_wrong_family(package: &Package) {
         NATIVE_POSITION,
     );
     assert!(
-        matches!(edit, Err(PercentageError::WrongFormatFamily { .. })),
+        matches!(edit, Err(PercentageError::Refused(litchi::numbers::cell::data_format::percentage::transaction::Refusal::WrongFormatFamily { .. }))),
         "native Number cell edit must be refused by the Percentage API: {edit:?}"
     );
     assert_eq!(package_bytes(package), source_bytes);
@@ -411,9 +427,16 @@ fn exercise_input_limit() {
 fn exercise_semantic_limit() {
     static ONCE: OnceLock<()> = OnceLock::new();
     ONCE.get_or_init(|| {
-        let semantic = litchi::numbers::SemanticLimits::builder().max_objects(1).and_then(|b| b.max_sheets(1)).and_then(|b| b.max_tables(1)).and_then(|b| b.max_references(1)).and_then(|b| b.build())
+        let semantic = litchi::numbers::SemanticLimits::builder()
+            .max_objects(1)
+            .and_then(|b| b.max_sheets(1))
+            .and_then(|b| b.max_tables(1))
+            .and_then(|b| b.max_references(1))
+            .and_then(|b| b.build())
             .unwrap_or_else(|error| panic!("one-entry semantic limits must validate: {error}"));
-        let constrained = litchi::numbers::OpenOptions::new().source_limits(options().source_limits_value()).semantic_limits(semantic);
+        let constrained = litchi::numbers::OpenOptions::new()
+            .source_limits(options().source_limits_value())
+            .semantic_limits(semantic);
         let result = Package::from_bytes_with_options(NATIVE_NUMBERS, constrained);
         assert!(
             result.is_err(),

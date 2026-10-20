@@ -11,6 +11,6 @@ pub use litchi_iwa_common::table::lock::State;
 /// Transaction types for persisted Keynote slide-table lock state.
 pub mod transaction {
     pub use crate::package::slide_table_lock_state::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }

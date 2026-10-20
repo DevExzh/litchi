@@ -309,7 +309,9 @@ impl ShowTree {
         )
         .lift()?;
         if show.unique(SHOW_SLIDE_LIST).lift()?.is_some() {
-            return Err(Error::UnsupportedTopology);
+            return Err(Error::Refused(
+                crate::slide::creation::Refusal::UnsupportedTopology,
+            ));
         }
         let tree = show
             .unique(SHOW_SLIDE_TREE)
@@ -317,13 +319,17 @@ impl ShowTree {
             .ok_or(Error::InvalidSource)?;
         let tree = Fields::parse(tree.message().lift()?, workspace.wire).lift()?;
         if tree.unique(TREE_ROOT_NODE).lift()?.is_some() {
-            return Err(Error::UnsupportedTopology);
+            return Err(Error::Refused(
+                crate::slide::creation::Refusal::UnsupportedTopology,
+            ));
         }
         let order = repeated_references(&tree, TREE_SLIDES)?;
         let mut sorted = order.clone();
         sorted.sort_unstable();
         if sorted.first() == Some(&0) || sorted.windows(2).any(|pair| pair[0] == pair[1]) {
-            return Err(Error::UnsupportedTopology);
+            return Err(Error::Refused(
+                crate::slide::creation::Refusal::UnsupportedTopology,
+            ));
         }
         Ok(Self { identifier, order })
     }
@@ -369,9 +375,11 @@ pub(super) fn node_slide(workspace: &Workspace<'_>, node: u64) -> Result<u64, Er
     )
     .lift()?;
     if fields.all(NODE_CHILDREN).next().is_some() {
-        return Err(Error::UnsupportedContent {
-            reason: Unsupported::SharedComponent,
-        });
+        return Err(Error::Refused(
+            crate::slide::creation::Refusal::UnsupportedContent {
+                reason: Unsupported::SharedComponent,
+            },
+        ));
     }
     reference_field(&fields, NODE_SLIDE)?.ok_or(Error::InvalidSource)
 }
@@ -471,9 +479,11 @@ pub(super) fn check_external_references(
             .component(reference.component)
             .ok_or(Error::InvalidSource)?;
         if member_kind(&target.member_name()) == MemberKind::Other {
-            return Err(Error::UnsupportedContent {
-                reason: Unsupported::ExternalContent,
-            });
+            return Err(Error::Refused(
+                crate::slide::creation::Refusal::UnsupportedContent {
+                    reason: Unsupported::ExternalContent,
+                },
+            ));
         }
     }
     Ok(())

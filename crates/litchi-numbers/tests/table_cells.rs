@@ -176,11 +176,15 @@ fn native_a1_read_helpers_match_checked_coordinate_reads() -> TestResult {
 
     assert!(matches!(
         package.table_cell_a1("Sheet 1", "Table 1", "A0"),
-        Err(Error::InvalidAddress)
+        Err(Error::Refused(
+            litchi_numbers::table::cells::Refusal::InvalidAddress
+        ))
     ));
     assert!(matches!(
         package.table_cells_a1("Sheet 1", "Table 1", "A1:B2:C3"),
-        Err(Error::InvalidAddress)
+        Err(Error::Refused(
+            litchi_numbers::table::cells::Refusal::InvalidAddress
+        ))
     ));
     Ok(())
 }
@@ -235,7 +239,9 @@ fn native_scalar_shortcuts_share_selector_atomic_and_inverse_paths() -> TestResu
 
     assert!(matches!(
         package.clear_table_cell_a1(0usize, 0usize, "A0"),
-        Err(Error::InvalidAddress)
+        Err(Error::Refused(
+            litchi_numbers::table::cells::Refusal::InvalidAddress
+        ))
     ));
     assert_eq!(package.exact_bytes(), source);
     Ok(())
@@ -281,31 +287,35 @@ fn missing_selectors_and_bounds_return_typed_errors() -> TestResult {
     let b2 = At::from_a1("B2")?;
     assert!(matches!(
         package.table_cell("missing sheet", 0usize, b2),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::cells::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_cell(0usize, "missing table", b2),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::cells::Refusal::TableNotFound
+        ))
     ));
 
     let dimensions = Dimensions::new(22, 7);
     let outside = At::new(22, 0);
     assert!(matches!(
         package.table_cell(0usize, 0usize, outside),
-        Err(Error::OutOfBounds {
+        Err(Error::Refused(litchi_numbers::table::cells::Refusal::OutOfBounds {
             position,
             dimensions: actual,
-        }) if position == outside && actual == dimensions
+        })) if position == outside && actual == dimensions
     ));
 
     let end = At::new(22, 8);
     let outside_range = Area::new(At::new(21, 6), end)?;
     assert!(matches!(
         package.table_cells(0usize, 0usize, outside_range),
-        Err(Error::OutOfBounds {
+        Err(Error::Refused(litchi_numbers::table::cells::Refusal::OutOfBounds {
             position,
             dimensions: actual,
-        }) if position == end && actual == dimensions
+        })) if position == end && actual == dimensions
     ));
     Ok(())
 }
@@ -705,7 +715,7 @@ fn duplicate_bounds_and_addresses_fail_before_publication() -> TestResult {
         .expect_err("duplicate coordinates must fail");
     assert!(matches!(
         duplicate,
-        Error::DuplicatePosition { position } if position == b3
+        Error::Refused(litchi_numbers::table::cells::Refusal::DuplicatePosition { position }) if position == b3
     ));
 
     let outside = At::new(22, 0);
@@ -715,16 +725,18 @@ fn duplicate_bounds_and_addresses_fail_before_publication() -> TestResult {
         .expect_err("out-of-bounds coordinate must fail while staging");
     assert!(matches!(
         bounds,
-        Error::OutOfBounds {
+        Error::Refused(litchi_numbers::table::cells::Refusal::OutOfBounds {
             position,
             dimensions,
-        } if position == outside && dimensions == Dimensions::new(22, 7)
+        }) if position == outside && dimensions == Dimensions::new(22, 7)
     ));
     assert!(matches!(
         package
             .edit_table_cells(0usize, 0usize)?
             .set_a1("private invalid address", Input::boolean(true)),
-        Err(Error::InvalidAddress)
+        Err(Error::Refused(
+            litchi_numbers::table::cells::Refusal::InvalidAddress
+        ))
     ));
     assert_eq!(package.exact_bytes(), source);
     Ok(())
@@ -748,10 +760,12 @@ fn native_header_name_index_allows_noop_and_refuses_change() -> TestResult {
         .expect_err("header-name indexed edits must refuse atomically");
     assert!(matches!(
         error,
-        Error::UnsupportedDependency {
-            path: Path::Table { sheet: 0, table: 0 },
-            kind: DependencyKind::HeaderNameIndex,
-        }
+        Error::Refused(
+            litchi_numbers::table::cells::Refusal::UnsupportedDependency {
+                path: Path::Table { sheet: 0, table: 0 },
+                kind: DependencyKind::HeaderNameIndex,
+            }
+        )
     ));
     assert_eq!(package.exact_bytes(), source);
     Ok(())
@@ -779,9 +793,9 @@ fn locked_table_allows_exact_noop_and_refuses_changed_cell() -> TestResult {
         .expect_err("a locked table must refuse a changed cell batch");
     assert!(matches!(
         error,
-        Error::TableLocked {
+        Error::Refused(litchi_numbers::table::cells::Refusal::TableLocked {
             path: Path::Table { sheet: 0, table: 0 }
-        }
+        })
     ));
     assert_eq!(locked.exact_bytes(), source);
     Ok(())

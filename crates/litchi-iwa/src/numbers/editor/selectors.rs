@@ -604,14 +604,12 @@ pub(super) fn focused_merge_table_indices(
     let limits = litchi_numbers::SemanticLimits::DEFAULT;
     let check = |kind, observed: usize, maximum: usize| -> Result<()> {
         if observed > maximum {
-            return Err(
-                litchi_numbers::table::merge::transaction::Error::LimitExceeded {
-                    kind,
-                    observed: observed as u64,
-                    maximum: maximum as u64,
-                }
-                .into(),
-            );
+            return Err(litchi_numbers::table::merge::transaction::Error::Limit {
+                kind,
+                observed: observed as u64,
+                maximum: maximum as u64,
+            }
+            .into());
         }
         Ok(())
     };

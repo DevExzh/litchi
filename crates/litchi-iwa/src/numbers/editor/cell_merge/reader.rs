@@ -61,7 +61,7 @@ fn map_catalog_error(error: litchi_iwa_archive::Error) -> Error {
                 LimitKind::IwaStreamBytes => TableMergesLimitKind::PayloadBytes,
                 LimitKind::IwaTotalBytes => TableMergesLimitKind::TotalPayloadBytes,
             };
-            TableMergesError::LimitExceeded {
+            TableMergesError::Limit {
                 kind,
                 observed,
                 maximum,

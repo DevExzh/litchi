@@ -115,14 +115,18 @@ fn pages_deletion_refuses_missing_tables_and_incoming_formula_dependencies() -> 
             .edit_body_table_deletion()
             .remove(BodyTableSelector::index(0))
             .and_then(|edit| edit.commit()),
-        Err(BodyTableDeletionError::UnsupportedDependency)
+        Err(BodyTableDeletionError::Refused(
+            litchi::pages::table::deletion::Refusal::UnsupportedDependency
+        ))
     ));
     assert!(matches!(
         source
             .edit_body_table_deletion()
             .remove(BodyTableSelector::index(usize::MAX))
             .and_then(|edit| edit.commit()),
-        Err(BodyTableDeletionError::TableNotFound)
+        Err(BodyTableDeletionError::Refused(
+            litchi::pages::table::deletion::Refusal::TableNotFound
+        ))
     ));
     let mut unchanged = Vec::new();
     source.write_to(&mut unchanged)?;

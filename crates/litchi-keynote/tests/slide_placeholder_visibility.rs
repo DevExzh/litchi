@@ -267,7 +267,9 @@ fn missing_body_is_none_for_reads_and_typed_for_edits() -> TestResult<()> {
     );
     assert!(matches!(
         package.edit_slide_placeholder_visibility(0usize, Kind::Body),
-        Err(Error::PlaceholderNotFound { .. })
+        Err(Error::Refused(
+            litchi_keynote::slide::placeholder::Refusal::PlaceholderNotFound { .. }
+        ))
     ));
     Ok(())
 }
@@ -310,7 +312,7 @@ fn reference_limit_is_charged_on_placeholder_edit_admission() -> TestResult<()> 
     let before = bytes(&package)?;
     assert!(matches!(
         package.edit_slide_placeholder_visibility(0usize, Kind::Title),
-        Err(Error::LimitExceeded {
+        Err(Error::Limit {
             kind: litchi_keynote::slide::placeholder::LimitKind::References,
             observed: 2,
             maximum: 1

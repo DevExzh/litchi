@@ -1084,7 +1084,9 @@ fn selectors_read_all_seven_fields_and_positions_count_only_tables() -> TestResu
     );
     assert!(matches!(
         package.slide_table_header_settings("Tables", TableSelector::index(2)),
-        Err(SlideTableHeaderError::TablePositionNotFound { .. })
+        Err(SlideTableHeaderError::Refused(
+            litchi_keynote::slide::table::headers::transaction::Refusal::TablePositionNotFound { .. }
+        ))
     ));
 
     let edit = package.edit_slide_table_headers("Tables", 0usize)?;
@@ -1331,7 +1333,9 @@ fn locked_table_refuses_changed_settings_but_allows_exact_noop() -> TestResult {
             .edit_slide_table_headers("Tables", 0usize)?
             .set(changed_settings())
             .commit(),
-        Err(SlideTableHeaderError::Locked)
+        Err(SlideTableHeaderError::Refused(
+            litchi_keynote::slide::table::headers::transaction::Refusal::Locked
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1352,7 +1356,9 @@ fn coordinate_dependency_graphs_block_counts_but_allow_safe_flags() -> TestResul
                 .edit_slide_table_headers("Tables", 0usize)?
                 .set(changed_settings())
                 .commit(),
-            Err(SlideTableHeaderError::UnsupportedDependency)
+            Err(SlideTableHeaderError::Refused(
+                litchi_keynote::slide::table::headers::transaction::Refusal::UnsupportedDependency
+            ))
         ));
         assert_eq!(exact_bytes(&package)?, before);
 
@@ -1386,7 +1392,9 @@ fn pivot_owner_blocks_even_flag_only_edits() -> TestResult {
             .edit_slide_table_headers("Tables", 0usize)?
             .set(toggled_flags(fixture_settings(0)))
             .commit(),
-        Err(SlideTableHeaderError::UnsupportedDependency)
+        Err(SlideTableHeaderError::Refused(
+            litchi_keynote::slide::table::headers::transaction::Refusal::UnsupportedDependency
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -1501,7 +1509,7 @@ fn finite_resource_limits_reject_before_publication() -> TestResult {
         let result = package
             .edit_slide_table_headers(0usize, 0usize)
             .and_then(|edit| edit.set(changed_settings()).commit());
-        if matches!(result, Err(SlideTableHeaderError::LimitExceeded { .. })) {
+        if matches!(result, Err(SlideTableHeaderError::Limit { .. })) {
             assert_eq!(exact_bytes(&package)?, before);
             rejected = true;
             break;

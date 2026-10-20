@@ -71,7 +71,9 @@ impl Edit<'_> {
             .iter()
             .any(|existing| existing.overlaps(region))
         {
-            return Err(Error::OverlappingRegion);
+            return Err(Error::Refused(
+                crate::table::merge::transaction::Refusal::OverlappingRegion,
+            ));
         }
         self.regions
             .try_reserve(1)
@@ -340,7 +342,9 @@ fn transaction_budget(package: &Package) -> Result<table_lock::WireBudget, Error
 
 fn validate_region(target: &table_lock::BodyTableTarget, region: Region) -> Result<(), Error> {
     if region.end_row() >= target.table_rows || region.end_column() >= target.table_columns {
-        return Err(Error::InvalidRegion);
+        return Err(Error::Refused(
+            crate::table::merge::transaction::Refusal::InvalidRegion,
+        ));
     }
     Ok(())
 }
@@ -363,7 +367,9 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         });
     }
     if !source.state.source.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::table::merge::transaction::Refusal::UnsupportedSource,
+        ));
     }
     table_lock::validate_body_table_target(source, &edit.target, &mut budget)
         .map_err(map_lock_error)?;
@@ -457,7 +463,9 @@ fn rewrite_model(
         .find(|entry| entry.name() == component_name)
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::table::merge::transaction::Refusal::UnsupportedSource,
+        ));
     }
     let original = model_message(source, target)?.data.as_slice();
     let bounds = preflight_merge_rewrite(source, target, before, after, original.len(), budget)?;
@@ -589,10 +597,14 @@ fn preflight_merge_rewrite(
     let replacement_compressed_bound = match entry.metadata().central().compression_method() {
         0 => compressed_bound,
         8 => table_lock::deflate_compressed_bound(compressed_bound).ok_or(Error::InvalidSource)?,
-        _ => return Err(Error::UnsupportedSource),
+        _ => {
+            return Err(Error::Refused(
+                crate::table::merge::transaction::Refusal::UnsupportedSource,
+            ));
+        },
     };
     let old_compressed_size =
-        usize::try_from(entry.metadata().compressed_size()).map_err(|_| Error::LimitExceeded {
+        usize::try_from(entry.metadata().compressed_size()).map_err(|_| Error::Limit {
             kind: LimitKind::EntryBytes,
             observed: u64::MAX,
             maximum: source.state.source.limits().max_entry_bytes(),
@@ -645,7 +657,7 @@ fn writer_limits(
 ) -> Result<ReadLimits, Error> {
     let fields = budget.remaining_wire_fields();
     if fields == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireFields,
             observed: 1,
             maximum: 0,
@@ -653,7 +665,7 @@ fn writer_limits(
     }
     let work = budget.remaining_wire_work();
     if work == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: 1,
             maximum: 0,
@@ -661,7 +673,7 @@ fn writer_limits(
     }
     let base = budget.wire_limits();
     if bounds.rewritten_message_bound > base.max_output_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireOutputBytes,
             observed: bounds.rewritten_message_bound as u64,
             maximum: base.max_output_bytes() as u64,
@@ -878,7 +890,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::ArchiveBytes => LimitKind::TotalPayloadBytes,
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
@@ -902,15 +914,17 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
 
 fn map_page_layout_error(error: page_layout::Error) -> Error {
     match error {
-        page_layout::Error::UnsupportedSource => Error::UnsupportedSource,
+        page_layout::Error::Refused(
+            crate::page_layout::transaction::Refusal::UnsupportedSource,
+        ) => Error::Refused(crate::table::merge::transaction::Refusal::UnsupportedSource),
         page_layout::Error::InvalidSource | page_layout::Error::InvalidLayout(_) => {
             Error::InvalidSource
         },
-        page_layout::Error::LimitExceeded {
+        page_layout::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 page_layout::LimitKind::InputBytes => LimitKind::InputBytes,
                 page_layout::LimitKind::OutputBytes => LimitKind::OutputBytes,

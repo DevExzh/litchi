@@ -147,7 +147,7 @@ impl TransactionBudget {
     }
 
     fn charge(&mut self, kind: LimitKind, amount: usize) -> Result<(), Error> {
-        let amount = u64::try_from(amount).map_err(|_| Error::LimitExceeded {
+        let amount = u64::try_from(amount).map_err(|_| Error::Limit {
             kind,
             observed: u64::MAX,
             maximum: self.maximum(kind),
@@ -158,13 +158,13 @@ impl TransactionBudget {
     fn charge_u64(&mut self, kind: LimitKind, amount: u64) -> Result<(), Error> {
         let current = *self.slot_mut(kind);
         let maximum = self.maximum(kind);
-        let observed = current.checked_add(amount).ok_or(Error::LimitExceeded {
+        let observed = current.checked_add(amount).ok_or(Error::Limit {
             kind,
             observed: u64::MAX,
             maximum,
         })?;
         if observed > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed,
                 maximum,
@@ -175,7 +175,7 @@ impl TransactionBudget {
     }
 
     fn observe(&mut self, kind: LimitKind, amount: usize) -> Result<(), Error> {
-        let amount = u64::try_from(amount).map_err(|_| Error::LimitExceeded {
+        let amount = u64::try_from(amount).map_err(|_| Error::Limit {
             kind,
             observed: u64::MAX,
             maximum: self.maximum(kind),
@@ -184,7 +184,7 @@ impl TransactionBudget {
         if amount > current {
             let maximum = self.maximum(kind);
             if amount > maximum {
-                return Err(Error::LimitExceeded {
+                return Err(Error::Limit {
                     kind,
                     observed: amount,
                     maximum,
@@ -423,6 +423,42 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The selected graph is malformed or ambiguous.
+    #[error("the Pages body-footnote graph cannot be edited safely")]
+    InvalidSource,
+    /// A finite transaction resource ceiling was exceeded.
+    #[error("Pages body-footnote {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed.
+    #[error("could not allocate {amount} units for the Pages body-footnote transaction")]
+    Allocation {
+        /// Elements or bytes requested.
+        amount: usize,
+    },
+    /// Candidate semantic/locality verification failed.
+    #[error("the edited Pages body-footnote graph failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Pages body-footnote patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// No footnote matched the selector.
     #[error("the Pages body-footnote selector did not match a footnote")]
     NotFound,
@@ -444,34 +480,33 @@ pub enum Error {
     /// The package has no exact physical source suitable for lifecycle edits.
     #[error("this Pages source does not support physical body-footnote edits")]
     UnsupportedSource,
-    /// The selected graph is malformed or ambiguous.
-    #[error("the Pages body-footnote graph cannot be edited safely")]
-    InvalidSource,
     /// A valid but unsupported dependency owns part of the graph.
     #[error("the Pages body-footnote graph has an unsupported dependency")]
     UnsupportedDependency,
-    /// A finite transaction resource ceiling was exceeded.
-    #[error("Pages body-footnote {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed.
-    #[error("could not allocate {amount} units for the Pages body-footnote transaction")]
-    Allocation {
-        /// Elements or bytes requested.
-        amount: usize,
-    },
-    /// Candidate semantic/locality verification failed.
-    #[error("the edited Pages body-footnote graph failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Pages body-footnote patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::NotFound { .. } => RefusalKind::NotFound,
+            Self::PositionOutOfBounds { .. }
+            | Self::PositionOccupied { .. }
+            | Self::TextTooLarge { .. }
+            | Self::CustomMarkTooLarge { .. } => RefusalKind::InvalidValue,
+            Self::StructuralMarker { .. }
+            | Self::UnsupportedSource { .. }
+            | Self::UnsupportedDependency { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable body-footnote lifecycle edit staged against an immutable
@@ -575,7 +610,10 @@ impl<'a> Edit<'a> {
         let snapshot = source
             .body_footnote_snapshot()
             .map_err(|_error| Error::InvalidSource)?;
-        let before = snapshot.select(selector).ok_or(Error::NotFound)?.clone();
+        let before = snapshot
+            .select(selector)
+            .ok_or(Error::Refused(Refusal::NotFound))?
+            .clone();
         let position = before.position;
         Ok(Self {
             source,
@@ -605,9 +643,9 @@ impl<'a> Edit<'a> {
 
     /// Stage replacement of the selected footnote text.
     pub fn set(&mut self, text: &str) -> Result<&mut Self, Error> {
-        validate_authored(text, MAX_TEXT_BYTES, Error::TextTooLarge)?;
+        validate_authored(text, MAX_TEXT_BYTES, Error::Refused(Refusal::TextTooLarge))?;
         let Some(after) = self.after.as_mut() else {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         };
         after.text = try_boxed(text)?;
         Ok(self)
@@ -616,10 +654,14 @@ impl<'a> Edit<'a> {
     /// Stage replacement/removal of the optional custom marker.
     pub fn set_custom_mark(&mut self, custom_mark: Option<&str>) -> Result<&mut Self, Error> {
         if let Some(value) = custom_mark {
-            validate_authored(value, MAX_CUSTOM_MARK_BYTES, Error::CustomMarkTooLarge)?;
+            validate_authored(
+                value,
+                MAX_CUSTOM_MARK_BYTES,
+                Error::Refused(Refusal::CustomMarkTooLarge),
+            )?;
         }
         let Some(after) = self.after.as_mut() else {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         };
         after.custom_mark = custom_mark.map(try_boxed).transpose()?;
         Ok(self)
@@ -880,9 +922,17 @@ impl Package {
         text: impl AsRef<str>,
         custom_mark: Option<&str>,
     ) -> Result<Commit, Error> {
-        validate_authored(text.as_ref(), MAX_TEXT_BYTES, Error::TextTooLarge)?;
+        validate_authored(
+            text.as_ref(),
+            MAX_TEXT_BYTES,
+            Error::Refused(Refusal::TextTooLarge),
+        )?;
         if let Some(value) = custom_mark {
-            validate_authored(value, MAX_CUSTOM_MARK_BYTES, Error::CustomMarkTooLarge)?;
+            validate_authored(
+                value,
+                MAX_CUSTOM_MARK_BYTES,
+                Error::Refused(Refusal::CustomMarkTooLarge),
+            )?;
         }
         insert_lifecycle(self, position, text.as_ref(), custom_mark)
     }
@@ -949,7 +999,7 @@ fn validate_authored(value: &str, maximum: usize, overflow: Error) -> Result<(),
         return Err(overflow);
     }
     if value.contains(['\u{000e}', '\u{fffc}']) {
-        return Err(Error::StructuralMarker);
+        return Err(Error::Refused(Refusal::StructuralMarker));
     }
     Ok(())
 }
@@ -966,7 +1016,7 @@ fn try_boxed(value: &str) -> Result<Box<str>, Error> {
 }
 
 fn current_footnote(package: &Package, position: Position) -> Result<Footnote, Error> {
-    current_footnote_at_optional(package, position)?.ok_or(Error::NotFound)
+    current_footnote_at_optional(package, position)?.ok_or(Error::Refused(Refusal::NotFound))
 }
 
 fn current_footnote_at_optional(
@@ -1039,20 +1089,30 @@ fn publish_rewrite(
 
 fn map_text_error(error: super::footnote_text::Error) -> Error {
     match error {
-        super::footnote_text::Error::NotFound => Error::NotFound,
-        super::footnote_text::Error::StructuralMarker => Error::StructuralMarker,
-        super::footnote_text::Error::TextTooLarge => Error::TextTooLarge,
-        super::footnote_text::Error::CustomMarkTooLarge => Error::CustomMarkTooLarge,
-        super::footnote_text::Error::UnsupportedSource => Error::UnsupportedSource,
+        super::footnote_text::Error::Refused(crate::footnote::text::Refusal::NotFound) => {
+            Error::Refused(Refusal::NotFound)
+        },
+        super::footnote_text::Error::Refused(crate::footnote::text::Refusal::StructuralMarker) => {
+            Error::Refused(Refusal::StructuralMarker)
+        },
+        super::footnote_text::Error::Refused(crate::footnote::text::Refusal::TextTooLarge) => {
+            Error::Refused(Refusal::TextTooLarge)
+        },
+        super::footnote_text::Error::Refused(
+            crate::footnote::text::Refusal::CustomMarkTooLarge,
+        ) => Error::Refused(Refusal::CustomMarkTooLarge),
+        super::footnote_text::Error::Refused(crate::footnote::text::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
         super::footnote_text::Error::InvalidSource => Error::InvalidSource,
         super::footnote_text::Error::Verification => Error::Verification,
         super::footnote_text::Error::PatchConflict => Error::PatchConflict,
         super::footnote_text::Error::Allocation { amount } => Error::Allocation { amount },
-        super::footnote_text::Error::LimitExceeded {
+        super::footnote_text::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::footnote_text::LimitKind::InputBytes => LimitKind::InputBytes,
                 super::footnote_text::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1078,7 +1138,7 @@ fn map_package_error(error: super::PackageError) -> Error {
         super::PackageError::Allocation { amount } => Error::Allocation { amount },
         super::PackageError::PayloadLimit { observed, limit }
         | super::PackageError::ObjectLimit { observed, limit }
-        | super::PackageError::SectionNamesTooLarge { observed, limit } => Error::LimitExceeded {
+        | super::PackageError::SectionNamesTooLarge { observed, limit } => Error::Limit {
             kind: LimitKind::Entries,
             observed: observed as u64,
             maximum: limit as u64,
@@ -1093,7 +1153,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1128,7 +1188,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
@@ -1177,7 +1237,7 @@ fn map_graph_error(error: graph_codec::DecodeError) -> Error {
                 (LimitKind::WireWork, observed, maximum)
             },
             graph_codec::DecodeLimit::Nesting { observed, maximum } => {
-                return Error::LimitExceeded {
+                return Error::Limit {
                     kind: LimitKind::WireNesting,
                     observed: u64::from(observed),
                     maximum: u64::from(maximum),
@@ -1191,7 +1251,7 @@ fn map_graph_error(error: graph_codec::DecodeError) -> Error {
             },
             _ => return Error::InvalidSource,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1209,7 +1269,7 @@ fn map_text_wire_error(error: litchi_iwa_text_wire::RewriteError) -> Error {
             resource,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match resource {
                 "output bytes" => LimitKind::OutputBytes,
                 "fields" => LimitKind::WireFields,
@@ -1225,7 +1285,9 @@ fn map_text_wire_error(error: litchi_iwa_text_wire::RewriteError) -> Error {
             Error::Allocation { amount }
         },
         litchi_iwa_text_wire::RewriteError::RangeOutOfBounds { .. }
-        | litchi_iwa_text_wire::RewriteError::SurrogateSplit { .. } => Error::PositionOutOfBounds,
+        | litchi_iwa_text_wire::RewriteError::SurrogateSplit { .. } => {
+            Error::Refused(Refusal::PositionOutOfBounds)
+        },
         litchi_iwa_text_wire::RewriteError::ReversedRange { .. }
         | litchi_iwa_text_wire::RewriteError::ArithmeticOverflow { .. }
         | litchi_iwa_text_wire::RewriteError::InvalidLimit { .. }
@@ -1418,7 +1480,7 @@ fn metadata_location<'source>(
         .source
         .components()
         .get("Index/Metadata.iwa")
-        .ok_or(Error::UnsupportedDependency)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let archive = component.archive();
     let mut location = None;
     for (object_index, object) in archive.objects.iter().enumerate() {
@@ -1502,7 +1564,7 @@ fn map_metadata_error(error: MetadataRewriteError) -> Error {
                 (LimitKind::WireWork, observed, maximum)
             },
             package_metadata_codec::RewriteLimit::Nesting { observed, maximum } => {
-                return Error::LimitExceeded {
+                return Error::Limit {
                     kind: LimitKind::WireNesting,
                     observed: u64::from(observed),
                     maximum: u64::from(maximum),
@@ -1519,7 +1581,7 @@ fn map_metadata_error(error: MetadataRewriteError) -> Error {
             },
             _ => return Error::InvalidSource,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1532,7 +1594,7 @@ fn map_metadata_error(error: MetadataRewriteError) -> Error {
         Some(package_metadata_codec::InvalidReason::VersionedRemoval)
         | Some(package_metadata_codec::InvalidReason::CrossComponentRemoval)
         | Some(package_metadata_codec::InvalidReason::ExistingReferenceCollision) => {
-            Error::UnsupportedDependency
+            Error::Refused(Refusal::UnsupportedDependency)
         },
         _ => Error::InvalidSource,
     }
@@ -1560,7 +1622,7 @@ fn component_for_member<'a>(
             found = Some(component);
         }
     }
-    found.ok_or(Error::UnsupportedDependency)
+    found.ok_or(Error::Refused(Refusal::UnsupportedDependency))
 }
 
 fn current_metadata_component(
@@ -1674,7 +1736,7 @@ fn metadata_addition(
                 .ok_or(Error::InvalidSource)?,
         );
         if facts.uuids.iter().any(|binding| binding.uuid == uuid) {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
     }
     let storage_uuid = ObjectUuidAddition::new(body_selector, storage_identifier, uuid);
@@ -1746,7 +1808,7 @@ fn metadata_removal(
             .iter()
             .any(|(object, _)| *object == storage_identifier)
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let mut matching_uuid_count = 0usize;
     let mut current_uuid = None;
@@ -1767,9 +1829,9 @@ fn metadata_removal(
             has_versioned_uuid = true;
         }
     }
-    let current_uuid = current_uuid.ok_or(Error::UnsupportedDependency)?;
+    let current_uuid = current_uuid.ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     if has_versioned_uuid {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     if matching_uuid_count != 1 {
         return Err(Error::InvalidSource);
@@ -1795,7 +1857,7 @@ fn metadata_removal(
         }
     }
     if has_versioned_external {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let mut matching_data_count = 0usize;
     let mut has_unsupported_data = false;
@@ -1812,7 +1874,7 @@ fn metadata_removal(
         }
     }
     if has_unsupported_data {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
 
     let mut external_removals = Vec::new();
@@ -1923,14 +1985,14 @@ fn insert_lifecycle(
 ) -> Result<Commit, Error> {
     source.validate().map_err(map_package_error)?;
     let mut budget = TransactionBudget::new(source)?;
-    let position_index =
-        usize::try_from(position.utf16_index()).map_err(|_| Error::PositionOutOfBounds)?;
+    let position_index = usize::try_from(position.utf16_index())
+        .map_err(|_| Error::Refused(Refusal::PositionOutOfBounds))?;
     if current_footnote_at_optional(source, position)?.is_some() {
-        return Err(Error::PositionOccupied);
+        return Err(Error::Refused(Refusal::PositionOccupied));
     }
     let source_catalog = &source.state.source;
     if !source_catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let body_identifier =
         super::root_references_with_limits(source_catalog.components(), source_catalog.limits())
@@ -1950,7 +2012,8 @@ fn insert_lifecycle(
         .ok_or(Error::InvalidSource)?;
     let body_message_index = unique_body_message_index(body_object)?;
     let body_message = body_object.messages[body_message_index].clone();
-    let position_u32 = u32::try_from(position_index).map_err(|_| Error::PositionOutOfBounds)?;
+    let position_u32 =
+        u32::try_from(position_index).map_err(|_| Error::Refused(Refusal::PositionOutOfBounds))?;
     let max_identifier = max_object_identifier(source, &mut budget)?;
     let reference_identifier =
         NonZeroU64::new(max_identifier.checked_add(1).ok_or(Error::InvalidSource)?)
@@ -2076,7 +2139,7 @@ fn rewrite_remove(source: &Package, position: Position) -> Result<Package, Error
         .enumerate()
         .find(|(_, graph)| graph.position == position)
         .map(|(index, graph)| (index, *graph))
-        .ok_or(Error::NotFound)?;
+        .ok_or(Error::Refused(Refusal::NotFound))?;
     let source_catalog = &source.state.source;
     let body_component = component_for_object(source, graph.body_identifier.get())?;
     let (mut archive, archive_limits) = editable_archive(source, &body_component, &mut budget)?;
@@ -2087,7 +2150,8 @@ fn rewrite_remove(source: &Package, position: Position) -> Result<Package, Error
     let body_message = body_object.messages[body_message_index].clone();
     let body_payload = rewrite_body_storage(
         &body_message.data,
-        usize::try_from(position.utf16_index()).map_err(|_| Error::PositionOutOfBounds)?,
+        usize::try_from(position.utf16_index())
+            .map_err(|_| Error::Refused(Refusal::PositionOutOfBounds))?,
         Some(graph.reference_identifier),
         position.utf16_index(),
         graph.reference_identifier,
@@ -2235,7 +2299,7 @@ fn editable_archive(
         .find(|entry| entry.name() == name)
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let limits = package
         .state
@@ -2322,7 +2386,10 @@ fn rewrite_body_storage(
     reject_deprecated_body_references(payload)?;
     let rewrite_limits = super::storage_rewrite_limits(limits).map_err(|_| Error::InvalidSource)?;
     let range = if remove_reference.is_some() {
-        position..position.checked_add(1).ok_or(Error::PositionOutOfBounds)?
+        position
+            ..position
+                .checked_add(1)
+                .ok_or(Error::Refused(Refusal::PositionOutOfBounds))?
     } else {
         position..position
     };
@@ -2935,7 +3002,7 @@ fn update_body_header_reference(
             return Err(Error::InvalidSource);
         }
     } else if aggregate_count != 1 {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let mut canonical_fields = 0usize;
     for field in &mut info.field_infos {
@@ -2965,7 +3032,7 @@ fn update_body_header_reference(
                     .retain(|identifier| *identifier != reference);
             }
         } else if field.object_references.contains(&reference) {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
     }
     if adding {
@@ -3134,16 +3201,16 @@ fn prove_exclusive_graph(
     if selected.iter().enumerate().any(|(slot, entry)| {
         entry.is_none_or(|entry| entry.graph_index != graph_index || entry.slot != slot)
     }) {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     if selected.iter().flatten().any(|entry| entry.unsupported) {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let incoming = selected.map(|entry| entry.map_or(0, |entry| entry.incoming));
     let typed_incoming = selected.map(|entry| entry.map_or(0, |entry| entry.typed_incoming));
     // The source graph has exactly body -> reference -> storage -> marker.
     if incoming != [1, 1, 1] || typed_incoming.iter().any(|count| *count > 1) {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -3173,7 +3240,7 @@ fn validate_existing_footnote_graphs(
             binding.object == graph.reference_identifier.get()
                 || binding.object == graph.marker_identifier.get()
         }) {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let mut storage_binding_count = 0usize;
         let mut has_unsupported_storage_binding = false;
@@ -3190,7 +3257,7 @@ fn validate_existing_footnote_graphs(
             }
         }
         if storage_binding_count != 1 || has_unsupported_storage_binding {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
     }
     Ok(())
@@ -3267,12 +3334,12 @@ fn validate_storage_attachment_owners(
             litchi_iwa_common::decode_varint_from_bytes(identifier_field.payload())
                 .map_err(|_| Error::InvalidSource)?;
         if width != identifier_field.payload().len() || identifier != marker_identifier {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         marker_count = marker_count.checked_add(1).ok_or(Error::InvalidSource)?;
     }
     if marker_count != 1 {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }

@@ -24,6 +24,6 @@ pub use litchi_iwa_common::table::sort::Scope;
 /// Transaction types for persisted Keynote slide-table sort configuration.
 pub mod transaction {
     pub use crate::package::slide_table_sort_order::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }

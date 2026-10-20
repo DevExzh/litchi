@@ -107,7 +107,7 @@ impl PlaybackBudget {
     ) -> Result<(), Error> {
         let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -148,7 +148,7 @@ impl PlaybackBudget {
             .checked_add(amount)
             .ok_or(Error::InvalidSource)?;
         if observed > self.max_output {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::OutputBytes,
                 observed: observed as u64,
                 maximum: self.max_output as u64,
@@ -160,7 +160,7 @@ impl PlaybackBudget {
     fn preflight_work(&self, amount: usize) -> Result<(), Error> {
         let observed = self.work.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > self.max_work {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: observed as u64,
                 maximum: self.max_work as u64,
@@ -184,7 +184,7 @@ impl PlaybackBudget {
 
     fn nesting(&mut self, amount: usize) -> Result<(), Error> {
         if amount > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: amount as u64,
                 maximum: self.max_nesting as u64,
@@ -368,6 +368,31 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the Keynote movie-playback source cannot be edited safely")]
+    InvalidSource,
+    #[error("Keynote movie-playback {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    #[error("could not allocate {amount} units for the Keynote movie-playback transaction")]
+    Allocation { amount: usize },
+    #[error("the edited Keynote movie playback failed semantic verification")]
+    Verification,
+    #[error("the Keynote movie-playback patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     #[error("this Keynote source does not support physical movie-playback edits")]
     UnsupportedSource,
     #[error("the requested Keynote movie-playback graph operation is unsupported")]
@@ -382,20 +407,31 @@ pub enum Error {
     SlidePositionNotFound { position: Position },
     #[error("the selected Keynote slide has no movie at position {position:?}")]
     MoviePositionNotFound { position: Position },
-    #[error("the Keynote movie-playback source cannot be edited safely")]
-    InvalidSource,
-    #[error("Keynote movie-playback {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    #[error("could not allocate {amount} units for the Keynote movie-playback transaction")]
-    Allocation { amount: usize },
-    #[error("the edited Keynote movie playback failed semantic verification")]
-    Verification,
-    #[error("the Keynote movie-playback patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::MoviePositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable playback value staged against an immutable package snapshot.
@@ -422,7 +458,9 @@ impl<'a> Edit<'a> {
         movie_selector: impl Into<MovieSelector>,
     ) -> Result<Self, Error> {
         let selection = select_movie(source, slide_selector.into(), movie_selector.into(), true)?;
-        let after = selection.before.ok_or(Error::UnsupportedDependency)?;
+        let after = selection
+            .before
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
         Ok(Self {
             source,
             selection,
@@ -740,7 +778,9 @@ fn commit_edit(
         true,
         &mut budget,
     )?;
-    let before = selection.before.ok_or(Error::UnsupportedDependency)?;
+    let before = selection
+        .before
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     if !same_selection(&current, selection) || current.before != Some(before) {
         return Err(Error::InvalidSource);
     }
@@ -759,7 +799,7 @@ fn commit_edit(
         });
     }
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let (candidate, deleted_previews) = rewrite_movie(source, selection, after, &mut budget)?;
     candidate.validate().map_err(map_read_error)?;
@@ -843,9 +883,9 @@ fn select_movie_with_budget(
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(map_read_error)?
-        .ok_or(Error::SlidePositionNotFound {
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound {
             position: slide_position,
-        })?;
+        }))?;
     let (slide_component_name, slide) = package
         .object_with_component(record.slide_identifier)
         .ok_or(Error::InvalidSource)?;
@@ -910,9 +950,9 @@ fn select_movie_with_budget(
     let movie_position = movie_selector.as_position();
     let (movie_identifier, message_index, movie_kind, _) = *movie_entries
         .get(movie_position.get())
-        .ok_or(Error::MoviePositionNotFound {
+        .ok_or(Error::Refused(Refusal::MoviePositionNotFound {
             position: movie_position,
-        })?;
+        }))?;
     if !matches!(movie_kind, MovieKind::File | MovieKind::Audio) {
         return Err(Error::InvalidSource);
     }
@@ -976,7 +1016,7 @@ fn ensure_unique_movie_identity(
     if matches != 1 || selected_matches != 1 {
         // Cross-component movie graphs and physical duplicate identifiers are
         // intentionally unsupported by this scalar owner.
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -1016,7 +1056,9 @@ fn rewrite_movie(
         .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
-    let before = selection.before.ok_or(Error::UnsupportedDependency)?;
+    let before = selection
+        .before
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     if before == after {
         return Ok((source.snapshot(), 0));
     }
@@ -1032,7 +1074,7 @@ fn rewrite_movie(
     let compressed_bound =
         SnappyStream::maximum_compressed_len(encoded_bound).map_err(map_core_error)?;
     if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::EntryBytes,
             observed: compressed_bound as u64,
             maximum: snappy_limits.max_compressed_stream() as u64,
@@ -1112,7 +1154,7 @@ fn resolve_slide_position(
         SlideSelector::Position(position) => Ok(position),
         SlideSelector::Name(name) => {
             if name.is_empty() {
-                return Err(Error::EmptySlideName);
+                return Err(Error::Refused(Refusal::EmptySlideName));
             }
             package
                 .show()
@@ -1120,7 +1162,7 @@ fn resolve_slide_position(
                 .select_slide(selector)
                 .map_err(map_slide_selector_error)?
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(Error::SlideNameNotFound)
+                .ok_or(Error::Refused(Refusal::SlideNameNotFound))
         },
     }
 }
@@ -1508,14 +1550,16 @@ fn settings_from_snapshot(
 fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
 fn map_slide_selector_error(error: crate::SlideSelectorError) -> Error {
     match error {
-        crate::SlideSelectorError::DuplicateSlideName { .. } => Error::AmbiguousSelector,
-        crate::SlideSelectorError::EmptySlideName => Error::EmptySlideName,
+        crate::SlideSelectorError::DuplicateSlideName { .. } => {
+            Error::Refused(Refusal::AmbiguousSelector)
+        },
+        crate::SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
     }
 }
 
@@ -1526,7 +1570,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::Slides => LimitKind::Slides,
                 SemanticLimitKind::References => LimitKind::References,
@@ -1541,7 +1585,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -1570,7 +1614,7 @@ fn map_codec_error(error: movie_playback_codec::DecodeError) -> Error {
             movie_playback_codec::DecodeLimit::Retained => LimitKind::OutputBytes,
             _ => LimitKind::WireWork,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1588,7 +1632,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1615,7 +1659,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::ArchiveBytes
                 | litchi_iwa_core::LimitKind::ObjectBytes
@@ -1750,7 +1794,7 @@ mod tests {
         let error = decode_movie_playback_payload(&payload(), limits).unwrap_err();
         assert!(matches!(
             error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::WireFields,
                 ..
             }

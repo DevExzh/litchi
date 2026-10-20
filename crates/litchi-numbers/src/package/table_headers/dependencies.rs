@@ -109,13 +109,19 @@ pub(in crate::package) fn validate_dependencies(
         }
     }
     if unsupported_pivot_dependency {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_headers::Refusal::UnsupportedDependency { path },
+        ));
     }
     if header_counts_changed && header_count_dependency {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_headers::Refusal::UnsupportedDependency { path },
+        ));
     }
     if section_counts_changed && active_pivot_or_group {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_headers::Refusal::UnsupportedDependency { path },
+        ));
     }
     if table_info_has_count_dependency(
         source,
@@ -123,7 +129,9 @@ pub(in crate::package) fn validate_dependencies(
         header_counts_changed,
         section_counts_changed,
     )? {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_headers::Refusal::UnsupportedDependency { path },
+        ));
     }
     let repeating_changed = before.repeating_header_rows_enabled
         != after.repeating_header_rows_enabled
@@ -149,11 +157,15 @@ pub(in crate::package) fn validate_dependencies(
             .fields()
             .any(|field| field.number() == 4)
         {
-            return Err(Error::UnsupportedDependency { path });
+            return Err(Error::Refused(
+                crate::package::table_headers::Refusal::UnsupportedDependency { path },
+            ));
         }
     }
     if header_counts_changed && has_rooted_header_name_manager(source)? {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_headers::Refusal::UnsupportedDependency { path },
+        ));
     }
     Ok(())
 }

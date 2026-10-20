@@ -62,7 +62,9 @@ impl Edit<'_> {
     /// This changes merge geometry while preserving the underlying cell values.
     pub fn merge(&mut self, region: Region) -> Result<&mut Self, TableMergesError> {
         if region.end_row() >= self.rows || region.end_column() >= self.columns {
-            return Err(TableMergesError::InvalidRegion);
+            return Err(TableMergesError::Refused(
+                crate::package::table_merges::Refusal::InvalidRegion,
+            ));
         }
         self.budget
             .charge_work(self.regions.len().saturating_add(1))?;
@@ -72,7 +74,9 @@ impl Edit<'_> {
             .copied()
             .any(|existing| existing.overlaps(region))
         {
-            return Err(TableMergesError::OverlappingRegion);
+            return Err(TableMergesError::Refused(
+                crate::package::table_merges::Refusal::OverlappingRegion,
+            ));
         }
         let observed = self
             .regions
@@ -80,7 +84,7 @@ impl Edit<'_> {
             .checked_add(1)
             .ok_or(TableMergesError::InvalidSource)?;
         if observed > self.max_regions {
-            return Err(TableMergesError::LimitExceeded {
+            return Err(TableMergesError::Limit {
                 kind: TableMergesLimitKind::Regions,
                 observed: usize_as_u64(observed),
                 maximum: usize_as_u64(self.max_regions),
@@ -138,7 +142,9 @@ impl Edit<'_> {
         }
 
         if !source_catalog.source_is_exact() {
-            return Err(TableMergesError::UnsupportedSource);
+            return Err(TableMergesError::Refused(
+                crate::package::table_merges::Refusal::UnsupportedSource,
+            ));
         }
 
         let package = rewrite(
@@ -460,7 +466,9 @@ fn rewrite(
         .find(|entry| entry.name() == component_name)
         .ok_or(TableMergesError::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(TableMergesError::UnsupportedSource);
+        return Err(TableMergesError::Refused(
+            crate::package::table_merges::Refusal::UnsupportedSource,
+        ));
     }
     let physical_limits = source_catalog.limits();
     let archive_limits = physical_limits
@@ -572,7 +580,7 @@ fn rewrite(
     let compressed_bound =
         SnappyStream::maximum_compressed_len(encoded_bound).map_err(super::map_core_error)?;
     if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(TableMergesError::LimitExceeded {
+        return Err(TableMergesError::Limit {
             kind: TableMergesLimitKind::EntryBytes,
             observed: usize_as_u64(compressed_bound),
             maximum: usize_as_u64(snappy_limits.max_compressed_stream()),
@@ -785,15 +793,21 @@ fn physical_source(
 fn map_header_error(error: super::super::table_headers::Error) -> TableMergesError {
     use super::super::table_headers::{Error, LimitKind};
     match error {
-        Error::SheetNotFound => TableMergesError::SheetNotFound,
-        Error::TableNotFound => TableMergesError::TableNotFound,
-        Error::UnsupportedSource => TableMergesError::UnsupportedSource,
-        Error::LimitExceeded {
+        Error::Refused(crate::package::table_headers::Refusal::SheetNotFound) => {
+            TableMergesError::Refused(crate::package::table_merges::Refusal::SheetNotFound)
+        },
+        Error::Refused(crate::package::table_headers::Refusal::TableNotFound) => {
+            TableMergesError::Refused(crate::package::table_merges::Refusal::TableNotFound)
+        },
+        Error::Refused(crate::package::table_headers::Refusal::UnsupportedSource) => {
+            TableMergesError::Refused(crate::package::table_merges::Refusal::UnsupportedSource)
+        },
+        Error::Limit {
             kind,
             observed,
             maximum,
             ..
-        } => TableMergesError::LimitExceeded {
+        } => TableMergesError::Limit {
             kind: match kind {
                 LimitKind::InputBytes => TableMergesLimitKind::InputBytes,
                 LimitKind::OutputBytes => TableMergesLimitKind::OutputBytes,
@@ -821,9 +835,11 @@ fn map_header_error(error: super::super::table_headers::Error) -> TableMergesErr
         Error::Verification => TableMergesError::Verification,
         Error::PatchConflict => TableMergesError::PatchConflict,
         Error::InvalidSource { .. }
-        | Error::InvalidSettings { .. }
-        | Error::TableLocked { .. }
-        | Error::UnsupportedDependency { .. } => TableMergesError::InvalidSource,
+        | Error::Refused(crate::package::table_headers::Refusal::InvalidSettings { .. })
+        | Error::Refused(crate::package::table_headers::Refusal::TableLocked { .. })
+        | Error::Refused(crate::package::table_headers::Refusal::UnsupportedDependency {
+            ..
+        }) => TableMergesError::InvalidSource,
     }
 }
 

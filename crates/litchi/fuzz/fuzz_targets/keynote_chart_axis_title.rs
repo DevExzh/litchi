@@ -508,7 +508,10 @@ fn exercise_selector_failures(package: &Package, source: &[u8]) {
     let empty_name = package
         .slide_chart_axis_title(0usize, ChartSelector::name(""), Axis::Category)
         .expect_err("empty chart selector was accepted");
-    assert!(matches!(empty_name, ChartAxisTitleError::EmptyChartName));
+    assert!(matches!(
+        empty_name,
+        ChartAxisTitleError::Refused(litchi::keynote::chart::axis_title::Refusal::EmptyChartName)
+    ));
     observe_error(empty_name);
     assert_eq!(package_bytes(package), source);
 }
@@ -628,7 +631,7 @@ fn exercise_limit_guards() {
         assert!(
             matches!(
                 &error,
-                ChartAxisTitleError::LimitExceeded {
+                ChartAxisTitleError::Limit {
                     kind: ChartAxisTitleLimitKind::OutputBytes,
                     ..
                 }

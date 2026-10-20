@@ -244,7 +244,7 @@ fn contains_ascii_case_insensitive(haystack: &str, needle: &[u8]) -> bool {
 /// Exact-source transactions for one slide's build order.
 pub mod order {
     pub use crate::package::slide_build_order::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 

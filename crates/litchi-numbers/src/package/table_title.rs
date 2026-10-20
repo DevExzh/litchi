@@ -89,27 +89,10 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// No rooted sheet matched the selector.
-    #[error("the Numbers workbook has no sheet matching the requested selector")]
-    SheetNotFound,
-    /// No table on the selected sheet matched the selector.
-    #[error("the selected Numbers sheet has no table matching the requested selector")]
-    TableNotFound,
-    /// A changed edit targeted an effectively locked table.
-    #[error("the selected Numbers table is locked at {path:?}")]
-    TableLocked {
-        /// Selected semantic table.
-        path: Path,
-    },
-    /// A visible title is missing a required native rendering dependency.
-    #[error("the selected Numbers table title is missing a required dependency at {path:?}")]
-    UnsupportedDependency {
-        /// Selected semantic table.
-        path: Path,
-    },
-    /// The exact native profile is not supported for changed publication.
-    #[error("this Numbers source does not support exact table-title editing")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// Rooted ownership, metadata, or wire framing is invalid.
     #[error("the Numbers table-title source is invalid at {path:?}")]
     InvalidSource {
@@ -118,7 +101,7 @@ pub enum Error {
     },
     /// A finite transaction resource ceiling was exceeded.
     #[error("Numbers table-title {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category.
         kind: LimitKind,
         /// Observed amount.
@@ -142,6 +125,55 @@ pub enum Error {
     /// The patch was applied to a package other than its exact source.
     #[error("the table-title patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// No rooted sheet matched the selector.
+    #[error("the Numbers workbook has no sheet matching the requested selector")]
+    SheetNotFound,
+    /// No table on the selected sheet matched the selector.
+    #[error("the selected Numbers sheet has no table matching the requested selector")]
+    TableNotFound,
+    /// A changed edit targeted an effectively locked table.
+    #[error("the selected Numbers table is locked at {path:?}")]
+    TableLocked {
+        /// Selected semantic table.
+        path: Path,
+    },
+    /// A visible title is missing a required native rendering dependency.
+    #[error("the selected Numbers table title is missing a required dependency at {path:?}")]
+    UnsupportedDependency {
+        /// Selected semantic table.
+        path: Path,
+    },
+    /// The exact native profile is not supported for changed publication.
+    #[error("this Numbers source does not support exact table-title editing")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SheetNotFound { .. } | Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::TableLocked { .. } => RefusalKind::Protected,
+            Self::UnsupportedDependency { .. } | Self::UnsupportedSource { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -446,7 +478,7 @@ fn resolve_title_selectors<'sheet, 'table>(
         .map_err(|_error| Error::InvalidSource {
             path: Path::Package,
         })?
-        .ok_or(Error::SheetNotFound)?;
+        .ok_or(Error::Refused(Refusal::SheetNotFound))?;
     let table_position = match table.into() {
         TableSelector::Position(index) => {
             let index = index.get();
@@ -456,7 +488,7 @@ fn resolve_title_selectors<'sheet, 'table>(
             .tables()
             .position(|candidate| candidate.name() == name),
     }
-    .ok_or(Error::TableNotFound)?;
+    .ok_or(Error::Refused(Refusal::TableNotFound))?;
     Ok((selected_sheet.index(), table_position))
 }
 
@@ -526,7 +558,7 @@ fn resolve_native_title_target(
         sheet_payloads
             .get(sheet_position)
             .copied()
-            .ok_or(Error::SheetNotFound)?,
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?,
     )
     .map_err(map_header_error)?;
     if let Some(active) = budget.as_deref_mut() {
@@ -629,7 +661,7 @@ fn resolve_native_title_target(
             locked: LockState::from_locked(info_snapshot.locked().unwrap_or(false)),
         });
     }
-    Err(Error::TableNotFound)
+    Err(Error::Refused(Refusal::TableNotFound))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -698,7 +730,7 @@ impl TransactionBudget {
         self.charge_work(report.work_bytes())?;
         self.charge_references(report.references())?;
         if report.max_depth() > u32::try_from(WireLimits::MAX_NESTING).unwrap_or(u32::MAX) {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(report.max_depth()),
                 maximum: u64::try_from(WireLimits::MAX_NESTING).unwrap_or(u64::MAX),
@@ -820,7 +852,7 @@ fn charge_remaining(
             .checked_sub(*remaining)
             .and_then(|used| used.checked_add(amount))
             .unwrap_or(usize::MAX);
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
@@ -891,19 +923,25 @@ const fn invalid_source() -> Error {
 
 fn map_header_error(error: super::table_headers::Error) -> Error {
     match error {
-        super::table_headers::Error::SheetNotFound => Error::SheetNotFound,
-        super::table_headers::Error::TableNotFound => Error::TableNotFound,
-        super::table_headers::Error::UnsupportedSource => Error::UnsupportedSource,
+        super::table_headers::Error::Refused(
+            crate::package::table_headers::Refusal::SheetNotFound,
+        ) => Error::Refused(Refusal::SheetNotFound),
+        super::table_headers::Error::Refused(
+            crate::package::table_headers::Refusal::TableNotFound,
+        ) => Error::Refused(Refusal::TableNotFound),
+        super::table_headers::Error::Refused(
+            crate::package::table_headers::Refusal::UnsupportedSource,
+        ) => Error::Refused(Refusal::UnsupportedSource),
         super::table_headers::Error::Allocation { amount, path } => Error::Allocation {
             amount,
             path: map_header_path(path),
         },
-        super::table_headers::Error::LimitExceeded {
+        super::table_headers::Error::Limit {
             kind,
             observed,
             maximum,
             path,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_header_limit(kind),
             observed,
             maximum,
@@ -911,9 +949,11 @@ fn map_header_error(error: super::table_headers::Error) -> Error {
         },
         super::table_headers::Error::PatchConflict => Error::PatchConflict,
         super::table_headers::Error::Verification => Error::Verification,
-        super::table_headers::Error::TableLocked { path } => Error::TableLocked {
+        super::table_headers::Error::Refused(
+            crate::package::table_headers::Refusal::TableLocked { path },
+        ) => Error::Refused(Refusal::TableLocked {
             path: map_header_path(path),
-        },
+        }),
         _ => invalid_source(),
     }
 }
@@ -955,7 +995,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::WireOutputBytes,
@@ -980,31 +1020,31 @@ fn map_title_codec_error(error: numbers_table_title_codec::DecodeError) -> Error
     use numbers_table_title_codec::DecodeLimit;
 
     match error.resource_limit() {
-        Some(DecodeLimit::Bytes { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Bytes { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
             path: Path::Package,
         },
-        Some(DecodeLimit::References { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::References { observed, maximum }) => Error::Limit {
             kind: LimitKind::PayloadReferences,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
             path: Path::Package,
         },
-        Some(DecodeLimit::Fields { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Fields { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireFields,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
             path: Path::Package,
         },
-        Some(DecodeLimit::Work { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Work { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireWork,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
             path: Path::Package,
         },
-        Some(DecodeLimit::Nesting { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Nesting { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
@@ -1049,7 +1089,7 @@ fn validate_changed_source(
         report,
     )?;
     if target.native.locked == LockState::Locked {
-        return Err(Error::TableLocked { path });
+        return Err(Error::Refused(Refusal::TableLocked { path }));
     }
     validate_view_state_dependency(source, budget)?;
     Ok(())
@@ -1076,7 +1116,7 @@ fn validate_view_state_dependency(
             .any(|message| message.type_ == TABLE_NAME_SELECTION_MESSAGE_TYPE)
         {
             budget.charge_transaction_work(work)?;
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
     }
     budget.charge_transaction_work(work)
@@ -1096,17 +1136,17 @@ fn validate_visible_prerequisites(
     };
     let height_bits = target
         .height_bits
-        .ok_or(Error::UnsupportedDependency { path })?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
     let height = f64::from_bits(height_bits);
     if !height.is_finite() || height < 0.0 {
         return Err(invalid_source());
     }
     let paragraph_style = target
         .paragraph_style
-        .ok_or(Error::UnsupportedDependency { path })?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
     let shape_style = target
         .shape_style
-        .ok_or(Error::UnsupportedDependency { path })?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
     if paragraph_style == shape_style
         || [paragraph_style, shape_style]
             .into_iter()
@@ -1478,7 +1518,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         });
     }
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let mut budget = edit.budget;
     budget.charge_transaction_work(source.len().saturating_mul(2))?;
@@ -1821,7 +1861,7 @@ mod tests {
         let attempted = attempted_budget.charge_transaction_work(large.3);
         assert!(matches!(
             attempted,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: super::LimitKind::TransactionWork,
                 ..
             })

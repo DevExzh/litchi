@@ -52,7 +52,7 @@ pub enum Error {
     /// A numeric literal or cached result was not finite.
     NonFinite,
     /// A finite resource ceiling was exceeded.
-    LimitExceeded {
+    Limit {
         /// Resource which exceeded its ceiling.
         kind: LimitKind,
         /// Requested aggregate amount.
@@ -85,7 +85,7 @@ impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NonFinite => formatter.write_str("Numbers formula scalar must be finite"),
-            Self::LimitExceeded {
+            Self::Limit {
                 observed, maximum, ..
             } => write!(
                 formatter,
@@ -466,7 +466,7 @@ impl Expression {
         let name = name.as_ref();
         const MAX_SUPPORTED_FUNCTION_NAME_BYTES: usize = 7;
         if name.len() > MAX_SUPPORTED_FUNCTION_NAME_BYTES {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::OwnedBytes,
                 observed: name.len(),
                 maximum: MAX_SUPPORTED_FUNCTION_NAME_BYTES,
@@ -482,7 +482,7 @@ impl Expression {
         };
         for argument in arguments {
             if retained.len() == MAX_FUNCTION_ARGUMENTS {
-                return Err(Error::LimitExceeded {
+                return Err(Error::Limit {
                     kind: LimitKind::FunctionArguments,
                     observed: retained.len().saturating_add(1),
                     maximum: MAX_FUNCTION_ARGUMENTS,
@@ -599,7 +599,7 @@ impl Metrics {
         )?;
         self.depth = self.depth.max(child.metrics.depth.saturating_add(1));
         if self.depth > MAX_DEPTH {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::Depth,
                 observed: self.depth,
                 maximum: MAX_DEPTH,
@@ -634,7 +634,9 @@ pub(crate) fn resolve_table_handle<'sheet, 'table>(
                 .sheets()
                 .get(position)
                 .map(|sheet| (position, sheet))
-                .ok_or(TableCellError::SheetNotFound)?
+                .ok_or(TableCellError::Refused(
+                    crate::table::cells::Refusal::SheetNotFound,
+                ))?
         },
         SheetSelector::Name(name) => {
             let mut matches = source
@@ -643,11 +645,15 @@ pub(crate) fn resolve_table_handle<'sheet, 'table>(
                 .iter()
                 .enumerate()
                 .filter(|(_position, sheet)| sheet.name() == name);
-            let first = matches.next().ok_or(TableCellError::SheetNotFound)?;
+            let first = matches.next().ok_or(TableCellError::Refused(
+                crate::table::cells::Refusal::SheetNotFound,
+            ))?;
             if matches.next().is_some() {
-                return Err(TableCellError::AmbiguousSource {
-                    path: Path::Package,
-                });
+                return Err(TableCellError::Refused(
+                    crate::table::cells::Refusal::AmbiguousSource {
+                        path: Path::Package,
+                    },
+                ));
             }
             first
         },
@@ -663,21 +669,27 @@ pub(crate) fn resolve_table_handle<'sheet, 'table>(
                 .tables()
                 .nth(position)
                 .map(|table| (position, table))
-                .ok_or(TableCellError::TableNotFound)?
+                .ok_or(TableCellError::Refused(
+                    crate::table::cells::Refusal::TableNotFound,
+                ))?
         },
         TableSelector::Name(name) => {
             let mut matches = sheet
                 .tables()
                 .enumerate()
                 .filter(|(_position, table)| table.name() == name);
-            let first = matches.next().ok_or(TableCellError::TableNotFound)?;
+            let first = matches.next().ok_or(TableCellError::Refused(
+                crate::table::cells::Refusal::TableNotFound,
+            ))?;
             if matches.next().is_some() {
-                return Err(TableCellError::AmbiguousSource {
-                    path: Path::Table {
-                        sheet: compact_sheet,
-                        table: u32::try_from(first.0).unwrap_or(u32::MAX),
+                return Err(TableCellError::Refused(
+                    crate::table::cells::Refusal::AmbiguousSource {
+                        path: Path::Table {
+                            sheet: compact_sheet,
+                            table: u32::try_from(first.0).unwrap_or(u32::MAX),
+                        },
                     },
-                });
+                ));
             }
             first
         },
@@ -698,7 +710,7 @@ pub(crate) fn resolve_table_handle<'sheet, 'table>(
 
 fn copy_text(value: &str, maximum: usize) -> Result<Box<str>, Error> {
     if value.len() > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::OwnedBytes,
             observed: value.len(),
             maximum,
@@ -741,7 +753,7 @@ fn checked_limit_add(
 ) -> Result<usize, Error> {
     let observed = current.checked_add(amount).unwrap_or(usize::MAX);
     if observed > maximum {
-        Err(Error::LimitExceeded {
+        Err(Error::Limit {
             kind,
             observed,
             maximum,
@@ -784,9 +796,11 @@ fn validate_expression(
     depth: usize,
 ) -> Result<(), CellError> {
     if depth > MAX_DEPTH {
-        return Err(CellError::UnsupportedSource {
-            path: Path::Package,
-        });
+        return Err(CellError::Refused(
+            crate::table::cells::Refusal::UnsupportedSource {
+                path: Path::Package,
+            },
+        ));
     }
     match expression.root() {
         Node::Cell(reference) => validate_cell(*reference, local),
@@ -835,9 +849,11 @@ fn validate_children(
     local: Dimensions,
     depth: usize,
 ) -> Result<(), CellError> {
-    let child_depth = depth.checked_add(1).ok_or(CellError::UnsupportedSource {
-        path: Path::Package,
-    })?;
+    let child_depth = depth.checked_add(1).ok_or(CellError::Refused(
+        crate::table::cells::Refusal::UnsupportedSource {
+            path: Path::Package,
+        },
+    ))?;
     for child in children {
         validate_expression(child, source, local, child_depth)?;
     }
@@ -848,14 +864,18 @@ fn validate_cell(reference: CellReference, dimensions: Dimensions) -> Result<(),
     let (row, column) = reference.coordinates();
     if row >= dimensions.rows() as usize || column >= dimensions.columns() as usize {
         let (Ok(row), Ok(column)) = (u32::try_from(row), u32::try_from(column)) else {
-            return Err(CellError::UnsupportedSource {
-                path: Path::Package,
-            });
+            return Err(CellError::Refused(
+                crate::table::cells::Refusal::UnsupportedSource {
+                    path: Path::Package,
+                },
+            ));
         };
-        Err(CellError::OutOfBounds {
-            position: crate::table::At::new(row, column),
-            dimensions,
-        })
+        Err(CellError::Refused(
+            crate::table::cells::Refusal::OutOfBounds {
+                position: crate::table::At::new(row, column),
+                dimensions,
+            },
+        ))
     } else {
         Ok(())
     }
@@ -864,9 +884,11 @@ fn validate_cell(reference: CellReference, dimensions: Dimensions) -> Result<(),
 fn validate_axis(reference: AxisReference, maximum: u32) -> Result<(), CellError> {
     let position = reference.parts().0;
     if position >= maximum as usize {
-        Err(CellError::UnsupportedSource {
-            path: Path::Package,
-        })
+        Err(CellError::Refused(
+            crate::table::cells::Refusal::UnsupportedSource {
+                path: Path::Package,
+            },
+        ))
     } else {
         Ok(())
     }

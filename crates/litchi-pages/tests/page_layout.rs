@@ -987,7 +987,9 @@ fn legacy_nested_source_allows_noop_but_refuses_changed_layout() -> TestResult {
     edit.set_layout(changed_layout(before)?)?;
     assert!(matches!(
         edit.commit(),
-        Err(PageLayoutError::UnsupportedSource)
+        Err(PageLayoutError::Refused(
+            litchi_pages::page_layout::transaction::Refusal::UnsupportedSource
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
@@ -1049,7 +1051,7 @@ fn output_limit_is_typed_and_failure_atomic() -> TestResult {
     edit.set_layout(full_layout()?)?;
     assert!(matches!(
         edit.commit(),
-        Err(PageLayoutError::LimitExceeded {
+        Err(PageLayoutError::Limit {
             kind: PageLayoutLimitKind::OutputBytes,
             ..
         })

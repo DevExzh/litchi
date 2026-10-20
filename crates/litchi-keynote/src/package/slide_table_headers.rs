@@ -192,6 +192,41 @@ impl fmt::Display for InvalidReason {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The selected graph, archive metadata, or wire framing is malformed.
+    #[error("the selected Keynote slide-table header source is invalid")]
+    InvalidSource,
+    /// A finite transaction resource ceiling was exceeded.
+    #[error(
+        "Keynote slide-table headers {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        /// Resource category.
+        kind: LimitKind,
+        /// Observed amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote slide-table header transaction")]
+    Allocation { amount: usize },
+    /// Candidate reopening or locality verification failed.
+    #[error("the edited Keynote slide-table headers failed semantic verification")]
+    Verification,
+    /// The patch was created from another exact source artifact.
+    #[error("the Keynote slide-table header patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source has no exact physical package artifact.
     #[error("this Keynote source does not support physical slide-table header edits")]
     UnsupportedSource,
@@ -227,30 +262,32 @@ pub enum Error {
         /// Content-free validation reason.
         reason: InvalidReason,
     },
-    /// The selected graph, archive metadata, or wire framing is malformed.
-    #[error("the selected Keynote slide-table header source is invalid")]
-    InvalidSource,
-    /// A finite transaction resource ceiling was exceeded.
-    #[error(
-        "Keynote slide-table headers {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        /// Resource category.
-        kind: LimitKind,
-        /// Observed amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote slide-table header transaction")]
-    Allocation { amount: usize },
-    /// Candidate reopening or locality verification failed.
-    #[error("the edited Keynote slide-table headers failed semantic verification")]
-    Verification,
-    /// The patch was created from another exact source artifact.
-    #[error("the Keynote slide-table header patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::UnsupportedDependency { .. }
+            | Self::UnsupportedTopology { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::InvalidSettings { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::TablePositionNotFound { .. } => RefusalKind::NotFound,
+            Self::Locked { .. } => RefusalKind::Protected,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -315,7 +352,7 @@ impl HeaderBudget {
     ) -> Result<(), Error> {
         let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -414,7 +451,7 @@ impl HeaderBudget {
         self.allocations(report.allocations())?;
         self.nesting = self.nesting.max(report.max_depth() as usize);
         if self.nesting > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: self.nesting as u64,
                 maximum: self.max_nesting as u64,
@@ -474,7 +511,7 @@ impl HeaderBudget {
         self.transaction_work(other.transaction_work)?;
         self.nesting = self.nesting.max(other.nesting);
         if self.nesting > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: self.nesting as u64,
                 maximum: self.max_nesting as u64,
@@ -824,10 +861,10 @@ fn commit_edit(
         });
     }
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     if selection.locked {
-        return Err(Error::Locked);
+        return Err(Error::Refused(Refusal::Locked));
     }
     let mut budget = selection.admission_budget;
     validate_requested(after, selection.rows, selection.columns, selection.path())?;
@@ -897,9 +934,9 @@ fn select_table(
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(map_read_error)?
-        .ok_or(Error::SlidePositionNotFound {
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound {
             position: slide_position,
-        })?;
+        }))?;
     let (_slide_component_name, slide) = package
         .object_with_component(record.slide_identifier)
         .ok_or(Error::InvalidSource)?;
@@ -944,7 +981,7 @@ fn select_table(
             .iter()
             .any(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
         {
-            return Err(Error::UnsupportedTopology);
+            return Err(Error::Refused(Refusal::UnsupportedTopology));
         }
         if !owned_set.contains(&table_info_identifier) {
             return Err(Error::InvalidSource);
@@ -973,14 +1010,14 @@ fn select_table(
             .iter()
             .any(|message| message.type_ == LEGACY_TABLE_MODEL_MESSAGE_TYPE)
         {
-            return Err(Error::UnsupportedTopology);
+            return Err(Error::Refused(Refusal::UnsupportedTopology));
         }
         let (model_message_index, model_payload) = unique_message(model, TABLE_MODEL_MESSAGE_TYPE)?;
         let snapshot = decode_header(model_payload, package, &mut budget)?;
         let before = settings_from_snapshot(snapshot)?;
         validate_stored(before, snapshot.rows(), snapshot.columns())?;
         if snapshot.rows() == 0 || snapshot.columns() == 0 {
-            return Err(Error::UnsupportedTopology);
+            return Err(Error::Refused(Refusal::UnsupportedTopology));
         }
         tables.push((
             table_info_identifier,
@@ -1011,9 +1048,9 @@ fn select_table(
     ) = tables
         .get(table_position.get())
         .cloned()
-        .ok_or(Error::TablePositionNotFound {
+        .ok_or(Error::Refused(Refusal::TablePositionNotFound {
             position: table_position,
-        })?;
+        }))?;
     ensure_unique_identity(package, table_info_identifier, &mut budget)?;
     ensure_unique_identity(package, model_identifier, &mut budget)?;
     ensure_unique_table_owner(
@@ -1064,7 +1101,7 @@ fn rewrite_headers(
         .find(|entry| entry.name() == selection.component_name.as_ref())
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let physical_limits = source.state.options.archive();
     let archive_limits = physical_limits
@@ -1326,24 +1363,24 @@ fn validate_requested(
     if u16::from(header_rows).saturating_add(u16::from(footer_rows))
         > u16::try_from(rows).unwrap_or(u16::MAX)
     {
-        return Err(Error::InvalidSettings {
+        return Err(Error::Refused(Refusal::InvalidSettings {
             path,
             reason: InvalidReason::RowSectionsExceedTable {
                 header_rows,
                 footer_rows,
                 table_rows: rows,
             },
-        });
+        }));
     }
     let header_columns = u8::try_from(settings.header_column_count()).unwrap_or(u8::MAX);
     if u32::from(header_columns) > columns {
-        return Err(Error::InvalidSettings {
+        return Err(Error::Refused(Refusal::InvalidSettings {
             path,
             reason: InvalidReason::HeaderColumnsExceedTable {
                 header_columns,
                 table_columns: columns,
             },
-        });
+        }));
     }
     Ok(())
 }
@@ -1356,15 +1393,15 @@ fn resolve_slide_position(
         SlideSelector::Position(position) => Ok(position),
         SlideSelector::Name(name) => {
             if name.is_empty() {
-                return Err(Error::EmptySlideName);
+                return Err(Error::Refused(Refusal::EmptySlideName));
             }
             package
                 .show()
                 .map_err(map_read_error)?
                 .select_slide(selector)
-                .map_err(|_| Error::AmbiguousSelector)?
+                .map_err(|_| Error::Refused(Refusal::AmbiguousSelector))?
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(Error::SlideNameNotFound)
+                .ok_or(Error::Refused(Refusal::SlideNameNotFound))
         },
     }
 }
@@ -1487,7 +1524,7 @@ fn strict_reference(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
                 }
                 identifier = Some(value);
             },
-            2 | 3 => return Err(Error::UnsupportedTopology),
+            2 | 3 => return Err(Error::Refused(Refusal::UnsupportedTopology)),
             _ => return Err(Error::InvalidSource),
         }
     }
@@ -1575,7 +1612,7 @@ fn validate_slide_metadata(
             continue;
         }
         if !field.object_references.is_empty() || !field.data_references.is_empty() {
-            return Err(Error::UnsupportedTopology);
+            return Err(Error::Refused(Refusal::UnsupportedTopology));
         }
     }
     // Native Keynote commonly emits aggregate-only slide authority.  When it
@@ -1608,13 +1645,13 @@ fn validate_table_info_metadata(
         return Err(Error::InvalidSource);
     }
     if !info.data_references.is_empty() {
-        return Err(Error::UnsupportedTopology);
+        return Err(Error::Refused(Refusal::UnsupportedTopology));
     }
     let mut model_field_count = 0usize;
     for field in &info.field_infos {
         if field.path.as_slice() != [TABLE_MODEL_FIELD] {
             if !field.object_references.is_empty() || !field.data_references.is_empty() {
-                return Err(Error::UnsupportedTopology);
+                return Err(Error::Refused(Refusal::UnsupportedTopology));
             }
             continue;
         }
@@ -1835,7 +1872,7 @@ fn ensure_unique_identity(
     if count == 1 {
         Ok(())
     } else {
-        Err(Error::UnsupportedDependency)
+        Err(Error::Refused(Refusal::UnsupportedDependency))
     }
 }
 
@@ -1892,7 +1929,7 @@ fn ensure_unique_table_owner(
     if owned_count == 1 && z_count == 1 && selected && model_owners == 1 {
         Ok(())
     } else {
-        Err(Error::UnsupportedDependency)
+        Err(Error::Refused(Refusal::UnsupportedDependency))
     }
 }
 
@@ -1913,14 +1950,14 @@ fn validate_global_inbound_references(
         .map_err(map_archive_error)?;
     let Some((_component, table_info)) = package.object_with_component(table_info_identifier)
     else {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     };
     let Some(message_info) = table_info
         .archive_info
         .message_infos
         .get(table_info_message_index)
     else {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     };
     let expected_model_edges = message_info
         .object_references
@@ -1934,7 +1971,7 @@ fn validate_global_inbound_references(
         .filter(|identifier| **identifier == model_identifier)
         .count();
     if expected_model_edges == 0 {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let mut census = InboundReferenceCensus {
         slide_identifier,
@@ -2012,7 +2049,7 @@ fn validate_global_inbound_references(
             model_identifier,
         )?
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -2127,7 +2164,7 @@ fn same_selection(a: &HeaderSelection, b: &HeaderSelection) -> bool {
 fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
@@ -2138,7 +2175,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::References => LimitKind::References,
                 _ => LimitKind::WireWork,
@@ -2178,12 +2215,10 @@ fn map_header_codec_error(error: header_codec::DecodeError) -> Error {
             header_codec::WireResourceLimit::Bytes { observed, maximum } => {
                 header_limit(LimitKind::WireBytes, observed, maximum)
             },
-            header_codec::WireResourceLimit::Nesting { observed, maximum } => {
-                Error::LimitExceeded {
-                    kind: LimitKind::WireNesting,
-                    observed: u64::from(observed),
-                    maximum: u64::from(maximum),
-                }
+            header_codec::WireResourceLimit::Nesting { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireNesting,
+                observed: u64::from(observed),
+                maximum: u64::from(maximum),
             },
             _ => Error::InvalidSource,
         };
@@ -2200,19 +2235,15 @@ fn map_table_info_codec_error(error: table_info_codec::DecodeError) -> Error {
     }
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
-            table_info_codec::WireResourceLimit::Bytes { observed, maximum } => {
-                Error::LimitExceeded {
-                    kind: LimitKind::WireBytes,
-                    observed: observed.unwrap_or(0) as u64,
-                    maximum: maximum.unwrap_or(0) as u64,
-                }
+            table_info_codec::WireResourceLimit::Bytes { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireBytes,
+                observed: observed.unwrap_or(0) as u64,
+                maximum: maximum.unwrap_or(0) as u64,
             },
-            table_info_codec::WireResourceLimit::Nesting { observed, maximum } => {
-                Error::LimitExceeded {
-                    kind: LimitKind::WireNesting,
-                    observed: u64::from(observed.unwrap_or(0)),
-                    maximum: u64::from(maximum.unwrap_or(0)),
-                }
+            table_info_codec::WireResourceLimit::Nesting { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireNesting,
+                observed: u64::from(observed.unwrap_or(0)),
+                maximum: u64::from(maximum.unwrap_or(0)),
             },
             _ => Error::InvalidSource,
         };
@@ -2221,7 +2252,7 @@ fn map_table_info_codec_error(error: table_info_codec::DecodeError) -> Error {
 }
 
 fn header_limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
@@ -2238,7 +2269,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -2263,7 +2294,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
@@ -2447,7 +2478,7 @@ fn validate_dependencies(
                 // scalar transaction.  Even freeze/repeat-only edits could
                 // otherwise publish from a dangling or wrong-typed owner, so
                 // reject every changed edit that carries field 85.
-                return Err(Error::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             },
             CATEGORY_GROUPING_FIELD | CATEGORY_OWNER_FIELD | 84 => {
                 let active = if field.number() == CATEGORY_GROUPING_FIELD {
@@ -2476,10 +2507,10 @@ fn validate_dependencies(
         }
     }
     if header_counts_changed && header_count_dependency {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     if section_counts_changed && active_pivot_or_group {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let table_info_dependency = table_info_has_count_dependency(
         source,
@@ -2489,10 +2520,10 @@ fn validate_dependencies(
         budget,
     )?;
     if table_info_dependency {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     if header_counts_changed && has_rooted_header_name_manager(source, budget)? {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -2733,7 +2764,7 @@ fn deprecated_category_grouping_active(
                 let (enabled, root_reference) = group_by_enabled(field.payload(), limits, budget)?
                     .ok_or(Error::InvalidSource)?;
                 if root_reference.is_some() {
-                    return Err(Error::UnsupportedDependency);
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
                 }
                 active |= enabled;
             },
@@ -2809,7 +2840,7 @@ fn group_by_enabled(
             // aggregate, row-UID, or child-reference state that this scalar
             // header transaction cannot regenerate safely.
             2 | 4 | 5 | 15 | 17 if field.wire_type() == 2 => {
-                return Err(Error::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             },
             _ => return Err(Error::InvalidSource),
         }
@@ -2835,17 +2866,17 @@ fn validate_inert_group_node(
             1 if !uid_seen && field.wire_type() == 2 => {
                 uid_seen = true;
                 if validate_uuid_payload(field.payload(), limits, budget)? != (1, 0) {
-                    return Err(Error::UnsupportedDependency);
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
                 }
             },
             6 if !format_manager_seen && field.wire_type() == 2 => {
                 format_manager_seen = true;
                 if !field.payload().is_empty() {
-                    return Err(Error::UnsupportedDependency);
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
                 }
             },
             3..=5 | 7..=10 if field.wire_type() == 2 => {
-                return Err(Error::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             },
             _ => return Err(Error::InvalidSource),
         }
@@ -2881,7 +2912,7 @@ fn validate_inert_coordinate(
     if column == Some(expected_column) && row == Some(0) {
         Ok(())
     } else {
-        Err(Error::UnsupportedDependency)
+        Err(Error::Refused(Refusal::UnsupportedDependency))
     }
 }
 

@@ -20,4 +20,6 @@ pub enum Background {
 }
 
 // Exact-source transaction vocabulary of this family (ADR 0034 W1).
-pub use crate::package::slide_background::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub use crate::package::slide_background::{
+    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+};

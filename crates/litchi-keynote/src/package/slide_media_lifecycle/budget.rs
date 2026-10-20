@@ -233,7 +233,7 @@ fn checked_add(left: u64, right: u64) -> Result<u64, Error> {
 }
 
 fn limit(kind: LimitKind, observed: u64, maximum: u64) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed,
         maximum,

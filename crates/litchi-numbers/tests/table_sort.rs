@@ -535,7 +535,10 @@ fn changed_sort_rejects_locked_table_atomically() -> TestResult {
         .set(order(1, Direction::Ascending)?)
         .commit()
         .expect_err("changed persisted sort must reject a locked table");
-    assert!(matches!(error, Error::TableLocked { .. }));
+    assert!(matches!(
+        error,
+        Error::Refused(litchi_numbers::table::sort::transaction::Refusal::TableLocked { .. })
+    ));
     assert_eq!(locked.exact_bytes(), before);
     Ok(())
 }
@@ -693,11 +696,15 @@ fn selector_errors_are_redacted_and_public_values_are_archive_free() -> TestResu
     let package = Package::from_bytes(&without_sort(&std::fs::read(fixture_path())?)?)?;
     assert!(matches!(
         package.table_sort_order("missing sheet", 0usize),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::sort::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_sort_order(0usize, "missing table"),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::sort::transaction::Refusal::TableNotFound
+        ))
     ));
     let order = order(1, Direction::Ascending)?;
     let rendered = format!("{order:?}");

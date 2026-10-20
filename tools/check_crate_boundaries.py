@@ -15631,6 +15631,8 @@ PAGES_PACKAGE_SOURCE = PAGES_SOURCE_ROOT / "package.rs"
 # legacy-name overrides)``.  The legacy name of a short name is
 # ``prefix + short`` unless the override map names it.
 PAGES_TRANSACTION_SIX = ("Commit", "Diagnostics", "Edit", "Error", "LimitKind", "Patch")
+# Record 0361: a family may also export its typed refusal reasons (0351 §2.4).
+PAGES_TRANSACTION_OPTIONAL_EXPORTS = frozenset({"Refusal"})
 PAGES_TRANSACTION_FAMILIES: tuple[
     tuple[str, str, tuple[str, ...], tuple[str, ...], dict[str, str]], ...
 ] = (
@@ -71084,7 +71086,10 @@ IWA_TABLE_MERGE_HOST_FOCUSED_CALL = re.compile(
 IWA_KEYNOTE_TABLE_MERGE_ALLOWED_FALLBACK_ARM = re.compile(
     r"\bErr\s*\(\s*litchi_keynote\s*::\s*slide\s*::\s*table\s*::\s*merge"
     r"\s*::\s*transaction\s*::\s*Error"
-    r"\s*::\s*UnsupportedDependency\s*\)\s*=>"
+    # Record 0361: the refusal is `Error::Refused(Refusal::UnsupportedDependency)`.
+    r"\s*::\s*Refused\s*\(\s*litchi_keynote\s*::\s*slide\s*::\s*table\s*::\s*merge"
+    r"\s*::\s*transaction\s*::\s*Refusal"
+    r"\s*::\s*UnsupportedDependency\s*,?\s*\)\s*\)\s*=>"
 )
 
 # Selected table-cell reads share the same three-layer boundary as merged
@@ -77401,7 +77406,7 @@ def _pages_transaction_family_violations(
                 f"{title} public module {public_path} is missing canonical export "
                 f"{name}: {public_relative}"
             )
-    for name in sorted(exported - expected):
+    for name in sorted(exported - expected - PAGES_TRANSACTION_OPTIONAL_EXPORTS):
         violations.append(
             f"{title} public module {public_path} exports non-canonical {name}: "
             f"{public_relative}"

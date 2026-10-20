@@ -604,60 +604,78 @@ fn select_physical(
     let configured = package
         .slide_table_sort_order(slide, table)
         .map_err(|error| map_sort_error(error, path))?
-        .ok_or(Error::SortOrderMissing { path })?;
+        .ok_or(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::SortOrderMissing { path },
+        ))?;
     if configured.scope() != requested_scope {
-        return Err(Error::ScopeMismatch {
-            path: range.map_or(path, |value| {
-                Path::rows(target.slide_position, target.table_position, value)
-            }),
-            configured: configured.scope(),
-            requested: requested_scope,
-        });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::ScopeMismatch {
+                path: range.map_or(path, |value| {
+                    Path::rows(target.slide_position, target.table_position, value)
+                }),
+                configured: configured.scope(),
+                requested: requested_scope,
+            },
+        ));
     }
     validate_order_columns(&configured, target.columns, path)?;
     if target.locked {
-        return Err(Error::TableLocked { path });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::TableLocked { path },
+        ));
     }
     let topology = core::admit_physical_table(package, &target, budget)
         .map_err(|error| map_core(error, path))?;
     if topology.has_formula_entries() {
-        return Err(Error::UnsupportedFeature {
-            path,
-            feature: UnsupportedFeature::Formula,
-        });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                path,
+                feature: UnsupportedFeature::Formula,
+            },
+        ));
     }
     if topology.has_formula_error_entries() {
-        return Err(Error::UnsupportedFeature {
-            path,
-            feature: UnsupportedFeature::FormulaError,
-        });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                path,
+                feature: UnsupportedFeature::FormulaError,
+            },
+        ));
     }
     if topology.has_conditional_style_entries() {
-        return Err(Error::UnsupportedFeature {
-            path,
-            feature: UnsupportedFeature::ConditionalStyles,
-        });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                path,
+                feature: UnsupportedFeature::ConditionalStyles,
+            },
+        ));
     }
     if topology.has_comment_entries() {
-        return Err(Error::UnsupportedFeature {
-            path,
-            feature: UnsupportedFeature::CommentAnchors,
-        });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                path,
+                feature: UnsupportedFeature::CommentAnchors,
+            },
+        ));
     }
     if topology.has_rich_text_entries() {
-        return Err(Error::UnsupportedFeature {
-            path,
-            feature: UnsupportedFeature::UnsupportedCell,
-        });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                path,
+                feature: UnsupportedFeature::UnsupportedCell,
+            },
+        ));
     }
     let body_rows = body_row_count(&target, &topology, path)?;
     if let Some(selected) = range {
         if selected.end() > body_rows {
-            return Err(Error::RowRangeOutOfBounds {
-                path: Path::rows(target.slide_position, target.table_position, selected),
-                range: selected,
-                body_rows,
-            });
+            return Err(Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::RowRangeOutOfBounds {
+                    path: Path::rows(target.slide_position, target.table_position, selected),
+                    range: selected,
+                    body_rows,
+                },
+            ));
         }
     }
     Ok(PhysicalSelection {
@@ -694,7 +712,9 @@ fn execute_transaction(
     }
     let catalog = core::physical_catalog(source).map_err(|error| map_core(error, path))?;
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedSource,
+        ));
     }
     let previews = super::rendering_invalidation::root_preview_deletions(catalog.package())
         .map_err(|_| Error::Verification { path })?;
@@ -742,11 +762,13 @@ fn plan_permutation(
 ) -> Result<PhysicalPermutation> {
     let path = selection.path();
     let (range_start, range_end) = selection.range_bounds()?;
-    let selected_len = range_end
-        .checked_sub(range_start)
-        .ok_or(Error::InvalidPermutation { path })?;
+    let selected_len = range_end.checked_sub(range_start).ok_or(Error::Refused(
+        crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation { path },
+    ))?;
     if scan.selected_keys.len() != selected_len {
-        return Err(Error::InvalidPermutation { path });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation { path },
+        ));
     }
     // The common planner owns a source-offset vector and reserves it before
     // returning its requirements.  Charge that storage before entering the
@@ -768,16 +790,20 @@ fn plan_permutation(
     )
     .map_err(|error| match error {
         litchi_iwa_common::table::sort::planning::Error::MixedScalarKinds { row, rule } => {
-            Error::MixedSortKeyKinds {
-                path,
-                row: Position::new(range_start.saturating_add(row.get())),
-                rule: Position::new(rule),
-            }
+            Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::MixedSortKeyKinds {
+                    path,
+                    row: Position::new(range_start.saturating_add(row.get())),
+                    rule: Position::new(rule),
+                },
+            )
         },
         litchi_iwa_common::table::sort::planning::Error::Allocation { rows } => {
             Error::Allocation { amount: rows, path }
         },
-        _ => Error::InvalidPermutation { path },
+        _ => Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation { path },
+        ),
     })?;
     let body_rows = selection.body_rows()?;
     let total_rows =
@@ -805,23 +831,49 @@ fn plan_permutation(
     for (destination_offset, source_offset) in planner.sources_by_destination().iter().enumerate() {
         let source_body = range_start
             .checked_add(source_offset.get())
-            .ok_or(Error::InvalidPermutation { path })?;
-        let destination_body = range_start
-            .checked_add(destination_offset)
-            .ok_or(Error::InvalidPermutation { path })?;
+            .ok_or(Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
+                    path,
+                },
+            ))?;
+        let destination_body =
+            range_start
+                .checked_add(destination_offset)
+                .ok_or(Error::Refused(
+                    crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
+                        path,
+                    },
+                ))?;
         if source_body >= body_rows || destination_body >= body_rows {
-            return Err(Error::InvalidPermutation { path });
+            return Err(Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
+                    path,
+                },
+            ));
         }
         let source_global = usize::try_from(selection.topology.header_rows())
             .ok()
             .and_then(|head| head.checked_add(source_body))
-            .ok_or(Error::InvalidPermutation { path })?;
+            .ok_or(Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
+                    path,
+                },
+            ))?;
         let destination_global = usize::try_from(selection.topology.header_rows())
             .ok()
             .and_then(|head| head.checked_add(destination_body))
-            .ok_or(Error::InvalidPermutation { path })?;
-        destination_by_source[source_global] =
-            u32::try_from(destination_global).map_err(|_| Error::InvalidPermutation { path })?;
+            .ok_or(Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
+                    path,
+                },
+            ))?;
+        destination_by_source[source_global] = u32::try_from(destination_global).map_err(|_| {
+            Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
+                    path,
+                },
+            )
+        })?;
     }
     let moved_rows = destination_by_source
         .iter()
@@ -853,9 +905,9 @@ fn scan_table(
     let path = selection.path();
     let strings = read_string_table(package, selection, budget)?;
     let (range_start, range_end) = selection.range_bounds()?;
-    let selected_len = range_end
-        .checked_sub(range_start)
-        .ok_or(Error::InvalidPermutation { path })?;
+    let selected_len = range_end.checked_sub(range_start).ok_or(Error::Refused(
+        crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation { path },
+    ))?;
     let total_rows =
         usize::try_from(selection.target.rows).map_err(|_| Error::InvalidSource { path })?;
     let body_start = selection.body_start()?;
@@ -933,7 +985,11 @@ fn scan_table(
             return Err(Error::InvalidSource { path });
         }
         if tile.should_use_wide_rows() != selection.topology.wide_rows() {
-            return Err(Error::UnsupportedTopology { path });
+            return Err(Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology {
+                    path,
+                },
+            ));
         }
         for record in prepared.row_records() {
             let local = record.snapshot().tile_row_index();
@@ -975,7 +1031,7 @@ fn scan_table(
                         return Err(Error::InvalidSource { path });
                     };
                     let Some(value) = value.clone() else {
-                        return Err(Error::MissingSortKey {
+                        return Err(Error::Refused(crate::slide::table::physical_sort::transaction::Refusal::MissingSortKey {
                             path,
                             row: Position::new(
                                 global_usize
@@ -983,7 +1039,7 @@ fn scan_table(
                                     .ok_or(Error::InvalidSource { path })?,
                             ),
                             column,
-                        });
+                        }));
                     };
                     let _ = rule_index;
                     keys.push(value);
@@ -1045,19 +1101,25 @@ fn read_string_table(
             .map_err(|error| map_storage_codec(error, path))?;
     charge_storage_report(report, budget, path)?;
     if snapshot.list_type() != 1 || shape.has_segments || shape.has_unsupported_sidecar {
-        return Err(Error::UnsupportedTopology { path });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { path },
+        ));
     }
     if shape.has_rich_text_entries {
-        return Err(Error::UnsupportedFeature {
-            path,
-            feature: UnsupportedFeature::UnsupportedCell,
-        });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                path,
+                feature: UnsupportedFeature::UnsupportedCell,
+            },
+        ));
     }
     if shape.has_comment_entries {
-        return Err(Error::UnsupportedFeature {
-            path,
-            feature: UnsupportedFeature::CommentAnchors,
-        });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                path,
+                feature: UnsupportedFeature::CommentAnchors,
+            },
+        ));
     }
 
     // Decode the same source a second time only after its entry shape is
@@ -1141,14 +1203,16 @@ fn decode_row_cells(
 ) -> Result<Vec<Option<PhysicalScalar>>> {
     let path = selection.path();
     if snapshot.storage_version() != Some(5) {
-        return Err(Error::UnsupportedTopology { path });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { path },
+        ));
     }
-    let storage = snapshot
-        .cell_storage_buffer()
-        .ok_or(Error::UnsupportedTopology { path })?;
-    let offsets = snapshot
-        .cell_offsets()
-        .ok_or(Error::UnsupportedTopology { path })?;
+    let storage = snapshot.cell_storage_buffer().ok_or(Error::Refused(
+        crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { path },
+    ))?;
+    let offsets = snapshot.cell_offsets().ok_or(Error::Refused(
+        crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { path },
+    ))?;
     let columns =
         usize::try_from(selection.target.columns).map_err(|_| Error::InvalidSource { path })?;
     let expected_cells =
@@ -1172,15 +1236,16 @@ fn decode_row_cells(
             .work(pre_storage.len())
             .map_err(|error| map_core(error, path))?;
     }
-    let expected_wide_rows = selection
-        .topology
-        .wide_rows()
-        .ok_or(Error::UnsupportedTopology { path })?;
-    let has_wide_offsets = snapshot
-        .has_wide_offsets()
-        .ok_or(Error::UnsupportedTopology { path })?;
+    let expected_wide_rows = selection.topology.wide_rows().ok_or(Error::Refused(
+        crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { path },
+    ))?;
+    let has_wide_offsets = snapshot.has_wide_offsets().ok_or(Error::Refused(
+        crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { path },
+    ))?;
     if has_wide_offsets != expected_wide_rows {
-        return Err(Error::UnsupportedTopology { path });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { path },
+        ));
     }
     let wide_multiplier = if has_wide_offsets { 4usize } else { 1usize };
     validate_padded_offsets(
@@ -1310,10 +1375,12 @@ fn validate_pre_bnc_sentinels(
             || end > storage.len()
             || storage.get(start..end) != Some(EMPTY_V4_SENTINEL.as_slice())
         {
-            return Err(Error::UnsupportedFeature {
-                path,
-                feature: UnsupportedFeature::RowAffineDependency,
-            });
+            return Err(Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                    path,
+                    feature: UnsupportedFeature::RowAffineDependency,
+                },
+            ));
         }
         start = end;
     }
@@ -1393,44 +1460,61 @@ fn decode_cell(
         return Err(Error::InvalidSource { path });
     }
     if view.comment_identifier().is_some() {
-        return Err(Error::UnsupportedFeature {
-            path,
-            feature: UnsupportedFeature::CommentAnchors,
-        });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                path,
+                feature: UnsupportedFeature::CommentAnchors,
+            },
+        ));
     }
     if let Some(identifier) = view.rich_text_identifier() {
         if identifier == 0 {
             return Err(Error::InvalidSource { path });
         }
-        return Err(Error::UnsupportedFeature {
-            path,
-            feature: UnsupportedFeature::UnsupportedCell,
-        });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                path,
+                feature: UnsupportedFeature::UnsupportedCell,
+            },
+        ));
     }
     if view.formula_error_identifier().is_some() {
-        return Err(Error::UnsupportedFeature {
-            path,
-            feature: UnsupportedFeature::FormulaError,
-        });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                path,
+                feature: UnsupportedFeature::FormulaError,
+            },
+        ));
     }
     if view.conditional_style_identifier().is_some()
         || view.conditional_style_applied_rule().is_some()
     {
-        return Err(Error::UnsupportedFeature {
-            path,
-            feature: UnsupportedFeature::ConditionalStyles,
-        });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                path,
+                feature: UnsupportedFeature::ConditionalStyles,
+            },
+        ));
     }
     if view.control_cell_spec_identifier().is_some()
         || view.has_reserved_known_field()
         || !view.opaque_tail().is_empty()
     {
-        return Err(Error::UnsupportedFeature {
-            path,
-            feature: UnsupportedFeature::RowAffineDependency,
-        });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                path,
+                feature: UnsupportedFeature::RowAffineDependency,
+            },
+        ));
     }
-    let unsupported = |feature| Error::UnsupportedFeature { path, feature };
+    let unsupported = |feature| {
+        Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                path,
+                feature,
+            },
+        )
+    };
     match view.stored_value() {
         StoredValue::Empty => Ok(None),
         StoredValue::Text(identifier) => {
@@ -1446,35 +1530,43 @@ fn decode_cell(
         StoredValue::Unsupported(_) => Err(unsupported(UnsupportedFeature::UnsupportedCell)),
         StoredValue::Number => match view.cached_scalar() {
             Some(CachedScalar::Number(value)) => Ok(Some(PhysicalScalar::Number(value.get()))),
-            _ => Err(Error::UnsupportedCell {
-                path,
-                row: Position::new(global_row.saturating_sub(body_start)),
-                column: ColumnIndex::new(column).map_err(|_| Error::InvalidSource { path })?,
-            }),
+            _ => Err(Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::UnsupportedCell {
+                    path,
+                    row: Position::new(global_row.saturating_sub(body_start)),
+                    column: ColumnIndex::new(column).map_err(|_| Error::InvalidSource { path })?,
+                },
+            )),
         },
         StoredValue::Boolean => match view.cached_scalar() {
             Some(CachedScalar::Boolean(value)) => Ok(Some(PhysicalScalar::Boolean(value))),
-            _ => Err(Error::UnsupportedCell {
-                path,
-                row: Position::new(global_row.saturating_sub(body_start)),
-                column: ColumnIndex::new(column).map_err(|_| Error::InvalidSource { path })?,
-            }),
+            _ => Err(Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::UnsupportedCell {
+                    path,
+                    row: Position::new(global_row.saturating_sub(body_start)),
+                    column: ColumnIndex::new(column).map_err(|_| Error::InvalidSource { path })?,
+                },
+            )),
         },
         StoredValue::Date => match view.cached_scalar() {
             Some(CachedScalar::Date(value)) => Ok(Some(PhysicalScalar::Date(value.get()))),
-            _ => Err(Error::UnsupportedCell {
-                path,
-                row: Position::new(global_row.saturating_sub(body_start)),
-                column: ColumnIndex::new(column).map_err(|_| Error::InvalidSource { path })?,
-            }),
+            _ => Err(Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::UnsupportedCell {
+                    path,
+                    row: Position::new(global_row.saturating_sub(body_start)),
+                    column: ColumnIndex::new(column).map_err(|_| Error::InvalidSource { path })?,
+                },
+            )),
         },
         StoredValue::Duration => match view.cached_scalar() {
             Some(CachedScalar::Duration(value)) => Ok(Some(PhysicalScalar::Duration(value.get()))),
-            _ => Err(Error::UnsupportedCell {
-                path,
-                row: Position::new(global_row.saturating_sub(body_start)),
-                column: ColumnIndex::new(column).map_err(|_| Error::InvalidSource { path })?,
-            }),
+            _ => Err(Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::UnsupportedCell {
+                    path,
+                    row: Position::new(global_row.saturating_sub(body_start)),
+                    column: ColumnIndex::new(column).map_err(|_| Error::InvalidSource { path })?,
+                },
+            )),
         },
     }
 }
@@ -1553,10 +1645,12 @@ fn read_header_indices(
         for record in prepared.records() {
             let snapshot = record.snapshot();
             if snapshot.hiding_state() != 0 {
-                return Err(Error::UnsupportedFeature {
-                    path,
-                    feature: UnsupportedFeature::NonPositionalHiddenState,
-                });
+                return Err(Error::Refused(
+                    crate::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                        path,
+                        feature: UnsupportedFeature::NonPositionalHiddenState,
+                    },
+                ));
             }
             if snapshot.number_of_cells() != selection.target.columns {
                 return Err(Error::InvalidSource { path });
@@ -1595,10 +1689,12 @@ fn read_header_indices(
     charge_rewrite_requirements(prepared.requirements(), budget, path)?;
     for record in prepared.records() {
         if record.snapshot().hiding_state() != 0 {
-            return Err(Error::UnsupportedFeature {
-                path,
-                feature: UnsupportedFeature::NonPositionalHiddenState,
-            });
+            return Err(Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                    path,
+                    feature: UnsupportedFeature::NonPositionalHiddenState,
+                },
+            ));
         }
     }
     output.sort_unstable();
@@ -1732,7 +1828,7 @@ fn rewrite_physical(
                     return Ok(count);
                 }
                 if source_tile != destination_tile {
-                    return Err(Error::UnsupportedTopology { path });
+                    return Err(Error::Refused(crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { path }));
                 }
                 if source_tile == tile.tile_id {
                     count.checked_add(1).ok_or(Error::InvalidSource { path })
@@ -1776,7 +1872,11 @@ fn rewrite_physical(
                 continue;
             }
             if source_tile != destination_tile {
-                return Err(Error::UnsupportedTopology { path });
+                return Err(Error::Refused(
+                    crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology {
+                        path,
+                    },
+                ));
             }
             if source_tile == tile.tile_id {
                 let source_local = source_global % tile_size;
@@ -1819,13 +1919,21 @@ fn rewrite_physical(
             return Err(Error::InvalidSource { path });
         }
         if tile_snapshot.should_use_wide_rows() != selection.topology.wide_rows() {
-            return Err(Error::UnsupportedTopology { path });
+            return Err(Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology {
+                    path,
+                },
+            ));
         }
         if prepared
             .row_records()
             .any(|record| record.snapshot().has_wide_offsets() != selection.topology.wide_rows())
         {
-            return Err(Error::UnsupportedTopology { path });
+            return Err(Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology {
+                    path,
+                },
+            ));
         }
         let (rewritten, report) = physical_codec::execute_tile_rows_rewrite(prepared, options)
             .map_err(|error| map_physical_codec(error, path))?;
@@ -1880,15 +1988,24 @@ fn rewrite_physical(
             let source_index = record.snapshot().index();
             let source_usize =
                 usize::try_from(source_index).map_err(|_| Error::InvalidSource { path })?;
-            let destination = destination_by_source
-                .get(source_usize)
-                .copied()
-                .ok_or(Error::InvalidPermutation { path })?;
+            let destination =
+                destination_by_source
+                    .get(source_usize)
+                    .copied()
+                    .ok_or(Error::Refused(
+                    crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
+                        path,
+                    },
+                ))?;
             if source_index == destination {
                 return Ok(count);
             }
             if source_index / HEADER_BUCKET_ROWS != destination / HEADER_BUCKET_ROWS {
-                return Err(Error::UnsupportedTopology { path });
+                return Err(Error::Refused(
+                    crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology {
+                        path,
+                    },
+                ));
             }
             count.checked_add(1).ok_or(Error::InvalidSource { path })
         })?;
@@ -1916,11 +2033,15 @@ fn rewrite_physical(
             let source_usize =
                 usize::try_from(source_index).map_err(|_| Error::InvalidSource { path })?;
             let Some(destination) = destination_by_source.get(source_usize).copied() else {
-                return Err(Error::InvalidPermutation { path });
+                return Err(Error::Refused(
+                    crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
+                        path,
+                    },
+                ));
             };
             if source_index != destination {
                 if source_index / HEADER_BUCKET_ROWS != destination / HEADER_BUCKET_ROWS {
-                    return Err(Error::UnsupportedTopology { path });
+                    return Err(Error::Refused(crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { path }));
                 }
                 if moves.len() == moves.capacity() {
                     return Err(Error::Allocation { amount: 1, path });
@@ -2228,9 +2349,9 @@ fn verify_candidate(
     let inverse = invert_permutation_checked(destination_by_source, budget, path)?;
     let (range_start, range_end) = selection.range_bounds()?;
     let body_start = selection.body_start()?;
-    let selected_len = range_end
-        .checked_sub(range_start)
-        .ok_or(Error::InvalidPermutation { path })?;
+    let selected_len = range_end.checked_sub(range_start).ok_or(Error::Refused(
+        crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation { path },
+    ))?;
     if candidate_scan.selected_keys.len() != selected_len {
         return Err(Error::Verification { path });
     }
@@ -3150,7 +3271,9 @@ fn invert_permutation_checked(
     budget
         .retained(bytes)
         .map_err(|error| map_core(error, path))?;
-    invert_permutation(values).ok_or(Error::InvalidPermutation { path })
+    invert_permutation(values).ok_or(Error::Refused(
+        crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation { path },
+    ))
 }
 
 fn copy_permutation_checked(
@@ -3203,18 +3326,35 @@ fn invert_permutation_u32_checked(
         })?;
     inverse.resize(values.len(), u32::MAX);
     for (source, destination) in values.iter().copied().enumerate() {
-        let destination =
-            usize::try_from(destination).map_err(|_| Error::InvalidPermutation { path })?;
-        let slot = inverse
-            .get_mut(destination)
-            .ok_or(Error::InvalidPermutation { path })?;
+        let destination = usize::try_from(destination).map_err(|_| {
+            Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
+                    path,
+                },
+            )
+        })?;
+        let slot = inverse.get_mut(destination).ok_or(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation { path },
+        ))?;
         if *slot != u32::MAX {
-            return Err(Error::InvalidPermutation { path });
+            return Err(Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
+                    path,
+                },
+            ));
         }
-        *slot = u32::try_from(source).map_err(|_| Error::InvalidPermutation { path })?;
+        *slot = u32::try_from(source).map_err(|_| {
+            Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
+                    path,
+                },
+            )
+        })?;
     }
     if inverse.contains(&u32::MAX) {
-        return Err(Error::InvalidPermutation { path });
+        return Err(Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation { path },
+        ));
     }
     Ok(inverse)
 }
@@ -3484,49 +3624,49 @@ fn map_physical_codec(error: physical_codec::DecodeError, path: Path) -> Error {
         return Error::InvalidSource { path };
     };
     match limit {
-        physical_codec::DecodeLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+        physical_codec::DecodeLimit::Bytes { observed, maximum } => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        physical_codec::DecodeLimit::Fields { observed, maximum } => Error::LimitExceeded {
+        physical_codec::DecodeLimit::Fields { observed, maximum } => Error::Limit {
             kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        physical_codec::DecodeLimit::Work { observed, maximum } => Error::LimitExceeded {
+        physical_codec::DecodeLimit::Work { observed, maximum } => Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        physical_codec::DecodeLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+        physical_codec::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
             path,
         },
-        physical_codec::DecodeLimit::Records { observed, maximum } => Error::LimitExceeded {
+        physical_codec::DecodeLimit::Records { observed, maximum } => Error::Limit {
             kind: LimitKind::PhysicalRows,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        physical_codec::DecodeLimit::Elements { observed, maximum } => Error::LimitExceeded {
+        physical_codec::DecodeLimit::Elements { observed, maximum } => Error::Limit {
             kind: LimitKind::PhysicalColumns,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        physical_codec::DecodeLimit::OutputBytes { observed, maximum } => Error::LimitExceeded {
+        physical_codec::DecodeLimit::OutputBytes { observed, maximum } => Error::Limit {
             kind: LimitKind::WireOutputBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        physical_codec::DecodeLimit::ScratchBytes { observed, maximum } => Error::LimitExceeded {
+        physical_codec::DecodeLimit::ScratchBytes { observed, maximum } => Error::Limit {
             kind: LimitKind::WireScratchBytes,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -3545,37 +3685,37 @@ fn map_storage_codec(error: storage_codec::DecodeError, path: Path) -> Error {
         return Error::InvalidSource { path };
     };
     match limit {
-        storage_codec::DecodeLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+        storage_codec::DecodeLimit::Bytes { observed, maximum } => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        storage_codec::DecodeLimit::Fields { observed, maximum } => Error::LimitExceeded {
+        storage_codec::DecodeLimit::Fields { observed, maximum } => Error::Limit {
             kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        storage_codec::DecodeLimit::Text { observed, maximum } => Error::LimitExceeded {
+        storage_codec::DecodeLimit::Text { observed, maximum } => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        storage_codec::DecodeLimit::References { observed, maximum } => Error::LimitExceeded {
+        storage_codec::DecodeLimit::References { observed, maximum } => Error::Limit {
             kind: LimitKind::PayloadReferences,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        storage_codec::DecodeLimit::Work { observed, maximum } => Error::LimitExceeded {
+        storage_codec::DecodeLimit::Work { observed, maximum } => Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        storage_codec::DecodeLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+        storage_codec::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
@@ -3585,7 +3725,7 @@ fn map_storage_codec(error: storage_codec::DecodeError, path: Path) -> Error {
             amount: requested,
             path,
         },
-        storage_codec::DecodeLimit::Retained { observed, maximum } => Error::LimitExceeded {
+        storage_codec::DecodeLimit::Retained { observed, maximum } => Error::Limit {
             kind: LimitKind::WireRetainedBytes,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -3597,22 +3737,42 @@ fn map_storage_codec(error: storage_codec::DecodeError, path: Path) -> Error {
 
 fn map_core(error: core::Error, path: Path) -> Error {
     match error {
-        core::Error::UnsupportedSource => Error::UnsupportedSource,
-        core::Error::UnsupportedDependency => Error::UnsupportedDependency {
-            path,
-            feature: UnsupportedFeature::RowAffineDependency,
+        core::Error::UnsupportedSource => Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedSource,
+        ),
+        core::Error::UnsupportedDependency => Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedDependency {
+                path,
+                feature: UnsupportedFeature::RowAffineDependency,
+            },
+        ),
+        core::Error::UnsupportedTopology => Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { path },
+        ),
+        core::Error::AmbiguousSelector => Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::AmbiguousSelector,
+        ),
+        core::Error::EmptySlideName => {
+            Error::Refused(crate::slide::table::physical_sort::transaction::Refusal::EmptySlideName)
         },
-        core::Error::UnsupportedTopology => Error::UnsupportedTopology { path },
-        core::Error::AmbiguousSelector => Error::AmbiguousSelector,
-        core::Error::EmptySlideName => Error::EmptySlideName,
-        core::Error::SlideNameNotFound => Error::SlideNameNotFound,
-        core::Error::SlidePositionNotFound(position) => Error::SlidePositionNotFound { position },
-        core::Error::TablePositionNotFound(position) => Error::TablePositionNotFound { position },
+        core::Error::SlideNameNotFound => Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::SlideNameNotFound,
+        ),
+        core::Error::SlidePositionNotFound(position) => Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::SlidePositionNotFound {
+                position,
+            },
+        ),
+        core::Error::TablePositionNotFound(position) => Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::TablePositionNotFound {
+                position,
+            },
+        ),
         core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_core_limit(kind),
             observed,
             maximum,
@@ -3650,28 +3810,64 @@ fn map_core_limit(kind: core::LimitKind) -> LimitKind {
 
 fn map_sort_error(error: SlideTableSortError, path: Path) -> Error {
     match error {
-        SlideTableSortError::UnsupportedSource => Error::UnsupportedSource,
-        SlideTableSortError::UnsupportedDependency => Error::UnsupportedDependency {
-            path,
-            feature: UnsupportedFeature::RowAffineDependency,
+        SlideTableSortError::Refused(
+            crate::slide::table::sort::transaction::Refusal::UnsupportedSource,
+        ) => Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedSource,
+        ),
+        SlideTableSortError::Refused(
+            crate::slide::table::sort::transaction::Refusal::UnsupportedDependency,
+        ) => Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedDependency {
+                path,
+                feature: UnsupportedFeature::RowAffineDependency,
+            },
+        ),
+        SlideTableSortError::Refused(
+            crate::slide::table::sort::transaction::Refusal::UnsupportedTopology,
+        ) => Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { path },
+        ),
+        SlideTableSortError::Refused(
+            crate::slide::table::sort::transaction::Refusal::AmbiguousSelector,
+        ) => Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::AmbiguousSelector,
+        ),
+        SlideTableSortError::Refused(
+            crate::slide::table::sort::transaction::Refusal::EmptySlideName,
+        ) => {
+            Error::Refused(crate::slide::table::physical_sort::transaction::Refusal::EmptySlideName)
         },
-        SlideTableSortError::UnsupportedTopology => Error::UnsupportedTopology { path },
-        SlideTableSortError::AmbiguousSelector => Error::AmbiguousSelector,
-        SlideTableSortError::EmptySlideName => Error::EmptySlideName,
-        SlideTableSortError::SlideNameNotFound => Error::SlideNameNotFound,
-        SlideTableSortError::SlidePositionNotFound { position } => {
-            Error::SlidePositionNotFound { position }
+        SlideTableSortError::Refused(
+            crate::slide::table::sort::transaction::Refusal::SlideNameNotFound,
+        ) => Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::SlideNameNotFound,
+        ),
+        SlideTableSortError::Refused(
+            crate::slide::table::sort::transaction::Refusal::SlidePositionNotFound { position },
+        ) => Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::SlidePositionNotFound {
+                position,
+            },
+        ),
+        SlideTableSortError::Refused(
+            crate::slide::table::sort::transaction::Refusal::TablePositionNotFound { position },
+        ) => Error::Refused(
+            crate::slide::table::physical_sort::transaction::Refusal::TablePositionNotFound {
+                position,
+            },
+        ),
+        SlideTableSortError::Refused(crate::slide::table::sort::transaction::Refusal::Locked) => {
+            Error::Refused(
+                crate::slide::table::physical_sort::transaction::Refusal::TableLocked { path },
+            )
         },
-        SlideTableSortError::TablePositionNotFound { position } => {
-            Error::TablePositionNotFound { position }
-        },
-        SlideTableSortError::Locked => Error::TableLocked { path },
         SlideTableSortError::InvalidSource => Error::InvalidSource { path },
-        SlideTableSortError::LimitExceeded {
+        SlideTableSortError::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_sort_limit(kind),
             observed,
             maximum,
@@ -3710,7 +3906,7 @@ fn map_read(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::References => LimitKind::PayloadReferences,
                 SemanticLimitKind::Objects => LimitKind::PayloadObjects,
@@ -3728,7 +3924,7 @@ fn map_read(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 PayloadLimitKind::Bytes => LimitKind::InputBytes,
                 PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -3756,7 +3952,7 @@ fn map_archive(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -3787,7 +3983,7 @@ fn map_core_archive(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages

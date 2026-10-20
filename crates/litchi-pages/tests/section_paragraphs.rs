@@ -106,17 +106,26 @@ fn refusals_are_typed_and_leave_the_source_untouched() -> TestResult {
     let mut edit = package.edit_section_paragraphs(0_usize)?;
     assert!(matches!(
         edit.set(at(9), "x"),
-        Err(Error::PositionNotFound { count: 3, .. })
+        Err(Error::Refused(
+            litchi_pages::section::paragraphs::Refusal::PositionNotFound { count: 3, .. }
+        ))
     ));
     assert!(matches!(
         edit.set(at(0), "a\nb"),
-        Err(Error::ParagraphBreak)
+        Err(Error::Refused(
+            litchi_pages::section::paragraphs::Refusal::ParagraphBreak
+        ))
     ));
     assert!(edit.insert(at(0), "\u{fffc}").is_err());
 
     let single = Package::open(fixture("chart-grid-authored-native.pages"))?;
     let mut edit = single.edit_section_paragraphs(0_usize)?;
-    assert!(matches!(edit.remove(at(0)), Err(Error::LastParagraph)));
+    assert!(matches!(
+        edit.remove(at(0)),
+        Err(Error::Refused(
+            litchi_pages::section::paragraphs::Refusal::LastParagraph
+        ))
+    ));
 
     // The table's anchor sits in the last paragraph: removing or moving it
     // would delete or move the table.
@@ -124,10 +133,20 @@ fn refusals_are_typed_and_leave_the_source_untouched() -> TestResult {
     let count = table.section_paragraphs(0_usize)?.len();
     let mut edit = table.edit_section_paragraphs(0_usize)?;
     edit.relocate(at(count - 1), at(0))?;
-    assert!(matches!(edit.commit(), Err(Error::AnchoredParagraph)));
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Refused(
+            litchi_pages::section::paragraphs::Refusal::AnchoredParagraph
+        ))
+    ));
     let mut edit = table.edit_section_paragraphs(0_usize)?;
     edit.remove(at(count - 1))?;
-    assert!(matches!(edit.commit(), Err(Error::AnchoredParagraph)));
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Refused(
+            litchi_pages::section::paragraphs::Refusal::AnchoredParagraph
+        ))
+    ));
     Ok(())
 }
 

@@ -1648,7 +1648,9 @@ fn raw_paragraph(package: &Package, section: usize, line: usize) -> Result<Strin
 /// sections.
 fn anchored() -> crate::Error {
     failure(LeafError::PagesParagraphs(
-        litchi_pages::section::paragraphs::Error::AnchoredParagraph,
+        litchi_pages::section::paragraphs::Error::Refused(
+            litchi_pages::section::paragraphs::Refusal::AnchoredParagraph,
+        ),
     ))
 }
 

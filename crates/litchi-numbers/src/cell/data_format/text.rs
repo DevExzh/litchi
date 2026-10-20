@@ -11,6 +11,6 @@ pub use super::Text;
 /// explicit Text format.
 pub mod transaction {
     pub use crate::package::table_cell_text_format::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }

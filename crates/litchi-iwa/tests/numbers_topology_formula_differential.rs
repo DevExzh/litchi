@@ -132,7 +132,9 @@ enum Op {
 /// The body row and column counts, from the leaf's range refusal.
 fn body_lengths(package: &Package, sheet: usize, table: usize) -> TestResult<(usize, usize)> {
     let length = |result: Result<_, TopologyError>| match result {
-        Err(TopologyError::PositionOutOfRange { length, .. }) => Ok(length),
+        Err(TopologyError::Refused(
+            litchi_numbers::table::topology::Refusal::PositionOutOfRange { length, .. },
+        )) => Ok(length),
         _ => Err("no range refusal"),
     };
     let rows = length(

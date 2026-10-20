@@ -99,7 +99,7 @@ impl Table {
 
 fn map_focused_cells_error(error: litchi_pages::table::cells::Error) -> Error {
     match error {
-        litchi_pages::table::cells::Error::LimitExceeded {
+        litchi_pages::table::cells::Error::Limit {
             kind,
             observed,
             maximum,
@@ -148,16 +148,22 @@ fn map_focused_cells_limit(
 fn map_focused_deletion_error(error: litchi_pages::table::deletion::Error) -> Error {
     let message = error.to_string();
     match error {
-        litchi_pages::table::deletion::Error::TableNotFound
-        | litchi_pages::table::deletion::Error::AmbiguousTableName
-        | litchi_pages::table::deletion::Error::AmbiguousSelector => Error::ParseError(message),
+        litchi_pages::table::deletion::Error::Refused(
+            litchi_pages::table::deletion::Refusal::TableNotFound,
+        )
+        | litchi_pages::table::deletion::Error::Refused(
+            litchi_pages::table::deletion::Refusal::AmbiguousTableName,
+        )
+        | litchi_pages::table::deletion::Error::Refused(
+            litchi_pages::table::deletion::Refusal::AmbiguousSelector,
+        ) => Error::ParseError(message),
         litchi_pages::table::deletion::Error::Allocation { amount } => {
             Error::IwaCommon(litchi_iwa_common::Error::Allocation {
                 resource: "Pages body-table deletion",
                 amount,
             })
         },
-        litchi_pages::table::deletion::Error::LimitExceeded {
+        litchi_pages::table::deletion::Error::Limit {
             kind,
             observed,
             maximum,
@@ -175,13 +181,17 @@ fn map_focused_deletion_error(error: litchi_pages::table::deletion::Error) -> Er
                 limit: maximum,
             })
         },
-        litchi_pages::table::deletion::Error::UnsupportedSource
+        litchi_pages::table::deletion::Error::Refused(
+            litchi_pages::table::deletion::Refusal::UnsupportedSource,
+        )
         | litchi_pages::table::deletion::Error::InvalidSource
         | litchi_pages::table::deletion::Error::Verification
         | litchi_pages::table::deletion::Error::PatchConflict => {
             Error::InvalidFormat(format!("focused Pages table deletion: {message}"))
         },
-        litchi_pages::table::deletion::Error::UnsupportedDependency => Error::ParseError(message),
+        litchi_pages::table::deletion::Error::Refused(
+            litchi_pages::table::deletion::Refusal::UnsupportedDependency,
+        ) => Error::ParseError(message),
         _ => Error::InvalidFormat(format!("focused Pages table deletion: {message}")),
     }
 }

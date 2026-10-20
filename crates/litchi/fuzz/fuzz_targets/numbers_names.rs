@@ -6,8 +6,7 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    Package, SheetSelector,
-    TableSelector,
+    Package, SheetSelector, TableSelector,
     sheet::order::{Commit as SheetOrderCommit, Error as SheetOrderError},
     table::title::{Error as TitleError, Path as TitlePath, Settings as TitleSettings},
 };
@@ -51,18 +50,34 @@ fuzz_target!(|data: &[u8]| {
 fn fuzz_options() -> litchi::numbers::OpenOptions {
     static OPTIONS: OnceLock<litchi::numbers::OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = litchi::numbers::SourceLimits::builder().max_input_bytes(MAX_INPUT_BYTES).and_then(|b| b.max_members(MAX_ENTRIES)).and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES)).and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES)).and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES)).and_then(|b| b.build())
-        .unwrap_or_else(|error| unreachable!("valid Numbers fuzz archive limits: {error}"));
-        let semantic =
-            litchi::numbers::SemanticLimits::builder().max_objects(MAX_OBJECTS).and_then(|b| b.max_sheets(MAX_SHEETS)).and_then(|b| b.max_tables(MAX_TABLES)).and_then(|b| b.max_references(MAX_REFERENCES)).and_then(|b| b.build())
-                .unwrap_or_else(|error| unreachable!("valid Numbers fuzz semantic limits: {error}"))
-                .to_builder().max_materialized_cells(MAX_MATERIALIZED_CELLS).and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES)).and_then(|b| b.build())
-                .unwrap_or_else(|error| {
-                    unreachable!("valid Numbers fuzz projection limits: {error}")
-                })
-                .to_builder().max_formula_render_work(MAX_FORMULA_WORK).and_then(|b| b.max_formula_render_depth(MAX_FORMULA_DEPTH)).and_then(|b| b.build())
-                .unwrap_or_else(|error| unreachable!("valid Numbers fuzz formula limits: {error}"));
-        litchi::numbers::OpenOptions::new().source_limits(archive).semantic_limits(semantic)
+        let archive = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|b| b.max_members(MAX_ENTRIES))
+            .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Numbers fuzz archive limits: {error}"));
+        let semantic = litchi::numbers::SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|b| b.max_sheets(MAX_SHEETS))
+            .and_then(|b| b.max_tables(MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Numbers fuzz semantic limits: {error}"))
+            .to_builder()
+            .max_materialized_cells(MAX_MATERIALIZED_CELLS)
+            .and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Numbers fuzz projection limits: {error}"))
+            .to_builder()
+            .max_formula_render_work(MAX_FORMULA_WORK)
+            .and_then(|b| b.max_formula_render_depth(MAX_FORMULA_DEPTH))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Numbers fuzz formula limits: {error}"));
+        litchi::numbers::OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -387,7 +402,9 @@ fn exercise_title_selector_errors(package: &Package) {
             SheetSelector::index(package.workbook_ref().sheets().len()),
             TableSelector::index(0),
         ),
-        Err(TitleError::SheetNotFound)
+        Err(TitleError::Refused(
+            litchi::numbers::table::title::Refusal::SheetNotFound
+        ))
     ));
     if let Err(error) = package.table_title_settings(
         SheetSelector::name(PRIVATE_TITLE_SHEET),
@@ -423,13 +440,17 @@ fn exercise_sheet_order(package: &Package, data: &[u8]) {
         package
             .edit_sheet_order()
             .move_sheet(SheetSelector::index(sheet_count), 0),
-        Err(SheetOrderError::SheetNotFound)
+        Err(SheetOrderError::Refused(
+            litchi::numbers::sheet::order::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package
             .edit_sheet_order()
             .move_sheet(SheetSelector::index(source), sheet_count),
-        Err(SheetOrderError::DestinationOutOfRange { .. })
+        Err(SheetOrderError::Refused(
+            litchi::numbers::sheet::order::Refusal::DestinationOutOfRange { .. }
+        ))
     ));
 
     let command = control(data, 0) % 3;

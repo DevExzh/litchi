@@ -91,6 +91,42 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source graph or selected storage cannot be decoded or rewritten safely.
+    #[error("the Keynote speaker-notes source cannot be edited safely")]
+    InvalidSource,
+    /// A finite transaction resource ceiling was exceeded.
+    #[error("Keynote speaker-notes {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote speaker-notes transaction")]
+    Allocation {
+        /// Elements or bytes requested.
+        amount: usize,
+    },
+    /// Full semantic readback did not reproduce the requested change.
+    #[error("the edited Keynote speaker notes failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote speaker-notes patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was prepared without an exact physical package artifact.
     #[error("this Keynote source does not support physical speaker-notes edits")]
     UnsupportedSource,
@@ -135,31 +171,33 @@ pub enum Error {
     /// A second operation was staged on an edit that already has one.
     #[error("a Keynote speaker-notes edit accepts exactly one staged operation")]
     OperationAlreadyStaged,
-    /// The source graph or selected storage cannot be decoded or rewritten safely.
-    #[error("the Keynote speaker-notes source cannot be edited safely")]
-    InvalidSource,
-    /// A finite transaction resource ceiling was exceeded.
-    #[error("Keynote speaker-notes {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category that exceeded its limit.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote speaker-notes transaction")]
-    Allocation {
-        /// Elements or bytes requested.
-        amount: usize,
-    },
-    /// Full semantic readback did not reproduce the requested change.
-    #[error("the edited Keynote speaker notes failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote speaker-notes patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::ObjectMarkerReplacement { .. }
+            | Self::DependentContent { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::SpanOutOfBounds { .. }
+            | Self::SurrogateBoundary { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::NotesStorageNotFound { .. } => RefusalKind::NotFound,
+            Self::OperationAlreadyStaged { .. } => RefusalKind::UnsupportedOperation,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug)]
@@ -201,7 +239,8 @@ impl<'a> Edit<'a> {
         selector: impl Into<SlideSelector<'selector>>,
     ) -> Result<Self, Error> {
         let position = resolve_position(source, selector.into())?;
-        let snapshot = notes_snapshot_at(source, position)?.ok_or(Error::NotesStorageNotFound)?;
+        let snapshot = notes_snapshot_at(source, position)?
+            .ok_or(Error::Refused(Refusal::NotesStorageNotFound))?;
         Ok(Self {
             source,
             position,
@@ -266,7 +305,7 @@ impl<'a> Edit<'a> {
     /// markers cannot be introduced or consumed by this plain-text capability.
     pub fn replace(&mut self, span: TextSpan, replacement: &str) -> Result<&mut Self, Error> {
         if self.operation.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
         validate_replacement(replacement)?;
         let range = validate_span(&self.before, span)?;
@@ -372,7 +411,7 @@ impl<'a> Edit<'a> {
         }
         selected_slide_snapshot(self.source, self.position)?;
         if !catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
 
         let changed_replacement = operation
@@ -667,21 +706,21 @@ fn resolve_position(package: &Package, selector: SlideSelector<'_>) -> Result<Po
             .slide_record_at(position.get())
             .map_err(map_read_error)?
             .map(|_record| position)
-            .ok_or(Error::SlidePositionNotFound { position }),
+            .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position })),
         SlideSelector::Name(_) => package
             .show()
             .map_err(map_read_error)?
             .select_slide(selector)
             .map_err(map_slide_selector_error)?
             .map(|slide| Position::new(slide.index()))
-            .ok_or(Error::SlideNameNotFound),
+            .ok_or(Error::Refused(Refusal::SlideNameNotFound)),
     }
 }
 
 fn map_slide_selector_error(error: SlideSelectorError) -> Error {
     match error {
-        SlideSelectorError::EmptySlideName => Error::EmptySlideName,
-        SlideSelectorError::DuplicateSlideName { .. } => Error::AmbiguousSelector,
+        SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        SlideSelectorError::DuplicateSlideName { .. } => Error::Refused(Refusal::AmbiguousSelector),
     }
 }
 
@@ -708,7 +747,7 @@ fn notes_snapshot_at(
     let record = package
         .slide_record_at(position.get())
         .map_err(map_read_error)?
-        .ok_or(Error::SlidePositionNotFound { position })?;
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position }))?;
     let slide = package
         .required_object(record.slide_identifier, "Keynote slide")
         .map_err(map_read_error)?;
@@ -890,7 +929,7 @@ fn rewrite_notes(
         || rewrite.object_reference_occurrences_before()
             != rewrite.object_reference_occurrences_after()
     {
-        return Err(Error::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     if !rewrite.changed() {
         return Err(Error::Verification);
@@ -929,7 +968,7 @@ fn selected_slide_snapshot(package: &Package, position: Position) -> Result<crat
     let record = package
         .slide_record_at(position.get())
         .map_err(map_read_error)?
-        .ok_or(Error::SlidePositionNotFound { position })?;
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position }))?;
     let slide = package
         .required_object(record.slide_identifier, "Keynote slide")
         .map_err(map_read_error)?;
@@ -1035,7 +1074,7 @@ fn prove_exclusive_notes_ownership(
     let slide_identifier = package
         .slide_record_at(position.get())
         .map_err(map_read_error)?
-        .ok_or(Error::SlidePositionNotFound { position })?
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position }))?
         .slide_identifier;
     prove_exclusive_metadata_owner(
         package,
@@ -1084,7 +1123,7 @@ fn prove_exclusive_metadata_owner(
                         || owner_identifier != expected_owner_identifier
                         || message.type_ != expected_message_type
                     {
-                        return Err(Error::DependentContent);
+                        return Err(Error::Refused(Refusal::DependentContent));
                     }
                 }
             }
@@ -1093,7 +1132,7 @@ fn prove_exclusive_metadata_owner(
     match occurrences {
         1 => Ok(()),
         0 => Err(Error::InvalidSource),
-        _ => Err(Error::DependentContent),
+        _ => Err(Error::Refused(Refusal::DependentContent)),
     }
 }
 
@@ -1118,7 +1157,7 @@ fn prove_exclusive_payload_owners(
                         }
                         note_edges = note_edges.checked_add(1).ok_or(Error::InvalidSource)?;
                         if note_edges > 1 || owner_identifier != expected_slide_identifier {
-                            return Err(Error::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
                     },
                     NOTE_MESSAGE_TYPE => {
@@ -1129,7 +1168,7 @@ fn prove_exclusive_payload_owners(
                         }
                         storage_edges = storage_edges.checked_add(1).ok_or(Error::InvalidSource)?;
                         if storage_edges > 1 || owner_identifier != note_identifier {
-                            return Err(Error::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
                     },
                     _ => {},
@@ -1160,11 +1199,11 @@ fn validate_exact_note_payload_shape(package: &Package, payload: &[u8]) -> Resul
     let limits = package.wire_limits().map_err(map_wire_error)?;
     let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
     if view.len() != 1 {
-        return Err(Error::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     let field = view.get(0).ok_or(Error::InvalidSource)?;
     if field.number() != 1 || field.wire_type() != 2 {
-        return Err(Error::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     validate_exact_reference_shape(package, field.canonical_payload().map_err(map_wire_error)?)
 }
@@ -1174,7 +1213,7 @@ fn validate_exact_reference_shape(package: &Package, payload: &[u8]) -> Result<(
     let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
     for field in view.fields() {
         if !matches!(field.number(), 1..=3) || field.wire_type() != 0 {
-            return Err(Error::DependentContent);
+            return Err(Error::Refused(Refusal::DependentContent));
         }
         field.validate_canonical_framing().map_err(map_wire_error)?;
     }
@@ -1208,14 +1247,14 @@ fn storage_rewrite_limits(
 
 fn validate_replacement(replacement: &str) -> Result<(), Error> {
     if contains_dependent_marker(replacement) {
-        return Err(Error::ObjectMarkerReplacement);
+        return Err(Error::Refused(Refusal::ObjectMarkerReplacement));
     }
     Ok(())
 }
 
 fn validate_consumed_text(text: &str) -> Result<(), Error> {
     if contains_dependent_marker(text) {
-        return Err(Error::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     Ok(())
 }
@@ -1229,10 +1268,10 @@ fn validate_span(text: &str, span: TextSpan) -> Result<Range<usize>, Error> {
     let length_position =
         TextPosition::from_utf16_index(length).map_err(|_error| Error::InvalidSource)?;
     if span.end() > length_position {
-        return Err(Error::SpanOutOfBounds {
+        return Err(Error::Refused(Refusal::SpanOutOfBounds {
             span,
             length: length_position,
-        });
+        }));
     }
     Ok(utf16_to_byte_index(text, span.start())?..utf16_to_byte_index(text, span.end())?)
 }
@@ -1251,7 +1290,7 @@ fn utf16_to_byte_index(text: &str, position: TextPosition) -> Result<usize, Erro
             .checked_add(character.len_utf16())
             .ok_or(Error::InvalidSource)?;
         if units > target {
-            return Err(Error::SurrogateBoundary { position });
+            return Err(Error::Refused(Refusal::SurrogateBoundary { position }));
         }
     }
     if units == target {
@@ -1310,7 +1349,7 @@ fn try_owned_text(text: &str) -> Result<String, Error> {
 }
 
 fn utf16_len(text: &str) -> Result<u32, Error> {
-    u32::try_from(text.encode_utf16().count()).map_err(|_error| Error::LimitExceeded {
+    u32::try_from(text.encode_utf16().count()).map_err(|_error| Error::Limit {
         kind: LimitKind::TextUnits,
         observed: u64::MAX,
         maximum: u64::from(u32::MAX),
@@ -1324,7 +1363,7 @@ fn utf16_len(text: &str) -> Result<u32, Error> {
 fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
@@ -1335,7 +1374,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::Objects => LimitKind::Entries,
                 SemanticLimitKind::Slides => LimitKind::Slides,
@@ -1352,7 +1391,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -1374,7 +1413,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1398,7 +1437,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::MessageBytes => LimitKind::WireBytes,
                 litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
@@ -1421,7 +1460,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1443,7 +1482,7 @@ fn map_text_rewrite_error(error: litchi_iwa_text_wire::RewriteError) -> Error {
             resource,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: text_rewrite_limit_kind(resource),
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
@@ -1452,7 +1491,7 @@ fn map_text_rewrite_error(error: litchi_iwa_text_wire::RewriteError) -> Error {
             field,
             value,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: text_rewrite_limit_kind(field),
             observed: usize_to_u64(value),
             maximum: usize_to_u64(maximum),
@@ -1476,7 +1515,7 @@ fn text_rewrite_limit_kind(resource: &str) -> LimitKind {
 }
 
 fn text_limit_error(observed: usize, maximum: usize) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind: LimitKind::TextBytes,
         observed: usize_to_u64(observed),
         maximum: usize_to_u64(maximum),

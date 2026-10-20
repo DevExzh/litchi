@@ -2767,7 +2767,12 @@ fn active_view_selection_and_multiview_writes_fail_closed() -> TestResult {
         .commit();
     assert!(matches!(
         result,
-        Err(Error::UnsupportedDependency | Error::InvalidSource | Error::UnsupportedSource)
+        Err(Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+        ) | Error::InvalidSource
+            | Error::Refused(
+                litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedSource
+            ))
     ));
     assert_eq!(package.exact_bytes(), before);
 
@@ -2826,7 +2831,12 @@ fn active_view_selection_and_multiview_writes_fail_closed() -> TestResult {
         .commit();
     assert!(matches!(
         second_result,
-        Err(Error::UnsupportedDependency | Error::InvalidSource | Error::UnsupportedSource)
+        Err(Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+        ) | Error::InvalidSource
+            | Error::Refused(
+                litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedSource
+            ))
     ));
     assert_eq!(second_active.exact_bytes(), second_before);
 
@@ -2835,11 +2845,23 @@ fn active_view_selection_and_multiview_writes_fail_closed() -> TestResult {
     let missing_before = missing_uuid.exact_bytes();
     assert!(matches!(
         missing_uuid.body_table_hidden_axes(0usize),
-        Err(Error::InvalidSource | Error::UnsupportedDependency | Error::UnsupportedSource)
+        Err(Error::InvalidSource
+            | Error::Refused(
+                litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+            )
+            | Error::Refused(
+                litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedSource
+            ))
     ));
     assert!(matches!(
         missing_uuid.edit_body_table_hidden_axes(0usize),
-        Err(Error::InvalidSource | Error::UnsupportedDependency | Error::UnsupportedSource)
+        Err(Error::InvalidSource
+            | Error::Refused(
+                litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+            )
+            | Error::Refused(
+                litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedSource
+            ))
     ));
     assert_eq!(missing_uuid.exact_bytes(), missing_before);
     Ok(())
@@ -3105,7 +3127,9 @@ fn filtered_and_pivot_states_are_preserved_or_refused_fail_closed() -> TestResul
     assert!(
         matches!(
             &result,
-            Err(Error::UnsupportedDependency | Error::InvalidSource)
+            Err(Error::Refused(
+                litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+            ) | Error::InvalidSource)
         ),
         "pivot topology must be refused: {result:?}"
     );
@@ -3219,7 +3243,12 @@ fn pivot_owner_is_distinct_from_merge_owner_and_bool_values_are_strict() -> Test
         .edit_body_table_hidden_axes(0usize)?
         .set(HiddenAxes::new([AxisIndex::row(0)])?)
         .commit();
-    assert!(matches!(pivot_result, Err(Error::UnsupportedDependency)));
+    assert!(matches!(
+        pivot_result,
+        Err(Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+        ))
+    ));
     assert_eq!(pivot.exact_bytes(), pivot_before);
 
     let merge_source = merge_owner_only(&source, 0)?;
@@ -3544,7 +3573,7 @@ fn output_and_wire_limits_reject_before_publication() -> TestResult {
         .edit_body_table_hidden_axes(0usize)?
         .set(requested.clone())
         .commit();
-    assert!(matches!(result, Err(Error::LimitExceeded { .. })));
+    assert!(matches!(result, Err(Error::Limit { .. })));
     assert_eq!(bounded_package.exact_bytes(), before);
 
     let normal_source = normal_package()?;
@@ -3589,7 +3618,7 @@ fn output_and_wire_limits_reject_before_publication() -> TestResult {
                 .edit_body_table_hidden_axes(0usize)
                 .map(|edit| edit.set(requested.clone()))
                 .and_then(|edit| edit.commit());
-            assert!(matches!(result, Err(Error::LimitExceeded { .. })));
+            assert!(matches!(result, Err(Error::Limit { .. })));
             assert_eq!(package.exact_bytes(), before);
         },
         Err(error) => {
@@ -3665,10 +3694,10 @@ fn public_hidden_axis_transactions_are_send_sync_debug_and_redacted() -> TestRes
     assert_redacted(&format!("{commit:?}"));
     assert_redacted(&format!("{:?}", commit.diagnostics()));
     for error in [
-        Error::TableNotFound,
-        Error::TableLocked,
+        Error::Refused(litchi_pages::table::hidden_axes::transaction::Refusal::TableNotFound),
+        Error::Refused(litchi_pages::table::hidden_axes::transaction::Refusal::TableLocked),
         Error::PatchConflict,
-        Error::LimitExceeded {
+        Error::Limit {
             kind: BodyTableHiddenAxesLimitKind::WireBytes,
             observed: 17,
             maximum: 23,
@@ -4899,11 +4928,18 @@ fn selectors_read_rows_columns_and_absence_without_collapsing_names() -> TestRes
     );
     assert!(matches!(
         package.body_table_hidden_axes(BodyTableSelector::name("Missing")),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::TableNotFound
+        ))
     ));
     assert!(matches!(
         package.body_table_hidden_axes(usize::MAX),
-        Err(Error::TableNotFound | Error::AmbiguousSelector)
+        Err(
+            Error::Refused(litchi_pages::table::hidden_axes::transaction::Refusal::TableNotFound)
+                | Error::Refused(
+                    litchi_pages::table::hidden_axes::transaction::Refusal::AmbiguousSelector
+                )
+        )
     ));
 
     let ambiguous_source = synthetic_package(
@@ -4919,7 +4955,11 @@ fn selectors_read_rows_columns_and_absence_without_collapsing_names() -> TestRes
     let ambiguous = Package::from_bytes(&ambiguous_source)?;
     assert!(matches!(
         ambiguous.body_table_hidden_axes(BodyTableSelector::name("Revenue")),
-        Err(Error::AmbiguousTableName | Error::AmbiguousSelector)
+        Err(Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::AmbiguousTableName
+        ) | Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::AmbiguousSelector
+        ))
     ));
     Ok(())
 }
@@ -4998,7 +5038,12 @@ fn ownerless_creation_rejects_active_or_column_extent_uuid_in_unselected_map() -
             .set(requested.clone())
             .commit();
         assert!(
-            matches!(&result, Err(Error::UnsupportedDependency)),
+            matches!(
+                &result,
+                Err(Error::Refused(
+                    litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+                ))
+            ),
             "{label} UUID collision in an unselected map was accepted: {result:?}"
         );
         assert_eq!(package.exact_bytes(), before);
@@ -5200,7 +5245,9 @@ fn source_built_aggregate_nonempty_dependency_creation_is_refused() -> TestResul
     assert!(
         matches!(
             &result,
-            Err(Error::UnsupportedDependency | Error::InvalidSource)
+            Err(Error::Refused(
+                litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+            ) | Error::InvalidSource)
         ),
         "non-empty source-built dependency was admitted: {result:?}"
     );
@@ -5232,7 +5279,9 @@ fn source_built_aggregate_foreign_engine_edge_is_refused() -> TestResult {
         .and_then(|edit| edit.set(requested).commit());
     assert!(matches!(
         result,
-        Err(Error::UnsupportedDependency | Error::InvalidSource)
+        Err(Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+        ) | Error::InvalidSource)
     ));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
@@ -5591,9 +5640,9 @@ fn hostile_metadata_identity_routes_and_watermarks_fail_closed_atomically() -> T
             matches!(
                 &result,
                 Err(Error::InvalidSource
-                    | Error::UnsupportedSource
-                    | Error::UnsupportedDependency
-                    | Error::LimitExceeded { .. })
+                    | Error::Refused(litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedSource)
+                    | Error::Refused(litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency)
+                    | Error::Limit { .. })
             ),
             "hostile metadata case {case_index} was accepted: {result:?}"
         );
@@ -5627,7 +5676,13 @@ fn unknown_metadata_is_read_and_noop_preserved_but_changed_creation_refused() ->
     assert!(
         matches!(
             &result,
-            Err(Error::InvalidSource | Error::UnsupportedSource | Error::UnsupportedDependency)
+            Err(Error::InvalidSource
+                | Error::Refused(
+                    litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedSource
+                )
+                | Error::Refused(
+                    litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+                ))
         ),
         "changed owner creation accepted unknown PackageMetadata fields: {result:?}"
     );
@@ -5672,7 +5727,7 @@ fn ownerless_creation_output_limit_is_atomic() -> TestResult {
         .set(requested)
         .commit();
     assert!(
-        matches!(&result, Err(Error::LimitExceeded { .. })),
+        matches!(&result, Err(Error::Limit { .. })),
         "ownerless creation crossed the output limit without reporting it: {result:?}"
     );
     assert_eq!(bounded.exact_bytes(), before);
@@ -5911,7 +5966,12 @@ fn locked_tables_refuse_changed_axis_publication_but_allow_reads() -> TestResult
         .edit_body_table_hidden_axes(0usize)?
         .set(HiddenAxes::new([AxisIndex::row(0)])?)
         .commit();
-    assert!(matches!(result, Err(Error::TableLocked)));
+    assert!(matches!(
+        result,
+        Err(Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::TableLocked
+        ))
+    ));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
 }

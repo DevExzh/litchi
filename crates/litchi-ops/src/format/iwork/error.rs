@@ -362,6 +362,12 @@ impl LeafError {
     }
 }
 
+/// The code of a refused leaf edit: its kind alone decides (record 0351
+/// §2.4, record 0361), as for every other format.
+fn refused(kind: litchi_core::edit::RefusalKind) -> Code {
+    crate::error::refusal_code(kind)
+}
+
 /// The code of a physical iWork archive failure: a resource ceiling is
 /// `limit_exceeded` (record 0306: source limits and package-directory
 /// captures report through it), I/O is `io_error`, the rest is a malformed
@@ -409,18 +415,10 @@ fn pages_code(error: &litchi_pages::PackageError) -> Code {
 fn pages_text_code(error: &litchi_pages::section::text::Error) -> Code {
     use litchi_pages::section::text::Error as E;
     match error {
-        E::NameNotFound | E::PositionNotFound { .. } => Code::PathNotFound,
-        E::AmbiguousSelector { .. } | E::BodySectionCount { .. } => Code::InvalidPath,
-        E::SpanOutOfBounds { .. } | E::SurrogateBoundary { .. } => Code::OutOfRange,
-        E::SectionBreakReplacement
-        | E::FootnoteAnchorReplacement
-        | E::ObjectMarkerReplacement
-        | E::DependentContent
-        | E::UnsupportedSource => Code::UnsupportedCapability,
-        E::LimitExceeded { .. } => Code::LimitExceeded,
-        E::Allocation { .. } | E::OperationAlreadyStaged | E::Verification => Code::InternalError,
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
         E::InvalidSource | E::PatchConflict => Code::InvalidInput,
-        _ => Code::InvalidValue,
+        _ => Code::InternalError,
     }
 }
 
@@ -428,12 +426,14 @@ fn pages_text_code(error: &litchi_pages::section::text::Error) -> Code {
 fn pages_paragraphs_code(error: &litchi_pages::section::paragraphs::Error) -> Code {
     use litchi_pages::section::paragraphs::Error as E;
     match error {
+        // Removing the final slide, section or paragraph is a caller
+        // argument error, as for PPTX `SlideRemovalRefusal::FinalSlide`.
+        E::Refused(litchi_pages::section::paragraphs::Refusal::LastParagraph) => {
+            Code::InvalidArgument
+        },
+        E::Refused(refusal) => refused(refusal.kind()),
         E::Text(error) => pages_text_code(error),
-        E::PositionNotFound { .. } => Code::PathNotFound,
-        E::ParagraphBreak => Code::InvalidValue,
-        E::InterleavedAnchors | E::AnchoredParagraph => Code::UnsupportedCapability,
-        E::LastParagraph => Code::InvalidArgument,
-        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::Limit { .. } => Code::LimitExceeded,
         E::PatchConflict => Code::InvalidInput,
         _ => Code::InternalError,
     }
@@ -443,12 +443,10 @@ fn pages_paragraphs_code(error: &litchi_pages::section::paragraphs::Error) -> Co
 fn pages_name_code(error: &litchi_pages::section::name::Error) -> Code {
     use litchi_pages::section::name::Error as E;
     match error {
-        E::NameNotFound | E::PositionNotFound { .. } => Code::PathNotFound,
-        E::LimitExceeded { .. } => Code::LimitExceeded,
-        E::UnsupportedSource => Code::UnsupportedCapability,
-        E::PatchConflict | E::InvalidSource => Code::InvalidInput,
-        E::Allocation { .. } | E::Verification => Code::InternalError,
-        _ => Code::InvalidValue,
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict => Code::InvalidInput,
+        _ => Code::InternalError,
     }
 }
 
@@ -456,11 +454,9 @@ fn pages_name_code(error: &litchi_pages::section::name::Error) -> Code {
 fn pages_text_style_code(error: &litchi_pages::section::text_style::Error) -> Code {
     use litchi_pages::section::text_style::Error as E;
     match error {
-        E::SectionNotFound => Code::PathNotFound,
-        E::InvalidSpan | E::EmptyStyle => Code::InvalidArgument,
-        E::UnsupportedDependency | E::UnsupportedSource => Code::UnsupportedCapability,
-        E::LimitExceeded { .. } => Code::LimitExceeded,
-        E::PatchConflict | E::InvalidSource => Code::InvalidInput,
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict => Code::InvalidInput,
         _ => Code::InternalError,
     }
 }
@@ -469,12 +465,9 @@ fn pages_text_style_code(error: &litchi_pages::section::text_style::Error) -> Co
 fn keynote_placeholder_code(error: &litchi_keynote::slide::placeholder::Error) -> Code {
     use litchi_keynote::slide::placeholder::Error as E;
     match error {
-        E::SlideNameNotFound | E::SlidePositionNotFound { .. } | E::PlaceholderNotFound { .. } => {
-            Code::PathNotFound
-        },
-        E::UnsupportedSource => Code::UnsupportedCapability,
-        E::LimitExceeded { .. } => Code::LimitExceeded,
-        E::InvalidSource | E::AmbiguousSelector => Code::InvalidInput,
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict => Code::InvalidInput,
         _ => Code::InternalError,
     }
 }
@@ -483,14 +476,9 @@ fn keynote_placeholder_code(error: &litchi_keynote::slide::placeholder::Error) -
 fn keynote_media_code(error: &litchi_keynote::slide::media::lifecycle::Error) -> Code {
     use litchi_keynote::slide::media::lifecycle::Error as E;
     match error {
-        E::SlideNameNotFound
-        | E::SlidePositionNotFound { .. }
-        | E::MoviePositionNotFound { .. } => Code::PathNotFound,
-        E::UnsupportedSource | E::UnsupportedComment | E::AudioPoster | E::KindMismatch { .. } => {
-            Code::UnsupportedCapability
-        },
-        E::LimitExceeded { .. } => Code::LimitExceeded,
-        E::InvalidSource | E::PatchConflict | E::Read => Code::InvalidInput,
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict => Code::InvalidInput,
         _ => Code::InternalError,
     }
 }
@@ -499,11 +487,9 @@ fn keynote_media_code(error: &litchi_keynote::slide::media::lifecycle::Error) ->
 fn pages_table_values_code(error: &litchi_pages::table::values::Error) -> Code {
     use litchi_pages::table::values::Error as E;
     match error {
-        E::TableNotFound => Code::PathNotFound,
-        E::InvalidCell => Code::InvalidValue,
-        E::Formulas | E::UnsupportedStorage | E::UnsupportedSource => Code::UnsupportedCapability,
-        E::LimitExceeded { .. } => Code::LimitExceeded,
-        E::PatchConflict | E::InvalidSource => Code::InvalidInput,
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict => Code::InvalidInput,
         _ => Code::InternalError,
     }
 }
@@ -512,12 +498,10 @@ fn pages_table_values_code(error: &litchi_pages::table::values::Error) -> Code {
 fn pages_region_code(error: &litchi_pages::header_footer::text::Error) -> Code {
     use litchi_pages::header_footer::text::Error as E;
     match error {
-        E::NotFound | E::PositionOutOfBounds => Code::PathNotFound,
-        E::TextTooLarge | E::StructuralMarker => Code::InvalidValue,
-        E::LimitExceeded { .. } => Code::LimitExceeded,
-        E::PatchConflict | E::InvalidSource => Code::InvalidInput,
-        E::Allocation { .. } | E::Verification => Code::InternalError,
-        _ => Code::UnsupportedCapability,
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict => Code::InvalidInput,
+        _ => Code::InternalError,
     }
 }
 
@@ -525,12 +509,10 @@ fn pages_region_code(error: &litchi_pages::header_footer::text::Error) -> Code {
 fn pages_footnote_code(error: &litchi_pages::footnote::text::Error) -> Code {
     use litchi_pages::footnote::text::Error as E;
     match error {
-        E::NotFound => Code::PathNotFound,
-        E::TextTooLarge | E::CustomMarkTooLarge | E::StructuralMarker => Code::InvalidValue,
-        E::LimitExceeded { .. } => Code::LimitExceeded,
-        E::PatchConflict | E::InvalidSource => Code::InvalidInput,
-        E::Allocation { .. } | E::Verification => Code::InternalError,
-        _ => Code::UnsupportedCapability,
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict => Code::InvalidInput,
+        _ => Code::InternalError,
     }
 }
 
@@ -538,15 +520,10 @@ fn pages_footnote_code(error: &litchi_pages::footnote::text::Error) -> Code {
 fn pages_footnotes_code(error: &litchi_pages::footnote::body::transaction::Error) -> Code {
     use litchi_pages::footnote::body::transaction::Error as E;
     match error {
-        E::NotFound => Code::PathNotFound,
-        E::PositionOutOfBounds => Code::OutOfRange,
-        E::PositionOccupied | E::StructuralMarker | E::TextTooLarge | E::CustomMarkTooLarge => {
-            Code::InvalidValue
-        },
-        E::LimitExceeded { .. } => Code::LimitExceeded,
-        E::PatchConflict | E::InvalidSource => Code::InvalidInput,
-        E::Allocation { .. } | E::Verification => Code::InternalError,
-        _ => Code::UnsupportedCapability,
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict => Code::InvalidInput,
+        _ => Code::InternalError,
     }
 }
 
@@ -554,9 +531,9 @@ fn pages_footnotes_code(error: &litchi_pages::footnote::body::transaction::Error
 fn pages_metadata_code(error: &litchi_pages::metadata::Error) -> Code {
     use litchi_pages::metadata::Error as E;
     match error {
-        E::InvalidValue | E::InvalidKeyword => Code::InvalidValue,
-        E::LimitExceeded { .. } => Code::LimitExceeded,
-        E::PatchConflict | E::InvalidSource => Code::InvalidInput,
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict => Code::InvalidInput,
         _ => Code::InternalError,
     }
 }
@@ -565,12 +542,10 @@ fn pages_metadata_code(error: &litchi_pages::metadata::Error) -> Code {
 fn pages_deletion_code(error: &litchi_pages::table::deletion::Error) -> Code {
     use litchi_pages::table::deletion::Error as E;
     match error {
-        E::TableNotFound => Code::PathNotFound,
-        E::AmbiguousTableName | E::AmbiguousSelector => Code::InvalidPath,
-        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
         E::PatchConflict => Code::InvalidInput,
-        E::Verification => Code::InternalError,
-        _ => Code::UnsupportedCapability,
+        _ => Code::InternalError,
     }
 }
 
@@ -578,12 +553,11 @@ fn pages_deletion_code(error: &litchi_pages::table::deletion::Error) -> Code {
 fn pages_creation_code(error: &litchi_pages::table::creation::Error) -> Code {
     use litchi_pages::table::creation::Error as E;
     match error {
-        E::InvalidSize { .. } | E::InvalidCell | E::PositionOutOfBounds => Code::OutOfRange,
-        E::LimitExceeded { .. } => Code::LimitExceeded,
-        E::InvalidSource | E::PatchConflict => Code::InvalidInput,
+        E::Refused(refusal) => refused(refusal.kind()),
         E::Values(error) => pages_table_values_code(error),
-        E::Verification | E::Allocation { .. } => Code::InternalError,
-        _ => Code::UnsupportedCapability,
+        E::Limit { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict => Code::InvalidInput,
+        _ => Code::InternalError,
     }
 }
 
@@ -591,13 +565,15 @@ fn pages_creation_code(error: &litchi_pages::table::creation::Error) -> Code {
 fn pages_section_lifecycle_code(error: &litchi_pages::section::lifecycle::Error) -> Code {
     use litchi_pages::section::lifecycle::Error as E;
     match error {
-        E::SectionNotFound => Code::PathNotFound,
-        E::InvalidName => Code::InvalidValue,
-        E::InitialSection | E::EmptySection => Code::InvalidArgument,
-        E::LimitExceeded { .. } => Code::LimitExceeded,
+        // Removing the final slide, section or paragraph is a caller
+        // argument error, as for PPTX `SlideRemovalRefusal::FinalSlide`.
+        E::Refused(litchi_pages::section::lifecycle::Refusal::InitialSection) => {
+            Code::InvalidArgument
+        },
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
         E::PatchConflict => Code::InvalidInput,
-        E::Verification | E::OperationAlreadyStaged | E::NoStagedOperation => Code::InternalError,
-        _ => Code::UnsupportedCapability,
+        _ => Code::InternalError,
     }
 }
 
@@ -618,18 +594,9 @@ fn keynote_code(error: &litchi_keynote::ReadError) -> Code {
 fn keynote_text_code(error: &litchi_keynote::slide::text::Error) -> Code {
     use litchi_keynote::slide::text::Error as E;
     match error {
-        E::SlideNameNotFound | E::SlidePositionNotFound { .. } | E::TextStorageNotFound { .. } => {
-            Code::PathNotFound
-        },
-        E::AmbiguousSelector | E::EmptySlideName => Code::InvalidPath,
-        E::SpanOutOfBounds { .. } | E::SurrogateBoundary { .. } => Code::OutOfRange,
-        E::UnsupportedSource
-        | E::UnsupportedKind { .. }
-        | E::ObjectMarkerReplacement
-        | E::DependentContent => Code::UnsupportedCapability,
-        E::LimitExceeded { .. } => Code::LimitExceeded,
-        E::OperationAlreadyStaged => Code::InternalError,
-        E::InvalidSource => Code::InvalidInput,
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict => Code::InvalidInput,
         _ => Code::InternalError,
     }
 }
@@ -638,7 +605,7 @@ fn keynote_text_code(error: &litchi_keynote::slide::text::Error) -> Code {
 fn keynote_edit_code(error: &litchi_keynote::edit::Error) -> Code {
     use litchi_keynote::edit::Error as E;
     match error {
-        E::SlideNameNotFound | E::SlidePositionNotFound { .. } => Code::PathNotFound,
+        E::Refused(refusal) => refused(refusal.kind()),
         _ => Code::InternalError,
     }
 }
@@ -647,8 +614,8 @@ fn keynote_edit_code(error: &litchi_keynote::edit::Error) -> Code {
 fn keynote_order_code(error: &litchi_keynote::slide::order::Error) -> Code {
     use litchi_keynote::slide::order::Error as E;
     match error {
-        E::SlideNameNotFound | E::SlidePositionNotFound { .. } => Code::PathNotFound,
-        E::DestinationOutOfRange { .. } => Code::OutOfRange,
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
         _ => Code::InternalError,
     }
 }
@@ -657,9 +624,14 @@ fn keynote_order_code(error: &litchi_keynote::slide::order::Error) -> Code {
 fn keynote_deletion_code(error: &litchi_keynote::slide::delete::Error) -> Code {
     use litchi_keynote::slide::delete::Error as E;
     match error {
-        E::SlideNameNotFound | E::SlidePositionNotFound { .. } => Code::PathNotFound,
-        E::CannotDeleteFinalSlide => Code::InvalidArgument,
-        _ => Code::UnsupportedCapability,
+        // Removing the final slide, section or paragraph is a caller
+        // argument error, as for PPTX `SlideRemovalRefusal::FinalSlide`.
+        E::Refused(litchi_keynote::slide::delete::Refusal::CannotDeleteFinalSlide) => {
+            Code::InvalidArgument
+        },
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
+        _ => Code::InternalError,
     }
 }
 
@@ -667,15 +639,8 @@ fn keynote_deletion_code(error: &litchi_keynote::slide::delete::Error) -> Code {
 fn keynote_notes_code(error: &litchi_keynote::slide::notes::Error) -> Code {
     use litchi_keynote::slide::notes::Error as E;
     match error {
-        E::SlideNameNotFound | E::SlidePositionNotFound { .. } | E::NotesStorageNotFound => {
-            Code::PathNotFound
-        },
-        E::AmbiguousSelector | E::EmptySlideName => Code::InvalidPath,
-        E::SpanOutOfBounds { .. } | E::SurrogateBoundary { .. } => Code::OutOfRange,
-        E::UnsupportedSource | E::ObjectMarkerReplacement | E::DependentContent => {
-            Code::UnsupportedCapability
-        },
-        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
         E::InvalidSource | E::PatchConflict => Code::InvalidInput,
         _ => Code::InternalError,
     }
@@ -685,16 +650,8 @@ fn keynote_notes_code(error: &litchi_keynote::slide::notes::Error) -> Code {
 fn keynote_drawables_code(error: &litchi_keynote::slide::drawable::Error) -> Code {
     use litchi_keynote::slide::drawable::Error as E;
     match error {
-        E::SlideNameNotFound
-        | E::SlidePositionNotFound { .. }
-        | E::DrawablePositionNotFound { .. } => Code::PathNotFound,
-        E::AmbiguousSelector | E::EmptySlideName => Code::InvalidPath,
-        E::ZPositionOutOfRange { .. } => Code::OutOfRange,
-        E::InvalidGeometry | E::InvalidImage | E::InvalidSpan => Code::InvalidValue,
-        E::InvalidTableSize { .. } => Code::OutOfRange,
-        E::DrawableRemoved => Code::InvalidArgument,
-        E::UnsupportedSource | E::Unsupported { .. } => Code::UnsupportedCapability,
-        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
         E::InvalidSource | E::PatchConflict => Code::InvalidInput,
         _ => Code::InternalError,
     }
@@ -704,16 +661,8 @@ fn keynote_drawables_code(error: &litchi_keynote::slide::drawable::Error) -> Cod
 fn keynote_creation_code(error: &litchi_keynote::slide::creation::Error) -> Code {
     use litchi_keynote::slide::creation::Error as E;
     match error {
-        E::SlideNameNotFound | E::SlidePositionNotFound { .. } => Code::PathNotFound,
-        E::AmbiguousSelector | E::EmptySlideName => Code::InvalidPath,
-        E::LayoutNameNotFound | E::AmbiguousLayout | E::LayoutPositionNotFound { .. } => {
-            Code::InvalidValue
-        },
-        E::PositionOutOfRange { .. } => Code::OutOfRange,
-        E::UnsupportedSource | E::UnsupportedTopology | E::UnsupportedContent { .. } => {
-            Code::UnsupportedCapability
-        },
-        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
         E::InvalidSource | E::PatchConflict => Code::InvalidInput,
         _ => Code::InternalError,
     }
@@ -735,14 +684,8 @@ fn numbers_code(error: &litchi_numbers::Error) -> Code {
 fn numbers_cells_code(error: &litchi_numbers::table::cells::Error) -> Code {
     use litchi_numbers::table::cells::Error as E;
     match error {
-        E::SheetNotFound | E::TableNotFound => Code::PathNotFound,
-        E::InvalidAddress | E::OutOfBounds { .. } => Code::OutOfRange,
-        E::AmbiguousSource { .. } | E::DuplicatePosition { .. } => Code::InvalidPath,
-        E::LimitExceeded { .. } => Code::LimitExceeded,
-        E::TableLocked { .. } => Code::DocumentProtected,
-        E::UnsupportedSource { .. } | E::UnsupportedDependency { .. } => {
-            Code::UnsupportedCapability
-        },
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
         E::InvalidSource { .. } | E::PatchConflict => Code::InvalidInput,
         _ => Code::InternalError,
     }

@@ -343,7 +343,11 @@ fn positions_and_locks_fail_closed_without_mutating_source() -> TestResult {
     let package = Package::from_bytes(&source)?;
     assert!(matches!(
         package.slide_table_title_settings("Tables", TableSelector::index(2)),
-        Err(litchi_keynote::slide::table::title::transaction::Error::TablePositionNotFound { .. })
+        Err(
+            litchi_keynote::slide::table::title::transaction::Error::Refused(
+                litchi_keynote::slide::table::title::transaction::Refusal::TablePositionNotFound { .. }
+            )
+        )
     ));
     assert_eq!(exact_bytes(&package)?, source);
 
@@ -384,7 +388,11 @@ fn positions_and_locks_fail_closed_without_mutating_source() -> TestResult {
             .edit_slide_table_title("Tables", 0usize)?
             .set(Settings::new(Some(false), None))
             .commit(),
-        Err(litchi_keynote::slide::table::title::transaction::Error::Locked)
+        Err(
+            litchi_keynote::slide::table::title::transaction::Error::Refused(
+                litchi_keynote::slide::table::title::transaction::Refusal::Locked
+            )
+        )
     ));
     assert_eq!(exact_bytes(&locked)?, locked_source);
     Ok(())

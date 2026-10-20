@@ -1795,7 +1795,7 @@ assert_eq!(restored_bytes, original_bytes);
 
 Unchanged settings retain the original source allocation. A changed commit
 requires an exact flat package: normalized legacy sources can be read but a
-changed edit returns `litchi_pages::document_settings::Error::UnsupportedSource`.
+changed edit returns `litchi_pages::document_settings::Refusal::UnsupportedSource`.
 Changed commits invalidate the private layout cache, remove stale root previews,
 and fully reopen the candidate; the inverse patch restores the exact original
 package. See `litchi-pages/examples/edit_document_settings.rs` for the complete
@@ -1839,7 +1839,7 @@ assert_eq!(restored_bytes, original_bytes);
 An unchanged layout reuses the exact source allocation and keeps preview and
 view-state caches. A changed layout requires an exact flat package; normalized
 legacy sources are read-only for this transaction and return
-`PageLayoutError::UnsupportedSource` when changed. Changed commits update the
+`page_layout::Refusal::UnsupportedSource` when changed. Changed commits update the
 private derived layout state, invalidate and remove stale root previews, and
 fully reopen the candidate before publication. The inverse patch restores the
 exact original package. See `litchi-pages/examples/edit_page_layout.rs` for a
@@ -2032,11 +2032,11 @@ only the optional stored value (`None` is effectively `false`) and do not infer
 interactive state. The transaction deliberately refuses dependent topologies:
 any header/footer section-count change with an active pivot or group, a header
 row/column count change with a rooted header-name manager, or a repeat-flag
-change on a legacy sheet topology returns `Error::UnsupportedDependency`.
+change on a legacy sheet topology returns `Refusal::UnsupportedDependency`.
 
 Changed edits require an exact flat Numbers package. A legacy nested
 `Index.zip` can be read and a no-op preserved, but a changed transaction fails
-with `litchi_numbers::table::headers::transaction::Error::UnsupportedSource`
+with `litchi_numbers::table::headers::transaction::Refusal::UnsupportedSource`
 rather than normalizing through the retired migration-host path. See
 `litchi-numbers/examples/edit_table_headers.rs` for a distinct-output workflow
 that streams with `Package::write_to` through a synchronized sibling temporary
@@ -2181,7 +2181,7 @@ candidate, and delete the root `preview.jpg`, `preview-micro.jpg`, and
 `preview-web.jpg` members when present. A semantic no-op retains the exact
 source; read-only legacy nested-`Index.zip` input can likewise remain
 preserved, but a changed names transaction returns
-`litchi_numbers::names::Error::UnsupportedSource` rather than normalizing it
+`litchi_numbers::names::Refusal::UnsupportedSource` rather than normalizing it
 through the migration host. See `litchi-numbers/examples/edit_names.rs` for a
 distinct-output workflow that streams with `Package::write_to` through a
 synchronized sibling temporary file and no-clobber publication.
@@ -2320,7 +2320,7 @@ assert_eq!(restored_bytes, original);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-An absent role cannot be edited and returns `Error::PlaceholderNotFound`; this
+An absent role cannot be edited and returns `Refusal::PlaceholderNotFound`; this
 transaction does not create a placeholder. Its scope is only visibility for
 existing title/body layout placeholders: slide-number visibility, layout
 editing, and slide or placeholder creation remain separate operations. An
@@ -2808,7 +2808,7 @@ settings only, preserves unknown content in an exact source, and produces an
 immutable committed package plus an exact-source inverse patch. Read-only
 legacy nested-`Index.zip` input remains preservable and can be streamed back
 unchanged with `Package::write_to`; a changed settings commit deliberately
-returns `litchi_keynote::show::Error::UnsupportedSource` rather than normalize
+returns `litchi_keynote::show::Refusal::UnsupportedSource` rather than normalize
 or rebuild that legacy layout. See
 `litchi-keynote/examples/edit_show_settings.rs` for safe distinct-output,
 sibling-temporary, no-clobber publication.

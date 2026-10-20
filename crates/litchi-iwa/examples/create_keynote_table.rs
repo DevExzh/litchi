@@ -146,7 +146,9 @@ fn set_focused_keynote_table_dimension(
         .commit();
     let commit = match result {
         Ok(commit) => commit,
-        Err(litchi_keynote::slide::table::dimension::transaction::Error::UnsupportedDependency) => {
+        Err(litchi_keynote::slide::table::dimension::transaction::Error::Refused(
+            litchi_keynote::slide::table::dimension::transaction::Refusal::UnsupportedDependency,
+        )) => {
             // keynote::Builder snapshots intentionally do not satisfy
             // the focused owner's exact-source authority proof. Keep the
             // builder's private physical sizing and do not fall back to the

@@ -11,7 +11,7 @@ pub(super) fn map_header_codec_error(
     error: numbers_table_header_settings_codec::DecodeError,
 ) -> Error {
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -19,7 +19,7 @@ pub(super) fn map_header_codec_error(
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -30,7 +30,7 @@ pub(super) fn map_header_codec_error(
         Some(numbers_table_header_settings_codec::WireResourceLimit::Bytes {
             observed,
             maximum,
-        }) => Error::LimitExceeded {
+        }) => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -39,7 +39,7 @@ pub(super) fn map_header_codec_error(
         Some(numbers_table_header_settings_codec::WireResourceLimit::Nesting {
             observed,
             maximum,
-        }) => Error::LimitExceeded {
+        }) => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
@@ -53,7 +53,7 @@ pub(super) fn map_header_codec_error(
 
 pub(super) fn map_table_info_codec_error(error: table_info_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -61,7 +61,7 @@ pub(super) fn map_table_info_codec_error(error: table_info_codec::DecodeError) -
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -80,7 +80,7 @@ pub(super) fn map_candidate_read_error(error: ReadError) -> Error {
             kind: litchi_iwa_archive::LimitKind::InputBytes,
             observed,
             maximum,
-        }) => Error::LimitExceeded {
+        }) => Error::Limit {
             kind: LimitKind::OutputBytes,
             observed,
             maximum,
@@ -99,7 +99,7 @@ pub(super) fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::Objects => LimitKind::PayloadObjects,
                 SemanticLimitKind::References => LimitKind::PayloadReferences,
@@ -118,7 +118,7 @@ pub(super) fn map_read_error(error: ReadError) -> Error {
             maximum: usize_as_u64(maximum),
             path: Path::Package,
         },
-        ReadError::InputTooLarge { observed, maximum } => Error::LimitExceeded {
+        ReadError::InputTooLarge { observed, maximum } => Error::Limit {
             kind: LimitKind::InputBytes,
             observed,
             maximum,
@@ -136,7 +136,7 @@ pub(super) fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -157,7 +157,9 @@ pub(super) fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             amount,
             path: Path::Package,
         },
-        litchi_iwa_archive::Error::Reassembly(_) => Error::UnsupportedSource,
+        litchi_iwa_archive::Error::Reassembly(_) => {
+            Error::Refused(crate::package::table_headers::Refusal::UnsupportedSource)
+        },
         litchi_iwa_archive::Error::Iwa(core_error) => map_core_error(core_error),
         _ => Error::InvalidSource {
             path: Path::Package,
@@ -171,7 +173,7 @@ pub(super) fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
@@ -202,7 +204,7 @@ pub(super) fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::WireOutputBytes,

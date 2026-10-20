@@ -631,14 +631,14 @@ impl MovieInfo {
 /// Exact-source transactions replacing one existing media payload.
 pub mod data {
     pub use crate::package::slide_media_replacement::{
-        Commit, Data, Diagnostics, Edit, Error, LimitKind, MediaPart, Patch,
+        Commit, Data, Diagnostics, Edit, Error, LimitKind, MediaPart, Patch, Refusal,
     };
 }
 
 /// Exact-source duplicate/remove transactions for slide media.
 pub mod lifecycle {
     pub use crate::package::slide_media_lifecycle::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 

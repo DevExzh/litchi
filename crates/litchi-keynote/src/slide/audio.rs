@@ -73,7 +73,7 @@ impl Options {
 /// Exact-source transactions for one audio control's position.
 pub mod position {
     pub use crate::package::slide_audio_position::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 

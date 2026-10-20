@@ -500,7 +500,9 @@ fn rewrite_date_time_cell_metadata(
         .map_err(|_| Error::InvalidSource { path })?;
     let source_numeric_type = cell.numeric_cell_type();
     if !cell.is_date_time_format_compatible() {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     cell.set_date_time_format_identifier_preserving_value(desired_identifier)
         .map_err(|_| Error::InvalidSource { path })?;
@@ -593,7 +595,9 @@ fn rewrite_duration_cell_metadata(
         .map_err(|_| Error::InvalidSource { path })?;
     let source_secondary = cell.secondary_format_identifier();
     if !cell.is_duration_format_compatible() || !cell.has_only_duration_format_metadata() {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     cell.set_duration_format_identifier_preserving_value(desired_identifier)
         .map_err(|_| Error::InvalidSource { path })?;
@@ -831,13 +835,19 @@ fn inspect_text_cell_metadata(
             .map_err(|_| Error::InvalidSource { path })?,
     );
     if flags & BNC_RESERVED_KNOWN_FIELD_FLAG != 0 {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     if flags & BNC_FORMAT_FLAGS & !BNC_TEXT_ALLOWED_FORMAT_FLAGS != 0 {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     if cell.cell_format_kind() != Some(litchi_numbers_wire::TEXT_CELL_FORMAT_KIND) {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
 
     let mut offset = BNC_HEADER_LEN;
@@ -909,7 +919,9 @@ fn validate_text_cell_metadata(
             .text_identifier
             .is_none_or(|identifier| identifier == 0)
     {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     Ok(metadata)
 }
@@ -963,7 +975,9 @@ fn rewrite_text_cell_metadata(
             litchi_numbers_wire::StoredValue::Empty | litchi_numbers_wire::StoredValue::Text(_)
         )
     {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
 
     let output = match desired_identifier {
@@ -994,7 +1008,7 @@ fn rewrite_text_cell_metadata(
                 output
             } else {
                 cell.set_data_format_identifier(identifier, CellDataFormatKind::Text, None)
-                    .map_err(|_| Error::UnsupportedDependency { path })?;
+                    .map_err(|_| Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path }))?;
                 cell.try_encode_with_limit(output_limit)
                     .map_err(|error| map_bnc_error(error, path))?
             }
@@ -1585,7 +1599,9 @@ fn read_display_format_with_budget(
         .iter()
         .filter(|(id, _)| *id == tile_id)
         .map(|(_, reference)| *reference);
-    let tile_identifier = tile_matches.next().ok_or(Error::CellNotFound)?;
+    let tile_identifier = tile_matches.next().ok_or(Error::Refused(
+        crate::package::table_cell_pop_up_menu::Refusal::CellNotFound,
+    ))?;
     if tile_matches.next().is_some() || tile_identifier == target.model_identifier {
         return Err(Error::InvalidSource { path }.into());
     }
@@ -1714,7 +1730,10 @@ fn read_display_format_with_budget(
     if format_table_identifier == target.model_identifier
         || format_table_identifier == tile_identifier
     {
-        return Err(Error::UnsupportedDependency { path }.into());
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        )
+        .into());
     }
     popup::validate_selected_model_reference(source, target, format_table_identifier, path)?;
     native::require_exclusive_selected_model_reference(
@@ -1763,7 +1782,11 @@ fn read_display_format_with_budget(
             (tile_component_index, tile_identifier),
             (format_component_index, format_table_identifier),
         ])
-        .map_err(|_| Error::UnsupportedDependency { path })?;
+        .map_err(|_| {
+            Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            )
+        })?;
     let format_object = native::unique_object(format_archive, format_table_identifier, path)?;
     let format_message = native::unique_list_message(format_object, 2, budget, path)?;
     let format_payload = native::copy_payload_with_budget(format_message.payload, budget, path)?;
@@ -1827,14 +1850,18 @@ fn rewrite_display_format(
     budget: &mut TransactionBudget,
 ) -> Result<native::NativeControlOutput, Error> {
     if target.locked {
-        return Err(Error::TableLocked { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::TableLocked { path },
+        ));
     }
     if before
         .as_ref()
         .is_some_and(|value| value.family() != family)
         || after.as_ref().is_some_and(|value| value.family() != family)
     {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     let model_component = source
         .state
@@ -1878,7 +1905,9 @@ fn rewrite_display_format(
         .iter()
         .filter(|(id, _)| *id == tile_id)
         .map(|(_, reference)| *reference);
-    let tile_identifier = tile_matches.next().ok_or(Error::CellNotFound)?;
+    let tile_identifier = tile_matches.next().ok_or(Error::Refused(
+        crate::package::table_cell_pop_up_menu::Refusal::CellNotFound,
+    ))?;
     if tile_matches.next().is_some() || tile_identifier == target.model_identifier {
         return Err(Error::InvalidSource { path });
     }
@@ -1937,7 +1966,9 @@ fn rewrite_display_format(
             cell.secondary_format_identifier()
         };
     if cell.control_cell_spec_identifier().is_some() {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     let explicit_flags = cell.explicit_format_flags();
     match (family, old_format, cell.cell_format_kind()) {
@@ -1956,7 +1987,9 @@ fn rewrite_display_format(
                 || (family == DisplayFormatFamily::Scientific
                     && !scientific_cell_type_matches_value(&cell))
             {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             }
         },
         (DisplayFormatFamily::DateTime, Some(identifier), Some(kind))
@@ -1967,7 +2000,9 @@ fn rewrite_display_format(
                 || explicit_flags != litchi_numbers_wire::EXPLICIT_DATE_TIME_FORMAT
                 || !cell.is_date_time_format_compatible()
             {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             }
         },
         (DisplayFormatFamily::Duration, Some(identifier), Some(kind))
@@ -1980,7 +2015,9 @@ fn rewrite_display_format(
                 || explicit_flags != expected_explicit
                 || !cell.is_duration_format_compatible()
             {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             }
         },
         (DisplayFormatFamily::Currency, Some(identifier), Some(kind))
@@ -1992,7 +2029,9 @@ fn rewrite_display_format(
                 || old_secondary.is_some_and(|identifier| identifier == 0)
                 || !currency_cell_type_matches_value(&cell, true)
             {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             }
         },
         (DisplayFormatFamily::Text, Some(identifier), Some(kind))
@@ -2011,7 +2050,9 @@ fn rewrite_display_format(
                 || metadata.text_identifier != Some(identifier)
                 || old_secondary != metadata.generic_identifier
             {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             }
         },
         (_, None, None)
@@ -2029,7 +2070,11 @@ fn rewrite_display_format(
                     || cell.is_date_time_format_compatible())
                 && (family != DisplayFormatFamily::Duration
                     || cell.is_duration_format_compatible()) => {},
-        _ => return Err(Error::UnsupportedDependency { path }),
+        _ => {
+            return Err(Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            ));
+        },
     }
     let format_table_identifier = store
         .format_table()
@@ -2038,7 +2083,9 @@ fn rewrite_display_format(
     if format_table_identifier == target.model_identifier
         || format_table_identifier == tile_identifier
     {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     popup::validate_selected_model_reference(source, target, format_table_identifier, path)?;
     native::require_exclusive_selected_model_reference(
@@ -2087,7 +2134,11 @@ fn rewrite_display_format(
             (tile_component_index, tile_identifier),
             (format_component_index, format_table_identifier),
         ])
-        .map_err(|_| Error::UnsupportedDependency { path })?;
+        .map_err(|_| {
+            Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            )
+        })?;
     let format_object = native::unique_object(format_archive, format_table_identifier, path)?;
     let format_message = native::unique_list_message(format_object, 2, budget, path)?;
     let format_message_index = format_message.message_index;
@@ -2382,7 +2433,7 @@ fn rewrite_display_format(
         }
         budget
             .charge_payload_bytes(archive_bytes.len(), path)
-            .map_err(|_| Error::LimitExceeded {
+            .map_err(|_| Error::Limit {
                 kind: super::table_cell_pop_up_menu::LimitKind::PayloadBytes,
                 observed: archive_bytes.len() as u64,
                 maximum: u64::MAX,
@@ -2441,7 +2492,9 @@ fn resolve_custom_cell_graph(
     .map_err(|error| native::map_storage_error(error, path))?;
     native::charge_storage_report(budget, store_report, path)?;
     if store.deprecated_custom_format_table().is_some() {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     let tile_options = budget.residual_storage_options(store.tiles());
     let mut tile_visitor = native::TileReferenceCollector::new(budget, path);
@@ -2463,7 +2516,9 @@ fn resolve_custom_cell_graph(
         .iter()
         .filter(|(id, _)| *id == tile_id)
         .map(|(_, reference)| *reference);
-    let tile_identifier = tile_matches.next().ok_or(Error::CellNotFound)?;
+    let tile_identifier = tile_matches.next().ok_or(Error::Refused(
+        crate::package::table_cell_pop_up_menu::Refusal::CellNotFound,
+    ))?;
     if tile_matches.next().is_some()
         || tile_identifier == target.model_identifier
         || tile_references.iter().any(|(_, reference)| *reference == 0)
@@ -2516,7 +2571,9 @@ fn resolve_custom_cell_graph(
     let cell = BncCell::parse(&cell_source).map_err(|_| Error::InvalidSource { path })?;
     native::validate_bnc_format_metadata(&cell_source, &cell, path)?;
     if cell.control_cell_spec_identifier().is_some() {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     let format_identifier = cell.format_identifier();
     if format_identifier.is_some_and(|identifier| identifier == 0) {
@@ -2530,12 +2587,16 @@ fn resolve_custom_cell_graph(
             // Converted Text retains a secondary Number edge.  It is not a
             // Custom owner shape; accepting it would require moving two
             // families and could strand the secondary key.
-            return Err(Error::UnsupportedDependency { path });
+            return Err(Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            ));
         }
     }
     if format_identifier.is_none() {
         if explicit_flags != 0 {
-            return Err(Error::UnsupportedDependency { path });
+            return Err(Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            ));
         }
     }
     let format_table_identifier = store
@@ -2545,7 +2606,9 @@ fn resolve_custom_cell_graph(
     if format_table_identifier == target.model_identifier
         || format_table_identifier == tile_identifier
     {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     popup::validate_selected_model_reference(source, target, format_table_identifier, path)?;
     if for_write {
@@ -2579,7 +2642,9 @@ fn resolve_custom_cell_graph(
     let (list_type, list_report) = format_type;
     native::charge_storage_report(budget, list_report, path)?;
     if list_type.list_type() != FORMAT_LIST_TYPE {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     let facts = native::list_facts(&format_payload, budget, path)?;
     let _ = facts
@@ -2628,8 +2693,9 @@ fn selected_custom_reference(
     if !entry.is_format || entry.ref_count == 0 || entry.payload.is_empty() {
         return Err(Error::InvalidSource { path });
     }
-    parse_custom_reference(&entry.payload, budget, path)?
-        .ok_or(Error::UnsupportedDependency { path })
+    parse_custom_reference(&entry.payload, budget, path)?.ok_or(Error::Refused(
+        crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+    ))
 }
 
 fn selected_custom_reference_payload(
@@ -2734,7 +2800,11 @@ fn validate_custom_graph_ownership(
             (graph.format_component_index, graph.format_table_identifier),
             (registry.component_index, registry.object_identifier),
         ])
-        .map_err(|_| Error::UnsupportedDependency { path })?;
+        .map_err(|_| {
+            Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            )
+        })?;
     Ok(())
 }
 
@@ -2747,7 +2817,9 @@ fn locate_custom_registry(
         .state
         .components
         .get_archive("Index/Document.iwa")
-        .ok_or(Error::UnsupportedSource)?;
+        .ok_or(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource,
+        ))?;
     let document_object = native::unique_object(document_archive, 1, path)?;
     let document_index =
         native::unique_message_index(document_object, DOCUMENT_MESSAGE_TYPE, path)?;
@@ -2798,7 +2870,11 @@ fn locate_custom_registry(
         (None, Some(registry_identifier)) => {
             (CustomRegistryRoute::LegacySuperField12, registry_identifier)
         },
-        (Some(_), Some(_)) => return Err(Error::UnsupportedDependency { path }),
+        (Some(_), Some(_)) => {
+            return Err(Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            ));
+        },
         (None, None) => return Err(Error::InvalidSource { path }),
     };
     let resolved = source
@@ -2823,7 +2899,9 @@ fn locate_custom_registry(
         .first()
         .ok_or(Error::InvalidSource { path })?;
     if message.type_ != CUSTOM_FORMAT_REGISTRY_MESSAGE_TYPE {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     for (other_component_index, component) in source.state.components.catalog().iter().enumerate() {
         for other in &component.archive().objects {
@@ -2838,7 +2916,11 @@ fn locate_custom_registry(
                 if candidate.type_ == message.type_
                     && parse_registry_shape(&candidate.data, budget, path).is_ok()
                 {
-                    return Err(Error::UnsupportedDependency { path });
+                    return Err(Error::Refused(
+                        crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency {
+                            path,
+                        },
+                    ));
                 }
             }
         }
@@ -3343,7 +3425,9 @@ fn parse_custom_archive(
         pre_type,
         CUSTOM_NUMBER_FORMAT_TYPE | CUSTOM_TEXT_FORMAT_TYPE | CUSTOM_DATE_TIME_FORMAT_TYPE
     ) {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     let declared_type = parse_optional_varint(&view, CUSTOM_FORMAT_TYPE_FIELD, path)?;
     if declared_type.is_some_and(|value| value != u64::from(pre_type)) {
@@ -3356,7 +3440,9 @@ fn parse_custom_archive(
         .filter(|field| field.number() == CUSTOM_FORMAT_CONDITION_FIELD)
         .count();
     if condition_count > crate::cell::data_format::custom::MAX_RULES {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     let mut conditions = Vec::new();
     if condition_count != 0 {
@@ -3411,7 +3497,9 @@ fn parse_custom_archive(
         },
         CUSTOM_TEXT_FORMAT_TYPE => {
             if !conditions.is_empty() {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             }
             let (prefix, suffix, includes_cell) =
                 split_custom_text_pattern(default_pattern, budget, path)?;
@@ -3425,13 +3513,17 @@ fn parse_custom_archive(
         },
         CUSTOM_DATE_TIME_FORMAT_TYPE => {
             if !conditions.is_empty() {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             }
             let pattern = DateTimePattern::from_owned(default_pattern)
                 .map_err(|_| Error::InvalidSource { path })?;
             Ok(Custom::DateTime(CustomDateTime::new(name, pattern)))
         },
-        _ => Err(Error::UnsupportedDependency { path }),
+        _ => Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        )),
     }
 }
 
@@ -3466,12 +3558,18 @@ fn parse_custom_condition(
         2 => Condition::LessThanOrEqualTo(threshold),
         3 => Condition::GreaterThan(threshold),
         4 => Condition::GreaterThanOrEqualTo(threshold),
-        _ => return Err(Error::UnsupportedDependency { path }),
+        _ => {
+            return Err(Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            ));
+        },
     };
     let format_payload = parse_required_bytes(&view, CUSTOM_CONDITION_FORMAT_FIELD, path)?;
     let (format_type, pattern) = parse_custom_pattern(format_payload, expected_type, budget, path)?;
     if format_type != expected_type {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     Ok((condition, pattern))
 }
@@ -3490,7 +3588,9 @@ fn parse_custom_pattern(
     )?)
     .map_err(|_| Error::InvalidSource { path })?;
     if format_type != expected_type {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     let pattern = parse_required_string(
         &view,
@@ -3506,7 +3606,9 @@ fn parse_custom_pattern(
     // belong to a different owner and are rejected.
     let show_thousands = parse_optional_bool(&view, 5, path)?;
     if expected_type != CUSTOM_NUMBER_FORMAT_TYPE && show_thousands.is_some_and(|value| value) {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     if parse_optional_bool(&view, 6, path)?.is_some_and(|value| value)
         || parse_optional_varint(&view, 11, path)?
@@ -3515,11 +3617,15 @@ fn parse_custom_pattern(
         || parse_optional_bool(&view, 20, path)?.is_some_and(|value| value)
         || parse_optional_bool(&view, 36, path)?.is_some_and(|value| value)
     {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     for field_number in [27_u32, 28, 29, 30, 34, 35] {
         if parse_optional_varint(&view, field_number, path)?.is_some_and(|value| value != 0) {
-            return Err(Error::UnsupportedDependency { path });
+            return Err(Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            ));
         }
     }
     // Numbers uses field 31 as a cached pattern index. Source-built Number
@@ -3539,13 +3645,17 @@ fn parse_custom_pattern(
                 .checked_sub(1)
                 .and_then(|index| u64::try_from(index).ok())
                 .ok_or(Error::InvalidSource { path }),
-            _ => Err(Error::UnsupportedDependency { path }),
+            _ => Err(Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            )),
         }?;
         if value != expected_index
             && (expected_type != CUSTOM_TEXT_FORMAT_TYPE
                 || Some(value) != custom_text_pattern_suffix_width(&pattern))
         {
-            return Err(Error::UnsupportedDependency { path });
+            return Err(Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            ));
         }
     }
     if let Some(contains_integer) = parse_optional_bool(&view, 37, path)? {
@@ -3563,7 +3673,9 @@ fn parse_custom_pattern(
             contains_integer == expected
         };
         if !valid {
-            return Err(Error::UnsupportedDependency { path });
+            return Err(Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            ));
         }
     }
     for field in view.fields() {
@@ -3575,7 +3687,9 @@ fn parse_custom_pattern(
         {
             continue;
         }
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     Ok((format_type, pattern))
 }
@@ -3602,7 +3716,9 @@ fn split_custom_text_pattern(
         return Ok((pattern, String::new(), false));
     };
     if suffix.contains(CUSTOM_TEXT_VALUE_TOKEN) {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     budget.charge_allocations(2, path)?;
     let mut prefix_owned = String::new();
@@ -4205,7 +4321,7 @@ fn custom_uuid_is_referenced(
                         .map_err(|error| native::map_storage_error(error, path))?;
                     native::charge_storage_report(budget, report, path)?;
                     if list_type.list_type() == CUSTOM_FORMAT_LIST_TYPE {
-                        return Err(Error::UnsupportedDependency { path });
+                        return Err(Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path }));
                     }
                     if list_type.list_type() != FORMAT_LIST_TYPE {
                         continue;
@@ -4239,7 +4355,7 @@ fn custom_uuid_is_referenced(
                         list_type.list_type(),
                         CUSTOM_FORMAT_LIST_TYPE | FORMAT_LIST_TYPE
                     ) {
-                        return Err(Error::UnsupportedDependency { path });
+                        return Err(Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path }));
                     }
                 }
             }
@@ -4285,10 +4401,14 @@ fn parse_custom_reference(
         if uuid_payload.is_none() {
             return Ok(None);
         }
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     if other_known {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     let uuid = parse_custom_uuid(
         uuid_payload.ok_or(Error::InvalidSource { path })?,
@@ -4309,7 +4429,9 @@ fn validate_custom_legacy_routes(
         .state
         .components
         .get_archive("Index/Document.iwa")
-        .ok_or(Error::UnsupportedSource)?;
+        .ok_or(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource,
+        ))?;
     let document_object = native::unique_object(document_archive, 1, path)?;
     let document_index =
         native::unique_message_index(document_object, DOCUMENT_MESSAGE_TYPE, path)?;
@@ -4329,10 +4451,16 @@ fn validate_custom_legacy_routes(
         let mut native_references = 0usize;
         for nested in legacy.fields() {
             match nested.number() {
-                7 => return Err(Error::UnsupportedDependency { path }),
+                7 => {
+                    return Err(Error::Refused(
+                        crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency {
+                            path,
+                        },
+                    ));
+                },
                 LEGACY_CUSTOM_REGISTRY_REFERENCE_FIELD => {
                     if !matches!(route, CustomRegistryRoute::LegacySuperField12) {
-                        return Err(Error::UnsupportedDependency { path });
+                        return Err(Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path }));
                     }
                     let nested_identifier = parse_custom_registry_reference(nested, path)?;
                     if nested_identifier != registry_identifier {
@@ -4368,7 +4496,11 @@ fn validate_custom_legacy_routes(
                 .map_err(|error| native::map_storage_error(error, path))?;
                 native::charge_storage_report(budget, report, path)?;
                 if store.deprecated_custom_format_table().is_some() {
-                    return Err(Error::UnsupportedDependency { path });
+                    return Err(Error::Refused(
+                        crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency {
+                            path,
+                        },
+                    ));
                 }
             }
         }
@@ -4617,7 +4749,9 @@ fn prepare_display_rewrite(
     match family {
         DisplayFormatFamily::Number => {
             let NativeDisplayValue::Number(value) = value else {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             };
             let prepared = number_codec::prepare_number_format_rewrite(
                 source,
@@ -4633,7 +4767,9 @@ fn prepare_display_rewrite(
         },
         DisplayFormatFamily::Currency => {
             let NativeDisplayValue::Currency(value) = value else {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             };
             let code = value.code();
             let prepared = currency_codec::prepare_currency_format_rewrite(
@@ -4652,7 +4788,9 @@ fn prepare_display_rewrite(
         },
         DisplayFormatFamily::Percentage => {
             let NativeDisplayValue::Percentage(value) = value else {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             };
             let prepared = percentage_codec::prepare_percentage_format_rewrite(
                 source,
@@ -4668,7 +4806,9 @@ fn prepare_display_rewrite(
         },
         DisplayFormatFamily::Scientific => {
             let NativeDisplayValue::Scientific(value) = value else {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             };
             let prepared = scientific_codec::prepare_scientific_format_rewrite(
                 source,
@@ -4682,7 +4822,9 @@ fn prepare_display_rewrite(
         },
         DisplayFormatFamily::Fraction => {
             let NativeDisplayValue::Fraction(value) = value else {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             };
             let prepared = fraction_codec::prepare_fraction_format_rewrite(
                 source,
@@ -4696,7 +4838,9 @@ fn prepare_display_rewrite(
         },
         DisplayFormatFamily::DateTime => {
             let NativeDisplayValue::DateTime(value) = value else {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             };
             let prepared = date_time_codec::prepare_date_time_format_rewrite(
                 source,
@@ -4708,7 +4852,9 @@ fn prepare_display_rewrite(
         },
         DisplayFormatFamily::Duration => {
             let NativeDisplayValue::Duration(value) = value else {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             };
             let prepared = duration_codec::prepare_duration_format_rewrite(
                 source,
@@ -4720,7 +4866,9 @@ fn prepare_display_rewrite(
         },
         DisplayFormatFamily::Text => {
             let NativeDisplayValue::Text(_) = value else {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             };
             let prepared = text_codec::prepare_text_format_rewrite(
                 source,
@@ -4744,7 +4892,9 @@ fn prepare_display_append(
     match family {
         DisplayFormatFamily::Number => {
             let NativeDisplayValue::Number(value) = value else {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             };
             let prepared = number_codec::prepare_number_format_write(
                 number_codec::NumberFormatWrite::new(
@@ -4759,7 +4909,9 @@ fn prepare_display_append(
         },
         DisplayFormatFamily::Currency => {
             let NativeDisplayValue::Currency(value) = value else {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             };
             let code = value.code();
             let prepared = currency_codec::prepare_currency_format_write(
@@ -4777,7 +4929,9 @@ fn prepare_display_append(
         },
         DisplayFormatFamily::Percentage => {
             let NativeDisplayValue::Percentage(value) = value else {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             };
             let prepared = percentage_codec::prepare_percentage_format_write(
                 percentage_codec::PercentageFormatWrite::new(
@@ -4792,7 +4946,9 @@ fn prepare_display_append(
         },
         DisplayFormatFamily::Scientific => {
             let NativeDisplayValue::Scientific(value) = value else {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             };
             let prepared = scientific_codec::prepare_scientific_format_write(
                 scientific_codec::ScientificFormatWrite::new(u32::from(
@@ -4805,7 +4961,9 @@ fn prepare_display_append(
         },
         DisplayFormatFamily::Fraction => {
             let NativeDisplayValue::Fraction(value) = value else {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             };
             let prepared = fraction_codec::prepare_fraction_format_write(
                 fraction_codec::FractionFormatWrite::new(native_fraction_accuracy(
@@ -4818,7 +4976,9 @@ fn prepare_display_append(
         },
         DisplayFormatFamily::DateTime => {
             let NativeDisplayValue::DateTime(value) = value else {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             };
             let prepared = date_time_codec::prepare_date_time_format_write(
                 date_time_codec::DateTimeFormatWrite::new(value.pattern()),
@@ -4829,7 +4989,9 @@ fn prepare_display_append(
         },
         DisplayFormatFamily::Duration => {
             let NativeDisplayValue::Duration(value) = value else {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             };
             let prepared = duration_codec::prepare_duration_format_write(
                 duration_format_write(value),
@@ -4840,7 +5002,9 @@ fn prepare_display_append(
         },
         DisplayFormatFamily::Text => {
             let NativeDisplayValue::Text(_) = value else {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             };
             let prepared =
                 text_codec::prepare_text_format_write(text_codec::TextFormatWrite::new(), options)
@@ -5192,7 +5356,9 @@ fn execute_text_rewrite(
 
 fn display_read_error_to_write_error(error: DisplayReadError, path: Path) -> Error {
     match error {
-        DisplayReadError::WrongFormatFamily => Error::UnsupportedDependency { path },
+        DisplayReadError::WrongFormatFamily => Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ),
         DisplayReadError::Native(error) => error,
     }
 }
@@ -5353,7 +5519,9 @@ pub(super) fn read_custom_format_with_budget(
                     return Err(CustomFormatReadError::WrongFormatFamily);
                 }
             },
-            Err(Error::UnsupportedDependency { .. }) => {
+            Err(Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { .. },
+            )) => {
                 return Err(CustomFormatReadError::WrongFormatFamily);
             },
             Err(error) => return Err(CustomFormatReadError::Native(error)),
@@ -5362,7 +5530,9 @@ pub(super) fn read_custom_format_with_budget(
     }
     let reference = match selected_custom_reference(&graph, format_identifier, path, budget) {
         Ok(reference) => reference,
-        Err(Error::UnsupportedDependency { .. }) => {
+        Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { .. },
+        )) => {
             return Err(CustomFormatReadError::WrongFormatFamily);
         },
         Err(error) => return Err(CustomFormatReadError::Native(error)),
@@ -5411,11 +5581,15 @@ pub(super) fn rewrite_custom_format(
     budget: &mut TransactionBudget,
 ) -> Result<native::NativeControlOutput, Error> {
     if target.locked {
-        return Err(Error::TableLocked { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::TableLocked { path },
+        ));
     }
     if let (Some(before), Some(after)) = (before, after) {
         if custom_format_type(before) != custom_format_type(after) {
-            return Err(Error::UnsupportedDependency { path });
+            return Err(Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            ));
         }
     }
     let graph = resolve_custom_cell_graph(source, target, path, true, budget)?;
@@ -5450,13 +5624,17 @@ pub(super) fn rewrite_custom_format(
                     graph.explicit_flags,
                 )
             {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             }
             Some(format.clone())
         }
     } else {
         if graph.explicit_flags != 0 {
-            return Err(Error::UnsupportedDependency { path });
+            return Err(Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            ));
         }
         None
     };

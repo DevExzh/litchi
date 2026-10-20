@@ -15,6 +15,7 @@ use std::error::Error as StdError;
 use std::sync::Arc;
 use std::thread;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{
     decode_varint_from_bytes,
@@ -26,10 +27,9 @@ use litchi_iwa_protos::{
 };
 use litchi_pages::table::hidden_axes::{AxisIndex, HiddenAxes};
 use litchi_pages::{
-    table::hidden_axes::transaction::Error as Error, table::hidden_axes::transaction::LimitKind as BodyTableHiddenAxesLimitKind, BodyTableSelector,
-    Package, PackageError,
+    BodyTableSelector, Package, PackageError, table::hidden_axes::transaction::Error,
+    table::hidden_axes::transaction::LimitKind as BodyTableHiddenAxesLimitKind,
 };
-use litchi_iwa_archive::Limits;
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -1744,7 +1744,12 @@ fn exercise_aggregate_owner_creation(descriptor: &[u8]) {
         .set(requested.clone())
         .commit();
     if !cross {
-        assert!(matches!(result, Err(Error::UnsupportedDependency)));
+        assert!(matches!(
+            result,
+            Err(Error::Refused(
+                litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+            ))
+        ));
         assert_eq!(package.exact_bytes(), source.as_slice());
         return;
     }
@@ -1798,8 +1803,11 @@ fn exercise_native_existing_owner(descriptor: &[u8]) {
         2 * 1024 * 1024,
     )
     .expect("finite native fixture limits");
-    let package = Package::from_bytes_with_options(source, litchi_pages::OpenOptions::new().__archive_limits(limits))
-        .expect("qualified native hidden-axis source");
+    let package = Package::from_bytes_with_options(
+        source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )
+    .expect("qualified native hidden-axis source");
     let before = package.body_table_hidden_axes(0usize).expect("native read");
     let expected_before = if starts_hidden {
         HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)]).expect("native axes")
@@ -1839,7 +1847,11 @@ fn exercise_native_existing_owner(descriptor: &[u8]) {
         package.text().expect("source text")
     );
     let target_bytes = commit.package().exact_bytes();
-    let reopened = Package::from_bytes_with_options(&target_bytes, litchi_pages::OpenOptions::new().__archive_limits(limits)).expect("native reopen");
+    let reopened = Package::from_bytes_with_options(
+        &target_bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )
+    .expect("native reopen");
     assert_eq!(
         reopened
             .body_table_hidden_axes(0usize)
@@ -2186,11 +2198,16 @@ fn exercise_primary(source: &[u8], descriptor: &[u8]) {
                 "valid descriptor edit unexpectedly rejected: {error}"
             );
             if indexed_ownerless_nonempty_set {
-                assert_eq!(error, Error::UnsupportedDependency);
+                assert_eq!(error, Error::Refused(litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency));
             } else if selected_index == 0 && flags & 0x08 != 0 {
-                assert_eq!(error, Error::TableLocked);
+                assert_eq!(
+                    error,
+                    Error::Refused(
+                        litchi_pages::table::hidden_axes::transaction::Refusal::TableLocked
+                    )
+                );
             } else {
-                assert_eq!(error, Error::UnsupportedDependency);
+                assert_eq!(error, Error::Refused(litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency));
             }
             black_box(error);
             return;
@@ -3456,9 +3473,14 @@ fn exercise_malformed(source: &[u8], descriptor: &[u8]) {
                 Err(error) => {
                     assert_eq!(package.exact_bytes(), before);
                     if flags & 0x08 != 0 {
-                        assert_eq!(error, Error::TableLocked);
+                        assert_eq!(
+                            error,
+                            Error::Refused(
+                                litchi_pages::table::hidden_axes::transaction::Refusal::TableLocked
+                            )
+                        );
                     } else if flags & 0x06 != 0 {
-                        assert_eq!(error, Error::UnsupportedDependency);
+                        assert_eq!(error, Error::Refused(litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency));
                     } else {
                         panic!("metadata non-creation edit unexpectedly rejected: {error:?}");
                     }
@@ -3565,7 +3587,7 @@ fn assert_precise_malformed_error(mode: u8, error: Error) {
         assert!(
             matches!(
                 error,
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: BodyTableHiddenAxesLimitKind::WireFields,
                     ..
                 }
@@ -3575,8 +3597,12 @@ fn assert_precise_malformed_error(mode: u8, error: Error) {
         return;
     }
     let expected = match mode {
-        MODE_DUPLICATE_NAME => Error::AmbiguousTableName,
-        MODE_FILTER_METADATA => Error::UnsupportedDependency,
+        MODE_DUPLICATE_NAME => Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::AmbiguousTableName,
+        ),
+        MODE_FILTER_METADATA => Error::Refused(
+            litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
+        ),
         _ => Error::InvalidSource,
     };
     assert_eq!(
@@ -3590,7 +3616,7 @@ fn assert_metadata_edit_error(mode: u8, error: Error) {
         MODE_METADATA_WATERMARK_NEAR_MAX => assert!(
             matches!(
                 error,
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: BodyTableHiddenAxesLimitKind::PayloadObjects,
                     ..
                 }
@@ -3633,7 +3659,10 @@ fn exercise_data_dependent_limits(source: &[u8], descriptor: &[u8]) {
         FIXTURE_STREAM_CEILING,
     )
     .unwrap_or_else(|error| panic!("bounded limit profile must be valid: {error}"));
-    let package = match Package::from_bytes_with_options(source, litchi_pages::OpenOptions::new().__archive_limits(limits)) {
+    let package = match Package::from_bytes_with_options(
+        source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    ) {
         Ok(package) => {
             assert!(
                 maximum >= source_length,
@@ -3708,7 +3737,10 @@ fn exercise_limit_boundaries(source: &[u8]) {
             FIXTURE_STREAM_CEILING,
         )
         .unwrap_or_else(|error| panic!("limit-boundary profile must be valid: {error}"));
-        let package = match Package::from_bytes_with_options(source, litchi_pages::OpenOptions::new().__archive_limits(limits)) {
+        let package = match Package::from_bytes_with_options(
+            source,
+            litchi_pages::OpenOptions::new().__archive_limits(limits),
+        ) {
             Ok(package) => {
                 assert!(
                     maximum >= length,
@@ -3975,10 +4007,7 @@ fn nested_codec_options(source: &[u8]) -> hidden_codec::DecodeOptions {
 
 fn assert_resource_error(error: Error) {
     assert!(
-        matches!(
-            error,
-            Error::LimitExceeded { .. } | Error::Allocation { .. }
-        ),
+        matches!(error, Error::Limit { .. } | Error::Allocation { .. }),
         "valid bounded read returned an unexpected error: {error:?}"
     );
 }
@@ -3987,11 +4016,17 @@ fn assert_resource_or_expected_edit_error(error: Error) {
     assert!(
         matches!(
             error,
-            Error::LimitExceeded { .. }
+            Error::Limit { .. }
                 | Error::Allocation { .. }
-                | Error::TableLocked
-                | Error::UnsupportedDependency
-                | Error::UnsupportedSource
+                | Error::Refused(
+                    litchi_pages::table::hidden_axes::transaction::Refusal::TableLocked
+                )
+                | Error::Refused(
+                    litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
+                )
+                | Error::Refused(
+                    litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedSource
+                )
         ),
         "valid bounded edit returned an unexpected error: {error:?}"
     );

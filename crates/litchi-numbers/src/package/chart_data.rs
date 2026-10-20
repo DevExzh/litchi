@@ -75,6 +75,39 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The rooted graph or selected payload is malformed.
+    #[error("the Numbers chart-data source is invalid")]
+    InvalidSource,
+    /// A finite operation budget was exceeded.
+    #[error("Numbers chart data {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource that exceeded its ceiling.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded temporary allocation failed.
+    #[error("could not allocate {amount} units for Numbers chart data")]
+    Allocation { amount: usize },
+    /// The patch was created from another exact package artifact.
+    #[error("the Numbers chart-data patch does not match the exact source package")]
+    PatchConflict,
+    /// Candidate reopening or semantic readback did not reproduce the target.
+    #[error("the edited Numbers chart data failed semantic verification")]
+    Verification,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The package does not retain a supported physical source.
     #[error("this Numbers source does not support chart data reads")]
     UnsupportedSource,
@@ -96,31 +129,34 @@ pub enum Error {
     /// No chart matched the requested position.
     #[error("the selected Numbers sheet has no chart at position {position:?}")]
     ChartPositionNotFound { position: Position },
-    /// The rooted graph or selected payload is malformed.
-    #[error("the Numbers chart-data source is invalid")]
-    InvalidSource,
-    /// A finite operation budget was exceeded.
-    #[error("Numbers chart data {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource that exceeded its ceiling.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded temporary allocation failed.
-    #[error("could not allocate {amount} units for Numbers chart data")]
-    Allocation { amount: usize },
     /// Chart-data writes must preserve the source axes and rectangular shape.
     #[error("Numbers chart-data edits must preserve the existing labels and dimensions")]
     ShapeMismatch,
-    /// The patch was created from another exact package artifact.
-    #[error("the Numbers chart-data patch does not match the exact source package")]
-    PatchConflict,
-    /// Candidate reopening or semantic readback did not reproduce the target.
-    #[error("the edited Numbers chart data failed semantic verification")]
-    Verification,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::UnsupportedDependency { .. }
+            | Self::ShapeMismatch { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. } | Self::EmptySheetName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SheetNameNotFound { .. }
+            | Self::SheetPositionNotFound { .. }
+            | Self::ChartPositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 impl Package {
@@ -321,22 +357,32 @@ fn own_values(
 
 pub(super) fn map_arrangement_error(error: ChartArrangementError) -> Error {
     match error {
-        ChartArrangementError::UnsupportedSource => Error::UnsupportedSource,
-        ChartArrangementError::UnsupportedDependency => Error::UnsupportedDependency,
-        ChartArrangementError::AmbiguousSelector => Error::AmbiguousSelector,
-        ChartArrangementError::EmptySheetName => Error::EmptySheetName,
-        ChartArrangementError::SheetNameNotFound => Error::SheetNameNotFound,
-        ChartArrangementError::SheetPositionNotFound { position } => {
-            Error::SheetPositionNotFound { position }
+        ChartArrangementError::Refused(chart_arrangement::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
         },
-        ChartArrangementError::ChartPositionNotFound { position } => {
-            Error::ChartPositionNotFound { position }
+        ChartArrangementError::Refused(chart_arrangement::Refusal::UnsupportedDependency) => {
+            Error::Refused(Refusal::UnsupportedDependency)
         },
-        ChartArrangementError::LimitExceeded {
+        ChartArrangementError::Refused(chart_arrangement::Refusal::AmbiguousSelector) => {
+            Error::Refused(Refusal::AmbiguousSelector)
+        },
+        ChartArrangementError::Refused(chart_arrangement::Refusal::EmptySheetName) => {
+            Error::Refused(Refusal::EmptySheetName)
+        },
+        ChartArrangementError::Refused(chart_arrangement::Refusal::SheetNameNotFound) => {
+            Error::Refused(Refusal::SheetNameNotFound)
+        },
+        ChartArrangementError::Refused(chart_arrangement::Refusal::SheetPositionNotFound {
+            position,
+        }) => Error::Refused(Refusal::SheetPositionNotFound { position }),
+        ChartArrangementError::Refused(chart_arrangement::Refusal::ChartPositionNotFound {
+            position,
+        }) => Error::Refused(Refusal::ChartPositionNotFound { position }),
+        ChartArrangementError::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_arrangement_limit_kind(kind),
             observed,
             maximum,
@@ -381,7 +427,7 @@ pub(super) fn map_codec_limit(error: &codec::DecodeError) -> Option<Error> {
         codec::DecodeLimit::Text { observed, maximum } => (LimitKind::TextBytes, observed, maximum),
         _ => return None,
     };
-    Some(Error::LimitExceeded {
+    Some(Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,

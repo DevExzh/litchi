@@ -382,72 +382,41 @@ impl EditError {
         })
     }
 
-    /// The unified code: selectors that match nothing are `path_not_found`,
-    /// refused values `invalid_value`, locked tables `document_protected`,
-    /// native shapes the leaf does not rewrite `unsupported_capability`.
+    /// The unified code: a refusal reports its kind's code (record 0351
+    /// §2.4, record 0361), a configured budget `limit_exceeded`, a malformed
+    /// source or a patch for another base `invalid_input`, the rest
+    /// `internal_error`.
     pub(crate) fn code(&self) -> Code {
-        macro_rules! common {
-            ($error:expr, $module:path, { $($arm:tt)* }) => {{
+        macro_rules! family {
+            ($error:expr, $module:path) => {{
                 use $module as E;
                 match $error {
-                    E::SheetNotFound => Code::PathNotFound,
-                    E::LimitExceeded { .. } => Code::LimitExceeded,
-                    E::UnsupportedSource { .. } => Code::UnsupportedCapability,
+                    E::Refused(refusal) => crate::error::refusal_code(refusal.kind()),
+                    E::Limit { .. } => Code::LimitExceeded,
                     E::InvalidSource { .. } | E::PatchConflict => Code::InvalidInput,
-                    $($arm)*
                     _ => Code::InternalError,
                 }
             }};
         }
         match self {
-            Self::Names(error) => common!(error, litchi_numbers::names::Error, {
-                E::TableNotFound => Code::PathNotFound,
-                E::InvalidName { .. } => Code::InvalidValue,
-                E::DuplicateName { .. } | E::DuplicateTarget { .. } => Code::InvalidValue,
-                E::TableLocked { .. } => Code::DocumentProtected,
-                E::UnsupportedDependency { .. } => Code::UnsupportedCapability,
-            }),
-            Self::Order(error) => common!(error, litchi_numbers::sheet::order::Error, {
-                E::DestinationOutOfRange { .. } => Code::OutOfRange,
-            }),
-            Self::Relocation(error) => common!(error, litchi_numbers::table::relocation::Error, {
-                E::TableNotFound => Code::PathNotFound,
-                E::TableLocked { .. } => Code::DocumentProtected,
-                E::DuplicateTableName { .. } => Code::InvalidValue,
-            }),
-            Self::Merges(error) => {
-                common!(error, litchi_numbers::table::merge::transaction::Error, {
-                    E::TableNotFound => Code::PathNotFound,
-                    E::AmbiguousSelector => Code::InvalidPath,
-                    E::OverlappingRegion | E::InvalidRegion => Code::InvalidValue,
-                })
+            Self::Names(error) => family!(error, litchi_numbers::names::Error),
+            Self::Order(error) => family!(error, litchi_numbers::sheet::order::Error),
+            Self::Relocation(error) => family!(error, litchi_numbers::table::relocation::Error),
+            Self::Merges(error) => family!(error, litchi_numbers::table::merge::transaction::Error),
+            Self::NumberFormat(error) => {
+                family!(
+                    error,
+                    litchi_numbers::cell::data_format::number::transaction::Error
+                )
             },
-            Self::NumberFormat(error) => common!(
-                error,
-                litchi_numbers::cell::data_format::number::transaction::Error,
-                {
-                    E::TableNotFound => Code::PathNotFound,
-                    E::CellNotFound => Code::PathNotFound,
-                    E::TableLocked { .. } => Code::DocumentProtected,
-                    E::WrongFormatFamily { .. } | E::UnsupportedDependency { .. } => {
-                        Code::UnsupportedCapability
-                    },
-                }
-            ),
-            Self::PercentageFormat(error) => common!(
-                error,
-                litchi_numbers::cell::data_format::percentage::transaction::Error,
-                {
-                    E::TableNotFound => Code::PathNotFound,
-                    E::CellNotFound => Code::PathNotFound,
-                    E::TableLocked { .. } => Code::DocumentProtected,
-                    E::WrongFormatFamily { .. } | E::UnsupportedDependency { .. } => {
-                        Code::UnsupportedCapability
-                    },
-                }
-            ),
+            Self::PercentageFormat(error) => {
+                family!(
+                    error,
+                    litchi_numbers::cell::data_format::percentage::transaction::Error
+                )
+            },
             Self::Formula(error) => match error {
-                litchi_numbers::formula::Error::LimitExceeded { .. } => Code::LimitExceeded,
+                litchi_numbers::formula::Error::Limit { .. } => Code::LimitExceeded,
                 litchi_numbers::formula::Error::UnsupportedFunction => Code::UnsupportedCapability,
                 _ => Code::InvalidValue,
             },
@@ -456,88 +425,27 @@ impl EditError {
                 | litchi_numbers::create::Error::IdentityNotDistinct => Code::InvalidArgument,
                 _ => Code::InternalError,
             },
-            Self::SheetLifecycle(error) => {
-                use litchi_numbers::sheet::lifecycle::Error as E;
-                match error {
-                    E::SheetNotFound => Code::PathNotFound,
-                    E::InvalidName { .. } => Code::InvalidValue,
-                    E::LastSheet => Code::InvalidArgument,
-                    E::SheetNotEmpty | E::UnsupportedDependency | E::UnsupportedSource => {
-                        Code::UnsupportedCapability
-                    },
-                    E::LimitExceeded { .. } => Code::LimitExceeded,
-                    E::InvalidSource | E::PatchConflict => Code::InvalidInput,
-                    _ => Code::InternalError,
-                }
+            // Removing the final sheet or table axis is a caller argument
+            // error, as for PPTX `SlideRemovalRefusal::FinalSlide`.
+            Self::SheetLifecycle(litchi_numbers::sheet::lifecycle::Error::Refused(
+                litchi_numbers::sheet::lifecycle::Refusal::LastSheet,
+            ))
+            | Self::Topology(litchi_numbers::table::topology::Error::Refused(
+                litchi_numbers::table::topology::Refusal::LastAxis,
+            )) => Code::InvalidArgument,
+            Self::SheetLifecycle(error) => family!(error, litchi_numbers::sheet::lifecycle::Error),
+            Self::TableLifecycle(error) => family!(error, litchi_numbers::table::lifecycle::Error),
+            Self::TableOrder(error) => family!(error, litchi_numbers::table::order::Error),
+            Self::Topology(error) => match error {
+                // A cell clear inside a topology edit reports the cell
+                // transaction's own code.
+                litchi_numbers::table::topology::Error::Refused(
+                    litchi_numbers::table::topology::Refusal::CellClear { error },
+                ) => cells_error(*error).code(),
+                _ => family!(error, litchi_numbers::table::topology::Error),
             },
-            Self::TableLifecycle(error) => {
-                use litchi_numbers::table::lifecycle::Error as E;
-                match error {
-                    E::SheetNotFound | E::TableNotFound => Code::PathNotFound,
-                    E::InvalidName { .. } | E::InvalidSize { .. } => Code::InvalidValue,
-                    E::NoTemplate | E::UnsupportedDependency | E::UnsupportedSource => {
-                        Code::UnsupportedCapability
-                    },
-                    E::LimitExceeded { .. } => Code::LimitExceeded,
-                    E::InvalidSource | E::PatchConflict => Code::InvalidInput,
-                    _ => Code::InternalError,
-                }
-            },
-            Self::TableOrder(error) => {
-                use litchi_numbers::table::order::Error as E;
-                match error {
-                    E::SheetNotFound | E::TableNotFound => Code::PathNotFound,
-                    E::DestinationOutOfRange { .. } => Code::OutOfRange,
-                    E::UnsupportedDependency | E::UnsupportedSource => Code::UnsupportedCapability,
-                    E::LimitExceeded { .. } => Code::LimitExceeded,
-                    E::InvalidSource | E::PatchConflict => Code::InvalidInput,
-                    _ => Code::InternalError,
-                }
-            },
-            Self::Topology(error) => {
-                use litchi_numbers::table::topology::Error as E;
-                match error {
-                    E::SheetNotFound | E::TableNotFound => Code::PathNotFound,
-                    E::PositionOutOfRange { .. } => Code::OutOfRange,
-                    E::SectionFull | E::LastAxis => Code::InvalidArgument,
-                    E::Unsupported { .. } | E::UnsupportedDependency | E::UnsupportedSource => {
-                        Code::UnsupportedCapability
-                    },
-                    E::CellClear { error } => cells_error(*error).code(),
-                    E::LimitExceeded { .. } => Code::LimitExceeded,
-                    E::InvalidSource | E::PatchConflict => Code::InvalidInput,
-                    _ => Code::InternalError,
-                }
-            },
-            Self::TextStyle(error) => {
-                use litchi_numbers::cell::text_style::Error as E;
-                match error {
-                    E::SheetNotFound | E::TableNotFound | E::CellNotFound => Code::PathNotFound,
-                    E::EmptyStyle => Code::InvalidArgument,
-                    E::EmptyCell | E::UnsupportedDependency | E::UnsupportedSource => {
-                        Code::UnsupportedCapability
-                    },
-                    E::LimitExceeded { .. } => Code::LimitExceeded,
-                    E::InvalidSource | E::PatchConflict => Code::InvalidInput,
-                    _ => Code::InternalError,
-                }
-            },
-            Self::Comment(error) => {
-                use litchi_numbers::cell::comment::Error as E;
-                match error {
-                    E::SheetNotFound | E::TableNotFound | E::CommentNotFound { .. } => {
-                        Code::PathNotFound
-                    },
-                    E::InvalidAddress => Code::InvalidPath,
-                    E::OutOfBounds { .. } => Code::OutOfRange,
-                    E::UnsupportedDependency { .. } | E::UnsupportedSource => {
-                        Code::UnsupportedCapability
-                    },
-                    E::LimitExceeded { .. } => Code::LimitExceeded,
-                    E::InvalidSource { .. } | E::PatchConflict => Code::InvalidInput,
-                    _ => Code::InternalError,
-                }
-            },
+            Self::TextStyle(error) => family!(error, litchi_numbers::cell::text_style::Error),
+            Self::Comment(error) => family!(error, litchi_numbers::cell::comment::Error),
         }
     }
 }

@@ -227,9 +227,9 @@ impl MergeReader {
     ///
     /// # Errors
     ///
-    /// Returns [`TableMergesError::SheetNotFound`],
-    /// [`TableMergesError::TableNotFound`], or
-    /// [`TableMergesError::AmbiguousSelector`] for selector failures, and a
+    /// Returns [`crate::table::merge::transaction::Refusal::SheetNotFound`],
+    /// [`crate::table::merge::transaction::Refusal::TableNotFound`], or
+    /// [`crate::table::merge::transaction::Refusal::AmbiguousSelector`] for selector failures, and a
     /// typed source or resource error for malformed selected metadata.
     pub fn table_merges<'sheet, 'table>(
         &self,
@@ -266,9 +266,12 @@ fn select_metadata_positions(
     table_selector: TableSelector<'_>,
     budget: &mut Budget,
 ) -> Result<(usize, usize), TableMergesError> {
-    let document_archive = components
-        .get_archive("Index/Document.iwa")
-        .ok_or(TableMergesError::UnsupportedSource)?;
+    let document_archive =
+        components
+            .get_archive("Index/Document.iwa")
+            .ok_or(TableMergesError::Refused(
+                crate::package::table_merges::Refusal::UnsupportedSource,
+            ))?;
     budget.charge_work(document_archive.objects.len())?;
     let document = document_archive
         .object(1)
@@ -311,15 +314,18 @@ fn select_metadata_positions(
                 return Ok(());
             }
             if selected_sheet.is_some() {
-                return Err(TableMergesError::AmbiguousSelector);
+                return Err(TableMergesError::Refused(
+                    crate::package::table_merges::Refusal::AmbiguousSelector,
+                ));
             }
         }
         require_declared_reference(document, document_index, sheet_identifier, &[1], budget)?;
         selected_sheet = Some((sheet_position, sheet_identifier));
         Ok(())
     })?;
-    let (sheet_position, sheet_identifier) =
-        selected_sheet.ok_or(TableMergesError::SheetNotFound)?;
+    let (sheet_position, sheet_identifier) = selected_sheet.ok_or(TableMergesError::Refused(
+        crate::package::table_merges::Refusal::SheetNotFound,
+    ))?;
     ensure_single_document_sheet_edge(&document_message.data, sheet_identifier, budget)?;
 
     let table_position =
@@ -352,7 +358,7 @@ fn map_names_error(error: numbers_names_codec::DecodeError) -> TableMergesError 
             limit(TableMergesLimitKind::WireBytes, observed, maximum)
         },
         Some(numbers_names_codec::WireResourceLimit::Nesting { observed, maximum }) => {
-            TableMergesError::LimitExceeded {
+            TableMergesError::Limit {
                 kind: TableMergesLimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -468,7 +474,9 @@ fn select_metadata_table(
                         return Ok(());
                     }
                     if selected.is_some() {
-                        return Err(TableMergesError::AmbiguousSelector);
+                        return Err(TableMergesError::Refused(
+                            crate::package::table_merges::Refusal::AmbiguousSelector,
+                        ));
                     }
                     selected = Some(table_position);
                     selected_drawable = Some(drawable_identifier);
@@ -477,7 +485,9 @@ fn select_metadata_table(
             Ok(())
         },
     )?;
-    let selected = selected.ok_or(TableMergesError::TableNotFound)?;
+    let selected = selected.ok_or(TableMergesError::Refused(
+        crate::package::table_merges::Refusal::TableNotFound,
+    ))?;
     let selected_drawable = selected_drawable.ok_or(TableMergesError::InvalidSource)?;
     ensure_single_table_info_edge(
         sheet_message.type_,

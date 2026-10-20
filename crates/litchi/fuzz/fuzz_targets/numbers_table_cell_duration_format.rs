@@ -20,8 +20,7 @@ use std::{
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    At, Package, Error as PackageError,
-    SheetSelector, TableSelector,
+    At, Error as PackageError, Package, SheetSelector, TableSelector,
     cell::data_format::{
         Duration,
         duration::{Style, Unit, UnitRange, Units},
@@ -107,14 +106,29 @@ fuzz_target!(|data: &[u8]| {
 fn options() -> litchi::numbers::OpenOptions {
     static OPTIONS: OnceLock<litchi::numbers::OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = litchi::numbers::SourceLimits::builder().max_input_bytes(MAX_INPUT_BYTES).and_then(|b| b.max_members(MAX_ENTRIES)).and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES)).and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES)).and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES)).and_then(|b| b.build())
-        .unwrap_or_else(|error| unreachable!("valid Duration archive limits: {error}"));
-        let semantic =
-            litchi::numbers::SemanticLimits::builder().max_objects(MAX_OBJECTS).and_then(|b| b.max_sheets(MAX_SHEETS)).and_then(|b| b.max_tables(MAX_TABLES)).and_then(|b| b.max_references(MAX_REFERENCES)).and_then(|b| b.build())
-                .unwrap_or_else(|error| unreachable!("valid Duration semantic limits: {error}"))
-                .to_builder().max_materialized_cells(MAX_MATERIALIZED_CELLS).and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES)).and_then(|b| b.build())
-                .unwrap_or_else(|error| unreachable!("valid Duration projection limits: {error}"));
-        litchi::numbers::OpenOptions::new().source_limits(archive).semantic_limits(semantic)
+        let archive = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|b| b.max_members(MAX_ENTRIES))
+            .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Duration archive limits: {error}"));
+        let semantic = litchi::numbers::SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|b| b.max_sheets(MAX_SHEETS))
+            .and_then(|b| b.max_tables(MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Duration semantic limits: {error}"))
+            .to_builder()
+            .max_materialized_cells(MAX_MATERIALIZED_CELLS)
+            .and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Duration projection limits: {error}"));
+        litchi::numbers::OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -423,7 +437,7 @@ fn exercise_wrong_family(package: &Package, position: At) {
     assert!(
         matches!(
             read,
-            Err(litchi::numbers::cell::data_format::duration::transaction::Error::WrongFormatFamily { .. })
+            Err(litchi::numbers::cell::data_format::duration::transaction::Error::Refused(litchi::numbers::cell::data_format::duration::transaction::Refusal::WrongFormatFamily { .. }))
         ),
         "non-Duration cell must be refused by the Duration API: {read:?}"
     );
@@ -431,7 +445,7 @@ fn exercise_wrong_family(package: &Package, position: At) {
     assert!(
         matches!(
             edit,
-            Err(litchi::numbers::cell::data_format::duration::transaction::Error::WrongFormatFamily { .. })
+            Err(litchi::numbers::cell::data_format::duration::transaction::Error::Refused(litchi::numbers::cell::data_format::duration::transaction::Refusal::WrongFormatFamily { .. }))
         ),
         "non-Duration edit must be refused by the Duration API: {edit:?}"
     );
@@ -1147,9 +1161,16 @@ fn exercise_input_limit() {
 fn exercise_semantic_limit() {
     static ONCE: OnceLock<()> = OnceLock::new();
     ONCE.get_or_init(|| {
-        let semantic = litchi::numbers::SemanticLimits::builder().max_objects(1).and_then(|b| b.max_sheets(1)).and_then(|b| b.max_tables(1)).and_then(|b| b.max_references(1)).and_then(|b| b.build())
+        let semantic = litchi::numbers::SemanticLimits::builder()
+            .max_objects(1)
+            .and_then(|b| b.max_sheets(1))
+            .and_then(|b| b.max_tables(1))
+            .and_then(|b| b.max_references(1))
+            .and_then(|b| b.build())
             .unwrap_or_else(|error| panic!("one-entry Duration limits: {error}"));
-        let constrained = litchi::numbers::OpenOptions::new().source_limits(options().source_limits_value()).semantic_limits(semantic);
+        let constrained = litchi::numbers::OpenOptions::new()
+            .source_limits(options().source_limits_value())
+            .semantic_limits(semantic);
         let result = Package::from_bytes_with_options(&duration_source(), constrained);
         assert!(result.is_err(), "one-entry limits admitted Duration source");
         black_box(result.err().map(|error| error.to_string()));
@@ -1160,11 +1181,25 @@ fn exercise_output_limit() {
     static ONCE: OnceLock<()> = OnceLock::new();
     ONCE.get_or_init(|| {
         let source = duration_source();
-        let limits = litchi::numbers::SourceLimits::builder().max_input_bytes(u64::try_from(source.len()).unwrap_or(u64::MAX)).and_then(|b| b.max_members(litchi::numbers::SourceLimits::MAXIMUM.max_members())).and_then(|b| b.max_entry_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_entry_bytes())).and_then(|b| b.max_aggregate_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())).and_then(|b| b.max_component_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_component_bytes())).and_then(|b| b.build())
-        .unwrap_or_else(|error| panic!("Duration output limits: {error}"));
+        let limits = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(u64::try_from(source.len()).unwrap_or(u64::MAX))
+            .and_then(|b| b.max_members(litchi::numbers::SourceLimits::MAXIMUM.max_members()))
+            .and_then(|b| {
+                b.max_entry_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_entry_bytes())
+            })
+            .and_then(|b| {
+                b.max_aggregate_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+            })
+            .and_then(|b| {
+                b.max_component_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_component_bytes())
+            })
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| panic!("Duration output limits: {error}"));
         let package = Package::from_bytes_with_options(
             &source,
-            litchi::numbers::OpenOptions::new().source_limits(limits).semantic_limits(litchi::numbers::SemanticLimits::DEFAULT),
+            litchi::numbers::OpenOptions::new()
+                .source_limits(limits)
+                .semantic_limits(litchi::numbers::SemanticLimits::DEFAULT),
         )
         .unwrap_or_else(|error| panic!("Duration exact-limit source must open: {error}"));
         let before = package_bytes(&package);
@@ -1181,7 +1216,7 @@ fn exercise_output_limit() {
         assert!(
             matches!(
                 result.as_ref(),
-                Err(litchi::numbers::cell::data_format::duration::transaction::Error::LimitExceeded { .. })
+                Err(litchi::numbers::cell::data_format::duration::transaction::Error::Limit { .. })
             ),
             "exact Duration output limit did not produce a bounded refusal: {result:?}"
         );

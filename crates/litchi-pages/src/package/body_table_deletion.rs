@@ -104,30 +104,18 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
-    /// No rooted body table matched the selector.
-    #[error("the Pages body has no table matching the requested selector")]
-    TableNotFound,
-    /// More than one rooted body table matched an exact name.
-    #[error("the Pages body has more than one table with the requested name")]
-    AmbiguousTableName,
-    /// The rooted graph or selector was not unique.
-    #[error("the Pages body-table deletion selector is ambiguous")]
-    AmbiguousSelector,
-    /// The source cannot publish a preservation-safe changed artifact.
-    #[error("the Pages package source does not support exact body-table deletion")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The selected rooted graph or native payload is malformed.
     #[error("the selected Pages body-table deletion source is invalid")]
     InvalidSource,
-    /// A surviving object owns a selected formula dependency, so deleting the
-    /// table would change another table's calculation semantics.
-    #[error("a surviving Pages formula dependency prevents body-table deletion")]
-    UnsupportedDependency,
     /// A finite transaction resource ceiling was exceeded.
     #[error(
         "Pages body-table deletion {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category that exceeded its ceiling.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -147,12 +135,61 @@ pub enum Error {
     /// The supplied patch was created from a different exact source artifact.
     #[error("the Pages body-table deletion patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// No rooted body table matched the selector.
+    #[error("the Pages body has no table matching the requested selector")]
+    TableNotFound,
+    /// More than one rooted body table matched an exact name.
+    #[error("the Pages body has more than one table with the requested name")]
+    AmbiguousTableName,
+    /// The rooted graph or selector was not unique.
+    #[error("the Pages body-table deletion selector is ambiguous")]
+    AmbiguousSelector,
+    /// The source cannot publish a preservation-safe changed artifact.
+    #[error("the Pages package source does not support exact body-table deletion")]
+    UnsupportedSource,
+    /// A surviving object owns a selected formula dependency, so deleting the
+    /// table would change another table's calculation semantics.
+    #[error("a surviving Pages formula dependency prevents body-table deletion")]
+    UnsupportedDependency,
     /// The edit already stages its one removal.
     #[error("the Pages body-table deletion edit already stages a removal")]
     OperationAlreadyStaged,
     /// The edit was committed without a staged removal.
     #[error("the Pages body-table deletion edit stages no removal")]
     NoStagedOperation,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::AmbiguousTableName { .. } | Self::AmbiguousSelector { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
+                RefusalKind::UnsupportedOperation
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One object location retained by the deletion-wide object index.
@@ -531,10 +568,10 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// [`Error::OperationAlreadyStaged`] after one removal.
+    /// [`Refusal::OperationAlreadyStaged`] after one removal.
     pub fn remove(mut self, selector: impl Into<BodyTableSelector<'a>>) -> Result<Self, Error> {
         if self.selector.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
         self.selector = Some(selector.into());
         Ok(self)
@@ -545,14 +582,16 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// [`Error::NoStagedOperation`] for an empty edit,
-    /// [`Error::TableNotFound`], [`Error::AmbiguousTableName`] and
-    /// [`Error::AmbiguousSelector`] for the selector,
-    /// [`Error::UnsupportedSource`] for a source that is not exact, and typed
+    /// [`Refusal::NoStagedOperation`] for an empty edit,
+    /// [`Refusal::TableNotFound`], [`Refusal::AmbiguousTableName`] and
+    /// [`Refusal::AmbiguousSelector`] for the selector,
+    /// [`Refusal::UnsupportedSource`] for a source that is not exact, and typed
     /// source, dependency, limit and verification errors. Failure never
     /// publishes a partial package.
     pub fn commit(self) -> Result<Commit, Error> {
-        let selector = self.selector.ok_or(Error::NoStagedOperation)?;
+        let selector = self
+            .selector
+            .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
         let source = &self.source.state.source;
         let mut budget = table_lock::WireBudget::new(source.limits()).map_err(map_lock_error)?;
         budget
@@ -562,7 +601,7 @@ impl<'a> Edit<'a> {
             .map_err(map_lock_error)?;
         let target = select_target(targets, selector, &mut budget)?;
         if !source.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         let removed_table =
             body_table_catalog::Snapshot::from_target(target.clone()).map_err(map_catalog_error)?;
@@ -612,7 +651,7 @@ impl Package {
             return Err(Error::PatchConflict);
         }
         if !source.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         if patch.removes_table {
             let current = self
@@ -1040,7 +1079,7 @@ fn select_target(
             targets
                 .into_iter()
                 .nth(position.get())
-                .ok_or(Error::TableNotFound)
+                .ok_or(Error::Refused(Refusal::TableNotFound))
         },
         BodyTableSelector::Name(name) => {
             let mut selected = None;
@@ -1057,11 +1096,11 @@ fn select_target(
                     continue;
                 }
                 if selected.is_some() {
-                    return Err(Error::AmbiguousTableName);
+                    return Err(Error::Refused(Refusal::AmbiguousTableName));
                 }
                 selected = Some(target);
             }
-            selected.ok_or(Error::TableNotFound)
+            selected.ok_or(Error::Refused(Refusal::TableNotFound))
         },
     }
 }
@@ -1146,13 +1185,15 @@ fn append_preview_deletions(
 
 fn map_catalog_error(error: body_table_catalog::Error) -> Error {
     match error {
-        body_table_catalog::Error::AmbiguousTableName => Error::AmbiguousTableName,
+        body_table_catalog::Error::AmbiguousTableName => {
+            Error::Refused(Refusal::AmbiguousTableName)
+        },
         body_table_catalog::Error::InvalidSource => Error::InvalidSource,
-        body_table_catalog::Error::LimitExceeded {
+        body_table_catalog::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_catalog_limit(kind),
             observed,
             maximum,
@@ -1164,16 +1205,24 @@ fn map_catalog_error(error: body_table_catalog::Error) -> Error {
 
 fn map_lock_error(error: table_lock::Error) -> Error {
     match error {
-        table_lock::Error::TableNotFound => Error::TableNotFound,
-        table_lock::Error::AmbiguousTableName => Error::AmbiguousTableName,
-        table_lock::Error::AmbiguousSelector => Error::AmbiguousSelector,
-        table_lock::Error::UnsupportedSource => Error::UnsupportedSource,
+        table_lock::Error::Refused(crate::table::lock::Refusal::TableNotFound) => {
+            Error::Refused(Refusal::TableNotFound)
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousTableName) => {
+            Error::Refused(Refusal::AmbiguousTableName)
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousSelector) => {
+            Error::Refused(Refusal::AmbiguousSelector)
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
         table_lock::Error::InvalidSource => Error::InvalidSource,
-        table_lock::Error::LimitExceeded {
+        table_lock::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_lock_limit(kind),
             observed,
             maximum,
@@ -1234,7 +1283,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1259,12 +1308,12 @@ fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::Archive(error) => map_archive_error(error),
         PackageError::Allocation { amount } => Error::Allocation { amount },
-        PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
             kind: LimitKind::PayloadObjects,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::PayloadLimit { observed, limit } => Error::Limit {
             kind: LimitKind::PayloadBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),

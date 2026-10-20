@@ -84,13 +84,10 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// No ordinary body image matched the checked source-order selector.
-    #[error("the Pages body has no image at position {position:?}")]
-    ImageNotFound { position: Position },
-    /// The source does not retain an exact physical artifact suitable for a
-    /// changed publication.
-    #[error("this Pages source does not support exact body-image adjustment edits")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The rooted image graph or selected payload is malformed or ambiguous.
     #[error("the selected Pages body-image adjustment source is invalid")]
     InvalidSource,
@@ -98,7 +95,7 @@ pub enum Error {
     #[error(
         "Pages body-image adjustments {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -115,6 +112,38 @@ pub enum Error {
     /// The patch was produced from another exact package artifact.
     #[error("the Pages body-image adjustment patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// No ordinary body image matched the checked source-order selector.
+    #[error("the Pages body has no image at position {position:?}")]
+    ImageNotFound { position: Position },
+    /// The source does not retain an exact physical artifact suitable for a
+    /// changed publication.
+    #[error("this Pages source does not support exact body-image adjustment edits")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::ImageNotFound { .. } => RefusalKind::NotFound,
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable image-adjustment value staged against an immutable package.
@@ -452,7 +481,7 @@ impl ImageBudget {
     ) -> Result<(), Error> {
         let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -482,7 +511,7 @@ impl ImageBudget {
             LimitKind::WireWork,
         )?;
         if depth > self.limits.max_nesting() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.limits.max_nesting() as u64,
@@ -539,16 +568,13 @@ impl ImageBudget {
     }
 
     fn residual_wire_limits(&self) -> Result<WireLimits, Error> {
-        let input = self
-            .max_input
-            .checked_sub(self.input)
-            .ok_or(Error::LimitExceeded {
-                kind: LimitKind::InputBytes,
-                observed: self.max_input.saturating_add(1) as u64,
-                maximum: self.max_input as u64,
-            })?;
+        let input = self.max_input.checked_sub(self.input).ok_or(Error::Limit {
+            kind: LimitKind::InputBytes,
+            observed: self.max_input.saturating_add(1) as u64,
+            maximum: self.max_input as u64,
+        })?;
         if input == 0 {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::InputBytes,
                 observed: self.max_input.saturating_add(1) as u64,
                 maximum: self.max_input as u64,
@@ -557,28 +583,25 @@ impl ImageBudget {
         let fields = self
             .max_fields
             .checked_sub(self.fields)
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: self.max_fields.saturating_add(1) as u64,
                 maximum: self.max_fields as u64,
             })?;
         if fields == 0 {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: self.max_fields.saturating_add(1) as u64,
                 maximum: self.max_fields as u64,
             });
         }
-        let work = self
-            .max_work
-            .checked_sub(self.work)
-            .ok_or(Error::LimitExceeded {
-                kind: LimitKind::WireWork,
-                observed: self.max_work.saturating_add(1) as u64,
-                maximum: self.max_work as u64,
-            })?;
+        let work = self.max_work.checked_sub(self.work).ok_or(Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: self.max_work.saturating_add(1) as u64,
+            maximum: self.max_work as u64,
+        })?;
         if work == 0 {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: self.max_work.saturating_add(1) as u64,
                 maximum: self.max_work as u64,
@@ -587,13 +610,13 @@ impl ImageBudget {
         let output = self
             .max_output
             .checked_sub(self.output)
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind: LimitKind::OutputBytes,
                 observed: self.max_output.saturating_add(1) as u64,
                 maximum: self.max_output as u64,
             })?;
         if output == 0 {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::OutputBytes,
                 observed: self.max_output.saturating_add(1) as u64,
                 maximum: self.max_output as u64,
@@ -616,13 +639,13 @@ impl ImageBudget {
         let output = self
             .max_output
             .checked_sub(self.output)
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind: LimitKind::OutputBytes,
                 observed: self.max_output.saturating_add(1) as u64,
                 maximum: self.max_output as u64,
             })?;
         if output == 0 {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::OutputBytes,
                 observed: self.max_output.saturating_add(1) as u64,
                 maximum: self.max_output as u64,
@@ -656,7 +679,7 @@ impl ImageBudget {
             LimitKind::WireWork,
         )?;
         if usize::try_from(requirements.max_depth).unwrap_or(usize::MAX) > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(requirements.max_depth),
                 maximum: self.max_nesting as u64,
@@ -675,7 +698,7 @@ impl ImageBudget {
     ) -> Result<(), Error> {
         let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -761,7 +784,7 @@ impl ImageBudget {
         self.allocations(report.allocations())?;
         self.retained(report.retained_bytes())?;
         if usize::try_from(report.max_depth()).unwrap_or(usize::MAX) > self.limits.max_nesting() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(report.max_depth()),
                 maximum: self.limits.max_nesting() as u64,
@@ -801,7 +824,7 @@ impl ImageBudget {
         self.retained(report.retained_bytes())?;
         self.retained(report.scratch_bytes())?;
         if usize::try_from(report.max_depth()).unwrap_or(usize::MAX) > self.limits.max_nesting() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(report.max_depth()),
                 maximum: self.limits.max_nesting() as u64,
@@ -903,7 +926,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         });
     }
     if !source.state.source.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let mut budget = ImageBudget::new(source)?;
     let (current, before) = resolve_image(
@@ -950,9 +973,9 @@ fn resolve_image(
     let body_view = budget.parse(body_payload, 1)?;
     let table = unique_field(&body_view, BODY_ATTACHMENTS_FIELD, 2)?;
     let Some(table) = table else {
-        return Err(Error::ImageNotFound {
+        return Err(Error::Refused(Refusal::ImageNotFound {
             position: requested,
-        });
+        }));
     };
     let table_view = budget.parse(table.payload(), 2)?;
     let mut entries = Vec::new();
@@ -1090,9 +1113,9 @@ fn resolve_image(
         }
         images_seen = images_seen.checked_add(1).ok_or(Error::InvalidSource)?;
     }
-    found.ok_or(Error::ImageNotFound {
+    found.ok_or(Error::Refused(Refusal::ImageNotFound {
         position: requested,
-    })
+    }))
 }
 
 fn body_storage_payload<'a>(
@@ -1612,7 +1635,7 @@ fn map_drawable_order_error(error: pages_drawable_order_codec::DecodeError) -> E
             },
             _ => (LimitKind::WireWork, 0, 0),
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1741,7 +1764,7 @@ fn rewrite_image(
         .snappy_limits()
         .map_err(map_archive_error)?;
     if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: compressed_bound as u64,
             maximum: snappy_limits.max_compressed_stream() as u64,
@@ -1811,7 +1834,7 @@ fn rewrite_image(
     let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
     budget.retained(compressed.len())?;
     if compressed.len() as u64 > source.state.source.limits().max_entry_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: compressed.len() as u64,
             maximum: source.state.source.limits().max_entry_bytes(),
@@ -1828,7 +1851,7 @@ fn rewrite_image(
     let requirements = prepared.execution_requirements();
     let max_input = source.state.source.limits().max_input_bytes();
     if requirements.output_bytes() as u64 > max_input {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: requirements.output_bytes() as u64,
             maximum: max_input,
@@ -2318,7 +2341,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
@@ -2337,7 +2360,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
 fn map_codec_error(error: image_adjustments_codec::DecodeError) -> Error {
     if let Some(limit) = error.limit_kind() {
         let (observed, maximum) = error.limit_values().unwrap_or((0, 0));
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: match limit {
                 image_adjustments_codec::DecodeLimit::InputBytes => LimitKind::InputBytes,
                 image_adjustments_codec::DecodeLimit::OutputBytes
@@ -2359,7 +2382,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             observed,
             maximum,
             kind,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
                 _ => LimitKind::InputBytes,
@@ -2379,7 +2402,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             observed,
             maximum,
             kind,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::ArchiveBytes
                 | litchi_iwa_core::LimitKind::ObjectBytes
@@ -2510,7 +2533,7 @@ mod tests {
         let error = result.expect_err("the one-under budget must reject the rewrite");
         assert!(matches!(
             error,
-            Error::LimitExceeded { kind, .. } if kind == expected
+            Error::Limit { kind, .. } if kind == expected
         ));
     }
 
@@ -2705,7 +2728,7 @@ mod tests {
         budget.max_allocations -= 1;
         assert!(matches!(
             budget.preflight_allocations(allocations),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::Allocations,
                 ..
             })
@@ -2714,7 +2737,7 @@ mod tests {
         retained_budget.max_retained = retained - 1;
         assert!(matches!(
             retained_budget.preflight_retained(retained),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::Retained,
                 ..
             })

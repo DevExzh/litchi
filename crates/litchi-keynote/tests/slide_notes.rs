@@ -589,46 +589,54 @@ fn selectors_utf16_boundaries_and_staging_errors_leave_source_unchanged() -> Tes
 
     assert!(matches!(
         package.edit_slide_notes("Missing"),
-        Err(SlideNotesError::SlideNameNotFound)
+        Err(SlideNotesError::Refused(
+            litchi_keynote::slide::notes::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_slide_notes(SlideSelector::index(2)),
-        Err(SlideNotesError::SlidePositionNotFound { position })
+        Err(SlideNotesError::Refused(litchi_keynote::slide::notes::Refusal::SlidePositionNotFound { position }))
             if position == Position::new(2)
     ));
     assert!(matches!(
         package.edit_slide_notes("No Notes"),
-        Err(SlideNotesError::NotesStorageNotFound)
+        Err(SlideNotesError::Refused(
+            litchi_keynote::slide::notes::Refusal::NotesStorageNotFound
+        ))
     ));
 
     let mut split_start = package.edit_slide_notes("Agenda")?;
     assert!(matches!(
         split_start.replace(TextSpan::from_utf16_indexes(9, 10)?, "x"),
-        Err(SlideNotesError::SurrogateBoundary { position })
+        Err(SlideNotesError::Refused(litchi_keynote::slide::notes::Refusal::SurrogateBoundary { position }))
             if position == TextPosition::from_utf16_code_units(9)
     ));
     let mut split_end = package.edit_slide_notes("Agenda")?;
     assert!(matches!(
         split_end.delete(TextSpan::from_utf16_indexes(8, 9)?),
-        Err(SlideNotesError::SurrogateBoundary { position })
+        Err(SlideNotesError::Refused(litchi_keynote::slide::notes::Refusal::SurrogateBoundary { position }))
             if position == TextPosition::from_utf16_code_units(9)
     ));
     let mut out_of_bounds = package.edit_slide_notes("Agenda")?;
     assert!(matches!(
         out_of_bounds.delete(TextSpan::from_utf16_indexes(0, 100)?),
-        Err(SlideNotesError::SpanOutOfBounds { length, .. })
+        Err(SlideNotesError::Refused(litchi_keynote::slide::notes::Refusal::SpanOutOfBounds { length, .. }))
             if length == TextPosition::from_utf16_code_units(16)
     ));
     let mut marker = package.edit_slide_notes("Agenda")?;
     assert!(matches!(
         marker.insert(TextPosition::ZERO, "bad\u{fffc}marker"),
-        Err(SlideNotesError::ObjectMarkerReplacement)
+        Err(SlideNotesError::Refused(
+            litchi_keynote::slide::notes::Refusal::ObjectMarkerReplacement
+        ))
     ));
     let mut one_operation = package.edit_slide_notes("Agenda")?;
     one_operation.insert(TextPosition::ZERO, "first")?;
     assert!(matches!(
         one_operation.insert(TextPosition::ZERO, "second"),
-        Err(SlideNotesError::OperationAlreadyStaged)
+        Err(SlideNotesError::Refused(
+            litchi_keynote::slide::notes::Refusal::OperationAlreadyStaged
+        ))
     ));
 
     assert_eq!(package.exact_bytes(), bytes);
@@ -787,7 +795,9 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
     let duplicate_name_package = Package::from_bytes(&duplicate_name)?;
     assert!(matches!(
         duplicate_name_package.edit_slide_notes("Agenda"),
-        Err(SlideNotesError::AmbiguousSelector)
+        Err(SlideNotesError::Refused(
+            litchi_keynote::slide::notes::Refusal::AmbiguousSelector
+        ))
     ));
 
     let malformed = [
@@ -995,7 +1005,9 @@ fn note_graph_metadata_ownership_is_proven_before_rewriting() -> TestResult<()> 
     edit.set("exclusive ownership is required")?;
     assert!(matches!(
         edit.commit(),
-        Err(SlideNotesError::DependentContent)
+        Err(SlideNotesError::Refused(
+            litchi_keynote::slide::notes::Refusal::DependentContent
+        ))
     ));
     assert_eq!(package.exact_bytes(), extra_owner);
     Ok(())
@@ -1083,7 +1095,10 @@ fn metadata_and_payload_ownership_aliases_fail_closed() -> TestResult<()> {
         edit.set("ownership ambiguity must not publish")?;
         assert!(matches!(
             edit.commit(),
-            Err(SlideNotesError::DependentContent | SlideNotesError::InvalidSource)
+            Err(
+                SlideNotesError::Refused(litchi_keynote::slide::notes::Refusal::DependentContent)
+                    | SlideNotesError::InvalidSource
+            )
         ));
         assert_eq!(package.exact_bytes(), adversarial);
     }
@@ -1133,7 +1148,9 @@ fn dependent_note_content_is_refused_without_blocking_unrelated_text() -> TestRe
     dependent.delete(TextSpan::from_utf16_indexes(8, 10)?)?;
     assert!(matches!(
         dependent.commit(),
-        Err(SlideNotesError::DependentContent)
+        Err(SlideNotesError::Refused(
+            litchi_keynote::slide::notes::Refusal::DependentContent
+        ))
     ));
     assert_eq!(package.exact_bytes(), bytes);
 
@@ -1164,7 +1181,7 @@ fn changed_notes_respect_the_retained_output_limit() -> TestResult<()> {
     edit.insert(TextPosition::ZERO, &"expanded".repeat(1_024))?;
     assert!(matches!(
         edit.commit(),
-        Err(SlideNotesError::LimitExceeded {
+        Err(SlideNotesError::Limit {
             kind: SlideNotesLimitKind::OutputBytes,
             ..
         })

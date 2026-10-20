@@ -16,12 +16,41 @@ use crate::{SlideSelector, SlideSelectorError};
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The immutable source package could not provide its semantic snapshot.
     #[error(transparent)]
     Read(#[from] ReadError),
     /// A semantic slide selector was ambiguous.
     #[error(transparent)]
     Selector(#[from] SlideSelectorError),
+    /// The physical package boundary rejected the candidate rewrite.
+    #[error(transparent)]
+    Archive(#[from] litchi_iwa_archive::Error),
+    /// The IWA framing boundary rejected the candidate rewrite.
+    #[error(transparent)]
+    Iwa(#[from] litchi_iwa_core::Error),
+    /// The raw protobuf wire boundary rejected the selected skip field.
+    #[error(transparent)]
+    Wire(#[from] litchi_iwa_common::Error),
+    /// Full candidate reopening did not reproduce the requested semantic value.
+    #[error("Keynote slide-state candidate verification failed: {reason}")]
+    Verification {
+        /// Stable verification failure description.
+        reason: &'static str,
+    },
+    /// The supplied patch was not created from this exact package artifact.
+    #[error("Keynote slide-state patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// No slide has the requested exact navigator name.
     #[error("Keynote show has no slide matching the requested navigator name")]
     SlideNameNotFound,
@@ -37,30 +66,35 @@ pub enum Error {
     /// Commit was requested before an operation was staged.
     #[error("Keynote slide-state transaction has no staged operation")]
     NoStagedOperation,
-    /// The physical package boundary rejected the candidate rewrite.
-    #[error(transparent)]
-    Archive(#[from] litchi_iwa_archive::Error),
-    /// The IWA framing boundary rejected the candidate rewrite.
-    #[error(transparent)]
-    Iwa(#[from] litchi_iwa_core::Error),
-    /// The raw protobuf wire boundary rejected the selected skip field.
-    #[error(transparent)]
-    Wire(#[from] litchi_iwa_common::Error),
     /// The semantic selector did not resolve to exactly one editable payload.
     #[error("invalid Keynote slide-state target: {reason}")]
     InvalidTarget {
         /// Stable description that does not expose native object identity.
         reason: &'static str,
     },
-    /// Full candidate reopening did not reproduce the requested semantic value.
-    #[error("Keynote slide-state candidate verification failed: {reason}")]
-    Verification {
-        /// Stable verification failure description.
-        reason: &'static str,
-    },
-    /// The supplied patch was not created from this exact package artifact.
-    #[error("Keynote slide-state patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SlideNameNotFound { .. } | Self::SlidePositionNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+            Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
+                RefusalKind::UnsupportedOperation
+            },
+            Self::InvalidTarget { .. } => RefusalKind::InvalidValue,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// A resource bounded by the primary slide-state transaction.
@@ -113,14 +147,16 @@ impl<'a> Edit<'a> {
         is_skipped: bool,
     ) -> Result<&mut Self, Error> {
         if self.intent.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
 
         let semantic_selector = selector.into();
         let selected = self.source.show()?.select_slide(semantic_selector)?;
         let slide = selected.ok_or(match semantic_selector {
-            SlideSelector::Name(_) => Error::SlideNameNotFound,
-            SlideSelector::Position(position) => Error::SlidePositionNotFound { position },
+            SlideSelector::Name(_) => Error::Refused(Refusal::SlideNameNotFound),
+            SlideSelector::Position(position) => {
+                Error::Refused(Refusal::SlidePositionNotFound { position })
+            },
         })?;
         self.intent = Some(SkipIntent {
             position: Position::new(slide.index()),
@@ -165,7 +201,9 @@ impl<'a> Edit<'a> {
     /// Returns an error without modifying the source when staging is empty or
     /// any wire, IWA, ZIP, limit, or readback invariant fails.
     pub fn commit(self) -> Result<Commit, Error> {
-        let intent = self.intent.ok_or(Error::NoStagedOperation)?;
+        let intent = self
+            .intent
+            .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
         let source_fingerprint = fingerprint(self.source.source_bytes());
         if intent.before == intent.after {
             return Ok(Commit {
@@ -435,9 +473,9 @@ impl Commit {
 fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, Error> {
     let record = source
         .slide_record_at(intent.position.get())?
-        .ok_or(Error::InvalidTarget {
+        .ok_or(Error::Refused(Refusal::InvalidTarget {
             reason: "resolved semantic slide has no native slide-node record",
-        })?;
+        }))?;
 
     let mut components = source
         .state
@@ -445,13 +483,15 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
         .components()
         .iter()
         .filter(|component| component.archive().object(record.node_identifier).is_some());
-    let component = components.next().ok_or(Error::InvalidTarget {
-        reason: "slide-node component is missing",
-    })?;
+    let component = components
+        .next()
+        .ok_or(Error::Refused(Refusal::InvalidTarget {
+            reason: "slide-node component is missing",
+        }))?;
     if components.next().is_some() {
-        return Err(Error::InvalidTarget {
+        return Err(Error::Refused(Refusal::InvalidTarget {
             reason: "slide-node component is ambiguous",
-        });
+        }));
     }
     let component_name = component.name();
 
@@ -459,13 +499,13 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == component_name)
-        .ok_or(Error::InvalidTarget {
+        .ok_or(Error::Refused(Refusal::InvalidTarget {
             reason: "slide-node package member is missing",
-        })?;
+        }))?;
     if entry.is_opaque() {
-        return Err(Error::InvalidTarget {
+        return Err(Error::Refused(Refusal::InvalidTarget {
             reason: "slide-node package member uses unsupported compression",
-        });
+        }));
     }
 
     let archive_limits = source.state.options.archive().effective_archive_limits()?;
@@ -476,35 +516,38 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
     let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)?;
     let object = archive
         .object(record.node_identifier)
-        .ok_or(Error::InvalidTarget {
+        .ok_or(Error::Refused(Refusal::InvalidTarget {
             reason: "selected slide node disappeared from its component",
-        })?;
+        }))?;
     let mut messages = object
         .messages
         .iter()
         .enumerate()
         .filter(|(_index, message)| message.type_ == 4);
-    let (message_index, message) = messages.next().ok_or(Error::InvalidTarget {
-        reason: "selected slide node has no type-4 payload",
-    })?;
+    let (message_index, message) =
+        messages
+            .next()
+            .ok_or(Error::Refused(Refusal::InvalidTarget {
+                reason: "selected slide node has no type-4 payload",
+            }))?;
     if messages.next().is_some() {
-        return Err(Error::InvalidTarget {
+        return Err(Error::Refused(Refusal::InvalidTarget {
             reason: "selected slide node has multiple type-4 payloads",
-        });
+        }));
     }
 
     let wire_limits = source.wire_limits()?;
     let physical_before = strict_slide_node_skipped(&message.data, wire_limits)?;
     if physical_before != intent.before {
-        return Err(Error::InvalidTarget {
+        return Err(Error::Refused(Refusal::InvalidTarget {
             reason: "selected slide-node wire state disagrees with the base snapshot",
-        });
+        }));
     }
     let patched = patch_varint_field(&message.data, 4, true, Some(u64::from(intent.after)))?;
     if patched.len() != message.data.len() {
-        return Err(Error::InvalidTarget {
+        return Err(Error::Refused(Refusal::InvalidTarget {
             reason: "Boolean slide-state rewrite changed payload length",
-        });
+        }));
     }
     if strict_slide_node_skipped(&patched, wire_limits)? != intent.after {
         return Err(Error::Verification {
@@ -514,9 +557,9 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
 
     archive
         .object_mut(record.node_identifier)
-        .ok_or(Error::InvalidTarget {
+        .ok_or(Error::Refused(Refusal::InvalidTarget {
             reason: "selected slide node disappeared during staging",
-        })?
+        }))?
         .replace_message_with_limits(
             message_index,
             RawMessage {

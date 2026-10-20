@@ -296,13 +296,25 @@ fn validate_input(
 ) -> Result<(), SlideMovieCreationError> {
     super::slide_audio_creation::validate_media_input(package, filename, bytes, expected).map_err(
         |error| match error {
-            SlideAudioCreationError::InvalidFilename => match kind {
-                InputKind::Movie => SlideMovieCreationError::InvalidMovieFilename,
-                InputKind::Poster => SlideMovieCreationError::InvalidPosterFilename,
+            SlideAudioCreationError::Refused(
+                crate::slide::audio::creation::Refusal::InvalidFilename,
+            ) => match kind {
+                InputKind::Movie => SlideMovieCreationError::Refused(
+                    crate::slide::movie::creation::Refusal::InvalidMovieFilename,
+                ),
+                InputKind::Poster => SlideMovieCreationError::Refused(
+                    crate::slide::movie::creation::Refusal::InvalidPosterFilename,
+                ),
             },
-            SlideAudioCreationError::UnsupportedAudio => match kind {
-                InputKind::Movie => SlideMovieCreationError::UnsupportedMovie,
-                InputKind::Poster => SlideMovieCreationError::UnsupportedPoster,
+            SlideAudioCreationError::Refused(
+                crate::slide::audio::creation::Refusal::UnsupportedAudio,
+            ) => match kind {
+                InputKind::Movie => SlideMovieCreationError::Refused(
+                    crate::slide::movie::creation::Refusal::UnsupportedMovie,
+                ),
+                InputKind::Poster => SlideMovieCreationError::Refused(
+                    crate::slide::movie::creation::Refusal::UnsupportedPoster,
+                ),
             },
             other => map_error(other),
         },
@@ -476,21 +488,43 @@ fn verify_created_movie_semantics(
 
 fn map_error(error: SlideAudioCreationError) -> SlideMovieCreationError {
     match error {
-        SlideAudioCreationError::UnsupportedSource => SlideMovieCreationError::UnsupportedSource,
-        SlideAudioCreationError::EmptySlideName => SlideMovieCreationError::EmptySlideName,
-        SlideAudioCreationError::SlideNameNotFound => SlideMovieCreationError::SlideNameNotFound,
-        SlideAudioCreationError::AmbiguousSelector => SlideMovieCreationError::AmbiguousSelector,
-        SlideAudioCreationError::SlidePositionNotFound { position } => {
-            SlideMovieCreationError::SlidePositionNotFound { position }
+        SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::UnsupportedSource,
+        ) => SlideMovieCreationError::Refused(
+            crate::slide::movie::creation::Refusal::UnsupportedSource,
+        ),
+        SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::EmptySlideName,
+        ) => {
+            SlideMovieCreationError::Refused(crate::slide::movie::creation::Refusal::EmptySlideName)
         },
+        SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::SlideNameNotFound,
+        ) => SlideMovieCreationError::Refused(
+            crate::slide::movie::creation::Refusal::SlideNameNotFound,
+        ),
+        SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::AmbiguousSelector,
+        ) => SlideMovieCreationError::Refused(
+            crate::slide::movie::creation::Refusal::AmbiguousSelector,
+        ),
+        SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::SlidePositionNotFound { position },
+        ) => SlideMovieCreationError::Refused(
+            crate::slide::movie::creation::Refusal::SlidePositionNotFound { position },
+        ),
         SlideAudioCreationError::InvalidSource
-        | SlideAudioCreationError::InvalidFilename
-        | SlideAudioCreationError::UnsupportedAudio => SlideMovieCreationError::InvalidSource,
-        SlideAudioCreationError::LimitExceeded {
+        | SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::InvalidFilename,
+        )
+        | SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::UnsupportedAudio,
+        ) => SlideMovieCreationError::InvalidSource,
+        SlideAudioCreationError::Limit {
             kind,
             observed,
             maximum,
-        } => SlideMovieCreationError::LimitExceeded {
+        } => SlideMovieCreationError::Limit {
             kind: map_limit_kind(kind),
             observed,
             maximum,
@@ -500,10 +534,16 @@ fn map_error(error: SlideAudioCreationError) -> SlideMovieCreationError {
         },
         SlideAudioCreationError::Verification => SlideMovieCreationError::Verification,
         SlideAudioCreationError::PatchConflict => SlideMovieCreationError::PatchConflict,
-        SlideAudioCreationError::OperationAlreadyStaged => {
-            SlideMovieCreationError::OperationAlreadyStaged
-        },
-        SlideAudioCreationError::NoStagedOperation => SlideMovieCreationError::NoStagedOperation,
+        SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::OperationAlreadyStaged,
+        ) => SlideMovieCreationError::Refused(
+            crate::slide::movie::creation::Refusal::OperationAlreadyStaged,
+        ),
+        SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::NoStagedOperation,
+        ) => SlideMovieCreationError::Refused(
+            crate::slide::movie::creation::Refusal::NoStagedOperation,
+        ),
     }
 }
 

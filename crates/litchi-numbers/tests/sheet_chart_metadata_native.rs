@@ -116,6 +116,6 @@ fn chart_metadata_honors_the_shared_reference_budget() -> TestResult {
     let error = package
         .sheet_chart_metadata(SheetSelector::index(0), ChartSelector::index(0))
         .expect_err("metadata selection must stay within the finite reference budget");
-    assert!(matches!(error, ChartMetadataError::LimitExceeded { .. }));
+    assert!(matches!(error, ChartMetadataError::Limit { .. }));
     Ok(())
 }

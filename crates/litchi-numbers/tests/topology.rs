@@ -248,28 +248,39 @@ fn refusals_are_typed() -> TestResult {
     let (rows, _) = size(&package, 0, 0);
     assert!(matches!(
         package.edit_table_topology(0, 0)?.commit(),
-        Err(Error::NoStagedOperation)
+        Err(Error::Refused(
+            litchi_numbers::table::topology::Refusal::NoStagedOperation
+        ))
     ));
     assert!(matches!(
         package
             .edit_table_topology(0, 0)?
             .insert_row(RowInsertion::body(rows as usize + 1)),
-        Err(Error::PositionOutOfRange { .. })
+        Err(Error::Refused(
+            litchi_numbers::table::topology::Refusal::PositionOutOfRange { .. }
+        ))
     ));
     assert!(matches!(
         package.edit_table_topology(0, 1),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::topology::Refusal::TableNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_table_topology(3, 0),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::topology::Refusal::SheetNotFound
+        ))
     ));
     let mut edit = package.edit_table_topology(0, 0)?;
     for _ in 0..5 {
         match edit.insert_row(RowInsertion::header(0)) {
             Ok(next) => edit = next,
             Err(error) => {
-                assert_eq!(error, Error::SectionFull);
+                assert_eq!(
+                    error,
+                    Error::Refused(litchi_numbers::table::topology::Refusal::SectionFull)
+                );
                 return Ok(());
             },
         }
@@ -421,7 +432,9 @@ fn corpus_tables_round_trip_or_refuse_typed() -> TestResult {
                     .commit();
                 let commit = match result {
                     Ok(commit) => commit,
-                    Err(Error::Unsupported { reason }) => {
+                    Err(Error::Refused(
+                        litchi_numbers::table::topology::Refusal::Unsupported { reason },
+                    )) => {
                         refused.push((path.clone(), reason));
                         continue;
                     },
@@ -447,7 +460,9 @@ fn corpus_tables_round_trip_or_refuse_typed() -> TestResult {
                         assert_eq!(cells(removed.package(), sheet, table), before);
                         removals += 1;
                     },
-                    Err(Error::CellClear { error }) => clear_refusals.push(error),
+                    Err(Error::Refused(litchi_numbers::table::topology::Refusal::CellClear {
+                        error,
+                    })) => clear_refusals.push(error),
                     Err(error) => panic!("{}: removal {error:?}", path.display()),
                 }
                 round_trips += 1;
@@ -465,8 +480,12 @@ fn corpus_tables_round_trip_or_refuse_typed() -> TestResult {
                         assert_eq!(bytes(restored.package())?, source);
                         content_removals += 1;
                     },
-                    Err(Error::CellClear { error }) => clear_refusals.push(error),
-                    Err(Error::Unsupported { reason }) => content_refusals.push(reason),
+                    Err(Error::Refused(litchi_numbers::table::topology::Refusal::CellClear {
+                        error,
+                    })) => clear_refusals.push(error),
+                    Err(Error::Refused(
+                        litchi_numbers::table::topology::Refusal::Unsupported { reason },
+                    )) => content_refusals.push(reason),
                     Err(error) => panic!("{}: content removal {error:?}", path.display()),
                 }
             }

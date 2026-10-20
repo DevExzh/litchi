@@ -134,7 +134,9 @@ impl Edit<'_> {
             position,
         )?;
         if target.locked {
-            return Err(Error::TableLocked { path: self.path });
+            return Err(Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::TableLocked { path: self.path },
+            ));
         }
         if self.before == self.after {
             return no_op_commit(self.source, self.path, self.before, self.after);
@@ -329,8 +331,9 @@ impl Package {
 
     /// Apply a previously-created exact control patch.
     pub fn apply_table_cell_control_format(&self, patch: &Patch) -> Result<Commit, Error> {
-        let catalog = super::table_headers::rewrite::physical_source(self)
-            .map_err(|_| Error::UnsupportedSource)?;
+        let catalog = super::table_headers::rewrite::physical_source(self).map_err(|_| {
+            Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource)
+        })?;
         let owner = catalog.__source_owner();
         if !patch.artifacts.authorizes_owner(&owner) {
             return Err(Error::PatchConflict);
@@ -423,8 +426,9 @@ fn no_op_commit(
     before: Option<CellControl>,
     after: Option<CellControl>,
 ) -> Result<Commit, Error> {
-    let catalog = super::table_headers::rewrite::physical_source(source)
-        .map_err(|_| Error::UnsupportedSource)?;
+    let catalog = super::table_headers::rewrite::physical_source(source).map_err(|_| {
+        Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource)
+    })?;
     let owner = catalog.__source_owner();
     Ok(Commit {
         package: source.snapshot(),
@@ -453,7 +457,9 @@ fn rewrite(
         return Err(Error::InvalidSource { path });
     };
     let source_owner = super::table_headers::rewrite::physical_source(source)
-        .map_err(|_| Error::UnsupportedSource)?
+        .map_err(|_| {
+            Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource)
+        })?
         .__source_owner();
     let target = popup::resolve_cell(
         source,
@@ -568,10 +574,13 @@ fn rewrite(
         position,
     )?;
     let mut budget = popup::TransactionBudget::for_cell_control(source);
-    let catalog = super::table_headers::rewrite::physical_source(source)
-        .map_err(|_| Error::UnsupportedSource)?;
+    let catalog = super::table_headers::rewrite::physical_source(source).map_err(|_| {
+        Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource)
+    })?;
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource,
+        ));
     }
     // Charge the complete source ZIP and native archive before the scalar
     // owner clones any archive or stages a list candidate.  The native helper
@@ -594,7 +603,7 @@ fn rewrite(
                 .map_err(|_| Error::Verification)?
                 > native_bound.compressed_bytes
         {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::PayloadBytes,
                 observed: u64::try_from(member.archive_bytes.len()).unwrap_or(u64::MAX),
                 maximum: u64::try_from(native_bound.archive_bytes).unwrap_or(u64::MAX),

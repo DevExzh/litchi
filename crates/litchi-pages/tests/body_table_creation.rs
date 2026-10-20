@@ -56,14 +56,18 @@ fn the_edit_stages_exactly_one_insertion() -> TestResult {
     let package = Package::open(pages_dir().join("body-table-visible.pages"))?;
     assert!(matches!(
         package.edit_body_table_creation().commit(),
-        Err(Error::NoStagedOperation)
+        Err(Error::Refused(
+            litchi_pages::table::creation::Refusal::NoStagedOperation
+        ))
     ));
     assert!(matches!(
         package
             .edit_body_table_creation()
             .insert(Position::new(0), NewTable::new(2, 2))?
             .insert(Position::new(0), NewTable::new(2, 2)),
-        Err(Error::OperationAlreadyStaged)
+        Err(Error::Refused(
+            litchi_pages::table::creation::Refusal::OperationAlreadyStaged
+        ))
     ));
     let commit = insert(&package, Position::new(0), NewTable::new(2, 2))?;
     assert!(commit.diagnostics().changed());
@@ -122,7 +126,9 @@ fn every_corpus_document_inserts_a_table_or_refuses_typed() -> TestResult {
                 assert!(
                     matches!(
                         insert(&package, Position::new(0), NewTable::new(2, 2)),
-                        Err(Error::Unsupported)
+                        Err(Error::Refused(
+                            litchi_pages::table::creation::Refusal::Unsupported
+                        ))
                     ),
                     "{}",
                     path.display()
@@ -139,7 +145,7 @@ fn every_corpus_document_inserts_a_table_or_refuses_typed() -> TestResult {
             );
             let commit = match result {
                 Ok(commit) => commit,
-                Err(Error::NoTemplate) => {
+                Err(Error::Refused(litchi_pages::table::creation::Refusal::NoTemplate)) => {
                     assert_eq!(tables, 0, "{}", path.display());
                     refused += 1;
                     continue;
@@ -172,10 +178,12 @@ fn invalid_requests_refuse_typed() -> TestResult {
     let package = Package::open(pages_dir().join("body-table-visible.pages"))?;
     assert!(matches!(
         insert(&package, Position::new(0), NewTable::new(0, 2)),
-        Err(Error::InvalidSize {
-            rows: 0,
-            columns: 2
-        })
+        Err(Error::Refused(
+            litchi_pages::table::creation::Refusal::InvalidSize {
+                rows: 0,
+                columns: 2
+            }
+        ))
     ));
     assert!(matches!(
         insert(
@@ -183,16 +191,22 @@ fn invalid_requests_refuse_typed() -> TestResult {
             Position::new(0),
             NewTable::new(2, 2).with_cell(2, 0, Value::Boolean(true))
         ),
-        Err(Error::InvalidCell)
+        Err(Error::Refused(
+            litchi_pages::table::creation::Refusal::InvalidCell
+        ))
     ));
     assert!(matches!(
         insert(&package, Position::new(1_000_000), NewTable::new(2, 2)),
-        Err(Error::PositionOutOfBounds)
+        Err(Error::Refused(
+            litchi_pages::table::creation::Refusal::PositionOutOfBounds
+        ))
     ));
     let plain = Package::open(pages_dir().join("basic.pages"))?;
     assert!(matches!(
         insert(&plain, Position::new(0), NewTable::new(2, 2)),
-        Err(Error::NoTemplate)
+        Err(Error::Refused(
+            litchi_pages::table::creation::Refusal::NoTemplate
+        ))
     ));
     Ok(())
 }

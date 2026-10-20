@@ -789,10 +789,12 @@ fn first_section_inheritance_changes_fail_before_template_traversal() -> TestRes
                 .set(after)?
                 .commit()
                 .unwrap_err(),
-            Error::UnsupportedDependency {
-                path: Path::section(Position::new(0)),
-                kind: DependencyKind::PreviousSectionTemplates,
-            }
+            Error::Refused(
+                litchi_pages::section::settings::Refusal::UnsupportedDependency {
+                    path: Path::section(Position::new(0)),
+                    kind: DependencyKind::PreviousSectionTemplates,
+                }
+            )
         );
         assert_eq!(exact_bytes(&package)?, bytes);
     }
@@ -863,15 +865,17 @@ fn selectors_and_legacy_sources_are_typed_and_failure_atomic() -> TestResult {
 
     assert!(matches!(
         package.edit_section_settings(SectionSelector::name("missing-private-selector")),
-        Err(Error::NameNotFound)
+        Err(Error::Refused(
+            litchi_pages::section::settings::Refusal::NameNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_section_settings(SectionSelector::index(2)),
-        Err(Error::PositionNotFound { position }) if position == Position::new(2)
+        Err(Error::Refused(litchi_pages::section::settings::Refusal::PositionNotFound { position })) if position == Position::new(2)
     ));
     assert!(matches!(
         package.edit_section_settings(SectionSelector::name("Same")),
-        Err(Error::AmbiguousSelector { first, duplicate })
+        Err(Error::Refused(litchi_pages::section::settings::Refusal::AmbiguousSelector { first, duplicate }))
             if first == Position::new(0) && duplicate == Position::new(1)
     ));
     assert_eq!(exact_bytes(&package)?, bytes);
@@ -904,7 +908,9 @@ fn selectors_and_legacy_sources_are_typed_and_failure_atomic() -> TestResult {
             .edit_section_settings(SectionSelector::index(0))?
             .set(changed)?
             .commit(),
-        Err(Error::UnsupportedSource { .. })
+        Err(Error::Refused(
+            litchi_pages::section::settings::Refusal::UnsupportedSource { .. }
+        ))
     ));
     assert_eq!(exact_bytes(&legacy_package)?, legacy);
     Ok(())

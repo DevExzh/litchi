@@ -380,6 +380,42 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The package cannot be edited safely (malformed or inconsistent).
+    #[error("the Keynote source cannot be edited safely")]
+    InvalidSource,
+    /// A resource limit was exceeded.
+    #[error("Keynote slide-drawable {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// The exceeded resource.
+        kind: LimitKind,
+        /// The observed amount.
+        observed: u64,
+        /// The configured maximum.
+        maximum: u64,
+    },
+    /// An allocation failed.
+    #[error("could not allocate {amount} units for the Keynote slide-drawable transaction")]
+    Allocation {
+        /// The requested amount.
+        amount: usize,
+    },
+    /// The published candidate did not verify.
+    #[error("the Keynote slide-drawable candidate failed semantic verification")]
+    Verification,
+    /// The patch does not match the exact source package.
+    #[error("the Keynote slide-drawable patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The package was not opened from an exact physical source.
     #[error("this Keynote source does not support structural edits")]
     UnsupportedSource,
@@ -439,31 +475,36 @@ pub enum Error {
     /// The text span is empty, reversed or past the end of the text.
     #[error("the Keynote text span is outside the drawable text")]
     InvalidSpan,
-    /// The package cannot be edited safely (malformed or inconsistent).
-    #[error("the Keynote source cannot be edited safely")]
-    InvalidSource,
-    /// A resource limit was exceeded.
-    #[error("Keynote slide-drawable {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// The exceeded resource.
-        kind: LimitKind,
-        /// The observed amount.
-        observed: u64,
-        /// The configured maximum.
-        maximum: u64,
-    },
-    /// An allocation failed.
-    #[error("could not allocate {amount} units for the Keynote slide-drawable transaction")]
-    Allocation {
-        /// The requested amount.
-        amount: usize,
-    },
-    /// The published candidate did not verify.
-    #[error("the Keynote slide-drawable candidate failed semantic verification")]
-    Verification,
-    /// The patch does not match the exact source package.
-    #[error("the Keynote slide-drawable patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::Unsupported { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::ZPositionOutOfRange { .. }
+            | Self::InvalidGeometry { .. }
+            | Self::InvalidTableSize { .. }
+            | Self::InvalidImage { .. }
+            | Self::InvalidSpan { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::DrawablePositionNotFound { .. } => RefusalKind::NotFound,
+            Self::DrawableRemoved { .. } => RefusalKind::UnsupportedTarget,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One staged operation with privately remembered native identity.
@@ -730,11 +771,11 @@ impl<'a> Edit<'a> {
             .get(&selected.identifier)
             .and_then(|inventory| inventory.items.get(drawable.as_index()))
             .cloned()
-            .ok_or(Error::DrawablePositionNotFound {
+            .ok_or(Error::Refused(Refusal::DrawablePositionNotFound {
                 position: drawable.as_position(),
-            })?;
+            }))?;
         if self.removed.contains(&item.identifier) {
-            return Err(Error::DrawableRemoved);
+            return Err(Error::Refused(Refusal::DrawableRemoved));
         }
         Ok((selected, item))
     }
@@ -747,7 +788,7 @@ impl<'a> Edit<'a> {
         let observed = base.saturating_add_signed(self.deltas.get(&slide).copied().unwrap_or(0));
         let maximum = self.source.semantic_limits().max_references();
         if observed >= maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::Drawables,
                 observed: observed as u64 + 1,
                 maximum: maximum as u64,
@@ -765,8 +806,8 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// Returns typed selector errors, [`Error::InvalidGeometry`], and
-    /// [`Error::Unsupported`] for other kinds.
+    /// Returns typed selector errors, [`Refusal::InvalidGeometry`], and
+    /// [`Refusal::Unsupported`] for other kinds.
     ///
     /// ```no_run
     /// use litchi_keynote::slide::drawable::Geometry;
@@ -791,13 +832,13 @@ impl<'a> Edit<'a> {
         geometry: Geometry,
     ) -> Result<&mut Self, Error> {
         if !geometry.is_valid() {
-            return Err(Error::InvalidGeometry);
+            return Err(Error::Refused(Refusal::InvalidGeometry));
         }
         let (selected, item) = self.drawable(slide.into(), drawable.into())?;
         if !item.kind.geometry_editable() || item.geometry.is_none() {
-            return Err(Error::Unsupported {
+            return Err(Error::Refused(Refusal::Unsupported {
                 reason: Unsupported::Kind { kind: item.kind },
-            });
+            }));
         }
         let earlier = self
             .operations
@@ -840,7 +881,7 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// Returns typed selector errors and [`Error::Unsupported`].
+    /// Returns typed selector errors and [`Refusal::Unsupported`].
     ///
     /// ```no_run
     /// use litchi_keynote::{DrawableSelector, Package, SlideSelector};
@@ -862,9 +903,9 @@ impl<'a> Edit<'a> {
     ) -> Result<&mut Self, Error> {
         let (selected, item) = self.drawable(slide.into(), drawable.into())?;
         if !item.kind.removable() {
-            return Err(Error::Unsupported {
+            return Err(Error::Refused(Refusal::Unsupported {
                 reason: Unsupported::Kind { kind: item.kind },
-            });
+            }));
         }
         self.removed.insert(item.identifier);
         *self.deltas.entry(selected.identifier).or_default() -= 1;
@@ -882,7 +923,7 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// Returns typed selector errors and [`Error::ZPositionOutOfRange`].
+    /// Returns typed selector errors and [`Refusal::ZPositionOutOfRange`].
     ///
     /// ```no_run
     /// use litchi_keynote::{DrawableSelector, Package, Position, SlideSelector};
@@ -909,7 +950,10 @@ impl<'a> Edit<'a> {
         let count =
             base.saturating_add_signed(self.deltas.get(&selected.identifier).copied().unwrap_or(0));
         if position.get() >= count {
-            return Err(Error::ZPositionOutOfRange { position, count });
+            return Err(Error::Refused(Refusal::ZPositionOutOfRange {
+                position,
+                count,
+            }));
         }
         let untouched = !self.operations.iter().any(|operation| match operation {
             Operation::Geometry { .. }
@@ -951,18 +995,18 @@ impl<'a> Edit<'a> {
         text: &str,
     ) -> Result<&mut Self, Error> {
         if !geometry.is_valid() {
-            return Err(Error::InvalidGeometry);
+            return Err(Error::Refused(Refusal::InvalidGeometry));
         }
         if let Some(Preset::RoundedRectangle { radius }) = preset
             && (!radius.is_finite()
                 || radius < 0.0
                 || radius > geometry.width.min(geometry.height) / 2.0)
         {
-            return Err(Error::InvalidGeometry);
+            return Err(Error::Refused(Refusal::InvalidGeometry));
         }
         let maximum = self.source.semantic_limits().max_text_bytes();
         if text.len() > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::TextBytes,
                 observed: text.len() as u64,
                 maximum: maximum as u64,
@@ -989,8 +1033,8 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// Returns typed selector errors, [`Error::InvalidGeometry`] and
-    /// [`Error::LimitExceeded`].
+    /// Returns typed selector errors, [`Refusal::InvalidGeometry`] and
+    /// [`Error::Limit`].
     ///
     /// ```no_run
     /// use litchi_keynote::slide::drawable::Geometry;
@@ -1021,9 +1065,9 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// Returns typed selector errors, [`Error::InvalidGeometry`] (also for a
+    /// Returns typed selector errors, [`Refusal::InvalidGeometry`] (also for a
     /// corner radius past half the shorter side) and
-    /// [`Error::LimitExceeded`].
+    /// [`Error::Limit`].
     ///
     /// ```no_run
     /// use litchi_keynote::slide::drawable::{Geometry, Preset};
@@ -1058,10 +1102,10 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// Returns typed selector errors, [`Error::InvalidGeometry`],
-    /// [`Error::InvalidImage`] for a file name without a stem,
-    /// [`Error::Unsupported`] with [`Unsupported::ImageFormat`] for other
-    /// formats and [`Error::LimitExceeded`] for bytes past the source entry
+    /// Returns typed selector errors, [`Refusal::InvalidGeometry`],
+    /// [`Refusal::InvalidImage`] for a file name without a stem,
+    /// [`Refusal::Unsupported`] with [`Unsupported::ImageFormat`] for other
+    /// formats and [`Error::Limit`] for bytes past the source entry
     /// limit.
     ///
     /// ```no_run
@@ -1085,16 +1129,16 @@ impl<'a> Edit<'a> {
         geometry: Geometry,
     ) -> Result<&mut Self, Error> {
         if !geometry.is_valid() {
-            return Err(Error::InvalidGeometry);
+            return Err(Error::Refused(Refusal::InvalidGeometry));
         }
         if author::sniff(bytes).is_none() {
-            return Err(Error::Unsupported {
+            return Err(Error::Refused(Refusal::Unsupported {
                 reason: Unsupported::ImageFormat,
-            });
+            }));
         }
         let maximum = self.source.source_limits().max_entry_bytes();
         if bytes.len() as u64 > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::EntryBytes,
                 observed: bytes.len() as u64,
                 maximum,
@@ -1106,7 +1150,7 @@ impl<'a> Edit<'a> {
         if stem.is_none_or(|stem| stem.is_empty() || stem.starts_with('.'))
             || file_name.contains(['/', '\\', '\0'])
         {
-            return Err(Error::InvalidImage);
+            return Err(Error::Refused(Refusal::InvalidImage));
         }
         let selected = self.slide(slide.into())?;
         self.check_drawable_limit(selected.identifier)?;
@@ -1161,10 +1205,10 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// Returns typed selector errors, [`Error::InvalidGeometry`],
-    /// [`Error::InvalidTableSize`] (also for a seeded cell outside the
-    /// table or a non-finite number), [`Error::LimitExceeded`], and
-    /// [`Error::Unsupported`] with [`Unsupported::TableTemplate`] for a deck
+    /// Returns typed selector errors, [`Refusal::InvalidGeometry`],
+    /// [`Refusal::InvalidTableSize`] (also for a seeded cell outside the
+    /// table or a non-finite number), [`Error::Limit`], and
+    /// [`Refusal::Unsupported`] with [`Unsupported::TableTemplate`] for a deck
     /// without a slide table.
     ///
     /// ```no_run
@@ -1190,12 +1234,12 @@ impl<'a> Edit<'a> {
         table: NewTable,
     ) -> Result<&mut Self, Error> {
         if !table.geometry.is_valid() {
-            return Err(Error::InvalidGeometry);
+            return Err(Error::Refused(Refusal::InvalidGeometry));
         }
-        let size = Error::InvalidTableSize {
+        let size = Error::Refused(Refusal::InvalidTableSize {
             rows: table.rows,
             columns: table.columns,
-        };
+        });
         if !litchi_numbers_wire::table_create::admits_size(table.rows, table.columns)
             || table.cells.iter().any(|(row, column, value)| {
                 *row >= table.rows
@@ -1213,7 +1257,7 @@ impl<'a> Edit<'a> {
             })
         }) + table.name.as_deref().map_or(0, str::len);
         if text_bytes > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::TextBytes,
                 observed: text_bytes as u64,
                 maximum: maximum as u64,
@@ -1222,9 +1266,9 @@ impl<'a> Edit<'a> {
         let selected = self.slide(slide.into())?;
         self.check_drawable_limit(selected.identifier)?;
         let (template, count) = self.table_template()?;
-        let template = template.ok_or(Error::Unsupported {
+        let template = template.ok_or(Error::Refused(Refusal::Unsupported {
             reason: Unsupported::TableTemplate,
-        })?;
+        }))?;
         let staged = self
             .operations
             .iter()
@@ -1255,7 +1299,7 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// Typed selector errors, and [`Error::Unsupported`] for drawables other
+    /// Typed selector errors, and [`Refusal::Unsupported`] for drawables other
     /// than text boxes and shapes.
     pub fn text_admits_combined_splice<'s>(
         &mut self,
@@ -1265,9 +1309,9 @@ impl<'a> Edit<'a> {
     ) -> Result<bool, Error> {
         let (_, item) = self.drawable(slide.into(), drawable.into())?;
         let (Kind::TextBox | Kind::Shape, Some(storage)) = (item.kind, item.storage) else {
-            return Err(Error::Unsupported {
+            return Err(Error::Refused(Refusal::Unsupported {
                 reason: Unsupported::Kind { kind: item.kind },
-            });
+            }));
         };
         stage::storage_admits_combined_splice(self.source, storage, hull)
     }
@@ -1283,10 +1327,10 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// Returns typed selector errors, [`Error::Unsupported`] for drawables
+    /// Returns typed selector errors, [`Refusal::Unsupported`] for drawables
     /// other than text boxes and shapes and, with
     /// [`Unsupported::InlineObjects`], for a change that would consume or
-    /// introduce an inline object marker, and [`Error::LimitExceeded`] past
+    /// introduce an inline object marker, and [`Error::Limit`] past
     /// the semantic text limit. A storage shared with other objects is
     /// refused by [`Self::commit`] ([`Unsupported::ExternalReferences`]).
     ///
@@ -1311,7 +1355,7 @@ impl<'a> Edit<'a> {
     ) -> Result<&mut Self, Error> {
         let maximum = self.source.semantic_limits().max_text_bytes();
         if text.len() > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::TextBytes,
                 observed: text.len() as u64,
                 maximum: maximum as u64,
@@ -1321,9 +1365,9 @@ impl<'a> Edit<'a> {
         let (Kind::TextBox | Kind::Shape, Some(storage), Some(current)) =
             (item.kind, item.storage, item.text.as_deref())
         else {
-            return Err(Error::Unsupported {
+            return Err(Error::Refused(Refusal::Unsupported {
                 reason: Unsupported::Kind { kind: item.kind },
-            });
+            }));
         };
         let earlier = self
             .operations
@@ -1336,9 +1380,9 @@ impl<'a> Edit<'a> {
             });
         let base = earlier.as_deref().map_or(current, |text| &**text);
         if text_change_touches_markers(base, text) {
-            return Err(Error::Unsupported {
+            return Err(Error::Refused(Refusal::Unsupported {
                 reason: Unsupported::InlineObjects,
-            });
+            }));
         }
         if let Some(earlier) = earlier {
             *earlier = text.into();
@@ -1368,8 +1412,8 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// Returns typed selector errors, [`Error::InvalidSpan`],
-    /// [`Error::Unsupported`] for drawables other than text boxes, shapes and
+    /// Returns typed selector errors, [`Refusal::InvalidSpan`],
+    /// [`Refusal::Unsupported`] for drawables other than text boxes, shapes and
     /// title and body placeholders, and [`Unsupported::TextStyling`] for a
     /// style that sets nothing; a
     /// storage shared with other objects is refused by [`Self::commit`].
@@ -1412,9 +1456,9 @@ impl<'a> Edit<'a> {
             Some(current),
         ) = (item.kind, item.storage, item.text.as_deref())
         else {
-            return Err(Error::Unsupported {
+            return Err(Error::Refused(Refusal::Unsupported {
                 reason: Unsupported::Kind { kind: item.kind },
-            });
+            }));
         };
         let staged_text = self
             .operations
@@ -1428,12 +1472,12 @@ impl<'a> Edit<'a> {
             });
         let text = staged_text.unwrap_or(current);
         if span.start() >= span.end() || span.end() > text.chars().count() {
-            return Err(Error::InvalidSpan);
+            return Err(Error::Refused(Refusal::InvalidSpan));
         }
         if style == Style::new() {
-            return Err(Error::Unsupported {
+            return Err(Error::Refused(Refusal::Unsupported {
                 reason: Unsupported::TextStyling,
-            });
+            }));
         }
         self.operations.push(Operation::TextStyle {
             slide: selected.identifier,
@@ -1454,8 +1498,8 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// Returns typed selector errors, [`Error::InvalidSpan`],
-    /// [`Error::Unsupported`] with [`Unsupported::Kind`] for a slide
+    /// Returns typed selector errors, [`Refusal::InvalidSpan`],
+    /// [`Refusal::Unsupported`] with [`Unsupported::Kind`] for a slide
     /// without notes and [`Unsupported::TextStyling`] for a style that sets
     /// nothing; notes stored outside their slide's component, or a storage
     /// other objects reference, are refused by [`Self::commit`].
@@ -1488,16 +1532,16 @@ impl<'a> Edit<'a> {
         let (note, storage, text) =
             super::slide_notes::notes_identity(self.source, selected.position)
                 .map_err(|_error| Error::InvalidSource)?
-                .ok_or(Error::Unsupported {
+                .ok_or(Error::Refused(Refusal::Unsupported {
                     reason: Unsupported::Kind { kind: Kind::Other },
-                })?;
+                }))?;
         if span.start() >= span.end() || span.end() > text.chars().count() {
-            return Err(Error::InvalidSpan);
+            return Err(Error::Refused(Refusal::InvalidSpan));
         }
         if style == Style::new() {
-            return Err(Error::Unsupported {
+            return Err(Error::Refused(Refusal::Unsupported {
                 reason: Unsupported::TextStyling,
-            });
+            }));
         }
         self.operations.push(Operation::NotesStyle {
             slide: selected.identifier,
@@ -1519,8 +1563,8 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// Typed selector errors, [`Error::Unsupported`] for drawables other
-    /// than tables, [`Error::InvalidSpan`] for a cell outside the table.
+    /// Typed selector errors, [`Refusal::Unsupported`] for drawables other
+    /// than tables, [`Refusal::InvalidSpan`] for a cell outside the table.
     ///
     /// ```no_run
     /// use litchi_keynote::slide::drawable::TableCellValue;
@@ -1551,14 +1595,14 @@ impl<'a> Edit<'a> {
     ) -> Result<&mut Self, Error> {
         let (selected, item) = self.drawable(slide.into(), drawable.into())?;
         if item.kind != Kind::Table {
-            return Err(Error::Unsupported {
+            return Err(Error::Refused(Refusal::Unsupported {
                 reason: Unsupported::Kind { kind: item.kind },
-            });
+            }));
         }
         if let TableCellValue::Number(number) = value
             && !number.is_finite()
         {
-            return Err(Error::InvalidSpan);
+            return Err(Error::Refused(Refusal::InvalidSpan));
         }
         self.operations.push(Operation::TableCell {
             slide: selected.identifier,
@@ -1577,7 +1621,7 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Unsupported`] for drawables referenced from outside
+    /// Returns [`Refusal::Unsupported`] for drawables referenced from outside
     /// their private graph, [`Error::Verification`] when the candidate does
     /// not read back as staged, and typed source, limit and allocation
     /// errors.
@@ -1793,7 +1837,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns typed selector errors, [`Error::LimitExceeded`] past the
+    /// Returns typed selector errors, [`Error::Limit`] past the
     /// semantic reference or text limits and [`Error::InvalidSource`] for
     /// malformed slides.
     pub fn slide_drawable_list<'s>(
@@ -1826,7 +1870,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns typed selector errors and [`Error::Unsupported`] for
+    /// Returns typed selector errors and [`Refusal::Unsupported`] for
     /// drawables without text.
     pub fn slide_drawable_text_runs<'s>(
         &self,
@@ -1836,17 +1880,16 @@ impl Package {
         let selected = select_slide(self, slide.into())?;
         let inventory = read_inventory(self, selected.identifier, read_limits(self)?)?;
         let selector = drawable.into();
-        let item =
-            inventory
-                .items
-                .get(selector.as_index())
-                .ok_or(Error::DrawablePositionNotFound {
-                    position: selector.as_position(),
-                })?;
+        let item = inventory
+            .items
+            .get(selector.as_index())
+            .ok_or(Error::Refused(Refusal::DrawablePositionNotFound {
+                position: selector.as_position(),
+            }))?;
         let (Some(storage), Some(text_value)) = (item.storage, item.text.as_deref()) else {
-            return Err(Error::Unsupported {
+            return Err(Error::Refused(Refusal::Unsupported {
                 reason: Unsupported::Kind { kind: item.kind },
-            });
+            }));
         };
         let wire = self
             .semantic_wire_limits()
@@ -1871,7 +1914,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns typed selector errors and [`Error::Unsupported`] for a slide
+    /// Returns typed selector errors and [`Refusal::Unsupported`] for a slide
     /// without notes.
     pub fn slide_notes_text_runs<'s>(
         &self,
@@ -1880,9 +1923,9 @@ impl Package {
         let selected = select_slide(self, slide.into())?;
         let (_, storage, text_value) = super::slide_notes::notes_identity(self, selected.position)
             .map_err(|_error| Error::InvalidSource)?
-            .ok_or(Error::Unsupported {
+            .ok_or(Error::Refused(Refusal::Unsupported {
                 reason: Unsupported::Kind { kind: Kind::Other },
-            })?;
+            }))?;
         let wire = self
             .semantic_wire_limits()
             .map_err(|_error| Error::InvalidSource)?;
@@ -1979,8 +2022,10 @@ fn select_slide(package: &Package, selector: SlideSelector<'_>) -> Result<Select
         .select_slide(selector)
         .map_err(map_selector_error)?
         .ok_or(match selector {
-            SlideSelector::Name(_) => Error::SlideNameNotFound,
-            SlideSelector::Position(position) => Error::SlidePositionNotFound { position },
+            SlideSelector::Name(_) => Error::Refused(Refusal::SlideNameNotFound),
+            SlideSelector::Position(position) => {
+                Error::Refused(Refusal::SlidePositionNotFound { position })
+            },
         })?
         .position();
     let record = package
@@ -2011,12 +2056,12 @@ fn read_inventory(
 ) -> Result<SlideDrawables, Error> {
     inventory::read_slide(source, slide, limits).map_err(|failure| match failure {
         ReadFailure::Structure(error) => lift(error),
-        ReadFailure::Drawables { observed, maximum } => Error::LimitExceeded {
+        ReadFailure::Drawables { observed, maximum } => Error::Limit {
             kind: LimitKind::Drawables,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        ReadFailure::TextBytes { observed, maximum } => Error::LimitExceeded {
+        ReadFailure::TextBytes { observed, maximum } => Error::Limit {
             kind: LimitKind::TextBytes,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -2415,7 +2460,7 @@ fn check_object_limit(source: &Package, workspace: &Workspace<'_>) -> Result<(),
         .structure_object_count()
         .saturating_add(workspace.created_objects());
     if observed > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::Objects,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -2427,20 +2472,22 @@ fn check_object_limit(source: &Package, workspace: &Workspace<'_>) -> Result<(),
 fn physical_source(package: &Package) -> Result<Arc<[u8]>, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) if source.source_is_exact() => Ok(source.shared_source()),
-        PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => {
+            Err(Error::Refused(Refusal::UnsupportedSource))
+        },
     }
 }
 
 /// Lift a kernel error into this family's vocabulary.
 fn lift(error: StructureError) -> Error {
     match error {
-        StructureError::UnsupportedContent(_) => Error::Unsupported {
+        StructureError::UnsupportedContent(_) => Error::Refused(Refusal::Unsupported {
             reason: Unsupported::UnmodelledContent,
-        },
-        StructureError::UnsupportedRegistry => Error::Unsupported {
+        }),
+        StructureError::UnsupportedRegistry => Error::Refused(Refusal::Unsupported {
             reason: Unsupported::RegistryShape,
-        },
-        StructureError::IdentifierOverflow => Error::LimitExceeded {
+        }),
+        StructureError::IdentifierOverflow => Error::Limit {
             kind: LimitKind::Identifiers,
             observed: u64::MAX,
             maximum: u64::MAX,
@@ -2449,7 +2496,7 @@ fn lift(error: StructureError) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 StructureLimit::WireBytes => LimitKind::WireBytes,
                 StructureLimit::WireFields => LimitKind::WireFields,
@@ -2472,8 +2519,8 @@ fn lift(error: StructureError) -> Error {
 
 fn map_selector_error(error: SlideSelectorError) -> Error {
     match error {
-        SlideSelectorError::EmptySlideName => Error::EmptySlideName,
-        SlideSelectorError::DuplicateSlideName { .. } => Error::AmbiguousSelector,
+        SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        SlideSelectorError::DuplicateSlideName { .. } => Error::Refused(Refusal::AmbiguousSelector),
     }
 }
 
@@ -2484,7 +2531,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             path: _,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::SemanticLimitKind::Objects => LimitKind::Objects,
                 super::SemanticLimitKind::Slides => LimitKind::Slides,
@@ -2501,7 +2548,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             path: _,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,

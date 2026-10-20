@@ -110,22 +110,10 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// No rooted sheet matched a selector.
-    #[error("the Numbers workbook has no sheet matching the requested selector")]
-    SheetNotFound,
-    /// No table on the selected source sheet matched the selector.
-    #[error("the selected Numbers sheet has no table matching the requested selector")]
-    TableNotFound,
-    /// A changed edit targeted an effectively locked table.
-    #[error("the selected Numbers table is locked at {path:?}")]
-    TableLocked { path: Path },
-    /// The destination sheet already holds a table of the relocated
-    /// table's name; table names are unique within a sheet.
-    #[error("the destination Numbers sheet already has a table of that name at {path:?}")]
-    DuplicateTableName { path: Path },
-    /// The exact physical source cannot be rewritten safely.
-    #[error("this Numbers source does not support exact table relocation")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// Rooted ownership, metadata, or wire framing is invalid.
     #[error("the Numbers table-relocation source is invalid at {path:?}")]
     InvalidSource { path: Path },
@@ -133,7 +121,7 @@ pub enum Error {
     #[error(
         "Numbers table relocation {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category that exceeded its ceiling.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -152,6 +140,49 @@ pub enum Error {
     /// The patch was produced from a different exact source artifact.
     #[error("the Numbers table-relocation patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// No rooted sheet matched a selector.
+    #[error("the Numbers workbook has no sheet matching the requested selector")]
+    SheetNotFound,
+    /// No table on the selected source sheet matched the selector.
+    #[error("the selected Numbers sheet has no table matching the requested selector")]
+    TableNotFound,
+    /// A changed edit targeted an effectively locked table.
+    #[error("the selected Numbers table is locked at {path:?}")]
+    TableLocked { path: Path },
+    /// The destination sheet already holds a table of the relocated
+    /// table's name; table names are unique within a sheet.
+    #[error("the destination Numbers sheet already has a table of that name at {path:?}")]
+    DuplicateTableName { path: Path },
+    /// The exact physical source cannot be rewritten safely.
+    #[error("this Numbers source does not support exact table relocation")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SheetNotFound { .. } | Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::TableLocked { .. } => RefusalKind::Protected,
+            Self::DuplicateTableName { .. } => RefusalKind::InvalidValue,
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -444,8 +475,8 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::SheetNotFound`] or [`Error::TableNotFound`] for a
-    /// selector that does not resolve, and [`Error::DuplicateTableName`]
+    /// Returns [`Refusal::SheetNotFound`] or [`Refusal::TableNotFound`] for a
+    /// selector that does not resolve, and [`Refusal::DuplicateTableName`]
     /// when the destination sheet already holds a table of the relocated
     /// table's name.
     pub fn edit_table_relocation<'source_sheet, 'table, 'destination_sheet>(
@@ -459,7 +490,7 @@ impl Package {
             .document
             .sheet(source_sheet.into())
             .map_err(|_error| invalid_source(Path::Package))?
-            .ok_or(Error::SheetNotFound)?;
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?;
         let source_sheet_position = source_sheet_semantic.index();
         let source_table_position = resolve_table_position(
             source_sheet_semantic,
@@ -475,7 +506,7 @@ impl Package {
             .document
             .sheet(destination_sheet.into())
             .map_err(|_error| invalid_source(Path::Package))?
-            .ok_or(Error::SheetNotFound)?;
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?;
         let destination_sheet_position = destination_sheet_semantic.index();
         let path = Path::Table {
             source_sheet: source_sheet_position,
@@ -491,7 +522,7 @@ impl Package {
                 .tables()
                 .any(|table| Some(table.name()) == name)
             {
-                return Err(Error::DuplicateTableName { path });
+                return Err(Error::Refused(Refusal::DuplicateTableName { path }));
             }
         }
         let table_target =
@@ -607,10 +638,10 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         });
     }
     if edit.table.locked == LockState::Locked {
-        return Err(Error::TableLocked { path: edit.path() });
+        return Err(Error::Refused(Refusal::TableLocked { path: edit.path() }));
     }
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     verify_source_state(edit.source, edit.operation)?;
     let source_previews = root_preview_deletions(catalog)?;
@@ -649,7 +680,7 @@ fn resolve_table_position(
                 .tables()
                 .nth(index)
                 .map(|_table| index)
-                .ok_or(Error::TableNotFound)
+                .ok_or(Error::Refused(Refusal::TableNotFound))
         },
         TableSelector::Name(name) => {
             let mut matches = sheet
@@ -657,7 +688,7 @@ fn resolve_table_position(
                 .enumerate()
                 .filter(|(_index, table)| table.name() == name);
             let Some((index, _table)) = matches.next() else {
-                return Err(Error::TableNotFound);
+                return Err(Error::Refused(Refusal::TableNotFound));
             };
             if matches.next().is_some() {
                 return Err(invalid_source(path));
@@ -703,7 +734,7 @@ pub(super) fn resolve_sheet_target(
     let sheet_identifier = table_headers::resolve::local_reference_identifier(
         sheet_payloads
             .get(sheet_position)
-            .ok_or(Error::SheetNotFound)?,
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?,
     )
     .map_err(|error| map_header_error(error, path))?;
     let resolved = source
@@ -855,7 +886,7 @@ fn rewrite_bytes_with_parent_policy(
             .find(|entry| entry.name() == name)
             .ok_or_else(|| invalid_source(operation.path()))?;
         if entry.is_opaque() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         let stream = SnappyStream::decompress_with_limits(
             entry.data(),
@@ -923,7 +954,7 @@ fn rewrite_bytes_with_parent_policy(
     let output = source_catalog
         .package()
         .reassemble_with_deletions_to_bytes(&edits, deleted_previews, physical_limits)
-        .map_err(|_error| Error::UnsupportedSource)?;
+        .map_err(|_error| Error::Refused(Refusal::UnsupportedSource))?;
     Ok(output)
 }
 
@@ -1988,7 +2019,7 @@ pub(super) fn physical_source(source: &Package) -> Result<&SourceCatalog, Error>
         .state
         .components
         .physical()
-        .ok_or(Error::UnsupportedSource)
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))
 }
 
 fn invalid_source(path: Path) -> Error {
@@ -1997,13 +2028,21 @@ fn invalid_source(path: Path) -> Error {
 
 pub(super) fn map_header_error(error: table_headers::Error, path: Path) -> Error {
     match error {
-        table_headers::Error::SheetNotFound => Error::SheetNotFound,
-        table_headers::Error::TableNotFound => Error::TableNotFound,
-        table_headers::Error::TableLocked { .. } => Error::TableLocked { path },
-        table_headers::Error::UnsupportedSource => Error::UnsupportedSource,
-        table_headers::Error::LimitExceeded {
+        table_headers::Error::Refused(table_headers::Refusal::SheetNotFound) => {
+            Error::Refused(Refusal::SheetNotFound)
+        },
+        table_headers::Error::Refused(table_headers::Refusal::TableNotFound) => {
+            Error::Refused(Refusal::TableNotFound)
+        },
+        table_headers::Error::Refused(table_headers::Refusal::TableLocked { .. }) => {
+            Error::Refused(Refusal::TableLocked { path })
+        },
+        table_headers::Error::Refused(table_headers::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
+        table_headers::Error::Limit {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::WireWork,
             observed,
             maximum,
@@ -2018,7 +2057,7 @@ fn map_wire_error(error: litchi_iwa_common::Error, path: Path) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             observed, limit, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::WireWork,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(limit).unwrap_or(u64::MAX),
@@ -2033,7 +2072,7 @@ fn map_core_error(error: CoreError, path: Path) -> Error {
     match error {
         CoreError::Limit {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::PayloadBytes,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),

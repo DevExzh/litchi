@@ -48792,7 +48792,9 @@ fn rewrite_movie_title_operation(
             )
 
             unsupported_arm = (
-                "Err(litchi_keynote::slide::table::merge::transaction::Error::UnsupportedDependency) => {"
+                "Err(litchi_keynote::slide::table::merge::transaction::Error::Refused(\n"
+                "            litchi_keynote::slide::table::merge::transaction::Refusal::UnsupportedDependency,\n"
+                "        )) => {"
             )
             self.assertIn(unsupported_arm, reader_source)
             reader_path.write_text(

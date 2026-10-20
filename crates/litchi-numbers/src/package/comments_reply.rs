@@ -67,7 +67,7 @@ impl CommentReplyIndex {
     pub fn try_from_usize(index: usize) -> Result<Self, Error> {
         u32::try_from(index)
             .map(Self)
-            .map_err(|_| Error::IndexOverflow { observed: index })
+            .map_err(|_| Error::Refused(Refusal::IndexOverflow { observed: index }))
     }
 }
 
@@ -210,41 +210,18 @@ pub enum LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// An A1 address was malformed.
-    #[error("invalid Numbers comment-reply cell address")]
-    InvalidAddress,
-    /// A sheet selector did not resolve.
-    #[error("the Numbers workbook has no sheet matching the comment-reply selector")]
-    SheetNotFound,
-    /// A table selector did not resolve.
-    #[error("the selected Numbers sheet has no table matching the comment-reply selector")]
-    TableNotFound,
-    /// A selected cell was outside the table.
-    #[error("the selected Numbers comment-reply cell is outside the table")]
-    OutOfBounds { path: Path },
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The source graph or its native framing was not authoritative.
     #[error("the Numbers comment-reply source is invalid at {path:?}")]
     InvalidSource { path: Path },
-    /// The package does not retain exact physical provenance.
-    #[error("this Numbers source does not support exact comment-reply editing")]
-    UnsupportedSource,
-    /// The selected cell has no rooted comment.
-    #[error("the selected Numbers cell has no rooted comment")]
-    CommentNotFound { path: Path },
-    /// The selected direct-reply ordinal does not exist.
-    #[error("the selected Numbers direct-reply ordinal does not exist")]
-    ReplyNotFound { path: Path },
-    /// The source graph needs a broader owner than this bounded slice.
-    #[error("the Numbers comment-reply source has an unsupported dependency at {path:?}")]
-    UnsupportedDependency { path: Path },
-    /// The selected table is locked against comment-reply mutation.
-    #[error("the selected Numbers table is locked at {path:?}")]
-    TableLocked { path: Path },
     /// An operation-local resource ceiling was exceeded.
     #[error(
         "Numbers comment-reply {kind:?} limit exceeded: observed {observed}, maximum {maximum} at {path:?}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource axis.
         kind: LimitKind,
         /// Observed or requested quantity.
@@ -268,10 +245,71 @@ pub enum Error {
     /// A patch was applied to a different exact source.
     #[error("the Numbers comment-reply patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// An A1 address was malformed.
+    #[error("invalid Numbers comment-reply cell address")]
+    InvalidAddress,
+    /// A sheet selector did not resolve.
+    #[error("the Numbers workbook has no sheet matching the comment-reply selector")]
+    SheetNotFound,
+    /// A table selector did not resolve.
+    #[error("the selected Numbers sheet has no table matching the comment-reply selector")]
+    TableNotFound,
+    /// A selected cell was outside the table.
+    #[error("the selected Numbers comment-reply cell is outside the table")]
+    OutOfBounds { path: Path },
+    /// The package does not retain exact physical provenance.
+    #[error("this Numbers source does not support exact comment-reply editing")]
+    UnsupportedSource,
+    /// The selected cell has no rooted comment.
+    #[error("the selected Numbers cell has no rooted comment")]
+    CommentNotFound { path: Path },
+    /// The selected direct-reply ordinal does not exist.
+    #[error("the selected Numbers direct-reply ordinal does not exist")]
+    ReplyNotFound { path: Path },
+    /// The source graph needs a broader owner than this bounded slice.
+    #[error("the Numbers comment-reply source has an unsupported dependency at {path:?}")]
+    UnsupportedDependency { path: Path },
+    /// The selected table is locked against comment-reply mutation.
+    #[error("the selected Numbers table is locked at {path:?}")]
+    TableLocked { path: Path },
     /// A platform-sized ordinal could not be represented by the semantic
     /// index type.
     #[error("the comment-reply ordinal is too large")]
     IndexOverflow { observed: usize },
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::InvalidAddress { .. } | Self::OutOfBounds { .. } | Self::IndexOverflow { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SheetNotFound { .. }
+            | Self::TableNotFound { .. }
+            | Self::CommentNotFound { .. }
+            | Self::ReplyNotFound { .. } => RefusalKind::NotFound,
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::TableLocked { .. } => RefusalKind::Protected,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// Content-free publication diagnostics.
@@ -413,9 +451,9 @@ impl Edit<'_> {
     pub fn set(mut self, index: CommentReplyIndex, text: impl AsRef<str>) -> Self {
         let ordinal = index.index() as usize;
         if ordinal >= self.before.len() {
-            self.staging_error = Some(Error::ReplyNotFound {
+            self.staging_error = Some(Error::Refused(Refusal::ReplyNotFound {
                 path: self.path.reply(index),
-            });
+            }));
             return self;
         }
         let (timestamp, author) = self
@@ -456,9 +494,9 @@ impl Edit<'_> {
     pub fn remove(mut self, index: CommentReplyIndex) -> Self {
         let ordinal = index.index() as usize;
         if ordinal >= self.before.len() {
-            self.staging_error = Some(Error::ReplyNotFound {
+            self.staging_error = Some(Error::Refused(Refusal::ReplyNotFound {
                 path: self.path.reply(index),
-            });
+            }));
             return self;
         }
         let Ok(after) = clone_replies(&self.before, self.path) else {
@@ -610,19 +648,33 @@ struct ReplyState {
 
 fn map_root_error(error: RootError, path: Path) -> Error {
     match error {
-        RootError::InvalidAddress => Error::InvalidAddress,
-        RootError::SheetNotFound => Error::SheetNotFound,
-        RootError::TableNotFound => Error::TableNotFound,
-        RootError::OutOfBounds { .. } => Error::OutOfBounds { path },
-        RootError::UnsupportedSource => Error::UnsupportedSource,
-        RootError::CommentNotFound { .. } => Error::CommentNotFound { path },
-        RootError::UnsupportedDependency { .. } => Error::UnsupportedDependency { path },
-        RootError::LimitExceeded {
+        RootError::Refused(crate::package::comments::Refusal::InvalidAddress) => {
+            Error::Refused(Refusal::InvalidAddress)
+        },
+        RootError::Refused(crate::package::comments::Refusal::SheetNotFound) => {
+            Error::Refused(Refusal::SheetNotFound)
+        },
+        RootError::Refused(crate::package::comments::Refusal::TableNotFound) => {
+            Error::Refused(Refusal::TableNotFound)
+        },
+        RootError::Refused(crate::package::comments::Refusal::OutOfBounds { .. }) => {
+            Error::Refused(Refusal::OutOfBounds { path })
+        },
+        RootError::Refused(crate::package::comments::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
+        RootError::Refused(crate::package::comments::Refusal::CommentNotFound { .. }) => {
+            Error::Refused(Refusal::CommentNotFound { path })
+        },
+        RootError::Refused(crate::package::comments::Refusal::UnsupportedDependency { .. }) => {
+            Error::Refused(Refusal::UnsupportedDependency { path })
+        },
+        RootError::Limit {
             kind,
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 RootLimitKind::InputBytes => LimitKind::InputBytes,
                 RootLimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -645,12 +697,12 @@ fn map_root_error(error: RootError, path: Path) -> Error {
 
 fn map_budget_error(error: BudgetError, path: Path) -> Error {
     match error {
-        BudgetError::LimitExceeded {
+        BudgetError::Limit {
             kind,
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 BudgetLimitKind::InputBytes => LimitKind::InputBytes,
                 BudgetLimitKind::OutputBytes | BudgetLimitKind::PackageBytes => {
@@ -684,14 +736,20 @@ fn map_budget_error(error: BudgetError, path: Path) -> Error {
             path,
         },
         BudgetError::Allocation { amount, .. } => Error::Allocation { amount, path },
-        BudgetError::UnsupportedSource => Error::UnsupportedSource,
-        BudgetError::UnsupportedDependency { .. } => Error::UnsupportedDependency { path },
+        BudgetError::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource,
+        ) => Error::Refused(Refusal::UnsupportedSource),
+        BudgetError::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { .. },
+        ) => Error::Refused(Refusal::UnsupportedDependency { path }),
         BudgetError::Verification => Error::Verification,
         BudgetError::PatchConflict => Error::PatchConflict,
-        BudgetError::SheetNotFound
-        | BudgetError::TableNotFound
-        | BudgetError::CellNotFound
-        | BudgetError::TableLocked { .. }
+        BudgetError::Refused(crate::package::table_cell_pop_up_menu::Refusal::SheetNotFound)
+        | BudgetError::Refused(crate::package::table_cell_pop_up_menu::Refusal::TableNotFound)
+        | BudgetError::Refused(crate::package::table_cell_pop_up_menu::Refusal::CellNotFound)
+        | BudgetError::Refused(crate::package::table_cell_pop_up_menu::Refusal::TableLocked {
+            ..
+        })
         | BudgetError::InvalidSource { .. } => Error::InvalidSource { path },
     }
 }
@@ -762,9 +820,9 @@ fn charge_metadata_requirements(
 fn map_metadata_error(error: super::super::comments_metadata::MetadataError, path: Path) -> Error {
     match error.kind {
         super::super::comments_metadata::FailureKind::Unsupported => {
-            Error::UnsupportedDependency { path }
+            Error::Refused(Refusal::UnsupportedDependency { path })
         },
-        super::super::comments_metadata::FailureKind::Limit => Error::LimitExceeded {
+        super::super::comments_metadata::FailureKind::Limit => Error::Limit {
             kind: LimitKind::Work,
             observed: error.observed,
             maximum: error.maximum,
@@ -790,12 +848,12 @@ fn map_native_error(
 ) -> Error {
     match error {
         super::super::comments_reply_native::NativeReplyError::UnsupportedDependency => {
-            Error::UnsupportedDependency { path }
+            Error::Refused(Refusal::UnsupportedDependency { path })
         },
         super::super::comments_reply_native::NativeReplyError::Allocation => {
             Error::Allocation { amount: 1, path }
         },
-        super::super::comments_reply_native::NativeReplyError::Limit => Error::LimitExceeded {
+        super::super::comments_reply_native::NativeReplyError::Limit => Error::Limit {
             kind: LimitKind::Work,
             observed: 1,
             maximum: 0,
@@ -818,7 +876,7 @@ fn reply_from_text(
 ) -> Result<CommentReply, Error> {
     let maximum = source.state.options.semantic().max_output_text_bytes();
     if text.len() > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::TextBytes,
             observed: text.len(),
             maximum,
@@ -870,11 +928,13 @@ fn resolve_reply_state<'sheet, 'table>(
 ) -> Result<ReplyState, Error> {
     let located = resolve_comment(source, sheet, table, position).map_err(|error| {
         let path = match error {
-            RootError::OutOfBounds { path }
+            RootError::Refused(crate::package::comments::Refusal::OutOfBounds { path })
             | RootError::InvalidSource { path }
-            | RootError::CommentNotFound { path }
-            | RootError::UnsupportedDependency { path }
-            | RootError::LimitExceeded { path, .. }
+            | RootError::Refused(crate::package::comments::Refusal::CommentNotFound { path })
+            | RootError::Refused(crate::package::comments::Refusal::UnsupportedDependency {
+                path,
+            })
+            | RootError::Limit { path, .. }
             | RootError::Allocation { path, .. } => root_to_reply_path(path),
             _ => Path::Package,
         };
@@ -882,7 +942,7 @@ fn resolve_reply_state<'sheet, 'table>(
     })?;
     let path = root_to_reply_path(located.target.path);
     if located.comment.is_none() {
-        return Err(Error::CommentNotFound { path });
+        return Err(Error::Refused(Refusal::CommentNotFound { path }));
     }
     let replies = source
         .table_cell_comment_replies(
@@ -899,7 +959,7 @@ fn resolve_reply_state<'sheet, 'table>(
         .as_ref()
         .ok_or(Error::InvalidSource { path })?;
     if !entry.owner.supports_text_rewrite() {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
     }
     Ok(ReplyState { located, replies })
 }
@@ -994,7 +1054,7 @@ fn reject_cross_member_references(
                         .is_some_and(|identifier| identifiers.contains(&identifier)))
         })
     {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
     }
 
     for (component_index, component) in source.state.components.catalog().iter().enumerate() {
@@ -1012,9 +1072,9 @@ fn reject_cross_member_references(
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     limits,
                 )
-                .map_err(|_| Error::UnsupportedDependency { path })?;
+                .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?;
             if probe.found {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
             }
         }
     }
@@ -1027,7 +1087,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         return no_op_commit(edit.source, path, &edit.before, &edit.after);
     }
     if edit.target.target.native.locked == crate::table::lock::State::Locked {
-        return Err(Error::TableLocked { path });
+        return Err(Error::Refused(Refusal::TableLocked { path }));
     }
     // The reply transaction owns one ledger from source ingress through the
     // private candidate reopen.  Start it before resolving the physical
@@ -1036,7 +1096,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let mut budget = TransactionBudget::new(edit.source);
     let catalog = physical_source(edit.source).map_err(|error| map_root_error(error, path))?;
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     budget
         .charge_package_source(catalog, BudgetPath::Package)
@@ -1077,7 +1137,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             .as_ref()
             .is_some_and(|entry| entry.storage_occurrences != 1)
     {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
     }
     // The complete global graph census is deliberately performed before any
     // native candidate allocation. It validates direct leaves, duplicate IDs,
@@ -1130,7 +1190,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     };
     let route = |route: super::MessageRoute| -> Result<NativeReplyObjectRoute, Error> {
         if route.component_index != component_index {
-            return Err(Error::UnsupportedDependency { path });
+            return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
         }
         let object = component
             .archive()
@@ -1271,9 +1331,10 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         list,
         root,
         replies: &replies,
-        tile_row: u32::try_from(edit.target.target.row).map_err(|_| Error::OutOfBounds { path })?,
+        tile_row: u32::try_from(edit.target.target.row)
+            .map_err(|_| Error::Refused(Refusal::OutOfBounds { path }))?,
         tile_column: u32::try_from(edit.target.target.column)
-            .map_err(|_| Error::OutOfBounds { path })?,
+            .map_err(|_| Error::Refused(Refusal::OutOfBounds { path }))?,
         comment_key,
         operation,
         new_root: root_identity,
@@ -1298,7 +1359,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         additions.push(
             metadata_facts
                 .uuid_addition(component, identity)
-                .map_err(|_| Error::UnsupportedDependency { path })?,
+                .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?,
         );
         let _ = ordinal;
     }
@@ -1307,12 +1368,12 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         removals.push(
             metadata_facts
                 .uuid_removal(component_index, *identifier)
-                .map_err(|_| Error::UnsupportedDependency { path })?,
+                .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?,
         );
     }
     let selectors = metadata_facts
         .touched_selectors(&component_indices)
-        .map_err(|_| Error::UnsupportedDependency { path })?;
+        .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?;
     let transition = CombinedBatch::new(
         metadata_facts.last_object_identifier(),
         fresh
@@ -1359,7 +1420,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         .state
         .components
         .physical()
-        .ok_or(Error::UnsupportedSource)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
     let edit_count = native.member_edits.len().saturating_add(1);
     budget
         .charge_allocations(edit_count.saturating_add(2), BudgetPath::Package)
@@ -1498,7 +1559,7 @@ fn pack_reply_metadata(
         .state
         .components
         .physical()
-        .ok_or(Error::UnsupportedSource)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
     let entry = physical
         .package()
         .iter()
@@ -1567,7 +1628,7 @@ fn pack_reply_metadata(
     if compressed.len() > maximum_compressed
         || compressed.len() > snappy_limits.max_compressed_stream()
     {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::CompressedBytes,
             observed: compressed.len(),
             maximum: maximum_compressed.min(snappy_limits.max_compressed_stream()),
@@ -1592,9 +1653,9 @@ impl Package {
         replies
             .get(index.index() as usize)
             .cloned()
-            .ok_or(Error::ReplyNotFound {
+            .ok_or(Error::Refused(Refusal::ReplyNotFound {
                 path: path.reply(index),
-            })
+            }))
     }
 
     /// Read one direct reply using an A1 address.
@@ -1605,7 +1666,7 @@ impl Package {
         address: &str,
         index: CommentReplyIndex,
     ) -> Result<CommentReply, Error> {
-        let position = At::from_a1(address).map_err(|_| Error::InvalidAddress)?;
+        let position = At::from_a1(address).map_err(|_| Error::Refused(Refusal::InvalidAddress))?;
         self.table_cell_comment_reply(sheet, table, position, index)
     }
 
@@ -1637,7 +1698,7 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
         address: &str,
     ) -> Result<Edit<'_>, Error> {
-        let position = At::from_a1(address).map_err(|_| Error::InvalidAddress)?;
+        let position = At::from_a1(address).map_err(|_| Error::Refused(Refusal::InvalidAddress))?;
         self.edit_table_cell_comment_replies(sheet, table, position)
     }
 
@@ -1664,7 +1725,7 @@ impl Package {
         index: CommentReplyIndex,
         text: impl AsRef<str>,
     ) -> Result<Commit, Error> {
-        let position = At::from_a1(address).map_err(|_| Error::InvalidAddress)?;
+        let position = At::from_a1(address).map_err(|_| Error::Refused(Refusal::InvalidAddress))?;
         self.set_table_cell_comment_reply(sheet, table, position, index, text)
     }
 
@@ -1689,7 +1750,7 @@ impl Package {
         address: &str,
         index: CommentReplyIndex,
     ) -> Result<Commit, Error> {
-        let position = At::from_a1(address).map_err(|_| Error::InvalidAddress)?;
+        let position = At::from_a1(address).map_err(|_| Error::Refused(Refusal::InvalidAddress))?;
         self.remove_table_cell_comment_reply(sheet, table, position, index)
     }
 
@@ -1714,7 +1775,7 @@ impl Package {
         address: &str,
         text: impl AsRef<str>,
     ) -> Result<Commit, Error> {
-        let position = At::from_a1(address).map_err(|_| Error::InvalidAddress)?;
+        let position = At::from_a1(address).map_err(|_| Error::Refused(Refusal::InvalidAddress))?;
         self.add_table_cell_comment_reply(sheet, table, position, text)
     }
 
@@ -1773,19 +1834,19 @@ fn require_exact_apply_source(source_is_exact: bool) -> Result<(), Error> {
     if source_is_exact {
         Ok(())
     } else {
-        Err(Error::UnsupportedSource)
+        Err(Error::Refused(Refusal::UnsupportedSource))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, require_exact_apply_source};
+    use super::{Error, Refusal, require_exact_apply_source};
 
     #[test]
     fn changed_direct_apply_requires_exact_physical_provenance() {
         assert_eq!(
             require_exact_apply_source(false),
-            Err(Error::UnsupportedSource)
+            Err(Error::Refused(Refusal::UnsupportedSource))
         );
         assert_eq!(require_exact_apply_source(true), Ok(()));
     }

@@ -93,7 +93,7 @@ fn lowered_transaction_budget_fails_atomically() -> TestResult {
             .edit_body_table_deletion()
             .remove(BodyTableSelector::index(0))
             .and_then(|edit| edit.commit()),
-        Err(BodyTableDeletionError::LimitExceeded { .. })
+        Err(BodyTableDeletionError::Limit { .. })
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())

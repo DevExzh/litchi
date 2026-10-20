@@ -1296,7 +1296,7 @@ fn checked_mul_limit(left: u64, right: u64, kind: LimitKind) -> Result<u64, Erro
 }
 
 const fn limit_error(kind: LimitKind, observed: u64, maximum: u64) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed,
         maximum,
@@ -1477,7 +1477,7 @@ mod tests {
             .unwrap_err();
         assert!(matches!(
             error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::RetainedElements,
                 observed: 2,
                 maximum: 1,
@@ -1506,7 +1506,7 @@ mod tests {
         })();
         assert!(matches!(
             result,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::TransactionWork,
                 observed,
                 maximum,
@@ -1541,7 +1541,7 @@ mod tests {
         });
         assert!(matches!(
             result,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::TransactionWork,
                 observed,
                 maximum,
@@ -1685,7 +1685,7 @@ mod tests {
         let error = budget.preauthorize_publication(reservation).unwrap_err();
         assert!(matches!(
             error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::TransactionWork,
                 observed,
                 maximum,
@@ -1870,7 +1870,7 @@ mod tests {
         let error = tile_work_ceiling(remaining, 2_000, 1_002).unwrap_err();
         assert!(matches!(
             error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::TransactionWork,
                 observed: 1_002,
                 maximum: 1_001,

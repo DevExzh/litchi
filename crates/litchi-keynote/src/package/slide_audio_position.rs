@@ -94,6 +94,39 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The selected media graph or payload was malformed.
+    #[error("the Keynote audio-position source is invalid")]
+    InvalidSource,
+    /// A finite operation resource ceiling was exceeded.
+    #[error("Keynote audio position {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote audio-position transaction")]
+    Allocation { amount: usize },
+    /// Candidate reopening did not reproduce the staged position and locality.
+    #[error("the edited Keynote audio position failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote audio-position patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was not retained as an exact physical package.
     #[error("this Keynote source does not support physical audio-position edits")]
     UnsupportedSource,
@@ -115,31 +148,34 @@ pub enum Error {
     /// No audio control existed at a checked source-order position.
     #[error("the selected Keynote slide has no audio at position {position:?}")]
     MoviePositionNotFound { position: Position },
-    /// The selected media graph or payload was malformed.
-    #[error("the Keynote audio-position source is invalid")]
-    InvalidSource,
     /// A supplied or decoded coordinate was not finite.
     #[error("Keynote audio position must contain finite coordinates")]
     InvalidPosition,
-    /// A finite operation resource ceiling was exceeded.
-    #[error("Keynote audio position {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category that exceeded its limit.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote audio-position transaction")]
-    Allocation { amount: usize },
-    /// Candidate reopening did not reproduce the staged position and locality.
-    #[error("the edited Keynote audio position failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote audio-position patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::InvalidPosition { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::MoviePositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 impl From<super::slide_movie_geometry::Error> for Error {
@@ -148,27 +184,39 @@ impl From<super::slide_movie_geometry::Error> for Error {
             Error as SlideMovieGeometryError, LimitKind as SlideMovieGeometryLimitKind,
         };
         match error {
-            SlideMovieGeometryError::UnsupportedSource => Self::UnsupportedSource,
-            SlideMovieGeometryError::UnsupportedDependency => Self::UnsupportedDependency,
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::UnsupportedSource,
+            ) => Self::Refused(Refusal::UnsupportedSource),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::UnsupportedDependency,
+            ) => Self::Refused(Refusal::UnsupportedDependency),
             // Position-only audio edits preserve the native lock bit.  The
             // shared geometry selector can still report this for the
             // file-movie contract, but it is not an audio-position outcome.
-            SlideMovieGeometryError::Locked => Self::UnsupportedDependency,
-            SlideMovieGeometryError::AmbiguousSelector => Self::AmbiguousSelector,
-            SlideMovieGeometryError::EmptySlideName => Self::EmptySlideName,
-            SlideMovieGeometryError::SlideNameNotFound => Self::SlideNameNotFound,
-            SlideMovieGeometryError::SlidePositionNotFound { position } => {
-                Self::SlidePositionNotFound { position }
+            SlideMovieGeometryError::Refused(crate::slide::movie::geometry::Refusal::Locked) => {
+                Self::Refused(Refusal::UnsupportedDependency)
             },
-            SlideMovieGeometryError::MoviePositionNotFound { position } => {
-                Self::MoviePositionNotFound { position }
-            },
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::AmbiguousSelector,
+            ) => Self::Refused(Refusal::AmbiguousSelector),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::EmptySlideName,
+            ) => Self::Refused(Refusal::EmptySlideName),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::SlideNameNotFound,
+            ) => Self::Refused(Refusal::SlideNameNotFound),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::SlidePositionNotFound { position },
+            ) => Self::Refused(Refusal::SlidePositionNotFound { position }),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::MoviePositionNotFound { position },
+            ) => Self::Refused(Refusal::MoviePositionNotFound { position }),
             SlideMovieGeometryError::InvalidSource => Self::InvalidSource,
-            SlideMovieGeometryError::LimitExceeded {
+            SlideMovieGeometryError::Limit {
                 kind,
                 observed,
                 maximum,
-            } => Self::LimitExceeded {
+            } => Self::Limit {
                 kind: match kind {
                     SlideMovieGeometryLimitKind::InputBytes => LimitKind::InputBytes,
                     SlideMovieGeometryLimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -526,7 +574,7 @@ impl Package {
             });
         }
         if !catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         reopen_target_patch(self, patch, &mut budget)
     }
@@ -536,7 +584,7 @@ fn validate_position(position: Point) -> Result<(), Error> {
     if position.x.is_finite() && position.y.is_finite() {
         Ok(())
     } else {
-        Err(Error::InvalidPosition)
+        Err(Error::Refused(Refusal::InvalidPosition))
     }
 }
 
@@ -582,7 +630,7 @@ fn commit_edit(
     }
     let catalog = physical_catalog(source)?;
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let current = select_audio_with_budget(
         source,
@@ -705,7 +753,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::Slides => LimitKind::Slides,
                 SemanticLimitKind::References => LimitKind::References,
@@ -719,7 +767,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,

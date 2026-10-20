@@ -118,6 +118,44 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source graph or payload is malformed or inconsistent.
+    #[error("the Keynote direct-drawable comment source is invalid")]
+    InvalidSource,
+    /// A finite resource ceiling was exceeded.
+    #[error(
+        "Keynote direct-drawable comment {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        /// Resource category that exceeded its configured ceiling.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded semantic allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote comment transaction")]
+    Allocation { amount: usize },
+    /// Candidate reopening did not reproduce the requested semantic state.
+    #[error("the edited Keynote direct-drawable comment failed semantic verification")]
+    Verification,
+    /// A patch was presented to a different exact source or stale profile.
+    #[error("the Keynote direct-drawable comment patch does not match the exact source package")]
+    PatchConflict,
+    /// A lower-level package read failed at the semantic boundary.
+    #[error("the Keynote direct-drawable comment source could not be read")]
+    Read,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was not retained as an exact physical Keynote package.
     #[error("this Keynote source does not support direct-drawable comment edits")]
     UnsupportedSource,
@@ -148,33 +186,33 @@ pub enum Error {
     /// The selected graph is outside this owner’s safe mutation profile.
     #[error("the requested Keynote direct-drawable comment graph is unsupported")]
     UnsupportedDependency,
-    /// The source graph or payload is malformed or inconsistent.
-    #[error("the Keynote direct-drawable comment source is invalid")]
-    InvalidSource,
-    /// A finite resource ceiling was exceeded.
-    #[error(
-        "Keynote direct-drawable comment {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        /// Resource category that exceeded its configured ceiling.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded semantic allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote comment transaction")]
-    Allocation { amount: usize },
-    /// Candidate reopening did not reproduce the requested semantic state.
-    #[error("the edited Keynote direct-drawable comment failed semantic verification")]
-    Verification,
-    /// A patch was presented to a different exact source or stale profile.
-    #[error("the Keynote direct-drawable comment patch does not match the exact source package")]
-    PatchConflict,
-    /// A lower-level package read failed at the semantic boundary.
-    #[error("the Keynote direct-drawable comment source could not be read")]
-    Read,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::UnsupportedDrawable { .. }
+            | Self::UnsupportedDependency { .. } => RefusalKind::UnsupportedContent,
+            Self::EmptySlideName { .. } | Self::AmbiguousSelector { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::DrawablePositionNotFound { .. }
+            | Self::ReplyPositionNotFound { .. }
+            | Self::CommentNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 impl From<super::slide_media_lifecycle::Error> for Error {
@@ -333,7 +371,7 @@ impl<'a> Edit<'a> {
     /// Stage appending one ordered reply to the selected root comment.
     pub fn add_reply(mut self, text: impl AsRef<str>) -> Result<Self, Error> {
         if self.before.comment.is_none() {
-            return Err(Error::CommentNotFound);
+            return Err(Error::Refused(Refusal::CommentNotFound));
         }
         self.operation = Some(Operation::AddReply {
             text: copy_text(text.as_ref(), &mut self.budget)?,
@@ -366,7 +404,7 @@ impl<'a> Edit<'a> {
 
     fn ensure_reply(&self, selector: ReplySelector) -> Result<(), Error> {
         if self.before.comment.is_none() {
-            return Err(Error::CommentNotFound);
+            return Err(Error::Refused(Refusal::CommentNotFound));
         }
         if self
             .before
@@ -374,9 +412,9 @@ impl<'a> Edit<'a> {
             .get(selector.as_position().get())
             .is_none()
         {
-            return Err(Error::ReplyPositionNotFound {
+            return Err(Error::Refused(Refusal::ReplyPositionNotFound {
                 position: selector.as_position(),
-            });
+            }));
         }
         Ok(())
     }
@@ -789,13 +827,15 @@ fn charge_candidate_reopen(
 fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(catalog) if catalog.source_is_exact() => Ok(catalog),
-        PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => {
+            Err(Error::Refused(Refusal::UnsupportedSource))
+        },
     }
 }
 
 fn copy_text(text: &str, budget: &mut Budget) -> Result<Box<str>, Error> {
     if text.len() > MAX_COMMENT_TEXT_BYTES {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::CommentBytes,
             observed: text.len() as u64,
             maximum: MAX_COMMENT_TEXT_BYTES as u64,
@@ -950,21 +990,29 @@ fn verify_operation(
 fn map_lifecycle_error(error: super::slide_media_lifecycle::Error) -> Error {
     use super::slide_media_lifecycle::Error as SourceError;
     match error {
-        SourceError::UnsupportedSource => Error::UnsupportedSource,
-        SourceError::EmptySlideName => Error::EmptySlideName,
-        SourceError::SlideNameNotFound => Error::SlideNameNotFound,
-        SourceError::AmbiguousSelector => Error::AmbiguousSelector,
-        SourceError::SlidePositionNotFound { position } => {
-            Error::SlidePositionNotFound { position }
+        SourceError::Refused(crate::slide::media::lifecycle::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
         },
-        SourceError::MoviePositionNotFound { position } => {
-            Error::DrawablePositionNotFound { position }
+        SourceError::Refused(crate::slide::media::lifecycle::Refusal::EmptySlideName) => {
+            Error::Refused(Refusal::EmptySlideName)
         },
-        SourceError::LimitExceeded {
+        SourceError::Refused(crate::slide::media::lifecycle::Refusal::SlideNameNotFound) => {
+            Error::Refused(Refusal::SlideNameNotFound)
+        },
+        SourceError::Refused(crate::slide::media::lifecycle::Refusal::AmbiguousSelector) => {
+            Error::Refused(Refusal::AmbiguousSelector)
+        },
+        SourceError::Refused(crate::slide::media::lifecycle::Refusal::SlidePositionNotFound {
+            position,
+        }) => Error::Refused(Refusal::SlidePositionNotFound { position }),
+        SourceError::Refused(crate::slide::media::lifecycle::Refusal::MoviePositionNotFound {
+            position,
+        }) => Error::Refused(Refusal::DrawablePositionNotFound { position }),
+        SourceError::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_limit_kind(kind),
             observed,
             maximum,
@@ -974,10 +1022,13 @@ fn map_lifecycle_error(error: super::slide_media_lifecycle::Error) -> Error {
         SourceError::Verification => Error::Verification,
         SourceError::PatchConflict => Error::PatchConflict,
         // The comment route stages exactly one lifecycle operation itself.
-        SourceError::OperationAlreadyStaged | SourceError::NoStagedOperation => Error::Verification,
-        SourceError::KindMismatch { .. }
-        | SourceError::UnsupportedComment
-        | SourceError::AudioPoster
+        SourceError::Refused(crate::slide::media::lifecycle::Refusal::OperationAlreadyStaged)
+        | SourceError::Refused(crate::slide::media::lifecycle::Refusal::NoStagedOperation) => {
+            Error::Verification
+        },
+        SourceError::Refused(crate::slide::media::lifecycle::Refusal::KindMismatch { .. })
+        | SourceError::Refused(crate::slide::media::lifecycle::Refusal::UnsupportedComment)
+        | SourceError::Refused(crate::slide::media::lifecycle::Refusal::AudioPoster)
         | SourceError::InvalidSource => Error::InvalidSource,
     }
 }
@@ -1007,7 +1058,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::Slides => LimitKind::Slides,
                 SemanticLimitKind::References => LimitKind::References,
@@ -1021,7 +1072,7 @@ fn map_read_error(error: ReadError) -> Error {
             maximum,
             kind,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::OutputBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,

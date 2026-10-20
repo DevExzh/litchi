@@ -314,23 +314,23 @@ fn custom_transaction_debug_redacts_semantic_content() -> TestResult {
         format!("{:?}", changed.diagnostics()),
         format!(
             "{:?}",
-            Error::WrongFormatFamily {
+            Error::Refused(litchi_numbers::cell::data_format::custom::transaction::Refusal::WrongFormatFamily {
                 path: Path::Cell {
                     sheet: 3,
                     table: 5,
                     position: selected_position(),
                 },
-            }
+            })
         ),
         format!(
             "{}",
-            Error::WrongFormatFamily {
+            Error::Refused(litchi_numbers::cell::data_format::custom::transaction::Refusal::WrongFormatFamily {
                 path: Path::Cell {
                     sheet: 3,
                     table: 5,
                     position: selected_position(),
                 },
-            }
+            })
         ),
     ];
 
@@ -731,11 +731,15 @@ fn custom_selectors_wrong_family_and_missing_selection_are_typed() -> TestResult
     );
     assert!(matches!(
         package.table_cell_custom_format("missing sheet", 0usize, selected_position()),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::custom::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_cell_custom_format(0usize, "missing table", selected_position()),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::custom::transaction::Refusal::TableNotFound
+        ))
     ));
 
     let ordinary = Package::from_bytes(&fixture::synthetic_package_for(
@@ -744,7 +748,9 @@ fn custom_selectors_wrong_family_and_missing_selection_are_typed() -> TestResult
     )?)?;
     assert!(matches!(
         ordinary.table_cell_custom_format(0usize, 0usize, selected_position()),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::custom::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     let text = Package::from_bytes(&source(fixture::CustomFamily::Text)?)?;
     assert!(matches!(
@@ -849,7 +855,12 @@ fn custom_locked_changed_edit_refuses_publication_but_reads() -> TestResult {
             .set(replacement)
             .commit()
             .expect_err("a changed custom edit must refuse a locked table");
-        assert!(matches!(error, Error::TableLocked { .. }));
+        assert!(matches!(
+            error,
+            Error::Refused(
+                litchi_numbers::cell::data_format::custom::transaction::Refusal::TableLocked { .. }
+            )
+        ));
         assert_eq!(package.exact_bytes(), before);
     }
     Ok(())
@@ -952,9 +963,7 @@ fn custom_input_operation_budgets_and_allocation_refuse_before_publication() -> 
     assert!(
         matches!(
             result,
-            Err(Error::LimitExceeded { .. })
-                | Err(Error::Allocation { .. })
-                | Err(Error::Verification)
+            Err(Error::Limit { .. }) | Err(Error::Allocation { .. }) | Err(Error::Verification)
         ),
         "unexpected custom operation-budget result: {result:?}"
     );

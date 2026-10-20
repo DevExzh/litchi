@@ -479,7 +479,9 @@ fn focused_numbers_comment_reads_handle_absent_and_shared_roots() -> TestResult 
             TableSelector::index(0),
             "A1",
         ),
-        Err(TableCellCommentError::CommentNotFound { .. })
+        Err(TableCellCommentError::Refused(
+            litchi_numbers::cell::comment::Refusal::CommentNotFound { .. }
+        ))
     ));
     assert_source_unchanged(&absent_package, &absent)?;
 
@@ -887,7 +889,7 @@ fn focused_comment_metadata_budget_counts_author_and_text_together() -> TestResu
     )?;
     assert!(matches!(
         package.table_cell_comment_replies_a1(fixture::SHEET_NAME, fixture::TABLE_NAME, "A1"),
-        Err(TableCellCommentError::LimitExceeded {
+        Err(TableCellCommentError::Limit {
             kind: TableCellCommentLimitKind::TextBytes,
             ..
         })

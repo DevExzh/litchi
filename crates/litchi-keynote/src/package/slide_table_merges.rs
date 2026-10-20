@@ -120,6 +120,33 @@ impl fmt::Display for Path {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the selected Keynote slide-table merge source is invalid")]
+    InvalidSource,
+    #[error(
+        "Keynote slide-table merges {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    #[error("could not allocate {amount} units for the Keynote slide-table merge operation")]
+    Allocation { amount: usize },
+    #[error("the edited Keynote slide-table merges failed semantic verification")]
+    Verification,
+    #[error("the Keynote slide-table merge patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     #[error("this Keynote source does not support focused slide-table merge reads")]
     UnsupportedSource,
     #[error("the requested Keynote slide-table merge graph has an unsupported dependency")]
@@ -138,22 +165,31 @@ pub enum Error {
     TablePositionNotFound { position: Position },
     #[error("the requested Keynote slide-table merge region is invalid")]
     InvalidRegion,
-    #[error("the selected Keynote slide-table merge source is invalid")]
-    InvalidSource,
-    #[error(
-        "Keynote slide-table merges {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    #[error("could not allocate {amount} units for the Keynote slide-table merge operation")]
-    Allocation { amount: usize },
-    #[error("the edited Keynote slide-table merges failed semantic verification")]
-    Verification,
-    #[error("the Keynote slide-table merge patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::UnsupportedDependency { .. }
+            | Self::UnsupportedTopology { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::InvalidRegion { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::TablePositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 impl Package {
@@ -275,7 +311,7 @@ fn map_merge_error(error: MergeReadError) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_wire_limit(*kind),
             observed: *observed as u64,
             maximum: *limit as u64,
@@ -304,19 +340,23 @@ fn map_wire_limit(kind: WireLimitKind) -> LimitKind {
 
 fn map_core_error(error: core::Error) -> Error {
     match error {
-        core::Error::UnsupportedSource => Error::UnsupportedSource,
-        core::Error::UnsupportedDependency => Error::UnsupportedDependency,
-        core::Error::UnsupportedTopology => Error::UnsupportedTopology,
-        core::Error::AmbiguousSelector => Error::AmbiguousSelector,
-        core::Error::EmptySlideName => Error::EmptySlideName,
-        core::Error::SlideNameNotFound => Error::SlideNameNotFound,
-        core::Error::SlidePositionNotFound(position) => Error::SlidePositionNotFound { position },
-        core::Error::TablePositionNotFound(position) => Error::TablePositionNotFound { position },
+        core::Error::UnsupportedSource => Error::Refused(Refusal::UnsupportedSource),
+        core::Error::UnsupportedDependency => Error::Refused(Refusal::UnsupportedDependency),
+        core::Error::UnsupportedTopology => Error::Refused(Refusal::UnsupportedTopology),
+        core::Error::AmbiguousSelector => Error::Refused(Refusal::AmbiguousSelector),
+        core::Error::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        core::Error::SlideNameNotFound => Error::Refused(Refusal::SlideNameNotFound),
+        core::Error::SlidePositionNotFound(position) => {
+            Error::Refused(Refusal::SlidePositionNotFound { position })
+        },
+        core::Error::TablePositionNotFound(position) => {
+            Error::Refused(Refusal::TablePositionNotFound { position })
+        },
         core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_core_limit(kind),
             observed,
             maximum,

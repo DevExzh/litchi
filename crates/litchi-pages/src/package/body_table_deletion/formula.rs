@@ -894,13 +894,17 @@ fn reject_surviving_owner(
         .facts
         .has_removed_inline_edges(removed_internal_ids, budget)?
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(
+            crate::table::deletion::Refusal::UnsupportedDependency,
+        ));
     }
     for tile_id in &owner.facts.cell_tile_ids {
         charge_work(budget, 1)?;
         let tile = cell_tiles.get(tile_id).ok_or(Error::InvalidSource)?;
         if tile.has_removed_edges(removed_internal_ids, budget)? {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedDependency,
+            ));
         }
     }
     Ok(())
@@ -923,13 +927,17 @@ fn reject_surviving_nonprunable_dependencies(
             .facts
             .has_removed_opaque_dependencies(removed_internal_ids, removed_uuids, budget)?;
     if removed_range_back || removed_opaque {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(
+            crate::table::deletion::Refusal::UnsupportedDependency,
+        ));
     }
     for tile_id in &owner.facts.range_tile_ids {
         charge_work(budget, 1)?;
         let tile = range_tiles.get(tile_id).ok_or(Error::InvalidSource)?;
         if removed_internal_ids.contains(&tile.snapshot.to_owner_id()) && tile.has_from_to_range {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedDependency,
+            ));
         }
     }
     Ok(())
@@ -1385,38 +1393,38 @@ fn map_decode_error(error: DecodeError) -> Error {
         return Error::InvalidSource;
     };
     match limit {
-        DecodeLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::Bytes { observed, maximum } => Error::Limit {
             kind: super::LimitKind::WireBytes,
             observed: usize_u64(observed),
             maximum: usize_u64(maximum),
         },
-        DecodeLimit::References { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::References { observed, maximum } => Error::Limit {
             kind: super::LimitKind::PayloadReferences,
             observed: usize_u64(observed),
             maximum: usize_u64(maximum),
         },
-        DecodeLimit::Fields { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::Fields { observed, maximum } => Error::Limit {
             kind: super::LimitKind::WireFields,
             observed: usize_u64(observed),
             maximum: usize_u64(maximum),
         },
-        DecodeLimit::Work { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::Work { observed, maximum } => Error::Limit {
             kind: super::LimitKind::WireWork,
             observed: usize_u64(observed),
             maximum: usize_u64(maximum),
         },
-        DecodeLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::Nesting { observed, maximum } => Error::Limit {
             kind: super::LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         },
         DecodeLimit::Allocation { requested } => allocation(requested),
-        DecodeLimit::Text { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::Text { observed, maximum } => Error::Limit {
             kind: super::LimitKind::WireBytes,
             observed: usize_u64(observed),
             maximum: usize_u64(maximum),
         },
-        DecodeLimit::Retained { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::Retained { observed, maximum } => Error::Limit {
             kind: super::LimitKind::WireOutputBytes,
             observed: usize_u64(observed),
             maximum: usize_u64(maximum),

@@ -858,8 +858,12 @@ fn replace_cell_comment_with_focused_owner(
     })?;
     let commit = match source.set_table_cell_comment(sheet, table, position, text) {
         Ok(commit) => commit,
-        Err(TableCellCommentError::CommentNotFound { .. })
-        | Err(TableCellCommentError::UnsupportedDependency { .. }) => {
+        Err(TableCellCommentError::Refused(
+            litchi_numbers::cell::comment::Refusal::CommentNotFound { .. },
+        ))
+        | Err(TableCellCommentError::Refused(
+            litchi_numbers::cell::comment::Refusal::UnsupportedDependency { .. },
+        )) => {
             return Ok(FocusedCommentReplacement::LegacyFallback);
         },
         Err(error) => return Err(focused_comment_error(error)),
@@ -946,9 +950,13 @@ fn focused_comment_reply_error(error: FocusedCommentReplyError) -> Error {
 fn focused_comment_reply_can_fallback(error: FocusedCommentReplyError) -> bool {
     matches!(
         error,
-        FocusedCommentReplyError::CommentNotFound { .. }
-            | FocusedCommentReplyError::UnsupportedDependency { .. }
-            | FocusedCommentReplyError::UnsupportedSource
+        FocusedCommentReplyError::Refused(
+            litchi_numbers::cell::comment::transaction::Refusal::CommentNotFound { .. }
+        ) | FocusedCommentReplyError::Refused(
+            litchi_numbers::cell::comment::transaction::Refusal::UnsupportedDependency { .. }
+        ) | FocusedCommentReplyError::Refused(
+            litchi_numbers::cell::comment::transaction::Refusal::UnsupportedSource
+        )
     )
 }
 

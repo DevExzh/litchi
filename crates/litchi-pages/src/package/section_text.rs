@@ -72,6 +72,42 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The selected native body cannot be decoded or rewritten safely.
+    #[error("the Pages source cannot be edited safely")]
+    InvalidSource,
+    /// A finite transaction resource ceiling was exceeded.
+    #[error("Pages section-text {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Pages section-text transaction")]
+    Allocation {
+        /// Elements or bytes requested.
+        amount: usize,
+    },
+    /// Full semantic readback did not reproduce the requested change.
+    #[error("the edited Pages section text failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Pages section-text patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// More than one section matched an exact-name selector.
     #[error(
         "the Pages section-text selector is ambiguous at positions {first:?} and {duplicate:?}"
@@ -129,31 +165,33 @@ pub enum Error {
     /// The snapshot has no exact physical source suitable for a changed edit.
     #[error("this Pages source does not support physical section-text edits")]
     UnsupportedSource,
-    /// The selected native body cannot be decoded or rewritten safely.
-    #[error("the Pages source cannot be edited safely")]
-    InvalidSource,
-    /// A finite transaction resource ceiling was exceeded.
-    #[error("Pages section-text {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category that exceeded its limit.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed before publication.
-    #[error("could not allocate {amount} units for the Pages section-text transaction")]
-    Allocation {
-        /// Elements or bytes requested.
-        amount: usize,
-    },
-    /// Full semantic readback did not reproduce the requested change.
-    #[error("the edited Pages section text failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Pages section-text patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::AmbiguousSelector { .. }
+            | Self::SpanOutOfBounds { .. }
+            | Self::SurrogateBoundary { .. } => RefusalKind::InvalidValue,
+            Self::NameNotFound { .. } | Self::PositionNotFound { .. } => RefusalKind::NotFound,
+            Self::BodySectionCount { .. }
+            | Self::SectionBreakReplacement { .. }
+            | Self::FootnoteAnchorReplacement { .. }
+            | Self::ObjectMarkerReplacement { .. }
+            | Self::DependentContent { .. }
+            | Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+            Self::OperationAlreadyStaged { .. } => RefusalKind::UnsupportedOperation,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug)]
@@ -226,7 +264,7 @@ impl<'a> Edit<'a> {
     /// already staged operation.
     pub fn replace(&mut self, span: TextSpan, replacement: &str) -> Result<&mut Self, Error> {
         if self.operation.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
         validate_replacement(replacement)?;
         let byte_range = validate_section_span(self.before, span)?;
@@ -278,7 +316,7 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::DependentContent`] when the section owns
+    /// Returns [`Refusal::DependentContent`] when the section owns
     /// footnote or inline-object anchors, or another staging error.
     pub fn clear(&mut self) -> Result<&mut Self, Error> {
         self.set("")
@@ -365,7 +403,7 @@ impl<'a> Edit<'a> {
         }
 
         if !self.source.state.source.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         let package = rewrite_package_text(
             self.source,
@@ -619,7 +657,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::DependentContent`] when the selected
+    /// Returns [`Refusal::DependentContent`] when the selected
     /// section owns content that cannot be removed by this plain-text
     /// capability, or another typed transaction error before publication.
     pub fn clear_section_text<'selector>(
@@ -651,13 +689,13 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::BodySectionCount`] for empty or
+    /// Returns [`Refusal::BodySectionCount`] for empty or
     /// multi-section snapshots, or another typed source error.
     pub fn edit_body_text(&self) -> Result<Edit<'_>, Error> {
         if self.sections().len() != 1 {
-            return Err(Error::BodySectionCount {
+            return Err(Error::Refused(Refusal::BodySectionCount {
                 actual: self.sections().len(),
-            });
+            }));
         }
         self.edit_section_text(SectionSelector::index(0))
     }
@@ -833,14 +871,14 @@ fn validate_rooted_body_ownership(
                             || field.path.as_slice() != ROOT_BODY_FIELD
                             || field.data_references.contains(&body)
                         {
-                            return Err(Error::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
                     }
                     if field.data_references.contains(&body) {
                         return Err(if is_root {
                             Error::InvalidSource
                         } else {
-                            Error::DependentContent
+                            Error::Refused(Refusal::DependentContent)
                         });
                     }
                 }
@@ -880,7 +918,7 @@ fn validate_rooted_body_ownership(
                     || message_index >= object.messages.len()
                     || message_type != ROOT_MESSAGE_TYPE
                 {
-                    return Err(Error::DependentContent);
+                    return Err(Error::Refused(Refusal::DependentContent));
                 }
                 if data_reference || aggregate_count > 1 || field_count > 1 {
                     return Err(Error::InvalidSource);
@@ -962,8 +1000,10 @@ fn resolve_position<'selector>(
         .select_section(selected_selector)
         .map_err(map_selector_error)?
         .ok_or(match selected_selector {
-            SectionSelector::Name(_) => Error::NameNotFound,
-            SectionSelector::Position(position) => Error::PositionNotFound { position },
+            SectionSelector::Name(_) => Error::Refused(Refusal::NameNotFound),
+            SectionSelector::Position(position) => {
+                Error::Refused(Refusal::PositionNotFound { position })
+            },
         })?;
     Ok(Position::new(selected.index()))
 }
@@ -972,7 +1012,7 @@ fn section_text_at(package: &Package, position: Position) -> Result<&str, Error>
     let section = package
         .sections()
         .get(position.get())
-        .ok_or(Error::PositionNotFound { position })?;
+        .ok_or(Error::Refused(Refusal::PositionNotFound { position }))?;
     section.body_text().ok_or(Error::InvalidSource)
 }
 
@@ -980,7 +1020,9 @@ pub(super) fn native_body(package: &Package) -> Result<NativeBodySnapshot, Error
     let components = package.state.source.components();
     let limits = package.state.source.limits();
     let root = root_references_with_limits(components, limits).map_err(map_package_error)?;
-    let identifier = root.body.ok_or(Error::UnsupportedSource)?;
+    let identifier = root
+        .body
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
     validate_rooted_body_ownership(package, identifier)?;
     let object = find_object(components, identifier.get()).ok_or(Error::InvalidSource)?;
     let max_text_bytes = effective_text_limit(limits);
@@ -1062,7 +1104,7 @@ pub(super) fn native_section_range(
     position: Position,
 ) -> Result<Range<usize>, Error> {
     if package.sections().get(position.get()).is_none() {
-        return Err(Error::PositionNotFound { position });
+        return Err(Error::Refused(Refusal::PositionNotFound { position }));
     }
     let total = body.utf16_len;
     if body.references.is_empty() {
@@ -1183,7 +1225,7 @@ fn rewrite_package_text(
         || rewritten.object_reference_occurrences_before()
             != rewritten.object_reference_occurrences_after()
     {
-        return Err(Error::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     if !rewritten.changed() {
         return Err(Error::Verification);
@@ -1541,20 +1583,20 @@ fn shifted_index(index: u32, span: &Range<usize>, replacement_units: usize) -> R
 
 fn validate_replacement(replacement: &str) -> Result<(), Error> {
     if replacement.contains('\u{0004}') {
-        return Err(Error::SectionBreakReplacement);
+        return Err(Error::Refused(Refusal::SectionBreakReplacement));
     }
     if replacement.contains('\u{000e}') {
-        return Err(Error::FootnoteAnchorReplacement);
+        return Err(Error::Refused(Refusal::FootnoteAnchorReplacement));
     }
     if replacement.contains('\u{fffc}') {
-        return Err(Error::ObjectMarkerReplacement);
+        return Err(Error::Refused(Refusal::ObjectMarkerReplacement));
     }
     Ok(())
 }
 
 fn validate_consumed_text(text: &str) -> Result<(), Error> {
     if text.contains('\u{000e}') || text.contains('\u{fffc}') {
-        return Err(Error::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     if text.contains('\u{0004}') {
         return Err(Error::InvalidSource);
@@ -1567,10 +1609,10 @@ fn validate_section_span(text: &str, span: TextSpan) -> Result<Range<usize>, Err
     let length_position =
         TextPosition::from_utf16_index(length).map_err(|_error| Error::InvalidSource)?;
     if span.end() > length_position {
-        return Err(Error::SpanOutOfBounds {
+        return Err(Error::Refused(Refusal::SpanOutOfBounds {
             span,
             length: length_position,
-        });
+        }));
     }
     let start = utf16_to_byte_index(text, span.start())?;
     let end = utf16_to_byte_index(text, span.end())?;
@@ -1592,7 +1634,7 @@ fn utf16_to_byte_index(text: &str, position: TextPosition) -> Result<usize, Erro
             .checked_add(character.len_utf16())
             .ok_or(Error::InvalidSource)?;
         if units > target_index {
-            return Err(Error::SurrogateBoundary { position });
+            return Err(Error::Refused(Refusal::SurrogateBoundary { position }));
         }
     }
     if units == target_index {
@@ -1670,7 +1712,7 @@ fn try_owned_text(text: &str) -> Result<String, Error> {
 }
 
 fn utf16_len(text: &str) -> Result<u32, Error> {
-    u32::try_from(text.encode_utf16().count()).map_err(|_error| Error::LimitExceeded {
+    u32::try_from(text.encode_utf16().count()).map_err(|_error| Error::Limit {
         kind: LimitKind::TextUnits,
         observed: u64::MAX,
         maximum: u64::from(u32::MAX),
@@ -1680,13 +1722,13 @@ fn utf16_len(text: &str) -> Result<u32, Error> {
 #[allow(clippy::needless_pass_by_value, reason = "Result::map_err conversion")]
 fn map_selector_error(selection_error: crate::SelectorError) -> Error {
     match selection_error {
-        crate::SelectorError::EmptySectionName => Error::NameNotFound,
+        crate::SelectorError::EmptySectionName => Error::Refused(Refusal::NameNotFound),
         crate::SelectorError::AmbiguousSectionName {
             first, duplicate, ..
-        } => Error::AmbiguousSelector {
+        } => Error::Refused(Refusal::AmbiguousSelector {
             first: Position::new(first),
             duplicate: Position::new(duplicate),
-        },
+        }),
     }
 }
 
@@ -1695,21 +1737,30 @@ fn map_transaction_error(transaction_error: crate::section::settings::Error) -> 
     use crate::section::settings::{Error as SettingsError, LimitKind as SettingsLimitKind};
 
     match transaction_error {
-        SettingsError::AmbiguousSelector { first, duplicate } => {
-            Error::AmbiguousSelector { first, duplicate }
+        SettingsError::Refused(crate::section::settings::Refusal::AmbiguousSelector {
+            first,
+            duplicate,
+        }) => Error::Refused(Refusal::AmbiguousSelector { first, duplicate }),
+        SettingsError::Refused(crate::section::settings::Refusal::NameNotFound) => {
+            Error::Refused(Refusal::NameNotFound)
         },
-        SettingsError::NameNotFound => Error::NameNotFound,
-        SettingsError::PositionNotFound { position } => Error::PositionNotFound { position },
+        SettingsError::Refused(crate::section::settings::Refusal::PositionNotFound {
+            position,
+        }) => Error::Refused(Refusal::PositionNotFound { position }),
         SettingsError::InvalidSettings(_)
-        | SettingsError::UnsupportedDependency { .. }
-        | SettingsError::UnsupportedSource { .. } => Error::UnsupportedSource,
+        | SettingsError::Refused(crate::section::settings::Refusal::UnsupportedDependency {
+            ..
+        })
+        | SettingsError::Refused(crate::section::settings::Refusal::UnsupportedSource { .. }) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
         SettingsError::InvalidSource { .. } => Error::InvalidSource,
-        SettingsError::LimitExceeded {
+        SettingsError::Limit {
             kind,
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SettingsLimitKind::InputBytes => LimitKind::InputBytes,
                 SettingsLimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1755,13 +1806,13 @@ fn map_package_error(package_error: PackageError) -> Error {
         | PackageError::NotOfficeFile
         | PackageError::MissingIdentity
         | PackageError::InvalidLimit { .. }
-        | PackageError::Limit { .. } => Error::UnsupportedSource,
-        PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
+        | PackageError::Limit { .. } => Error::Refused(Refusal::UnsupportedSource),
+        PackageError::PayloadLimit { observed, limit } => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
             kind: LimitKind::Entries,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
@@ -1789,7 +1840,7 @@ fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1825,7 +1876,7 @@ fn map_core_error(core_error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
@@ -1865,7 +1916,7 @@ fn map_text_rewrite_error(error: litchi_iwa_text_wire::RewriteError) -> Error {
             resource,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: text_rewrite_limit_kind(resource),
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
@@ -1874,7 +1925,7 @@ fn map_text_rewrite_error(error: litchi_iwa_text_wire::RewriteError) -> Error {
             field,
             value,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: text_rewrite_limit_kind(field),
             observed: usize_to_u64(value),
             maximum: usize_to_u64(maximum),
@@ -1908,7 +1959,7 @@ fn text_rewrite_limit_kind(resource: &str) -> LimitKind {
 }
 
 fn text_limit_error(observed: usize, maximum: usize) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind: LimitKind::TextBytes,
         observed: usize_to_u64(observed),
         maximum: usize_to_u64(maximum),

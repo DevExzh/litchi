@@ -467,7 +467,7 @@ fn aggregate(value: usize) -> Result<usize, Error> {
 }
 
 fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: u64::try_from(observed).unwrap_or(u64::MAX),
         maximum: u64::try_from(maximum).unwrap_or(u64::MAX),

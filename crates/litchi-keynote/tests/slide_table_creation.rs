@@ -130,9 +130,9 @@ fn every_corpus_deck_creates_a_table_or_refuses_typed() -> TestResult {
             );
             match staged.map(|_| ()) {
                 Ok(()) => {},
-                Err(Error::Unsupported {
+                Err(Error::Refused(litchi_keynote::slide::drawable::Refusal::Unsupported {
                     reason: Unsupported::TableTemplate,
-                }) => {
+                })) => {
                     refused += 1;
                     continue;
                 },

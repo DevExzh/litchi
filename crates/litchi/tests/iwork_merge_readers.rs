@@ -16,7 +16,9 @@ fn numbers_merge_reader_is_available_without_the_migration_host() {
     );
     assert!(matches!(
         reader.table_merges(SheetSelector::index(999), TableSelector::index(0)),
-        Err(TableMergesError::SheetNotFound)
+        Err(TableMergesError::Refused(
+            litchi::numbers::table::merge::transaction::Refusal::SheetNotFound
+        ))
     ));
 }
 

@@ -10,7 +10,7 @@ pub use litchi_iwa_common::shape::image::{
 /// [`crate::Package::edit_sheet_image_adjustments`].
 pub mod adjustments {
     pub use crate::package::families::image_adjustments::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 

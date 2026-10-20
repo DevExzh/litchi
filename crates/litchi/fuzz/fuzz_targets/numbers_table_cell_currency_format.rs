@@ -19,8 +19,7 @@ use std::{
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    At, Package, SheetSelector,
-    TableSelector,
+    At, Package, SheetSelector, TableSelector,
     cell::data_format::currency::{
         Currency, CurrencyCode, CurrencyStyle, DecimalPlaces, NegativeStyle, ThousandsSeparator,
         transaction::Error as CurrencyError,
@@ -86,14 +85,29 @@ fuzz_target!(|data: &[u8]| {
 fn options() -> litchi::numbers::OpenOptions {
     static OPTIONS: OnceLock<litchi::numbers::OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = litchi::numbers::SourceLimits::builder().max_input_bytes(MAX_INPUT_BYTES).and_then(|b| b.max_members(MAX_ENTRIES)).and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES)).and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES)).and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES)).and_then(|b| b.build())
-        .unwrap_or_else(|error| unreachable!("valid Currency archive limits: {error}"));
-        let semantic =
-            litchi::numbers::SemanticLimits::builder().max_objects(MAX_OBJECTS).and_then(|b| b.max_sheets(MAX_SHEETS)).and_then(|b| b.max_tables(MAX_TABLES)).and_then(|b| b.max_references(MAX_REFERENCES)).and_then(|b| b.build())
-                .unwrap_or_else(|error| unreachable!("valid Currency semantic limits: {error}"))
-                .to_builder().max_materialized_cells(MAX_MATERIALIZED_CELLS).and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES)).and_then(|b| b.build())
-                .unwrap_or_else(|error| unreachable!("valid Currency projection limits: {error}"));
-        litchi::numbers::OpenOptions::new().source_limits(archive).semantic_limits(semantic)
+        let archive = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|b| b.max_members(MAX_ENTRIES))
+            .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Currency archive limits: {error}"));
+        let semantic = litchi::numbers::SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|b| b.max_sheets(MAX_SHEETS))
+            .and_then(|b| b.max_tables(MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Currency semantic limits: {error}"))
+            .to_builder()
+            .max_materialized_cells(MAX_MATERIALIZED_CELLS)
+            .and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Currency projection limits: {error}"));
+        litchi::numbers::OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -156,12 +170,7 @@ fn secondary_currency_package() -> &'static Package {
     })
 }
 
-fn exercise_package(
-    package: &Package,
-    data: &[u8],
-    position: At,
-    fixture_invariants: bool,
-) {
+fn exercise_package(package: &Package, data: &[u8], position: At, fixture_invariants: bool) {
     exercise_selector_reads(package, data, position);
     exercise_selector_errors(package, position);
 
@@ -391,7 +400,7 @@ fn exercise_wrong_family(package: &Package, position: At) {
         position,
     );
     assert!(
-        matches!(read, Err(CurrencyError::WrongFormatFamily { .. })),
+        matches!(read, Err(CurrencyError::Refused(litchi::numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. }))),
         "non-Currency cell must be refused by the Currency API: {read:?}"
     );
     let edit = package.edit_table_cell_currency_format(
@@ -400,7 +409,7 @@ fn exercise_wrong_family(package: &Package, position: At) {
         position,
     );
     assert!(
-        matches!(edit, Err(CurrencyError::WrongFormatFamily { .. })),
+        matches!(edit, Err(CurrencyError::Refused(litchi::numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. }))),
         "non-Currency cell edit must be refused by the Currency API: {edit:?}"
     );
     assert_eq!(package_bytes(package), source_bytes);
@@ -713,7 +722,7 @@ fn exercise_locked_graph() {
             .set(Currency::default().with_code(CurrencyCode::GBP))
             .commit();
         assert!(
-            matches!(result, Err(CurrencyError::TableLocked { .. })),
+            matches!(result, Err(CurrencyError::Refused(litchi::numbers::cell::data_format::currency::transaction::Refusal::TableLocked { .. }))),
             "changed Currency edit must refuse a locked table: {result:?}"
         );
         assert_eq!(package_bytes(&package), before);
@@ -810,9 +819,16 @@ fn exercise_input_limit() {
 fn exercise_semantic_limit() {
     static ONCE: OnceLock<()> = OnceLock::new();
     ONCE.get_or_init(|| {
-        let semantic = litchi::numbers::SemanticLimits::builder().max_objects(1).and_then(|b| b.max_sheets(1)).and_then(|b| b.max_tables(1)).and_then(|b| b.max_references(1)).and_then(|b| b.build())
+        let semantic = litchi::numbers::SemanticLimits::builder()
+            .max_objects(1)
+            .and_then(|b| b.max_sheets(1))
+            .and_then(|b| b.max_tables(1))
+            .and_then(|b| b.max_references(1))
+            .and_then(|b| b.build())
             .unwrap_or_else(|error| panic!("one-entry Currency semantic limits: {error}"));
-        let constrained = litchi::numbers::OpenOptions::new().source_limits(options().source_limits_value()).semantic_limits(semantic);
+        let constrained = litchi::numbers::OpenOptions::new()
+            .source_limits(options().source_limits_value())
+            .semantic_limits(semantic);
         let result = Package::from_bytes_with_options(
             &fixture::synthetic_package_for(
                 fixture::FormatFamily::Currency,
@@ -837,11 +853,25 @@ fn exercise_operation_limit() {
             fixture::FormatSharing::Shared,
         )
         .unwrap_or_else(|error| panic!("Currency operation-limit source: {error}"));
-        let limits = litchi::numbers::SourceLimits::builder().max_input_bytes(u64::try_from(source.len()).unwrap_or(u64::MAX)).and_then(|b| b.max_members(litchi::numbers::SourceLimits::MAXIMUM.max_members())).and_then(|b| b.max_entry_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_entry_bytes())).and_then(|b| b.max_aggregate_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())).and_then(|b| b.max_component_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_component_bytes())).and_then(|b| b.build())
-        .unwrap_or_else(|error| panic!("Currency operation limits: {error}"));
+        let limits = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(u64::try_from(source.len()).unwrap_or(u64::MAX))
+            .and_then(|b| b.max_members(litchi::numbers::SourceLimits::MAXIMUM.max_members()))
+            .and_then(|b| {
+                b.max_entry_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_entry_bytes())
+            })
+            .and_then(|b| {
+                b.max_aggregate_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+            })
+            .and_then(|b| {
+                b.max_component_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_component_bytes())
+            })
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| panic!("Currency operation limits: {error}"));
         let package = Package::from_bytes_with_options(
             &source,
-            litchi::numbers::OpenOptions::new().source_limits(limits).semantic_limits(litchi::numbers::SemanticLimits::DEFAULT),
+            litchi::numbers::OpenOptions::new()
+                .source_limits(limits)
+                .semantic_limits(litchi::numbers::SemanticLimits::DEFAULT),
         )
         .unwrap_or_else(|error| panic!("Currency exact-limit source must open: {error}"));
         let before = package_bytes(&package);

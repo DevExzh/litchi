@@ -422,13 +422,18 @@ fn selectors_read_position_and_name_and_reject_ambiguity() -> TestResult {
     assert_eq!(by_position, Settings::new(Some(true), Some(false)));
     assert!(matches!(
         package.body_table_title_settings(BodyTableSelector::name("Missing")),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_pages::table::title::Refusal::TableNotFound
+        ))
     ));
 
     let ambiguous = Package::from_bytes(&synthetic_package(["Revenue", "Revenue"])?)?;
     assert!(matches!(
         ambiguous.body_table_title_settings(BodyTableSelector::name("Revenue")),
-        Err(Error::AmbiguousTableName | Error::AmbiguousSelector)
+        Err(
+            Error::Refused(litchi_pages::table::title::Refusal::AmbiguousTableName)
+                | Error::Refused(litchi_pages::table::title::Refusal::AmbiguousSelector)
+        )
     ));
     Ok(())
 }
@@ -519,13 +524,13 @@ fn patch_conflict_and_malformed_selected_fields_are_atomic() -> TestResult {
     let malformed = Package::from_bytes(&malformed_source)?;
     assert!(matches!(
         malformed.body_table_title_settings(0usize),
-        Err(Error::InvalidSource | Error::LimitExceeded { .. })
+        Err(Error::InvalidSource | Error::Limit { .. })
     ));
     assert!(matches!(
         malformed
             .edit_body_table_title(0usize)
             .and_then(|edit| edit.set(Settings::new(Some(false), None)).commit()),
-        Err(Error::InvalidSource | Error::LimitExceeded { .. })
+        Err(Error::InvalidSource | Error::Limit { .. })
     ));
     assert_eq!(malformed.exact_bytes(), malformed_source.as_slice());
     Ok(())
@@ -588,7 +593,7 @@ fn aggregate_only_native_ownership_is_accepted_and_limits_fail_closed() -> TestR
     if let Ok(bounded) = bounded {
         assert!(matches!(
             bounded.body_table_title_settings(0usize),
-            Err(Error::LimitExceeded { .. }) | Err(Error::InvalidSource)
+            Err(Error::Limit { .. }) | Err(Error::InvalidSource)
         ));
     }
     Ok(())

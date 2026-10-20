@@ -577,7 +577,7 @@ fn arrangement_batch_semantic_reference_limit_refuses_without_mutation() -> Test
         .expect_err("the batch traversal must honor the semantic reference ceiling");
     assert!(matches!(
         error,
-        ChartArrangementError::LimitExceeded {
+        ChartArrangementError::Limit {
             kind: ChartArrangementLimitKind::References,
             ..
         }
@@ -886,28 +886,36 @@ fn arrangement_selectors_fail_closed_for_missing_names_positions_and_ambiguity()
     let package = Package::from_bytes(&source)?;
     assert!(matches!(
         package.slide_chart_arrangement("missing", 0usize),
-        Err(ChartArrangementError::SlideNameNotFound)
+        Err(ChartArrangementError::Refused(
+            litchi_keynote::chart::arrangement::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_chart_arrangement(SlideSelector::name(""), 0usize),
-        Err(ChartArrangementError::EmptySlideName)
+        Err(ChartArrangementError::Refused(
+            litchi_keynote::chart::arrangement::Refusal::EmptySlideName
+        ))
     ));
     assert!(matches!(
         package.slide_chart_arrangement(0usize, "missing"),
-        Err(ChartArrangementError::ChartNameNotFound)
+        Err(ChartArrangementError::Refused(
+            litchi_keynote::chart::arrangement::Refusal::ChartNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_chart_arrangement(0usize, ChartSelector::name("")),
-        Err(ChartArrangementError::EmptyChartName)
+        Err(ChartArrangementError::Refused(
+            litchi_keynote::chart::arrangement::Refusal::EmptyChartName
+        ))
     ));
     assert!(matches!(
         package.slide_chart_arrangement(Position::new(9), 0usize),
-        Err(ChartArrangementError::SlidePositionNotFound { position })
+        Err(ChartArrangementError::Refused(litchi_keynote::chart::arrangement::Refusal::SlidePositionNotFound { position }))
             if position == Position::new(9)
     ));
     assert!(matches!(
         package.slide_chart_arrangement(0usize, Position::new(9)),
-        Err(ChartArrangementError::ChartPositionNotFound { position })
+        Err(ChartArrangementError::Refused(litchi_keynote::chart::arrangement::Refusal::ChartPositionNotFound { position }))
             if position == Position::new(9)
     ));
 
@@ -922,7 +930,12 @@ fn arrangement_selectors_fail_closed_for_missing_names_positions_and_ambiguity()
     let error = duplicate
         .edit_slide_chart_arrangement(0usize, ChartSelector::name("Revenue"))
         .expect_err("duplicate chart names must be ambiguous");
-    assert!(matches!(error, ChartArrangementError::AmbiguousSelector));
+    assert!(matches!(
+        error,
+        ChartArrangementError::Refused(
+            litchi_keynote::chart::arrangement::Refusal::AmbiguousSelector
+        )
+    ));
     error_is_redacted(&error);
     assert_eq!(exact_bytes(&duplicate)?, before);
     Ok(())
@@ -1046,7 +1059,7 @@ fn arrangement_semantic_limits_fail_before_publication_and_output_limits_are_ato
     assert!(
         matches!(
             error,
-            ChartArrangementError::LimitExceeded {
+            ChartArrangementError::Limit {
                 kind: ChartArrangementLimitKind::OutputBytes,
                 ..
             }

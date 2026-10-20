@@ -41,7 +41,9 @@ pub(super) fn rewrite(
     previews: &[&str],
 ) -> Result<Rewritten, Error> {
     if target.document.component_index != target.sidebar_root.component_index {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::package::sheet_order::Refusal::UnsupportedSource,
+        ));
     }
     let source_catalog = physical_source(source)?;
     let component = source
@@ -57,7 +59,9 @@ pub(super) fn rewrite(
         .find(|entry| entry.name() == component_name)
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::package::sheet_order::Refusal::UnsupportedSource,
+        ));
     }
     let decoded_extent = archive_extent(component.archive())?;
     let decoded_allocation = archive_allocation_cost(component.archive())?;
@@ -685,11 +689,9 @@ pub(super) fn root_preview_deletions(source: &SourceCatalog) -> Result<Vec<&'sta
 }
 
 pub(super) fn physical_source(package: &Package) -> Result<&SourceCatalog, Error> {
-    package
-        .state
-        .components
-        .physical()
-        .ok_or(Error::UnsupportedSource)
+    package.state.components.physical().ok_or(Error::Refused(
+        crate::package::sheet_order::Refusal::UnsupportedSource,
+    ))
 }
 
 pub(super) fn preflight_transaction_work(
@@ -1303,7 +1305,9 @@ mod tests {
         let attributed = Package::from_bytes(&package_bytes(true, false, 3)?)?;
         assert!(matches!(
             attributed.edit_sheet_order().move_sheet(0usize, 2),
-            Err(Error::UnsupportedSource)
+            Err(Error::Refused(
+                crate::package::sheet_order::Refusal::UnsupportedSource
+            ))
         ));
         let malformed = Package::from_bytes(&package_bytes(false, true, 3)?)?;
         assert!(matches!(
@@ -1318,7 +1322,12 @@ mod tests {
         let source = package_bytes(false, false, 2)?;
         let package = Package::from_bytes(&source)?;
         let result = package.edit_sheet_order().move_sheet(0usize, 2)?.commit();
-        assert!(matches!(result, Err(Error::UnsupportedSource)));
+        assert!(matches!(
+            result,
+            Err(Error::Refused(
+                crate::package::sheet_order::Refusal::UnsupportedSource
+            ))
+        ));
         assert_eq!(exact_bytes(&package)?, source);
         Ok(())
     }

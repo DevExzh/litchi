@@ -45,14 +45,10 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A value holds a NUL character, which a property list cannot carry.
-    #[error("a Pages document property cannot contain a NUL character")]
-    InvalidValue,
-    /// A keyword holds `;` or `,`, or surrounding whitespace, which the
-    /// one `Keywords` string cannot keep apart from its neighbours
-    /// (`litchi_core::metadata::keywords::join`).
-    #[error("a Pages keyword cannot be stored in the separated Keywords string")]
-    InvalidKeyword,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The existing properties sidecar cannot be read or rewritten.
     #[error("the Pages properties sidecar cannot be edited safely")]
     InvalidSource,
@@ -60,7 +56,7 @@ pub enum Error {
     #[error(
         "Pages document-properties {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category that exceeded its limit.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -74,6 +70,38 @@ pub enum Error {
     /// The patch does not belong to this exact immutable package artifact.
     #[error("the Pages document-properties patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// A value holds a NUL character, which a property list cannot carry.
+    #[error("a Pages document property cannot contain a NUL character")]
+    InvalidValue,
+    /// A keyword holds `;` or `,`, or surrounding whitespace, which the
+    /// one `Keywords` string cannot keep apart from its neighbours
+    /// (`litchi_core::metadata::keywords::join`).
+    #[error("a Pages keyword cannot be stored in the separated Keywords string")]
+    InvalidKeyword,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::InvalidValue { .. } | Self::InvalidKeyword { .. } => RefusalKind::InvalidValue,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// A staged change of one property: keep, set, or remove.
@@ -152,7 +180,7 @@ impl fmt::Debug for Edit<'_> {
 impl<'a> Edit<'a> {
     fn stage(&mut self, field: Field, value: Option<&str>) -> Result<&mut Self, Error> {
         if value.is_some_and(|value| value.contains('\0')) {
-            return Err(Error::InvalidValue);
+            return Err(Error::Refused(Refusal::InvalidValue));
         }
         self.changes[field as usize] = Change::Set(value.map(str::to_owned));
         Ok(self)
@@ -162,7 +190,7 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// [`Error::InvalidValue`] for a value holding NUL.
+    /// [`Refusal::InvalidValue`] for a value holding NUL.
     pub fn set_title(&mut self, value: Option<&str>) -> Result<&mut Self, Error> {
         self.stage(Field::Title, value)
     }
@@ -171,7 +199,7 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// [`Error::InvalidValue`] for a value holding NUL.
+    /// [`Refusal::InvalidValue`] for a value holding NUL.
     pub fn set_author(&mut self, value: Option<&str>) -> Result<&mut Self, Error> {
         self.stage(Field::Author, value)
     }
@@ -185,11 +213,11 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// [`Error::InvalidValue`] for a keyword holding NUL, and
-    /// [`Error::InvalidKeyword`] for one the joined string cannot keep.
+    /// [`Refusal::InvalidValue`] for a keyword holding NUL, and
+    /// [`Refusal::InvalidKeyword`] for one the joined string cannot keep.
     pub fn set_keywords(&mut self, keywords: &[String]) -> Result<&mut Self, Error> {
         if keywords.iter().any(|keyword| keyword.contains('\0')) {
-            return Err(Error::InvalidValue);
+            return Err(Error::Refused(Refusal::InvalidValue));
         }
         if keywords == self.source.metadata().keywords {
             self.changes[Field::Keywords as usize] = Change::Keep;
@@ -200,7 +228,7 @@ impl<'a> Edit<'a> {
         } else {
             Some(
                 litchi_core::metadata::keywords::join(keywords)
-                    .map_err(|_error| Error::InvalidKeyword)?,
+                    .map_err(|_error| Error::Refused(Refusal::InvalidKeyword))?,
             )
         };
         self.changes[Field::Keywords as usize] = Change::Set(value);
@@ -211,7 +239,7 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// [`Error::InvalidValue`] for a value holding NUL.
+    /// [`Refusal::InvalidValue`] for a value holding NUL.
     pub fn set_description(&mut self, value: Option<&str>) -> Result<&mut Self, Error> {
         self.stage(Field::Description, value)
     }
@@ -278,7 +306,7 @@ impl<'a> Edit<'a> {
             .to_writer_binary(&mut encoded)
             .map_err(|_error| Error::InvalidSource)?;
         if encoded.len() > MAX_PROPERTIES_BYTES {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::PropertiesBytes,
                 observed: u64::try_from(encoded.len()).unwrap_or(u64::MAX),
                 maximum: u64::try_from(MAX_PROPERTIES_BYTES).unwrap_or(u64::MAX),

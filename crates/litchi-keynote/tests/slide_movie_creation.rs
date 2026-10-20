@@ -479,7 +479,9 @@ fn oversized_filenames_retain_movie_and_poster_error_provenance() -> TestResult 
             )
             .and_then(|edit| edit.commit())
             .err(),
-        Some(SlideMovieCreationError::InvalidMovieFilename),
+        Some(SlideMovieCreationError::Refused(
+            litchi_keynote::slide::movie::creation::Refusal::InvalidMovieFilename
+        )),
     );
     assert_eq!(
         source
@@ -494,7 +496,9 @@ fn oversized_filenames_retain_movie_and_poster_error_provenance() -> TestResult 
             )
             .and_then(|edit| edit.commit())
             .err(),
-        Some(SlideMovieCreationError::InvalidPosterFilename),
+        Some(SlideMovieCreationError::Refused(
+            litchi_keynote::slide::movie::creation::Refusal::InvalidPosterFilename
+        )),
     );
     assert_eq!(exact_bytes(&source)?, NATIVE_SOURCE);
     Ok(())

@@ -430,13 +430,17 @@ pub(super) fn prepare(
             .versioned_component_ids
             .contains(&removal.identifier);
         if versioned || !exact || current_count != 1 {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         if fact_index
             .unknown_external_targets
             .contains(&removal.identifier)
         {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
     }
 
@@ -489,13 +493,17 @@ pub(super) fn prepare(
             .versioned_component_ids
             .contains(&metadata_component.identifier)
         {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         if fact_index
             .unknown_external_targets
             .contains(&metadata_component.identifier)
         {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         if !removed_components.insert(metadata_component.identifier) {
             continue;
@@ -523,11 +531,15 @@ pub(super) fn prepare(
             .map(Vec::as_slice)
             .unwrap_or(&[]);
         if owner_component.is_none() && !uuid_matches.is_empty() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         for binding in uuid_matches {
             if owner_component != Some(binding.component) {
-                return Err(Error::UnsupportedSource);
+                return Err(Error::Refused(
+                    crate::table::deletion::Refusal::UnsupportedSource,
+                ));
             }
         }
         if fact_index.ambiguous_by_object.contains_key(&object) {
@@ -536,7 +548,9 @@ pub(super) fn prepare(
             // selected object.  A component deletion later in the pipeline
             // cannot make the first registry scan safe, so refuse the source
             // regardless of which component owns the ambiguous record.
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         let current = uuid_matches.iter().filter(|binding| binding.current);
         let mut current_count = 0usize;
@@ -546,7 +560,9 @@ pub(super) fn prepare(
             current_binding = Some(*binding);
         }
         if uuid_matches.iter().any(|binding| !binding.current) {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         if current_count > 1 {
             return Err(Error::InvalidSource);
@@ -564,14 +580,18 @@ pub(super) fn prepare(
             .map(Vec::as_slice)
             .unwrap_or(&[]);
         if owner_component.is_none() && !external_matches.is_empty() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         for reference in external_matches.iter().copied() {
             // In PackageMetadata an external reference's object identifier is
             // owned by its target component.  A source component may point at
             // that object, but it cannot claim ownership of the removal.
             if owner_component != Some(reference.target) {
-                return Err(Error::UnsupportedSource);
+                return Err(Error::Refused(
+                    crate::table::deletion::Refusal::UnsupportedSource,
+                ));
             }
             // Registry field removals run before component registrations are
             // physically removed.  Authorize every matching current edge in
@@ -580,7 +600,9 @@ pub(super) fn prepare(
             // otherwise the codec sees a surviving intermediate edge to the
             // just-removed object and correctly rejects it as cross-component.
             if !reference.current || reference.unknown {
-                return Err(Error::UnsupportedSource);
+                return Err(Error::Refused(
+                    crate::table::deletion::Refusal::UnsupportedSource,
+                ));
             }
             push_external_removal(&mut removals, reference, budget)?;
         }
@@ -591,14 +613,20 @@ pub(super) fn prepare(
             .map(Vec::as_slice)
             .unwrap_or(&[]);
         if owner_component.is_none() && !owner_matches.is_empty() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         for owner in owner_matches.iter().copied() {
             if owner_component != Some(owner.component) {
-                return Err(Error::UnsupportedSource);
+                return Err(Error::Refused(
+                    crate::table::deletion::Refusal::UnsupportedSource,
+                ));
             }
             if !owner.current || owner.unknown {
-                return Err(Error::UnsupportedSource);
+                return Err(Error::Refused(
+                    crate::table::deletion::Refusal::UnsupportedSource,
+                ));
             }
             // Data-owner fields are also visited by the ordinary metadata
             // pass before a later component-registration removal.  Authorize
@@ -800,7 +828,9 @@ pub(super) fn rewrite_with_preflight(
             continue;
         }
         if map.unknown {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         if removal_batch.data_metadata_map().is_some() {
             return Err(Error::InvalidSource);
@@ -974,7 +1004,9 @@ fn component_selector<'a>(
     locator: &str,
 ) -> Result<ComponentSelector<'a>, Error> {
     if fact_index.versioned_component_ids.contains(&identifier) {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::table::deletion::Refusal::UnsupportedSource,
+        ));
     }
     let component = fact_index
         .component_by_locator
@@ -993,7 +1025,9 @@ fn component_selector_by_identifier<'a>(
     identifier: u64,
 ) -> Result<ComponentSelector<'a>, Error> {
     if fact_index.versioned_component_ids.contains(&identifier) {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::table::deletion::Refusal::UnsupportedSource,
+        ));
     }
     let component = fact_index
         .component_by_identifier
@@ -1204,7 +1238,9 @@ fn released_watermark(
         }
     }
     if maximum_remaining == 0 {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::table::deletion::Refusal::UnsupportedSource,
+        ));
     }
     Ok(Some(maximum_remaining))
 }
@@ -1293,7 +1329,7 @@ fn map_metadata_error(error: RewriteError) -> Error {
                 (super::LimitKind::WireWork, observed, maximum)
             },
             package_metadata_codec::RewriteLimit::Nesting { observed, maximum } => {
-                return Error::LimitExceeded {
+                return Error::Limit {
                     kind: super::LimitKind::WireNesting,
                     observed: u64::from(observed),
                     maximum: u64::from(maximum),
@@ -1310,7 +1346,7 @@ fn map_metadata_error(error: RewriteError) -> Error {
             },
             _ => return Error::InvalidSource,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -1324,7 +1360,9 @@ fn map_metadata_error(error: RewriteError) -> Error {
         | Some(package_metadata_codec::InvalidReason::VersionedComponent)
         | Some(package_metadata_codec::InvalidReason::CrossComponentRemoval)
         | Some(package_metadata_codec::InvalidReason::ExistingReferenceCollision)
-        | Some(package_metadata_codec::InvalidReason::RemovalMismatch) => Error::UnsupportedSource,
+        | Some(package_metadata_codec::InvalidReason::RemovalMismatch) => {
+            Error::Refused(crate::table::deletion::Refusal::UnsupportedSource)
+        },
         _ => Error::InvalidSource,
     }
 }

@@ -72,6 +72,31 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the Keynote movie-title source cannot be edited safely")]
+    InvalidSource,
+    #[error("Keynote movie-title {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    #[error("could not allocate {amount} units for the Keynote movie-title transaction")]
+    Allocation { amount: usize },
+    #[error("the edited Keynote movie title failed semantic verification")]
+    Verification,
+    #[error("the Keynote movie-title patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     #[error("this Keynote source does not support physical movie-title edits")]
     UnsupportedSource,
     #[error("the requested Keynote movie-title graph operation is unsupported")]
@@ -86,20 +111,31 @@ pub enum Error {
     SlidePositionNotFound { position: Position },
     #[error("the selected Keynote slide has no movie at position {position:?}")]
     MoviePositionNotFound { position: Position },
-    #[error("the Keynote movie-title source cannot be edited safely")]
-    InvalidSource,
-    #[error("Keynote movie-title {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    #[error("could not allocate {amount} units for the Keynote movie-title transaction")]
-    Allocation { amount: usize },
-    #[error("the edited Keynote movie title failed semantic verification")]
-    Verification,
-    #[error("the Keynote movie-title patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::MoviePositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable movie-title value staged against an immutable package.
@@ -195,7 +231,7 @@ impl<'a> Edit<'a> {
             });
         }
         if !catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         self.source.validate().map_err(map_read_error)?;
         if self
@@ -208,7 +244,7 @@ impl<'a> Edit<'a> {
                 .as_deref()
                 .is_some_and(super::slide_movie_caption::contains_dependent_marker)
         {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let mut budget = super::slide_chart_caption::CaptionBudget::for_package(self.source)
             .map_err(map_chart_error)?;
@@ -623,7 +659,7 @@ fn verify_title_transition(
 
 fn copy_title(value: &str) -> Result<String, Error> {
     if value.len() > MAX_TITLE_BYTES {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::TitleBytes,
             observed: usize_to_u64(value.len()),
             maximum: usize_to_u64(MAX_TITLE_BYTES),
@@ -641,28 +677,38 @@ fn copy_title(value: &str) -> Result<String, Error> {
 fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
 fn map_movie_caption_error(error: super::slide_movie_caption::Error) -> Error {
     match error {
-        super::slide_movie_caption::Error::UnsupportedSource => Error::UnsupportedSource,
-        super::slide_movie_caption::Error::UnsupportedDependency => Error::UnsupportedDependency,
-        super::slide_movie_caption::Error::AmbiguousSelector => Error::AmbiguousSelector,
-        super::slide_movie_caption::Error::EmptySlideName => Error::EmptySlideName,
-        super::slide_movie_caption::Error::SlideNameNotFound => Error::SlideNameNotFound,
-        super::slide_movie_caption::Error::SlidePositionNotFound { position } => {
-            Error::SlidePositionNotFound { position }
-        },
-        super::slide_movie_caption::Error::MoviePositionNotFound { position } => {
-            Error::MoviePositionNotFound { position }
-        },
-        super::slide_movie_caption::Error::LimitExceeded {
+        super::slide_movie_caption::Error::Refused(
+            crate::slide::movie::caption::Refusal::UnsupportedSource,
+        ) => Error::Refused(Refusal::UnsupportedSource),
+        super::slide_movie_caption::Error::Refused(
+            crate::slide::movie::caption::Refusal::UnsupportedDependency,
+        ) => Error::Refused(Refusal::UnsupportedDependency),
+        super::slide_movie_caption::Error::Refused(
+            crate::slide::movie::caption::Refusal::AmbiguousSelector,
+        ) => Error::Refused(Refusal::AmbiguousSelector),
+        super::slide_movie_caption::Error::Refused(
+            crate::slide::movie::caption::Refusal::EmptySlideName,
+        ) => Error::Refused(Refusal::EmptySlideName),
+        super::slide_movie_caption::Error::Refused(
+            crate::slide::movie::caption::Refusal::SlideNameNotFound,
+        ) => Error::Refused(Refusal::SlideNameNotFound),
+        super::slide_movie_caption::Error::Refused(
+            crate::slide::movie::caption::Refusal::SlidePositionNotFound { position },
+        ) => Error::Refused(Refusal::SlidePositionNotFound { position }),
+        super::slide_movie_caption::Error::Refused(
+            crate::slide::movie::caption::Refusal::MoviePositionNotFound { position },
+        ) => Error::Refused(Refusal::MoviePositionNotFound { position }),
+        super::slide_movie_caption::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_caption_limit(kind),
             observed,
             maximum,
@@ -676,19 +722,29 @@ fn map_movie_caption_error(error: super::slide_movie_caption::Error) -> Error {
 
 fn map_chart_error(error: super::slide_chart_caption::Error) -> Error {
     match error {
-        super::slide_chart_caption::Error::UnsupportedSource => Error::UnsupportedSource,
-        super::slide_chart_caption::Error::UnsupportedDependency => Error::UnsupportedDependency,
-        super::slide_chart_caption::Error::AmbiguousSelector => Error::AmbiguousSelector,
-        super::slide_chart_caption::Error::EmptySlideName => Error::EmptySlideName,
-        super::slide_chart_caption::Error::SlideNameNotFound => Error::SlideNameNotFound,
-        super::slide_chart_caption::Error::SlidePositionNotFound { position } => {
-            Error::SlidePositionNotFound { position }
-        },
-        super::slide_chart_caption::Error::LimitExceeded {
+        super::slide_chart_caption::Error::Refused(
+            crate::chart::caption::Refusal::UnsupportedSource,
+        ) => Error::Refused(Refusal::UnsupportedSource),
+        super::slide_chart_caption::Error::Refused(
+            crate::chart::caption::Refusal::UnsupportedDependency,
+        ) => Error::Refused(Refusal::UnsupportedDependency),
+        super::slide_chart_caption::Error::Refused(
+            crate::chart::caption::Refusal::AmbiguousSelector,
+        ) => Error::Refused(Refusal::AmbiguousSelector),
+        super::slide_chart_caption::Error::Refused(
+            crate::chart::caption::Refusal::EmptySlideName,
+        ) => Error::Refused(Refusal::EmptySlideName),
+        super::slide_chart_caption::Error::Refused(
+            crate::chart::caption::Refusal::SlideNameNotFound,
+        ) => Error::Refused(Refusal::SlideNameNotFound),
+        super::slide_chart_caption::Error::Refused(
+            crate::chart::caption::Refusal::SlidePositionNotFound { position },
+        ) => Error::Refused(Refusal::SlidePositionNotFound { position }),
+        super::slide_chart_caption::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_chart_limit(kind),
             observed,
             maximum,
@@ -707,7 +763,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::Objects => LimitKind::Entries,
                 SemanticLimitKind::Slides => LimitKind::Slides,
@@ -724,7 +780,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,

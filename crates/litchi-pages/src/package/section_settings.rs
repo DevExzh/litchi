@@ -97,9 +97,11 @@ pub(crate) fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         });
     }
     if !source.state.source.source_is_exact() {
-        return Err(Error::UnsupportedSource {
-            path: Path::section(position),
-        });
+        return Err(Error::Refused(
+            crate::section::settings::Refusal::UnsupportedSource {
+                path: Path::section(position),
+            },
+        ));
     }
 
     let payload = transaction::selected_payload(source, target)?;
@@ -289,7 +291,7 @@ fn map_decode_error(
         ),
         _ => return Error::InvalidSource { path },
     };
-    Error::LimitExceeded {
+    Error::Limit {
         path,
         kind,
         observed,
@@ -419,7 +421,7 @@ fn rewrite_payload(
         source
             .len()
             .checked_add(rewritten.len())
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 path,
                 kind: crate::section::settings::LimitKind::WireWork,
                 observed: u64::MAX,
@@ -447,10 +449,12 @@ fn validate_changed_dependencies(
     let hide_changed =
         before.first_page_hides_header_footer() != after.first_page_hides_header_footer();
     if inherit_changed && target.position.get() == 0 {
-        return Err(Error::UnsupportedDependency {
-            path: Path::section(target.position),
-            kind: crate::section::settings::DependencyKind::PreviousSectionTemplates,
-        });
+        return Err(Error::Refused(
+            crate::section::settings::Refusal::UnsupportedDependency {
+                path: Path::section(target.position),
+                kind: crate::section::settings::DependencyKind::PreviousSectionTemplates,
+            },
+        ));
     }
     if !(inherit_changed || first_changed || even_odd_changed || hide_changed) {
         return Ok(());
@@ -543,7 +547,9 @@ fn required_reference(
     budget.charge_work(payload.len(), path)?;
     let mut selected = view.fields().filter(|field| field.number() == field_number);
     let Some(field) = selected.next() else {
-        return Err(Error::UnsupportedDependency { path, kind });
+        return Err(Error::Refused(
+            crate::section::settings::Refusal::UnsupportedDependency { path, kind },
+        ));
     };
     if selected.next().is_some() || field.wire_type() != 2 {
         return Err(Error::InvalidSource { path });
@@ -565,7 +571,9 @@ fn validate_template(
 ) -> Result<(), Error> {
     let path = Path::section(position);
     let Some(object) = object_index.get(identifier, path, budget)? else {
-        return Err(Error::UnsupportedDependency { path, kind });
+        return Err(Error::Refused(
+            crate::section::settings::Refusal::UnsupportedDependency { path, kind },
+        ));
     };
     let (message_index, message) =
         transaction::unique_message(object, transaction::TEMPLATE_MESSAGE_TYPE, path)?;
@@ -745,7 +753,9 @@ fn validate_storage(
             field.number(),
             9 | 11 | 15 | 16 | 17 | 21 | 22 | 23 | 25 | 26
         ) {
-            return Err(Error::UnsupportedDependency { path, kind });
+            return Err(Error::Refused(
+                crate::section::settings::Refusal::UnsupportedDependency { path, kind },
+            ));
         }
     }
     Ok(())
@@ -1468,7 +1478,7 @@ mod tests {
         let (attempt, usage) = repeated_metadata_attempt(8_192, Some(large.transaction_work - 1))?;
         assert!(matches!(
             attempt,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: crate::section::settings::LimitKind::TransactionWork,
                 ..
             })

@@ -107,6 +107,33 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the Keynote package source is malformed or inconsistent")]
+    InvalidSource,
+    #[error("lifecycle resource limit {kind} exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    #[error("allocation of {amount} bytes was refused")]
+    Allocation { amount: usize },
+    #[error("candidate verification failed")]
+    Verification,
+    #[error("the lifecycle patch does not apply to this exact source")]
+    PatchConflict,
+    #[error("the package could not be read")]
+    Read,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     #[error("the source is not an exact physical Keynote package")]
     UnsupportedSource,
     #[error("Keynote slide name must not be empty")]
@@ -130,28 +157,41 @@ pub enum Error {
     UnsupportedComment,
     #[error("an audio drawable has no poster image")]
     AudioPoster,
-    #[error("the Keynote package source is malformed or inconsistent")]
-    InvalidSource,
-    #[error("lifecycle resource limit {kind} exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    #[error("allocation of {amount} bytes was refused")]
-    Allocation { amount: usize },
-    #[error("candidate verification failed")]
-    Verification,
-    #[error("the lifecycle patch does not apply to this exact source")]
-    PatchConflict,
-    #[error("the package could not be read")]
-    Read,
     /// The edit already stages its one duplication or removal.
     #[error("the media lifecycle edit already stages an operation")]
     OperationAlreadyStaged,
     /// The edit was committed without a staged operation.
     #[error("the media lifecycle edit stages no operation")]
     NoStagedOperation,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::UnsupportedComment { .. }
+            | Self::AudioPoster { .. } => RefusalKind::UnsupportedContent,
+            Self::EmptySlideName { .. } | Self::AmbiguousSelector { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::MoviePositionNotFound { .. } => RefusalKind::NotFound,
+            Self::KindMismatch { .. } => RefusalKind::UnsupportedTarget,
+            Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
+                RefusalKind::UnsupportedOperation
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// The 128-bit identity used by native build chunks, kept private to the
@@ -428,7 +468,7 @@ impl<'a> Edit<'a> {
         expected_kind: Option<MovieKind>,
     ) -> Result<Self, Error> {
         if self.staged.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
         self.staged = Some(Staged {
             slide,
@@ -447,7 +487,7 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// [`Error::OperationAlreadyStaged`] after one operation.
+    /// [`Refusal::OperationAlreadyStaged`] after one operation.
     pub fn duplicate(
         self,
         slide: impl Into<SlideSelector<'a>>,
@@ -465,7 +505,7 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// [`Error::OperationAlreadyStaged`] after one operation.
+    /// [`Refusal::OperationAlreadyStaged`] after one operation.
     pub fn remove(
         self,
         slide: impl Into<SlideSelector<'a>>,
@@ -475,14 +515,14 @@ impl<'a> Edit<'a> {
     }
 
     /// Stage the duplication of a file-backed movie; the commit refuses any
-    /// other media kind with [`Error::KindMismatch`]. The selector remains
+    /// other media kind with [`Refusal::KindMismatch`]. The selector remains
     /// source-order and therefore stays stable when native object identifiers
     /// change. Direct comments follow the cloning policy of
     /// [`Self::duplicate`].
     ///
     /// # Errors
     ///
-    /// [`Error::OperationAlreadyStaged`] after one operation.
+    /// [`Refusal::OperationAlreadyStaged`] after one operation.
     pub fn duplicate_movie(
         self,
         slide: impl Into<SlideSelector<'a>>,
@@ -498,11 +538,11 @@ impl<'a> Edit<'a> {
 
     /// Stage the duplication of an audio drawable, including supported
     /// direct comment threads; the commit refuses any other media kind with
-    /// [`Error::KindMismatch`].
+    /// [`Refusal::KindMismatch`].
     ///
     /// # Errors
     ///
-    /// [`Error::OperationAlreadyStaged`] after one operation.
+    /// [`Refusal::OperationAlreadyStaged`] after one operation.
     pub fn duplicate_audio(
         self,
         slide: impl Into<SlideSelector<'a>>,
@@ -517,11 +557,11 @@ impl<'a> Edit<'a> {
     }
 
     /// Stage the removal of a file-backed movie; the commit refuses any other
-    /// media kind with [`Error::KindMismatch`].
+    /// media kind with [`Refusal::KindMismatch`].
     ///
     /// # Errors
     ///
-    /// [`Error::OperationAlreadyStaged`] after one operation.
+    /// [`Refusal::OperationAlreadyStaged`] after one operation.
     pub fn remove_movie(
         self,
         slide: impl Into<SlideSelector<'a>>,
@@ -536,11 +576,11 @@ impl<'a> Edit<'a> {
     }
 
     /// Stage the removal of an audio drawable; the commit refuses any other
-    /// media kind with [`Error::KindMismatch`].
+    /// media kind with [`Refusal::KindMismatch`].
     ///
     /// # Errors
     ///
-    /// [`Error::OperationAlreadyStaged`] after one operation.
+    /// [`Refusal::OperationAlreadyStaged`] after one operation.
     pub fn remove_audio(
         self,
         slide: impl Into<SlideSelector<'a>>,
@@ -559,11 +599,13 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// [`Error::NoStagedOperation`] for an empty edit; selector, kind,
+    /// [`Refusal::NoStagedOperation`] for an empty edit; selector, kind,
     /// comment, source, resource and verification errors. Failure never
     /// publishes a partial package.
     pub fn commit(self) -> Result<Commit, Error> {
-        let staged = self.staged.ok_or(Error::NoStagedOperation)?;
+        let staged = self
+            .staged
+            .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
         run_lifecycle(
             self.source,
             staged.slide,
@@ -648,10 +690,10 @@ fn run_lifecycle(
     if let Some(expected) = expected_kind
         && selection.kind != expected
     {
-        return Err(Error::KindMismatch {
+        return Err(Error::Refused(Refusal::KindMismatch {
             expected,
             actual: selection.kind,
-        });
+        }));
     }
     budget.charge_entries(1)?;
     budget.charge_references(
@@ -692,7 +734,9 @@ fn run_lifecycle(
 fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(catalog) if catalog.source_is_exact() => Ok(catalog),
-        PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => {
+            Err(Error::Refused(Refusal::UnsupportedSource))
+        },
     }
 }
 
@@ -1122,7 +1166,7 @@ fn map_identity_limit(limit: identity_codec::RewriteLimit) -> Error {
             (K::References, observed, maximum)
         },
         L::Nesting { observed, maximum } => {
-            return Error::LimitExceeded {
+            return Error::Limit {
                 kind: K::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -1130,7 +1174,7 @@ fn map_identity_limit(limit: identity_codec::RewriteLimit) -> Error {
         },
         _ => return Error::InvalidSource,
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
@@ -1153,7 +1197,7 @@ fn map_media_limit(limit: media_codec::DecodeLimit) -> Error {
             (K::EntryBytes, observed, maximum)
         },
         L::Nesting { observed, maximum } => {
-            return Error::LimitExceeded {
+            return Error::Limit {
                 kind: K::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -1161,7 +1205,7 @@ fn map_media_limit(limit: media_codec::DecodeLimit) -> Error {
         },
         _ => return Error::InvalidSource,
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
@@ -1955,7 +1999,7 @@ fn serialize_component(
     budget.charge_allocations(compression_allocation)?;
     let compressed = SnappyStream::compress(&bytes).map_err(|_| Error::InvalidSource)?;
     if compressed.len() > snappy_limits.max_compressed_stream() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::EntryBytes,
             observed: compressed.len() as u64,
             maximum: snappy_limits.max_compressed_stream() as u64,

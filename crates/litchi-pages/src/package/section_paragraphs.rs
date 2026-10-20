@@ -63,9 +63,33 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The underlying section-text transaction refused the change.
     #[error(transparent)]
     Text(#[from] section_text::Error),
+    /// A finite transaction resource ceiling was exceeded.
+    #[error("Pages paragraph {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Pages paragraph patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// No paragraph exists at the position.
     #[error("the Pages paragraph position {position:?} does not exist (the section has {count})")]
     PositionNotFound {
@@ -89,19 +113,29 @@ pub enum Error {
     /// A section keeps at least one paragraph.
     #[error("a Pages section keeps at least one paragraph")]
     LastParagraph,
-    /// A finite transaction resource ceiling was exceeded.
-    #[error("Pages paragraph {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category that exceeded its limit.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Pages paragraph patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::PositionNotFound { .. } => RefusalKind::NotFound,
+            Self::ParagraphBreak { .. } | Self::InterleavedAnchors { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AnchoredParagraph { .. } | Self::LastParagraph { .. } => {
+                RefusalKind::UnsupportedTarget
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// Whether `character` is a native anchor: an inline object marker or a
@@ -125,7 +159,7 @@ fn with_text(paragraph: &str, text: &str) -> Result<String, Error> {
     let body_end = rest.trim_end_matches(is_anchor).len();
     let (body, trailing) = rest.split_at(body_end);
     if body.contains(is_anchor) {
-        return Err(Error::InterleavedAnchors);
+        return Err(Error::Refused(Refusal::InterleavedAnchors));
     }
     Ok(format!("{leading}{text}{trailing}"))
 }
@@ -146,10 +180,10 @@ impl Operation {
         let count = paragraphs.len();
         let check = |index: usize, bound: usize| {
             if index >= bound {
-                Err(Error::PositionNotFound {
+                Err(Error::Refused(Refusal::PositionNotFound {
                     position: Position::new(index),
                     count,
-                })
+                }))
             } else {
                 Ok(())
             }
@@ -166,7 +200,7 @@ impl Operation {
             Self::Remove(index) => {
                 check(*index, count)?;
                 if count == 1 {
-                    return Err(Error::LastParagraph);
+                    return Err(Error::Refused(Refusal::LastParagraph));
                 }
                 paragraphs.remove(*index);
             },
@@ -253,7 +287,7 @@ impl fmt::Debug for Edit<'_> {
 impl<'a> Edit<'a> {
     fn stage(&mut self, operation: Operation) -> Result<&mut Self, Error> {
         if self.operations.len() >= MAX_OPERATIONS {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::Operations,
                 observed: u64::try_from(self.operations.len() + 1).unwrap_or(u64::MAX),
                 maximum: u64::try_from(MAX_OPERATIONS).unwrap_or(u64::MAX),
@@ -269,10 +303,12 @@ impl<'a> Edit<'a> {
 
     fn checked_text(text: &str) -> Result<&str, Error> {
         if text.contains(BREAK) {
-            return Err(Error::ParagraphBreak);
+            return Err(Error::Refused(Refusal::ParagraphBreak));
         }
         if text.contains(is_anchor) || text.contains('\u{0004}') {
-            return Err(Error::Text(section_text::Error::ObjectMarkerReplacement));
+            return Err(Error::Text(section_text::Error::Refused(
+                crate::section::text::Refusal::ObjectMarkerReplacement,
+            )));
         }
         Ok(text)
     }
@@ -297,8 +333,8 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// [`Error::PositionNotFound`], [`Error::ParagraphBreak`],
-    /// [`Error::InterleavedAnchors`], or a marker refusal for text holding a
+    /// [`Refusal::PositionNotFound`], [`Refusal::ParagraphBreak`],
+    /// [`Refusal::InterleavedAnchors`], or a marker refusal for text holding a
     /// native marker character.
     pub fn set(&mut self, index: Position, text: &str) -> Result<&mut Self, Error> {
         let text = Self::checked_text(text)?;
@@ -320,7 +356,7 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// [`Error::PositionNotFound`]; [`Error::LastParagraph`] for a section's
+    /// [`Refusal::PositionNotFound`]; [`Refusal::LastParagraph`] for a section's
     /// only paragraph.
     pub fn remove(&mut self, index: Position) -> Result<&mut Self, Error> {
         self.stage(Operation::Remove(index.get()))
@@ -330,7 +366,7 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// [`Error::PositionNotFound`].
+    /// [`Refusal::PositionNotFound`].
     pub fn relocate(&mut self, from: Position, to: Position) -> Result<&mut Self, Error> {
         self.stage(Operation::Relocate(from.get(), to.get()))
     }
@@ -339,7 +375,7 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// [`Error::PositionNotFound`].
+    /// [`Refusal::PositionNotFound`].
     pub fn swap(&mut self, left: Position, right: Position) -> Result<&mut Self, Error> {
         self.stage(Operation::Swap(left.get(), right.get()))
     }
@@ -495,7 +531,7 @@ impl Publisher {
             return Ok(());
         };
         if touches_anchor(before, span, replacement) {
-            return Err(Error::AnchoredParagraph);
+            return Err(Error::Refused(Refusal::AnchoredParagraph));
         }
         self.replace(span, replacement)
     }
@@ -843,7 +879,7 @@ impl Package {
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, splice, touches_anchor, with_text};
+    use super::{Error, Refusal, splice, touches_anchor, with_text};
 
     #[test]
     fn set_keeps_leading_and_trailing_anchors() {
@@ -858,7 +894,7 @@ mod tests {
         assert_eq!(with_text("Plain", "New").ok().as_deref(), Some("New"));
         assert_eq!(
             with_text("A\u{fffc}B", "New"),
-            Err(Error::InterleavedAnchors)
+            Err(Error::Refused(Refusal::InterleavedAnchors))
         );
     }
 

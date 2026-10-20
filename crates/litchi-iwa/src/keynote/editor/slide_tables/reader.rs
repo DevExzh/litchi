@@ -96,7 +96,9 @@ pub(super) fn regions_in_editor(
         // Preserve the existing compatibility arm for legacy table-model
         // roles. All other post-admission failures remain typed focused
         // failures and must not widen into the archive-wide reader.
-        Err(litchi_keynote::slide::table::merge::transaction::Error::UnsupportedDependency) => {
+        Err(litchi_keynote::slide::table::merge::transaction::Error::Refused(
+            litchi_keynote::slide::table::merge::transaction::Refusal::UnsupportedDependency,
+        )) => {
             crate::numbers::editor::table_cell_merges_in_package(editor.package(), model_object_id)
         },
         Err(error) => Err(map_focused_merges_error(error)),
@@ -371,7 +373,7 @@ fn map_common_wire_error(error: litchi_iwa_common::Error, context: &str) -> Erro
             let Some(kind) = map_common_wire_limit(kind) else {
                 return invalid_source(format!("{context} has an unsupported wire limit"));
             };
-            Error::KeynoteSlideTableMerges(SlideTableMergesError::LimitExceeded {
+            Error::KeynoteSlideTableMerges(SlideTableMergesError::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: limit as u64,
@@ -568,7 +570,7 @@ impl SelectorBudget {
         let observed = current.saturating_add(amount);
         if observed > maximum {
             return Err(Error::KeynoteSlideTableMerges(
-                SlideTableMergesError::LimitExceeded {
+                SlideTableMergesError::Limit {
                     kind,
                     observed: observed as u64,
                     maximum: maximum as u64,
@@ -641,7 +643,7 @@ fn map_catalog_error(error: ArchiveError) -> Error {
             kind,
             observed,
             maximum,
-        } => SlideTableMergesError::LimitExceeded {
+        } => SlideTableMergesError::Limit {
             kind: map_archive_limit(kind),
             observed,
             maximum,
@@ -731,14 +733,14 @@ fn map_table_info_error(error: table_info_codec::DecodeError) -> Error {
 
 fn map_projection_error(error: litchi_keynote::ReadError) -> Error {
     Error::KeynoteSlideTableMerges(match error {
-        litchi_keynote::ReadError::UnexpectedFormat { .. } => {
-            SlideTableMergesError::UnsupportedSource
-        },
+        litchi_keynote::ReadError::UnexpectedFormat { .. } => SlideTableMergesError::Refused(
+            litchi_keynote::slide::table::merge::transaction::Refusal::UnsupportedSource,
+        ),
         litchi_keynote::ReadError::Archive(ArchiveError::Limit {
             kind,
             observed,
             maximum,
-        }) => SlideTableMergesError::LimitExceeded {
+        }) => SlideTableMergesError::Limit {
             kind: map_archive_limit(kind),
             observed,
             maximum,
@@ -748,7 +750,7 @@ fn map_projection_error(error: litchi_keynote::ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => SlideTableMergesError::LimitExceeded {
+        } => SlideTableMergesError::Limit {
             kind: match kind {
                 litchi_keynote::PayloadLimitKind::Bytes => {
                     litchi_keynote::slide::table::merge::transaction::LimitKind::InputBytes
@@ -772,7 +774,7 @@ fn map_projection_error(error: litchi_keynote::ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => SlideTableMergesError::LimitExceeded {
+        } => SlideTableMergesError::Limit {
             kind: match kind {
                 litchi_keynote::SemanticLimitKind::Objects => {
                     litchi_keynote::slide::table::merge::transaction::LimitKind::PayloadObjects
@@ -814,14 +816,14 @@ fn map_wire_error(
         return SlideTableMergesError::Allocation { amount };
     }
     if let Some((observed, maximum)) = fields {
-        return SlideTableMergesError::LimitExceeded {
+        return SlideTableMergesError::Limit {
             kind: litchi_keynote::slide::table::merge::transaction::LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = work {
-        return SlideTableMergesError::LimitExceeded {
+        return SlideTableMergesError::Limit {
             kind: litchi_keynote::slide::table::merge::transaction::LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -843,7 +845,7 @@ fn map_wire_error(
                 return SlideTableMergesError::InvalidSource;
             },
         };
-        return SlideTableMergesError::LimitExceeded {
+        return SlideTableMergesError::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -860,7 +862,9 @@ enum WireResourceValues {
 }
 
 fn unsupported_dependency() -> Error {
-    Error::KeynoteSlideTableMerges(SlideTableMergesError::UnsupportedDependency)
+    Error::KeynoteSlideTableMerges(SlideTableMergesError::Refused(
+        litchi_keynote::slide::table::merge::transaction::Refusal::UnsupportedDependency,
+    ))
 }
 
 fn allocation_error(amount: usize) -> Error {

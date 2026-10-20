@@ -1991,7 +1991,7 @@ fn explicit_tiny_media_byte_ceiling_rejects_lifecycle_reads_atomically() -> Test
         .err()
         .ok_or_else(|| io::Error::other("tiny media-byte ceiling must reject lifecycle reads"))?;
     match error {
-        SlideMediaLifecycleError::LimitExceeded {
+        SlideMediaLifecycleError::Limit {
             kind: SlideMediaLifecycleLimitKind::MediaBytes,
             observed,
             maximum,
@@ -2187,7 +2187,7 @@ fn typed_lifecycle_kind_mismatch_precedes_metadata_rewrite() -> TestResult {
             .unwrap_err(),
     ] {
         assert!(
-            matches!(error, SlideMediaLifecycleError::KindMismatch { expected, actual } if expected != actual)
+            matches!(error, SlideMediaLifecycleError::Refused(litchi_keynote::slide::media::lifecycle::Refusal::KindMismatch { expected, actual }) if expected != actual)
         );
     }
     assert!(
@@ -2338,14 +2338,18 @@ fn the_edit_stages_exactly_one_lifecycle_operation() -> TestResult {
     let package = Package::from_bytes(NATIVE_SOURCE)?;
     assert!(matches!(
         package.edit_slide_media_lifecycle().commit(),
-        Err(SlideMediaLifecycleError::NoStagedOperation)
+        Err(SlideMediaLifecycleError::Refused(
+            litchi_keynote::slide::media::lifecycle::Refusal::NoStagedOperation
+        ))
     ));
     assert!(matches!(
         package
             .edit_slide_media_lifecycle()
             .duplicate(SlideSelector::index(0), MovieSelector::index(0))?
             .remove(SlideSelector::index(0), MovieSelector::index(0)),
-        Err(SlideMediaLifecycleError::OperationAlreadyStaged)
+        Err(SlideMediaLifecycleError::Refused(
+            litchi_keynote::slide::media::lifecycle::Refusal::OperationAlreadyStaged
+        ))
     ));
     let commit = package
         .edit_slide_media_lifecycle()

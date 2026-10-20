@@ -125,6 +125,43 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source chart graph, title stand-in, or selected native payload is
+    /// malformed or unsupported.
+    #[error("the Keynote chart-title source cannot be edited safely")]
+    InvalidSource,
+    /// A finite resource ceiling was exceeded.
+    #[error("Keynote chart-title {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote chart-title transaction")]
+    Allocation {
+        /// Elements or bytes requested.
+        amount: usize,
+    },
+    /// Full candidate reopening did not reproduce the requested title.
+    #[error("the edited Keynote chart title failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote chart-title patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was prepared without an exact physical package artifact.
     #[error("this Keynote source does not support physical chart-title edits")]
     UnsupportedSource,
@@ -155,32 +192,30 @@ pub enum Error {
     /// An empty exact chart name was supplied.
     #[error("the Keynote chart selector name cannot be empty")]
     EmptyChartName,
-    /// The source chart graph, title stand-in, or selected native payload is
-    /// malformed or unsupported.
-    #[error("the Keynote chart-title source cannot be edited safely")]
-    InvalidSource,
-    /// A finite resource ceiling was exceeded.
-    #[error("Keynote chart-title {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category that exceeded its limit.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote chart-title transaction")]
-    Allocation {
-        /// Elements or bytes requested.
-        amount: usize,
-    },
-    /// Full candidate reopening did not reproduce the requested title.
-    #[error("the edited Keynote chart title failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote chart-title patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::EmptyChartName { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::ChartNameNotFound { .. }
+            | Self::ChartPositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable chart-title value staged against an immutable package snapshot.
@@ -316,7 +351,7 @@ impl<'a> Edit<'a> {
         }
 
         if !catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         self.source.validate().map_err(map_read_error)?;
         validate_chart_title_reference_metadata(self.source, &mut budget)?;
@@ -735,20 +770,22 @@ pub(super) fn select_chart(
         .map_err(|_error| Error::Allocation {
             amount: graphs.len(),
         })?;
-    let chart_position = match chart_selector {
-        ChartSelector::Index(index) => graphs.get(index).map(|_graph| Position::new(index)).ok_or(
-            Error::ChartPositionNotFound {
-                position: Position::new(index),
+    let chart_position =
+        match chart_selector {
+            ChartSelector::Index(index) => graphs
+                .get(index)
+                .map(|_graph| Position::new(index))
+                .ok_or(Error::Refused(Refusal::ChartPositionNotFound {
+                    position: Position::new(index),
+                }))?,
+            ChartSelector::Name(name) => {
+                let selected = catalog
+                    .select_position(name)
+                    .map_err(map_chart_selector_error)?
+                    .ok_or(Error::Refused(Refusal::ChartNameNotFound))?;
+                Position::new(selected)
             },
-        )?,
-        ChartSelector::Name(name) => {
-            let selected = catalog
-                .select_position(name)
-                .map_err(map_chart_selector_error)?
-                .ok_or(Error::ChartNameNotFound)?;
-            Position::new(selected)
-        },
-    };
+        };
     let graph = graphs
         .get(chart_position.get())
         .ok_or(Error::InvalidSource)?;
@@ -825,9 +862,11 @@ pub(super) fn select_chart_with_budget(
     charge_chart_catalog_selection(&graphs, chart_selector, budget)?;
     let chart_position = match chart_selector {
         ChartSelector::Index(index) => graphs.get(index).map(|_graph| Position::new(index)).ok_or(
-            chart_axis_support::map_chart_title_error(Error::ChartPositionNotFound {
-                position: Position::new(index),
-            }),
+            chart_axis_support::map_chart_title_error(Error::Refused(
+                Refusal::ChartPositionNotFound {
+                    position: Position::new(index),
+                },
+            )),
         )?,
         ChartSelector::Name(name) => {
             let selected = catalog
@@ -835,7 +874,9 @@ pub(super) fn select_chart_with_budget(
                 .map_err(map_chart_selector_error)
                 .map_err(chart_axis_support::map_chart_title_error)?
                 .ok_or_else(|| {
-                    chart_axis_support::map_chart_title_error(Error::ChartNameNotFound)
+                    chart_axis_support::map_chart_title_error(Error::Refused(
+                        Refusal::ChartNameNotFound,
+                    ))
                 })?;
             Position::new(selected)
         },
@@ -990,31 +1031,35 @@ pub(super) fn map_axis_support_error(error: AxisSupportError) -> Error {
     match error {
         AxisSupportError::Selector(selector) => match selector {
             chart_axis_support::AxisSupportSelectorError::UnsupportedSource => {
-                Error::UnsupportedSource
+                Error::Refused(Refusal::UnsupportedSource)
             },
             chart_axis_support::AxisSupportSelectorError::AmbiguousSelector => {
-                Error::AmbiguousSelector
+                Error::Refused(Refusal::AmbiguousSelector)
             },
-            chart_axis_support::AxisSupportSelectorError::EmptySlideName => Error::EmptySlideName,
+            chart_axis_support::AxisSupportSelectorError::EmptySlideName => {
+                Error::Refused(Refusal::EmptySlideName)
+            },
             chart_axis_support::AxisSupportSelectorError::SlideNameNotFound => {
-                Error::SlideNameNotFound
+                Error::Refused(Refusal::SlideNameNotFound)
             },
             chart_axis_support::AxisSupportSelectorError::SlidePositionNotFound { position } => {
-                Error::SlidePositionNotFound { position }
+                Error::Refused(Refusal::SlidePositionNotFound { position })
             },
             chart_axis_support::AxisSupportSelectorError::ChartNameNotFound => {
-                Error::ChartNameNotFound
+                Error::Refused(Refusal::ChartNameNotFound)
             },
             chart_axis_support::AxisSupportSelectorError::ChartPositionNotFound { position } => {
-                Error::ChartPositionNotFound { position }
+                Error::Refused(Refusal::ChartPositionNotFound { position })
             },
-            chart_axis_support::AxisSupportSelectorError::EmptyChartName => Error::EmptyChartName,
+            chart_axis_support::AxisSupportSelectorError::EmptyChartName => {
+                Error::Refused(Refusal::EmptyChartName)
+            },
         },
         AxisSupportError::LimitExceeded {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 chart_axis_support::AxisSupportLimitKind::InputBytes => LimitKind::InputBytes,
                 chart_axis_support::AxisSupportLimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1056,7 +1101,7 @@ fn resolve_slide_position(
             .slide_record_at(position.get())
             .map_err(map_read_error)?
             .map(|_record| position)
-            .ok_or(Error::SlidePositionNotFound { position }),
+            .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position })),
         SlideSelector::Name(name) => {
             let selector = SlideSelector::try_name(name).map_err(map_slide_selector_error)?;
             package
@@ -1065,7 +1110,7 @@ fn resolve_slide_position(
                 .select_slide(selector)
                 .map_err(map_slide_selector_error)?
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(Error::SlideNameNotFound)
+                .ok_or(Error::Refused(Refusal::SlideNameNotFound))
         },
     }
 }
@@ -1078,9 +1123,9 @@ fn chart_graphs(
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(map_read_error)?
-        .ok_or(Error::SlidePositionNotFound {
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound {
             position: slide_position,
-        })?;
+        }))?;
     let (slide_component_name, slide) = package
         .object_with_component(record.slide_identifier)
         .ok_or(Error::InvalidSource)?;
@@ -1162,9 +1207,9 @@ fn chart_graphs_with_budget(
         .slide_record_at(slide_position.get())
         .map_err(map_read_error)
         .map_err(chart_graph_error)?
-        .ok_or(Error::SlidePositionNotFound {
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound {
             position: slide_position,
-        })
+        }))
         .map_err(chart_graph_error)?;
     let (slide_component_name, slide) = package
         .object_with_component(record.slide_identifier)
@@ -1680,7 +1725,7 @@ impl ChartGraphScanBudget {
     fn charge(&mut self, amount: usize) -> Result<(), Error> {
         let observed = self.work.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > self.maximum_work {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(self.maximum_work),
@@ -1750,7 +1795,7 @@ impl ChartGraphScanBudget {
             .map_err(map_core_error)?;
         let compressed = SnappyStream::maximum_compressed_len(encoded).map_err(map_core_error)?;
         if compressed > snappy_limits.max_compressed_stream() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::EntryBytes,
                 observed: usize_to_u64(compressed),
                 maximum: usize_to_u64(snappy_limits.max_compressed_stream()),
@@ -1773,7 +1818,7 @@ impl ChartGraphScanBudget {
         let candidate_u64 =
             u64::try_from(candidate_bytes).map_err(|_error| Error::InvalidSource)?;
         if candidate_u64 > physical_limits.max_input_bytes() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::InputBytes,
                 observed: candidate_u64,
                 maximum: physical_limits.max_input_bytes(),
@@ -1781,7 +1826,7 @@ impl ChartGraphScanBudget {
         }
         let catalog = physical_catalog(source)?.package();
         if catalog.len() > physical_limits.max_entries() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::Entries,
                 observed: usize_to_u64(catalog.len()),
                 maximum: usize_to_u64(physical_limits.max_entries()),
@@ -1804,7 +1849,7 @@ impl ChartGraphScanBudget {
                 .encoded_len_with_limits(archive_limits)
                 .map_err(map_core_error)?;
             if bytes > physical_limits.max_iwa_stream_bytes() {
-                return Err(Error::LimitExceeded {
+                return Err(Error::Limit {
                     kind: LimitKind::EntryBytes,
                     observed: usize_to_u64(bytes),
                     maximum: usize_to_u64(physical_limits.max_iwa_stream_bytes()),
@@ -3216,7 +3261,7 @@ fn precharge_chart_title_rewrite(
             .ok_or(Error::InvalidSource)?;
     }
     if output_length > limits.max_output_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: usize_to_u64(output_length),
             maximum: usize_to_u64(limits.max_output_bytes()),
@@ -3262,7 +3307,7 @@ fn rewrite_chart_non_style_extension(
         )
         .ok_or(Error::InvalidSource)?;
     if output_length > limits.max_output_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: usize_to_u64(output_length),
             maximum: usize_to_u64(limits.max_output_bytes()),
@@ -3303,7 +3348,7 @@ fn clone_title_source(
     budget: &mut ChartGraphScanBudget,
 ) -> Result<Vec<u8>, Error> {
     if data.len() > limits.max_output_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: usize_to_u64(data.len()),
             maximum: usize_to_u64(limits.max_output_bytes()),
@@ -3319,12 +3364,11 @@ fn clone_title_source(
 }
 
 fn chart_title_decode_options(limits: WireLimits) -> Result<DecodeOptions, Error> {
-    let recursion_limit =
-        u32::try_from(limits.max_nesting()).map_err(|_error| Error::LimitExceeded {
-            kind: LimitKind::WireNesting,
-            observed: usize_to_u64(limits.max_nesting()),
-            maximum: u64::from(u32::MAX),
-        })?;
+    let recursion_limit = u32::try_from(limits.max_nesting()).map_err(|_error| Error::Limit {
+        kind: LimitKind::WireNesting,
+        observed: usize_to_u64(limits.max_nesting()),
+        maximum: u64::from(u32::MAX),
+    })?;
     Ok(DecodeOptions::new(
         limits.max_input_bytes().max(1),
         limits.max_fields(),
@@ -3337,7 +3381,7 @@ fn chart_title_decode_options(limits: WireLimits) -> Result<DecodeOptions, Error
 
 fn copy_title(title: &str) -> Result<String, Error> {
     if title.len() > MAX_CHART_TITLE_BYTES {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::TitleBytes,
             observed: usize_to_u64(title.len()),
             maximum: usize_to_u64(MAX_CHART_TITLE_BYTES),
@@ -3356,32 +3400,32 @@ fn copy_title(title: &str) -> Result<String, Error> {
 fn map_chart_title_codec_error(error: ChartTitleDecodeError) -> Error {
     if let Some(limit) = error.resource_limit() {
         return match limit {
-            ChartTitleDecodeLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+            ChartTitleDecodeLimit::Bytes { observed, maximum } => Error::Limit {
                 kind: LimitKind::WireBytes,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            ChartTitleDecodeLimit::Fields { observed, maximum } => Error::LimitExceeded {
+            ChartTitleDecodeLimit::Fields { observed, maximum } => Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            ChartTitleDecodeLimit::Work { observed, maximum } => Error::LimitExceeded {
+            ChartTitleDecodeLimit::Work { observed, maximum } => Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            ChartTitleDecodeLimit::Output { observed, maximum } => Error::LimitExceeded {
+            ChartTitleDecodeLimit::Output { observed, maximum } => Error::Limit {
                 kind: LimitKind::OutputBytes,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            ChartTitleDecodeLimit::Title { observed, maximum } => Error::LimitExceeded {
+            ChartTitleDecodeLimit::Title { observed, maximum } => Error::Limit {
                 kind: LimitKind::TitleBytes,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            ChartTitleDecodeLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+            ChartTitleDecodeLimit::Nesting { observed, maximum } => Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -3391,12 +3435,12 @@ fn map_chart_title_codec_error(error: ChartTitleDecodeError) -> Error {
     }
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
-            ChartTitleWireResourceLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+            ChartTitleWireResourceLimit::Bytes { observed, maximum } => Error::Limit {
                 kind: LimitKind::WireBytes,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            ChartTitleWireResourceLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+            ChartTitleWireResourceLimit::Nesting { observed, maximum } => Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -3412,22 +3456,24 @@ fn map_chart_title_codec_error(error: ChartTitleDecodeError) -> Error {
 
 fn map_chart_selector_error(error: ChartSelectorError) -> Error {
     match error {
-        ChartSelectorError::EmptyName => Error::EmptyChartName,
-        ChartSelectorError::DuplicateChartTitle { .. } => Error::AmbiguousSelector,
+        ChartSelectorError::EmptyName => Error::Refused(Refusal::EmptyChartName),
+        ChartSelectorError::DuplicateChartTitle { .. } => {
+            Error::Refused(Refusal::AmbiguousSelector)
+        },
     }
 }
 
 fn map_slide_selector_error(error: SlideSelectorError) -> Error {
     match error {
-        SlideSelectorError::EmptySlideName => Error::EmptySlideName,
-        SlideSelectorError::DuplicateSlideName { .. } => Error::AmbiguousSelector,
+        SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        SlideSelectorError::DuplicateSlideName { .. } => Error::Refused(Refusal::AmbiguousSelector),
     }
 }
 
 fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
@@ -3438,7 +3484,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::Objects => LimitKind::Entries,
                 SemanticLimitKind::Slides => LimitKind::Slides,
@@ -3455,7 +3501,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -3483,7 +3529,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -3506,7 +3552,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::ArchiveBytes => LimitKind::TotalBytes,
                 litchi_iwa_core::LimitKind::Objects
@@ -3541,7 +3587,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,

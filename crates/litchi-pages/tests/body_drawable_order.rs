@@ -279,13 +279,17 @@ fn positions_handles_and_patches_fail_closed() -> TestResult<()> {
     let handles = source.body_drawable_order()?;
     assert!(matches!(
         source.body_drawable(Position::new(99)),
-        Err(BodyDrawableOrderError::PositionNotFound { .. })
+        Err(BodyDrawableOrderError::Refused(
+            litchi_pages::drawable::order::Refusal::PositionNotFound { .. }
+        ))
     ));
 
     let mut duplicate = source.edit_body_drawable_order()?;
     assert!(matches!(
         duplicate.set_order(&[handles[0].clone(), handles[0].clone(), handles[2].clone()]),
-        Err(BodyDrawableOrderError::InvalidOrder)
+        Err(BodyDrawableOrderError::Refused(
+            litchi_pages::drawable::order::Refusal::InvalidOrder
+        ))
     ));
 
     let foreign = Package::from_bytes(&fixture_bytes(&DRAWABLE_IDENTIFIERS, b"foreign")?)?;
@@ -293,7 +297,9 @@ fn positions_handles_and_patches_fail_closed() -> TestResult<()> {
     let mut foreign_edit = source.edit_body_drawable_order()?;
     assert!(matches!(
         foreign_edit.set_order(&foreign_handles),
-        Err(BodyDrawableOrderError::HandleSourceMismatch)
+        Err(BodyDrawableOrderError::Refused(
+            litchi_pages::drawable::order::Refusal::HandleSourceMismatch
+        ))
     ));
 
     let mut changed = source.edit_body_drawable_order()?;

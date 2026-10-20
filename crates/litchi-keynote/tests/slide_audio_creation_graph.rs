@@ -1161,7 +1161,9 @@ fn audio_position_validates_build_payload_before_admitting_its_header_edge() -> 
     let forged_package = Package::from_bytes(&forged)?;
     assert!(matches!(
         forged_package.edit_slide_audio_position(SlideSelector::index(0), selector),
-        Err(litchi_keynote::slide::audio::position::Error::UnsupportedDependency),
+        Err(litchi_keynote::slide::audio::position::Error::Refused(
+            litchi_keynote::slide::audio::position::Refusal::UnsupportedDependency
+        )),
     ));
     assert_eq!(package_bytes(&forged_package)?, forged);
     Ok(())

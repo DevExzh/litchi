@@ -322,7 +322,9 @@ fn path_source(preset: Preset, width: f32, height: f32) -> Result<Writer, Error>
         ),
         Preset::RoundedRectangle { radius } => {
             if !radius.is_finite() || radius < 0.0 || radius > width.min(height) / 2.0 {
-                return Err(Error::InvalidGeometry);
+                return Err(Error::Refused(
+                    crate::slide::drawable::Refusal::InvalidGeometry,
+                ));
             }
             source.message(
                 4,
@@ -488,9 +490,11 @@ pub(super) fn add_text_shape(
     geometry: Geometry,
     text: &str,
 ) -> Result<u64, Error> {
-    let style = context.textbox_style.ok_or(Error::Unsupported {
-        reason: Unsupported::MissingThemeStyle,
-    })?;
+    let style = context.textbox_style.ok_or(Error::Refused(
+        crate::slide::drawable::Refusal::Unsupported {
+            reason: Unsupported::MissingThemeStyle,
+        },
+    ))?;
     let member = slide_member(workspace, slide)?;
     let slide_payload = workspace.payload(slide, SLIDE).map_err(lift)?.to_vec();
     let styles = storage_styles(workspace, &slide_payload, context).map_err(lift)?;
@@ -626,13 +630,17 @@ fn data_file_name(preferred: &str, identifier: u64) -> Result<String, Error> {
         .file_stem()
         .and_then(|stem| stem.to_str())
         .filter(|stem| !stem.is_empty())
-        .ok_or(Error::InvalidImage)?;
+        .ok_or(Error::Refused(
+            crate::slide::drawable::Refusal::InvalidImage,
+        ))?;
     let name = match path.extension().and_then(|extension| extension.to_str()) {
         Some(extension) if !extension.is_empty() => format!("{stem}-{identifier}.{extension}"),
         _ => format!("{stem}-{identifier}"),
     };
     if name.contains(['/', '\\', '\0']) || name.starts_with('.') {
-        return Err(Error::InvalidImage);
+        return Err(Error::Refused(
+            crate::slide::drawable::Refusal::InvalidImage,
+        ));
     }
     Ok(name)
 }
@@ -646,12 +654,16 @@ pub(super) fn add_image(
     preferred_file_name: &str,
     geometry: Geometry,
 ) -> Result<u64, Error> {
-    let style = context.media_style.ok_or(Error::Unsupported {
-        reason: Unsupported::MissingThemeStyle,
-    })?;
-    let (_, pixels) = sniff(bytes).ok_or(Error::Unsupported {
-        reason: Unsupported::ImageFormat,
-    })?;
+    let style = context.media_style.ok_or(Error::Refused(
+        crate::slide::drawable::Refusal::Unsupported {
+            reason: Unsupported::MissingThemeStyle,
+        },
+    ))?;
+    let (_, pixels) = sniff(bytes).ok_or(Error::Refused(
+        crate::slide::drawable::Refusal::Unsupported {
+            reason: Unsupported::ImageFormat,
+        },
+    ))?;
     let natural = pixels
         .filter(|(width, height)| *width > 0 && *height > 0)
         .map_or((geometry.width, geometry.height), |(width, height)| {
@@ -666,7 +678,7 @@ pub(super) fn add_image(
         .max()
         .unwrap_or(0)
         .checked_add(1)
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: super::LimitKind::Identifiers,
             observed: u64::MAX,
             maximum: u64::MAX,
@@ -769,7 +781,9 @@ mod tests {
         assert!(path_source(Preset::RoundedRectangle { radius: 5.0 }, 10.0, 20.0).is_ok());
         assert!(matches!(
             path_source(Preset::RoundedRectangle { radius: 5.1 }, 10.0, 20.0),
-            Err(Error::InvalidGeometry)
+            Err(Error::Refused(
+                crate::slide::drawable::Refusal::InvalidGeometry
+            ))
         ));
         assert!(path_source(Preset::Ellipse, 10.0, 20.0).is_ok());
     }

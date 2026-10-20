@@ -89,32 +89,18 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
-    /// No rooted body table matched the selector.
-    #[error("the Pages body has no table matching the requested selector")]
-    TableNotFound,
-    /// More than one rooted body table matched an exact name.
-    #[error("the Pages body has more than one table with the requested name")]
-    AmbiguousTableName,
-    /// The rooted selector or ownership graph is ambiguous.
-    #[error("the Pages body-table merge selector is ambiguous")]
-    AmbiguousSelector,
-    /// The source cannot be inspected through the exact native profile.
-    #[error("the Pages package source does not support body-table merge reads")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The selected rooted graph or merge formula is malformed.
     #[error("the selected Pages body-table merge source is invalid")]
     InvalidSource,
-    /// A requested region is outside the selected table dimensions.
-    #[error("the requested Pages body-table merge region is outside the table bounds")]
-    InvalidRegion,
-    /// A requested region overlaps an already staged merged-cell rectangle.
-    #[error("the requested Pages body-table merge region overlaps an existing merge")]
-    OverlappingRegion,
     /// A finite read resource ceiling was exceeded.
     #[error(
         "Pages body-table merges {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -136,6 +122,53 @@ pub enum Error {
     PatchConflict,
 }
 
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// No rooted body table matched the selector.
+    #[error("the Pages body has no table matching the requested selector")]
+    TableNotFound,
+    /// More than one rooted body table matched an exact name.
+    #[error("the Pages body has more than one table with the requested name")]
+    AmbiguousTableName,
+    /// The rooted selector or ownership graph is ambiguous.
+    #[error("the Pages body-table merge selector is ambiguous")]
+    AmbiguousSelector,
+    /// The source cannot be inspected through the exact native profile.
+    #[error("the Pages package source does not support body-table merge reads")]
+    UnsupportedSource,
+    /// A requested region is outside the selected table dimensions.
+    #[error("the requested Pages body-table merge region is outside the table bounds")]
+    InvalidRegion,
+    /// A requested region overlaps an already staged merged-cell rectangle.
+    #[error("the requested Pages body-table merge region overlaps an existing merge")]
+    OverlappingRegion,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::AmbiguousTableName { .. }
+            | Self::AmbiguousSelector { .. }
+            | Self::InvalidRegion { .. }
+            | Self::OverlappingRegion { .. } => RefusalKind::InvalidValue,
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
+}
+
 fn select_reader_target(
     targets: Vec<table_lock::BodyTableTarget>,
     selector: BodyTableSelector<'_>,
@@ -147,7 +180,9 @@ fn select_reader_target(
             targets
                 .into_iter()
                 .nth(position.get())
-                .ok_or(table_lock::Error::TableNotFound)
+                .ok_or(table_lock::Error::Refused(
+                    crate::table::lock::Refusal::TableNotFound,
+                ))
         },
         BodyTableSelector::Name(name) => {
             let mut first = None;
@@ -157,10 +192,14 @@ fn select_reader_target(
                     continue;
                 }
                 if first.replace(target).is_some() {
-                    return Err(table_lock::Error::AmbiguousTableName);
+                    return Err(table_lock::Error::Refused(
+                        crate::table::lock::Refusal::AmbiguousTableName,
+                    ));
                 }
             }
-            first.ok_or(table_lock::Error::TableNotFound)
+            first.ok_or(table_lock::Error::Refused(
+                crate::table::lock::Refusal::TableNotFound,
+            ))
         },
     }
 }
@@ -259,7 +298,7 @@ fn model_message_from_components<'source>(
 fn read_limits(budget: &table_lock::WireBudget) -> Result<ReadLimits, Error> {
     let fields = budget.remaining_wire_fields();
     if fields == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireFields,
             observed: 1,
             maximum: 0,
@@ -267,7 +306,7 @@ fn read_limits(budget: &table_lock::WireBudget) -> Result<ReadLimits, Error> {
     }
     let work = budget.remaining_wire_work();
     if work == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: 1,
             maximum: 0,
@@ -306,7 +345,7 @@ fn map_common_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_common_limit(kind),
             observed: observed as u64,
             maximum: limit as u64,
@@ -319,15 +358,23 @@ fn map_common_error(error: litchi_iwa_common::Error) -> Error {
 
 fn map_lock_error(error: table_lock::Error) -> Error {
     match error {
-        table_lock::Error::TableNotFound => Error::TableNotFound,
-        table_lock::Error::AmbiguousTableName => Error::AmbiguousTableName,
-        table_lock::Error::AmbiguousSelector => Error::AmbiguousSelector,
-        table_lock::Error::UnsupportedSource => Error::UnsupportedSource,
-        table_lock::Error::LimitExceeded {
+        table_lock::Error::Refused(crate::table::lock::Refusal::TableNotFound) => {
+            Error::Refused(Refusal::TableNotFound)
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousTableName) => {
+            Error::Refused(Refusal::AmbiguousTableName)
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousSelector) => {
+            Error::Refused(Refusal::AmbiguousSelector)
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
+        table_lock::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_lock_limit(kind),
             observed,
             maximum,

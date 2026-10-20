@@ -103,20 +103,14 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    #[error("the Pages body has no table matching the requested selector")]
-    TableNotFound,
-    #[error("the Pages body has more than one table with the requested name")]
-    AmbiguousTableName,
-    #[error("the Pages body-table sort selector is ambiguous")]
-    AmbiguousSelector,
-    #[error("the Pages package source does not support exact body-table sort editing")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     #[error("the selected Pages body-table sort source is invalid")]
     InvalidSource,
-    #[error("the selected Pages body table is locked")]
-    TableLocked,
     #[error("Pages body-table sort {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         kind: LimitKind,
         observed: u64,
         maximum: u64,
@@ -127,6 +121,45 @@ pub enum Error {
     Verification,
     #[error("the Pages body-table sort patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    #[error("the Pages body has no table matching the requested selector")]
+    TableNotFound,
+    #[error("the Pages body has more than one table with the requested name")]
+    AmbiguousTableName,
+    #[error("the Pages body-table sort selector is ambiguous")]
+    AmbiguousSelector,
+    #[error("the Pages package source does not support exact body-table sort editing")]
+    UnsupportedSource,
+    #[error("the selected Pages body table is locked")]
+    TableLocked,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::AmbiguousTableName { .. } | Self::AmbiguousSelector { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+            Self::TableLocked { .. } => RefusalKind::Protected,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -486,13 +519,13 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         });
     }
     if edit.target.native.explicit_locked == Some(true) {
-        return Err(Error::TableLocked);
+        return Err(Error::Refused(Refusal::TableLocked));
     }
     if let Some(order) = &edit.after {
         validate_order_columns(order, edit.target.columns)?;
     }
     if !source.state.source.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let mut budget =
         table_lock::WireBudget::new(source.state.source.limits()).map_err(map_lock_error)?;
@@ -891,7 +924,7 @@ fn rewrite_model(
         .find(|entry| entry.name() == component_name)
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let (mut archive, archive_limits) =
         page_layout::editable_archive(source, component_name).map_err(map_page_layout_error)?;
@@ -997,7 +1030,7 @@ fn preflight_sort_rewrite(
         .find(|entry| entry.name() == component.name())
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let original = model_message(source, &target.native)?;
     page_layout::validate_selected_metadata(
@@ -1029,7 +1062,7 @@ fn preflight_sort_rewrite(
     let compressed_bound =
         table_lock::snappy_compressed_bound(archive_bound).ok_or(Error::InvalidSource)?;
     let old_compressed_size =
-        usize::try_from(entry.metadata().compressed_size()).map_err(|_| Error::LimitExceeded {
+        usize::try_from(entry.metadata().compressed_size()).map_err(|_| Error::Limit {
             kind: LimitKind::EntryBytes,
             observed: u64::MAX,
             maximum: catalog.limits().max_entry_bytes(),
@@ -1116,7 +1149,7 @@ fn codec_options(
     let limits = budget.wire_limits();
     let fields = budget.remaining_wire_fields();
     if fields == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireFields,
             observed: 1,
             maximum: 0,
@@ -1124,7 +1157,7 @@ fn codec_options(
     }
     let work = budget.remaining_wire_work();
     if work == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: 1,
             maximum: 0,
@@ -1132,7 +1165,7 @@ fn codec_options(
     }
     let references = budget.remaining_payload_references();
     if references == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireRules,
             observed: 1,
             maximum: 0,
@@ -1366,19 +1399,27 @@ fn invalid_source() -> Error {
 
 fn map_lock_error(error: table_lock::Error) -> Error {
     match error {
-        table_lock::Error::TableNotFound => Error::TableNotFound,
-        table_lock::Error::AmbiguousTableName => Error::AmbiguousTableName,
-        table_lock::Error::AmbiguousSelector => Error::AmbiguousSelector,
-        table_lock::Error::UnsupportedSource => Error::UnsupportedSource,
+        table_lock::Error::Refused(crate::table::lock::Refusal::TableNotFound) => {
+            Error::Refused(Refusal::TableNotFound)
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousTableName) => {
+            Error::Refused(Refusal::AmbiguousTableName)
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousSelector) => {
+            Error::Refused(Refusal::AmbiguousSelector)
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
         table_lock::Error::InvalidSource => Error::InvalidSource,
         table_lock::Error::PatchConflict => Error::PatchConflict,
         table_lock::Error::Verification => Error::Verification,
         table_lock::Error::Allocation { amount } => Error::Allocation { amount },
-        table_lock::Error::LimitExceeded {
+        table_lock::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 table_lock::LimitKind::InputBytes => LimitKind::InputBytes,
                 table_lock::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1424,7 +1465,7 @@ fn map_codec_error(error: codec::DecodeError) -> Error {
             (LimitKind::WireWork, observed, maximum)
         },
         codec::DecodeLimit::Nesting { observed, maximum } => {
-            return Error::LimitExceeded {
+            return Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -1447,7 +1488,7 @@ fn map_codec_error(error: codec::DecodeError) -> Error {
         },
         _ => return invalid_source(),
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
@@ -1461,7 +1502,7 @@ fn map_archive_error(error: ArchiveError) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 ArchiveLimitKind::InputBytes => LimitKind::InputBytes,
                 ArchiveLimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1486,15 +1527,17 @@ fn map_archive_error(error: ArchiveError) -> Error {
 
 fn map_page_layout_error(error: page_layout::Error) -> Error {
     match error {
-        page_layout::Error::UnsupportedSource => Error::UnsupportedSource,
+        page_layout::Error::Refused(
+            crate::page_layout::transaction::Refusal::UnsupportedSource,
+        ) => Error::Refused(Refusal::UnsupportedSource),
         page_layout::Error::InvalidSource | page_layout::Error::InvalidLayout(_) => {
             Error::InvalidSource
         },
-        page_layout::Error::LimitExceeded {
+        page_layout::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 page_layout::LimitKind::InputBytes => LimitKind::InputBytes,
                 page_layout::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1525,13 +1568,13 @@ fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::Archive(error) => map_archive_error(error),
         PackageError::Allocation { amount } => Error::Allocation { amount },
-        PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
             kind: LimitKind::PayloadObjects,
             observed: observed as u64,
             maximum: limit as u64,
         },
         PackageError::PayloadLimit { observed, limit }
-        | PackageError::SectionNamesTooLarge { observed, limit } => Error::LimitExceeded {
+        | PackageError::SectionNamesTooLarge { observed, limit } => Error::Limit {
             kind: LimitKind::PayloadBytes,
             observed: observed as u64,
             maximum: limit as u64,
@@ -1555,7 +1598,7 @@ fn map_core_error(error: CoreError) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 CoreLimitKind::ArchiveBytes => LimitKind::TotalPayloadBytes,
                 CoreLimitKind::Objects => LimitKind::PayloadObjects,

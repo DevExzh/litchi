@@ -46,7 +46,7 @@ use crate::{
 
 use super::{At, CoordinateError, Dimensions};
 
-pub use crate::package::table_cells::{DependencyKind, Error, LimitKind, Path};
+pub use crate::package::table_cells::{DependencyKind, Error, LimitKind, Path, Refusal};
 
 /// One supported scalar or bounded semantic formula staged for a Numbers cell.
 #[derive(Clone, PartialEq)]
@@ -508,10 +508,10 @@ impl<'source> Edit<'source> {
         if position.row() >= self.dimensions.rows()
             || position.column() >= self.dimensions.columns()
         {
-            return Err(Error::OutOfBounds {
+            return Err(Error::Refused(Refusal::OutOfBounds {
                 position,
                 dimensions: self.dimensions,
-            });
+            }));
         }
         let observed = checked_staged_total(
             self.changes.len(),
@@ -564,7 +564,7 @@ impl<'source> Edit<'source> {
         if let Some(position) = self.changes.windows(2).find_map(|pair| {
             (pair[0].position() == pair[1].position()).then_some(pair[0].position())
         }) {
-            return Err(Error::DuplicatePosition { position });
+            return Err(Error::Refused(Refusal::DuplicatePosition { position }));
         }
         (self.commit)(Plan {
             source: self.source,
@@ -1540,7 +1540,7 @@ impl fmt::Debug for Commit {
 }
 
 fn map_coordinate_error(_error: CoordinateError) -> Error {
-    Error::InvalidAddress
+    Error::Refused(Refusal::InvalidAddress)
 }
 
 fn checked_staged_total(
@@ -1550,14 +1550,14 @@ fn checked_staged_total(
     kind: LimitKind,
     path: Path,
 ) -> Result<usize, Error> {
-    let observed = current.checked_add(added).ok_or(Error::LimitExceeded {
+    let observed = current.checked_add(added).ok_or(Error::Limit {
         kind,
         observed: u64::MAX,
         maximum: usize_to_u64(maximum),
         path,
     })?;
     if observed > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -1615,7 +1615,7 @@ mod tests {
                 LimitKind::Updates,
                 Path::Package,
             ),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::Updates,
                 observed,
                 maximum: reported_maximum,

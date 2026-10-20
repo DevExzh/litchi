@@ -474,13 +474,11 @@ impl SelectorBudget {
     ) -> Result<()> {
         let observed = current.saturating_add(amount);
         if observed > maximum {
-            return Err(Error::PagesTableMerges(
-                BodyTableMergesError::LimitExceeded {
-                    kind,
-                    observed: observed as u64,
-                    maximum: maximum as u64,
-                },
-            ));
+            return Err(Error::PagesTableMerges(BodyTableMergesError::Limit {
+                kind,
+                observed: observed as u64,
+                maximum: maximum as u64,
+            }));
         }
         *current = observed;
         Ok(())
@@ -537,7 +535,7 @@ fn map_catalog_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => BodyTableMergesError::LimitExceeded {
+        } => BodyTableMergesError::Limit {
             kind: map_archive_limit(kind),
             observed,
             maximum,
@@ -588,7 +586,7 @@ fn map_table_info_error(body_storage_id: u64, error: table_info_codec::DecodeErr
         }
     };
     if let Some((kind, observed, maximum)) = limit {
-        return BodyTableMergesError::LimitExceeded {
+        return BodyTableMergesError::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -659,7 +657,7 @@ mod tests {
             .expect_err("the focused table ceiling must reject the 4097th attachment");
         assert!(matches!(
             error,
-            Error::PagesTableMerges(BodyTableMergesError::LimitExceeded {
+            Error::PagesTableMerges(BodyTableMergesError::Limit {
                 kind: BodyTableMergesLimitKind::PayloadItems,
                 observed: 4_097,
                 maximum: 4_096,

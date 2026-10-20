@@ -180,7 +180,9 @@ fn rejects_unsafe_names_or_non_audio_without_mutating_source() -> TestResult {
                 .edit_slide_audio_creation()
                 .add(SlideSelector::index(0), name, &data, options()?)
                 .and_then(|edit| edit.commit()),
-            Err(SlideAudioCreationError::InvalidFilename),
+            Err(SlideAudioCreationError::Refused(
+                litchi_keynote::slide::audio::creation::Refusal::InvalidFilename
+            )),
         ));
     }
     for invalid in [b"".as_slice(), b"not an audio payload".as_slice()] {
@@ -189,7 +191,9 @@ fn rejects_unsafe_names_or_non_audio_without_mutating_source() -> TestResult {
                 .edit_slide_audio_creation()
                 .add(SlideSelector::index(0), "audio.wav", invalid, options()?)
                 .and_then(|edit| edit.commit()),
-            Err(SlideAudioCreationError::UnsupportedAudio),
+            Err(SlideAudioCreationError::Refused(
+                litchi_keynote::slide::audio::creation::Refusal::UnsupportedAudio
+            )),
         ));
     }
     assert_eq!(exact_bytes(&source)?, NATIVE_SOURCE);
@@ -227,14 +231,18 @@ fn source_selector_is_semantic_and_out_of_range_is_atomic() -> TestResult {
                 options()?
             )
             .and_then(|edit| edit.commit()),
-        Err(SlideAudioCreationError::SlidePositionNotFound { .. }),
+        Err(SlideAudioCreationError::Refused(
+            litchi_keynote::slide::audio::creation::Refusal::SlidePositionNotFound { .. }
+        )),
     ));
     assert!(matches!(
         source
             .edit_slide_audio_creation()
             .add(SlideSelector::name(""), "audio.wav", &audio(), options()?)
             .and_then(|edit| edit.commit()),
-        Err(SlideAudioCreationError::EmptySlideName),
+        Err(SlideAudioCreationError::Refused(
+            litchi_keynote::slide::audio::creation::Refusal::EmptySlideName
+        )),
     ));
     assert_eq!(exact_bytes(&source)?, NATIVE_SOURCE);
     Ok(())
@@ -264,7 +272,7 @@ fn oversized_audio_reports_entry_limit_without_changing_source() -> TestResult {
         .add(SlideSelector::index(0), "oversized.wav", &data, options()?)
         .and_then(|edit| edit.commit())
     {
-        Err(SlideAudioCreationError::LimitExceeded {
+        Err(SlideAudioCreationError::Limit {
             kind: SlideAudioCreationLimitKind::EntryBytes,
             observed,
             maximum,
@@ -330,14 +338,18 @@ fn the_edit_stages_exactly_one_audio_creation() -> TestResult {
     let data = audio();
     assert!(matches!(
         source.edit_slide_audio_creation().commit(),
-        Err(SlideAudioCreationError::NoStagedOperation)
+        Err(SlideAudioCreationError::Refused(
+            litchi_keynote::slide::audio::creation::Refusal::NoStagedOperation
+        ))
     ));
     assert!(matches!(
         source
             .edit_slide_audio_creation()
             .add(SlideSelector::index(0), "fresh-pcm.wav", &data, options()?)?
             .add(SlideSelector::index(0), "fresh-pcm.wav", &data, options()?),
-        Err(SlideAudioCreationError::OperationAlreadyStaged)
+        Err(SlideAudioCreationError::Refused(
+            litchi_keynote::slide::audio::creation::Refusal::OperationAlreadyStaged
+        ))
     ));
     // Discarding a staged edit leaves the source untouched.
     let _discarded = source.edit_slide_audio_creation().add(

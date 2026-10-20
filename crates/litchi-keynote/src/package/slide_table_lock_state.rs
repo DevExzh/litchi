@@ -113,6 +113,33 @@ impl fmt::Display for Path {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the selected Keynote slide-table lock source is invalid")]
+    InvalidSource,
+    #[error(
+        "Keynote slide-table lock {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    #[error("could not allocate {amount} units for the Keynote slide-table lock transaction")]
+    Allocation { amount: usize },
+    #[error("the edited Keynote slide-table lock failed semantic verification")]
+    Verification,
+    #[error("the Keynote slide-table lock patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     #[error("this Keynote source does not support persisted slide-table lock edits")]
     UnsupportedSource,
     #[error("the requested Keynote slide-table lock graph is outside the supported scope")]
@@ -129,22 +156,32 @@ pub enum Error {
     TablePositionNotFound { position: Position },
     #[error("the selected Keynote slide-table is locked")]
     Locked,
-    #[error("the selected Keynote slide-table lock source is invalid")]
-    InvalidSource,
-    #[error(
-        "Keynote slide-table lock {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    #[error("could not allocate {amount} units for the Keynote slide-table lock transaction")]
-    Allocation { amount: usize },
-    #[error("the edited Keynote slide-table lock failed semantic verification")]
-    Verification,
-    #[error("the Keynote slide-table lock patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::TablePositionNotFound { .. } => RefusalKind::NotFound,
+            Self::Locked { .. } => RefusalKind::Protected,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -258,7 +295,7 @@ impl LockBudget {
     ) -> Result<(), Error> {
         let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -436,7 +473,7 @@ impl LockBudget {
         self.scratch(requirements.scratch_bytes())?;
         self.nesting = self.nesting.max(requirements.max_depth() as usize);
         if self.nesting > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: self.nesting as u64,
                 maximum: self.max_nesting as u64,
@@ -465,7 +502,7 @@ impl LockBudget {
         self.scratch(report.scratch_bytes())?;
         self.nesting = self.nesting.max(report.max_depth() as usize);
         if self.nesting > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: self.nesting as u64,
                 maximum: self.max_nesting as u64,
@@ -846,7 +883,7 @@ fn commit_edit(source: &Package, selection: &LockSelection, after: State) -> Res
         });
     }
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let mut budget = selection.admission_budget;
     let candidate = rewrite_lock(source, selection, after, &mut budget)?;
@@ -932,9 +969,9 @@ fn select_table_with_budget(
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(map_read_error)?
-        .ok_or(Error::SlidePositionNotFound {
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound {
             position: slide_position,
-        })?;
+        }))?;
     let (_slide_component, slide) = package
         .object_with_component(record.slide_identifier)
         .ok_or(Error::InvalidSource)?;
@@ -989,12 +1026,12 @@ fn select_table_with_budget(
         });
         if info_count == 0 {
             if has_role_alias {
-                return Err(Error::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             }
             continue;
         }
         if info_count != 1 || has_role_alias {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         if owned
             .iter()
@@ -1038,7 +1075,7 @@ fn select_table_with_budget(
             )
         });
         if model_count != 1 || has_model_role_alias {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let (model_message_index, model_payload) =
             unique_message(model, TABLE_MODEL_MESSAGE_TYPE, budget)?;
@@ -1054,13 +1091,12 @@ fn select_table_with_budget(
     }
 
     let table_position = table_selector.as_position();
-    let candidate =
-        candidates
-            .get(table_position.get())
-            .copied()
-            .ok_or(Error::TablePositionNotFound {
-                position: table_position,
-            })?;
+    let candidate = candidates
+        .get(table_position.get())
+        .copied()
+        .ok_or(Error::Refused(Refusal::TablePositionNotFound {
+            position: table_position,
+        }))?;
     let (component_name, _info_object) = package
         .object_with_component(candidate.table_info_identifier)
         .ok_or(Error::InvalidSource)?;
@@ -1114,7 +1150,7 @@ fn validate_package_metadata(package: &Package, budget: &mut LockBudget) -> Resu
                 )?;
                 if message.type_ == PACKAGE_METADATA_MESSAGE_TYPE {
                     if payload.replace(message.data.as_slice()).is_some() {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
             }
@@ -1180,7 +1216,7 @@ fn rewrite_lock(
         .find(|entry| entry.name() == selection.component_name.as_ref())
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let physical_limits = source.state.options.archive();
     let archive_limits = physical_limits
@@ -1363,7 +1399,7 @@ fn validate_model_payload(
         budget.nesting = depth;
     }
     if budget.nesting > budget.max_nesting {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireNesting,
             observed: budget.nesting as u64,
             maximum: budget.max_nesting as u64,
@@ -1389,7 +1425,7 @@ fn validate_slide_metadata(
         return Err(Error::InvalidSource);
     }
     if !info.data_references.is_empty() {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     reject_duplicates(&info.object_references, budget)?;
     budget.allocations(info.object_references.len())?;
@@ -1422,7 +1458,7 @@ fn validate_slide_metadata(
                 .ok_or(Error::InvalidSource)?,
         )?;
         if !field.data_references.is_empty() {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         match field.path.as_slice() {
             [SLIDE_OWNED_DRAWABLES_FIELD] => {
@@ -1444,7 +1480,7 @@ fn validate_slide_metadata(
                 saw_z_order = true;
             },
             _ if !field.object_references.is_empty() => {
-                return Err(Error::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             },
             _ => {},
         }
@@ -1469,7 +1505,7 @@ fn validate_table_info_metadata(
         return Err(Error::InvalidSource);
     }
     if !info.data_references.is_empty() {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     reject_duplicates(&info.object_references, budget)?;
     if info
@@ -1501,7 +1537,7 @@ fn validate_table_info_metadata(
                 .ok_or(Error::InvalidSource)?,
         )?;
         if !field.data_references.is_empty() {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         match field.path.as_slice() {
             [TABLE_MODEL_FIELD] => {
@@ -1525,7 +1561,7 @@ fn validate_table_info_metadata(
                 saw_parent = true;
             },
             _ if !field.object_references.is_empty() => {
-                return Err(Error::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             },
             _ => {},
         }
@@ -1586,7 +1622,7 @@ fn unique_message<'a>(
         validate_message_header(object, index)?;
         if message.type_ == message_type {
             if selected.is_some() {
-                return Err(Error::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             }
             selected = Some((index, message.data.as_slice()));
         }
@@ -1687,7 +1723,7 @@ fn strict_reference(
                 }
                 identifier = Some(value);
             },
-            2 | 3 => return Err(Error::UnsupportedDependency),
+            2 | 3 => return Err(Error::Refused(Refusal::UnsupportedDependency)),
             _ => return Err(Error::InvalidSource),
         }
     }
@@ -1725,7 +1761,7 @@ fn ensure_unique_identity(
         }
     }
     if count != 1 {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -1785,7 +1821,7 @@ fn ensure_unique_table_owner(
     if owned_count == 1 && z_order_count == 1 && selected_slide && model_owners == 1 {
         Ok(())
     } else {
-        Err(Error::UnsupportedDependency)
+        Err(Error::Refused(Refusal::UnsupportedDependency))
     }
 }
 
@@ -1831,7 +1867,7 @@ fn validate_global_inbound_references(
     let expected_info_edges = reference_occurrence_count(slide_info, table_info_identifier)?;
     let expected_model_edges = reference_occurrence_count(table_info_info, model_identifier)?;
     if expected_info_edges == 0 || expected_model_edges == 0 {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     budget.work(
         slide_info
@@ -1950,7 +1986,7 @@ fn validate_global_inbound_references(
         || census.info_edges != census.expected_info_edges
         || census.model_edges != census.expected_model_edges
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -2255,15 +2291,15 @@ fn resolve_slide_position(
         SlideSelector::Position(position) => Ok(position),
         SlideSelector::Name(name) => {
             if name.is_empty() {
-                return Err(Error::EmptySlideName);
+                return Err(Error::Refused(Refusal::EmptySlideName));
             }
             package
                 .show()
                 .map_err(map_read_error)?
                 .select_slide(selector)
-                .map_err(|_| Error::AmbiguousSelector)?
+                .map_err(|_| Error::Refused(Refusal::AmbiguousSelector))?
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(Error::SlideNameNotFound)
+                .ok_or(Error::Refused(Refusal::SlideNameNotFound))
         },
     }
 }
@@ -2283,7 +2319,7 @@ fn same_selection(left: &LockSelection, right: &LockSelection) -> bool {
 fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
@@ -2294,7 +2330,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::References => LimitKind::References,
                 _ => LimitKind::WireWork,
@@ -2312,42 +2348,42 @@ fn map_table_info_error(error: table_info_codec::DecodeError) -> Error {
         return Error::Allocation { amount };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.output_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.allocation_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::Allocations,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.retained_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::Retained,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.scratch_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::Scratch,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -2355,19 +2391,15 @@ fn map_table_info_error(error: table_info_codec::DecodeError) -> Error {
     }
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
-            table_info_codec::WireResourceLimit::Bytes { observed, maximum } => {
-                Error::LimitExceeded {
-                    kind: LimitKind::InputBytes,
-                    observed: observed.unwrap_or_default() as u64,
-                    maximum: maximum.unwrap_or_default() as u64,
-                }
+            table_info_codec::WireResourceLimit::Bytes { observed, maximum } => Error::Limit {
+                kind: LimitKind::InputBytes,
+                observed: observed.unwrap_or_default() as u64,
+                maximum: maximum.unwrap_or_default() as u64,
             },
-            table_info_codec::WireResourceLimit::Nesting { observed, maximum } => {
-                Error::LimitExceeded {
-                    kind: LimitKind::WireNesting,
-                    observed: observed.unwrap_or_default() as u64,
-                    maximum: maximum.unwrap_or_default() as u64,
-                }
+            table_info_codec::WireResourceLimit::Nesting { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireNesting,
+                observed: observed.unwrap_or_default() as u64,
+                maximum: maximum.unwrap_or_default() as u64,
             },
             _ => Error::InvalidSource,
         };
@@ -2396,7 +2428,7 @@ fn map_metadata_error(error: package_metadata_codec::RewriteError) -> Error {
             (LimitKind::WireWork, observed, maximum)
         },
         package_metadata_codec::RewriteLimit::Nesting { observed, maximum } => {
-            return Error::LimitExceeded {
+            return Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -2413,7 +2445,7 @@ fn map_metadata_error(error: package_metadata_codec::RewriteError) -> Error {
         },
         _ => return Error::InvalidSource,
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
@@ -2425,40 +2457,30 @@ fn map_table_model_error(error: table_model_discovery_codec::DecodeError) -> Err
         return Error::InvalidSource;
     };
     match limit {
-        table_model_discovery_codec::DecodeLimit::Bytes { observed, maximum } => {
-            Error::LimitExceeded {
-                kind: LimitKind::InputBytes,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        table_model_discovery_codec::DecodeLimit::Bytes { observed, maximum } => Error::Limit {
+            kind: LimitKind::InputBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        table_model_discovery_codec::DecodeLimit::Fields { observed, maximum } => {
-            Error::LimitExceeded {
-                kind: LimitKind::WireFields,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        table_model_discovery_codec::DecodeLimit::Fields { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireFields,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        table_model_discovery_codec::DecodeLimit::Work { observed, maximum } => {
-            Error::LimitExceeded {
-                kind: LimitKind::WireWork,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        table_model_discovery_codec::DecodeLimit::Work { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        table_model_discovery_codec::DecodeLimit::Text { observed, maximum } => {
-            Error::LimitExceeded {
-                kind: LimitKind::WireWork,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        table_model_discovery_codec::DecodeLimit::Text { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        table_model_discovery_codec::DecodeLimit::Nesting { observed, maximum } => {
-            Error::LimitExceeded {
-                kind: LimitKind::WireNesting,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        table_model_discovery_codec::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireNesting,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
         _ => Error::InvalidSource,
     }
@@ -2474,7 +2496,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -2499,7 +2521,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages

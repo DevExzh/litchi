@@ -82,6 +82,38 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source graph or payload is malformed.
+    #[error("the Keynote image-adjustment source is invalid")]
+    InvalidSource,
+    /// A finite operation budget was exceeded.
+    #[error(
+        "Keynote image-adjustment {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    /// A required temporary allocation could not be reserved.
+    #[error("could not allocate {amount} units for Keynote image adjustments")]
+    Allocation { amount: usize },
+    /// The reopened candidate did not retain the requested semantic value.
+    #[error("the edited Keynote image adjustments failed semantic verification")]
+    Verification,
+    /// The patch was created from another exact package artifact.
+    #[error("the Keynote image-adjustment patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The package does not retain an exact physical source suitable for edits.
     #[error("this Keynote source does not support physical image-adjustment edits")]
     UnsupportedSource,
@@ -103,27 +135,31 @@ pub enum Error {
     /// No image matched the requested source-order position.
     #[error("the selected Keynote slide has no image at position {position:?}")]
     ImagePositionNotFound { position: Position },
-    /// The source graph or payload is malformed.
-    #[error("the Keynote image-adjustment source is invalid")]
-    InvalidSource,
-    /// A finite operation budget was exceeded.
-    #[error(
-        "Keynote image-adjustment {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    /// A required temporary allocation could not be reserved.
-    #[error("could not allocate {amount} units for Keynote image adjustments")]
-    Allocation { amount: usize },
-    /// The reopened candidate did not retain the requested semantic value.
-    #[error("the edited Keynote image adjustments failed semantic verification")]
-    Verification,
-    /// The patch was created from another exact package artifact.
-    #[error("the Keynote image-adjustment patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::ImagePositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// Typed failures at the hidden host migration seam.
@@ -470,7 +506,7 @@ impl ImageBudget {
     ) -> Result<(), Error> {
         let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -517,7 +553,7 @@ impl ImageBudget {
 
     fn nesting(&mut self, depth: usize) -> Result<(), Error> {
         if depth > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
@@ -571,7 +607,7 @@ impl ImageBudget {
     ) -> Result<(), Error> {
         let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -599,16 +635,13 @@ impl ImageBudget {
     }
 
     fn residual_wire_limits(&self) -> Result<WireLimits, Error> {
-        let input = self
-            .max_input
-            .checked_sub(self.input)
-            .ok_or(Error::LimitExceeded {
-                kind: LimitKind::WireBytes,
-                observed: self.max_input.saturating_add(1) as u64,
-                maximum: self.max_input as u64,
-            })?;
+        let input = self.max_input.checked_sub(self.input).ok_or(Error::Limit {
+            kind: LimitKind::WireBytes,
+            observed: self.max_input.saturating_add(1) as u64,
+            maximum: self.max_input as u64,
+        })?;
         if input == 0 {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireBytes,
                 observed: self.max_input.saturating_add(1) as u64,
                 maximum: self.max_input as u64,
@@ -617,28 +650,25 @@ impl ImageBudget {
         let fields = self
             .max_fields
             .checked_sub(self.fields)
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: self.max_fields.saturating_add(1) as u64,
                 maximum: self.max_fields as u64,
             })?;
         if fields == 0 {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: self.max_fields.saturating_add(1) as u64,
                 maximum: self.max_fields as u64,
             });
         }
-        let work = self
-            .max_work
-            .checked_sub(self.work)
-            .ok_or(Error::LimitExceeded {
-                kind: LimitKind::WireWork,
-                observed: self.max_work.saturating_add(1) as u64,
-                maximum: self.max_work as u64,
-            })?;
+        let work = self.max_work.checked_sub(self.work).ok_or(Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: self.max_work.saturating_add(1) as u64,
+            maximum: self.max_work as u64,
+        })?;
         if work == 0 {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: self.max_work.saturating_add(1) as u64,
                 maximum: self.max_work as u64,
@@ -661,13 +691,13 @@ impl ImageBudget {
         let output = self
             .max_output
             .checked_sub(self.output)
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind: LimitKind::OutputBytes,
                 observed: self.max_output.saturating_add(1) as u64,
                 maximum: self.max_output as u64,
             })?;
         if output == 0 {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::OutputBytes,
                 observed: self.max_output.saturating_add(1) as u64,
                 maximum: self.max_output as u64,
@@ -753,7 +783,7 @@ impl ImageBudget {
             .checked_add(amount)
             .ok_or(Error::InvalidSource)?;
         if observed > self.max_output {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::OutputBytes,
                 observed: observed as u64,
                 maximum: self.max_output as u64,
@@ -765,7 +795,7 @@ impl ImageBudget {
     fn preflight_work(&self, amount: usize) -> Result<(), Error> {
         let observed = self.work.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > self.max_work {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: observed as u64,
                 maximum: self.max_work as u64,
@@ -936,9 +966,9 @@ fn select_image_with_budget(
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(map_read_error)?
-        .ok_or(Error::SlidePositionNotFound {
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound {
             position: slide_position,
-        })?;
+        }))?;
     let (slide_component_name, slide) = package
         .object_with_component(record.slide_identifier)
         .ok_or(Error::InvalidSource)?;
@@ -973,11 +1003,11 @@ fn select_image_with_budget(
         image_count = image_count.checked_add(1).ok_or(Error::InvalidSource)?;
         Ok(())
     })?;
-    let entry = selected.ok_or(Error::ImagePositionNotFound {
+    let entry = selected.ok_or(Error::Refused(Refusal::ImagePositionNotFound {
         position: image_position,
-    })?;
+    }))?;
     if require_editable && entry.layout {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let image = package
         .object(entry.identifier)
@@ -1046,7 +1076,7 @@ fn commit_edit(
         });
     }
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let candidate = rewrite_image(source, selection, after, &mut budget)?;
     candidate.validate().map_err(map_read_error)?;
@@ -1165,7 +1195,7 @@ fn rewrite_image(
     let compressed_bound =
         SnappyStream::maximum_compressed_len(encoded_bound).map_err(map_core_error)?;
     if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireBytes,
             observed: compressed_bound as u64,
             maximum: snappy_limits.max_compressed_stream() as u64,
@@ -1708,7 +1738,7 @@ fn resolve_slide_position(
         SlideSelector::Position(position) => Ok(position),
         SlideSelector::Name(name) => {
             if name.is_empty() {
-                return Err(Error::EmptySlideName);
+                return Err(Error::Refused(Refusal::EmptySlideName));
             }
             package
                 .show()
@@ -1716,7 +1746,7 @@ fn resolve_slide_position(
                 .select_slide(selector)
                 .map_err(map_slide_selector_error)?
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(Error::SlideNameNotFound)
+                .ok_or(Error::Refused(Refusal::SlideNameNotFound))
         },
     }
 }
@@ -1966,14 +1996,14 @@ fn same_selection(left: &ImageSelection, right: &ImageSelection) -> bool {
 fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
 fn map_slide_selector_error(error: SlideSelectorError) -> Error {
     match error {
-        SlideSelectorError::DuplicateSlideName { .. } => Error::AmbiguousSelector,
-        SlideSelectorError::EmptySlideName => Error::EmptySlideName,
+        SlideSelectorError::DuplicateSlideName { .. } => Error::Refused(Refusal::AmbiguousSelector),
+        SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
     }
 }
 
@@ -1984,7 +2014,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::References => LimitKind::References,
                 _ => LimitKind::WireWork,
@@ -1997,7 +2027,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -2026,7 +2056,7 @@ fn map_codec_error(error: image_adjustments_codec::DecodeError) -> Error {
             | image_adjustments_codec::DecodeLimit::Scratch => LimitKind::WireWork,
             _ => LimitKind::WireWork,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -2041,7 +2071,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
@@ -2067,7 +2097,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             observed,
             maximum,
             kind,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes
                 | litchi_iwa_archive::LimitKind::CompressedEntryBytes
@@ -2095,7 +2125,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::ArchiveBytes
                 | litchi_iwa_core::LimitKind::ObjectBytes
@@ -2264,7 +2294,7 @@ mod tests {
         let error = budget.scan(&[0x08], 2, 1).unwrap_err();
         assert!(matches!(
             error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: 3,
                 maximum: 2,

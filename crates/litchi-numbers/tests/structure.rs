@@ -88,33 +88,45 @@ fn sheet_lifecycle_refusals_are_typed() -> TestResult {
     let package = Package::new();
     assert!(matches!(
         package.edit_sheet_lifecycle().add(""),
-        Err(SheetError::InvalidName {
-            reason: InvalidName::Empty
-        })
+        Err(SheetError::Refused(
+            litchi_numbers::sheet::lifecycle::Refusal::InvalidName {
+                reason: InvalidName::Empty
+            }
+        ))
     ));
     assert!(matches!(
         package.edit_sheet_lifecycle().add("Sheet 1"),
-        Err(SheetError::InvalidName {
-            reason: InvalidName::Duplicate
-        })
+        Err(SheetError::Refused(
+            litchi_numbers::sheet::lifecycle::Refusal::InvalidName {
+                reason: InvalidName::Duplicate
+            }
+        ))
     ));
     assert!(matches!(
         package.edit_sheet_lifecycle().add("a\0b"),
-        Err(SheetError::InvalidName {
-            reason: InvalidName::ContainsNul
-        })
+        Err(SheetError::Refused(
+            litchi_numbers::sheet::lifecycle::Refusal::InvalidName {
+                reason: InvalidName::ContainsNul
+            }
+        ))
     ));
     assert!(matches!(
         package.edit_sheet_lifecycle().remove(0usize),
-        Err(SheetError::LastSheet)
+        Err(SheetError::Refused(
+            litchi_numbers::sheet::lifecycle::Refusal::LastSheet
+        ))
     ));
     assert!(matches!(
         package.edit_sheet_lifecycle().remove("Missing"),
-        Err(SheetError::SheetNotFound)
+        Err(SheetError::Refused(
+            litchi_numbers::sheet::lifecycle::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_sheet_lifecycle().commit(),
-        Err(SheetError::NoStagedOperation)
+        Err(SheetError::Refused(
+            litchi_numbers::sheet::lifecycle::Refusal::NoStagedOperation
+        ))
     ));
     let two = package
         .edit_sheet_lifecycle()
@@ -141,7 +153,9 @@ fn every_corpus_workbook_takes_a_sheet_and_gives_it_back() -> TestResult {
         let name = "Litchi structural probe";
         let commit = match package.edit_sheet_lifecycle().add(name)?.commit() {
             Ok(commit) => commit,
-            Err(SheetError::UnsupportedSource) => continue,
+            Err(SheetError::Refused(
+                litchi_numbers::sheet::lifecycle::Refusal::UnsupportedSource,
+            )) => continue,
             Err(error) => return Err(format!("{}: {error}", path.display()).into()),
         };
         let mut expected = names.clone();
@@ -209,7 +223,9 @@ fn tables_move_within_their_sheet_and_back() -> TestResult {
     let package = Package::new();
     assert!(matches!(
         package.edit_table_order(0usize)?.move_table(0usize, 1),
-        Err(OrderError::DestinationOutOfRange { .. })
+        Err(OrderError::Refused(
+            litchi_numbers::table::order::Refusal::DestinationOutOfRange { .. }
+        ))
     ));
     let unchanged = package
         .edit_table_order(0usize)?
@@ -238,7 +254,9 @@ fn tables_are_removed_with_their_private_graph() -> TestResult {
     assert_eq!(bytes(restored.package())?, source);
     assert!(matches!(
         emptied.edit_table_lifecycle(0usize)?.remove(0usize),
-        Err(TableError::TableNotFound)
+        Err(TableError::Refused(
+            litchi_numbers::table::lifecycle::Refusal::TableNotFound
+        ))
     ));
     // An emptied sheet can then go.
     let two = emptied
@@ -270,7 +288,14 @@ fn tables_are_removed_with_their_private_graph() -> TestResult {
                     .commit()
                 {
                     Ok(commit) => commit,
-                    Err(TableError::UnsupportedDependency | TableError::UnsupportedSource) => {
+                    Err(
+                        TableError::Refused(
+                            litchi_numbers::table::lifecycle::Refusal::UnsupportedDependency,
+                        )
+                        | TableError::Refused(
+                            litchi_numbers::table::lifecycle::Refusal::UnsupportedSource,
+                        ),
+                    ) => {
                         refused += 1;
                         continue;
                     },
@@ -323,9 +348,11 @@ fn corpus_sheets_are_removed_with_their_tables() -> TestResult {
         let commit = match package.edit_sheet_lifecycle().remove(0usize)?.commit() {
             Ok(commit) => commit,
             Err(
-                SheetError::UnsupportedDependency
-                | SheetError::UnsupportedSource
-                | SheetError::SheetNotEmpty,
+                SheetError::Refused(
+                    litchi_numbers::sheet::lifecycle::Refusal::UnsupportedDependency,
+                )
+                | SheetError::Refused(litchi_numbers::sheet::lifecycle::Refusal::UnsupportedSource)
+                | SheetError::Refused(litchi_numbers::sheet::lifecycle::Refusal::SheetNotEmpty),
             ) => {
                 refused += 1;
                 continue;
@@ -440,7 +467,12 @@ fn every_corpus_workbook_takes_a_table() -> TestResult {
             .commit()
         {
             Ok(commit) => commit,
-            Err(error @ (TableError::UnsupportedSource | TableError::NoTemplate)) => {
+            Err(
+                error @ (TableError::Refused(
+                    litchi_numbers::table::lifecycle::Refusal::UnsupportedSource,
+                )
+                | TableError::Refused(litchi_numbers::table::lifecycle::Refusal::NoTemplate)),
+            ) => {
                 refused.push(format!("{}: {error}", path.display()));
                 continue;
             },
@@ -469,7 +501,9 @@ fn every_corpus_workbook_takes_a_table() -> TestResult {
                 .commit()
             {
                 Ok(_) => writable += 1,
-                Err(litchi_numbers::table::cells::Error::UnsupportedDependency { .. }) => {},
+                Err(litchi_numbers::table::cells::Error::Refused(
+                    litchi_numbers::table::cells::Refusal::UnsupportedDependency { .. },
+                )) => {},
                 Err(error) => return Err(format!("{} cell: {error}", path.display()).into()),
             }
         }
@@ -489,7 +523,12 @@ fn every_corpus_workbook_takes_a_table() -> TestResult {
             },
             // A native formula graph the removal phase does not rewrite
             // (a range tile with several from-to ranges) refuses, typed.
-            Err(TableError::UnsupportedSource | TableError::UnsupportedDependency) => {},
+            Err(
+                TableError::Refused(litchi_numbers::table::lifecycle::Refusal::UnsupportedSource)
+                | TableError::Refused(
+                    litchi_numbers::table::lifecycle::Refusal::UnsupportedDependency,
+                ),
+            ) => {},
             Err(error) => return Err(format!("{} remove: {error}", path.display()).into()),
         }
         added += 1;

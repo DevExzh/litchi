@@ -2099,7 +2099,9 @@ mod tests {
         deletion.remove_slide(SlideSelector::index(0)).unwrap();
         assert!(matches!(
             deletion.commit(),
-            Err(litchi_keynote::slide::delete::Error::AmbiguousOwnership)
+            Err(litchi_keynote::slide::delete::Error::Refused(
+                litchi_keynote::slide::delete::Refusal::AmbiguousOwnership
+            ))
         ));
         assert_eq!(focused_bytes(&focused), before);
         assert_eq!(before, source);

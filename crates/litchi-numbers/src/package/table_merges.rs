@@ -127,24 +127,16 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
-    /// No rooted sheet matched the selector.
-    #[error("the Numbers workbook has no sheet matching the requested selector")]
-    SheetNotFound,
-    /// No rooted table matched the selector.
-    #[error("the selected Numbers sheet has no table matching the requested selector")]
-    TableNotFound,
-    /// A name selector matched more than one semantic sheet or table.
-    #[error("the Numbers source has more than one sheet or table with the requested name")]
-    AmbiguousSelector,
-    /// The package source cannot be inspected through this exact profile.
-    #[error("the Numbers package source does not support focused table-merge reads")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The rooted graph, metadata, or merge formula is malformed.
     #[error("the selected Numbers table-merge source is invalid")]
     InvalidSource,
     /// A finite read resource ceiling was exceeded.
     #[error("Numbers table merges {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -158,18 +150,58 @@ pub enum Error {
         /// Requested elements or bytes.
         amount: usize,
     },
-    /// A staged merge intersects another selected merged region.
-    #[error("the requested Numbers merged-cell region overlaps an existing region")]
-    OverlappingRegion,
-    /// A staged region extends outside the selected table dimensions.
-    #[error("the requested Numbers merged-cell region is outside the selected table")]
-    InvalidRegion,
     /// Candidate reopening or exact-locality verification failed.
     #[error("the edited Numbers table merges failed semantic verification")]
     Verification,
     /// The patch was created from a different exact package artifact.
     #[error("the Numbers table-merges patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// No rooted sheet matched the selector.
+    #[error("the Numbers workbook has no sheet matching the requested selector")]
+    SheetNotFound,
+    /// No rooted table matched the selector.
+    #[error("the selected Numbers sheet has no table matching the requested selector")]
+    TableNotFound,
+    /// A name selector matched more than one semantic sheet or table.
+    #[error("the Numbers source has more than one sheet or table with the requested name")]
+    AmbiguousSelector,
+    /// The package source cannot be inspected through this exact profile.
+    #[error("the Numbers package source does not support focused table-merge reads")]
+    UnsupportedSource,
+    /// A staged merge intersects another selected merged region.
+    #[error("the requested Numbers merged-cell region overlaps an existing region")]
+    OverlappingRegion,
+    /// A staged region extends outside the selected table dimensions.
+    #[error("the requested Numbers merged-cell region is outside the selected table")]
+    InvalidRegion,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SheetNotFound { .. } | Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::AmbiguousSelector { .. }
+            | Self::OverlappingRegion { .. }
+            | Self::InvalidRegion { .. } => RefusalKind::InvalidValue,
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 impl Package {
@@ -353,7 +385,7 @@ impl Budget {
     ) -> Result<(), Error> {
         let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -491,7 +523,7 @@ impl Budget {
     }
 
     fn remaining(used: usize, maximum: usize, kind: LimitKind) -> Result<usize, Error> {
-        maximum.checked_sub(used).ok_or(Error::LimitExceeded {
+        maximum.checked_sub(used).ok_or(Error::Limit {
             kind,
             observed: maximum.saturating_add(1) as u64,
             maximum: maximum as u64,
@@ -579,12 +611,12 @@ fn select_semantic_positions(
                 budget.charge_items(1)?;
                 if candidate.name() == name {
                     if selected.is_some() {
-                        return Err(Error::AmbiguousSelector);
+                        return Err(Error::Refused(Refusal::AmbiguousSelector));
                     }
                     selected = Some(candidate);
                 }
             }
-            selected.ok_or(Error::SheetNotFound)?
+            selected.ok_or(Error::Refused(Refusal::SheetNotFound))?
         },
         SheetSelector::Position(index) => {
             let index = index.get();
@@ -595,7 +627,7 @@ fn select_semantic_positions(
                 .document
                 .sheets()
                 .get(index)
-                .ok_or(Error::SheetNotFound)?
+                .ok_or(Error::Refused(Refusal::SheetNotFound))?
         },
     };
     let table_position = match table_selector {
@@ -604,7 +636,7 @@ fn select_semantic_positions(
             budget.charge_tables(1)?;
             budget.charge_work(1)?;
             if sheet.tables().nth(index).is_none() {
-                return Err(Error::TableNotFound);
+                return Err(Error::Refused(Refusal::TableNotFound));
             }
             index
         },
@@ -618,12 +650,12 @@ fn select_semantic_positions(
                     continue;
                 }
                 if first.is_some() {
-                    return Err(Error::AmbiguousSelector);
+                    return Err(Error::Refused(Refusal::AmbiguousSelector));
                 }
                 first = Some(index);
             }
             let Some(index) = first else {
-                return Err(Error::TableNotFound);
+                return Err(Error::Refused(Refusal::TableNotFound));
             };
             index
         },
@@ -833,7 +865,7 @@ fn resolve_model_payload<'source>(
 ) -> Result<&'source [u8], Error> {
     let document_archive = components
         .get_archive("Index/Document.iwa")
-        .ok_or(Error::UnsupportedSource)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
     // Archive::object performs a linear identifier scan.  Precharge the
     // complete candidate set before entering it so malformed archives cannot
     // spend unbounded lookup work before a finite refusal.
@@ -938,7 +970,7 @@ fn resolve_model_payload<'source>(
         },
         _ => return Err(Error::InvalidSource),
     }
-    selected_model.ok_or(Error::TableNotFound)
+    selected_model.ok_or(Error::Refused(Refusal::TableNotFound))
 }
 
 fn inspect_drawable<'source>(
@@ -1211,7 +1243,7 @@ fn map_merge_error(error: merge_wire::MergeReadError) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_common_limit(*kind),
             observed: *observed as u64,
             maximum: *limit as u64,
@@ -1244,7 +1276,7 @@ fn map_common_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_common_limit(kind),
             observed: observed as u64,
             maximum: limit as u64,
@@ -1261,7 +1293,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1279,7 +1311,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        litchi_iwa_archive::Error::Reassembly(_) => Error::UnsupportedSource,
+        litchi_iwa_archive::Error::Reassembly(_) => Error::Refused(Refusal::UnsupportedSource),
         _ => Error::InvalidSource,
     }
 }
@@ -1290,7 +1322,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
@@ -1320,7 +1352,7 @@ fn map_package_error(error: PackageError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::Objects => LimitKind::PayloadObjects,
                 SemanticLimitKind::References => LimitKind::PayloadReferences,
@@ -1340,13 +1372,13 @@ fn map_package_error(error: PackageError) -> Error {
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        PackageError::InputTooLarge { observed, maximum } => Error::LimitExceeded {
+        PackageError::InputTooLarge { observed, maximum } => Error::Limit {
             kind: LimitKind::InputBytes,
             observed,
             maximum,
         },
         PackageError::UnexpectedFormat { .. } | PackageError::InvalidLimit { .. } => {
-            Error::UnsupportedSource
+            Error::Refused(Refusal::UnsupportedSource)
         },
         PackageError::Io(_)
         | PackageError::Detection(_)
@@ -1360,7 +1392,7 @@ fn map_package_error(error: PackageError) -> Error {
 }
 
 fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,

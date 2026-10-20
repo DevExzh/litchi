@@ -172,12 +172,11 @@ pub(super) fn rewrite_node_cache(
     limits: WireLimits,
     budget: &mut CreationBudget,
 ) -> Result<Vec<u8>, SlideAudioCreationError> {
-    let event_count =
-        u32::try_from(event_count).map_err(|_| SlideAudioCreationError::LimitExceeded {
-            kind: SlideAudioCreationLimitKind::WireFields,
-            observed: u64::try_from(event_count).unwrap_or(u64::MAX),
-            maximum: u64::from(u32::MAX),
-        })?;
+    let event_count = u32::try_from(event_count).map_err(|_| SlideAudioCreationError::Limit {
+        kind: SlideAudioCreationLimitKind::WireFields,
+        observed: u64::try_from(event_count).unwrap_or(u64::MAX),
+        maximum: u64::from(u32::MAX),
+    })?;
     let options = node_cache_options(source, limits, budget);
     let (output, report) = node_cache::rewrite_slide_node_build_cache_for_event_count_with_report(
         source,
@@ -341,7 +340,7 @@ fn limit_error(
     observed: usize,
     maximum: usize,
 ) -> SlideAudioCreationError {
-    SlideAudioCreationError::LimitExceeded {
+    SlideAudioCreationError::Limit {
         kind,
         observed: u64::try_from(observed).unwrap_or(u64::MAX),
         maximum: u64::try_from(maximum).unwrap_or(u64::MAX),

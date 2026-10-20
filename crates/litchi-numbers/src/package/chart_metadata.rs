@@ -108,7 +108,7 @@ pub enum Error {
     ForeignReference,
     /// A finite operation budget was exceeded.
     #[error("Numbers chart metadata {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource that exceeded its ceiling.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -380,22 +380,32 @@ fn own_title(title: Option<&str>, budget: &mut ChartBudget) -> Result<Option<Str
 
 fn map_arrangement_error(error: ChartArrangementError) -> Error {
     match error {
-        ChartArrangementError::UnsupportedSource => Error::UnsupportedSource,
-        ChartArrangementError::UnsupportedDependency => Error::UnsupportedDependency,
-        ChartArrangementError::AmbiguousSelector => Error::AmbiguousSelector,
-        ChartArrangementError::EmptySheetName => Error::EmptySheetName,
-        ChartArrangementError::SheetNameNotFound => Error::SheetNameNotFound,
-        ChartArrangementError::SheetPositionNotFound { position } => {
-            Error::SheetPositionNotFound { position }
+        ChartArrangementError::Refused(chart_arrangement::Refusal::UnsupportedSource) => {
+            Error::UnsupportedSource
         },
-        ChartArrangementError::ChartPositionNotFound { position } => {
-            Error::ChartPositionNotFound { position }
+        ChartArrangementError::Refused(chart_arrangement::Refusal::UnsupportedDependency) => {
+            Error::UnsupportedDependency
         },
-        ChartArrangementError::LimitExceeded {
+        ChartArrangementError::Refused(chart_arrangement::Refusal::AmbiguousSelector) => {
+            Error::AmbiguousSelector
+        },
+        ChartArrangementError::Refused(chart_arrangement::Refusal::EmptySheetName) => {
+            Error::EmptySheetName
+        },
+        ChartArrangementError::Refused(chart_arrangement::Refusal::SheetNameNotFound) => {
+            Error::SheetNameNotFound
+        },
+        ChartArrangementError::Refused(chart_arrangement::Refusal::SheetPositionNotFound {
+            position,
+        }) => Error::SheetPositionNotFound { position },
+        ChartArrangementError::Refused(chart_arrangement::Refusal::ChartPositionNotFound {
+            position,
+        }) => Error::ChartPositionNotFound { position },
+        ChartArrangementError::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_limit_kind(kind),
             observed,
             maximum,
@@ -423,7 +433,7 @@ fn map_metadata_codec_limit(error: &codec::DecodeError) -> Option<Error> {
         codec::DecodeLimit::Text { observed, maximum } => (LimitKind::TextBytes, observed, maximum),
         _ => return None,
     };
-    Some(Error::LimitExceeded {
+    Some(Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
@@ -450,7 +460,7 @@ fn map_title_codec_limit(error: &title_codec::DecodeError) -> Option<Error> {
         },
         _ => return None,
     };
-    Some(Error::LimitExceeded {
+    Some(Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,

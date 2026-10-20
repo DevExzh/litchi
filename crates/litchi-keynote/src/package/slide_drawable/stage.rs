@@ -168,9 +168,11 @@ pub(super) fn remove(
     let wire = workspace.wire;
     let member = workspace.component_of(slide).ok_or(Error::InvalidSource)?;
     if workspace.component_of(drawable).as_deref() != Some(member.as_str()) {
-        return Err(Error::Unsupported {
-            reason: Unsupported::ForeignComponent,
-        });
+        return Err(Error::Refused(
+            crate::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::ForeignComponent,
+            },
+        ));
     }
     let members = workspace.member_objects(&member);
     let mut graph = HashMap::with_capacity(members.len());
@@ -202,9 +204,11 @@ pub(super) fn remove(
                 }
                 if *target == drawable {
                     if *source != slide {
-                        return Err(Error::Unsupported {
-                            reason: Unsupported::ExternalReferences,
-                        });
+                        return Err(Error::Refused(
+                            crate::slide::drawable::Refusal::Unsupported {
+                                reason: Unsupported::ExternalReferences,
+                            },
+                        ));
                     }
                 } else if shared.insert(*target) {
                     grew = true;
@@ -231,9 +235,11 @@ pub(super) fn remove(
                     .object
                     .is_some_and(|object| closure.contains(&object))
         }) {
-            return Err(Error::Unsupported {
-                reason: Unsupported::ExternalReferences,
-            });
+            return Err(Error::Refused(
+                crate::slide::drawable::Refusal::Unsupported {
+                    reason: Unsupported::ExternalReferences,
+                },
+            ));
         }
     }
 
@@ -288,9 +294,11 @@ pub(super) fn remove(
     if owned.iter().filter(|id| **id == drawable).count() != 1
         || walked.iter().filter(|id| **id == drawable).count() != listed
     {
-        return Err(Error::Unsupported {
-            reason: Unsupported::ExternalReferences,
-        });
+        return Err(Error::Refused(
+            crate::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::ExternalReferences,
+            },
+        ));
     }
     let encode = |values: &[u64]| {
         values
@@ -350,14 +358,18 @@ pub(super) fn move_to(
     let current = order
         .iter()
         .position(|id| *id == drawable)
-        .ok_or(Error::Unsupported {
-            reason: Unsupported::ExternalReferences,
-        })?;
+        .ok_or(Error::Refused(
+            crate::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::ExternalReferences,
+            },
+        ))?;
     if position >= order.len() {
-        return Err(Error::ZPositionOutOfRange {
-            position: litchi_core::Position::new(position),
-            count: order.len(),
-        });
+        return Err(Error::Refused(
+            crate::slide::drawable::Refusal::ZPositionOutOfRange {
+                position: litchi_core::Position::new(position),
+                count: order.len(),
+            },
+        ));
     }
     let moved = order.remove(current);
     order.insert(position, moved);
@@ -405,9 +417,11 @@ fn own_storage(
     if workspace.component_of(drawable).as_deref() != Some(member.as_str())
         || workspace.component_of(storage).as_deref() != Some(member.as_str())
     {
-        return Err(Error::Unsupported {
-            reason: Unsupported::ForeignComponent,
-        });
+        return Err(Error::Refused(
+            crate::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::ForeignComponent,
+            },
+        ));
     }
     // The storage is the drawable's own: no other object of the component
     // and no other component references it.
@@ -419,9 +433,11 @@ fn own_storage(
             .map_err(lift)?
             .contains(&storage)
         {
-            return Err(Error::Unsupported {
-                reason: Unsupported::ExternalReferences,
-            });
+            return Err(Error::Refused(
+                crate::slide::drawable::Refusal::Unsupported {
+                    reason: Unsupported::ExternalReferences,
+                },
+            ));
         }
     }
     let component_id = workspace
@@ -435,9 +451,11 @@ fn own_storage(
                 reference.component == component_id && reference.object == Some(storage)
             })
         {
-            return Err(Error::Unsupported {
-                reason: Unsupported::ExternalReferences,
-            });
+            return Err(Error::Refused(
+                crate::slide::drawable::Refusal::Unsupported {
+                    reason: Unsupported::ExternalReferences,
+                },
+            ));
         }
     }
     Ok(member)
@@ -461,9 +479,11 @@ pub(super) fn set_text(
         .iter()
         .any(|middle| middle.contains(['\u{fffc}', '\u{000e}']))
     {
-        return Err(Error::Unsupported {
-            reason: Unsupported::InlineObjects,
-        });
+        return Err(Error::Refused(
+            crate::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::InlineObjects,
+            },
+        ));
     }
     // UTF-16 offsets of the changed span in the storage text.
     let prefix_bytes = removed.as_ptr() as usize - before.as_ptr() as usize;
@@ -485,9 +505,11 @@ pub(super) fn set_text(
         || rewrite.object_reference_occurrences_before()
             != rewrite.object_reference_occurrences_after()
     {
-        return Err(Error::Unsupported {
-            reason: Unsupported::InlineObjects,
-        });
+        return Err(Error::Refused(
+            crate::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::InlineObjects,
+            },
+        ));
     }
     replace_payload(
         workspace,
@@ -555,7 +577,7 @@ fn map_rewrite_error(error: litchi_iwa_text_wire::RewriteError) -> Error {
             resource,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match resource {
                 "text bytes" => super::LimitKind::TextBytes,
                 "text fragments" => super::LimitKind::TextFragments,
@@ -639,9 +661,11 @@ pub(super) fn set_text_style(
         })
         .transpose()
         .map_err(lift)?
-        .ok_or(Error::Unsupported {
-            reason: Unsupported::TextStyling,
-        })?;
+        .ok_or(Error::Refused(
+            crate::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::TextStyling,
+            },
+        ))?;
     let sheet_member = workspace
         .component_of(stylesheet)
         .ok_or(Error::InvalidSource)?;
@@ -668,9 +692,11 @@ pub(super) fn set_text_style(
         if let Some(parent) = parent
             && workspace.component_of(*parent).as_deref() != Some(sheet_member.as_str())
         {
-            return Err(Error::Unsupported {
-                reason: Unsupported::ForeignComponent,
-            });
+            return Err(Error::Refused(
+                crate::slide::drawable::Refusal::Unsupported {
+                    reason: Unsupported::ForeignComponent,
+                },
+            ));
         }
         let identifier = workspace.allocate().map_err(lift)?;
         let data =
@@ -830,9 +856,9 @@ const FORMULA_OWNER: u32 = 4_008;
 const HEADER_BUCKET_ROWS: u32 = 65_536;
 
 fn table_storage() -> Error {
-    Error::Unsupported {
+    Error::Refused(crate::slide::drawable::Refusal::Unsupported {
         reason: Unsupported::TableStorage,
-    }
+    })
 }
 
 fn first_reference(payload: &[u8], number: u32, wire: WireLimits) -> Result<Option<u64>, Error> {
@@ -922,9 +948,11 @@ pub(super) fn set_table_cell(
     {
         FormulaState::Inert => {},
         _ => {
-            return Err(Error::Unsupported {
-                reason: Unsupported::TableFormulas,
-            });
+            return Err(Error::Refused(
+                crate::slide::drawable::Refusal::Unsupported {
+                    reason: Unsupported::TableFormulas,
+                },
+            ));
         },
     }
     let (_, _, info_payload) = payload_of(workspace, info, &[TABLE_INFO])?;
@@ -933,7 +961,7 @@ pub(super) fn set_table_cell(
     let rows = first_varint(model_payload, 6, wire)?.ok_or(Error::InvalidSource)?;
     let columns = first_varint(model_payload, 7, wire)?.ok_or(Error::InvalidSource)?;
     if u64::from(row) >= rows || u64::from(column) >= columns {
-        return Err(Error::InvalidSpan);
+        return Err(Error::Refused(crate::slide::drawable::Refusal::InvalidSpan));
     }
     let columns = u32::try_from(columns).map_err(|_| Error::InvalidSource)?;
     let store = first_message(model_payload, 4, wire)?.ok_or(Error::InvalidSource)?;

@@ -758,7 +758,9 @@ fn set_focused_sheet_chart_data(
         Err(error) => {
             if matches!(
                 &error,
-                litchi_numbers::sheet::chart::data::Error::UnsupportedDependency
+                litchi_numbers::sheet::chart::data::Error::Refused(
+                    litchi_numbers::sheet::chart::data::Refusal::UnsupportedDependency
+                )
             ) {
                 return Err(FocusedSheetChartDataError::UnsupportedDependency(data));
             }
@@ -770,7 +772,9 @@ fn set_focused_sheet_chart_data(
     let committed = edit.set(data).commit().map_err(|error| {
         if matches!(
             &error,
-            litchi_numbers::sheet::chart::data::Error::UnsupportedDependency
+            litchi_numbers::sheet::chart::data::Error::Refused(
+                litchi_numbers::sheet::chart::data::Refusal::UnsupportedDependency
+            )
         ) {
             FocusedSheetChartDataError::Host(Error::InvalidFormat(
                 "focused Numbers chart data commit rejected a previously admitted dependency"

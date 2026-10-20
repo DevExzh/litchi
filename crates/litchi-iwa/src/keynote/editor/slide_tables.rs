@@ -261,7 +261,9 @@ pub(super) fn compatibility_slide_table_merge_regions(
         // Keep the source-built migration behavior for legacy table-model
         // roles. Ownership was already proved through the selected slide and
         // table, so the bounded compatibility reader may inspect that model.
-        Err(litchi_keynote::slide::table::merge::transaction::Error::UnsupportedDependency) => {
+        Err(litchi_keynote::slide::table::merge::transaction::Error::Refused(
+            litchi_keynote::slide::table::merge::transaction::Refusal::UnsupportedDependency,
+        )) => {
             crate::numbers::editor::table_cell_merges_in_package(editor.package(), model_object_id)
         },
         Err(error) => Err(map_focused_keynote_merges_error(error)),
@@ -270,7 +272,7 @@ pub(super) fn compatibility_slide_table_merge_regions(
 
 fn map_focused_keynote_cells_error(error: litchi_keynote::slide::table::cells::Error) -> Error {
     match error {
-        litchi_keynote::slide::table::cells::Error::LimitExceeded {
+        litchi_keynote::slide::table::cells::Error::Limit {
             kind,
             observed,
             maximum,
@@ -324,7 +326,7 @@ fn map_focused_keynote_merges_error(
     error: litchi_keynote::slide::table::merge::transaction::Error,
 ) -> Error {
     match error {
-        litchi_keynote::slide::table::merge::transaction::Error::LimitExceeded {
+        litchi_keynote::slide::table::merge::transaction::Error::Limit {
             kind,
             observed,
             maximum,
@@ -335,20 +337,34 @@ fn map_focused_keynote_merges_error(
                 amount,
             })
         },
-        error @ litchi_keynote::slide::table::merge::transaction::Error::AmbiguousSelector
-        | error @ litchi_keynote::slide::table::merge::transaction::Error::EmptySlideName
-        | error @ litchi_keynote::slide::table::merge::transaction::Error::SlideNameNotFound
-        | error
-        @ litchi_keynote::slide::table::merge::transaction::Error::SlidePositionNotFound {
-            ..
-        }
-        | error
-        @ litchi_keynote::slide::table::merge::transaction::Error::TablePositionNotFound {
-            ..
-        } => Error::ParseError(error.to_string()),
-        error @ (litchi_keynote::slide::table::merge::transaction::Error::UnsupportedSource
-        | litchi_keynote::slide::table::merge::transaction::Error::UnsupportedDependency
-        | litchi_keynote::slide::table::merge::transaction::Error::UnsupportedTopology
+        error @ litchi_keynote::slide::table::merge::transaction::Error::Refused(
+            litchi_keynote::slide::table::merge::transaction::Refusal::AmbiguousSelector,
+        )
+        | error @ litchi_keynote::slide::table::merge::transaction::Error::Refused(
+            litchi_keynote::slide::table::merge::transaction::Refusal::EmptySlideName,
+        )
+        | error @ litchi_keynote::slide::table::merge::transaction::Error::Refused(
+            litchi_keynote::slide::table::merge::transaction::Refusal::SlideNameNotFound,
+        )
+        | error @ litchi_keynote::slide::table::merge::transaction::Error::Refused(
+            litchi_keynote::slide::table::merge::transaction::Refusal::SlidePositionNotFound {
+                ..
+            },
+        )
+        | error @ litchi_keynote::slide::table::merge::transaction::Error::Refused(
+            litchi_keynote::slide::table::merge::transaction::Refusal::TablePositionNotFound {
+                ..
+            },
+        ) => Error::ParseError(error.to_string()),
+        error @ (litchi_keynote::slide::table::merge::transaction::Error::Refused(
+            litchi_keynote::slide::table::merge::transaction::Refusal::UnsupportedSource,
+        )
+        | litchi_keynote::slide::table::merge::transaction::Error::Refused(
+            litchi_keynote::slide::table::merge::transaction::Refusal::UnsupportedDependency,
+        )
+        | litchi_keynote::slide::table::merge::transaction::Error::Refused(
+            litchi_keynote::slide::table::merge::transaction::Refusal::UnsupportedTopology,
+        )
         | litchi_keynote::slide::table::merge::transaction::Error::InvalidSource) => {
             Error::InvalidFormat(format!("focused Keynote table merges: {error}"))
         },

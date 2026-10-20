@@ -506,27 +506,37 @@ fn chart_title_selectors_and_graph_guards_fail_closed() -> TestResult<()> {
     );
     assert!(matches!(
         package.slide_chart_title(0usize, ChartSelector::name("revenue")),
-        Err(ChartTitleError::ChartNameNotFound)
+        Err(ChartTitleError::Refused(
+            litchi_keynote::chart::title::Refusal::ChartNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_chart_title(0usize, ChartSelector::name("Missing")),
-        Err(ChartTitleError::ChartNameNotFound)
+        Err(ChartTitleError::Refused(
+            litchi_keynote::chart::title::Refusal::ChartNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_chart_title("charts", 0usize),
-        Err(ChartTitleError::SlideNameNotFound)
+        Err(ChartTitleError::Refused(
+            litchi_keynote::chart::title::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_slide_chart_title("Missing", 0usize),
-        Err(ChartTitleError::SlideNameNotFound)
+        Err(ChartTitleError::Refused(
+            litchi_keynote::chart::title::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_slide_chart_title(0usize, 4usize),
-        Err(ChartTitleError::ChartPositionNotFound { position }) if position == Position::new(4)
+        Err(ChartTitleError::Refused(litchi_keynote::chart::title::Refusal::ChartPositionNotFound { position })) if position == Position::new(4)
     ));
     assert!(matches!(
         package.edit_slide_chart_title(0usize, ChartSelector::name("")),
-        Err(ChartTitleError::EmptyChartName)
+        Err(ChartTitleError::Refused(
+            litchi_keynote::chart::title::Refusal::EmptyChartName
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, bytes);
 
@@ -544,12 +554,16 @@ fn chart_title_selectors_and_graph_guards_fail_closed() -> TestResult<()> {
     );
     assert!(matches!(
         duplicate.slide_chart_title(0usize, ChartSelector::name("Revenue")),
-        Err(ChartTitleError::AmbiguousSelector)
+        Err(ChartTitleError::Refused(
+            litchi_keynote::chart::title::Refusal::AmbiguousSelector
+        ))
     ));
     let duplicate_source = exact_bytes(&duplicate)?;
     assert!(matches!(
         duplicate.edit_slide_chart_title(0usize, ChartSelector::name("Revenue")),
-        Err(ChartTitleError::AmbiguousSelector)
+        Err(ChartTitleError::Refused(
+            litchi_keynote::chart::title::Refusal::AmbiguousSelector
+        ))
     ));
     assert_eq!(exact_bytes(&duplicate)?, duplicate_source);
 

@@ -10,6 +10,6 @@ pub use litchi_iwa_common::table::headers::{Count, Error, Settings};
 /// Exact-source transactions for one rooted Pages body table's header settings.
 pub mod transaction {
     pub use crate::package::body_table_headers::{
-        Commit, Diagnostics, Edit, Error, InvalidReason, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, InvalidReason, LimitKind, Patch, Refusal,
     };
 }

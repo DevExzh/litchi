@@ -7,13 +7,15 @@ pub use litchi_iwa_common::chart::metadata::ChartMetadata;
 /// Exact-source transactions for one body chart's arrangement.
 pub mod arrangement {
     pub use crate::package::body_chart_arrangement::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 
 /// Exact-source transactions for one body chart's data grid.
 pub mod data {
-    pub use crate::package::body_chart_data::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+    pub use crate::package::body_chart_data::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
 }
 
 /// Typed failures of the body-chart metadata reader.

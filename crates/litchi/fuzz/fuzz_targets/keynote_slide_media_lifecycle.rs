@@ -96,14 +96,14 @@ fn verify_seed_lifecycle_paths(package: &Package) {
         let commit = if duplicate {
             package
                 .edit_slide_media_lifecycle()
-.duplicate(slide, movie)
-.and_then(|edit| edit.commit())
+                .duplicate(slide, movie)
+                .and_then(|edit| edit.commit())
                 .unwrap_or_else(|error| panic!("seed lifecycle duplication must succeed: {error}"))
         } else {
             package
                 .edit_slide_media_lifecycle()
-.remove(slide, movie)
-.and_then(|edit| edit.commit())
+                .remove(slide, movie)
+                .and_then(|edit| edit.commit())
                 .unwrap_or_else(|error| panic!("seed lifecycle removal must succeed: {error}"))
         };
         let candidate = package_bytes(commit.package())
@@ -136,13 +136,15 @@ fn exercise_arbitrary_input(data: &[u8]) {
             };
             let movie = MovieSelector::index(usize::from(control(data, 1) % 3));
             let result = if control(data, 2) & 1 == 0 {
-                package.edit_slide_media_lifecycle()
-.duplicate(slide, movie)
-.and_then(|edit| edit.commit())
+                package
+                    .edit_slide_media_lifecycle()
+                    .duplicate(slide, movie)
+                    .and_then(|edit| edit.commit())
             } else {
-                package.edit_slide_media_lifecycle()
-.remove(slide, movie)
-.and_then(|edit| edit.commit())
+                package
+                    .edit_slide_media_lifecycle()
+                    .remove(slide, movie)
+                    .and_then(|edit| edit.commit())
             };
             if let Err(error) = result {
                 observe_error(error);
@@ -171,13 +173,15 @@ fn exercise_lifecycle(package: &Package, data: &[u8]) {
     let movie = MovieSelector::index(movie_position);
     let duplicate = control(data, 2) & 1 == 0;
     let result = if duplicate {
-        package.edit_slide_media_lifecycle()
-.duplicate(slide, movie)
-.and_then(|edit| edit.commit())
+        package
+            .edit_slide_media_lifecycle()
+            .duplicate(slide, movie)
+            .and_then(|edit| edit.commit())
     } else {
-        package.edit_slide_media_lifecycle()
-.remove(slide, movie)
-.and_then(|edit| edit.commit())
+        package
+            .edit_slide_media_lifecycle()
+            .remove(slide, movie)
+            .and_then(|edit| edit.commit())
     };
 
     let commit = match result {
