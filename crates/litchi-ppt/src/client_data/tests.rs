@@ -270,8 +270,6 @@ fn snapshot_noop_is_source_exact_and_unknown_order_is_retained() {
     let source_bytes = container(&payload);
     let source = super::Snapshot::parse(&source_bytes).unwrap();
 
-    let snapshot = source.edit().snapshot().unwrap();
-    assert_eq!(snapshot.bytes(), source_bytes.as_slice());
     let commit = source.edit().commit().unwrap();
     assert!(commit.patch().is_empty());
     assert_eq!(commit.snapshot().bytes(), source_bytes.as_slice());
@@ -384,4 +382,149 @@ fn failed_child_edits_leave_the_candidate_unchanged() {
             .is_err()
     );
     assert_eq!(limited_edit.children(), limited_original.as_slice());
+}
+
+/// A built one-slide package with two textboxes; the first gains an
+/// `OfficeArtClientData` holding one `ShapeFlags10Atom`.
+fn package_with_client_data() -> (crate::Package, Vec<u8>) {
+    use litchi_core::Position;
+
+    use crate::record_wire as wire;
+    use crate::slide_order::records::{Owner, Rewrite, publish};
+
+    let mut builder = crate::Builder::new();
+    let slide = builder.add_slide().unwrap();
+    builder.add_textbox(slide, 10, 10, 200, 40, "One").unwrap();
+    builder.add_textbox(slide, 10, 80, 200, 40, "Two").unwrap();
+    let package = builder.build().unwrap();
+    let shape_id = {
+        let presentation = package.presentation().unwrap();
+        let slides = presentation.slides().unwrap();
+        let shapes = slides[0].shapes().unwrap();
+        crate::text_edit::native_shape_id(&shapes[0])
+    };
+    let base = crate::scoped::Base::capture(&package).unwrap();
+    let native = base.native().unwrap();
+    let owner = Owner::Slide(Position::new(0));
+    let before = base.owner_record(&native, owner).unwrap();
+    let record = container(&child(0, 0, ClientDataChildKind::ShapeFlags10, &[0]));
+    let after =
+        crate::hyperlink::edit::rewrite_slide_shape(&before, shape_id, &mut |shape| {
+            let children = wire::child_list(shape)?;
+            assert!(children.iter().all(
+                |child| wire::record_type(child).unwrap() != OFFICE_ART_CLIENT_DATA_RECORD_TYPE
+            ));
+            let mut data = Vec::new();
+            let mut inserted = false;
+            for child in &children {
+                if !inserted && wire::record_type(child)? == 0xF00D {
+                    data.extend_from_slice(&record);
+                    inserted = true;
+                }
+                data.extend_from_slice(child);
+            }
+            if !inserted {
+                data.extend_from_slice(&record);
+            }
+            Ok(wire::rebuild(shape, &data)?)
+        })
+        .unwrap();
+    let published = publish(
+        &native,
+        &[Rewrite {
+            owner,
+            before: before.into(),
+            after: after.into(),
+        }],
+    )
+    .unwrap();
+    let bytes = published.bytes().to_vec();
+    (crate::Package::from_bytes(&bytes).unwrap(), bytes)
+}
+
+#[test]
+fn package_client_data_edits_publish_replay_and_invert_exactly() {
+    use litchi_core::Position;
+    use litchi_core::edit::RefusalKind;
+
+    use crate::text_edit::Target;
+
+    let (source, source_bytes) = package_with_client_data();
+    let target = Target::new(Position::new(0), Position::new(0));
+    let kinds = |package: &crate::Package| {
+        package
+            .edit_client_data(target)
+            .unwrap()
+            .children()
+            .iter()
+            .map(ClientDataChild::kind)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(kinds(&source), vec![ClientDataChildKind::ShapeFlags10]);
+
+    let no_op = source.edit_client_data(target).unwrap().commit().unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), source_bytes);
+
+    let flags = ClientDataChild::new(ClientDataChildKind::ShapeFlags, vec![1]).unwrap();
+    let mut edit = source.edit_client_data(target).unwrap();
+    edit.insert(0, flags.clone()).unwrap();
+    drop(edit);
+    assert_eq!(source.to_bytes().unwrap(), source_bytes);
+
+    let mut edit = source.edit_client_data(target).unwrap();
+    let Err(super::Error::Refused(refusal)) = edit.remove(9) else {
+        panic!("a missing child must be refused");
+    };
+    assert_eq!(refusal.kind(), RefusalKind::NotFound);
+    let Err(super::Error::Refused(refusal)) = edit.replace(9, flags.clone()) else {
+        panic!("a missing child must be refused");
+    };
+    assert_eq!(refusal.kind(), RefusalKind::NotFound);
+    assert!(edit.changes().is_empty());
+    edit.insert(0, flags).unwrap();
+    assert_eq!(edit.changes().len(), 1);
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.patch().before_bytes(), source_bytes.as_slice());
+    assert_eq!(
+        kinds(commit.package()),
+        vec![
+            ClientDataChildKind::ShapeFlags,
+            ClientDataChildKind::ShapeFlags10
+        ]
+    );
+
+    let replayed = source.apply_client_data(commit.patch()).unwrap();
+    assert_eq!(
+        replayed.package().to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
+    let restored = commit
+        .package()
+        .apply_client_data(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(restored.package().to_bytes().unwrap(), source_bytes);
+    assert!(matches!(
+        commit.package().apply_client_data(commit.patch()),
+        Err(super::Error::PatchConflict)
+    ));
+
+    let refusal_kind = |target| match source.edit_client_data(target) {
+        Err(super::Error::Refused(refusal)) => refusal.kind(),
+        other => panic!("expected a refusal, got {other:?}"),
+    };
+    assert_eq!(
+        refusal_kind(Target::new(Position::new(0), Position::new(1))),
+        RefusalKind::UnsupportedTarget
+    );
+    assert_eq!(
+        refusal_kind(Target::new(Position::new(0), Position::new(9))),
+        RefusalKind::NotFound
+    );
+    assert_eq!(
+        refusal_kind(Target::new(Position::new(3), Position::new(0))),
+        RefusalKind::NotFound
+    );
 }

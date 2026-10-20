@@ -5836,6 +5836,26 @@
           "name": "SlideSyncChangeSet",
           "scope": "litchi_ppt",
           "replacement": "use slide_sync::Patch (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::client_data",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::client_data",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::client_data",
+          "replacement": "use Package::edit_client_data(target) -> client_data::Edit (record 0357)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::client_data::Edit",
+          "replacement": "a commit publishes the Package"
         }
       ],
       "families": [
@@ -5848,7 +5868,8 @@
         "litchi_ppt::document_comparison",
         "litchi_ppt::external_media",
         "litchi_ppt::diagram",
-        "litchi_ppt::slide_sync"
+        "litchi_ppt::slide_sync",
+        "litchi_ppt::client_data"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
@@ -6453,6 +6474,26 @@
           "name": "SlideSyncChangeSet",
           "scope": "litchi_ppt",
           "replacement": "use slide_sync::Patch (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::client_data",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::client_data",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::client_data",
+          "replacement": "use Package::edit_client_data(target) -> client_data::Edit (record 0357)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::client_data::Edit",
+          "replacement": "a commit publishes the Package"
         }
       ],
       "families": [
@@ -6465,7 +6506,8 @@
         "litchi_ppt::document_comparison",
         "litchi_ppt::external_media",
         "litchi_ppt::diagram",
-        "litchi_ppt::slide_sync"
+        "litchi_ppt::slide_sync",
+        "litchi_ppt::client_data"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
