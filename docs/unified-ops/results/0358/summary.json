@@ -1,0 +1,198 @@
+[
+ {
+  "scenario": "odt/open_get",
+  "before_us": 138.9,
+  "after_us": 141.8,
+  "ratio": 1.021,
+  "before_runs": [
+   140.65460000000002,
+   137.2128
+  ],
+  "after_runs": [
+   145.6788,
+   137.9028
+  ]
+ },
+ {
+  "scenario": "odt/set",
+  "before_us": 418.3,
+  "after_us": 415.4,
+  "ratio": 0.993,
+  "before_runs": [
+   418.34619999999995,
+   418.3482
+  ],
+  "after_runs": [
+   413.842,
+   417.0182
+  ]
+ },
+ {
+  "scenario": "odt/batch1k",
+  "before_us": 1790.8,
+  "after_us": 1806.1,
+  "ratio": 1.009,
+  "before_runs": [
+   1784.9,
+   1796.759
+  ],
+  "after_runs": [
+   1796.519,
+   1815.73
+  ]
+ },
+ {
+  "scenario": "ods/open_get",
+  "before_us": 1280.8,
+  "after_us": 1293.4,
+  "ratio": 1.01,
+  "before_runs": [
+   1268.9564,
+   1292.6866
+  ],
+  "after_runs": [
+   1288.7846,
+   1298.0228
+  ]
+ },
+ {
+  "scenario": "ods/set",
+  "before_us": 11.5,
+  "after_us": 11.4,
+  "ratio": 0.995,
+  "before_runs": [
+   11.4582,
+   11.4782
+  ],
+  "after_runs": [
+   11.418,
+   11.41
+  ]
+ },
+ {
+  "scenario": "ods/batch1k",
+  "before_us": 5066.6,
+  "after_us": 5129.2,
+  "ratio": 1.012,
+  "before_runs": [
+   5044.245999999999,
+   5088.857
+  ],
+  "after_runs": [
+   5118.606000000001,
+   5139.737
+  ]
+ },
+ {
+  "scenario": "odp/open_get",
+  "before_us": 120.2,
+  "after_us": 121.0,
+  "ratio": 1.007,
+  "before_runs": [
+   119.9846,
+   120.36659999999999
+  ],
+  "after_runs": [
+   121.98060000000001,
+   119.96879999999999
+  ]
+ },
+ {
+  "scenario": "odp/set",
+  "before_us": 424.2,
+  "after_us": 425.2,
+  "ratio": 1.002,
+  "before_runs": [
+   426.0161999999999,
+   422.3822
+  ],
+  "after_runs": [
+   425.66619999999995,
+   424.7822
+  ]
+ },
+ {
+  "scenario": "odg/open_get",
+  "before_us": 2315.5,
+  "after_us": 2295.4,
+  "ratio": 0.991,
+  "before_runs": [
+   2310.8049,
+   2320.1449999999995
+  ],
+  "after_runs": [
+   2289.5178499999997,
+   2301.2823500000004
+  ]
+ },
+ {
+  "scenario": "odg/set",
+  "before_us": 9965.0,
+  "after_us": 10070.6,
+  "ratio": 1.011,
+  "before_runs": [
+   9958.246299999999,
+   9971.7364
+  ],
+  "after_runs": [
+   10060.4369,
+   10080.6711
+  ]
+ },
+ {
+  "scenario": "odc/open_get",
+  "before_us": 78.0,
+  "after_us": 77.1,
+  "ratio": 0.988,
+  "before_runs": [
+   77.76100000000001,
+   78.20819999999999
+  ],
+  "after_runs": [
+   77.3182,
+   76.8524
+  ]
+ },
+ {
+  "scenario": "odc/set",
+  "before_us": 205.0,
+  "after_us": 201.6,
+  "ratio": 0.984,
+  "before_runs": [
+   204.86005,
+   205.15005000000002
+  ],
+  "after_runs": [
+   201.00805000000003,
+   202.27455
+  ]
+ },
+ {
+  "scenario": "fodt/open_get",
+  "before_us": 372.0,
+  "after_us": 381.8,
+  "ratio": 1.026,
+  "before_runs": [
+   373.0478,
+   371.0418
+  ],
+  "after_runs": [
+   377.63599999999997,
+   386.036
+  ]
+ },
+ {
+  "scenario": "fods/open_get",
+  "before_us": 2153.3,
+  "after_us": 2210.5,
+  "ratio": 1.027,
+  "before_runs": [
+   2162.7070000000003,
+   2143.9507999999996
+  ],
+  "after_runs": [
+   2200.9674,
+   2220.0796
+  ]
+ }
+]
