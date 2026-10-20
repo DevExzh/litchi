@@ -1412,8 +1412,10 @@ post-drop retention claim. See the [0423 protocol](../../docs/performance/result
 Change 0159 adds the independent opt-in
 `pptx_source_backed_cross_copy_plain` selector over the exact same plain
 three-slide-source/two-slide-destination bytes. It calls the public
-`SourceBackedPresentationEditor::plan_cross_slide_copy` and
-`publish_cross_slide_copy_to_stream` APIs; source-backed publication's
+`source::Package::plan_cross_slide_copy` and
+`edit_cross_slide_copy` → `Edit::stage` → `commit` → `Package::write_to`
+APIs (record 0356b; formerly `SourceBackedPresentationEditor::plan_cross_slide_copy`
+and `publish_cross_slide_copy_to_stream`); source-backed publication's
 internal rerun/verification/topology work therefore remains part of the
 publication phase. Only plan and public publication durations are reported;
 setup, reopen, raw/topology/semantic gates, typed stale/foreign refusals, and

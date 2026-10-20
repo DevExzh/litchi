@@ -18605,9 +18605,10 @@ fn publish_pptx_source_backed_cross_copy(
     let source = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(
         source_archive.to_vec(),
     )))?;
-    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(Arc::new(
+    let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(
         OwnedSource::new(destination_archive.to_vec()),
     ))?;
+    let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
     let plan = editor.plan_cross_slide_copy(
         &source,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
@@ -18620,7 +18621,9 @@ fn publish_pptx_source_backed_cross_copy(
         );
     }
     let mut output = Vec::new();
-    let snapshot = editor.publish_cross_slide_copy_to_stream(&mut output, &plan)?;
+    let mut editor_copy = editor.edit_cross_slide_copy()?;
+    let snapshot = editor_copy.stage(&plan)?;
+    editor_copy.commit()?.package().write_to(&mut output)?;
     if snapshot.destination_slide_count() != PPTX_CROSS_COPY_DESTINATION_SLIDE_COUNT + 1
         || snapshot.insertion_position() != PPTX_CROSS_COPY_INSERTION_POSITION
     {
@@ -18904,7 +18907,8 @@ fn verify_pptx_source_backed_cross_copy_gates(
     let source_read: Arc<dyn ReadAt> = source_probe.clone();
     let destination_read: Arc<dyn ReadAt> = destination_probe.clone();
     let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-    let editor_probe = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+    let editor_probe_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+    let editor_probe = litchi_pptx::source::Package::from_presentation(&editor_probe_view)?;
     let probe_plan = editor_probe.plan_cross_slide_copy(
         &source_view,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
@@ -18922,7 +18926,12 @@ fn verify_pptx_source_backed_cross_copy_gates(
         .text_and_name()?;
     source_view.check_source()?;
     let mut probe_output = Vec::new();
-    editor_probe.publish_cross_slide_copy_to_stream(&mut probe_output, &probe_plan)?;
+    let mut editor_probe_copy = editor_probe.edit_cross_slide_copy()?;
+    editor_probe_copy.stage(&probe_plan)?;
+    editor_probe_copy
+        .commit()?
+        .package()
+        .write_to(&mut probe_output)?;
     let source_after = source_probe.bytes()?;
     let source_version_after = source_probe.version()?;
     let source_version_stability_verified =
@@ -19538,7 +19547,8 @@ fn verify_pptx_source_backed_cross_copy_lifecycle_gates(
     let source_read: Arc<dyn ReadAt> = source_probe.clone();
     let destination_read: Arc<dyn ReadAt> = destination_probe.clone();
     let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-    let editor_probe = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+    let editor_probe_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+    let editor_probe = litchi_pptx::source::Package::from_presentation(&editor_probe_view)?;
     let probe_plan = editor_probe.plan_cross_slide_copy(
         &source_view,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
@@ -19556,7 +19566,12 @@ fn verify_pptx_source_backed_cross_copy_lifecycle_gates(
         .text_and_name()?;
     source_view.check_source()?;
     let mut probe_output = Vec::new();
-    editor_probe.publish_cross_slide_copy_to_stream(&mut probe_output, &probe_plan)?;
+    let mut editor_probe_copy = editor_probe.edit_cross_slide_copy()?;
+    editor_probe_copy.stage(&probe_plan)?;
+    editor_probe_copy
+        .commit()?
+        .package()
+        .write_to(&mut probe_output)?;
     let source_after = source_probe.bytes()?;
     let source_version_after = source_probe.version()?;
     let source_version_stability_verified = before == after
@@ -19628,7 +19643,8 @@ fn source_backed_cross_copy_revision_refusal(
     let source_read: Arc<dyn ReadAt> = source.clone();
     let destination_read: Arc<dyn ReadAt> = destination.clone();
     let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+    let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+    let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
     let plan = editor.plan_cross_slide_copy(
         &source_view,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
@@ -19641,7 +19657,12 @@ fn source_backed_cross_copy_revision_refusal(
         destination.replace(destination_archive.to_vec())?;
     }
     let mut output = Vec::new();
-    let result = editor.publish_cross_slide_copy_to_stream(&mut output, &plan);
+    let result = (|| -> litchi_pptx::Result<_> {
+        let mut copy = editor.edit_cross_slide_copy()?;
+        let copied = copy.stage(&plan)?;
+        copy.commit()?.package().write_to(&mut output)?;
+        Ok(copied)
+    })();
     let typed_refusal = matches!(
         result,
         Err(litchi_pptx::Error::PatchConflict)
@@ -19659,20 +19680,27 @@ fn source_backed_cross_copy_foreign_destination_refusal(
     let source = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(
         source_archive.to_vec(),
     )))?;
-    let editor_a = litchi_pptx::SourceBackedPresentationEditor::from_read_at(Arc::new(
+    let editor_a_view = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(
         OwnedSource::new(destination_archive.to_vec()),
     ))?;
+    let editor_a = litchi_pptx::source::Package::from_presentation(&editor_a_view)?;
     let plan = editor_a.plan_cross_slide_copy(
         &source,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
         PPTX_CROSS_COPY_DESTINATION_SLIDE,
         PPTX_CROSS_COPY_INSERTION_POSITION,
     )?;
-    let editor_b = litchi_pptx::SourceBackedPresentationEditor::from_read_at(Arc::new(
+    let editor_b_view = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(
         OwnedSource::new(destination_archive.to_vec()),
     ))?;
+    let editor_b = litchi_pptx::source::Package::from_presentation(&editor_b_view)?;
     let mut output = Vec::new();
-    let result = editor_b.publish_cross_slide_copy_to_stream(&mut output, &plan);
+    let result = (|| -> litchi_pptx::Result<_> {
+        let mut copy = editor_b.edit_cross_slide_copy()?;
+        let copied = copy.stage(&plan)?;
+        copy.commit()?.package().write_to(&mut output)?;
+        Ok(copied)
+    })();
     Ok(matches!(result, Err(litchi_pptx::Error::PatchConflict)) && output.is_empty())
 }
 
@@ -52171,9 +52199,10 @@ fn run_pptx_source_backed_cross_copy(
         let source_read: Arc<dyn ReadAt> = source.clone();
         let destination_read: Arc<dyn ReadAt> = destination.clone();
         let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-        let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+        let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+        let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
         if source_view.slide_count() != PPTX_CROSS_COPY_SOURCE_SLIDE_COUNT
-            || editor.slide_count() != corpus.destination_slide_count
+            || editor_view.slide_count() != corpus.destination_slide_count
         {
             return Err("source-backed PPTX cross-copy setup changed slide counts".into());
         }
@@ -52202,7 +52231,9 @@ fn run_pptx_source_backed_cross_copy(
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
         let started = Instant::now();
-        let snapshot = editor.publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
+        let mut editor_copy = editor.edit_cross_slide_copy()?;
+        let snapshot = editor_copy.stage(&plan)?;
+        editor_copy.commit()?.package().write_to(&mut sink)?;
         let publication_duration = started.elapsed();
         if snapshot.destination_slide_count() != corpus.destination_slide_count + 1
             || snapshot.insertion_position() != corpus.insertion_position
@@ -52277,9 +52308,9 @@ fn run_pptx_source_backed_cross_copy(
         return Err("source-backed PPTX cross-copy measured output digests are not stable".into());
     }
     let cross_copy = PptxSourceBackedCrossCopySummary {
-        implementation: "presentation::SourceBackedPresentationEditor + SourceTopologyPlan + publish_cross_slide_copy_to_stream",
+        implementation: "source::Package::plan_cross_slide_copy + cross_slide_copy::Edit::stage + commit + write_to (record 0356b)",
         workload: "matched plain corpus / existing pptx_cross_copy_plain input",
-        timing_scope: "source-backed plan only + public publish_cross_slide_copy_to_stream; setup, reopen, verification, topology gates, and cache diagnostics excluded",
+        timing_scope: "source-backed plan only + stage + commit + write_to; setup, reopen, verification, topology gates, and cache diagnostics excluded",
         performance_claim: "none: opt-in correctness/counter evidence only; no eager/source speedup, ABBA, allocation, RSS, physical-I/O, or cold-cache claim",
         source_archive_sha256: sha256_hex(&corpus.source_archive),
         destination_archive_sha256: sha256_hex(&corpus.destination_archive),
@@ -52421,7 +52452,8 @@ fn run_pptx_source_backed_cross_copy_lifecycle(
         let started = Instant::now();
         let open_started = Instant::now();
         let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-        let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+        let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+        let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
         let open_duration = open_started.elapsed();
         let plan_started = Instant::now();
         let plan = editor.plan_cross_slide_copy(
@@ -52432,7 +52464,9 @@ fn run_pptx_source_backed_cross_copy_lifecycle(
         )?;
         let plan_duration = plan_started.elapsed();
         let publication_started = Instant::now();
-        let snapshot = editor.publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
+        let mut editor_copy = editor.edit_cross_slide_copy()?;
+        let snapshot = editor_copy.stage(&plan)?;
+        editor_copy.commit()?.package().write_to(&mut sink)?;
         let publication_duration = publication_started.elapsed();
         let duration = started.elapsed();
         let allocation_metrics = match allocation_region.finish() {
@@ -52564,7 +52598,7 @@ fn run_pptx_source_backed_cross_copy_lifecycle(
         .checked_mul(PPTX_CROSS_COPY_MEDIA_ENTRY_BYTES)
         .ok_or("source-backed PPTX lifecycle media byte count overflows usize")?;
     let cross_copy = PptxSourceBackedCrossCopyLifecycleSummary {
-        implementation: "SourceBackedPresentation::from_read_at + SourceBackedPresentationEditor::from_read_at + SourceTopologyPlan::publish_cross_slide_copy_to_stream",
+        implementation: "SourceBackedPresentation::from_read_at + source::Package::from_presentation + cross_slide_copy::Edit::stage + write_to (record 0356b)",
         workload: if corpus.media_rich {
             "matched media-rich owned cross-copy corpus"
         } else {

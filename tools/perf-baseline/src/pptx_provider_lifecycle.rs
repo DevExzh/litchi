@@ -789,22 +789,23 @@ fn run_lifecycle_iteration(
 
     let destination_allocation_region = crate::allocation_metrics::begin();
     let destination_started = Instant::now();
-    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at_with_options(
+    let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at_with_options(
         destination_read,
         litchi_pptx::OpenOptions::default()
             .source_limits(SourceLimits::default())
             .cache_limits(cache_limits)
             .execution_context(destination_context.context.clone()),
     )?;
+    let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
     let open_destination_ns = crate::elapsed_ns(destination_started.elapsed())?;
     let open_destination_allocation_metrics = destination_allocation_region.finish();
     if source_view.slide_count() != crate::PPTX_CROSS_COPY_SOURCE_SLIDE_COUNT
-        || editor.slide_count() != corpus.destination_slide_count
+        || editor_view.slide_count() != corpus.destination_slide_count
     {
         return Err("provider lifecycle opening changed prevalidated slide counts".into());
     }
     let source_opened = source_view.try_cache_diagnostics()?;
-    let destination_opened = editor.try_cache_diagnostics()?;
+    let destination_opened = editor_view.try_cache_diagnostics()?;
     let (source_opened_point, source_opened) = pptx_cache_retention::cache_point(
         source_opened,
         None,
@@ -852,7 +853,7 @@ fn run_lifecycle_iteration(
         return Err("provider lifecycle plan metadata is not deterministic".into());
     }
     let source_planned = source_view.try_cache_diagnostics()?;
-    let destination_planned = editor.try_cache_diagnostics()?;
+    let destination_planned = editor_view.try_cache_diagnostics()?;
     let (source_planned_point, source_planned) = pptx_cache_retention::cache_point(
         source_planned,
         Some(source_opened),
@@ -884,7 +885,9 @@ fn run_lifecycle_iteration(
 
     let publication_allocation_region = crate::allocation_metrics::begin();
     let publication_started = Instant::now();
-    let published = editor.publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
+    let mut editor_copy = editor.edit_cross_slide_copy()?;
+    let published = editor_copy.stage(&plan)?;
+    editor_copy.commit()?.package().write_to(&mut sink)?;
     let publication_ns = crate::elapsed_ns(publication_started.elapsed())?;
     let publication_allocation_metrics = publication_allocation_region.finish();
     let publication_sink = sink.summary();

@@ -87,7 +87,7 @@ impl RootNamespace {
 /// or more direct embedded images and chart hosts, and no diagram, table,
 /// notes, comments, external, or shared-owner relationship. No inverse or
 /// durable patch is represented.
-pub struct SourceBackedCrossSlideCopyPlan {
+pub(crate) struct SourceBackedCrossSlideCopyPlan {
     source: SourceBackedPresentation,
     source_position: usize,
     destination_slide_position: usize,
@@ -310,7 +310,7 @@ enum PreparedSlideRelationship {
 
 /// Semantic result of one published source-backed cross-presentation copy.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SourceBackedCrossSlideCopySnapshot {
+pub struct CopiedSlide {
     source_position: usize,
     destination_slide_position: usize,
     insertion_position: usize,
@@ -319,32 +319,43 @@ pub struct SourceBackedCrossSlideCopySnapshot {
 }
 
 impl SourceBackedCrossSlideCopyPlan {
+    /// What publishing this plan reports.
+    pub(crate) fn predicted(&self) -> Result<CopiedSlide> {
+        Ok(CopiedSlide {
+            source_position: self.source_position,
+            destination_slide_position: self.destination_slide_position,
+            insertion_position: self.insertion_position,
+            destination_slide_count: self.destination_slide_count,
+            source_name: clone_string(&self.source_name, "source-backed planned slide name")?,
+        })
+    }
+
     /// Source zero-based slide position captured by this plan.
     #[must_use]
-    pub const fn source_position(&self) -> usize {
+    pub(crate) const fn source_position(&self) -> usize {
         self.source_position
     }
 
     /// Destination slide position whose registered layout is reused.
     #[must_use]
-    pub const fn destination_slide_position(&self) -> usize {
+    pub(crate) const fn destination_slide_position(&self) -> usize {
         self.destination_slide_position
     }
 
     /// Destination zero-based insertion position captured by this plan.
     #[must_use]
-    pub const fn insertion_position(&self) -> usize {
+    pub(crate) const fn insertion_position(&self) -> usize {
         self.insertion_position
     }
 
     /// Destination slide count after the planned insertion.
     #[must_use]
-    pub const fn destination_slide_count(&self) -> usize {
+    pub(crate) const fn destination_slide_count(&self) -> usize {
         self.destination_slide_count
     }
 }
 
-impl SourceBackedCrossSlideCopySnapshot {
+impl CopiedSlide {
     /// Source zero-based slide position published by this operation.
     #[must_use]
     pub const fn source_position(&self) -> usize {
@@ -387,7 +398,7 @@ impl SourceBackedPresentationEditor {
     /// and `insertion_position` selects the destination slide-list position.
     /// Unnamed slides keep their absent or empty producer names. Nonempty name
     /// collisions are refused until an explicit resolver is supplied.
-    pub fn plan_cross_slide_copy(
+    pub(crate) fn plan_cross_slide_copy(
         &self,
         source: &SourceBackedPresentation,
         source_position: usize,
@@ -444,11 +455,11 @@ impl SourceBackedPresentationEditor {
     /// revisions before output. The OPC topology publisher owns raw ZIP
     /// preservation, content-types, canonical relationship members, ZIP32
     /// limits, and incomplete-output classification.
-    pub fn publish_cross_slide_copy_to_stream<W: Write>(
+    pub(crate) fn publish_cross_slide_copy_to_stream<W: Write>(
         self,
         writer: W,
         plan: &SourceBackedCrossSlideCopyPlan,
-    ) -> Result<SourceBackedCrossSlideCopySnapshot> {
+    ) -> Result<CopiedSlide> {
         self.package.check_execution()?;
         plan.source.check_source()?;
         let execution_context = self.package.execution_context();
@@ -491,7 +502,7 @@ impl SourceBackedPresentationEditor {
                 other => other,
             });
         }
-        Ok(SourceBackedCrossSlideCopySnapshot {
+        Ok(CopiedSlide {
             source_position: plan.source_position,
             destination_slide_position: plan.destination_slide_position,
             insertion_position: plan.insertion_position,

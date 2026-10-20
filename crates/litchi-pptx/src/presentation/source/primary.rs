@@ -5,6 +5,7 @@
 //! Structural revisions additionally retain one prepared OPC topology and a
 //! stable-key recipe for lazy readback and reversible publication.
 
+pub mod cross_slide_copy;
 mod deferred;
 mod durable;
 mod insertion;

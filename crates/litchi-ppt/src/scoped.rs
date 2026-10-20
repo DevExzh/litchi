@@ -9,10 +9,11 @@
 //! as a new package, and replays byte patches.
 //!
 //! A family's patch is exact and record-sized (record 0357a): it carries the
-//! length and SHA-256 of the source and target package and the coalesced
-//! 512-byte blocks that differ, so `apply_x` refuses a package that is not
-//! the patch's exact source ([`Failure::PatchConflict`]), rebuilds the exact
-//! target, and `inverse` swaps the endpoints. An exact no-op commit
+//! length and block root (record 0357b, [`digest`]) of the source and target
+//! package and the coalesced 512-byte blocks that differ, so `apply_x`
+//! refuses a package that is not the patch's exact source
+//! ([`Failure::PatchConflict`]), rebuilds the exact target, and `inverse`
+//! swaps the endpoints. An exact no-op commit
 //! publishes the source package unchanged (signatures included); a changed
 //! commit of a signed package is refused ([`Failure::Signed`]).
 
@@ -20,20 +21,25 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 use litchi_core::edit::{Diagnostics, Refusal, RefusalKind};
-use litchi_core::patch::BlobId;
 
 use crate::package::{Error as PackageError, OpenOptions, Package};
 use crate::slide_order;
 
-/// One side of an exact byte patch: the package length and its SHA-256.
+mod digest;
+
+pub(crate) use digest::ExactCache;
+use digest::{BlockDigests, Digest, Recipe};
+
+/// One side of an exact byte patch: the package length and its block root
+/// (record 0357b).
 #[derive(Clone, PartialEq, Eq)]
 struct Endpoint {
     len: usize,
-    digest: BlobId,
+    digest: Digest,
 }
 
 impl Endpoint {
-    fn new(len: usize, digest: BlobId) -> Self {
+    fn new(len: usize, digest: Digest) -> Self {
         Self { len, digest }
     }
 }
@@ -56,7 +62,7 @@ const BLOCK: usize = 512;
 
 /// An exact, record-sized patch between two package byte images.
 ///
-/// It carries both endpoints' length and SHA-256 and the coalesced 512-byte
+/// It carries both endpoints' length and block root and the coalesced 512-byte
 /// blocks that differ, so it applies only to the exact source (anything else
 /// is [`Failure::PatchConflict`]), reproduces the exact target, and inverts
 /// by swapping the endpoints and reading each range's other side. The ranges
@@ -88,8 +94,8 @@ impl PartialEq for BytePatch {
 impl Eq for BytePatch {}
 
 impl BytePatch {
-    /// The exact no-op patch of a package of `len` bytes with `digest`.
-    fn noop(len: usize, digest: BlobId) -> Self {
+    /// The exact no-op patch of a package of `len` bytes with root `digest`.
+    fn noop(len: usize, digest: Digest) -> Self {
         let endpoint = Endpoint::new(len, digest);
         Self {
             source: endpoint.clone(),
@@ -171,6 +177,12 @@ impl BytePatch {
         self.target.len
     }
 
+    /// The block-index spans the changed ranges cover, sorted and disjoint:
+    /// the target differs from the source only in these blocks.
+    fn spans(&self) -> Vec<std::ops::Range<usize>> {
+        spans(&self.ranges)
+    }
+
     /// The bytes the changed ranges span (the longer side of each range).
     pub(crate) fn changed_bytes(&self) -> usize {
         self.ranges
@@ -187,16 +199,16 @@ impl BytePatch {
             .sum()
     }
 
-    /// Whether a package of `len` bytes with `digest` is the patch's exact
-    /// source.
-    fn is_source(&self, len: usize, digest: &BlobId) -> bool {
+    /// Whether a package of `len` bytes with block root `digest` is the
+    /// patch's exact source.
+    fn is_source(&self, len: usize, digest: &Digest) -> bool {
         self.source.len == len && &self.source.digest == digest
     }
 
     /// The exact target rebuilt from the exact source bytes: copy them,
     /// resize to the target length and write every range's target side.
     /// The caller has checked [`Self::is_source`]; with the source bound by
-    /// length and SHA-256 the result is the exact target by construction
+    /// length and block root the result is the exact target by construction
     /// (debug builds re-hash it).
     fn rebuild(&self, source: &[u8]) -> Option<Vec<u8>> {
         let mut target = source.to_vec();
@@ -206,9 +218,23 @@ impl BytePatch {
             let stop = range.offset.checked_add(after.len())?;
             target.get_mut(range.offset..stop)?.copy_from_slice(after);
         }
-        debug_assert!(BlobId::of(&target) == self.target.digest);
+        debug_assert!(BlockDigests::of(&target).root() == self.target.digest);
         Some(target)
     }
+}
+
+/// The block-index spans of `ranges` (block-aligned offsets; a range covers
+/// the blocks its longer side touches).
+fn spans(ranges: &[Range]) -> Vec<std::ops::Range<usize>> {
+    ranges
+        .iter()
+        .map(|range| {
+            let stop = range
+                .offset
+                .saturating_add(range.before.len().max(range.after.len()));
+            range.offset / BLOCK..stop.div_ceil(BLOCK)
+        })
+        .collect()
 }
 
 impl std::fmt::Debug for BytePatch {
@@ -353,14 +379,17 @@ impl Base {
         &self.bytes
     }
 
-    /// The SHA-256 of the exact source bytes, cached on the package.
-    fn digest(&self) -> BlobId {
-        self.package.exact_digest(&self.bytes)
+    /// The block root of the exact source bytes, cached on the package.
+    fn digest(&self) -> Digest {
+        self.package.exact().root(&self.bytes)
     }
 
-    /// Whether the source carries a digital-signature component.
+    /// Whether the source carries a digital-signature component, cached on
+    /// the package.
     pub(crate) fn is_signed(&self) -> Result<bool, Failure> {
-        contains_signature(&self.bytes)
+        self.package
+            .exact()
+            .signed(|| contains_signature(&self.bytes))
     }
 
     /// A shared handle on the exact source package bytes.
@@ -395,31 +424,43 @@ impl Base {
     /// Publish whole candidate package bytes.
     ///
     /// The patch is the coalesced byte-range diff against the source, bound
-    /// to both endpoints' length and SHA-256; the target's digest is cached
-    /// on the published package, so a later edit or patch of it does not
-    /// hash it again.
+    /// to both endpoints' length and block root. The target's block list is
+    /// derived from the source's (cached on the source package) by hashing
+    /// only the changed and appended blocks, and seeds the published
+    /// package's cache, so a later edit or patch of it hashes nothing it
+    /// did not change.
     pub(crate) fn publish(self, after: Vec<u8>) -> Result<Published, Failure> {
         let ranges = BytePatch::ranges(&self.bytes, &after);
         if ranges.is_empty() {
             return Ok(self.unchanged());
         }
-        let target = Endpoint::new(after.len(), BlobId::of(&after));
+        let source = self.package.exact().blocks(&self.bytes);
+        let target = Arc::new(source.derive(&after, &spans(&ranges)));
         let patch = BytePatch {
-            source: Endpoint::new(self.bytes.len(), self.digest()),
-            target,
+            source: Endpoint::new(self.bytes.len(), source.root()),
+            target: Endpoint::new(after.len(), target.root()),
             ranges,
             inverted: false,
         };
-        self.publish_patched(&after, patch)
+        self.publish_patched(after, patch, Seed::Blocks(target))
     }
 
-    /// Publish the exact target `after` of `patch`, made from this source.
-    fn publish_patched(self, after: &[u8], patch: BytePatch) -> Result<Published, Failure> {
-        if contains_signature(&self.bytes)? {
+    /// Publish the exact target `after` of `patch`, made from this source,
+    /// and seed the published package's digest cache.
+    fn publish_patched(
+        self,
+        after: Vec<u8>,
+        patch: BytePatch,
+        seed: Seed,
+    ) -> Result<Published, Failure> {
+        if self.is_signed()? {
             return Err(Failure::Signed);
         }
-        let package = Package::from_bytes_with_options(after, self.open_options())?;
-        package.seed_exact_digest(patch.target.digest.clone());
+        let package = Package::from_owned_bytes_with_options(after, self.open_options())?;
+        match seed {
+            Seed::Blocks(blocks) => package.exact().seed_blocks(blocks),
+            Seed::Derived(recipe) => package.exact().seed_derived(patch.target.digest, recipe),
+        }
         Ok(Published {
             package,
             patch,
@@ -439,7 +480,7 @@ impl Base {
         if before == after {
             return Ok(self.unchanged());
         }
-        if contains_signature(&self.bytes)? {
+        if self.is_signed()? {
             return Err(Failure::Signed);
         }
         let published = slide_order::records::publish(
@@ -463,7 +504,21 @@ impl Base {
     }
 }
 
+/// How a publication seeds the published package's digest cache.
+enum Seed {
+    /// The target's block list, derived at commit.
+    Blocks(Arc<BlockDigests>),
+    /// The recipe of the target's block list, derived on first use; the
+    /// root is the patch's target root.
+    Derived(Recipe),
+}
+
 /// Replay an exact byte patch onto the package it was made from.
+///
+/// The receiving package's block root (cached, seeded, or computed once)
+/// must equal the patch source's. The rebuilt package is seeded with the
+/// patch's target root and the recipe of its block list, so the replay
+/// hashes no block.
 pub(crate) fn apply(package: &Package, patch: &BytePatch) -> Result<Published, Failure> {
     let base = Base::capture(package)?;
     if !patch.is_source(base.bytes().len(), &base.digest()) {
@@ -473,7 +528,8 @@ pub(crate) fn apply(package: &Package, patch: &BytePatch) -> Result<Published, F
         return Ok(base.unchanged());
     }
     let target = patch.rebuild(base.bytes()).ok_or(Failure::PatchConflict)?;
-    base.publish_patched(&target, patch.clone())
+    let recipe = package.exact().child(base.bytes(), &patch.spans());
+    base.publish_patched(target, patch.clone(), Seed::Derived(recipe))
 }
 
 fn open_options(package: &Package) -> OpenOptions<'static> {
@@ -580,7 +636,7 @@ macro_rules! family {
         #[doc = concat!(
                             "An exact, reversible ", $noun, " patch: the changed byte ranges ",
                             "between two packages, bound to the exact source package (length ",
-                            "and SHA-256) it was made from."
+                            "and SHA-256 block root) it was made from."
                         )]
         #[derive(Clone, PartialEq, Eq)]
         pub struct Patch($crate::scoped::BytePatch);
@@ -683,13 +739,17 @@ pub(crate) fn signed(package: &Package) -> Package {
     reason = "byte-patch unit tests use panic-driven assertions"
 )]
 mod tests {
-    use super::{BLOCK, BlobId, BytePatch, Endpoint};
+    use super::{BLOCK, BlockDigests, BytePatch, Endpoint};
+
+    fn root(bytes: &[u8]) -> super::Digest {
+        BlockDigests::of(bytes).root()
+    }
 
     impl BytePatch {
         fn diff(before: &[u8], after: &[u8]) -> Self {
             Self {
-                source: Endpoint::new(before.len(), BlobId::of(before)),
-                target: Endpoint::new(after.len(), BlobId::of(after)),
+                source: Endpoint::new(before.len(), root(before)),
+                target: Endpoint::new(after.len(), root(after)),
                 ranges: Self::ranges(before, after),
                 inverted: false,
             }
@@ -698,11 +758,11 @@ mod tests {
         /// What `apply` does with the package bytes: check the source,
         /// rebuild, and check the rebuilt target's digest.
         fn target_of(&self, source: &[u8]) -> Option<Vec<u8>> {
-            if !self.is_source(source.len(), &BlobId::of(source)) {
+            if !self.is_source(source.len(), &root(source)) {
                 return None;
             }
             let target = self.rebuild(source)?;
-            (BlobId::of(&target) == self.target.digest).then_some(target)
+            (root(&target) == self.target.digest).then_some(target)
         }
     }
 
@@ -737,7 +797,7 @@ mod tests {
         let patch = assert_exact(&bytes, &bytes);
         assert!(patch.is_noop());
         assert_eq!(patch.changed_bytes(), 0);
-        assert_eq!(patch, BytePatch::noop(bytes.len(), BlobId::of(&bytes)));
+        assert_eq!(patch, BytePatch::noop(bytes.len(), root(&bytes)));
         let mut other = bytes.clone();
         other[BLOCK] ^= 1;
         assert!(patch.target_of(&other).is_none());
