@@ -561,7 +561,7 @@ impl Edit {
         let input_limit = svg_plan::payload_limit(&self.base).min(MAX_SVG_INPUT_BYTES);
         if bytes.len() > input_limit {
             return Err(Error::Limit {
-                kind: super::super::LimitKind::SvgInputBytes,
+                kind: super::super::LimitKind::SvgInputBytes.into(),
                 observed: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
                 maximum: u64::try_from(input_limit).unwrap_or(u64::MAX),
             });
@@ -1272,7 +1272,7 @@ impl Edit {
             .ok_or_else(|| invalid("cell-transfer area overflow"))?;
         if cells > MAX_CELL_TRANSFER {
             return Err(Error::Limit {
-                kind: super::super::LimitKind::TransferCells,
+                kind: super::super::LimitKind::TransferCells.into(),
                 observed: cells,
                 maximum: MAX_CELL_TRANSFER,
             });
@@ -4014,7 +4014,7 @@ impl Edit {
         for (position, entry) in sheet.store()?.entries().iter().enumerate() {
             if position >= MAX_CELL_DEPENDENCY_SCAN {
                 return Err(Error::Limit {
-                    kind: super::super::LimitKind::TransferDependencyScan,
+                    kind: super::super::LimitKind::TransferDependencyScan.into(),
                     observed: u64::try_from(position)
                         .unwrap_or(u64::MAX)
                         .saturating_add(1),

@@ -922,6 +922,52 @@ fn wildcard_pptx_errors_are_corrupt_file() {
 
 #[cfg(feature = "xlsx")]
 #[test]
+fn xlsx_refusals_conflicts_and_limits_have_their_codes() {
+    use litchi_core::edit::{Refusal, RefusalKind};
+    assert_code(
+        litchi_xlsx::Error::Refused(Refusal::new(
+            RefusalKind::NotFound,
+            "edit_auto_filter",
+            "the worksheet does not exist",
+        )),
+        Code::NotFound,
+    );
+    assert_code(
+        litchi_xlsx::Error::Refused(Refusal::new(
+            RefusalKind::UnsupportedContent,
+            "edit_comments",
+            "markup compatibility",
+        )),
+        Code::UnsupportedCapability,
+    );
+    assert_code(
+        litchi_xlsx::Error::PatchConflict {
+            part: "/xl/workbook.xml".into(),
+        },
+        Code::InvalidInput,
+    );
+    assert_code(
+        litchi_xlsx::Error::InvalidLimit {
+            kind: litchi_xlsx::LimitKind::Opc(litchi_xlsx::opc::LimitKind::Parts),
+            value: 0,
+            maximum: 1,
+        },
+        Code::InvalidArgument,
+    );
+    assert_code(
+        litchi_xlsx::Error::Limit {
+            kind: litchi_xlsx::LimitKind::ConditionalFormatting(
+                litchi_xlsx::conditional_formatting::edit::LimitKind::Formats,
+            ),
+            observed: 2,
+            maximum: 1,
+        },
+        Code::LimitExceeded,
+    );
+}
+
+#[cfg(feature = "xlsx")]
+#[test]
 fn wildcard_xlsx_errors_are_corrupt_file() {
     let error = assert_code(litchi_xlsx::Error::Invalid("bad".into()), Code::CorruptFile);
     assert_eq!(error.format(), Some(FileFormat::Xlsx));

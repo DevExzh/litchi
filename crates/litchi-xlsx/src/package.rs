@@ -194,11 +194,7 @@ impl Package {
             .map_or_else(PackageEncryption::plain, PackageEncryption::encrypted);
         let package = OpcPackage::from_vec_with_limits(opened.into_bytes(), options.source_limits)?;
         Ok(Self {
-            workbook: Workbook::from_package_with_encryption(
-                package,
-                provenance,
-                options.leniency,
-            )?,
+            workbook: Workbook::from_package_with_encryption(package, provenance, options)?,
         })
     }
 
@@ -216,7 +212,7 @@ impl Package {
 
     fn from_validated(package: OpcPackage, options: OpenOptions) -> Result<Self> {
         Ok(Self {
-            workbook: Workbook::from_package_with_leniency(package, options.leniency)?,
+            workbook: Workbook::from_package_with_options(package, options)?,
         })
     }
 
@@ -1025,6 +1021,27 @@ impl Package {
     ) -> Result<()> {
         let mode = self.workbook.retained_mode("save_reencrypted")?;
         self.save_encrypted_with_limits(path, password, mode, limits)
+    }
+
+    /// A new package publishing `opc`, validated as a complete workbook,
+    /// under this package's policies (leniency, limits and encryption
+    /// provenance) and sharing its style lineage. This package is unchanged.
+    pub(crate) fn derive(&self, opc: OpcPackage) -> Result<Self> {
+        self.workbook
+            .adopt_published_package(opc)
+            .map(Self::from_workbook)
+    }
+
+    /// Run `mutation` on a copy of this package's OPC graph and publish the
+    /// result as a new package; this package is unchanged.
+    #[allow(dead_code, reason = "used by the record families")]
+    pub(crate) fn staged<T>(
+        &self,
+        mutation: impl FnOnce(&mut OpcPackage) -> Result<T>,
+    ) -> Result<(Self, T)> {
+        let mut staged = self.opc().clone();
+        let value = mutation(&mut staged)?;
+        Ok((self.derive(staged)?, value))
     }
 
     /// Replace this snapshot with a validated publication of `staged`.

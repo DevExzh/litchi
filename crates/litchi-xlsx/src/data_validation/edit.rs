@@ -32,7 +32,7 @@
 
 use super::Collection;
 use crate::Package;
-use crate::error::{Result, invalid};
+use crate::error::Result;
 use crate::part_edit::{Staged, family};
 
 family!("data-validation");
@@ -52,8 +52,8 @@ pub enum LimitKind {
 /// A staged data-validation edit of one [`Package`]. Dropping it discards
 /// it.
 #[derive(Debug)]
-pub struct Edit<'a> {
-    staged: Staged<'a>,
+pub struct Edit {
+    staged: Staged,
 }
 
 impl Package {
@@ -63,7 +63,7 @@ impl Package {
     ///
     /// Returns the encryption-policy error for a package whose mutations are
     /// refused.
-    pub fn edit_data_validations(&self) -> Result<Edit<'_>> {
+    pub fn edit_data_validations(&self) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::new(self, "edit_data_validations")?,
         })
@@ -82,7 +82,7 @@ impl Package {
     }
 }
 
-impl Edit<'_> {
+impl Edit {
     /// The staged validation collections of the worksheet at `sheet`.
     ///
     /// # Errors
@@ -105,9 +105,7 @@ impl Edit<'_> {
     pub fn set_validations(&mut self, sheet: usize, values: Vec<Collection>) -> Result<bool> {
         let count: usize = values.iter().map(|value| value.validations().len()).sum();
         if count > MAX_VALIDATIONS {
-            return Err(invalid(format!(
-                "data-validation count limit exceeded: {count} exceeds {MAX_VALIDATIONS}"
-            )));
+            return Err(Error::limit(LimitKind::Validations, count, MAX_VALIDATIONS));
         }
         let worksheet = self.staged.worksheet(sheet)?;
         let xml =

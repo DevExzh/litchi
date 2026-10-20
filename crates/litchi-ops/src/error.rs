@@ -1395,6 +1395,11 @@ impl Classify for litchi_xlsx::Error {
                 litchi_ooxml_common::package_encryption::PolicyError::NoRetainedMode => Class::of(Code::UnsupportedCapability),
             },
             Self::ResourceLimit(_) | Self::Limit { .. } => Class::of(Code::LimitExceeded),
+            // Typed refusals, patches for another base and invalid configured
+            // limits (record 0360).
+            Self::Refused(refusal) => refusal.classify(),
+            Self::PatchConflict { .. } => Class::of(Code::InvalidInput),
+            Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
             Self::Signed => Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION),
             Self::Unsupported { .. } | Self::UnsupportedSelector => {
                 Class::of(Code::UnsupportedCapability)

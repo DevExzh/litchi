@@ -441,9 +441,10 @@ pub(crate) struct Inner {
     pub(super) chart_inventories: Arc<crate::chart::edit::InventoryCache>,
     /// Repairs made while the workbook catalog was parsed at open time.
     pub(super) tolerance: ToleranceReport,
-    /// The opt-in repairs this workbook was opened with; snapshots derived
-    /// from it by edits re-open under the same policy.
-    pub(super) leniency: Leniency,
+    /// The ingress policies this workbook was opened with (its leniency,
+    /// limits and encryption limits); snapshots derived from it by edits
+    /// re-open under the same policies.
+    pub(super) options: crate::OpenOptions,
 }
 
 /// The owned, read-only semantic projection of an XLSX [`crate::Package`].
@@ -466,12 +467,22 @@ impl Workbook {
         Self::from_package_with_styles(package, None)
     }
 
-    /// [`Self::from_package`] with the opt-in repairs `leniency` allows.
-    pub(crate) fn from_package_with_leniency(
+    /// [`Self::from_package`] under the ingress policies `options`, which
+    /// the projection keeps.
+    pub(crate) fn from_package_with_options(
         package: OpcPackage,
-        leniency: Leniency,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::open_package(package, None, leniency)
+        Self::open_package(package, None, options)
+    }
+
+    /// The ingress policies the owning package was opened with.
+    #[allow(
+        dead_code,
+        reason = "read by the encrypted outputs and the semantic budgets"
+    )]
+    pub(crate) fn open_options(&self) -> &crate::OpenOptions {
+        &self.inner.options
     }
 
     /// The lineage's memo of worksheet drawing chart inventories.
@@ -482,16 +493,16 @@ impl Workbook {
     /// The opt-in repair policy the owning package was opened with.
     #[must_use]
     pub fn leniency(&self) -> Leniency {
-        self.inner.leniency
+        self.inner.options.leniency
     }
 
     #[cfg(feature = "encryption")]
     pub(crate) fn from_package_with_encryption(
         package: OpcPackage,
         encryption: PackageEncryption,
-        leniency: Leniency,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        let mut workbook = Self::open_package(package, None, leniency)?;
+        let mut workbook = Self::open_package(package, None, options)?;
         workbook.encryption = encryption;
         Ok(workbook)
     }
@@ -511,15 +522,17 @@ impl Workbook {
         package: OpcPackage,
         source: Option<&Workbook>,
     ) -> Result<Self> {
-        let leniency = source.map_or(Leniency::Strict, |source| source.inner.leniency);
-        Self::open_package(package, source, leniency)
+        let options =
+            source.map_or_else(crate::OpenOptions::default, |source| source.inner.options);
+        Self::open_package(package, source, options)
     }
 
     fn open_package(
         package: OpcPackage,
         source: Option<&Workbook>,
-        leniency: Leniency,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
+        let leniency = options.leniency;
         // The packaging repairs come first (they were made before the
         // workbook part could be read), then the open-time catalog sites
         // (findings 4.7/4.8); see `crate::leniency`.
@@ -655,7 +668,7 @@ impl Workbook {
                 format_cache,
                 chart_inventories,
                 tolerance,
-                leniency,
+                options,
             }),
             #[cfg(feature = "encryption")]
             encryption: source.map_or_else(PackageEncryption::plain, |source| source.encryption),

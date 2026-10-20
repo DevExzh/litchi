@@ -89,7 +89,7 @@ fn transaction_limits_report_their_kind() {
     assert!(matches!(
         error,
         Error::Limit {
-            kind: LimitKind::TransferCells,
+            kind: litchi_xlsx::LimitKind::Workbook(LimitKind::TransferCells),
             observed: 1_703_936,
             maximum: 65_536,
         }

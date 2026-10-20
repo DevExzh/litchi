@@ -51,6 +51,26 @@ impl OpenOptions {
         self
     }
 
+    /// The physical limits of the clear OPC archive.
+    #[must_use]
+    pub const fn source_limits_value(&self) -> SourceLimits {
+        self.source_limits
+    }
+
+    /// The opt-in repairs applied while the workbook is read.
+    #[must_use]
+    pub const fn leniency_value(&self) -> Leniency {
+        self.leniency
+    }
+
+    /// The outer encryption policy of password-bearing ingress, which an
+    /// opened package keeps for its encrypted outputs.
+    #[cfg(feature = "encryption")]
+    #[must_use]
+    pub const fn encryption_limits_value(&self) -> crate::encryption::Limits {
+        self.encryption_limits
+    }
+
     /// Select the outer encryption policy for password-bearing ingress.
     ///
     /// The encryption owner validates this policy during decryption. It does

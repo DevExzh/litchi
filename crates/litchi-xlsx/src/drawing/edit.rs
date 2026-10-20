@@ -105,7 +105,10 @@ pub(crate) fn source_elements(
     };
     let part = package.part(&drawing)?;
     let declared = part.declared_uncompressed_size()?;
-    LimitKind::DrawingBytes.check(usize::try_from(declared).unwrap_or(usize::MAX))?;
+    check_limit(
+        LimitKind::DrawingBytes,
+        usize::try_from(declared).unwrap_or(usize::MAX),
+    )?;
     let data = part.data()?;
     Ok(objects::read(data.as_bytes(), part.rels(), |target| {
         let image = package.part(target).ok()?;
@@ -134,7 +137,7 @@ impl Package {
     ///
     /// Returns the encryption-policy error for a package whose mutations are
     /// refused.
-    pub fn edit_drawings(&self) -> Result<Edit<'_>> {
+    pub fn edit_drawings(&self) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::new(self, "edit_drawings")?,
         })
@@ -153,9 +156,22 @@ impl Package {
     }
 }
 
+/// Refuse `observed` above the bound of `kind` with a typed limit.
+fn check_limit(kind: LimitKind, observed: usize) -> Result<()> {
+    let maximum = match kind {
+        LimitKind::Elements => MAX_ELEMENTS,
+        LimitKind::DrawingBytes => MAX_DRAWING_BYTES,
+        _ => MAX_IMAGE_BYTES,
+    };
+    if observed > maximum {
+        return Err(Error::limit(kind, observed, maximum));
+    }
+    Ok(())
+}
+
 /// A replacement image's size, content type and extension.
 fn check_image(image: &[u8], content_type: &str, extension: &str) -> Result<()> {
-    LimitKind::ImageBytes.check(image.len())?;
+    check_limit(LimitKind::ImageBytes, image.len())?;
     if !content_type.starts_with("image/")
         || extension.is_empty()
         || !extension.bytes().all(|b| b.is_ascii_alphanumeric())
@@ -183,11 +199,11 @@ fn worksheet_uri(package: &Package, sheet: usize) -> Result<PackURI> {
 /// A staged worksheet drawing edit of one [`Package`]. Dropping it discards
 /// it.
 #[derive(Debug)]
-pub struct Edit<'a> {
-    staged: Staged<'a>,
+pub struct Edit {
+    staged: Staged,
 }
 
-impl Edit<'_> {
+impl Edit {
     /// The staged elements of the worksheet at `sheet`.
     ///
     /// # Errors

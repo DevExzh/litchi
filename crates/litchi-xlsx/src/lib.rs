@@ -106,6 +106,7 @@ pub mod merge;
 pub mod metadata;
 pub mod named_sheet_view;
 pub mod ole_objects;
+pub mod opc;
 mod open_options;
 mod outline;
 pub mod outline_properties;
@@ -228,8 +229,8 @@ pub use data_validation::{
     write_data_validation_extensions,
 };
 pub use error::{
-    ColumnEditBlock, DefaultsEditBlock, EditBlock, Error, MergeEditBlock, RemoveBlock, RenameBlock,
-    Result, RowEditBlock, TabEditBlock,
+    ColumnEditBlock, DefaultsEditBlock, EditBlock, Error, LimitKind, MergeEditBlock, RemoveBlock,
+    RenameBlock, Result, RowEditBlock, TabEditBlock,
 };
 pub use external_links::{
     AlternateUrl, AlternateUrls, CellType, Dde, DdeItem, DdeValue, DdeValueType, DdeValues,

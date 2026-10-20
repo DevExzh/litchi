@@ -65,8 +65,8 @@ pub enum LimitKind {
 
 /// A staged legacy-note edit of one [`Package`]. Dropping it discards it.
 #[derive(Debug)]
-pub struct Edit<'a> {
-    staged: Staged<'a>,
+pub struct Edit {
+    staged: Staged,
 }
 
 impl Package {
@@ -76,7 +76,7 @@ impl Package {
     ///
     /// Returns the encryption-policy error for a package whose mutations are
     /// refused.
-    pub fn edit_comments(&self) -> Result<Edit<'_>> {
+    pub fn edit_comments(&self) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::new(self, "edit_comments")?,
         })
@@ -101,7 +101,7 @@ fn cell(value: &str) -> Result<(String, u32, u32)> {
     Ok((cell.a1(), cell.row().get(), cell.column().get()))
 }
 
-impl Edit<'_> {
+impl Edit {
     /// The staged notes of the worksheet at `sheet`; `None` without a
     /// comments part.
     ///
@@ -235,10 +235,15 @@ impl Edit<'_> {
             },
         };
         for (value, what) in [(author, "author"), (text, "text")] {
-            if value.len() > MAX_TEXT_BYTES || value.contains('\0') {
-                return Err(invalid(format!(
-                    "a note {what} must hold at most {MAX_TEXT_BYTES} bytes and no NUL"
-                )));
+            if value.len() > MAX_TEXT_BYTES {
+                return Err(Error::limit(
+                    LimitKind::TextBytes,
+                    value.len(),
+                    MAX_TEXT_BYTES,
+                ));
+            }
+            if value.contains('\0') {
+                return Err(invalid(format!("a note {what} must hold no NUL")));
             }
         }
         let worksheet = self.staged.worksheet(sheet)?;
@@ -252,9 +257,11 @@ impl Edit<'_> {
                     return Ok(false);
                 }
             } else if part.comments.len() >= MAX_COMMENTS {
-                return Err(invalid(format!(
-                    "a worksheet holds at most {MAX_COMMENTS} notes"
-                )));
+                return Err(Error::limit(
+                    LimitKind::Comments,
+                    part.comments.len() + 1,
+                    MAX_COMMENTS,
+                ));
             }
         }
         let added = existing

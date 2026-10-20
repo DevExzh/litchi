@@ -92,14 +92,7 @@ impl LimitKind {
 
     fn check(self, observed: usize) -> Result<()> {
         if observed > self.maximum() {
-            return Err(invalid(format!(
-                "worksheet chart {} limit exceeded: {observed} exceeds {}",
-                match self {
-                    Self::Charts => "count",
-                    Self::ChartBytes => "byte",
-                },
-                self.maximum()
-            )));
+            return Err(Error::limit(self, observed, self.maximum()));
         }
         Ok(())
     }

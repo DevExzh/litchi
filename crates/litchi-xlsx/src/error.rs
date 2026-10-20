@@ -74,16 +74,30 @@ pub enum Error {
     /// can distinguish resource exhaustion from malformed document input.
     #[error(transparent)]
     ResourceLimit(#[from] litchi_core::ResourceLimit),
-    /// A fixed bound of the primary workbook transaction was exceeded.
+    /// A bound of an edit family was exceeded.
     #[error("XLSX edit limit exceeded for {kind}: {observed} exceeds {maximum}")]
     Limit {
-        /// The bounded transaction dimension.
-        kind: crate::workbook::edit::LimitKind,
+        /// The bounded dimension and the family that owns it.
+        kind: LimitKind,
         /// The observed amount.
         observed: u64,
-        /// The fixed maximum.
+        /// The maximum in force.
         maximum: u64,
     },
+    /// A configured limit is outside the range its family accepts.
+    #[error("invalid XLSX limit for {kind}: {value} exceeds {maximum}")]
+    InvalidLimit {
+        /// The configured dimension.
+        kind: LimitKind,
+        /// The configured value.
+        value: u64,
+        /// The largest accepted value.
+        maximum: u64,
+    },
+    /// A staging or apply operation refused a well-formed request
+    /// (record 0351 §2.4).
+    #[error("XLSX {} refused ({}): {}", .0.operation(), .0.kind(), .0.reason())]
+    Refused(litchi_core::edit::Refusal),
     /// The bounded form-control properties codec refused a payload or edit.
     #[error(transparent)]
     FormControl(#[from] crate::form_control::FormControlError),
@@ -243,6 +257,112 @@ pub enum Error {
     #[error("Custom Data storage '{id}' is referenced by {connections} connections")]
     CustomDataReferenced { id: String, connections: usize },
 }
+
+impl Error {
+    /// A typed refusal of `operation` for `reason` (content-free text).
+    pub(crate) const fn refused(
+        kind: litchi_core::edit::RefusalKind,
+        operation: &'static str,
+        reason: &'static str,
+    ) -> Self {
+        Self::Refused(litchi_core::edit::Refusal::new(kind, operation, reason))
+    }
+
+    /// An exceeded bound of `kind`.
+    pub(crate) fn limit(kind: impl Into<LimitKind>, observed: usize, maximum: usize) -> Self {
+        Self::Limit {
+            kind: kind.into(),
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        }
+    }
+}
+
+/// A bounded dimension of an XLSX edit family, as reported by
+/// [`Error::Limit`] and [`Error::InvalidLimit`].
+///
+/// Each variant wraps the typed `LimitKind` of the family that owns the
+/// bound.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// The primary workbook transaction ([`crate::workbook::edit::LimitKind`]).
+    Workbook(crate::workbook::edit::LimitKind),
+    /// Conditional formatting ([`crate::conditional_formatting::edit::LimitKind`]).
+    ConditionalFormatting(crate::conditional_formatting::edit::LimitKind),
+    /// Data validation ([`crate::data_validation::edit::LimitKind`]).
+    DataValidation(crate::data_validation::edit::LimitKind),
+    /// Auto filters ([`crate::auto_filter::edit::LimitKind`]).
+    AutoFilter(crate::auto_filter::edit::LimitKind),
+    /// Legacy notes ([`crate::workbook::comments::edit::LimitKind`]).
+    Comments(crate::workbook::comments::edit::LimitKind),
+    /// Worksheet charts ([`crate::chart::edit::LimitKind`]).
+    Chart(crate::chart::edit::LimitKind),
+    /// Worksheet drawings ([`crate::drawing::edit::LimitKind`]).
+    Drawing(crate::drawing::edit::LimitKind),
+    /// Raw OPC edits ([`crate::opc::LimitKind`]).
+    Opc(crate::opc::LimitKind),
+}
+
+impl LimitKind {
+    /// A short structural description of the dimension.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        use crate::conditional_formatting::edit::LimitKind as ConditionalFormatting;
+        use crate::drawing::edit::LimitKind as Drawing;
+        match self {
+            Self::Workbook(kind) => kind.as_str(),
+            Self::ConditionalFormatting(ConditionalFormatting::Differentials) => {
+                "conditional-formatting differential formats"
+            },
+            Self::ConditionalFormatting(ConditionalFormatting::Formats) => {
+                "conditional-formatting collections of one worksheet"
+            },
+            Self::DataValidation(_) => "data validations of one worksheet",
+            Self::AutoFilter(_) => "auto-filter columns",
+            Self::Comments(crate::workbook::comments::edit::LimitKind::Comments) => {
+                "notes of one worksheet"
+            },
+            Self::Comments(crate::workbook::comments::edit::LimitKind::TextBytes) => {
+                "bytes of one note text or author"
+            },
+            Self::Chart(crate::chart::edit::LimitKind::Charts) => "charts of one worksheet",
+            Self::Chart(crate::chart::edit::LimitKind::ChartBytes) => "bytes of one chart part",
+            Self::Drawing(Drawing::Elements) => "objects of one worksheet drawing",
+            Self::Drawing(Drawing::DrawingBytes) => "bytes of one drawing part",
+            Self::Drawing(Drawing::ImageBytes) => "bytes of one image",
+            Self::Drawing(_) => "worksheet drawing",
+            Self::Opc(_) => "parts changed by one raw OPC commit",
+        }
+    }
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+macro_rules! limit_kind_from {
+    ($($variant:ident($kind:ty)),* $(,)?) => {
+        $(impl From<$kind> for LimitKind {
+            fn from(kind: $kind) -> Self {
+                Self::$variant(kind)
+            }
+        })*
+    };
+}
+
+limit_kind_from!(
+    Workbook(crate::workbook::edit::LimitKind),
+    ConditionalFormatting(crate::conditional_formatting::edit::LimitKind),
+    DataValidation(crate::data_validation::edit::LimitKind),
+    AutoFilter(crate::auto_filter::edit::LimitKind),
+    Comments(crate::workbook::comments::edit::LimitKind),
+    Chart(crate::chart::edit::LimitKind),
+    Drawing(crate::drawing::edit::LimitKind),
+    Opc(crate::opc::LimitKind),
+);
 
 impl From<std::convert::Infallible> for Error {
     fn from(never: std::convert::Infallible) -> Self {
