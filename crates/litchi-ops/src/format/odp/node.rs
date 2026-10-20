@@ -723,7 +723,7 @@ impl<'a> Props<'a> {
                 "title" => owned(metadata.as_ref()?.title.clone()),
                 "author" => owned(metadata.as_ref()?.author.clone()),
                 "subject" => owned(metadata.as_ref()?.subject.clone()),
-                "keywords" => owned(metadata.as_ref()?.keywords.clone()),
+                "keywords" => Value::owned_list(&metadata.as_ref()?.keywords),
                 "description" => owned(metadata.as_ref()?.description.clone()),
                 _ => None,
             },

@@ -5,8 +5,10 @@
 //! OfficeCLI root-metadata spellings that the DOCX/XLSX/PPTX roots read
 //! (`title`, `author`, `lastModifiedBy`, `revisionNumber`, ...), plus the
 //! `DocumentSummaryInformation` fields and `custom.<name>` for user-defined
-//! properties. `null` removes a property. The registry below is a static
-//! sorted table; lookup allocates nothing.
+//! properties. `null` removes a property. `keywords` takes a list, or text
+//! split at `;` and `,`; PIDSI `KEYWORDS` holds the list joined with `, `,
+//! and a list equal to the stored one keeps the stored text (record 0354).
+//! The registry below is a static sorted table; lookup allocates nothing.
 //!
 //! Creation (`create_with(.., CreateOptions::metadata(..))`) uses the leaf
 //! builders' `set_metadata` instead, which keeps the root class identifier
@@ -155,6 +157,10 @@ pub(crate) fn apply(
             .with_format(format)
             .with_suggestion("use a root-metadata key such as `title`, or `custom.<name>`"));
         };
+        if entry.name == "keywords" {
+            apply_keywords(properties, name, value, format)?;
+            continue;
+        }
         let result = if value.is_null() {
             properties.remove(entry.target).map(|_| ())
         } else {
@@ -164,6 +170,40 @@ pub(crate) fn apply(
         result.map_err(|_| invalid(name, format))?;
     }
     Ok(props.len())
+}
+
+/// Stage the keyword list: removed when empty, kept when it equals the
+/// stored text's split, else the list joined with `, `.
+fn apply_keywords(
+    properties: &mut SummaryProperties,
+    name: &str,
+    value: &PropValue<'_>,
+    format: FileFormat,
+) -> Result<()> {
+    use litchi_core::metadata::keywords;
+    let list = crate::props::keyword_list(value).ok_or_else(|| wrong_kind(name, format))?;
+    let current = properties
+        .summary_information()
+        .keywords()
+        .map(keywords::split)
+        .unwrap_or_default();
+    if list == current {
+        return Ok(());
+    }
+    let result = if list.is_empty() {
+        properties.remove("keywords").map(|_| ())
+    } else {
+        let text = keywords::join(&list).map_err(|_| {
+            Error::new(
+                Code::InvalidValue,
+                "a keyword holds ';' or ',' or surrounding whitespace, which the OLE keyword string cannot keep",
+            )
+            .with_property(name.to_owned())
+            .with_format(format)
+        })?;
+        properties.set("keywords", &text)
+    };
+    result.map_err(|_| invalid(name, format))
 }
 
 fn strip_custom(name: &str) -> Option<&str> {

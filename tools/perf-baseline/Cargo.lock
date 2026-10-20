@@ -900,7 +900,6 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 name = "litchi"
 version = "0.0.1"
 dependencies = [
- "fast-float2",
  "litchi-cfb",
  "litchi-core",
  "litchi-doc",
@@ -1237,6 +1236,7 @@ dependencies = [
  "litchi-ppt",
  "litchi-pptx",
  "litchi-rtf",
+ "litchi-sheet-text",
  "litchi-sign",
  "litchi-xls",
  "litchi-xlsb",
@@ -1347,6 +1347,15 @@ name = "litchi-sheet"
 version = "0.0.1"
 dependencies = [
  "litchi-core",
+ "thiserror",
+]
+
+[[package]]
+name = "litchi-sheet-text"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-sheet",
  "thiserror",
 ]
 

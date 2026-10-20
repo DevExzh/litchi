@@ -695,9 +695,10 @@ impl Edit<'_> {
         Ok(())
     }
 
-    /// Stages the comma-separated keyword value.
-    pub fn set_keywords(&mut self, value: Option<String>) -> Result<()> {
-        self.metadata_mut()?.after.keywords = value;
+    /// Stages the keyword list, one `meta:keyword` each; an empty list
+    /// removes them.
+    pub fn set_keywords(&mut self, keywords: Vec<String>) -> Result<()> {
+        self.metadata_mut()?.after.keywords = keywords;
         self.remove_metadata_noop();
         Ok(())
     }
@@ -1215,7 +1216,7 @@ pub struct MetadataFields {
     author: Option<String>,
     subject: Option<String>,
     description: Option<String>,
-    keywords: Option<String>,
+    keywords: Vec<String>,
 }
 
 impl MetadataFields {
@@ -1239,10 +1240,10 @@ impl MetadataFields {
     pub fn description(&self) -> Option<&str> {
         self.description.as_deref()
     }
-    /// Returns comma-separated keywords.
+    /// Returns the keywords, one `meta:keyword` each.
     #[must_use]
-    pub fn keywords(&self) -> Option<&str> {
-        self.keywords.as_deref()
+    pub fn keywords(&self) -> &[String] {
+        &self.keywords
     }
 
     pub(crate) fn set_title(&mut self, value: Option<String>) {
@@ -1261,8 +1262,8 @@ impl MetadataFields {
         self.description = value;
     }
 
-    pub(crate) fn set_keywords(&mut self, value: Option<String>) {
-        self.keywords = value;
+    pub(crate) fn set_keywords(&mut self, keywords: Vec<String>) {
+        self.keywords = keywords;
     }
 }
 

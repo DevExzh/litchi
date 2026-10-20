@@ -8,7 +8,7 @@ use super::super::model::{
 };
 use super::super::summary_information::{CREATE_DTM, FileTime, LAST_SAVE_DTM, TITLE};
 use super::super::{document_summary, summary_information};
-use super::{SYSTEM_IDENTIFIER, SummaryProperties};
+use super::{MetadataError, SYSTEM_IDENTIFIER, SummaryProperties};
 use litchi_cfb::{OleFile, OleWriter};
 use std::io::Cursor;
 
@@ -520,7 +520,7 @@ fn full_metadata() -> litchi_core::Metadata {
         title: Some("Quarterly report".to_owned()),
         subject: Some("Revenue".to_owned()),
         author: Some("Ada".to_owned()),
-        keywords: Some("q3; revenue".to_owned()),
+        keywords: vec!["q3".to_owned(), "revenue".to_owned()],
         description: Some("Draft".to_owned()),
         language: Some("en-US".to_owned()),
         template: Some("Normal.dot".to_owned()),
@@ -569,11 +569,11 @@ fn unified_metadata_round_trips_through_the_streams() {
     let bytes = compound_file(properties.to_streams().unwrap());
     let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
     let read: litchi_core::Metadata = ole.get_metadata().unwrap().into();
+    assert_eq!(read.keywords, metadata.keywords);
     for (field, left, right) in [
         ("title", &read.title, &metadata.title),
         ("subject", &read.subject, &metadata.subject),
         ("author", &read.author, &metadata.author),
-        ("keywords", &read.keywords, &metadata.keywords),
         ("description", &read.description, &metadata.description),
         ("template", &read.template, &metadata.template),
         (
@@ -676,7 +676,7 @@ fn unrepresentable_metadata_fields_are_refused_atomically() {
         let before = properties.clone();
         let error = properties.merge_metadata(&metadata).unwrap_err();
         assert!(
-            matches!(error, super::MetadataError::Unsupported { field: refused } if refused == field),
+            matches!(error, MetadataError::Unsupported { field: refused } if refused == field),
             "{field}: {error:?}"
         );
         assert_eq!(properties, before, "{field}");
@@ -691,7 +691,7 @@ fn unrepresentable_metadata_fields_are_refused_atomically() {
     };
     let error = properties.merge_metadata(&invalid).unwrap_err();
     assert_eq!(error.field(), "revision");
-    assert!(matches!(error, super::MetadataError::Invalid { .. }));
+    assert!(matches!(error, MetadataError::Invalid { .. }));
     assert_eq!(properties, before);
     // The error names the field, never the refused value.
     assert!(!error.to_string().contains("seven"));
@@ -715,6 +715,42 @@ fn metadata_merge_keeps_absent_fields_and_reports_changes() {
         Some("Annual report")
     );
     assert_eq!(properties.summary_information().author(), Some("Ada"));
+}
+
+#[test]
+fn metadata_keywords_keep_the_source_separators_until_the_list_changes() {
+    let mut properties = populated();
+    let same = litchi_core::Metadata {
+        keywords: vec!["q3".to_owned(), "revenue".to_owned()],
+        ..litchi_core::Metadata::default()
+    };
+    assert!(!properties.merge_metadata(&same).unwrap());
+    assert_eq!(
+        properties.summary_information().keywords(),
+        Some("q3; revenue")
+    );
+    let changed = litchi_core::Metadata {
+        keywords: vec!["q4".to_owned(), "revenue".to_owned()],
+        ..litchi_core::Metadata::default()
+    };
+    assert!(properties.merge_metadata(&changed).unwrap());
+    assert_eq!(
+        properties.summary_information().keywords(),
+        Some("q4, revenue")
+    );
+    let before = properties.clone();
+    let unstorable = litchi_core::Metadata {
+        keywords: vec!["a,b".to_owned()],
+        ..litchi_core::Metadata::default()
+    };
+    assert!(matches!(
+        properties.merge_metadata(&unstorable),
+        Err(MetadataError::Invalid {
+            field: "keywords",
+            ..
+        })
+    ));
+    assert_eq!(properties, before);
 }
 
 #[test]

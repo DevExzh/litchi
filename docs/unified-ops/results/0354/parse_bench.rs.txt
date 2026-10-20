@@ -1,0 +1,36 @@
+//! Scratch parse-only bench (not committed): times import::parse.
+use super::{Options, parse};
+use crate::transaction::SemanticLimits;
+
+fn source(rows: usize, quoted: bool) -> Vec<u8> {
+    let mut text = String::from("id,name,score,active,joined\n");
+    for index in 0..rows {
+        if quoted {
+            text.push_str(&format!("{},\"name, {}\",{}.25,{},2026-01-{:02}\n", index + 1, index, index % 1000, index % 3 == 0, index % 28 + 1));
+        } else {
+            text.push_str(&format!("{},name {},{}.25,{},2026-01-{:02}\n", index + 1, index, index % 1000, index % 3 == 0, index % 28 + 1));
+        }
+    }
+    text.into_bytes()
+}
+
+#[test]
+#[ignore = "scratch bench"]
+fn parse_bench() {
+    let rounds: usize = std::env::var("ROUNDS").ok().and_then(|v| v.parse().ok()).unwrap_or(41);
+    let limits = SemanticLimits::default();
+    let options = Options::csv().header(true);
+    for (label, quoted) in [("plain", false), ("quoted", true)] {
+        let bytes = source(10_000, quoted);
+        let mut samples = Vec::new();
+        for _ in 0..rounds {
+            let start = std::time::Instant::now();
+            let table = parse(&bytes, &options, &limits).unwrap();
+            let elapsed = start.elapsed().as_secs_f64() * 1e6;
+            std::hint::black_box(&table);
+            samples.push(elapsed);
+        }
+        samples.sort_by(f64::total_cmp);
+        println!("PARSE {label} bytes={} median_us={:.1} min_us={:.1} samples={:?}", bytes.len(), samples[rounds / 2], samples[0], samples.iter().map(|s| s.round() as u64).collect::<Vec<_>>());
+    }
+}

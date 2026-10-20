@@ -116,7 +116,9 @@ opc = ["dep:litchi-opc", "litchi-ops?/opc"]
 ooxml-common = ["dep:litchi-ooxml-common"]
 drawingml = ["dep:litchi-drawingml"]
 odf-common = ["dep:litchi-odf-common"]
-sheet = ["dep:litchi-sheet", "dep:fast-float2"]
+sheet = ["dep:litchi-sheet"]
+# Delimited (CSV/TSV/PRN), SYLK, DIF and fixed-width text workbooks (record 0354).
+sheet-text = ["sheet", "dep:litchi-sheet-text"]
 sign = [
     "dep:litchi-sign",
     "litchi-opc?/sign",
@@ -199,6 +201,7 @@ all = [
     "drawingml",
     "odf-common",
     "sheet",
+    "sheet-text",
     "sign",
     "encryption",
     "vba-inspection",
@@ -212,7 +215,6 @@ all = [
 ]
 
 [dependencies]
-fast-float2 = { version = "0.2", optional = true } # Text-sheet numeric parsing
 litchi-cfb = { workspace = true, optional = true } # Compound File Binary substrate
 litchi-core = { workspace = true } # Common types, traits, and utilities
 litchi-crypto = { workspace = true, features = ["ooxml"], optional = true } # Office encryption support
@@ -241,6 +243,7 @@ litchi-ppt = { workspace = true, optional = true } # Legacy PowerPoint binary su
 litchi-pptx = { workspace = true, optional = true } # PresentationML support
 litchi-rtf = { workspace = true, optional = true } # Rich Text Format support
 litchi-sheet = { workspace = true, optional = true } # Shared spreadsheet vocabulary
+litchi-sheet-text = { workspace = true, optional = true } # Text workbooks
 litchi-sign = { workspace = true, optional = true } # Office signature support
 litchi-xls = { workspace = true, optional = true } # Legacy Excel BIFF support
 litchi-xlsb = { workspace = true, optional = true } # BIFF12 support
@@ -586,19 +589,19 @@ required-features = ["xlsx", "eval"]
 
 [[example]]
 name = "text_formats_api_demo"
-required-features = ["sheet"]
+required-features = ["sheet-text"]
 
 [[example]]
 name = "text_formats_demo"
-required-features = ["sheet"]
+required-features = ["sheet-text"]
 
 [[example]]
 name = "text_formats_roundtrip"
-required-features = ["sheet"]
+required-features = ["sheet-text"]
 
 [[example]]
 name = "text_formats_simple"
-required-features = ["sheet"]
+required-features = ["sheet-text"]
 
 [[example]]
 name = "to_markdown"

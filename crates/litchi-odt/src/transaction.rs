@@ -1719,6 +1719,13 @@ impl Edit {
         self.stage_body(|edits, _| edits.set_metadata(field, value))
     }
 
+    /// Stages the `meta.xml` keyword list; the public route is
+    /// [`crate::metadata::Edit::set_keywords`].
+    pub(crate) fn set_metadata_keywords(&mut self, keywords: &[String]) -> Result<&mut Self> {
+        let keywords = keywords.to_vec();
+        self.stage_body(|edits, _| edits.set_metadata_keywords(keywords))
+    }
+
     /// The number of staged operations, body edits included.
     #[must_use]
     pub fn len(&self) -> usize {

@@ -201,7 +201,7 @@ pub(crate) const PRESENTATION_PROPS: &[PropSpec] = &[
     PropSpec::new("title", ValueType::Text),
     PropSpec::new("author", ValueType::Text),
     PropSpec::new("subject", ValueType::Text),
-    PropSpec::new("keywords", ValueType::Text),
+    PropSpec::new("keywords", ValueType::List),
     PropSpec::new("description", ValueType::Text),
 ];
 

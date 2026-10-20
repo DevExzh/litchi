@@ -598,7 +598,7 @@ fn workbook_value(metadata: &litchi_core::Metadata, key: WorkbookKey) -> Option<
         WorkbookKey::Title => text(&metadata.title),
         WorkbookKey::Author => text(&metadata.author),
         WorkbookKey::Subject => text(&metadata.subject),
-        WorkbookKey::Keywords => text(&metadata.keywords),
+        WorkbookKey::Keywords => Value::owned_list(&metadata.keywords),
         WorkbookKey::Description => text(&metadata.description),
         WorkbookKey::Category => text(&metadata.category),
         WorkbookKey::LastModifiedBy => text(&metadata.last_modified_by),

@@ -4745,7 +4745,10 @@ fn metadata_from_show_and_properties(
         .or(diagnostic.document_author)
         .or(diagnostic.sfwp_author)
         .map(PropertyScalar::into_string);
-    metadata.keywords = diagnostic.keywords.map(PropertyScalar::into_string);
+    metadata.keywords = diagnostic
+        .keywords
+        .map(|keywords| litchi_core::metadata::keywords::split(&keywords.into_string()))
+        .unwrap_or_default();
     metadata.description = diagnostic.comments.map(PropertyScalar::into_string);
     metadata.revision = diagnostic
         .revision

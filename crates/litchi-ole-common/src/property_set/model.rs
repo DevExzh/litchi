@@ -1079,7 +1079,11 @@ impl From<Metadata> for litchi_core::Metadata {
             title: ole_metadata.title,
             subject: ole_metadata.subject,
             author: ole_metadata.author,
-            keywords: ole_metadata.keywords,
+            keywords: ole_metadata
+                .keywords
+                .as_deref()
+                .map(litchi_core::metadata::keywords::split)
+                .unwrap_or_default(),
             description: ole_metadata.comments,
             identifier: None,
             language: None,

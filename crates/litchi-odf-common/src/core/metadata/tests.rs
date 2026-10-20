@@ -403,7 +403,7 @@ fn test_into_metadata_empty() {
     let meta: CoreMetadata = odf.into();
     assert!(meta.title.is_none());
     assert!(meta.author.is_none());
-    assert!(meta.keywords.is_none());
+    assert!(meta.keywords.is_empty());
 }
 
 #[test]
@@ -430,7 +430,7 @@ fn test_into_metadata_with_data() {
     assert_eq!(meta.title, Some("Title".to_string()));
     assert_eq!(meta.author, Some("Author".to_string()));
     assert_eq!(meta.subject, Some("Subject".to_string()));
-    assert_eq!(meta.keywords, Some("a, b".to_string()));
+    assert_eq!(meta.keywords, ["a", "b"]);
     assert_eq!(meta.description, Some("Desc".to_string()));
     assert_eq!(meta.page_count, Some(5));
     assert_eq!(meta.word_count, Some(100));
@@ -448,7 +448,7 @@ fn test_into_metadata_no_keywords() {
     };
 
     let meta: CoreMetadata = odf.into();
-    assert!(meta.keywords.is_none());
+    assert!(meta.keywords.is_empty());
 }
 
 /// Record 0290: both conversions to the common model carry `dc:language`,
@@ -460,4 +460,41 @@ fn common_metadata_carries_the_language() {
     assert_eq!(converted.language.as_deref(), Some("de-DE"));
     let checked = Metadata::from_xml(xml).unwrap().try_into_core().unwrap();
     assert_eq!(checked.language.as_deref(), Some("de-DE"));
+}
+
+/// Record 0354: a keyword list patches one `meta:keyword` per keyword and
+/// an unchanged list keeps the source elements.
+#[test]
+fn keyword_lists_patch_one_element_per_keyword() {
+    let xml = concat!(
+        r#"<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/">"#,
+        r#"<office:meta><dc:title>T</dc:title><meta:keyword>a, b</meta:keyword><meta:keyword>c</meta:keyword></office:meta></office:document-meta>"#
+    );
+    let source = Metadata::from_xml(xml).unwrap();
+    assert_eq!(source.keywords, ["a, b", "c"]);
+    let mut current: CoreMetadata = source.clone().into();
+    assert_eq!(current.keywords, ["a, b", "c"]);
+    let unchanged = MetaXmlPatch::preserve_all().diff_simple_fields(&source, &current);
+    assert_eq!(
+        patch_meta_xml(xml, &unchanged).unwrap().as_deref(),
+        Some(xml)
+    );
+
+    current.keywords = vec!["x".to_owned(), "y; z".to_owned()];
+    let changed = MetaXmlPatch::preserve_all().diff_simple_fields(&source, &current);
+    let patched = patch_meta_xml(xml, &changed).unwrap().unwrap();
+    assert!(
+        patched.contains("<dc:title>T</dc:title><meta:keyword>x</meta:keyword><meta:keyword>y; z</meta:keyword></office:meta>"),
+        "{patched}"
+    );
+    assert_eq!(
+        Metadata::from_xml(&patched).unwrap().keywords,
+        ["x", "y; z"]
+    );
+
+    current.keywords.clear();
+    let removed = MetaXmlPatch::preserve_all().diff_simple_fields(&source, &current);
+    let patched = patch_meta_xml(xml, &removed).unwrap().unwrap();
+    assert!(!patched.contains("meta:keyword"), "{patched}");
 }
