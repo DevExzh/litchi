@@ -175,7 +175,7 @@ impl SlideSnapshot {
 
     /// Start an isolated edit over this exact slide source.
     #[must_use]
-    pub fn edit(&self) -> super::transaction::SlideEditor {
+    pub(crate) fn edit(&self) -> super::transaction::SlideEditor {
         super::transaction::SlideEditor::open(self.clone())
     }
 }

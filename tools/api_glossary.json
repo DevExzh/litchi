@@ -5751,6 +5751,41 @@
           "name": "snapshot",
           "scope": "litchi_ppt::external_media::Edit",
           "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use Package::edit_diagrams(slide) -> diagram::Edit (record 0357)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::diagram::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "SlideEditor",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use Package::edit_diagrams(slide) -> diagram::Edit (record 0357)"
+        },
+        {
+          "name": "SlideCommit",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use diagram::Commit (record 0357)"
+        },
+        {
+          "name": "SlidePatch",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use diagram::Patch (record 0357)"
         }
       ],
       "families": [
@@ -5761,7 +5796,8 @@
         "litchi_ppt::picture_bullets",
         "litchi_ppt::animation",
         "litchi_ppt::document_comparison",
-        "litchi_ppt::external_media"
+        "litchi_ppt::external_media",
+        "litchi_ppt::diagram"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
@@ -6281,6 +6317,41 @@
           "name": "snapshot",
           "scope": "litchi_ppt::external_media::Edit",
           "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use Package::edit_diagrams(slide) -> diagram::Edit (record 0357)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::diagram::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "SlideEditor",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use Package::edit_diagrams(slide) -> diagram::Edit (record 0357)"
+        },
+        {
+          "name": "SlideCommit",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use diagram::Commit (record 0357)"
+        },
+        {
+          "name": "SlidePatch",
+          "scope": "litchi_ppt::diagram",
+          "replacement": "use diagram::Patch (record 0357)"
         }
       ],
       "families": [
@@ -6291,7 +6362,8 @@
         "litchi_ppt::picture_bullets",
         "litchi_ppt::animation",
         "litchi_ppt::document_comparison",
-        "litchi_ppt::external_media"
+        "litchi_ppt::external_media",
+        "litchi_ppt::diagram"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",

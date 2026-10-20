@@ -13,8 +13,13 @@
 //! their typed views.
 
 mod codec;
+mod edit;
 mod model;
 mod package;
+#[allow(
+    dead_code,
+    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+)]
 mod transaction;
 mod validation;
 
@@ -22,10 +27,11 @@ mod validation;
 mod tests;
 
 pub use codec::{parse, parse_bytes};
+pub use edit::Edit;
 pub use model::{
     Build, Diagram, EditLimits, Id, Inventory, Limits, Payload, PayloadKind, ShapeRef,
 };
-pub use package::{
-    SlideCommit, SlideEditor, SlideLimits, SlidePatch, SlideRevision, SlideSnapshot,
-};
-pub use transaction::{Change, Commit, Patch, Revision, Snapshot, Transaction};
+pub use package::{SlideLimits, SlideRevision, SlideSnapshot};
+pub use transaction::{Change, Revision, Snapshot};
+
+crate::scoped::family!("diagram");
