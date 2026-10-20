@@ -2745,6 +2745,38 @@ def p0357a():
     return out
 
 
+
+@needs("0357b")
+def p0357b():
+    """Record 0357b: incremental block-root digests for the scoped-family
+    patch (0357a-F1). The same probe as 0357a, ABC-CBA over the pre-0357a
+    base, the 0357a tip and this record; the rows compare this record with
+    the pre-0357a base, continuing the 0357a series, plus the first commit
+    on a never-hashed package (a once-per-package cost, no budget)."""
+    out = []
+    path = RES / "0357b" / "summary.json"
+    s = load_json(path)
+    for key, op, label in (("commit_median_us", "set", "scoped commit (external media path)"),
+                           ("apply_median_us", "set", "scoped patch apply"),
+                           ("inverse_apply_median_us", "set", "scoped patch inverse apply")):
+        b, a = s["base"][key], s["b"][key]
+        out.append(row("0357b", "ppt", op, f"{label}, after vs before", "1,000 patches",
+                       b, a, [a / b], regression("0357b"),
+                       f"scoped_patch:{slug(label)}:after-before", src([path]),
+                       comparison="after/before"))
+    b, a = s["base"]["first_commit_median_us"], s["b"]["first_commit_median_us"]
+    out.append(row("0357b", "ppt", "set",
+                   "first scoped commit on a never-hashed package, after vs before",
+                   "200 packages", b, a, [a / b], NONE,
+                   "scoped_patch:first_commit_never_hashed:after-before", src([path]),
+                   comparison="after/before",
+                   explanation="Record 0357b §3: once per package, the first scoped commit "
+                               "builds the source's block list (one SHA-256 pass over the "
+                               "43,520-byte source); every later commit or apply of that "
+                               "package or of a package published from it reuses it. "
+                               "The 0357a tip paid two whole-image hashes here."))
+    return out
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
@@ -2753,7 +2785,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0306, p0307, p0308, p0309, p0310, p0311, p0312,
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
-           p0347, p0348, p0355, p0355a, p0356, p0357, p0357a]
+           p0347, p0348, p0355, p0355a, p0356, p0357, p0357a, p0357b]
 
 
 

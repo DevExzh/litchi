@@ -1,0 +1,15 @@
+# scoped_patch_probe release binaries (not committed), record 0357b.
+# Build: cargo build --release --offline --locked -p litchi-ppt --example scoped_patch_probe
+#   (rustc 1.95.0 per rust-toolchain.toml, no LTO, CARGO_BUILD_JOBS=6), each in its own target dir
+# Sources: git archive <rev> Cargo.toml crates rust-toolchain.toml .cargo, plus the worktree
+#   Cargo.lock (untracked, identical for all three) and this record's
+#   crates/litchi-ppt/examples/scoped_patch_probe.rs (base and a got the pre-rustfmt copy;
+#   it differs only in the line break of one statement).
+# base: e673d4addb (pre-0357a whole-artifact patch)
+# a:    7d22d1a18b (0357a tip, HEAD before this record)
+# b:    git write-tree ff8ebf207d004898902a301e905bfa8bf8e9acf1 of the staged F1 code (its crates/ subtree is the F1 commit's)
+# fixture: test-data/unified-ops/0294/video.ppt
+10a002dc2042c68b41905f9e18cb39c0e51894658c167bbe353be4682cb97963  base
+59d3999f69616dd873e2389e623ed39de3d982151404c3b56c41c1cd68f6d7a7  a
+5a5f2bfffeb8a40ba01906924126b4cb30679d4fa52cfef2892b7faa376c3515  b
+f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a  test-data/unified-ops/0294/video.ppt

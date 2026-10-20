@@ -413,7 +413,8 @@ litchi-ops `error::` tests pass: 62.
 - 0357a-F1: a changed scoped commit hashes its target once (about 21 µs on
   the 54 KiB probe deck, +10.7% over the whole-package patch); computing the
   target digest lazily, on the first `apply` of the inverse, would remove it
-  from the commit path. The bench matrix lists the row as a follow-up.
+  from the commit path. Closed by [0357b](0357b-ppt-block-roots-and-durable-structure-edits.md)
+  (incremental block roots; the commit is 0.970× the pre-0357a base).
 
 ## Primary-route ABBA after the 0357a changes
 
