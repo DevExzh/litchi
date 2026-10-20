@@ -6,7 +6,7 @@ mod lazy_auxiliary_tests {
     use crate::parts::fib::FileInformationBlock;
     use crate::raw::Package;
     use crate::tracked_revision::Limits;
-    use litchi_ole_common::object::{Editor as PackageEditor, Targets};
+    use litchi_ole_common::object::{Edit as PackageEditor, Targets};
     use std::io::Cursor;
 
     #[test]

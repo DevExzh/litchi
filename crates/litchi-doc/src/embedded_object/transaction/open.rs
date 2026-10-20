@@ -9,7 +9,7 @@ use super::super::model::Editor;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{ProtectionPolicy, classify};
-use litchi_ole_common::object::Editor as ObjectEditor;
+use litchi_ole_common::object::Edit as ObjectEditor;
 
 impl Editor {
     pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {

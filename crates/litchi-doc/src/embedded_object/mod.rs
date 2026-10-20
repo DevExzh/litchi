@@ -14,9 +14,7 @@ mod tests;
 
 pub use litchi_ole_common::object::Limits;
 pub use litchi_ole_common::object::link::{Link, Moniker, Times};
-pub use litchi_ole_common::ole_streams::{
-    Limits as OleStreamLimits, NativePatch, NativeSnapshot, PresentationPatch, PresentationSnapshot,
-};
+pub use litchi_ole_common::ole_streams::{Limits as OleStreamLimits, native, presentation};
 pub use model::{
     Clipboard, CompObj, Editor, Entry, Info, Inventory, Kind, Metadata, Ole, Reference, Unknown,
     WriteOptions,

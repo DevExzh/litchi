@@ -362,7 +362,10 @@ impl<R: Read + Seek> Reader<R> {
     pub fn custom_xml_data_store(
         &mut self,
     ) -> litchi_ole_common::custom_xml::Result<Option<litchi_ole_common::custom_xml::Store>> {
-        litchi_ole_common::custom_xml::inspect(&mut self.ole_file)
+        litchi_ole_common::custom_xml::inspect(
+            &mut self.ole_file,
+            litchi_ole_common::custom_xml::Limits::default(),
+        )
     }
 
     /// # Errors

@@ -986,7 +986,7 @@ impl Edit {
         }
         let before: Arc<[u8]> = Arc::from(self.base.to_bytes()?);
         let name = workbook_stream_name(&before)?;
-        let mut editor = litchi_ole_common::object::Editor::open(
+        let mut editor = litchi_ole_common::object::Edit::open(
             before.to_vec(),
             litchi_ole_common::object::Targets::default(),
             litchi_ole_common::object::Limits::default(),

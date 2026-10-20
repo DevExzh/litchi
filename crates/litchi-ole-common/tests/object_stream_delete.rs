@@ -5,7 +5,7 @@
 )]
 
 use litchi_cfb::{OleError, OleFile, OleWriter};
-use litchi_ole_common::object::{Editor, Limits, MAX_STREAM_REMOVALS, Targets};
+use litchi_ole_common::object::{Edit, Limits, MAX_STREAM_REMOVALS, Targets};
 use std::io::Cursor;
 
 fn path(parts: &[&str]) -> Vec<String> {
@@ -38,8 +38,8 @@ fn package() -> Vec<u8> {
     output.into_inner()
 }
 
-fn open(bytes: Vec<u8>) -> Editor {
-    Editor::open(bytes, Targets::default(), Limits::default()).unwrap()
+fn open(bytes: Vec<u8>) -> Edit {
+    Edit::open(bytes, Targets::default(), Limits::default()).unwrap()
 }
 
 #[test]
@@ -146,7 +146,7 @@ fn missing_empty_and_invalid_deletions_are_exact_atomic_noops() {
         &shared_last,
         &editor.stream_shared(&path(&["Last"])).unwrap()
     ));
-    assert!(!editor.is_changed());
+    assert!(!editor.clone().commit().unwrap().diagnostics().changed());
     let commit = editor.commit().unwrap();
     assert!(commit.patch().is_noop());
     assert_eq!(commit.patch().after(), source);
@@ -154,7 +154,7 @@ fn missing_empty_and_invalid_deletions_are_exact_atomic_noops() {
     for invalid in [vec![], path(&[""]), path(&["bad/name"]), path(&["Parent"])] {
         let mut failed = open(source.clone());
         assert!(failed.remove_stream(&invalid).is_err(), "{invalid:?}");
-        assert!(!failed.is_changed());
+        assert!(!failed.clone().commit().unwrap().diagnostics().changed());
         assert_eq!(failed.finish().unwrap(), source);
     }
 }
@@ -172,7 +172,7 @@ fn duplicates_limit_and_late_invalid_paths_leave_the_editor_unchanged() {
             .remove_streams([first.as_slice(), equivalent.as_slice()])
             .is_err()
     );
-    assert!(!duplicate.is_changed());
+    assert!(!duplicate.clone().commit().unwrap().diagnostics().changed());
     assert_eq!(duplicate.finish().unwrap(), source);
 
     let mut late = open(source.clone());
@@ -180,7 +180,7 @@ fn duplicates_limit_and_late_invalid_paths_leave_the_editor_unchanged() {
         late.remove_streams([first.as_slice(), invalid.as_slice()])
             .is_err()
     );
-    assert!(!late.is_changed());
+    assert!(!late.clone().commit().unwrap().diagnostics().changed());
     assert_eq!(late.finish().unwrap(), source);
 
     let storage = path(&["Parent"]);
@@ -190,7 +190,14 @@ fn duplicates_limit_and_late_invalid_paths_leave_the_editor_unchanged() {
             .remove_streams([first.as_slice(), storage.as_slice()])
             .is_err()
     );
-    assert!(!late_storage.is_changed());
+    assert!(
+        !late_storage
+            .clone()
+            .commit()
+            .unwrap()
+            .diagnostics()
+            .changed()
+    );
     assert_eq!(late_storage.finish().unwrap(), source);
 
     let overdepth = vec!["x".to_string(); Limits::default().max_storage_depth + 2];
@@ -202,11 +209,25 @@ fn duplicates_limit_and_late_invalid_paths_leave_the_editor_unchanged() {
             .unwrap()
             .is_none()
     );
-    assert!(!exact_depth_editor.is_changed());
+    assert!(
+        !exact_depth_editor
+            .clone()
+            .commit()
+            .unwrap()
+            .diagnostics()
+            .changed()
+    );
 
     let mut single_overdepth = open(source.clone());
     assert!(single_overdepth.remove_stream(&overdepth).is_err());
-    assert!(!single_overdepth.is_changed());
+    assert!(
+        !single_overdepth
+            .clone()
+            .commit()
+            .unwrap()
+            .diagnostics()
+            .changed()
+    );
     assert_eq!(single_overdepth.finish().unwrap(), source);
 
     let mut late_overdepth = open(source.clone());
@@ -215,7 +236,14 @@ fn duplicates_limit_and_late_invalid_paths_leave_the_editor_unchanged() {
             .remove_streams([first.as_slice(), overdepth.as_slice()])
             .is_err()
     );
-    assert!(!late_overdepth.is_changed());
+    assert!(
+        !late_overdepth
+            .clone()
+            .commit()
+            .unwrap()
+            .diagnostics()
+            .changed()
+    );
     assert_eq!(late_overdepth.finish().unwrap(), source);
 
     let selectors = (0..MAX_STREAM_REMOVALS)
@@ -227,7 +255,14 @@ fn duplicates_limit_and_late_invalid_paths_leave_the_editor_unchanged() {
         .unwrap();
     assert_eq!(results.len(), MAX_STREAM_REMOVALS);
     assert!(results.iter().all(Option::is_none));
-    assert!(!exact_limit.is_changed());
+    assert!(
+        !exact_limit
+            .clone()
+            .commit()
+            .unwrap()
+            .diagnostics()
+            .changed()
+    );
 
     let mut selectors = selectors;
     selectors.push(path(&["OneTooMany"]));
@@ -237,7 +272,7 @@ fn duplicates_limit_and_late_invalid_paths_leave_the_editor_unchanged() {
             .remove_streams(selectors.iter().map(Vec::as_slice))
             .is_err()
     );
-    assert!(!over_limit.is_changed());
+    assert!(!over_limit.clone().commit().unwrap().diagnostics().changed());
     assert_eq!(over_limit.finish().unwrap(), source);
 }
 
@@ -271,7 +306,7 @@ fn protected_packages_are_refused_before_stream_deletion_can_begin() {
     writer.create_stream(&["Payload"], b"payload").unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    assert!(Editor::open(output.into_inner(), Targets::default(), Limits::default()).is_err());
+    assert!(Edit::open(output.into_inner(), Targets::default(), Limits::default()).is_err());
 }
 
 #[test]
@@ -286,7 +321,7 @@ fn configured_capture_boundaries_remain_in_force_for_deletion() {
         max_object_size: 512,
         max_total_size: 8_200,
     };
-    let mut editor = Editor::open(source.clone(), Targets::default(), exact).unwrap();
+    let mut editor = Edit::open(source.clone(), Targets::default(), exact).unwrap();
     assert!(
         editor
             .remove_stream(&path(&["Parent", "Regular"]))
@@ -309,7 +344,7 @@ fn configured_capture_boundaries_remain_in_force_for_deletion() {
             ..exact
         },
     ] {
-        assert!(Editor::open(source.clone(), Targets::default(), limits).is_err());
+        assert!(Edit::open(source.clone(), Targets::default(), limits).is_err());
     }
 }
 

@@ -6,10 +6,7 @@ use super::super::storage::OBJECT_POOL;
 use crate::package::{Error as PackageError, Result};
 use litchi_cfb::OleError;
 use litchi_ole_common::object::Object;
-use litchi_ole_common::ole_streams::{
-    self, NativePatch, NativeSnapshot, NativeTransaction, PresentationPatch, PresentationSnapshot,
-    PresentationTransaction,
-};
+use litchi_ole_common::ole_streams::{self, native, presentation};
 
 fn reference_for_storage_id(editor: &Editor, storage_id: u32) -> Result<Reference> {
     editor
@@ -111,7 +108,7 @@ impl Editor {
         &self,
         storage_id: u32,
         index: usize,
-    ) -> Result<Option<PresentationSnapshot>> {
+    ) -> Result<Option<presentation::Snapshot>> {
         let reference = reference_for_storage_id(self, storage_id)?;
         self.presentation_for(&reference, index)
     }
@@ -122,7 +119,7 @@ impl Editor {
         storage_id: u32,
         index: usize,
         limits: ole_streams::Limits,
-    ) -> Result<Option<PresentationSnapshot>> {
+    ) -> Result<Option<presentation::Snapshot>> {
         let reference = reference_for_storage_id(self, storage_id)?;
         self.presentation_for_with_limits(&reference, index, limits)
     }
@@ -132,7 +129,7 @@ impl Editor {
         &self,
         reference: &Reference,
         index: usize,
-    ) -> Result<Option<PresentationSnapshot>> {
+    ) -> Result<Option<presentation::Snapshot>> {
         self.presentation_for_with_limits(reference, index, ole_streams::Limits::default())
     }
 
@@ -142,14 +139,14 @@ impl Editor {
         reference: &Reference,
         index: usize,
         limits: ole_streams::Limits,
-    ) -> Result<Option<PresentationSnapshot>> {
+    ) -> Result<Option<presentation::Snapshot>> {
         object_for_reference_checked(self, reference)?
-            .presentation_with_limits(index, limits)
+            .presentation(index, limits)
             .map_err(PackageError::from)
     }
 
     /// Returns all managed OLEDS presentations in numeric order.
-    pub fn presentations(&self, storage_id: u32) -> Result<Vec<(usize, PresentationSnapshot)>> {
+    pub fn presentations(&self, storage_id: u32) -> Result<Vec<(usize, presentation::Snapshot)>> {
         let reference = reference_for_storage_id(self, storage_id)?;
         self.presentations_for(&reference)
     }
@@ -159,7 +156,7 @@ impl Editor {
         &self,
         storage_id: u32,
         limits: ole_streams::Limits,
-    ) -> Result<Vec<(usize, PresentationSnapshot)>> {
+    ) -> Result<Vec<(usize, presentation::Snapshot)>> {
         let reference = reference_for_storage_id(self, storage_id)?;
         self.presentations_for_with_limits(&reference, limits)
     }
@@ -168,7 +165,7 @@ impl Editor {
     pub fn presentations_for(
         &self,
         reference: &Reference,
-    ) -> Result<Vec<(usize, PresentationSnapshot)>> {
+    ) -> Result<Vec<(usize, presentation::Snapshot)>> {
         self.presentations_for_with_limits(reference, ole_streams::Limits::default())
     }
 
@@ -177,14 +174,14 @@ impl Editor {
         &self,
         reference: &Reference,
         limits: ole_streams::Limits,
-    ) -> Result<Vec<(usize, PresentationSnapshot)>> {
+    ) -> Result<Vec<(usize, presentation::Snapshot)>> {
         object_for_reference_checked(self, reference)?
-            .presentations_with_limits(limits)
+            .presentations(limits)
             .map_err(PackageError::from)
     }
 
     /// Returns one managed object's inert OLEDS native-data stream.
-    pub fn native(&self, storage_id: u32) -> Result<Option<NativeSnapshot>> {
+    pub fn native(&self, storage_id: u32) -> Result<Option<native::Snapshot>> {
         let reference = reference_for_storage_id(self, storage_id)?;
         self.native_for(&reference)
     }
@@ -194,13 +191,13 @@ impl Editor {
         &self,
         storage_id: u32,
         limits: ole_streams::Limits,
-    ) -> Result<Option<NativeSnapshot>> {
+    ) -> Result<Option<native::Snapshot>> {
         let reference = reference_for_storage_id(self, storage_id)?;
         self.native_for_with_limits(&reference, limits)
     }
 
     /// Returns native data selected by a DOC object reference.
-    pub fn native_for(&self, reference: &Reference) -> Result<Option<NativeSnapshot>> {
+    pub fn native_for(&self, reference: &Reference) -> Result<Option<native::Snapshot>> {
         self.native_for_with_limits(reference, ole_streams::Limits::default())
     }
 
@@ -209,9 +206,9 @@ impl Editor {
         &self,
         reference: &Reference,
         limits: ole_streams::Limits,
-    ) -> Result<Option<NativeSnapshot>> {
+    ) -> Result<Option<native::Snapshot>> {
         object_for_reference_checked(self, reference)?
-            .native_with_limits(limits)
+            .native(limits)
             .map_err(PackageError::from)
     }
 
@@ -252,7 +249,7 @@ impl Editor {
     /// Atomically edits one managed OLEDS presentation stream.
     pub fn update_presentation<F>(&mut self, storage_id: u32, index: usize, edit: F) -> Result<()>
     where
-        F: FnOnce(&mut PresentationTransaction) -> std::result::Result<(), OleError>,
+        F: FnOnce(&mut presentation::Edit) -> std::result::Result<(), OleError>,
     {
         let reference = reference_for_storage_id(self, storage_id)?;
         self.update_presentation_for(&reference, index, edit)
@@ -266,7 +263,7 @@ impl Editor {
         edit: F,
     ) -> Result<()>
     where
-        F: FnOnce(&mut PresentationTransaction) -> std::result::Result<(), OleError>,
+        F: FnOnce(&mut presentation::Edit) -> std::result::Result<(), OleError>,
     {
         self.update_presentation_for_with_limits(
             reference,
@@ -285,7 +282,7 @@ impl Editor {
         edit: F,
     ) -> Result<()>
     where
-        F: FnOnce(&mut PresentationTransaction) -> std::result::Result<(), OleError>,
+        F: FnOnce(&mut presentation::Edit) -> std::result::Result<(), OleError>,
     {
         let reference = reference_for_storage_id(self, storage_id)?;
         self.update_presentation_for_with_limits(&reference, index, limits, edit)
@@ -300,18 +297,18 @@ impl Editor {
         edit: F,
     ) -> Result<()>
     where
-        F: FnOnce(&mut PresentationTransaction) -> std::result::Result<(), OleError>,
+        F: FnOnce(&mut presentation::Edit) -> std::result::Result<(), OleError>,
     {
         let object = object_for_reference_checked(self, reference)?;
         let source = object
-            .presentation_with_limits(index, limits)
+            .presentation(index, limits)
             .map_err(PackageError::from)?
             .ok_or_else(missing_stream)?;
         let key = object.key().to_owned();
         let mut candidate = self.clone();
         candidate
             .package
-            .update_presentation_with_limits(&key, index, limits, edit)
+            .update_presentation(&key, index, limits, edit)
             .map_err(PackageError::from)?;
         let replacement = candidate
             .presentation_for_with_limits(reference, index, limits)?
@@ -330,7 +327,7 @@ impl Editor {
         &mut self,
         storage_id: u32,
         index: usize,
-        patch: &PresentationPatch,
+        patch: &presentation::Patch,
     ) -> Result<()> {
         let reference = reference_for_storage_id(self, storage_id)?;
         self.apply_presentation_patch_for(&reference, index, patch)
@@ -341,11 +338,11 @@ impl Editor {
         &mut self,
         reference: &Reference,
         index: usize,
-        patch: &PresentationPatch,
+        patch: &presentation::Patch,
     ) -> Result<()> {
         let object = object_for_reference_checked(self, reference)?;
         let source = object
-            .presentation_with_limits(index, patch.source().limits())
+            .presentation(index, patch.source().limits())
             .map_err(PackageError::from)?
             .ok_or_else(missing_stream)?;
         patch.apply(&source).map_err(PackageError::from)?;
@@ -367,7 +364,7 @@ impl Editor {
     /// Atomically edits one managed OLEDS native-data stream.
     pub fn update_native<F>(&mut self, storage_id: u32, edit: F) -> Result<()>
     where
-        F: FnOnce(&mut NativeTransaction) -> std::result::Result<(), OleError>,
+        F: FnOnce(&mut native::Edit) -> std::result::Result<(), OleError>,
     {
         let reference = reference_for_storage_id(self, storage_id)?;
         self.update_native_for(&reference, edit)
@@ -376,7 +373,7 @@ impl Editor {
     /// Atomically edits native data selected by a DOC object reference.
     pub fn update_native_for<F>(&mut self, reference: &Reference, edit: F) -> Result<()>
     where
-        F: FnOnce(&mut NativeTransaction) -> std::result::Result<(), OleError>,
+        F: FnOnce(&mut native::Edit) -> std::result::Result<(), OleError>,
     {
         self.update_native_for_with_limits(reference, ole_streams::Limits::default(), edit)
     }
@@ -389,7 +386,7 @@ impl Editor {
         edit: F,
     ) -> Result<()>
     where
-        F: FnOnce(&mut NativeTransaction) -> std::result::Result<(), OleError>,
+        F: FnOnce(&mut native::Edit) -> std::result::Result<(), OleError>,
     {
         let reference = reference_for_storage_id(self, storage_id)?;
         self.update_native_for_with_limits(&reference, limits, edit)
@@ -403,18 +400,18 @@ impl Editor {
         edit: F,
     ) -> Result<()>
     where
-        F: FnOnce(&mut NativeTransaction) -> std::result::Result<(), OleError>,
+        F: FnOnce(&mut native::Edit) -> std::result::Result<(), OleError>,
     {
         let object = object_for_reference_checked(self, reference)?;
         let source = object
-            .native_with_limits(limits)
+            .native(limits)
             .map_err(PackageError::from)?
             .ok_or_else(missing_stream)?;
         let key = object.key().to_owned();
         let mut candidate = self.clone();
         candidate
             .package
-            .update_native_with_limits(&key, limits, edit)
+            .update_native(&key, limits, edit)
             .map_err(PackageError::from)?;
         let replacement = candidate
             .native_for_with_limits(reference, limits)?
@@ -429,7 +426,7 @@ impl Editor {
     }
 
     /// Applies a source-checked OLEDS native-data patch atomically.
-    pub fn apply_native_patch(&mut self, storage_id: u32, patch: &NativePatch) -> Result<()> {
+    pub fn apply_native_patch(&mut self, storage_id: u32, patch: &native::Patch) -> Result<()> {
         let reference = reference_for_storage_id(self, storage_id)?;
         self.apply_native_patch_for(&reference, patch)
     }
@@ -438,11 +435,11 @@ impl Editor {
     pub fn apply_native_patch_for(
         &mut self,
         reference: &Reference,
-        patch: &NativePatch,
+        patch: &native::Patch,
     ) -> Result<()> {
         let object = object_for_reference_checked(self, reference)?;
         let source = object
-            .native_with_limits(patch.source().limits())
+            .native(patch.source().limits())
             .map_err(PackageError::from)?
             .ok_or_else(missing_stream)?;
         patch.apply(&source).map_err(PackageError::from)?;

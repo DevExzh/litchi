@@ -47,7 +47,7 @@ use litchi_core::patch::{
 };
 use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_core::{Position, ReadAt, SourceVersion};
-use litchi_ole_common::object::{Editor as PackageEditor, Limits, Targets};
+use litchi_ole_common::object::{Edit as PackageEditor, Limits, Targets};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -7502,7 +7502,7 @@ fn commit_source_backed_numeric_plan(transaction: Edit) -> Result<SourceBackedPl
     // still checked independently below over the composed positional reader.
     source.inner.source_policy.require()?;
 
-    let publisher = SourceBackedOverlayPublisher::open_owned_with_limits(
+    let publisher = SourceBackedOverlayPublisher::open_owned(
         Arc::clone(&source.inner.bytes),
         source.inner.source_version,
         shared_ole_limits(source.inner.cfb_limits)?,
@@ -7632,7 +7632,7 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
     // complete reopen.
     source.inner.source_policy.require()?;
 
-    let publisher = SourceBackedOverlayPublisher::open_owned_with_limits(
+    let publisher = SourceBackedOverlayPublisher::open_owned(
         Arc::clone(&source.inner.bytes),
         source.inner.source_version,
         shared_ole_limits(source.inner.cfb_limits)?,

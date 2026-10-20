@@ -9,7 +9,7 @@ use super::validation;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{EditProtection, PackagePatch, ProtectionPolicy, classify};
-use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Targets};
+use litchi_ole_common::object::{Edit as ObjectEditor, Limits, Targets};
 
 /// Immutable package bytes plus the decoded annotation-tag state.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -250,7 +250,7 @@ impl Editor {
         Ok(Commit {
             snapshot: Snapshot::new(bytes, self.tags),
             patch,
-            package_patch: PackagePatch::new(object_commit.into_patch(), self.protection),
+            package_patch: PackagePatch::new(object_commit.into_parts().1, self.protection),
         })
     }
 
@@ -262,7 +262,8 @@ impl Editor {
                 .clone()
                 .commit()
                 .map_err(PackageError::from)?
-                .into_patch();
+                .into_parts()
+                .1;
             let package_patch = PackagePatch::new(package_patch, self.protection);
             return Ok(Commit {
                 snapshot: self.snapshot()?,
@@ -283,7 +284,7 @@ impl Editor {
             .commit()
             .map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
-        let package_patch = PackagePatch::new(object_commit.into_patch(), candidate.protection);
+        let package_patch = PackagePatch::new(object_commit.into_parts().1, candidate.protection);
         let package_snapshot = Snapshot::new(bytes, candidate.tags.clone());
         *self = candidate;
         Ok(Commit {

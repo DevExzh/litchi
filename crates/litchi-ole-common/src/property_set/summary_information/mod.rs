@@ -29,4 +29,4 @@ pub use model::{
     LAST_SAVE_DTM, MAX_TEXT_BYTES, MAX_THUMBNAIL_BYTES, PAGE_COUNT, REVISION_NUMBER, SUBJECT,
     TEMPLATE, THUMBNAIL, TITLE, Thumbnail, ThumbnailRef, WORD_COUNT,
 };
-pub use transaction::{Commit, Edit, Patch, Transaction};
+pub use transaction::{Commit, Diagnostics, Edit, Patch};

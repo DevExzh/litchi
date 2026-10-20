@@ -3,9 +3,7 @@
 use super::super::model::{Editor, Info, Inventory, Reference, WriteOptions};
 use super::{Commit, Patch, Snapshot};
 use crate::package::Error as PackageError;
-use litchi_ole_common::ole_streams::{
-    self, NativePatch, NativeTransaction, PresentationPatch, PresentationTransaction,
-};
+use litchi_ole_common::ole_streams::{self, native, presentation};
 use std::fmt;
 
 /// A staged, clone-first DOC embedded-object edit.
@@ -187,7 +185,7 @@ impl Transaction {
         edit: F,
     ) -> Result<(), TransactionError>
     where
-        F: FnOnce(&mut PresentationTransaction) -> Result<(), litchi_cfb::OleError>,
+        F: FnOnce(&mut presentation::Edit) -> Result<(), litchi_cfb::OleError>,
     {
         self.editor
             .update_presentation(storage_id, index, edit)
@@ -202,7 +200,7 @@ impl Transaction {
         edit: F,
     ) -> Result<(), TransactionError>
     where
-        F: FnOnce(&mut PresentationTransaction) -> Result<(), litchi_cfb::OleError>,
+        F: FnOnce(&mut presentation::Edit) -> Result<(), litchi_cfb::OleError>,
     {
         self.editor
             .update_presentation_for(reference, index, edit)
@@ -218,7 +216,7 @@ impl Transaction {
         edit: F,
     ) -> Result<(), TransactionError>
     where
-        F: FnOnce(&mut PresentationTransaction) -> Result<(), litchi_cfb::OleError>,
+        F: FnOnce(&mut presentation::Edit) -> Result<(), litchi_cfb::OleError>,
     {
         self.editor
             .update_presentation_with_limits(storage_id, index, limits, edit)
@@ -234,7 +232,7 @@ impl Transaction {
         edit: F,
     ) -> Result<(), TransactionError>
     where
-        F: FnOnce(&mut PresentationTransaction) -> Result<(), litchi_cfb::OleError>,
+        F: FnOnce(&mut presentation::Edit) -> Result<(), litchi_cfb::OleError>,
     {
         self.editor
             .update_presentation_for_with_limits(reference, index, limits, edit)
@@ -246,7 +244,7 @@ impl Transaction {
         &mut self,
         storage_id: u32,
         index: usize,
-        patch: &PresentationPatch,
+        patch: &presentation::Patch,
     ) -> Result<(), TransactionError> {
         self.editor
             .apply_presentation_patch(storage_id, index, patch)
@@ -258,7 +256,7 @@ impl Transaction {
         &mut self,
         reference: &Reference,
         index: usize,
-        patch: &PresentationPatch,
+        patch: &presentation::Patch,
     ) -> Result<(), TransactionError> {
         self.editor
             .apply_presentation_patch_for(reference, index, patch)
@@ -268,7 +266,7 @@ impl Transaction {
     /// Clone-edits one managed OLEDS native-data stream.
     pub fn update_native<F>(&mut self, storage_id: u32, edit: F) -> Result<(), TransactionError>
     where
-        F: FnOnce(&mut NativeTransaction) -> Result<(), litchi_cfb::OleError>,
+        F: FnOnce(&mut native::Edit) -> Result<(), litchi_cfb::OleError>,
     {
         self.editor
             .update_native(storage_id, edit)
@@ -282,7 +280,7 @@ impl Transaction {
         edit: F,
     ) -> Result<(), TransactionError>
     where
-        F: FnOnce(&mut NativeTransaction) -> Result<(), litchi_cfb::OleError>,
+        F: FnOnce(&mut native::Edit) -> Result<(), litchi_cfb::OleError>,
     {
         self.editor
             .update_native_for(reference, edit)
@@ -297,7 +295,7 @@ impl Transaction {
         edit: F,
     ) -> Result<(), TransactionError>
     where
-        F: FnOnce(&mut NativeTransaction) -> Result<(), litchi_cfb::OleError>,
+        F: FnOnce(&mut native::Edit) -> Result<(), litchi_cfb::OleError>,
     {
         self.editor
             .update_native_with_limits(storage_id, limits, edit)
@@ -312,7 +310,7 @@ impl Transaction {
         edit: F,
     ) -> Result<(), TransactionError>
     where
-        F: FnOnce(&mut NativeTransaction) -> Result<(), litchi_cfb::OleError>,
+        F: FnOnce(&mut native::Edit) -> Result<(), litchi_cfb::OleError>,
     {
         self.editor
             .update_native_for_with_limits(reference, limits, edit)
@@ -323,7 +321,7 @@ impl Transaction {
     pub fn apply_native_patch(
         &mut self,
         storage_id: u32,
-        patch: &NativePatch,
+        patch: &native::Patch,
     ) -> Result<(), TransactionError> {
         self.editor
             .apply_native_patch(storage_id, patch)
@@ -334,7 +332,7 @@ impl Transaction {
     pub fn apply_native_patch_for(
         &mut self,
         reference: &Reference,
-        patch: &NativePatch,
+        patch: &native::Patch,
     ) -> Result<(), TransactionError> {
         self.editor
             .apply_native_patch_for(reference, patch)

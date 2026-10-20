@@ -268,7 +268,7 @@ impl Transaction {
     /// cryptographic verifier or a VBA execution context.
     pub fn edit_vba_signature<F>(&mut self, edit: F) -> Result<bool>
     where
-        F: FnOnce(&mut vba_signature::Transaction) -> std::result::Result<(), vba_signature::Error>,
+        F: FnOnce(&mut vba_signature::Edit) -> std::result::Result<(), vba_signature::Error>,
     {
         self.edit_vba_signature_with_limits(vba_signature::Limits::default(), edit)
     }
@@ -280,7 +280,7 @@ impl Transaction {
         edit: F,
     ) -> Result<bool>
     where
-        F: FnOnce(&mut vba_signature::Transaction) -> std::result::Result<(), vba_signature::Error>,
+        F: FnOnce(&mut vba_signature::Edit) -> std::result::Result<(), vba_signature::Error>,
     {
         let signature = self.vba_signature_with(limits)?.ok_or_else(|| {
             Error::InvalidFormat(
@@ -294,7 +294,7 @@ impl Transaction {
         let commit = transaction.commit().map_err(|error| {
             Error::InvalidFormat(format!("invalid VBA signature edit: {error}"))
         })?;
-        self.set_vba_signature(commit.snapshot())
+        self.set_vba_signature(commit.package())
     }
 
     /// Returns the current transaction-local user-defined section.
@@ -327,17 +327,14 @@ impl Transaction {
             },
             _ => property_set::summary_information::Snapshot::new(CodePage::WINDOWS_1252)?,
         };
-        let mut transaction = snapshot.transaction()?;
-        {
-            let mut draft = transaction.edit();
-            edit(&mut draft)?;
-        }
-        let commit = transaction.commit()?;
-        if !commit.changed() {
+        let mut draft = snapshot.edit()?;
+        edit(&mut draft)?;
+        let commit = draft.commit()?;
+        if !commit.diagnostics().changed() {
             return Ok(false);
         }
         self.editor
-            .replace(Binding::SummaryInformation, commit.into_section())?;
+            .replace(Binding::SummaryInformation, commit.into_package())?;
         self.changed = true;
         Ok(true)
     }
@@ -362,17 +359,14 @@ impl Transaction {
             },
             _ => property_set::document_summary::Snapshot::new(CodePage::WINDOWS_1252)?,
         };
-        let mut transaction = snapshot.transaction()?;
-        {
-            let mut draft = transaction.edit();
-            edit(&mut draft)?;
-        }
-        let commit = transaction.commit()?;
-        if !commit.changed() {
+        let mut draft = snapshot.edit()?;
+        edit(&mut draft)?;
+        let commit = draft.commit()?;
+        if !commit.diagnostics().changed() {
             return Ok(false);
         }
         self.editor
-            .replace(Binding::DocumentSummaryInformation, commit.into_section())?;
+            .replace(Binding::DocumentSummaryInformation, commit.into_package())?;
         self.changed = true;
         Ok(true)
     }

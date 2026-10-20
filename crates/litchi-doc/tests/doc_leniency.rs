@@ -41,7 +41,7 @@ use litchi_doc::{
     PapxDefect, PieceDefect, SectionDefect, SprmDefect, StshifDefect, StyleDefect,
     StylesheetDefect, TableDefinitionDefect, raw::Package,
 };
-use litchi_ole_common::object::{Editor as PackageEditor, Targets};
+use litchi_ole_common::object::{Edit as PackageEditor, Targets};
 use std::io::Cursor;
 use std::path::PathBuf;
 

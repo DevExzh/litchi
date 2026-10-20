@@ -840,7 +840,7 @@ mod tests {
     use crate::parts::protection::{ProtectionAuthorization, ProtectionPolicy};
     use crate::tracked_revision::Limits as RevisionLimits;
     use litchi_core::Position;
-    use litchi_ole_common::object::{Editor as PackageEditor, Targets};
+    use litchi_ole_common::object::{Edit as PackageEditor, Targets};
     use std::io::Cursor;
 
     fn package() -> crate::Package {

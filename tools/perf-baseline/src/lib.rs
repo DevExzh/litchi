@@ -91,7 +91,7 @@ use litchi_core::{
 };
 use litchi_core::{OwnedSource, Position, Resource};
 use litchi_ole_common::object::{
-    Editor as OleObjectEditor, Limits as OleObjectLimits, Targets as OleObjectTargets,
+    Edit as OleObjectEditor, Limits as OleObjectLimits, Targets as OleObjectTargets,
 };
 use litchi_ooxml_common::xml::{
     OMML_NAMESPACE_URI, extract_omml_formulas, scan_omml_formula_ranges,
@@ -59862,9 +59862,6 @@ fn run_ole_common_open(
         let started = Instant::now();
         let editor = OleObjectEditor::open(source, targets, limits)?;
         let duration = started.elapsed();
-        if editor.is_changed() {
-            return Err("fresh OLE common editor unexpectedly reports a change".into());
-        }
         std::hint::black_box(&editor);
         final_editor = Some(editor);
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
@@ -59892,7 +59889,7 @@ fn run_ole_common_put_stream_publish(
         OleObjectTargets::default(),
         ole_common_limits(&corpus)?,
     )?;
-    let source = opened.snapshot();
+    let source = opened.staged();
     let mut elapsed = Vec::with_capacity(samples);
     let mut final_editor = None;
 
@@ -59902,11 +59899,10 @@ fn run_ole_common_put_stream_publish(
         let started = Instant::now();
         editor.put_stream(&path, replacement)?;
         let duration = started.elapsed();
-        if !editor.is_changed()
-            || editor
-                .stream(&path)
-                .ok_or("OLE common target disappeared")?
-                != OLE_COMMON_REPLACEMENT
+        if editor
+            .stream(&path)
+            .ok_or("OLE common target disappeared")?
+            != OLE_COMMON_REPLACEMENT
         {
             return Err("OLE common candidate publication did not retain the replacement".into());
         }
@@ -59944,7 +59940,7 @@ fn run_ole_common_finish_render(
         ole_common_limits(&corpus)?,
     )?;
     editor.put_stream(&path, OLE_COMMON_REPLACEMENT.to_vec())?;
-    let changed = editor.snapshot();
+    let changed = editor.staged();
     let mut elapsed = Vec::with_capacity(samples);
     let mut final_output = None;
 

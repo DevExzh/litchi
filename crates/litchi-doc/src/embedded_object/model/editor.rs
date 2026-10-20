@@ -2,7 +2,7 @@
 
 use super::super::Limits;
 use crate::parts::protection::{EditProtection, ProtectionPolicy};
-use litchi_ole_common::object::Editor as ObjectEditor;
+use litchi_ole_common::object::Edit as ObjectEditor;
 
 #[derive(Clone, Debug)]
 pub(in crate::embedded_object) struct RawPiece {

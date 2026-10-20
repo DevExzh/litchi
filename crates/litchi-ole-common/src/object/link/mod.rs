@@ -5,7 +5,7 @@
 //! module exposes only the structural metadata. It never resolves paths,
 //! opens a moniker, activates a class, or executes an embedded payload.
 //!
-//! [`Snapshot`] retains the exact source stream, [`Transaction`] stages
+//! [`Snapshot`] retains the exact source stream, [`Edit`] stages
 //! bounded typed edits, and [`Patch`] publishes a reversible replacement only
 //! after source-fingerprint and retained-range validation.
 
@@ -30,7 +30,7 @@ mod tests;
 pub use model::{Kind, Link, Moniker, Times};
 pub use patch::{Change, Patch};
 pub use snapshot::Snapshot;
-pub use transaction::{Commit, Revision, Transaction, update};
+pub use transaction::{Commit, Diagnostics, Edit, Revision, update};
 
 /// The CFB stream name used for OLEDS object-link metadata.
 pub const NAME: &str = "\u{0001}Ole";

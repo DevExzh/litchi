@@ -2,7 +2,7 @@
 
 use litchi_doc::builder::Builder;
 use litchi_doc::parts::fib::FileInformationBlock;
-use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Targets};
+use litchi_ole_common::object::{Edit as ObjectEditor, Limits, Targets};
 use std::io::Cursor;
 
 const DOP_INDEX: usize = 31;

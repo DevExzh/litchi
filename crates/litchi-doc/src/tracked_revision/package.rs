@@ -33,7 +33,7 @@ use crate::writer::ChpxFkpBuilder;
 use litchi_cfb::{OleFile, directory_names_equal};
 #[cfg(feature = "performance-diagnostics")]
 use litchi_ole_common::object::CfbParseEvent;
-use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
+use litchi_ole_common::object::{Edit as ObjectEditor, Targets};
 use litchi_ole_common::property_set::{
     DOCUMENT_SUMMARY_INFORMATION_FMTID, Stream as PropertySetStream,
     document_summary::DIGITAL_SIGNATURE,

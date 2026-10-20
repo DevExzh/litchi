@@ -11,7 +11,7 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 use litchi_cfb::OleFile;
-use litchi_ole_common::object::{Editor as PackageEditor, Limits as PackageLimits, Targets};
+use litchi_ole_common::object::{Edit as PackageEditor, Limits as PackageLimits, Targets};
 
 use super::{Edit as UserNamesEdit, Limits as UserNamesLimits, Snapshot as UserNamesSnapshot};
 use crate::{Error, Result};

@@ -18,7 +18,7 @@ use litchi_doc::tracked_revision::{
     Limits, RevisionEditor, RevisionKind, RevisionMetadata, Snapshot as RevisionSnapshot,
 };
 use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting};
-use litchi_ole_common::object::{Editor as PackageEditor, Targets};
+use litchi_ole_common::object::{Edit as PackageEditor, Targets};
 use litchi_ole_common::property_set::{
     CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Section, Stream, Value,
     document_summary::DIGITAL_SIGNATURE,

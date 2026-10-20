@@ -5,7 +5,7 @@ use super::super::model::{Editor, Inventory, Reference, WriteOptions};
 use super::Transaction;
 use crate::package::Result;
 use crate::parts::protection::ProtectionPolicy;
-use litchi_ole_common::ole_streams::{self, NativeSnapshot, PresentationSnapshot};
+use litchi_ole_common::ole_streams::{self, native, presentation};
 use std::sync::{Arc, OnceLock};
 
 /// Shared physical DOC bytes with a lazy slice-shaped public handle.
@@ -160,7 +160,7 @@ impl Snapshot {
         &self,
         storage_id: u32,
         index: usize,
-    ) -> Result<Option<PresentationSnapshot>> {
+    ) -> Result<Option<presentation::Snapshot>> {
         self.editor.presentation(storage_id, index)
     }
 
@@ -170,7 +170,7 @@ impl Snapshot {
         storage_id: u32,
         index: usize,
         limits: ole_streams::Limits,
-    ) -> Result<Option<PresentationSnapshot>> {
+    ) -> Result<Option<presentation::Snapshot>> {
         self.editor
             .presentation_with_limits(storage_id, index, limits)
     }
@@ -180,7 +180,7 @@ impl Snapshot {
         &self,
         reference: &Reference,
         index: usize,
-    ) -> Result<Option<PresentationSnapshot>> {
+    ) -> Result<Option<presentation::Snapshot>> {
         self.editor.presentation_for(reference, index)
     }
 
@@ -190,13 +190,13 @@ impl Snapshot {
         reference: &Reference,
         index: usize,
         limits: ole_streams::Limits,
-    ) -> Result<Option<PresentationSnapshot>> {
+    ) -> Result<Option<presentation::Snapshot>> {
         self.editor
             .presentation_for_with_limits(reference, index, limits)
     }
 
     /// Returns all managed OLEDS presentations in numeric order.
-    pub fn presentations(&self, storage_id: u32) -> Result<Vec<(usize, PresentationSnapshot)>> {
+    pub fn presentations(&self, storage_id: u32) -> Result<Vec<(usize, presentation::Snapshot)>> {
         self.editor.presentations(storage_id)
     }
 
@@ -205,7 +205,7 @@ impl Snapshot {
         &self,
         storage_id: u32,
         limits: ole_streams::Limits,
-    ) -> Result<Vec<(usize, PresentationSnapshot)>> {
+    ) -> Result<Vec<(usize, presentation::Snapshot)>> {
         self.editor.presentations_with_limits(storage_id, limits)
     }
 
@@ -213,7 +213,7 @@ impl Snapshot {
     pub fn presentations_for(
         &self,
         reference: &Reference,
-    ) -> Result<Vec<(usize, PresentationSnapshot)>> {
+    ) -> Result<Vec<(usize, presentation::Snapshot)>> {
         self.editor.presentations_for(reference)
     }
 
@@ -222,12 +222,12 @@ impl Snapshot {
         &self,
         reference: &Reference,
         limits: ole_streams::Limits,
-    ) -> Result<Vec<(usize, PresentationSnapshot)>> {
+    ) -> Result<Vec<(usize, presentation::Snapshot)>> {
         self.editor.presentations_for_with_limits(reference, limits)
     }
 
     /// Returns one managed object's inert OLEDS native-data stream.
-    pub fn native(&self, storage_id: u32) -> Result<Option<NativeSnapshot>> {
+    pub fn native(&self, storage_id: u32) -> Result<Option<native::Snapshot>> {
         self.editor.native(storage_id)
     }
 
@@ -236,12 +236,12 @@ impl Snapshot {
         &self,
         storage_id: u32,
         limits: ole_streams::Limits,
-    ) -> Result<Option<NativeSnapshot>> {
+    ) -> Result<Option<native::Snapshot>> {
         self.editor.native_with_limits(storage_id, limits)
     }
 
     /// Returns native data selected by a DOC object reference.
-    pub fn native_for(&self, reference: &Reference) -> Result<Option<NativeSnapshot>> {
+    pub fn native_for(&self, reference: &Reference) -> Result<Option<native::Snapshot>> {
         self.editor.native_for(reference)
     }
 
@@ -250,7 +250,7 @@ impl Snapshot {
         &self,
         reference: &Reference,
         limits: ole_streams::Limits,
-    ) -> Result<Option<NativeSnapshot>> {
+    ) -> Result<Option<native::Snapshot>> {
         self.editor.native_for_with_limits(reference, limits)
     }
 

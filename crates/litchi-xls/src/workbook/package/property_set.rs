@@ -174,12 +174,12 @@ impl Transaction {
                 CodePage::WINDOWS_1252,
             )?,
         };
-        let mut typed = snapshot.transaction()?;
-        edit(&mut typed.edit())?;
+        let mut typed = snapshot.edit()?;
+        edit(&mut typed)?;
         let commit = typed.commit()?;
-        if commit.changed() {
+        if commit.diagnostics().changed() {
             self.editor
-                .replace(Binding::SummaryInformation, commit.into_section())?;
+                .replace(Binding::SummaryInformation, commit.into_package())?;
         }
         Ok(())
     }
@@ -209,12 +209,12 @@ impl Transaction {
                 CodePage::WINDOWS_1252,
             )?,
         };
-        let mut typed = snapshot.transaction()?;
-        edit(&mut typed.edit())?;
+        let mut typed = snapshot.edit()?;
+        edit(&mut typed)?;
         let commit = typed.commit()?;
-        if commit.changed() {
+        if commit.diagnostics().changed() {
             self.editor
-                .replace(Binding::DocumentSummaryInformation, commit.into_section())?;
+                .replace(Binding::DocumentSummaryInformation, commit.into_package())?;
         }
         Ok(())
     }

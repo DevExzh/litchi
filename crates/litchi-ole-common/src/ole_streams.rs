@@ -663,7 +663,7 @@ impl TocEntry {
             reserved2: 0,
             dirty: true,
         };
-        let bytes = entry.to_bytes()?;
+        let bytes = entry.to_bytes(Limits::default())?;
         Self::parse_shared(bytes.into())
     }
 
@@ -705,13 +705,8 @@ impl TocEntry {
         self.target_device.bytes()
     }
 
-    /// Replaces or clears the target-device bytes.
-    pub fn set_target_device(&mut self, value: impl Into<Vec<u8>>) -> Result<(), OleError> {
-        self.set_target_device_with_limits(value, Limits::default())
-    }
-
     /// Replaces or clears the target-device bytes under explicit limits.
-    pub fn set_target_device_with_limits(
+    pub fn set_target_device(
         &mut self,
         value: impl Into<Vec<u8>>,
         limits: Limits,
@@ -833,13 +828,8 @@ impl TocEntry {
         Ok(())
     }
 
-    /// Serializes this entry, preserving source bytes when it is unedited.
-    pub fn to_bytes(&self) -> Result<Vec<u8>, OleError> {
-        self.to_bytes_with_limits(Limits::default())
-    }
-
     /// Serializes this entry under explicit resource limits.
-    pub fn to_bytes_with_limits(&self, limits: Limits) -> Result<Vec<u8>, OleError> {
+    pub fn to_bytes(&self, limits: Limits) -> Result<Vec<u8>, OleError> {
         let limits = limits.validate()?;
         self.validate(limits)?;
         if !self.dirty {
@@ -920,13 +910,8 @@ impl OlePresentationStream {
                 .all(|(left, right)| left.content_eq(right))
     }
 
-    /// Parses one complete OLEPresentationStream with default limits.
-    pub fn parse(bytes: &[u8]) -> Result<Self, OleError> {
-        Self::parse_with_limits(bytes, Limits::default())
-    }
-
     /// Parses one complete OLEPresentationStream under explicit limits.
-    pub fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Self, OleError> {
+    pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self, OleError> {
         let limits = limits.validate()?;
         if bytes.len() > limits.max_bytes {
             return Err(invalid(
@@ -1097,7 +1082,7 @@ impl OlePresentationStream {
         if stream.format.is_metafile_pict() {
             stream.reserved2 = Some([0; 18]);
         }
-        let bytes = stream.to_bytes_with_limits(Limits::default())?;
+        let bytes = stream.to_bytes(Limits::default())?;
         Self::parse_shared(bytes.into(), Limits::default())
     }
 
@@ -1152,13 +1137,8 @@ impl OlePresentationStream {
         self.target_device.bytes()
     }
 
-    /// Replaces or clears the DVTARGETDEVICE bytes.
-    pub fn set_target_device(&mut self, value: impl Into<Vec<u8>>) -> Result<(), OleError> {
-        self.set_target_device_with_limits(value, Limits::default())
-    }
-
     /// Replaces or clears the DVTARGETDEVICE bytes under explicit limits.
-    pub fn set_target_device_with_limits(
+    pub fn set_target_device(
         &mut self,
         value: impl Into<Vec<u8>>,
         limits: Limits,
@@ -1267,17 +1247,8 @@ impl OlePresentationStream {
         self.data.bytes()
     }
 
-    /// Replaces opaque presentation data.
-    pub fn set_data(&mut self, value: impl Into<Vec<u8>>) -> Result<(), OleError> {
-        self.set_data_with_limits(value, Limits::default())
-    }
-
     /// Replaces opaque presentation data under explicit limits.
-    pub fn set_data_with_limits(
-        &mut self,
-        value: impl Into<Vec<u8>>,
-        limits: Limits,
-    ) -> Result<(), OleError> {
+    pub fn set_data(&mut self, value: impl Into<Vec<u8>>, limits: Limits) -> Result<(), OleError> {
         let limits = limits.validate()?;
         let data = value.into();
         if data.len() > limits.max_data_bytes {
@@ -1319,16 +1290,8 @@ impl OlePresentationStream {
         &self.toc_entries
     }
 
-    /// Replaces one TOC entry atomically within this in-memory projection.
-    pub fn update_toc_entry<F>(&mut self, index: usize, edit: F) -> Result<(), OleError>
-    where
-        F: FnOnce(&mut TocEntry) -> Result<(), OleError>,
-    {
-        self.update_toc_entry_with_limits(index, Limits::default(), edit)
-    }
-
     /// Replaces one TOC entry atomically under explicit limits.
-    pub fn update_toc_entry_with_limits<F>(
+    pub fn update_toc_entry<F>(
         &mut self,
         index: usize,
         limits: Limits,
@@ -1357,17 +1320,12 @@ impl OlePresentationStream {
         Ok(())
     }
 
-    /// Inserts a TOC entry and authorizes a NANI TOC table when needed.
-    pub fn insert_toc_entry(&mut self, index: usize, entry: TocEntry) -> Result<(), OleError> {
-        self.insert_toc_entry_with_limits(index, entry, Limits::default())
-    }
-
     /// Inserts a TOC entry under explicit stream limits.
     ///
     /// A table created by this operation uses the OLEDS `NANI` signature and
     /// an entry count matching the resulting table.  Existing unknown tail
     /// bytes remain attached to the source-backed presentation stream.
-    pub fn insert_toc_entry_with_limits(
+    pub fn insert_toc_entry(
         &mut self,
         index: usize,
         entry: TocEntry,
@@ -1393,20 +1351,11 @@ impl OlePresentationStream {
         Ok(())
     }
 
-    /// Removes one TOC entry while retaining a valid NANI table.
-    pub fn remove_toc_entry(&mut self, index: usize) -> Result<TocEntry, OleError> {
-        self.remove_toc_entry_with_limits(index, Limits::default())
-    }
-
     /// Removes one TOC entry under explicit stream limits.
     ///
     /// Removing the final entry leaves an explicit `NANI` table with a zero
     /// count, which keeps the operation's table grammar unambiguous.
-    pub fn remove_toc_entry_with_limits(
-        &mut self,
-        index: usize,
-        limits: Limits,
-    ) -> Result<TocEntry, OleError> {
+    pub fn remove_toc_entry(&mut self, index: usize, limits: Limits) -> Result<TocEntry, OleError> {
         let limits = limits.validate()?;
         if index >= self.toc_entries.len() {
             return Err(invalid(
@@ -1534,13 +1483,8 @@ impl OlePresentationStream {
         self.encoded_len(limits).map(|_| ())
     }
 
-    /// Serializes this stream under the default resource limits.
-    pub fn to_bytes(&self) -> Result<Vec<u8>, OleError> {
-        self.to_bytes_with_limits(Limits::default())
-    }
-
     /// Serializes this stream under explicit resource limits.
-    pub fn to_bytes_with_limits(&self, limits: Limits) -> Result<Vec<u8>, OleError> {
+    pub fn to_bytes(&self, limits: Limits) -> Result<Vec<u8>, OleError> {
         let limits = limits.validate()?;
         self.validate(limits)?;
         if !self.dirty {
@@ -1635,408 +1579,6 @@ fn parse_toc_entry_from_reader(
     })
 }
 
-/// A cheap immutable snapshot of an OLEPresentationStream.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PresentationSnapshot {
-    stream: OlePresentationStream,
-    limits: Limits,
-    revision: StreamRevision,
-}
-
-impl PresentationSnapshot {
-    /// Parses a source presentation stream with default limits.
-    pub fn parse(bytes: &[u8]) -> Result<Self, OleError> {
-        Self::parse_with_limits(bytes, Limits::default())
-    }
-
-    /// Parses a source presentation stream under explicit limits.
-    pub fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Self, OleError> {
-        let limits = limits.validate()?;
-        if bytes.len() > limits.max_bytes {
-            return Err(invalid(
-                "OLEPresentationStream exceeds the configured limit",
-            ));
-        }
-        Self::parse_shared(Arc::<[u8]>::from(bytes), limits)
-    }
-
-    /// Parses a source presentation stream without copying its allocation.
-    pub fn parse_shared(bytes: Arc<[u8]>, limits: Limits) -> Result<Self, OleError> {
-        let limits = limits.validate()?;
-        let stream = OlePresentationStream::parse_shared(bytes, limits)?;
-        let revision = StreamRevision::from(Revision::of(stream.bytes()));
-        Ok(Self {
-            stream,
-            limits,
-            revision,
-        })
-    }
-
-    /// Captures an already parsed stream as a source snapshot.
-    pub fn from_stream(stream: OlePresentationStream, limits: Limits) -> Result<Self, OleError> {
-        let limits = limits.validate()?;
-        stream.validate(limits)?;
-        if stream.bytes().len() > limits.max_bytes {
-            return Err(invalid(
-                "OLEPresentationStream exceeds the configured limit",
-            ));
-        }
-        if stream.dirty {
-            let bytes = stream.to_bytes_with_limits(limits)?;
-            return Self::parse_shared(bytes.into(), limits);
-        }
-        let revision = StreamRevision::from(Revision::of(stream.bytes()));
-        Ok(Self {
-            stream,
-            limits,
-            revision,
-        })
-    }
-
-    /// Borrows the typed presentation projection.
-    #[must_use]
-    pub const fn stream(&self) -> &OlePresentationStream {
-        &self.stream
-    }
-
-    /// Exact source bytes.
-    #[must_use]
-    pub fn bytes(&self) -> &[u8] {
-        self.stream.bytes()
-    }
-
-    /// Shared ownership of the exact source allocation.
-    #[must_use]
-    pub fn bytes_shared(&self) -> Arc<[u8]> {
-        Arc::clone(&self.stream.wire)
-    }
-
-    /// Source identity used by reversible patches.
-    #[must_use]
-    pub const fn revision(&self) -> StreamRevision {
-        self.revision
-    }
-
-    /// Source fingerprint used by reversible patches.
-    #[must_use]
-    pub const fn fingerprint(&self) -> u64 {
-        self.revision.value()
-    }
-
-    /// Limits retained for subsequent edits.
-    #[must_use]
-    pub const fn limits(&self) -> Limits {
-        self.limits
-    }
-
-    /// Starts an isolated transaction.
-    #[must_use]
-    pub fn edit(&self) -> PresentationTransaction {
-        PresentationTransaction {
-            source: self.clone(),
-            candidate: self.stream.clone(),
-        }
-    }
-
-    fn patch_to(&self, after: &Self) -> PresentationPatch {
-        PresentationPatch::new(self.clone(), after.clone())
-    }
-}
-
-impl std::ops::Deref for PresentationSnapshot {
-    type Target = OlePresentationStream;
-
-    fn deref(&self) -> &Self::Target {
-        self.stream()
-    }
-}
-
-/// A failure-atomic edit over one presentation snapshot.
-#[derive(Debug, Clone)]
-pub struct PresentationTransaction {
-    source: PresentationSnapshot,
-    candidate: OlePresentationStream,
-}
-
-impl PresentationTransaction {
-    /// Borrows the immutable source snapshot.
-    #[must_use]
-    pub const fn source(&self) -> &PresentationSnapshot {
-        &self.source
-    }
-
-    /// Borrows the current typed candidate.
-    #[must_use]
-    pub const fn stream(&self) -> &OlePresentationStream {
-        &self.candidate
-    }
-
-    /// Whether the candidate differs from its source projection.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.candidate.content_eq(&self.source.stream)
-    }
-
-    /// Applies one callback to a cloned candidate and validates it before
-    /// publication.
-    pub fn update<F>(&mut self, edit: F) -> Result<&mut Self, OleError>
-    where
-        F: FnOnce(&mut OlePresentationStream) -> Result<(), OleError>,
-    {
-        let mut candidate = self.candidate.clone();
-        edit(&mut candidate)?;
-        candidate.validate(self.source.limits)?;
-        self.candidate = candidate;
-        Ok(self)
-    }
-
-    /// Stages an opaque data replacement.
-    pub fn set_data(&mut self, value: impl Into<Vec<u8>>) -> Result<&mut Self, OleError> {
-        let limits = self.source.limits;
-        self.update(|stream| stream.set_data_with_limits(value, limits))
-    }
-
-    /// Stages a primary clipboard-format replacement.
-    pub fn set_clipboard_format(&mut self, value: ClipboardFormat) -> Result<&mut Self, OleError> {
-        self.update(|stream| stream.set_clipboard_format(value))
-    }
-
-    /// Stages a target-device replacement.
-    pub fn set_target_device(&mut self, value: impl Into<Vec<u8>>) -> Result<&mut Self, OleError> {
-        let limits = self.source.limits;
-        self.update(|stream| stream.set_target_device_with_limits(value, limits))
-    }
-
-    /// Stages an aspect-hint replacement.
-    pub fn set_aspect(&mut self, value: u32) -> Result<&mut Self, OleError> {
-        self.update(|stream| {
-            stream.set_aspect(value);
-            Ok(())
-        })
-    }
-
-    /// Stages an Lindex-hint replacement.
-    pub fn set_lindex(&mut self, value: u32) -> Result<&mut Self, OleError> {
-        self.update(|stream| {
-            stream.set_lindex(value);
-            Ok(())
-        })
-    }
-
-    /// Stages an Advf-hint replacement.
-    pub fn set_advf(&mut self, value: u32) -> Result<&mut Self, OleError> {
-        self.update(|stream| {
-            stream.set_advf(value);
-            Ok(())
-        })
-    }
-
-    /// Stages a width replacement.
-    pub fn set_width(&mut self, value: i32) -> Result<&mut Self, OleError> {
-        self.update(|stream| {
-            stream.set_width(value);
-            Ok(())
-        })
-    }
-
-    /// Stages a height replacement.
-    pub fn set_height(&mut self, value: i32) -> Result<&mut Self, OleError> {
-        self.update(|stream| {
-            stream.set_height(value);
-            Ok(())
-        })
-    }
-
-    /// Stages a TOC entry edit.
-    pub fn update_toc_entry<F>(&mut self, index: usize, edit: F) -> Result<&mut Self, OleError>
-    where
-        F: FnOnce(&mut TocEntry) -> Result<(), OleError>,
-    {
-        let limits = self.source.limits;
-        self.update(|stream| stream.update_toc_entry_with_limits(index, limits, edit))
-    }
-
-    /// Stages insertion of a TOC entry.
-    pub fn insert_toc_entry(
-        &mut self,
-        index: usize,
-        entry: TocEntry,
-    ) -> Result<&mut Self, OleError> {
-        let limits = self.source.limits;
-        self.update(|stream| stream.insert_toc_entry_with_limits(index, entry, limits))
-    }
-
-    /// Stages removal of a TOC entry.
-    pub fn remove_toc_entry(&mut self, index: usize) -> Result<TocEntry, OleError> {
-        let limits = self.source.limits;
-        let mut removed = None;
-        self.update(|stream| {
-            removed = Some(stream.remove_toc_entry_with_limits(index, limits)?);
-            Ok(())
-        })?;
-        removed.ok_or_else(|| invalid("OLEPresentationStream TOC removal produced no entry"))
-    }
-
-    /// Projects the current candidate as a checked snapshot.
-    pub fn snapshot(&self) -> Result<PresentationSnapshot, OleError> {
-        self.materialize()
-    }
-
-    /// Discards this transaction and returns its source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> PresentationSnapshot {
-        self.source
-    }
-
-    /// Validates and publishes this transaction.
-    pub fn commit(self) -> Result<PresentationCommit, OleError> {
-        let snapshot = self.materialize()?;
-        let patch = self.source.patch_to(&snapshot);
-        Ok(PresentationCommit { snapshot, patch })
-    }
-
-    fn materialize(&self) -> Result<PresentationSnapshot, OleError> {
-        self.candidate.validate(self.source.limits)?;
-        if !self.is_changed() {
-            return Ok(self.source.clone());
-        }
-        let bytes = self.candidate.to_bytes_with_limits(self.source.limits)?;
-        PresentationSnapshot::parse_shared(bytes.into(), self.source.limits)
-    }
-}
-
-/// A successful presentation transaction publication.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PresentationCommit {
-    snapshot: PresentationSnapshot,
-    patch: PresentationPatch,
-}
-
-impl PresentationCommit {
-    /// Whether the exact stream bytes changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Borrows the published snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &PresentationSnapshot {
-        &self.snapshot
-    }
-
-    /// Borrows the reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &PresentationPatch {
-        &self.patch
-    }
-
-    /// Consumes this result into its snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> PresentationSnapshot {
-        self.snapshot
-    }
-
-    /// Consumes this result into its reversible patch.
-    #[must_use]
-    pub fn into_patch(self) -> PresentationPatch {
-        self.patch
-    }
-
-    /// Splits this publication into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (PresentationSnapshot, PresentationPatch) {
-        (self.snapshot, self.patch)
-    }
-}
-
-/// A reversible, exact-source-checked presentation replacement.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PresentationPatch {
-    base: StreamRevision,
-    target: StreamRevision,
-    before: PresentationSnapshot,
-    after: PresentationSnapshot,
-    changed: bool,
-}
-
-impl PresentationPatch {
-    fn new(before: PresentationSnapshot, after: PresentationSnapshot) -> Self {
-        let changed = before.bytes() != after.bytes();
-        Self {
-            base: before.revision,
-            target: after.revision,
-            before,
-            after,
-            changed,
-        }
-    }
-
-    /// Expected source revision.
-    #[must_use]
-    pub const fn base(&self) -> StreamRevision {
-        self.base
-    }
-
-    /// Resulting revision.
-    #[must_use]
-    pub const fn target(&self) -> StreamRevision {
-        self.target
-    }
-
-    /// Exact source bytes required by this patch.
-    #[must_use]
-    pub fn before_bytes(&self) -> &[u8] {
-        self.before.bytes()
-    }
-
-    /// Exact target bytes produced by this patch.
-    #[must_use]
-    pub fn after_bytes(&self) -> &[u8] {
-        self.after.bytes()
-    }
-
-    /// Borrows the exact source snapshot retained by this patch.
-    #[must_use]
-    pub const fn source(&self) -> &PresentationSnapshot {
-        &self.before
-    }
-
-    /// Borrows the exact replacement snapshot retained by this patch.
-    #[must_use]
-    pub const fn replacement(&self) -> &PresentationSnapshot {
-        &self.after
-    }
-
-    /// Whether the replacement is byte-for-byte empty.
-    #[must_use]
-    pub const fn is_noop(&self) -> bool {
-        !self.changed
-    }
-
-    /// Applies this patch only to its exact source snapshot.
-    pub fn apply(&self, source: &PresentationSnapshot) -> Result<PresentationSnapshot, OleError> {
-        if source.revision != self.base || source.bytes() != self.before.bytes() {
-            return Err(invalid(
-                "OLEDS presentation patch source does not match its base",
-            ));
-        }
-        Ok(self.after.clone())
-    }
-
-    /// Returns the exact inverse replacement.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            base: self.target,
-            target: self.base,
-            before: self.after.clone(),
-            after: self.before.clone(),
-            changed: self.changed,
-        }
-    }
-}
-
 /// A typed OLEDS `OLENativeStream` (`\x01Ole10Native`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OleNativeStream {
@@ -2050,13 +1592,8 @@ impl OleNativeStream {
         self.wire == other.wire && self.data == other.data
     }
 
-    /// Parses a native stream under default limits.
-    pub fn parse(bytes: &[u8]) -> Result<Self, OleError> {
-        Self::parse_with_limits(bytes, Limits::default())
-    }
-
     /// Parses a native stream under explicit limits.
-    pub fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Self, OleError> {
+    pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self, OleError> {
         let limits = limits.validate()?;
         if bytes.len() > limits.max_bytes {
             return Err(invalid("OLENativeStream exceeds the configured limit"));
@@ -2124,17 +1661,8 @@ impl OleNativeStream {
         self.data.bytes()
     }
 
-    /// Replaces opaque native data.
-    pub fn set_data(&mut self, value: impl Into<Vec<u8>>) -> Result<(), OleError> {
-        self.set_data_with_limits(value, Limits::default())
-    }
-
     /// Replaces opaque native data under explicit limits.
-    pub fn set_data_with_limits(
-        &mut self,
-        value: impl Into<Vec<u8>>,
-        limits: Limits,
-    ) -> Result<(), OleError> {
+    pub fn set_data(&mut self, value: impl Into<Vec<u8>>, limits: Limits) -> Result<(), OleError> {
         let limits = limits.validate()?;
         let value = value.into();
         if value.len() > limits.max_data_bytes {
@@ -2159,13 +1687,8 @@ impl OleNativeStream {
         Ok(length)
     }
 
-    /// Serializes this stream under the default resource limits.
-    pub fn to_bytes(&self) -> Result<Vec<u8>, OleError> {
-        self.to_bytes_with_limits(Limits::default())
-    }
-
     /// Serializes this stream under explicit resource limits.
-    pub fn to_bytes_with_limits(&self, limits: Limits) -> Result<Vec<u8>, OleError> {
+    pub fn to_bytes(&self, limits: Limits) -> Result<Vec<u8>, OleError> {
         let limits = limits.validate()?;
         self.encoded_len(limits)?;
         if !self.dirty {
@@ -2183,317 +1706,6 @@ impl OleNativeStream {
     }
 }
 
-/// A cheap immutable snapshot of an OLENativeStream.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NativeSnapshot {
-    stream: OleNativeStream,
-    limits: Limits,
-    revision: StreamRevision,
-}
-
-impl NativeSnapshot {
-    /// Parses a native stream with default limits.
-    pub fn parse(bytes: &[u8]) -> Result<Self, OleError> {
-        Self::parse_with_limits(bytes, Limits::default())
-    }
-
-    /// Parses a native stream with explicit limits.
-    pub fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Self, OleError> {
-        let limits = limits.validate()?;
-        if bytes.len() > limits.max_bytes {
-            return Err(invalid("OLENativeStream exceeds the configured limit"));
-        }
-        Self::parse_shared(Arc::<[u8]>::from(bytes), limits)
-    }
-
-    /// Parses a native stream without copying the source allocation.
-    pub fn parse_shared(bytes: Arc<[u8]>, limits: Limits) -> Result<Self, OleError> {
-        let limits = limits.validate()?;
-        let stream = OleNativeStream::parse_shared(bytes, limits)?;
-        let revision = StreamRevision::from(Revision::of(stream.bytes()));
-        Ok(Self {
-            stream,
-            limits,
-            revision,
-        })
-    }
-
-    /// Borrows the typed native stream.
-    #[must_use]
-    pub const fn stream(&self) -> &OleNativeStream {
-        &self.stream
-    }
-
-    /// Exact source bytes.
-    #[must_use]
-    pub fn bytes(&self) -> &[u8] {
-        self.stream.bytes()
-    }
-
-    /// Shared ownership of exact source bytes.
-    #[must_use]
-    pub fn bytes_shared(&self) -> Arc<[u8]> {
-        Arc::clone(&self.stream.wire)
-    }
-
-    /// Source identity used by patches.
-    #[must_use]
-    pub const fn revision(&self) -> StreamRevision {
-        self.revision
-    }
-
-    /// Source fingerprint used by patches.
-    #[must_use]
-    pub const fn fingerprint(&self) -> u64 {
-        self.revision.value()
-    }
-
-    /// Limits retained for subsequent edits.
-    #[must_use]
-    pub const fn limits(&self) -> Limits {
-        self.limits
-    }
-
-    /// Starts an isolated native-data edit.
-    #[must_use]
-    pub fn edit(&self) -> NativeTransaction {
-        NativeTransaction {
-            source: self.clone(),
-            candidate: self.stream.clone(),
-        }
-    }
-
-    /// Captures an already parsed native stream as a source snapshot.
-    pub fn from_stream(stream: OleNativeStream, limits: Limits) -> Result<Self, OleError> {
-        let limits = limits.validate()?;
-        stream.encoded_len(limits)?;
-        if stream.bytes().len() > limits.max_bytes {
-            return Err(invalid("OLENativeStream exceeds the configured limit"));
-        }
-        if stream.dirty {
-            let bytes = stream.to_bytes_with_limits(limits)?;
-            return Self::parse_shared(bytes.into(), limits);
-        }
-        let revision = StreamRevision::from(Revision::of(stream.bytes()));
-        Ok(Self {
-            stream,
-            limits,
-            revision,
-        })
-    }
-}
-
-impl std::ops::Deref for NativeSnapshot {
-    type Target = OleNativeStream;
-
-    fn deref(&self) -> &Self::Target {
-        self.stream()
-    }
-}
-
-/// A failure-atomic edit over one native snapshot.
-#[derive(Debug, Clone)]
-pub struct NativeTransaction {
-    source: NativeSnapshot,
-    candidate: OleNativeStream,
-}
-
-impl NativeTransaction {
-    /// Borrows the immutable source snapshot.
-    #[must_use]
-    pub const fn source(&self) -> &NativeSnapshot {
-        &self.source
-    }
-
-    /// Borrows the current candidate.
-    #[must_use]
-    pub const fn stream(&self) -> &OleNativeStream {
-        &self.candidate
-    }
-
-    /// Whether the candidate differs from its source projection.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.candidate.content_eq(&self.source.stream)
-    }
-
-    /// Applies a custom edit to a cloned candidate and validates it before
-    /// publishing it into this transaction.
-    pub fn update<F>(&mut self, edit: F) -> Result<&mut Self, OleError>
-    where
-        F: FnOnce(&mut OleNativeStream) -> Result<(), OleError>,
-    {
-        let mut candidate = self.candidate.clone();
-        edit(&mut candidate)?;
-        candidate.encoded_len(self.source.limits)?;
-        self.candidate = candidate;
-        Ok(self)
-    }
-
-    /// Stages an opaque native-data replacement.
-    pub fn set_data(&mut self, value: impl Into<Vec<u8>>) -> Result<&mut Self, OleError> {
-        let limits = self.source.limits;
-        self.update(|stream| stream.set_data_with_limits(value, limits))
-    }
-
-    /// Projects the current candidate as a checked snapshot.
-    pub fn snapshot(&self) -> Result<NativeSnapshot, OleError> {
-        self.materialize()
-    }
-
-    /// Discards this transaction and returns its source.
-    #[must_use]
-    pub fn rollback(self) -> NativeSnapshot {
-        self.source
-    }
-
-    /// Validates and publishes this transaction.
-    pub fn commit(self) -> Result<NativeCommit, OleError> {
-        let snapshot = self.materialize()?;
-        let patch = NativePatch::new(self.source, snapshot.clone());
-        Ok(NativeCommit { snapshot, patch })
-    }
-
-    fn materialize(&self) -> Result<NativeSnapshot, OleError> {
-        self.candidate.encoded_len(self.source.limits)?;
-        if !self.is_changed() {
-            return Ok(self.source.clone());
-        }
-        let bytes = self.candidate.to_bytes_with_limits(self.source.limits)?;
-        NativeSnapshot::parse_shared(bytes.into(), self.source.limits)
-    }
-}
-
-/// A successful native-data transaction publication.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NativeCommit {
-    snapshot: NativeSnapshot,
-    patch: NativePatch,
-}
-
-impl NativeCommit {
-    /// Whether exact source bytes changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Borrows the published snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &NativeSnapshot {
-        &self.snapshot
-    }
-
-    /// Borrows the reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &NativePatch {
-        &self.patch
-    }
-
-    /// Consumes this result into its published snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> NativeSnapshot {
-        self.snapshot
-    }
-
-    /// Consumes this result into its reversible patch.
-    #[must_use]
-    pub fn into_patch(self) -> NativePatch {
-        self.patch
-    }
-
-    /// Splits this publication into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (NativeSnapshot, NativePatch) {
-        (self.snapshot, self.patch)
-    }
-}
-
-/// A reversible, exact-source-checked native-data replacement.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NativePatch {
-    base: StreamRevision,
-    target: StreamRevision,
-    before: NativeSnapshot,
-    after: NativeSnapshot,
-    changed: bool,
-}
-
-impl NativePatch {
-    fn new(before: NativeSnapshot, after: NativeSnapshot) -> Self {
-        let changed = before.bytes() != after.bytes();
-        Self {
-            base: before.revision,
-            target: after.revision,
-            before,
-            after,
-            changed,
-        }
-    }
-
-    /// Expected source revision.
-    #[must_use]
-    pub const fn base(&self) -> StreamRevision {
-        self.base
-    }
-
-    /// Resulting revision.
-    #[must_use]
-    pub const fn target(&self) -> StreamRevision {
-        self.target
-    }
-
-    /// Exact source bytes required by this patch.
-    #[must_use]
-    pub fn before_bytes(&self) -> &[u8] {
-        self.before.bytes()
-    }
-
-    /// Exact target bytes produced by this patch.
-    #[must_use]
-    pub fn after_bytes(&self) -> &[u8] {
-        self.after.bytes()
-    }
-
-    /// Borrows the exact source snapshot retained by this patch.
-    #[must_use]
-    pub const fn source(&self) -> &NativeSnapshot {
-        &self.before
-    }
-
-    /// Borrows the exact replacement snapshot retained by this patch.
-    #[must_use]
-    pub const fn replacement(&self) -> &NativeSnapshot {
-        &self.after
-    }
-
-    /// Whether this patch is a byte-for-byte no-op.
-    #[must_use]
-    pub const fn is_noop(&self) -> bool {
-        !self.changed
-    }
-
-    /// Applies this patch only to its exact source snapshot.
-    pub fn apply(&self, source: &NativeSnapshot) -> Result<NativeSnapshot, OleError> {
-        if source.revision != self.base || source.bytes() != self.before.bytes() {
-            return Err(invalid("OLEDS native patch source does not match its base"));
-        }
-        Ok(self.after.clone())
-    }
-
-    /// Returns the exact inverse replacement.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            base: self.target,
-            target: self.base,
-            before: self.after.clone(),
-            after: self.before.clone(),
-            changed: self.changed,
-        }
-    }
-}
-
 /// Alias following the stream's specification name.
 pub type OLEPresentationStream = OlePresentationStream;
 /// Concise alias for [`OlePresentationStream`].
@@ -2503,27 +1715,9 @@ pub type OLENativeStream = OleNativeStream;
 /// Concise alias for [`OleNativeStream`].
 pub type NativeStream = OleNativeStream;
 
-/// Alias for the presentation snapshot.
-pub type Snapshot = PresentationSnapshot;
-/// Alias for the native snapshot.
-pub type NativeDataSnapshot = NativeSnapshot;
+pub mod presentation;
 
-/// Presentation-stream namespaced exports.
-pub mod presentation {
-    pub use super::{
-        ClipboardFormat, Limits, OLEPresentationStream, OlePresentationStream, PresentationCommit,
-        PresentationPatch, PresentationSnapshot, PresentationStream, PresentationTransaction,
-        StreamRevision, TargetDevice, TocEntry,
-    };
-}
-
-/// Native-stream namespaced exports.
-pub mod native {
-    pub use super::{
-        Limits, NativeCommit, NativePatch, NativeSnapshot, NativeStream, NativeTransaction,
-        OLENativeStream, OleNativeStream, StreamRevision,
-    };
-}
+pub mod native;
 
 /// TOCENTRY namespaced exports.
 pub mod toc_entry {
@@ -2535,9 +1729,9 @@ pub fn parse_named_presentation(
     name: &str,
     bytes: Arc<[u8]>,
     limits: Limits,
-) -> Result<PresentationSnapshot, OleError> {
+) -> Result<presentation::Snapshot, OleError> {
     presentation_index(name)?;
-    PresentationSnapshot::parse_shared(bytes, limits)
+    presentation::Snapshot::parse_shared(bytes, limits)
 }
 
 /// Parses the named `\x01Ole10Native` stream.
@@ -2545,11 +1739,11 @@ pub fn parse_named_native(
     name: &str,
     bytes: Arc<[u8]>,
     limits: Limits,
-) -> Result<NativeSnapshot, OleError> {
+) -> Result<native::Snapshot, OleError> {
     if name != NATIVE_STREAM_NAME {
         return Err(invalid("stream name is not \\x01Ole10Native"));
     }
-    NativeSnapshot::parse_shared(bytes, limits)
+    native::Snapshot::parse_shared(bytes, limits)
 }
 
 /// Returns the numeric presentation index from a valid `\x02OlePres###` name.

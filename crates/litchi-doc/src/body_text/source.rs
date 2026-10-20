@@ -2677,7 +2677,7 @@ mod tests {
     )]
 
     use super::*;
-    use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
+    use litchi_ole_common::object::{Edit as ObjectEditor, Targets};
     use std::sync::{
         Mutex,
         atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},

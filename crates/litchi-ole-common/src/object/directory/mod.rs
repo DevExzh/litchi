@@ -29,6 +29,6 @@ pub use catalog::{Catalog, Entry};
 pub use model::{EntryKind, Limits, Links, MAX_REGULAR_SID, Metadata, NOSTREAM, Sid};
 pub use patch::{Change, Patch};
 pub use snapshot::Snapshot;
-pub use transaction::{Commit, Revision, Transaction, update};
+pub use transaction::{Commit, Diagnostics, Edit, Revision, update};
 
 pub(crate) use codec::{decode, format_class_id};

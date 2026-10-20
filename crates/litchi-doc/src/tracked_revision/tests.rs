@@ -6,7 +6,7 @@ use crate::package::Error as PackageError;
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{ProtectionAuthorization, ProtectionPolicy};
 use crate::writer::{CharacterFormatting, ParagraphFormatting, TextRevision};
-use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
+use litchi_ole_common::object::{Edit as ObjectEditor, Targets};
 use std::io::Cursor;
 
 fn base_doc() -> Vec<u8> {

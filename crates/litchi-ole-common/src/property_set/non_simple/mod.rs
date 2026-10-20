@@ -13,7 +13,7 @@ mod transaction;
 
 pub use crate::property_set::model::{VT_STORAGE, VT_STORED_OBJECT, VT_STREAM, VT_STREAMED_OBJECT};
 pub use model::{Element, ElementKind, Limits, Snapshot};
-pub use transaction::{Commit, Editor, Patch, Revision, update};
+pub use transaction::{Commit, Diagnostics, Edit, Patch, Revision, update};
 
 #[cfg(test)]
 #[allow(

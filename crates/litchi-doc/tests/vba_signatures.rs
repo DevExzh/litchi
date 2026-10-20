@@ -2,7 +2,7 @@ use litchi_doc::parts::fib::FileInformationBlock;
 use litchi_doc::raw::Package;
 use litchi_doc::tracked_revision::Limits;
 use litchi_doc::{Builder, SignatureName};
-use litchi_ole_common::object::{Editor as PackageEditor, Targets};
+use litchi_ole_common::object::{Edit as PackageEditor, Targets};
 use std::io::Cursor;
 
 fn word_blob() -> Vec<u8> {

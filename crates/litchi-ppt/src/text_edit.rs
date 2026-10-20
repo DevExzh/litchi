@@ -482,9 +482,8 @@ impl SourceSnapshot {
             }
             .into());
         }
-        let publisher =
-            SourceBackedOverlayPublisher::open_with_limits(Arc::clone(&source), shared_limits)
-                .map_err(Error::Source)?;
+        let publisher = SourceBackedOverlayPublisher::open(Arc::clone(&source), shared_limits)
+            .map_err(Error::Source)?;
         let shared = publisher.shared();
         crate::package::preflight_shared_ole_file(&shared, options.source_limits)?;
         Self::from_publisher(source, length, &publisher, options)
@@ -1029,11 +1028,9 @@ fn publish_source_text(
 fn publish_source_noop(source: SourceSnapshot, target: Target) -> Result<SourceBackedCommit> {
     source.ensure_current()?;
     let shared_limits = shared_limits(source.inner.options.source_limits)?;
-    let publisher = SourceBackedOverlayPublisher::open_with_limits(
-        Arc::clone(&source.inner.source),
-        shared_limits,
-    )
-    .map_err(Error::Source)?;
+    let publisher =
+        SourceBackedOverlayPublisher::open(Arc::clone(&source.inner.source), shared_limits)
+            .map_err(Error::Source)?;
     let plan = publisher
         .plan_splices(Vec::new(), source.inner.options.splice_limits)
         .map_err(Error::Source)?;
@@ -1072,11 +1069,9 @@ fn publish_source_operation(
 ) -> Result<SourceBackedCommit> {
     source.ensure_current()?;
     let shared_limits = shared_limits(source.inner.options.source_limits)?;
-    let publisher = SourceBackedOverlayPublisher::open_with_limits(
-        Arc::clone(&source.inner.source),
-        shared_limits,
-    )
-    .map_err(Error::Source)?;
+    let publisher =
+        SourceBackedOverlayPublisher::open(Arc::clone(&source.inner.source), shared_limits)
+            .map_err(Error::Source)?;
     let observed_version = publisher.source_version().map_err(Error::Source)?;
     if observed_version != source.source_version() {
         return Err(Error::Source(OverlayError::SourceChanged {
@@ -1204,11 +1199,9 @@ impl SourceSnapshot {
     fn ensure_identity(&self) -> Result<()> {
         self.ensure_current()?;
         let shared_limits = shared_limits(self.inner.options.source_limits)?;
-        let publisher = SourceBackedOverlayPublisher::open_with_limits(
-            Arc::clone(&self.inner.source),
-            shared_limits,
-        )
-        .map_err(Error::Source)?;
+        let publisher =
+            SourceBackedOverlayPublisher::open(Arc::clone(&self.inner.source), shared_limits)
+                .map_err(Error::Source)?;
         let plan = publisher
             .plan_splices(Vec::new(), self.inner.options.splice_limits)
             .map_err(Error::Source)?;

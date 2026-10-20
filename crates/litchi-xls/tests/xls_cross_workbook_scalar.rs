@@ -52,7 +52,7 @@ fn raw_workbook_bytes(numbers: &[(u32, u16, f64)], _blanks: &[(u32, u16)]) -> Ve
 
 fn rewrite_workbook_stream(bytes: Vec<u8>, edit: impl FnOnce(&mut Vec<u8>)) -> Vec<u8> {
     let workbook_path = vec!["Workbook".to_string()];
-    let mut editor = litchi_ole_common::object::Editor::open(
+    let mut editor = litchi_ole_common::object::Edit::open(
         bytes,
         litchi_ole_common::object::Targets::default(),
         litchi_ole_common::object::Limits::default(),
@@ -209,7 +209,7 @@ fn insert_worksheet_records_before(
 }
 
 fn add_opaque_stream(bytes: Vec<u8>) -> Vec<u8> {
-    let mut editor = litchi_ole_common::object::Editor::open(
+    let mut editor = litchi_ole_common::object::Edit::open(
         bytes,
         litchi_ole_common::object::Targets::default(),
         litchi_ole_common::object::Limits::default(),

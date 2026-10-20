@@ -7,7 +7,7 @@ use super::storage::{OBJECT_POOL, is_object_storage_name};
 use super::{Snapshot, TransactionError};
 use crate::builder::Builder;
 use litchi_cfb::OleWriter;
-use litchi_ole_common::object::{Editor as ObjectEditor, Target, Targets};
+use litchi_ole_common::object::{Edit as ObjectEditor, Target, Targets};
 use litchi_ole_common::ole_streams::{
     CF_DIB, ClipboardFormat, Limits as OleStreamLimits, OleNativeStream, OlePresentationStream,
 };
@@ -294,11 +294,11 @@ fn ole2_test_object(marker: u8) -> Vec<u8> {
         [marker, marker.wrapping_add(1)],
     )
     .unwrap()
-    .to_bytes()
+    .to_bytes(litchi_ole_common::ole_streams::Limits::default())
     .unwrap();
     let native = OleNativeStream::new([marker.wrapping_add(2), marker.wrapping_add(3)])
         .unwrap()
-        .to_bytes()
+        .to_bytes(litchi_ole_common::ole_streams::Limits::default())
         .unwrap();
     object_cfb_with_ole2_streams(
         &comp_obj,
@@ -492,11 +492,11 @@ fn doc_ole2_stream_access_edits_atomically_and_preserves_host_metadata() {
     let presentation =
         OlePresentationStream::new(ClipboardFormat::Standard(CF_DIB), [0x10, 0x20, 0x30])
             .unwrap()
-            .to_bytes()
+            .to_bytes(litchi_ole_common::ole_streams::Limits::default())
             .unwrap();
     let native = OleNativeStream::new([0x40, 0x50, 0x60])
         .unwrap()
-        .to_bytes()
+        .to_bytes(litchi_ole_common::ole_streams::Limits::default())
         .unwrap();
 
     let mut editor = super::Editor::open(base_doc(), Limits::default()).unwrap();

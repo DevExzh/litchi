@@ -13,7 +13,7 @@ use crate::protection::{
     PROTECT_TYPE, SCENPROTECT_TYPE, WINPROTECT_TYPE, WRITEPROTECT_TYPE,
 };
 use litchi_cfb::OleFile;
-use litchi_ole_common::object::{Editor as ObjectEditor, Target, Targets};
+use litchi_ole_common::object::{Edit as ObjectEditor, Target, Targets};
 use litchi_ole_common::property_set::document_summary::DIGITAL_SIGNATURE;
 use litchi_ole_common::property_set::{Binding, PropertySetReader};
 use std::collections::{HashMap, HashSet};

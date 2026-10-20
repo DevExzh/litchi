@@ -12,7 +12,7 @@ use litchi_core::Position;
 use litchi_doc::raw::Package;
 use litchi_doc::writer::{Builder, CommentEntry};
 use litchi_doc::{Document, Error, HeaderFooterType, Paragraph};
-use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Targets};
+use litchi_ole_common::object::{Edit as ObjectEditor, Limits, Targets};
 use std::io::Cursor;
 use std::path::PathBuf;
 

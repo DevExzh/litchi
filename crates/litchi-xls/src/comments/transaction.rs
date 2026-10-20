@@ -19,7 +19,7 @@ use litchi_cfb::{
 };
 use litchi_core::binary;
 use litchi_core::{ReadAt, SourceVersion};
-use litchi_ole_common::object::{Editor as PackageEditor, Limits, Targets};
+use litchi_ole_common::object::{Edit as PackageEditor, Limits, Targets};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
@@ -715,8 +715,12 @@ impl Edit {
         let source = Arc::clone(&self.source.inner.bytes);
         let source_version =
             SourceVersion::new(source.as_ptr() as usize as u64, source.len() as u64);
-        let publisher = SourceBackedOverlayPublisher::open_owned(source, source_version)
-            .map_err(overlay_to_error)?;
+        let publisher = SourceBackedOverlayPublisher::open_owned(
+            source,
+            source_version,
+            litchi_cfb::SharedOleFileLimits::default(),
+        )
+        .map_err(overlay_to_error)?;
         let (plan, owner_validated) = publisher
             .plan_splices_with_owner(splices, StreamSpliceLimits::default(), |candidate| {
                 verify_source_backed_candidate(candidate.clone(), &self.source, &effective)

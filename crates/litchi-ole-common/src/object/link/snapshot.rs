@@ -1,6 +1,6 @@
 //! Immutable source-preserving link snapshots.
 
-use super::{Link, Patch, Revision, Transaction, validation};
+use super::{Edit, Link, Patch, Revision, validation};
 use litchi_cfb::OleError;
 use std::sync::Arc;
 
@@ -81,8 +81,8 @@ impl Snapshot {
 
     /// Starts an isolated typed edit based on this snapshot.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction::new(self.clone())
+    pub fn edit(&self) -> Edit {
+        Edit::new(self.clone())
     }
 
     pub(crate) fn patch_to(&self, after: &Snapshot) -> Patch {

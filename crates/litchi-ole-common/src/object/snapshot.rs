@@ -2,15 +2,15 @@
 //!
 //! A snapshot is the read side of the object owner.  It keeps the package
 //! topology and stream allocations shared across clones while leaving all
-//! mutation inside [`super::Editor`].  Format crates can therefore retain a
+//! mutation inside [`super::Edit`].  Format crates can therefore retain a
 //! stable view between semantic reads without holding a mutable editor.
 
 use super::codec::Package;
-use super::editor::Editor;
+use super::editor::Edit;
 use super::link::Link;
 use super::model::Objects;
 use super::target::Targets;
-use crate::ole_streams::{self, NativeSnapshot, PresentationSnapshot};
+use crate::ole_streams::{self, native, presentation};
 use litchi_cfb::{OleError, OleFile, OleFileLimits, SectorLayoutPolicy};
 use std::io::Cursor;
 use std::sync::Arc;
@@ -75,13 +75,13 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns the same bounded CFB and target-validation errors as
-    /// [`super::Editor::open`].
+    /// [`super::Edit::open`].
     pub fn open(
         bytes: Vec<u8>,
         targets: Targets,
         limits: super::model::Limits,
     ) -> Result<Self, OleError> {
-        Ok(Editor::open(bytes, targets, limits)?.snapshot())
+        Ok(Edit::open(bytes, targets, limits)?.staged())
     }
 
     /// The target catalog used by this snapshot.
@@ -94,12 +94,6 @@ impl Snapshot {
     #[must_use]
     pub fn objects(&self) -> &Objects {
         &self.state.objects
-    }
-
-    /// Whether the snapshot was produced after a committed edit.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.state.changed
     }
 
     /// The sector-layout policy captured from the editor that produced this
@@ -137,80 +131,53 @@ impl Snapshot {
             .link()
     }
 
-    /// Returns one selected object's direct-child OLEDS presentation stream.
-    ///
-    /// The returned snapshot shares the captured stream allocation.  It is an
-    /// inert view: no presentation payload is decoded, opened, or activated.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when `key` is absent, `index` is invalid, or the
-    /// matching stream is malformed or exceeds the default OLEDS limit.
+    /// Returns one selected object's presentation under explicit OLEDS limits.
     pub fn presentation(
         &self,
         key: &str,
         index: usize,
-    ) -> Result<Option<PresentationSnapshot>, OleError> {
-        self.presentation_with_limits(key, index, ole_streams::Limits::default())
-    }
-
-    /// Returns one selected object's presentation under explicit OLEDS limits.
-    pub fn presentation_with_limits(
-        &self,
-        key: &str,
-        index: usize,
         limits: ole_streams::Limits,
-    ) -> Result<Option<PresentationSnapshot>, OleError> {
+    ) -> Result<Option<presentation::Snapshot>, OleError> {
         self.state
             .objects
             .get(key)
             .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?
-            .presentation_with_limits(index, limits)
-    }
-
-    /// Returns all selected-object OLEDS presentations in numeric order.
-    pub fn presentations(&self, key: &str) -> Result<Vec<(usize, PresentationSnapshot)>, OleError> {
-        self.presentations_with_limits(key, ole_streams::Limits::default())
+            .presentation(index, limits)
     }
 
     /// Returns all selected-object OLEDS presentations under explicit limits.
-    pub fn presentations_with_limits(
+    pub fn presentations(
         &self,
         key: &str,
         limits: ole_streams::Limits,
-    ) -> Result<Vec<(usize, PresentationSnapshot)>, OleError> {
+    ) -> Result<Vec<(usize, presentation::Snapshot)>, OleError> {
         self.state
             .objects
             .get(key)
             .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?
-            .presentations_with_limits(limits)
-    }
-
-    /// Returns a selected object's direct-child OLEDS native-data stream.
-    pub fn native(&self, key: &str) -> Result<Option<NativeSnapshot>, OleError> {
-        self.native_with_limits(key, ole_streams::Limits::default())
+            .presentations(limits)
     }
 
     /// Returns a selected object's native-data stream under explicit limits.
-    pub fn native_with_limits(
+    pub fn native(
         &self,
         key: &str,
         limits: ole_streams::Limits,
-    ) -> Result<Option<NativeSnapshot>, OleError> {
+    ) -> Result<Option<native::Snapshot>, OleError> {
         self.state
             .objects
             .get(key)
             .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?
-            .native_with_limits(limits)
+            .native(limits)
     }
 
-    /// Creates an independent transactional editor from this snapshot.
+    /// Starts an independent edit from this snapshot.
     ///
-    /// The editor shares captured stream allocations until a write replaces
-    /// one of them, so creating a transaction does not copy large payloads.
+    /// The edit shares captured stream allocations until a write replaces
+    /// one of them, so starting an edit does not copy large payloads.
     #[must_use]
-    pub fn edit(&self) -> Editor {
-        Editor::from_snapshot(self)
+    pub fn edit(&self) -> Edit {
+        Edit::from_snapshot(self)
     }
 
     /// Renders the snapshot, preserving the original bytes for a true no-op.

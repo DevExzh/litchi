@@ -57,9 +57,4 @@ pub use model::{
 };
 #[cfg(test)]
 pub(crate) use model::{DEFAULT_CODEPAGE, PID_BEHAVIOR, PID_CODEPAGE};
-pub use non_simple::{
-    Commit as NonSimpleCommit, Editor as NonSimpleEditor, Element as NonSimpleElement,
-    ElementKind as NonSimpleElementKind, Limits as NonSimpleLimits, Patch as NonSimplePatch,
-    Revision as NonSimpleRevision, Snapshot as NonSimpleSnapshot,
-};
 pub use summary_properties::SummaryProperties;

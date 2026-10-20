@@ -11,7 +11,7 @@ use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{EditProtection, PackagePatch, ProtectionPolicy, classify};
 use crate::writer::fib::FibBuilder;
-use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Targets};
+use litchi_ole_common::object::{Edit as ObjectEditor, Limits, Targets};
 
 /// `FibRgFcLcb97` index of fcCmds/lcbCmds (MS-DOC 2.5).
 pub const FIB_INDEX_CMDS: usize = 24;
@@ -264,7 +264,7 @@ impl Editor {
         let patch = TransactionCommit::new(self.original, self.command_bars.clone());
         let object_commit = self.package.commit().map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
-        let package_patch = PackagePatch::new(object_commit.into_patch(), self.protection);
+        let package_patch = PackagePatch::new(object_commit.into_parts().1, self.protection);
         Ok(Commit {
             snapshot: Snapshot::new(bytes, self.command_bars),
             patch,
@@ -280,7 +280,8 @@ impl Editor {
                 .clone()
                 .commit()
                 .map_err(PackageError::from)?
-                .into_patch();
+                .into_parts()
+                .1;
             let package_patch = PackagePatch::new(package_patch, self.protection);
             return Ok(Commit {
                 snapshot: self.snapshot()?,
@@ -301,7 +302,7 @@ impl Editor {
             .commit()
             .map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
-        let package_patch = PackagePatch::new(object_commit.into_patch(), candidate.protection);
+        let package_patch = PackagePatch::new(object_commit.into_parts().1, candidate.protection);
         let package_snapshot = Snapshot::new(bytes, candidate.command_bars.clone());
         *self = candidate;
         Ok(Commit {

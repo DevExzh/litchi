@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use litchi_biff::{Limits as BiffLimits, Records};
 use litchi_ograph::chart::{Kind as GraphChartKind, Ref as GraphChartRef, Refs as GraphCharts};
-use litchi_ole_common::object::{Editor as ObjectEditor, Limits as ObjectLimits, Targets};
+use litchi_ole_common::object::{Edit as ObjectEditor, Limits as ObjectLimits, Targets};
 
 use super::chart_area;
 #[cfg(test)]

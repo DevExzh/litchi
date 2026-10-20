@@ -14,7 +14,7 @@ use litchi_cfb::{
     OleFile, OleWriter, OverlayLimits, SameLengthStreamOverlay, SectorLayoutPolicy, SharedOleFile,
 };
 use litchi_core::OwnedSource;
-use litchi_ole_common::object::{Editor, EntryKind, Limits, Snapshot, Target, Targets, discover};
+use litchi_ole_common::object::{Edit, EntryKind, Limits, Snapshot, Target, Targets, discover};
 use litchi_ole_common::property_set::Guid;
 use std::io::Cursor;
 use std::sync::Arc;
@@ -196,7 +196,7 @@ fn discovery_resolves_case_variant_target_paths_to_stored_cfb_names() {
         ["ObjectPool".to_string(), "_42".to_string()].as_slice()
     );
 
-    let editor = Editor::open(doc_with_object(&[0, 0, 0, 0]), selected, Limits::default())
+    let editor = Edit::open(doc_with_object(&[0, 0, 0, 0]), selected, Limits::default())
         .expect("editor target should resolve");
     assert_eq!(
         editor
@@ -252,11 +252,11 @@ fn targeted_replace_preserves_unrelated_streams_and_opaque_reference() {
     });
     let selected = targets("object", &["ObjectPool", "_42"]);
     let mut editor =
-        Editor::open(original, selected.clone(), Limits::default()).expect("editor should open");
+        Edit::open(original, selected.clone(), Limits::default()).expect("editor should open");
     editor
         .replace("object", replacement)
         .expect("replacement should commit");
-    assert!(editor.is_changed());
+    assert!(editor.clone().commit().unwrap().diagnostics().changed());
     let output = editor.finish().expect("editor should finish");
     let mut ole = OleFile::open(Cursor::new(output)).expect("output CFB should open");
     assert_eq!(
@@ -283,20 +283,20 @@ fn targeted_replace_preserves_unrelated_streams_and_opaque_reference() {
 #[test]
 fn no_op_editor_round_trip_is_byte_identical() {
     let original = doc_with_object(&[0, 0, 0, 0]);
-    let editor = Editor::open(
+    let editor = Edit::open(
         original.clone(),
         targets("object", &["ObjectPool", "_42"]),
         Limits::default(),
     )
     .expect("editor should open");
-    assert!(!editor.is_changed());
+    assert!(!editor.clone().commit().unwrap().diagnostics().changed());
     assert_eq!(editor.finish().expect("editor should finish"), original);
 }
 
 #[test]
 fn commit_exposes_snapshot_and_reversible_patch() {
     let original = doc_with_object(&[0, 0, 0, 0]);
-    let mut editor = Editor::open(
+    let mut editor = Edit::open(
         original.clone(),
         targets("object", &["ObjectPool", "_42"]),
         Limits::default(),
@@ -310,7 +310,7 @@ fn commit_exposes_snapshot_and_reversible_patch() {
     assert_eq!(committed.patch().before(), original.as_slice());
     assert_eq!(
         committed
-            .snapshot()
+            .package()
             .finish()
             .expect("snapshot should finish"),
         committed.patch().after()
@@ -365,7 +365,7 @@ fn editor_edit_preserves_directory_metadata_for_unchanged_entries() {
             .unwrap();
     });
     let selected = targets("object", &["ObjectPool", "_42"]);
-    let mut editor = Editor::open(original, selected, Limits::default()).expect("editor opens");
+    let mut editor = Edit::open(original, selected, Limits::default()).expect("editor opens");
     editor
         .put_stream(&["WordDocument".into()], b"edited host bytes".to_vec())
         .expect("unrelated stream edit should commit");
@@ -443,7 +443,7 @@ fn selected_storage_metadata_stays_on_object_while_promoted_root_uses_defaults()
     assert_eq!(root.creation_time, 0);
     assert_eq!(root.modified_time, 0);
 
-    let editor = Editor::open(
+    let editor = Edit::open(
         source,
         targets("object", &["Pool", "Object"]),
         Limits::default(),
@@ -491,7 +491,7 @@ fn replacement_preserves_target_storage_metadata_while_mapping_clsid() {
         writer.set_root_modified_time(0x3132_3334_3536_3738);
         writer.create_stream(&["Payload"], b"new").unwrap();
     });
-    let mut editor = Editor::open(
+    let mut editor = Edit::open(
         original,
         targets("object", &["Pool", "Object"]),
         Limits::default(),
@@ -534,7 +534,7 @@ fn replacement_preserves_target_storage_metadata_while_mapping_clsid() {
 
 #[test]
 fn added_storage_uses_zero_metadata_for_nonzero_source_root() {
-    let mut editor = Editor::open(
+    let mut editor = Edit::open(
         doc_with_object(&[0, 0, 0, 0]),
         targets("first", &["ObjectPool", "_42"]),
         Limits::default(),
@@ -600,7 +600,7 @@ fn object_add_and_replace_preflight_limits_are_failure_atomic() {
             .create_storage(&["Other"])
             .expect("unrelated storage should write");
     });
-    let mut editor = Editor::open(
+    let mut editor = Edit::open(
         original.clone(),
         targets("object", &["ObjectPool", "_42"]),
         limits,
@@ -611,14 +611,14 @@ fn object_add_and_replace_preflight_limits_are_failure_atomic() {
         .expect("replacement should be admitted independently")
         .expect("replacement should change the selected object");
     assert!(editor.replace_prepared(prepared).is_err());
-    assert!(!editor.is_changed());
+    assert!(!editor.clone().commit().unwrap().diagnostics().changed());
     assert_eq!(
         editor.finish().expect("failed replacement stays exact"),
         original
     );
 
     let original = doc_with_object(&[0, 0, 0, 0]);
-    let mut editor = Editor::open(
+    let mut editor = Edit::open(
         original.clone(),
         targets("first", &["ObjectPool", "_42"]),
         limits,
@@ -629,21 +629,21 @@ fn object_add_and_replace_preflight_limits_are_failure_atomic() {
             .add_storage(target("second", &["ObjectPool", "_43"]), replacement)
             .is_err()
     );
-    assert!(!editor.is_changed());
+    assert!(!editor.clone().commit().unwrap().diagnostics().changed());
     assert_eq!(editor.finish().expect("failed add stays exact"), original);
 }
 
 #[test]
 fn failed_replacement_is_transactional() {
     let original = doc_with_object(&[0, 0, 0, 0]);
-    let mut editor = Editor::open(
+    let mut editor = Edit::open(
         original.clone(),
         targets("object", &["ObjectPool", "_42"]),
         Limits::default(),
     )
     .expect("editor should open");
     assert!(editor.replace("object", vec![1, 2, 3]).is_err());
-    assert!(!editor.is_changed());
+    assert!(!editor.clone().commit().unwrap().diagnostics().changed());
     assert_eq!(editor.finish().expect("editor should finish"), original);
 }
 
@@ -654,7 +654,7 @@ fn uniquely_owned_noop_editor_retains_the_consumed_vec_allocation() {
     let expected = source.clone();
     let allocation = source.as_ptr();
     let capacity = source.capacity();
-    let editor = Editor::open(
+    let editor = Edit::open(
         source,
         targets("object", &["ObjectPool", "_42"]),
         Limits::default(),
@@ -680,7 +680,7 @@ fn prepared_replacement_admission_is_bounded_and_source_bound() {
             .expect("replacement stream should write");
     });
 
-    let editor = Editor::open(original.clone(), selected.clone(), Limits::default())
+    let editor = Edit::open(original.clone(), selected.clone(), Limits::default())
         .expect("editor should open");
     let original_object_size = editor
         .objects()
@@ -697,7 +697,7 @@ fn prepared_replacement_admission_is_bounded_and_source_bound() {
             .expect("exact replacement should be admitted")
             .is_none()
     );
-    assert!(!editor.is_changed());
+    assert!(!editor.clone().commit().unwrap().diagnostics().changed());
     assert_eq!(
         editor
             .clone()
@@ -710,7 +710,7 @@ fn prepared_replacement_admission_is_bounded_and_source_bound() {
         max_object_size: original_object_size,
         ..Limits::default()
     };
-    let bounded = Editor::open(original.clone(), selected.clone(), bounded_limits)
+    let bounded = Edit::open(original.clone(), selected.clone(), bounded_limits)
         .expect("bounded source should open");
     let oversized = write_cfb(|writer| {
         writer
@@ -721,7 +721,7 @@ fn prepared_replacement_admission_is_bounded_and_source_bound() {
             .expect("oversized replacement should write");
     });
     assert!(bounded.prepare_replacement("object", oversized).is_err());
-    assert!(!bounded.is_changed());
+    assert!(!bounded.clone().commit().unwrap().diagnostics().changed());
     assert_eq!(
         bounded.finish().expect("failed admission stays exact"),
         original
@@ -732,7 +732,7 @@ fn prepared_replacement_admission_is_bounded_and_source_bound() {
         max_storage_depth: 2,
         ..Limits::default()
     };
-    let object_count_editor = Editor::open(original.clone(), selected.clone(), object_count_limits)
+    let object_count_editor = Edit::open(original.clone(), selected.clone(), object_count_limits)
         .expect("source should fit per-object limits");
     let too_many_streams = write_cfb(|writer| {
         for name in ["A", "B", "C", "D", "E"] {
@@ -757,7 +757,14 @@ fn prepared_replacement_admission_is_bounded_and_source_bound() {
             .prepare_replacement("object", too_many_storages)
             .is_err()
     );
-    assert!(!object_count_editor.is_changed());
+    assert!(
+        !object_count_editor
+            .clone()
+            .commit()
+            .unwrap()
+            .diagnostics()
+            .changed()
+    );
     assert_eq!(
         object_count_editor
             .finish()
@@ -765,7 +772,7 @@ fn prepared_replacement_admission_is_bounded_and_source_bound() {
         original
     );
 
-    let mut stale = Editor::open(original.clone(), selected.clone(), Limits::default())
+    let mut stale = Edit::open(original.clone(), selected.clone(), Limits::default())
         .expect("editor should open");
     let prepared = stale
         .prepare_replacement("object", replacement.clone())
@@ -790,20 +797,20 @@ fn prepared_replacement_admission_is_bounded_and_source_bound() {
 
     let mut different_limits = Limits::default();
     different_limits.max_total_size -= 1;
-    let mut other = Editor::open(original.clone(), selected, different_limits)
+    let mut other = Edit::open(original.clone(), selected, different_limits)
         .expect("different limits should still admit the fixture");
     let prepared = editor
         .prepare_replacement("object", replacement.clone())
         .expect("replacement should be admitted")
         .expect("replacement should change the object");
     assert!(other.replace_prepared(prepared).is_err());
-    assert!(!other.is_changed());
+    assert!(!other.clone().commit().unwrap().diagnostics().changed());
     assert_eq!(
         other.finish().expect("limit mismatch stays exact"),
         original
     );
 
-    let mut same_limit_other = Editor::open(
+    let mut same_limit_other = Edit::open(
         original.clone(),
         targets("object", &["ObjectPool", "_42"]),
         Limits::default(),
@@ -814,7 +821,14 @@ fn prepared_replacement_admission_is_bounded_and_source_bound() {
         .expect("replacement should be admitted")
         .expect("replacement should change the object");
     assert!(same_limit_other.replace_prepared(prepared).is_err());
-    assert!(!same_limit_other.is_changed());
+    assert!(
+        !same_limit_other
+            .clone()
+            .commit()
+            .unwrap()
+            .diagnostics()
+            .changed()
+    );
     assert_eq!(
         same_limit_other
             .finish()
@@ -831,7 +845,7 @@ fn prepared_replacement_commit_supports_forward_and_inverse_patch() {
             .create_stream(&["CONTENTS"], b"forward replacement")
             .expect("replacement stream should write");
     });
-    let mut editor = Editor::open(
+    let mut editor = Edit::open(
         original.clone(),
         targets("object", &["ObjectPool", "_42"]),
         Limits::default(),
@@ -864,7 +878,7 @@ fn prepared_replacement_commit_supports_forward_and_inverse_patch() {
 #[test]
 fn shared_stream_replacement_reuses_validated_allocation() {
     let original = doc_with_object(&[0, 0, 0, 0]);
-    let mut editor = Editor::open(
+    let mut editor = Edit::open(
         original,
         targets("object", &["ObjectPool", "_42"]),
         Limits::default(),
@@ -929,7 +943,7 @@ fn same_length_editor_edit_uses_source_backed_copy_through() {
     let mut mutated = source.clone();
     mutated[free_offset] = 0xA7;
 
-    let mut editor = Editor::open(mutated.clone(), Targets::default(), Limits::default())
+    let mut editor = Edit::open(mutated.clone(), Targets::default(), Limits::default())
         .expect("source should open");
     editor
         .put_stream(&["A".into()], vec![0x44u8; 6_000])
@@ -1014,11 +1028,11 @@ fn sealed_copy_through_publishes_the_generic_overlay_bytes() {
     // One edit: the editor's commit-time render and its finish both take the
     // sealed copy-through and publish the generic plan's bytes.
     let mut editor =
-        Editor::open(source.clone(), Targets::default(), Limits::default()).expect("open");
+        Edit::open(source.clone(), Targets::default(), Limits::default()).expect("open");
     editor
         .put_stream(&["A".into()], a.clone())
         .expect("same-length edit should commit");
-    let snapshot = editor.snapshot();
+    let snapshot = editor.staged();
     assert_eq!(snapshot.finish().expect("snapshot finish"), expected_a);
     let commit = editor.clone().commit().expect("commit");
     assert_eq!(commit.patch().before(), source.as_slice());
@@ -1027,7 +1041,7 @@ fn sealed_copy_through_publishes_the_generic_overlay_bytes() {
 
     // Chained edits still overlay the one original allocation.
     let mut editor =
-        Editor::open(source.clone(), Targets::default(), Limits::default()).expect("open");
+        Edit::open(source.clone(), Targets::default(), Limits::default()).expect("open");
     editor.put_stream(&["A".into()], a).expect("first edit");
     editor
         .put_stream(&["Mini".into()], mini)
@@ -1064,7 +1078,7 @@ fn same_length_overlay_declines_noncanonical_v3_empty_size_word() {
     let mut mutated = source;
     mutated[size_high..size_high + 4].copy_from_slice(&0xDEAD_BEEFu32.to_le_bytes());
 
-    let mut editor = Editor::open(mutated, Targets::default(), Limits::default())
+    let mut editor = Edit::open(mutated, Targets::default(), Limits::default())
         .expect("mutated source should open");
     editor
         .put_stream(&["A".into()], vec![0x44u8; 128])
@@ -1093,14 +1107,14 @@ fn batched_stream_replacement_is_atomic_and_reuses_allocations() {
     ];
     let word: Arc<[u8]> = Arc::from(&b"batched word stream"[..]);
     let preview: Arc<[u8]> = Arc::from(&b"batched preview stream"[..]);
-    let mut noop = Editor::open(original.clone(), selected.clone(), Limits::default())
+    let mut noop = Edit::open(original.clone(), selected.clone(), Limits::default())
         .expect("no-op editor should open");
     let original_word = noop
         .stream_shared(&word_path)
         .expect("original WordDocument should be available");
     noop.put_streams_shared([(word_path.as_slice(), Arc::clone(&original_word))])
         .expect("identical batch should be a no-op");
-    assert!(!noop.is_changed());
+    assert!(!noop.clone().commit().unwrap().diagnostics().changed());
     assert!(Arc::ptr_eq(
         &original_word,
         &noop
@@ -1109,7 +1123,7 @@ fn batched_stream_replacement_is_atomic_and_reuses_allocations() {
     ));
     assert_eq!(noop.finish().expect("no-op batch stays exact"), original);
 
-    let mut sequential = Editor::open(original.clone(), selected.clone(), Limits::default())
+    let mut sequential = Edit::open(original.clone(), selected.clone(), Limits::default())
         .expect("sequential editor should open");
     sequential
         .put_stream_shared(&word_path, Arc::clone(&word))
@@ -1121,7 +1135,7 @@ fn batched_stream_replacement_is_atomic_and_reuses_allocations() {
         .finish()
         .expect("sequential editor should finish");
 
-    let mut editor = Editor::open(original.clone(), selected.clone(), Limits::default())
+    let mut editor = Edit::open(original.clone(), selected.clone(), Limits::default())
         .expect("editor should open");
     editor
         .put_streams_shared([
@@ -1146,7 +1160,7 @@ fn batched_stream_replacement_is_atomic_and_reuses_allocations() {
         sequential
     );
 
-    let mut rendered_editor = Editor::open(original.clone(), selected.clone(), Limits::default())
+    let mut rendered_editor = Edit::open(original.clone(), selected.clone(), Limits::default())
         .expect("rendered editor should open");
     let rendered = rendered_editor
         .put_streams_shared_with_rendered([
@@ -1184,10 +1198,17 @@ fn batched_stream_replacement_is_atomic_and_reuses_allocations() {
             .expect("all-no-op rendered batch should succeed")
             .is_none()
     );
-    assert!(rendered_editor.is_changed());
+    assert!(
+        rendered_editor
+            .clone()
+            .commit()
+            .unwrap()
+            .diagnostics()
+            .changed()
+    );
 
     let missing_path = vec!["missing".to_string()];
-    let mut failed = Editor::open(original.clone(), selected, Limits::default())
+    let mut failed = Edit::open(original.clone(), selected, Limits::default())
         .expect("second editor should open");
     let failed_word = failed
         .stream_shared(&word_path)
@@ -1200,7 +1221,7 @@ fn batched_stream_replacement_is_atomic_and_reuses_allocations() {
             ])
             .is_err()
     );
-    assert!(!failed.is_changed());
+    assert!(!failed.clone().commit().unwrap().diagnostics().changed());
     assert!(Arc::ptr_eq(
         &failed_word,
         &failed
@@ -1217,7 +1238,7 @@ fn rendered_batch_preserves_repeated_path_last_value() {
     let first: Arc<[u8]> = Arc::from(&b"first repeated value"[..]);
     let second: Arc<[u8]> = Arc::from(&b"last repeated value"[..]);
     let mut editor =
-        Editor::open(original, Targets::default(), Limits::default()).expect("editor should open");
+        Edit::open(original, Targets::default(), Limits::default()).expect("editor should open");
 
     let rendered = editor
         .put_streams_shared_with_rendered([
@@ -1242,7 +1263,7 @@ fn rendered_batch_preserves_repeated_path_last_value() {
             .expect("repeated-path editor should finish")
     );
 
-    let mut restored = Editor::open(
+    let mut restored = Edit::open(
         doc_with_object(&[0, 0, 0, 0]),
         Targets::default(),
         Limits::default(),
@@ -1258,7 +1279,9 @@ fn rendered_batch_preserves_repeated_path_last_value() {
         ])
         .expect("restore batch should succeed");
     assert!(rendered.is_some());
-    assert!(restored.is_changed());
+    // Restoring the original value renders the original bytes: the commit is
+    // an exact no-op.
+    assert!(!restored.clone().commit().unwrap().diagnostics().changed());
     assert!(Arc::ptr_eq(
         &original_word,
         &restored
@@ -1271,7 +1294,7 @@ fn rendered_batch_preserves_repeated_path_last_value() {
 fn rendered_batch_empty_and_equal_inputs_return_none_without_publication() {
     let original = doc_with_object(&[0, 0, 0, 0]);
     let word_path = vec!["WordDocument".to_string()];
-    let mut editor = Editor::open(original.clone(), Targets::default(), Limits::default())
+    let mut editor = Edit::open(original.clone(), Targets::default(), Limits::default())
         .expect("editor should open");
     let original_word = editor
         .stream_shared(&word_path)
@@ -1283,7 +1306,7 @@ fn rendered_batch_empty_and_equal_inputs_return_none_without_publication() {
             .expect("empty batch should succeed")
             .is_none()
     );
-    assert!(!editor.is_changed());
+    assert!(!editor.clone().commit().unwrap().diagnostics().changed());
     assert!(Arc::ptr_eq(
         &original_word,
         &editor
@@ -1297,7 +1320,7 @@ fn rendered_batch_empty_and_equal_inputs_return_none_without_publication() {
             .expect("equal batch should succeed")
             .is_none()
     );
-    assert!(!editor.is_changed());
+    assert!(!editor.clone().commit().unwrap().diagnostics().changed());
     assert!(Arc::ptr_eq(
         &original_word,
         &editor
@@ -1322,7 +1345,7 @@ fn rendered_batch_checks_max_streams_before_equal_repeated_items() {
         ..Limits::default()
     };
     let path = vec!["A".to_string()];
-    let mut editor = Editor::open(original.clone(), Targets::default(), limits)
+    let mut editor = Edit::open(original.clone(), Targets::default(), limits)
         .expect("bounded editor should open");
     let current = editor
         .stream_shared(&path)
@@ -1336,7 +1359,7 @@ fn rendered_batch_checks_max_streams_before_equal_repeated_items() {
             ])
             .is_err()
     );
-    assert!(!editor.is_changed());
+    assert!(!editor.clone().commit().unwrap().diagnostics().changed());
     assert!(Arc::ptr_eq(
         &current,
         &editor
@@ -1356,7 +1379,7 @@ fn rendered_batch_matches_recomputed_output_under_both_layout_policies() {
     let replacement: Arc<[u8]> = Arc::from(&b"layout policy replacement"[..]);
 
     for policy in [SectorLayoutPolicy::Reuse, SectorLayoutPolicy::Rewrite] {
-        let mut editor = Editor::open(original.clone(), Targets::default(), Limits::default())
+        let mut editor = Edit::open(original.clone(), Targets::default(), Limits::default())
             .expect("editor should open");
         editor.set_sector_layout_policy(policy);
         let rendered = editor
@@ -1376,7 +1399,7 @@ fn rendered_batch_matches_recomputed_output_under_both_layout_policies() {
 #[test]
 fn add_and_remove_use_explicit_targets() {
     let original = doc_with_object(&[0, 0, 0, 0]);
-    let mut editor = Editor::open(
+    let mut editor = Edit::open(
         original,
         targets("first", &["ObjectPool", "_42"]),
         Limits::default(),
@@ -1406,7 +1429,7 @@ fn snapshots_share_streams_and_edit_independently() {
     let snapshot = Snapshot::open(original.clone(), selected, Limits::default())
         .expect("snapshot should open");
     let clone = snapshot.clone();
-    assert!(!snapshot.is_changed());
+    assert_eq!(snapshot.finish().expect("source should finish"), original);
     let path = vec!["WordDocument".to_string()];
     let first = snapshot
         .stream_shared(&path)
@@ -1420,7 +1443,6 @@ fn snapshots_share_streams_and_edit_independently() {
     editor
         .put_stream(&path, b"edited from snapshot".to_vec())
         .expect("snapshot edit should commit");
-    assert!(!snapshot.is_changed());
     assert_eq!(snapshot.finish().expect("source should finish"), original);
     assert_eq!(editor.stream(&path), Some(&b"edited from snapshot"[..]));
 }
@@ -1463,18 +1485,18 @@ fn changed_snapshot_finish_keeps_the_source_layout_used_by_doc_editors() {
         output.into_inner()
     };
 
-    let mut editor = Editor::open(source.clone(), Targets::default(), Limits::default())
+    let mut editor = Edit::open(source.clone(), Targets::default(), Limits::default())
         .expect("source should open");
     editor
         .put_stream(&["A".into()], vec![0x55u8; 5_000])
         .expect("DOC stream edit should commit");
     let commit = editor.commit().expect("DOC edit should commit");
     assert_eq!(
-        commit.snapshot().sector_layout_policy(),
+        commit.package().sector_layout_policy(),
         SectorLayoutPolicy::Reuse
     );
     assert_eq!(
-        commit.snapshot().finish().expect("snapshot should finish"),
+        commit.package().finish().expect("snapshot should finish"),
         commit.patch().after(),
         "a changed source-backed snapshot must use the same layout policy as the DOC save"
     );
@@ -1505,14 +1527,14 @@ fn physical_candidate_limit_survives_snapshot_reopening_and_refusal() {
     });
     let maximum = u64::try_from(original.len()).unwrap();
     let limits = litchi_cfb::OleFileLimits::new(maximum).unwrap();
-    let editor = Editor::open_with_cfb_limits(
+    let editor = Edit::open_with_cfb_limits(
         original.clone(),
         Targets::default(),
         Limits::default(),
         limits,
     )
     .unwrap();
-    let snapshot = editor.snapshot();
+    let snapshot = editor.staged();
     let mut reopened = snapshot.edit();
     let path = vec!["Target".to_string()];
     let error = reopened.put_stream(&path, vec![0; 100_000]).unwrap_err();

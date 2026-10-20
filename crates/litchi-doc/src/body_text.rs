@@ -5787,7 +5787,7 @@ mod tests {
         BlobLimits, CompositionLimits, HistoryLimits, Patch, PatchLimits, Reversible,
         SubEditJoinFailure,
     };
-    use litchi_ole_common::object::{Editor as PackageEditor, Targets};
+    use litchi_ole_common::object::{Edit as PackageEditor, Targets};
     use std::io::Cursor;
     use std::sync::{Arc, OnceLock};
 

@@ -206,17 +206,14 @@ impl Transaction {
             },
             _ => property_set::summary_information::Snapshot::new(CodePage::WINDOWS_1252)?,
         };
-        let mut transaction = snapshot.transaction()?;
-        {
-            let mut draft = transaction.edit();
-            edit(&mut draft)?;
-        }
-        let commit = transaction.commit()?;
-        if !commit.changed() {
+        let mut draft = snapshot.edit()?;
+        edit(&mut draft)?;
+        let commit = draft.commit()?;
+        if !commit.diagnostics().changed() {
             return Ok(false);
         }
         self.editor
-            .replace(Binding::SummaryInformation, commit.into_section())?;
+            .replace(Binding::SummaryInformation, commit.into_package())?;
         self.changed = true;
         Ok(true)
     }
@@ -249,17 +246,14 @@ impl Transaction {
             },
             _ => property_set::document_summary::Snapshot::new(CodePage::WINDOWS_1252)?,
         };
-        let mut transaction = snapshot.transaction()?;
-        {
-            let mut draft = transaction.edit();
-            edit(&mut draft)?;
-        }
-        let commit = transaction.commit()?;
-        if !commit.changed() {
+        let mut draft = snapshot.edit()?;
+        edit(&mut draft)?;
+        let commit = draft.commit()?;
+        if !commit.diagnostics().changed() {
             return Ok(false);
         }
         self.editor
-            .replace(Binding::DocumentSummaryInformation, commit.into_section())?;
+            .replace(Binding::DocumentSummaryInformation, commit.into_package())?;
         self.changed = true;
         Ok(true)
     }
