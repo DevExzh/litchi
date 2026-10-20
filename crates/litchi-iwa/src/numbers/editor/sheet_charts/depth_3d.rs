@@ -6,7 +6,7 @@ use crate::charts::depth_3d::{
     chart_3d_depth as read_native_chart_3d_depth, set_chart_3d_depth as set_native_chart_3d_depth,
 };
 
-impl NumbersEditor {
+impl Editor {
     /// Read one sheet chart's depth in Chart-inspector percent.
     pub fn sheet_chart_3d_depth(
         &self,
@@ -52,7 +52,7 @@ impl NumbersEditor {
             graph.info.kind,
             depth,
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_3d_depth(sheet_id, drawable_object_id)? != depth {
             return Err(Error::InvalidFormat(
                 "Numbers chart 3D depth update failed validation".to_owned(),

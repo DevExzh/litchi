@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::{self, KeynoteEditor};
-use litchi_iwa::numbers::{self, NumbersEditor};
-use litchi_iwa::pages::{self, PagesEditor};
+use litchi_iwa::keynote::{self};
+use litchi_iwa::numbers::{self};
+use litchi_iwa::pages::{self};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
 use litchi_iwa_common::table::cell::conditional_highlight::{Condition, Rule, Style, Text};
 use litchi_numbers::cell::Value as CellValue;
@@ -103,7 +103,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.save(output)?;
     assert_eq!(
-        NumbersEditor::open(output)?.cell_conditional_highlight_rules(
+        numbers::Editor::open(output)?.cell_conditional_highlight_rules(
             table_id,
             HIGHLIGHT_ROW,
             HIGHLIGHT_COLUMN,
@@ -111,7 +111,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         Some(rules)
     );
     assert_eq!(
-        NumbersEditor::open(output)?.cell_conditional_highlight_rules(
+        numbers::Editor::open(output)?.cell_conditional_highlight_rules(
             table_id,
             SIGN_HIGHLIGHT_ROW,
             POSITIVE_HIGHLIGHT_COLUMN,
@@ -119,7 +119,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         Some(vec![positive_rule])
     );
     assert_eq!(
-        NumbersEditor::open(output)?.cell_conditional_highlight_rules(
+        numbers::Editor::open(output)?.cell_conditional_highlight_rules(
             table_id,
             SIGN_HIGHLIGHT_ROW,
             NEGATIVE_HIGHLIGHT_COLUMN,
@@ -130,7 +130,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn set_numbers_cells(
-    editor: &mut NumbersEditor,
+    editor: &mut numbers::Editor,
     updates: impl IntoIterator<Item = litchi_numbers::cell::Update>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let changes = updates
@@ -147,7 +147,7 @@ fn set_numbers_cells(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    *editor = NumbersEditor::from_bytes(&bytes)?;
+    *editor = numbers::Editor::from_bytes(&bytes)?;
     Ok(())
 }
 
@@ -231,7 +231,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.save(output)?;
     assert_eq!(
-        PagesEditor::open(output)?.table_cell_conditional_highlight_rules(
+        pages::Editor::open(output)?.table_cell_conditional_highlight_rules(
             table_id,
             HIGHLIGHT_ROW,
             HIGHLIGHT_COLUMN,
@@ -239,7 +239,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         Some(rules)
     );
     assert_eq!(
-        PagesEditor::open(output)?.table_cell_conditional_highlight_rules(
+        pages::Editor::open(output)?.table_cell_conditional_highlight_rules(
             table_id,
             SIGN_HIGHLIGHT_ROW,
             POSITIVE_HIGHLIGHT_COLUMN,
@@ -247,7 +247,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         Some(vec![positive_rule])
     );
     assert_eq!(
-        PagesEditor::open(output)?.table_cell_conditional_highlight_rules(
+        pages::Editor::open(output)?.table_cell_conditional_highlight_rules(
             table_id,
             SIGN_HIGHLIGHT_ROW,
             NEGATIVE_HIGHLIGHT_COLUMN,
@@ -319,7 +319,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.save(output)?;
     assert_eq!(
-        KeynoteEditor::open(output)?.slide_table_cell_conditional_highlight_rules(
+        keynote::Editor::open(output)?.slide_table_cell_conditional_highlight_rules(
             0,
             table.model_object_id,
             HIGHLIGHT_ROW,
@@ -328,7 +328,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         Some(rules)
     );
     assert_eq!(
-        KeynoteEditor::open(output)?.slide_table_cell_conditional_highlight_rules(
+        keynote::Editor::open(output)?.slide_table_cell_conditional_highlight_rules(
             0,
             table.model_object_id,
             SIGN_HIGHLIGHT_ROW,
@@ -337,7 +337,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         Some(vec![positive_rule])
     );
     assert_eq!(
-        KeynoteEditor::open(output)?.slide_table_cell_conditional_highlight_rules(
+        keynote::Editor::open(output)?.slide_table_cell_conditional_highlight_rules(
             0,
             table.model_object_id,
             SIGN_HIGHLIGHT_ROW,

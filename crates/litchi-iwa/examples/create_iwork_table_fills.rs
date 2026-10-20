@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote;
-use litchi_iwa::numbers::{self, NumbersEditor};
+use litchi_iwa::numbers::{self};
 use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill};
 use litchi_numbers::cell::Value as CellValue;
@@ -52,7 +52,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn set_numbers_cell(
-    editor: &mut NumbersEditor,
+    editor: &mut numbers::Editor,
     row: usize,
     column: usize,
     value: CellValue,
@@ -64,7 +64,7 @@ fn set_numbers_cell(
 }
 
 fn set_numbers_cells(
-    editor: &mut NumbersEditor,
+    editor: &mut numbers::Editor,
     updates: impl IntoIterator<Item = litchi_numbers::cell::Update>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let changes = updates
@@ -81,7 +81,7 @@ fn set_numbers_cells(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    *editor = NumbersEditor::from_bytes(&bytes)?;
+    *editor = numbers::Editor::from_bytes(&bytes)?;
     Ok(())
 }
 

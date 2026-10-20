@@ -1,4 +1,4 @@
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::text::{TextNumberAttachmentKind, TextNumberAttachmentSettings, TextPosition};
 use litchi_iwa_common::comment::DrawableId;
@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
         .nth(1)
         .ok_or("usage: create_pages_text_box_number_attachment <output.pages>")?;
-    let mut editor = PagesEditor::create_with_text(BODY)?;
+    let mut editor = pages::Editor::create_with_text(BODY)?;
     let text_box = editor.add_text_box(
         BODY_ANCHOR,
         TEXT_BOX_PREFIX,

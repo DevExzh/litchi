@@ -1591,7 +1591,7 @@ mod tests {
         .unwrap()
     }
 
-    fn explicit_style_id(editor: &NumbersEditor, table_id: u64, row: usize, column: usize) -> u64 {
+    fn explicit_style_id(editor: &Editor, table_id: u64, row: usize, column: usize) -> u64 {
         let descriptor = model::attached_table_descriptor(&editor.package, table_id).unwrap();
         let locations = storage::object_locations(&editor.package).unwrap();
         local_style_id(&editor.package, &descriptor, &locations, row, column)
@@ -2433,7 +2433,7 @@ mod tests {
         pages
             .set_table_cell_paragraph_tab_stops(pages_table, 1, 1, pages_tab_stops.clone())
             .unwrap();
-        let mut pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let mut pages = crate::pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages.table_cell_text_alignment(pages_table, 1, 1).unwrap(),
             Alignment::Justified
@@ -2735,8 +2735,7 @@ mod tests {
                 keynote_tab_stops.clone(),
             )
             .unwrap();
-        let mut keynote =
-            crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
             keynote
                 .slide_table_cell_text_alignment(0, table.model_object_id, 1, 1)

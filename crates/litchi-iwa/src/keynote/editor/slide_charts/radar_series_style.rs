@@ -8,7 +8,7 @@ use crate::charts::radar_series_style::{
     set_chart_radar_series_style as set_native_radar_style,
 };
 
-impl KeynoteEditor {
+impl Editor {
     /// Read the chart-wide Radar `Style` selection.
     pub fn slide_chart_radar_series_style(
         &self,
@@ -58,7 +58,7 @@ impl KeynoteEditor {
             series_count,
             style,
         )?;
-        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_radar_series_style(slide_index, drawable_object_id)? != style {
             return Err(Error::InvalidFormat(
                 "Keynote Radar series-style update failed validation".to_owned(),
@@ -97,7 +97,7 @@ mod tests {
                 ChartRadarSeriesStyle::Stroke,
             )
             .unwrap();
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_chart_radar_series_style(0, chart.drawable_object_id)

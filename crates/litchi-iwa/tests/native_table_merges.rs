@@ -2,11 +2,7 @@
 
 use std::error::Error;
 
-use litchi_iwa::{
-    keynote::KeynoteEditor,
-    numbers::{self, NumbersEditor},
-    pages::PagesEditor,
-};
+use litchi_iwa::{keynote, numbers, pages};
 use litchi_iwa_common::table::merge::Region;
 
 const PAGES: &[u8] = include_bytes!(concat!(
@@ -62,7 +58,7 @@ fn native_numbers_merge_reads_match_and_preserve_source() -> TestResult {
     focused.write_to(&mut output)?;
     assert_eq!(output, NUMBERS);
 
-    let host = NumbersEditor::from_bytes(NUMBERS)?;
+    let host = numbers::Editor::from_bytes(NUMBERS)?;
     // Select the native model in this test oracle without invoking the host's
     // appearance catalog, whose formatting profile excludes this CSV-imported
     // table. The retained merge reader proves attached ownership itself.
@@ -96,7 +92,7 @@ fn native_pages_merge_reads_match_and_preserve_source() -> TestResult {
     focused.write_to(&mut output)?;
     assert_eq!(output, PAGES);
 
-    let host = PagesEditor::from_bytes(PAGES)?;
+    let host = pages::Editor::from_bytes(PAGES)?;
     let tables = host.tables()?;
     assert_eq!(tables.len(), 2);
     assert_eq!(host.table_cell_merges(tables[0].model_object_id)?, expected);
@@ -119,7 +115,7 @@ fn native_pages_merge_reads_match_and_preserve_source() -> TestResult {
     );
     assert_eq!(
         table.get_cell(1, 3),
-        Some(&litchi_iwa::pages::PagesCellValue::Text("北京".into()))
+        Some(&litchi_iwa::pages::CellValue::Text("北京".into()))
     );
     assert_eq!(host.to_bytes()?, PAGES);
     Ok(())
@@ -134,7 +130,7 @@ fn native_keynote_merge_reads_match_and_preserve_source() -> TestResult {
     focused.write_to(&mut output)?;
     assert_eq!(output, KEYNOTE);
 
-    let host = KeynoteEditor::from_bytes(KEYNOTE)?;
+    let host = keynote::Editor::from_bytes(KEYNOTE)?;
     let tables = host.slide_tables(0)?;
     assert_eq!(tables.len(), 1);
     assert_eq!(

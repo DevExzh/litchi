@@ -37,7 +37,7 @@ fn asset_id(raw: u64) -> MediaAssetId {
 }
 
 fn focused_placeholder_visibility(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     kind: FocusedPlaceholderKind,
 ) -> Option<FocusedPlaceholderState> {
@@ -47,15 +47,15 @@ fn focused_placeholder_visibility(
         .unwrap()
 }
 
-fn reopen_focused_package(editor: &mut KeynoteEditor, package: &FocusedKeynotePackage) {
+fn reopen_focused_package(editor: &mut Editor, package: &FocusedKeynotePackage) {
     let mut bytes = Vec::new();
     package.write_to(&mut bytes).unwrap();
-    *editor = KeynoteEditor::from_bytes(&bytes).unwrap();
+    *editor = Editor::from_bytes(&bytes).unwrap();
 }
 
 #[test]
 fn reads_placeholder_text_without_mutating_navigator_names() {
-    let editor = KeynoteEditor::from_package(test_package()).unwrap();
+    let editor = Editor::from_package(test_package()).unwrap();
     let slides = editor.slides().unwrap();
     assert_eq!(slides.len(), 2);
     assert_eq!(slides[0].title.as_deref(), Some("Old title"));
@@ -65,7 +65,7 @@ fn reads_placeholder_text_without_mutating_navigator_names() {
 
 #[test]
 fn build_settings_project_to_semantic_values_and_validate_transactionally() {
-    let settings = KeynoteBuildSettings::appear_in();
+    let settings = BuildSettings::appear_in();
     let semantic = settings.semantic().unwrap();
     assert_eq!(semantic.effect(), &litchi_keynote::build::Effect::Appear);
     assert_eq!(semantic.duration().as_f64(), 1.0);
@@ -93,7 +93,7 @@ fn build_settings_project_to_semantic_values_and_validate_transactionally() {
 
 #[test]
 fn typed_build_mutators_preserve_transactional_invariants() {
-    let mut rotate = KeynoteBuildSettings::rotate_action(90.0, KeynoteRotationDirection::Clockwise);
+    let mut rotate = BuildSettings::rotate_action(90.0, RotationDirection::Clockwise);
     let before_invalid_acceleration = rotate.clone();
     assert!(
         rotate
@@ -111,9 +111,9 @@ fn typed_build_mutators_preserve_transactional_invariants() {
             if action.acceleration() == BuildAcceleration::EaseIn
     ));
 
-    let mut move_settings = KeynoteBuildSettings::move_action(4.0, 5.0);
+    let mut move_settings = BuildSettings::move_action(4.0, 5.0);
     move_settings.set_move_alignment(true).unwrap();
-    let path = KeynoteMotionPath::straight(8.0, 13.0);
+    let path = MotionPath::straight(8.0, 13.0);
     move_settings.set_move_path(path.clone()).unwrap();
     assert_eq!(
         move_settings
@@ -123,7 +123,7 @@ fn typed_build_mutators_preserve_transactional_invariants() {
         Some((&path, true))
     );
 
-    let mut simple = KeynoteBuildSettings::appear_in();
+    let mut simple = BuildSettings::appear_in();
     simple
         .set_effect(litchi_keynote::build::Effect::Appear)
         .unwrap();
@@ -132,7 +132,7 @@ fn typed_build_mutators_preserve_transactional_invariants() {
         &litchi_keynote::build::Effect::Appear
     );
     let before_invalid_path = move_settings.clone();
-    let invalid_path = KeynoteMotionPath {
+    let invalid_path = MotionPath {
         subpaths: Vec::new(),
         natural_width: 0.0,
         natural_height: 0.0,
@@ -145,10 +145,10 @@ fn typed_build_mutators_preserve_transactional_invariants() {
 
 #[test]
 fn slide_build_crud_is_transactional_and_updates_native_caches() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+    let mut editor = Editor::from_package(test_package()).unwrap();
     assert!(editor.slide_builds(0).unwrap().is_empty());
 
-    let settings = KeynoteBuildSettings::appear_in();
+    let settings = BuildSettings::appear_in();
     let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
     assert_eq!(created.drawable_object_id, 5);
     assert_eq!(created.settings, settings);
@@ -160,7 +160,7 @@ fn slide_build_crud_is_transactional_and_updates_native_caches() {
     assert_eq!(node.has_explicit_builds, Some(true));
     assert_eq!(node.has_explicit_builds_cache_version, Some(2));
 
-    let mut updated = KeynoteBuildSettings::dissolve_in();
+    let mut updated = BuildSettings::dissolve_in();
     updated.duration = 2.5;
     updated.delay = 0.25;
     updated.start = BuildStart::AfterTransition;
@@ -198,7 +198,7 @@ fn slide_build_crud_is_transactional_and_updates_native_caches() {
     assert_eq!(node.has_explicit_builds_cache_version, Some(2));
 
     let build_out = editor
-        .add_slide_build(0, 5, KeynoteBuildSettings::appear_out())
+        .add_slide_build(0, 5, BuildSettings::appear_out())
         .unwrap();
     assert_eq!(build_out.settings.animation_type, "Out");
     assert_eq!(build_out.settings.effect, "apple:bc-appear");
@@ -211,9 +211,8 @@ fn slide_rotate_action_crud_maps_native_parameters_and_is_transactional() {
         BuildAttributesAcceleration, BuildAttributesRotationDirection,
     };
 
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let mut settings =
-        KeynoteBuildSettings::rotate_action(810.0, KeynoteRotationDirection::Clockwise);
+    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut settings = BuildSettings::rotate_action(810.0, RotationDirection::Clockwise);
     settings.duration = 2.5;
     settings.rotation.as_mut().unwrap().acceleration = BuildAcceleration::EaseIn;
     let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
@@ -259,9 +258,9 @@ fn slide_rotate_action_crud_maps_native_parameters_and_is_transactional() {
 
     let mut updated = settings;
     updated.duration = 1.25;
-    updated.rotation = Some(KeynoteRotationAction {
+    updated.rotation = Some(RotationAction {
         total_degrees: 270.0,
-        direction: KeynoteRotationDirection::Counterclockwise,
+        direction: RotationDirection::Counterclockwise,
         acceleration: BuildAcceleration::EaseOut,
     });
     editor
@@ -270,7 +269,7 @@ fn slide_rotate_action_crud_maps_native_parameters_and_is_transactional() {
     assert_eq!(editor.slide_builds(0).unwrap()[0].settings, updated);
 
     editor
-        .set_slide_build(0, created.object_id, KeynoteBuildSettings::appear_out())
+        .set_slide_build(0, created.object_id, BuildSettings::appear_out())
         .unwrap();
     let graph = ObjectGraph::read(editor.package()).unwrap();
     let native: kn::BuildArchive = graph
@@ -281,7 +280,7 @@ fn slide_rotate_action_crud_maps_native_parameters_and_is_transactional() {
     assert_eq!(native.attributes.action_acceleration, None);
     assert_eq!(
         editor.slide_builds(0).unwrap()[0].settings,
-        KeynoteBuildSettings::appear_out()
+        BuildSettings::appear_out()
     );
 }
 
@@ -289,15 +288,15 @@ fn slide_rotate_action_crud_maps_native_parameters_and_is_transactional() {
 fn slide_custom_timing_curve_actions_create_update_and_clear_natively() {
     use kn::build_attributes_archive::BuildAttributesAcceleration;
 
-    let curve = KeynoteBuildTimingCurve::cubic(
-        KeynoteMotionPathPoint::new(0.18, 0.04),
-        KeynoteMotionPathPoint::new(0.82, 0.96),
+    let curve = BuildTimingCurve::cubic(
+        MotionPathPoint::new(0.18, 0.04),
+        MotionPathPoint::new(0.82, 0.96),
     );
-    let settings = KeynoteBuildSettings::rotate_action(720.0, KeynoteRotationDirection::Clockwise)
+    let settings = BuildSettings::rotate_action(720.0, RotationDirection::Clockwise)
         .with_custom_timing_curve(curve.clone())
         .unwrap();
 
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+    let mut editor = Editor::from_package(test_package()).unwrap();
     let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
     assert_eq!(created.settings, settings);
 
@@ -316,9 +315,9 @@ fn slide_custom_timing_curve_actions_create_update_and_clear_natively() {
     assert_eq!(animation.custom_effect_timing_curve_theme_name_1, None);
     drop(graph);
 
-    let updated_curve = KeynoteBuildTimingCurve::cubic(
-        KeynoteMotionPathPoint::new(0.11, 0.77),
-        KeynoteMotionPathPoint::new(0.91, 0.21),
+    let updated_curve = BuildTimingCurve::cubic(
+        MotionPathPoint::new(0.11, 0.77),
+        MotionPathPoint::new(0.91, 0.21),
     );
     let mut updated = settings.clone();
     updated
@@ -354,14 +353,13 @@ fn slide_custom_timing_curve_actions_create_update_and_clear_natively() {
 
 #[test]
 fn slide_custom_timing_curve_rejects_invalid_pairing_and_shape_transactionally() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let settings =
-        KeynoteBuildSettings::rotate_action(90.0, KeynoteRotationDirection::Counterclockwise);
+    let mut editor = Editor::from_package(test_package()).unwrap();
+    let settings = BuildSettings::rotate_action(90.0, RotationDirection::Counterclockwise);
     let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
     let before = editor.to_bytes().unwrap();
 
     let mut builtin_curve = settings.clone();
-    builtin_curve.timing_curve = Some(KeynoteBuildTimingCurve::linear());
+    builtin_curve.timing_curve = Some(BuildTimingCurve::linear());
     assert!(
         editor
             .set_slide_build(0, created.object_id, builtin_curve)
@@ -369,7 +367,7 @@ fn slide_custom_timing_curve_rejects_invalid_pairing_and_shape_transactionally()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
 
-    let mut invalid_curve = KeynoteBuildTimingCurve::linear();
+    let mut invalid_curve = BuildTimingCurve::linear();
     invalid_curve.path.subpaths[0].nodes[1].point.y = 0.9;
     let mut invalid_setter = settings.clone();
     assert!(
@@ -395,21 +393,21 @@ fn slide_custom_timing_curve_rejects_invalid_pairing_and_shape_transactionally()
     assert_eq!(editor.to_bytes().unwrap(), before);
 
     assert!(
-        KeynoteBuildSettings::appear_in()
-            .with_custom_timing_curve(KeynoteBuildTimingCurve::linear())
+        BuildSettings::appear_in()
+            .with_custom_timing_curve(BuildTimingCurve::linear())
             .is_err()
     );
 }
 
 #[test]
 fn slide_custom_timing_curve_updates_preserve_deep_unknown_path_wire() {
-    let settings = KeynoteBuildSettings::rotate_action(360.0, KeynoteRotationDirection::Clockwise)
-        .with_custom_timing_curve(KeynoteBuildTimingCurve::cubic(
-            KeynoteMotionPathPoint::new(0.15, 0.1),
-            KeynoteMotionPathPoint::new(0.85, 0.9),
+    let settings = BuildSettings::rotate_action(360.0, RotationDirection::Clockwise)
+        .with_custom_timing_curve(BuildTimingCurve::cubic(
+            MotionPathPoint::new(0.15, 0.1),
+            MotionPathPoint::new(0.85, 0.9),
         ))
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+    let mut editor = Editor::from_package(test_package()).unwrap();
     let created = editor.add_slide_build(0, 5, settings).unwrap();
     let mut package = editor.into_package();
     let suffixes = [
@@ -476,7 +474,7 @@ fn slide_custom_timing_curve_updates_preserve_deep_unknown_path_wire() {
         })
         .unwrap();
 
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let mut settings = editor.slide_builds(0).unwrap()[0].settings.clone();
     settings.timing_curve.as_mut().unwrap().path.subpaths[0].nodes[0]
         .out_control_point
@@ -505,9 +503,8 @@ fn slide_custom_timing_curve_updates_preserve_deep_unknown_path_wire() {
 
 #[test]
 fn slide_rotate_action_rejects_missing_and_duplicate_native_parameters() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let settings =
-        KeynoteBuildSettings::rotate_action(90.0, KeynoteRotationDirection::Counterclockwise);
+    let mut editor = Editor::from_package(test_package()).unwrap();
+    let settings = BuildSettings::rotate_action(90.0, RotationDirection::Counterclockwise);
     let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
     let mut package = editor.into_package();
     package
@@ -528,13 +525,13 @@ fn slide_rotate_action_rejects_missing_and_duplicate_native_parameters() {
         })
         .unwrap();
     assert!(
-        KeynoteEditor::from_package(package)
+        Editor::from_package(package)
             .unwrap()
             .slide_builds(0)
             .is_err()
     );
 
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+    let mut editor = Editor::from_package(test_package()).unwrap();
     let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
     let mut package = editor.into_package();
     package
@@ -546,7 +543,7 @@ fn slide_rotate_action_rejects_missing_and_duplicate_native_parameters() {
                 append_unknown_varint(
                     &mut attributes,
                     10,
-                    native_rotation_direction(KeynoteRotationDirection::Clockwise) as u64,
+                    native_rotation_direction(RotationDirection::Clockwise) as u64,
                 );
                 Ok(attributes)
             })?;
@@ -560,7 +557,7 @@ fn slide_rotate_action_rejects_missing_and_duplicate_native_parameters() {
             Ok(())
         })
         .unwrap();
-    let mut malformed = KeynoteEditor::from_package(package).unwrap();
+    let mut malformed = Editor::from_package(package).unwrap();
     assert!(malformed.slide_builds(0).is_err());
     let before = malformed.to_bytes().unwrap();
     assert!(
@@ -575,13 +572,13 @@ fn slide_rotate_action_rejects_missing_and_duplicate_native_parameters() {
 fn slide_scale_and_opacity_action_crud_maps_native_parameters_and_is_transactional() {
     use kn::build_attributes_archive::BuildAttributesAcceleration;
 
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let mut scale = KeynoteBuildSettings::scale_action(0.280_904_227_638_190_7);
+    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut scale = BuildSettings::scale_action(0.280_904_227_638_190_7);
     scale.duration = 1.75;
     scale.scale.as_mut().unwrap().acceleration = BuildAcceleration::EaseOut;
     let scale_build = editor.add_slide_build(0, 5, scale.clone()).unwrap();
 
-    let mut opacity = KeynoteBuildSettings::opacity_action(37.0);
+    let mut opacity = BuildSettings::opacity_action(37.0);
     opacity.duration = 2.25;
     opacity.opacity.as_mut().unwrap().acceleration = BuildAcceleration::EaseIn;
     let opacity_build = editor.add_slide_build(0, 6, opacity.clone()).unwrap();
@@ -629,7 +626,7 @@ fn slide_scale_and_opacity_action_crud_maps_native_parameters_and_is_transaction
             .is_err()
     );
     let mut mismatched = scale.clone();
-    mismatched.opacity = Some(KeynoteOpacityAction {
+    mismatched.opacity = Some(OpacityAction {
         opacity_percent: 50.0,
         acceleration: BuildAcceleration::None,
     });
@@ -657,10 +654,10 @@ fn slide_scale_and_opacity_action_crud_maps_native_parameters_and_is_transaction
 #[test]
 fn slide_scale_and_opacity_reject_malformed_native_parameters() {
     for (settings, scalar_field) in [
-        (KeynoteBuildSettings::scale_action(1.5), 11),
-        (KeynoteBuildSettings::opacity_action(50.0), 12),
+        (BuildSettings::scale_action(1.5), 11),
+        (BuildSettings::opacity_action(50.0), 12),
     ] {
-        let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+        let mut editor = Editor::from_package(test_package()).unwrap();
         let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
         let mut package = editor.into_package();
         package
@@ -681,13 +678,13 @@ fn slide_scale_and_opacity_reject_malformed_native_parameters() {
             })
             .unwrap();
         assert!(
-            KeynoteEditor::from_package(package)
+            Editor::from_package(package)
                 .unwrap()
                 .slide_builds(0)
                 .is_err()
         );
 
-        let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+        let mut editor = Editor::from_package(test_package()).unwrap();
         let created = editor.add_slide_build(0, 5, settings).unwrap();
         let mut package = editor.into_package();
         package
@@ -716,7 +713,7 @@ fn slide_scale_and_opacity_reject_malformed_native_parameters() {
             })
             .unwrap();
         assert!(
-            KeynoteEditor::from_package(package)
+            Editor::from_package(package)
                 .unwrap()
                 .slide_builds(0)
                 .is_err()
@@ -728,14 +725,14 @@ fn slide_scale_and_opacity_reject_malformed_native_parameters() {
 fn slide_emphasis_action_crud_maps_native_parameters_and_cleans_conversions() {
     use kn::build_attributes_archive::ActionBuildAttributesJiggleIntensity;
 
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+    let mut editor = Editor::from_package(test_package()).unwrap();
     let settings = [
-        KeynoteBuildSettings::blink_action(7, true),
-        KeynoteBuildSettings::bounce_action(5, false),
-        KeynoteBuildSettings::flip_action(6, KeynoteFlipDirection::RightToLeft),
-        KeynoteBuildSettings::jiggle_action(KeynoteJiggleIntensity::Large),
-        KeynoteBuildSettings::pop_action(165.0),
-        KeynoteBuildSettings::pulse_action(6, 135.0),
+        BuildSettings::blink_action(7, true),
+        BuildSettings::bounce_action(5, false),
+        BuildSettings::flip_action(6, FlipDirection::RightToLeft),
+        BuildSettings::jiggle_action(JiggleIntensity::Large),
+        BuildSettings::pop_action(165.0),
+        BuildSettings::pulse_action(6, 135.0),
     ];
     let mut builds = Vec::new();
     for settings in &settings {
@@ -791,23 +788,23 @@ fn slide_emphasis_action_crud_maps_native_parameters_and_cleans_conversions() {
     drop(graph);
 
     let before_invalid = editor.to_bytes().unwrap();
-    let mut invalid = KeynoteBuildSettings::pulse_action(0, 135.0);
+    let mut invalid = BuildSettings::pulse_action(0, 135.0);
     assert!(
         editor
             .set_slide_build(0, builds[5], invalid.clone())
             .is_err()
     );
-    invalid.emphasis = Some(KeynoteEmphasisAction::Pulse {
+    invalid.emphasis = Some(EmphasisAction::Pulse {
         repeat_count: 2,
         scale_percent: f64::NAN,
     });
     assert!(editor.set_slide_build(0, builds[5], invalid).is_err());
-    let mut mismatched = KeynoteBuildSettings::blink_action(2, true);
+    let mut mismatched = BuildSettings::blink_action(2, true);
     mismatched.effect = BOUNCE_ACTION_EFFECT.to_owned();
     assert!(editor.set_slide_build(0, builds[5], mismatched).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before_invalid);
 
-    let jiggle = KeynoteBuildSettings::jiggle_action(KeynoteJiggleIntensity::Small);
+    let jiggle = BuildSettings::jiggle_action(JiggleIntensity::Small);
     editor
         .set_slide_build(0, builds[5], jiggle.clone())
         .unwrap();
@@ -835,7 +832,7 @@ fn slide_emphasis_action_crud_maps_native_parameters_and_cleans_conversions() {
     assert_eq!(editor.slide_builds(0).unwrap()[5].settings, jiggle);
 
     editor
-        .set_slide_build(0, builds[5], KeynoteBuildSettings::appear_out())
+        .set_slide_build(0, builds[5], BuildSettings::appear_out())
         .unwrap();
     let graph = ObjectGraph::read(editor.package()).unwrap();
     let converted: kn::BuildArchive = graph
@@ -850,17 +847,17 @@ fn slide_emphasis_action_crud_maps_native_parameters_and_cleans_conversions() {
 #[test]
 fn slide_emphasis_actions_reject_missing_duplicate_and_cross_effect_fields() {
     let cases = [
-        KeynoteBuildSettings::blink_action(7, true),
-        KeynoteBuildSettings::bounce_action(5, false),
-        KeynoteBuildSettings::flip_action(6, KeynoteFlipDirection::LeftToRight),
-        KeynoteBuildSettings::jiggle_action(KeynoteJiggleIntensity::Medium),
-        KeynoteBuildSettings::pop_action(165.0),
-        KeynoteBuildSettings::pulse_action(6, 135.0),
-        KeynoteBuildSettings::blink_action(2, false),
-        KeynoteBuildSettings::rotate_action(90.0, KeynoteRotationDirection::Clockwise),
+        BuildSettings::blink_action(7, true),
+        BuildSettings::bounce_action(5, false),
+        BuildSettings::flip_action(6, FlipDirection::LeftToRight),
+        BuildSettings::jiggle_action(JiggleIntensity::Medium),
+        BuildSettings::pop_action(165.0),
+        BuildSettings::pulse_action(6, 135.0),
+        BuildSettings::blink_action(2, false),
+        BuildSettings::rotate_action(90.0, RotationDirection::Clockwise),
     ];
     for (mutation, settings) in cases.into_iter().enumerate() {
-        let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+        let mut editor = Editor::from_package(test_package()).unwrap();
         let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
         let mut package = editor.into_package();
         package
@@ -907,7 +904,7 @@ fn slide_emphasis_actions_reject_missing_duplicate_and_cross_effect_fields() {
                 Ok(())
             })
             .unwrap();
-        let mut malformed = KeynoteEditor::from_package(package).unwrap();
+        let mut malformed = Editor::from_package(package).unwrap();
         assert!(malformed.slide_builds(0).is_err(), "mutation {mutation}");
         let before = malformed.to_bytes().unwrap();
         assert!(
@@ -922,12 +919,11 @@ fn slide_emphasis_actions_reject_missing_duplicate_and_cross_effect_fields() {
 
 #[test]
 fn slide_keyboard_build_crud_maps_native_parameters_and_cleans_conversions() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let mut build_in = KeynoteBuildSettings::keyboard_in(KeynoteKeyboardDirection::Forward, false);
+    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut build_in = BuildSettings::keyboard_in(KeyboardDirection::Forward, false);
     build_in.duration = 2.25;
     let created_in = editor.add_slide_build(0, 5, build_in.clone()).unwrap();
-    let mut build_out =
-        KeynoteBuildSettings::keyboard_out(KeynoteKeyboardDirection::Backward, true);
+    let mut build_out = BuildSettings::keyboard_out(KeyboardDirection::Backward, true);
     build_out.duration = 1.75;
     let created_out = editor.add_slide_build(0, 6, build_out.clone()).unwrap();
     assert_eq!(created_in.settings, build_in);
@@ -978,7 +974,7 @@ fn slide_keyboard_build_crud_maps_native_parameters_and_cleans_conversions() {
             .is_err()
     );
     let mut mixed = build_in.clone();
-    mixed.emphasis = Some(KeynoteEmphasisAction::Blink {
+    mixed.emphasis = Some(EmphasisAction::Blink {
         repeat_count: 2,
         fade: false,
     });
@@ -989,14 +985,14 @@ fn slide_keyboard_build_crud_maps_native_parameters_and_cleans_conversions() {
     );
     assert_eq!(editor.to_bytes().unwrap(), before_invalid);
 
-    let converted = KeynoteBuildSettings::keyboard_out(KeynoteKeyboardDirection::Backward, true);
+    let converted = BuildSettings::keyboard_out(KeyboardDirection::Backward, true);
     editor
         .set_slide_build(0, created_in.object_id, converted.clone())
         .unwrap();
     assert_eq!(editor.slide_builds(0).unwrap()[0].settings, converted);
 
     editor
-        .set_slide_build(0, created_out.object_id, KeynoteBuildSettings::appear_out())
+        .set_slide_build(0, created_out.object_id, BuildSettings::appear_out())
         .unwrap();
     let graph = ObjectGraph::read(editor.package()).unwrap();
     let cleaned: kn::BuildArchive = graph
@@ -1017,8 +1013,8 @@ fn slide_keyboard_build_crud_maps_native_parameters_and_cleans_conversions() {
 #[test]
 fn slide_keyboard_build_rejects_missing_duplicate_and_cross_effect_fields() {
     for mutation in 0..5 {
-        let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-        let settings = KeynoteBuildSettings::keyboard_in(KeynoteKeyboardDirection::Forward, true);
+        let mut editor = Editor::from_package(test_package()).unwrap();
+        let settings = BuildSettings::keyboard_in(KeyboardDirection::Forward, true);
         let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
         let mut package = editor.into_package();
         package
@@ -1062,7 +1058,7 @@ fn slide_keyboard_build_rejects_missing_duplicate_and_cross_effect_fields() {
                 Ok(())
             })
             .unwrap();
-        let mut malformed = KeynoteEditor::from_package(package).unwrap();
+        let mut malformed = Editor::from_package(package).unwrap();
         assert!(malformed.slide_builds(0).is_err(), "mutation {mutation}");
         let before = malformed.to_bytes().unwrap();
         assert!(
@@ -1081,13 +1077,13 @@ fn slide_dissolve_build_crud_uses_native_text_delivery_defaults() {
         BuildAttributesDeliveryOption, BuildAttributesTextDelivery,
     };
 
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let build_in = KeynoteBuildSettings::dissolve_in();
+    let mut editor = Editor::from_package(test_package()).unwrap();
+    let build_in = BuildSettings::dissolve_in();
     let created = editor.add_slide_build(0, 5, build_in.clone()).unwrap();
     assert_eq!(created.settings, build_in);
     assert_eq!(
         editor.slide_builds(0).unwrap()[0].settings,
-        KeynoteBuildSettings::dissolve_in()
+        BuildSettings::dissolve_in()
     );
 
     let graph = ObjectGraph::read(editor.package()).unwrap();
@@ -1115,14 +1111,14 @@ fn slide_dissolve_build_crud_uses_native_text_delivery_defaults() {
     assert_eq!(native.attributes.custom_travel_distance, None);
     drop(graph);
 
-    let build_out = KeynoteBuildSettings::dissolve_out();
+    let build_out = BuildSettings::dissolve_out();
     editor
         .set_slide_build(0, created.object_id, build_out.clone())
         .unwrap();
     assert_eq!(editor.slide_builds(0).unwrap()[0].settings, build_out);
 
     let before_invalid = editor.to_bytes().unwrap();
-    let mut invalid_direction = KeynoteBuildSettings::dissolve_out();
+    let mut invalid_direction = BuildSettings::dissolve_out();
     invalid_direction.direction = Some(11);
     assert!(
         editor
@@ -1137,16 +1133,16 @@ fn slide_dissolve_build_crud_uses_native_text_delivery_defaults() {
 
 #[test]
 fn slide_object_build_crud_maps_native_effects_directions_and_defaults() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+    let mut editor = Editor::from_package(test_package()).unwrap();
     let settings = [
-        KeynoteBuildSettings::shimmer_in(),
-        KeynoteBuildSettings::shimmer_out(),
-        KeynoteBuildSettings::skid_in(KeynoteHorizontalBuildDirection::LeftToRight),
-        KeynoteBuildSettings::skid_out(KeynoteHorizontalBuildDirection::RightToLeft),
-        KeynoteBuildSettings::swoosh_in(KeynoteSwooshDirection::Center),
-        KeynoteBuildSettings::swoosh_out(KeynoteSwooshDirection::FromRight),
-        KeynoteBuildSettings::trace_in(KeynoteHorizontalBuildDirection::LeftToRight),
-        KeynoteBuildSettings::trace_out(KeynoteHorizontalBuildDirection::RightToLeft),
+        BuildSettings::shimmer_in(),
+        BuildSettings::shimmer_out(),
+        BuildSettings::skid_in(HorizontalBuildDirection::LeftToRight),
+        BuildSettings::skid_out(HorizontalBuildDirection::RightToLeft),
+        BuildSettings::swoosh_in(SwooshDirection::Center),
+        BuildSettings::swoosh_out(SwooshDirection::FromRight),
+        BuildSettings::trace_in(HorizontalBuildDirection::LeftToRight),
+        BuildSettings::trace_out(HorizontalBuildDirection::RightToLeft),
     ];
     let mut object_ids = Vec::new();
     for settings in &settings {
@@ -1252,8 +1248,7 @@ fn slide_object_build_crud_maps_native_effects_directions_and_defaults() {
     assert_eq!(editor.to_bytes().unwrap(), before_noop);
 
     let before_invalid = editor.to_bytes().unwrap();
-    let mut mismatched =
-        KeynoteBuildSettings::trace_in(KeynoteHorizontalBuildDirection::LeftToRight);
+    let mut mismatched = BuildSettings::trace_in(HorizontalBuildDirection::LeftToRight);
     mismatched.effect = SKID_BUILD_EFFECT.to_owned();
     assert!(
         editor
@@ -1269,14 +1264,14 @@ fn slide_object_build_crud_maps_native_effects_directions_and_defaults() {
     );
     assert_eq!(editor.to_bytes().unwrap(), before_invalid);
 
-    let converted = KeynoteBuildSettings::swoosh_out(KeynoteSwooshDirection::FromLeft);
+    let converted = BuildSettings::swoosh_out(SwooshDirection::FromLeft);
     editor
         .set_slide_build(0, object_ids[6], converted.clone())
         .unwrap();
     assert_eq!(editor.slide_builds(0).unwrap()[6].settings, converted);
 
     editor
-        .set_slide_build(0, object_ids[7], KeynoteBuildSettings::appear_out())
+        .set_slide_build(0, object_ids[7], BuildSettings::appear_out())
         .unwrap();
     let graph = ObjectGraph::read(editor.package()).unwrap();
     let cleaned: kn::BuildArchive = graph
@@ -1303,8 +1298,8 @@ fn slide_object_build_crud_maps_native_effects_directions_and_defaults() {
 
 #[test]
 fn slide_object_build_accepts_omitted_native_left_to_right_default_losslessly() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let settings = KeynoteBuildSettings::trace_in(KeynoteHorizontalBuildDirection::LeftToRight);
+    let mut editor = Editor::from_package(test_package()).unwrap();
+    let settings = BuildSettings::trace_in(HorizontalBuildDirection::LeftToRight);
     let created = editor.add_slide_build(0, 5, settings).unwrap();
     let mut package = editor.into_package();
     package
@@ -1326,13 +1321,13 @@ fn slide_object_build_accepts_omitted_native_left_to_right_default_losslessly() 
             Ok(())
         })
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let read = editor.slide_builds(0).unwrap().remove(0).settings;
     assert_eq!(read.direction, None);
     assert_eq!(
         read.object_effect,
-        Some(KeynoteObjectBuildEffect::Trace {
-            direction: KeynoteHorizontalBuildDirection::LeftToRight,
+        Some(ObjectBuildEffect::Trace {
+            direction: HorizontalBuildDirection::LeftToRight,
         })
     );
     let before = editor.to_bytes().unwrap();
@@ -1343,8 +1338,8 @@ fn slide_object_build_accepts_omitted_native_left_to_right_default_losslessly() 
 #[test]
 fn slide_object_build_rejects_duplicate_wrong_wire_and_cross_effect_fields() {
     for mutation in 0..6 {
-        let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-        let settings = KeynoteBuildSettings::trace_in(KeynoteHorizontalBuildDirection::RightToLeft);
+        let mut editor = Editor::from_package(test_package()).unwrap();
+        let settings = BuildSettings::trace_in(HorizontalBuildDirection::RightToLeft);
         let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
         let mut package = editor.into_package();
         package
@@ -1395,7 +1390,7 @@ fn slide_object_build_rejects_duplicate_wrong_wire_and_cross_effect_fields() {
                 Ok(())
             })
             .unwrap();
-        let mut malformed = KeynoteEditor::from_package(package).unwrap();
+        let mut malformed = Editor::from_package(package).unwrap();
         assert!(malformed.slide_builds(0).is_err(), "mutation {mutation}");
         let before = malformed.to_bytes().unwrap();
         assert!(
@@ -1410,11 +1405,11 @@ fn slide_object_build_rejects_duplicate_wrong_wire_and_cross_effect_fields() {
 
 #[test]
 fn slide_raw_custom_build_parameter_crud_is_lossless_and_transactional() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let mut settings = KeynoteBuildSettings::appear_in();
+    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut settings = BuildSettings::appear_in();
     settings.effect = "com.example.future-build".to_owned();
     settings.direction = Some(42);
-    settings.custom_parameters = KeynoteBuildCustomParameters {
+    settings.custom_parameters = BuildCustomParameters {
         bounce: Some(false),
         motion_blur: Some(true),
         include_endpoints: Some(false),
@@ -1451,13 +1446,13 @@ fn slide_raw_custom_build_parameter_crud_is_lossless_and_transactional() {
             .set_slide_build(0, created.object_id, invalid)
             .is_err()
     );
-    let mut mixed = KeynoteBuildSettings::keyboard_in(KeynoteKeyboardDirection::Forward, true);
+    let mut mixed = BuildSettings::keyboard_in(KeyboardDirection::Forward, true);
     mixed.custom_parameters.motion_blur = Some(true);
     assert!(editor.set_slide_build(0, created.object_id, mixed).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before_invalid);
 
     editor
-        .set_slide_build(0, created.object_id, KeynoteBuildSettings::appear_out())
+        .set_slide_build(0, created.object_id, BuildSettings::appear_out())
         .unwrap();
     let graph = ObjectGraph::read(editor.package()).unwrap();
     let cleaned: kn::BuildArchive = graph
@@ -1474,10 +1469,10 @@ fn slide_raw_custom_build_parameter_crud_is_lossless_and_transactional() {
 #[test]
 fn slide_raw_custom_build_parameters_reject_duplicate_and_wrong_wire_types() {
     for mutation in 0..7 {
-        let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-        let mut settings = KeynoteBuildSettings::appear_in();
+        let mut editor = Editor::from_package(test_package()).unwrap();
+        let mut settings = BuildSettings::appear_in();
         settings.effect = "com.example.future-build".to_owned();
-        settings.custom_parameters = KeynoteBuildCustomParameters {
+        settings.custom_parameters = BuildCustomParameters {
             bounce: Some(true),
             motion_blur: Some(false),
             include_endpoints: Some(true),
@@ -1515,7 +1510,7 @@ fn slide_raw_custom_build_parameters_reject_duplicate_and_wrong_wire_types() {
                 Ok(())
             })
             .unwrap();
-        let mut malformed = KeynoteEditor::from_package(package).unwrap();
+        let mut malformed = Editor::from_package(package).unwrap();
         assert!(malformed.slide_builds(0).is_err(), "mutation {mutation}");
         let before = malformed.to_bytes().unwrap();
         assert!(
@@ -1532,8 +1527,8 @@ fn slide_raw_custom_build_parameters_reject_duplicate_and_wrong_wire_types() {
 fn slide_move_action_crud_maps_editable_bezier_path_and_is_transactional() {
     use kn::build_attributes_archive::BuildAttributesAcceleration;
 
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let mut settings = KeynoteBuildSettings::move_action(488.492, -258.172);
+    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut settings = BuildSettings::move_action(488.492, -258.172);
     settings.duration = 2.25;
     let move_action = settings.move_action.as_mut().unwrap();
     move_action.align_to_path = true;
@@ -1584,14 +1579,14 @@ fn slide_move_action_crud_maps_editable_bezier_path_and_is_transactional() {
     let mut curved = settings;
     let path = &mut curved.move_action.as_mut().unwrap().path;
     path.subpaths[0].nodes = vec![
-        KeynoteMotionPathNode::sharp(0.0, 0.0),
-        KeynoteMotionPathNode {
-            in_control_point: KeynoteMotionPathPoint::new(120.0, -20.0),
-            point: KeynoteMotionPathPoint::new(240.0, -150.0),
-            out_control_point: KeynoteMotionPathPoint::new(360.0, -280.0),
-            node_type: KeynoteMotionPathNodeType::Bezier,
+        MotionPathNode::sharp(0.0, 0.0),
+        MotionPathNode {
+            in_control_point: MotionPathPoint::new(120.0, -20.0),
+            point: MotionPathPoint::new(240.0, -150.0),
+            out_control_point: MotionPathPoint::new(360.0, -280.0),
+            node_type: MotionPathNodeType::Bezier,
         },
-        KeynoteMotionPathNode::sharp(488.492, -258.172),
+        MotionPathNode::sharp(488.492, -258.172),
     ];
     editor
         .set_slide_build(0, created.object_id, curved.clone())
@@ -1599,7 +1594,7 @@ fn slide_move_action_crud_maps_editable_bezier_path_and_is_transactional() {
     assert_eq!(editor.slide_builds(0).unwrap()[0].settings, curved);
 
     editor
-        .set_slide_build(0, created.object_id, KeynoteBuildSettings::appear_out())
+        .set_slide_build(0, created.object_id, BuildSettings::appear_out())
         .unwrap();
     let graph = ObjectGraph::read(editor.package()).unwrap();
     let native: kn::BuildArchive = graph
@@ -1612,9 +1607,9 @@ fn slide_move_action_crud_maps_editable_bezier_path_and_is_transactional() {
 
 #[test]
 fn slide_move_updates_preserve_deep_unknown_path_wire() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+    let mut editor = Editor::from_package(test_package()).unwrap();
     let created = editor
-        .add_slide_build(0, 5, KeynoteBuildSettings::move_action(400.0, -200.0))
+        .add_slide_build(0, 5, BuildSettings::move_action(400.0, -200.0))
         .unwrap();
     let mut package = editor.into_package();
     let suffixes = [
@@ -1675,7 +1670,7 @@ fn slide_move_updates_preserve_deep_unknown_path_wire() {
         })
         .unwrap();
 
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let mut settings = editor.slide_builds(0).unwrap()[0].settings.clone();
     let path = &mut settings.move_action.as_mut().unwrap().path;
     path.subpaths[0].nodes[1].point.x = 420.0;
@@ -1706,8 +1701,8 @@ fn slide_move_updates_preserve_deep_unknown_path_wire() {
 #[test]
 fn slide_move_rejects_missing_duplicate_and_invalid_native_path_fields() {
     for mutation in 0..3 {
-        let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-        let settings = KeynoteBuildSettings::move_action(300.0, 100.0);
+        let mut editor = Editor::from_package(test_package()).unwrap();
+        let settings = BuildSettings::move_action(300.0, 100.0);
         let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
         let mut package = editor.into_package();
         package
@@ -1742,7 +1737,7 @@ fn slide_move_rejects_missing_duplicate_and_invalid_native_path_fields() {
                 Ok(())
             })
             .unwrap();
-        let mut malformed = KeynoteEditor::from_package(package).unwrap();
+        let mut malformed = Editor::from_package(package).unwrap();
         assert!(malformed.slide_builds(0).is_err());
         let before = malformed.to_bytes().unwrap();
         assert!(
@@ -1756,12 +1751,12 @@ fn slide_move_rejects_missing_duplicate_and_invalid_native_path_fields() {
 
 #[test]
 fn unsupported_action_timing_updates_preserve_opaque_native_parameters() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+    let mut editor = Editor::from_package(test_package()).unwrap();
     let created = editor
         .add_slide_build(
             0,
             5,
-            KeynoteBuildSettings::rotate_action(450.0, KeynoteRotationDirection::Clockwise),
+            BuildSettings::rotate_action(450.0, RotationDirection::Clockwise),
         )
         .unwrap();
     let mut package = editor.into_package();
@@ -1784,7 +1779,7 @@ fn unsupported_action_timing_updates_preserve_opaque_native_parameters() {
             Ok(())
         })
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let mut settings = editor.slide_builds(0).unwrap()[0].settings.clone();
     assert_eq!(settings.effect, "apple:action-future");
     assert!(settings.rotation.is_none());
@@ -1804,7 +1799,7 @@ fn unsupported_action_timing_updates_preserve_opaque_native_parameters() {
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
-            .set_slide_build(0, created.object_id, KeynoteBuildSettings::appear_out())
+            .set_slide_build(0, created.object_id, BuildSettings::appear_out())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -1812,8 +1807,8 @@ fn unsupported_action_timing_updates_preserve_opaque_native_parameters() {
 
 #[test]
 fn slide_build_start_modes_map_to_native_chunks_and_guard_sequence_edges() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let mut first_settings = KeynoteBuildSettings::appear_in();
+    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut first_settings = BuildSettings::appear_in();
     first_settings.start = BuildStart::AfterTransition;
     first_settings.delay = 0.25;
     let first = editor.add_slide_build(0, 5, first_settings).unwrap();
@@ -1822,7 +1817,7 @@ fn slide_build_start_modes_map_to_native_chunks_and_guard_sequence_edges() {
         BuildStart::AfterTransition
     );
 
-    let mut second_settings = KeynoteBuildSettings::appear_in();
+    let mut second_settings = BuildSettings::appear_in();
     second_settings.start = BuildStart::WithPrevious;
     let second = editor.add_slide_build(0, 6, second_settings).unwrap();
     let builds = editor.slide_builds(0).unwrap();
@@ -1866,22 +1861,22 @@ fn slide_build_start_modes_map_to_native_chunks_and_guard_sequence_edges() {
     assert_eq!(second_click.chunks[0].automatic, Some(false));
     assert_eq!(second_click.chunks[0].referent, Some(true));
 
-    let mut empty = KeynoteEditor::from_package(test_package()).unwrap();
-    let mut invalid_first = KeynoteBuildSettings::appear_in();
+    let mut empty = Editor::from_package(test_package()).unwrap();
+    let mut invalid_first = BuildSettings::appear_in();
     invalid_first.start = BuildStart::AfterPrevious;
     assert!(empty.add_slide_build(0, 5, invalid_first).is_err());
     assert!(empty.slide_builds(0).unwrap().is_empty());
 
-    let mut invalid_second = KeynoteBuildSettings::appear_in();
+    let mut invalid_second = BuildSettings::appear_in();
     invalid_second.start = BuildStart::AfterTransition;
     assert!(editor.add_slide_build(0, 5, invalid_second).is_err());
 }
 
 #[test]
 fn slide_build_reader_rejects_automatic_first_event_without_transition_semantics() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+    let mut editor = Editor::from_package(test_package()).unwrap();
     let build = editor
-        .add_slide_build(0, 5, KeynoteBuildSettings::appear_in())
+        .add_slide_build(0, 5, BuildSettings::appear_in())
         .unwrap();
     let chunk_id = build.chunks[0].object_id;
     let mut package = editor.into_package();
@@ -1902,15 +1897,15 @@ fn slide_build_reader_rejects_automatic_first_event_without_transition_semantics
         })
         .unwrap();
 
-    let malformed = KeynoteEditor::from_package(package).unwrap();
+    let malformed = Editor::from_package(package).unwrap();
     assert!(malformed.slide_builds(0).is_err());
 }
 
 #[test]
 fn build_updates_preserve_unknown_wire_and_normalize_native_merge_payloads() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
+    let mut editor = Editor::from_package(test_package()).unwrap();
     let created = editor
-        .add_slide_build(0, 5, KeynoteBuildSettings::appear_in())
+        .add_slide_build(0, 5, BuildSettings::appear_in())
         .unwrap();
     let mut package = editor.into_package();
     let mut build_suffix = Vec::new();
@@ -1944,8 +1939,8 @@ fn build_updates_preserve_unknown_wire_and_normalize_native_merge_payloads() {
         })
         .unwrap();
 
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
-    let mut settings = KeynoteBuildSettings::appear_in();
+    let mut editor = Editor::from_package(package).unwrap();
+    let mut settings = BuildSettings::appear_in();
     settings.effect = "apple:unmapped-test-effect".to_owned();
     settings.duration = 2.5;
     editor
@@ -1990,9 +1985,9 @@ fn build_crud_tracks_only_native_uuid_objects_and_releases_highwater() {
             },
         )
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let build = editor
-        .add_slide_build(0, 5, KeynoteBuildSettings::appear_in())
+        .add_slide_build(0, 5, BuildSettings::appear_in())
         .unwrap();
     assert_eq!(build.object_id, 21);
     assert_eq!(build.chunks[0].object_id, 22);
@@ -2019,19 +2014,15 @@ fn build_crud_tracks_only_native_uuid_objects_and_releases_highwater() {
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn slide_owned_text_storage_crud_covers_placeholders_and_text_boxes() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_text_box()).unwrap();
+    let mut editor = Editor::from_package(test_package_with_text_box()).unwrap();
     let text = editor.slide_text_storages(0).unwrap();
     assert_eq!(
         text.iter().map(|item| item.role).collect::<Vec<_>>(),
         [
-            KeynoteSlideTextRole::Title,
-            KeynoteSlideTextRole::Body,
-            KeynoteSlideTextRole::TextBox,
+            SlideTextRole::Title,
+            SlideTextRole::Body,
+            SlideTextRole::TextBox,
         ]
     );
     assert_eq!(text[2].drawable_object_id, 17);
@@ -2081,7 +2072,7 @@ fn slide_text_storage_updates_preserve_unknown_wire_and_restore_exactly() {
             Ok(object.replace_message(0, message).map(|_| ())?)
         })
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let baseline = editor
         .package()
         .archive("Index/Slide-4.iwa")
@@ -2123,7 +2114,7 @@ fn ambiguous_slide_text_ownership_fails_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.slide_text_storages(0).is_err());
     assert!(editor.set_slide_text_storage(0, 17, "rejected").is_err());
@@ -2153,7 +2144,7 @@ fn ambiguous_slide_text_ownership_fails_transactionally() {
             ))?)
         })
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.slide_text_storages(0).is_err());
     assert!(editor.set_slide_text_storage(0, 17, "rejected").is_err());
@@ -2161,12 +2152,8 @@ fn ambiguous_slide_text_ownership_fails_transactionally() {
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn ordinary_text_box_duplicate_delete_is_independent_and_exact() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_text_box()).unwrap();
+    let mut editor = Editor::from_package(test_package_with_text_box()).unwrap();
     let baseline = editor.to_bytes().unwrap();
 
     let created = editor.duplicate_slide_text_box(0, 17, "Clone 🚀").unwrap();
@@ -2231,12 +2218,8 @@ fn ordinary_text_box_duplicate_delete_is_independent_and_exact() {
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn ordinary_text_box_geometry_updates_are_guarded_and_byte_exact() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_text_box()).unwrap();
+    let mut editor = Editor::from_package(test_package_with_text_box()).unwrap();
     let original = editor.slide_text_box_geometry(0, 17).unwrap();
     assert_eq!(
         original,
@@ -2290,12 +2273,8 @@ fn ordinary_text_box_geometry_updates_are_guarded_and_byte_exact() {
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn ordinary_text_box_properties_updates_are_guarded_and_byte_exact() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_text_box()).unwrap();
+    let mut editor = Editor::from_package(test_package_with_text_box()).unwrap();
     let original = editor.slide_text_box_properties(0, 17).unwrap();
     assert_eq!(original, DrawableProperties::default());
     let baseline = editor.to_bytes().unwrap();
@@ -2342,10 +2321,6 @@ fn ordinary_text_box_properties_updates_are_guarded_and_byte_exact() {
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn text_box_duplicate_delete_tracks_package_highwater_and_slide_uuids() {
     let mut package = test_package_with_text_box();
     let uuid_entry = |identifier| ObjectUuidMapEntry {
@@ -2374,7 +2349,7 @@ fn text_box_duplicate_delete_tracks_package_highwater_and_slide_uuids() {
         )
         .unwrap();
 
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let baseline = editor.to_bytes().unwrap();
     let created = editor
         .duplicate_slide_text_box(0, 17, "Metadata clone")
@@ -2415,10 +2390,6 @@ fn text_box_duplicate_delete_tracks_package_highwater_and_slide_uuids() {
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn text_box_graph_crud_preserves_unknowns_and_rejects_external_owners() {
     let mut package = test_package_with_text_box();
     package
@@ -2432,7 +2403,7 @@ fn text_box_graph_crud_preserves_unknowns_and_rejects_external_owners() {
             Ok(())
         })
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let baseline = editor.to_bytes().unwrap();
     let created = editor
         .duplicate_slide_text_box(0, 17, "Unknown clone")
@@ -2471,7 +2442,7 @@ fn text_box_graph_crud_preserves_unknowns_and_rejects_external_owners() {
             Ok(archive.insert_object(owner)?)
         })
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.duplicate_slide_text_box(0, 17, "rejected").is_err());
     assert!(editor.remove_slide_text_box(0, 17).is_err());
@@ -2494,7 +2465,7 @@ fn text_box_graph_crud_preserves_unknowns_and_rejects_external_owners() {
             Ok(())
         })
         .unwrap();
-    assert!(KeynoteEditor::from_package(package).is_err());
+    assert!(Editor::from_package(package).is_err());
 }
 
 #[test]
@@ -2561,7 +2532,7 @@ fn transition_custom_parameters_reader_rejects_malformed_wire() {
                 Ok(())
             })
             .unwrap();
-        let rejected = match KeynoteEditor::from_package(package) {
+        let rejected = match Editor::from_package(package) {
             Ok(malformed) => malformed.slides().is_err(),
             Err(_) => true,
         };
@@ -2578,8 +2549,7 @@ fn transition_animation_parameters_reader_rejects_malformed_wire() {
             ..Default::default()
         }
         .encode_to_vec();
-        let curve_payload =
-            native_motion_path(&KeynoteMotionPath::straight(1.0, 1.0)).encode_to_vec();
+        let curve_payload = native_motion_path(&MotionPath::straight(1.0, 1.0)).encode_to_vec();
         let mut package = test_package();
         package
             .update_archive("Index/Slide-4.iwa", |archive| {
@@ -2654,7 +2624,7 @@ fn transition_animation_parameters_reader_rejects_malformed_wire() {
                 Ok(())
             })
             .unwrap();
-        let rejected = match KeynoteEditor::from_package(package) {
+        let rejected = match Editor::from_package(package) {
             Ok(malformed) => malformed.slides().is_err(),
             Err(_) => true,
         };
@@ -2664,12 +2634,12 @@ fn transition_animation_parameters_reader_rejects_malformed_wire() {
 
 #[test]
 fn reads_current_slide_layout_from_theme_relationship() {
-    let editor = KeynoteEditor::from_package(test_package_with_current_layout()).unwrap();
+    let editor = Editor::from_package(test_package_with_current_layout()).unwrap();
     let slides = editor.slides().unwrap();
     assert_eq!(
         slides[0].layout,
-        Some(KeynoteSlideLayoutInfo {
-            id: KeynoteSlideLayoutId::new(30).unwrap(),
+        Some(SlideLayoutInfo {
+            id: SlideLayoutId::new(30).unwrap(),
             name: "Title & Bullets".to_owned(),
             is_default: true,
         })
@@ -2679,14 +2649,14 @@ fn reads_current_slide_layout_from_theme_relationship() {
 
 #[test]
 fn slide_layout_ids_reject_null_and_round_trip_nonzero_values() {
-    assert_eq!(KeynoteSlideLayoutId::new(0), None);
-    let id = KeynoteSlideLayoutId::new(37).expect("nonzero layout IDs are valid");
+    assert_eq!(SlideLayoutId::new(0), None);
+    let id = SlideLayoutId::new(37).expect("nonzero layout IDs are valid");
     assert_eq!(id.as_u64(), 37);
 }
 
 #[test]
 fn updates_slide_layout_transactionally_without_replacing_user_content() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_two_layouts()).unwrap();
+    let mut editor = Editor::from_package(test_package_with_two_layouts()).unwrap();
     let layouts = editor.slide_layouts().unwrap();
     let title_only = layouts
         .iter()
@@ -2794,7 +2764,7 @@ fn updates_slide_layout_transactionally_without_replacing_user_content() {
 
 #[test]
 fn slide_layout_update_materializes_and_removes_image_graphs() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_image_layout()).unwrap();
+    let mut editor = Editor::from_package(test_package_with_image_layout()).unwrap();
     let layouts = editor.slide_layouts().unwrap();
     let photo = layouts
         .iter()
@@ -2846,12 +2816,8 @@ fn slide_layout_update_materializes_and_removes_image_graphs() {
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn creates_slide_with_materialized_layout_image_graph() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_image_layout()).unwrap();
+    let mut editor = Editor::from_package(test_package_with_image_layout()).unwrap();
     let photo = editor
         .slide_layouts()
         .unwrap()
@@ -2876,7 +2842,7 @@ fn creates_slide_with_materialized_layout_image_graph() {
 
 #[test]
 fn slide_layout_update_materializes_and_removes_live_video_graphs() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_live_video_layout()).unwrap();
+    let mut editor = Editor::from_package(test_package_with_live_video_layout()).unwrap();
     let layouts = editor.slide_layouts().unwrap();
     let live_video = layouts
         .iter()
@@ -2930,12 +2896,8 @@ fn slide_layout_update_materializes_and_removes_live_video_graphs() {
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn creates_slide_with_materialized_layout_live_video_graph() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_live_video_layout()).unwrap();
+    let mut editor = Editor::from_package(test_package_with_live_video_layout()).unwrap();
     let live_video = editor
         .slide_layouts()
         .unwrap()
@@ -2962,7 +2924,7 @@ fn creates_slide_with_materialized_layout_live_video_graph() {
 
 #[test]
 fn slide_layout_update_materializes_and_removes_file_movie_placeholders() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_file_movie_layout(1)).unwrap();
+    let mut editor = Editor::from_package(test_package_with_file_movie_layout(1)).unwrap();
     let layouts = editor.slide_layouts().unwrap();
     let movie_layout = layouts
         .iter()
@@ -3013,12 +2975,8 @@ fn slide_layout_update_materializes_and_removes_file_movie_placeholders() {
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn creates_slide_with_materialized_file_movie_placeholder_graph() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_file_movie_layout(1)).unwrap();
+    let mut editor = Editor::from_package(test_package_with_file_movie_layout(1)).unwrap();
     let movie_layout = editor
         .slide_layouts()
         .unwrap()
@@ -3054,7 +3012,7 @@ struct MovieIdentityOracle {
 }
 
 fn focused_movie_summaries(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
 ) -> Vec<litchi_keynote::slide::media::MovieInfo> {
     let package = FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -3069,10 +3027,7 @@ fn focused_movie_summaries(
 }
 
 #[allow(deprecated)]
-fn generated_movie_identities(
-    editor: &KeynoteEditor,
-    slide_index: usize,
-) -> Vec<MovieIdentityOracle> {
+fn generated_movie_identities(editor: &Editor, slide_index: usize) -> Vec<MovieIdentityOracle> {
     let slide_id = editor
         .slides()
         .unwrap()
@@ -3142,12 +3097,8 @@ fn generated_movie_identities(
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn static_layout_movies_remain_template_only_for_update_and_creation() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_file_movie_layout(0)).unwrap();
+    let mut editor = Editor::from_package(test_package_with_file_movie_layout(0)).unwrap();
     let movie_layout = editor
         .slide_layouts()
         .unwrap()
@@ -3187,7 +3138,7 @@ fn static_layout_movies_remain_template_only_for_update_and_creation() {
 
 #[test]
 fn hand_built_slide_movie_admission_rejection_is_transactional() {
-    let editor = KeynoteEditor::from_package(test_package_with_slide_movie()).unwrap();
+    let editor = Editor::from_package(test_package_with_slide_movie()).unwrap();
     let identities = generated_movie_identities(&editor, 0);
     assert_eq!(identities.len(), 1);
     let identity = identities[0];
@@ -3434,7 +3385,7 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
 
 #[test]
 fn slide_movie_mutations_reject_wrong_targets_transactionally() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_slide_movie()).unwrap();
+    let mut editor = Editor::from_package(test_package_with_slide_movie()).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(
         FocusedKeynotePackage::from_bytes(&before)
@@ -3467,8 +3418,7 @@ fn slide_movie_mutations_reject_wrong_targets_transactionally() {
     assert!(editor.replace_media(asset_id(2), TEST_MOVIE_VIDEO).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
 
-    let mut placeholder =
-        KeynoteEditor::from_package(test_package_with_file_movie_layout(1)).unwrap();
+    let mut placeholder = Editor::from_package(test_package_with_file_movie_layout(1)).unwrap();
     let layout = placeholder
         .slide_layouts()
         .unwrap()
@@ -3509,7 +3459,7 @@ fn slide_movie_mutations_reject_wrong_targets_transactionally() {
 
 #[test]
 fn slide_layout_update_rejects_ambiguous_live_videos_transactionally() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_live_video_layout()).unwrap();
+    let mut editor = Editor::from_package(test_package_with_live_video_layout()).unwrap();
     let layouts = editor.slide_layouts().unwrap();
     let live_video = layouts
         .iter()
@@ -3546,7 +3496,7 @@ fn slide_layout_update_rejects_ambiguous_live_videos_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.set_slide_layout(0, bullets).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -3554,7 +3504,7 @@ fn slide_layout_update_rejects_ambiguous_live_videos_transactionally() {
 
 #[test]
 fn slide_layout_update_rejects_ambiguous_materialized_images_transactionally() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_image_layout()).unwrap();
+    let mut editor = Editor::from_package(test_package_with_image_layout()).unwrap();
     let layouts = editor.slide_layouts().unwrap();
     let photo = layouts
         .iter()
@@ -3591,7 +3541,7 @@ fn slide_layout_update_rejects_ambiguous_materialized_images_transactionally() {
             Ok(())
         })
         .unwrap();
-    editor = KeynoteEditor::from_package(package).unwrap();
+    editor = Editor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.set_slide_layout(0, bullets).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -3599,17 +3549,17 @@ fn slide_layout_update_rejects_ambiguous_materialized_images_transactionally() {
 
 #[test]
 fn slide_layout_update_rejects_invalid_inputs_without_mutation() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_two_layouts()).unwrap();
+    let mut editor = Editor::from_package(test_package_with_two_layouts()).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
-            .set_slide_layout(2, KeynoteSlideLayoutId::new(37).unwrap())
+            .set_slide_layout(2, SlideLayoutId::new(37).unwrap())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
     assert!(
         editor
-            .set_slide_layout(0, KeynoteSlideLayoutId::new(999).unwrap())
+            .set_slide_layout(0, SlideLayoutId::new(999).unwrap())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -3633,9 +3583,9 @@ fn slide_layout_update_hides_a_retained_placeholder_missing_from_the_layout() {
             Ok(())
         })
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     editor
-        .set_slide_layout(0, KeynoteSlideLayoutId::new(37).unwrap())
+        .set_slide_layout(0, SlideLayoutId::new(37).unwrap())
         .unwrap();
     let slide = &editor.slides().unwrap()[0];
     assert_eq!(
@@ -3672,11 +3622,11 @@ fn slide_layout_update_rejects_ambiguous_wire_fields_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
-            .set_slide_layout(0, KeynoteSlideLayoutId::new(37).unwrap())
+            .set_slide_layout(0, SlideLayoutId::new(37).unwrap())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -3700,7 +3650,7 @@ fn current_slide_layout_rejects_missing_theme_mapping() {
             Ok(())
         })
         .unwrap();
-    assert!(KeynoteEditor::from_package(package).is_err());
+    assert!(Editor::from_package(package).is_err());
 }
 
 #[test]
@@ -3729,21 +3679,17 @@ fn current_slide_layout_rejects_multiple_theme_mappings() {
             Ok(())
         })
         .unwrap();
-    assert!(KeynoteEditor::from_package(package).is_err());
+    assert!(Editor::from_package(package).is_err());
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn creates_empty_slide_from_typed_theme_layout_transactionally() {
-    let mut editor = KeynoteEditor::from_package(test_package_with_theme()).unwrap();
+    let mut editor = Editor::from_package(test_package_with_theme()).unwrap();
     let layouts = editor.slide_layouts().unwrap();
     assert_eq!(
         layouts,
-        [KeynoteSlideLayoutInfo {
-            id: KeynoteSlideLayoutId::new(30).unwrap(),
+        [SlideLayoutInfo {
+            id: SlideLayoutId::new(30).unwrap(),
             name: "Title & Bullets".to_owned(),
             is_default: true,
         }]
@@ -3754,7 +3700,7 @@ fn creates_empty_slide_from_typed_theme_layout_transactionally() {
     assert!(editor.insert_slide(3, layouts[0].id).is_err());
     assert!(
         editor
-            .insert_slide(1, KeynoteSlideLayoutId::new(999).unwrap())
+            .insert_slide(1, SlideLayoutId::new(999).unwrap())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -3813,8 +3759,8 @@ fn duplicate_slide_tree_references_fail_transactionally() {
     // boundary. Keep the malformed package only to exercise the operation's
     // transactional failure path after admission has been bypassed in this
     // focused fixture.
-    assert!(KeynoteEditor::from_package(package.clone()).is_err());
-    let mut editor = KeynoteEditor {
+    assert!(Editor::from_package(package.clone()).is_err());
+    let mut editor = Editor {
         text: IWorkTextEditor::from_package(package),
     };
     let before = editor.to_bytes().unwrap();
@@ -3823,10 +3769,6 @@ fn duplicate_slide_tree_references_fail_transactionally() {
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn duplicates_slide_graph_with_independent_objects() {
     let mut package = test_package_with_slide_background();
     package
@@ -3847,7 +3789,7 @@ fn duplicates_slide_graph_with_independent_objects() {
             Ok(())
         })
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let source_component = editor
         .package()
         .entry("Index/Slide-4.iwa")
@@ -3901,7 +3843,7 @@ fn duplicates_slide_graph_with_independent_objects() {
     let notes = notes.commit().unwrap();
     let mut bytes = Vec::new();
     notes.package().write_to(&mut bytes).unwrap();
-    let mut editor = KeynoteEditor::from_bytes(&bytes).unwrap();
+    let mut editor = Editor::from_bytes(&bytes).unwrap();
     let slides = editor.slides().unwrap();
     assert_eq!(slides.len(), 3);
     assert_eq!(slides[0].title.as_deref(), Some("Old title"));
@@ -3916,10 +3858,6 @@ fn duplicates_slide_graph_with_independent_objects() {
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn cloned_slide_payloads_preserve_deep_unknown_fields_exactly() {
     let mut package = test_package();
     package
@@ -4000,7 +3938,7 @@ fn cloned_slide_payloads_preserve_deep_unknown_fields_exactly() {
         })
         .unwrap();
 
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let source = editor.package().archive("Index/Slide-4.iwa").unwrap();
     let created = editor.duplicate_slide(0).unwrap();
     let cloned = editor
@@ -4091,7 +4029,7 @@ fn cloned_slide_rejects_duplicate_reference_identifiers_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.duplicate_slide(0).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);

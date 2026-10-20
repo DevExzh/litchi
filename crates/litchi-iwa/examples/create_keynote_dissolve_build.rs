@@ -1,6 +1,6 @@
 //! Create a Keynote presentation with a native editable Dissolve Build In.
 
-use litchi_iwa::keynote::{self, KeynoteBuildSettings};
+use litchi_iwa::keynote::{self};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .into_iter()
         .next()
         .ok_or("the initial slide has no drawable")?;
-    keynote.add_slide_build(0, drawable.id.get(), KeynoteBuildSettings::dissolve_in())?;
+    keynote.add_slide_build(0, drawable.id.get(), keynote::BuildSettings::dissolve_in())?;
     keynote.save(output)?;
     Ok(())
 }

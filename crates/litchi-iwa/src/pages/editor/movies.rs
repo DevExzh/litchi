@@ -27,7 +27,7 @@ use graph::*;
 
 /// One ordinary file-backed movie anchored to the Pages body text flow.
 #[derive(Debug, Clone, PartialEq)]
-pub struct PagesMovieInfo {
+pub struct MovieInfo {
     pub drawable_object_id: u64,
     /// UTF-16 index of the object-replacement character in the body text.
     pub anchor_character_index: u32,
@@ -46,14 +46,14 @@ pub struct PagesMovieInfo {
 /// Result of removing one body-anchored Pages movie and its private graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedPagesMovie {
-    pub movie: PagesMovieInfo,
+    pub movie: MovieInfo,
     /// Assets culled because the removed movie held their final package reference.
     pub removed_data_identifiers: Vec<MediaAssetId>,
 }
 
-impl PagesEditor {
+impl Editor {
     /// List ordinary file-backed movies anchored to the body in text-flow order.
-    pub fn body_movies(&self) -> Result<Vec<PagesMovieInfo>> {
+    pub fn body_movies(&self) -> Result<Vec<MovieInfo>> {
         body_movie_infos(self)
     }
 
@@ -71,7 +71,7 @@ impl PagesEditor {
         preferred_poster_filename: &str,
         poster_data: &[u8],
         options: PagesMovieOptions,
-    ) -> Result<PagesMovieInfo> {
+    ) -> Result<MovieInfo> {
         let (geometry, duration_seconds) = movie_creation_values(options)?;
         let root = pages_document_root_facts(self.package())?;
         let style_id = movie_style_id(self.package(), &root)?;
@@ -372,7 +372,7 @@ impl PagesEditor {
         &mut self,
         source_drawable_object_id: u64,
         anchor_character_index: usize,
-    ) -> Result<PagesMovieInfo> {
+    ) -> Result<MovieInfo> {
         let source = body_movie_graph(self, source_drawable_object_id)?;
         let mut staged = self.package().clone();
         let first_identifier = next_object_identifier(&staged)?;
@@ -654,7 +654,7 @@ mod tests {
         reason = "exercises the legacy raw-ID Pages drawable-comment API; retained for migration-host compatibility"
     )]
     fn scratch_document_supports_movie_crud_without_a_source_package() {
-        let mut editor = PagesEditor::create_with_text("Quarterly report").unwrap();
+        let mut editor = Editor::create_with_text("Quarterly report").unwrap();
         let anchor = "Quarterly report".encode_utf16().count();
         assert!(editor.body_movies().unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
@@ -680,7 +680,7 @@ mod tests {
             POSTER
         );
 
-        let roundtripped = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let roundtripped = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             roundtripped.body_movies().unwrap(),
             std::slice::from_ref(&created)
@@ -806,12 +806,12 @@ mod tests {
         assert_eq!(editor.body_text().unwrap(), "Quarterly report");
         assert!(editor.body_movies().unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
     fn scratch_document_supports_native_movie_title_caption_crud() {
-        let mut editor = PagesEditor::create_with_text("Movie labels").unwrap();
+        let mut editor = Editor::create_with_text("Movie labels").unwrap();
         let movie = editor
             .add_body_movie(
                 "Movie labels".encode_utf16().count(),
@@ -882,7 +882,7 @@ mod tests {
             crate::DrawableTitleCaption::default()
         );
 
-        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_movie_title_caption(duplicate.drawable_object_id)
@@ -904,7 +904,7 @@ mod tests {
 
     #[test]
     fn scratch_document_supports_native_movie_duplication() {
-        let mut editor = PagesEditor::create_with_text("Quarterly report").unwrap();
+        let mut editor = Editor::create_with_text("Quarterly report").unwrap();
         let source = editor
             .add_body_movie(
                 "Quarterly report".encode_utf16().count(),
@@ -1008,7 +1008,7 @@ mod tests {
             REPLACEMENT_POSTER
         );
 
-        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.body_movies().unwrap().len(), 2);
         assert_eq!(
             reopened
@@ -1036,12 +1036,12 @@ mod tests {
         );
         assert!(editor.body_movies().unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
     fn invalid_movie_creation_and_cross_type_edits_are_transactional() {
-        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let mut editor = Editor::create_with_text("Body").unwrap();
         let baseline = editor.to_bytes().unwrap();
         assert!(editor.duplicate_body_movie(999, 0).is_err());
         assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -1119,7 +1119,7 @@ mod tests {
 
     #[test]
     fn removing_an_earlier_movie_shifts_and_preserves_later_attachments() {
-        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        let mut editor = Editor::create_with_text("Body").unwrap();
         let first = editor
             .add_body_movie(4, "first.mov", MOVIE, "first.png", POSTER, options())
             .unwrap();
@@ -1150,6 +1150,6 @@ mod tests {
                 .unwrap(),
             REPLACEMENT_POSTER
         );
-        PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 }

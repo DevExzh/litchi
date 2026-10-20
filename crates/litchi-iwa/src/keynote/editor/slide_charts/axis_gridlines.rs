@@ -15,7 +15,7 @@ use crate::charts::{ChartAxisGridline, ChartAxisGridlineStroke};
 use litchi_iwa_common::chart::axis::Axis;
 use litchi_iwa_common::chart::axis::style::Visibility;
 
-impl KeynoteEditor {
+impl Editor {
     /// Read whether Keynote shows major gridlines for one native slide-chart axis.
     pub fn slide_chart_axis_major_gridlines_visible(
         &self,
@@ -109,7 +109,7 @@ impl KeynoteEditor {
             gridline,
             stroke,
         )?;
-        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_axis_gridline_stroke(
             slide_index,
             drawable_object_id,
@@ -127,7 +127,7 @@ impl KeynoteEditor {
 }
 
 fn slide_chart_axis_major_gridlines_visible(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
@@ -143,7 +143,7 @@ fn slide_chart_axis_major_gridlines_visible(
 }
 
 fn set_slide_chart_axis_major_gridlines_visible(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
@@ -159,7 +159,7 @@ fn set_slide_chart_axis_major_gridlines_visible(
         axis,
         visible,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_axis_major_gridlines_visible(slide_index, drawable_object_id, axis)?
         != visible
     {
@@ -172,7 +172,7 @@ fn set_slide_chart_axis_major_gridlines_visible(
 }
 
 fn slide_chart_axis_minor_gridlines_visible(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
@@ -188,7 +188,7 @@ fn slide_chart_axis_minor_gridlines_visible(
 }
 
 fn set_slide_chart_axis_minor_gridlines_visible(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
@@ -204,7 +204,7 @@ fn set_slide_chart_axis_minor_gridlines_visible(
         axis,
         visible,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_axis_minor_gridlines_visible(slide_index, drawable_object_id, axis)?
         != visible
     {

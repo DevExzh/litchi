@@ -6,7 +6,7 @@ use crate::charts::axis::{
     set_chart_category_axis_series_names_visible as set_native_chart_category_axis_series_names_visible,
 };
 
-impl NumbersEditor {
+impl Editor {
     /// Read whether Numbers shows series names on a native sheet chart category axis.
     pub fn sheet_chart_category_axis_series_names_visible(
         &self,
@@ -33,7 +33,7 @@ impl NumbersEditor {
 }
 
 fn sheet_chart_category_axis_series_names_visible(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<bool> {
@@ -47,7 +47,7 @@ fn sheet_chart_category_axis_series_names_visible(
 }
 
 fn set_sheet_chart_category_axis_series_names_visible(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     visible: bool,
@@ -61,7 +61,7 @@ fn set_sheet_chart_category_axis_series_names_visible(
         "Numbers",
         visible,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_category_axis_series_names_visible(sheet_id, drawable_object_id)?
         != visible
     {

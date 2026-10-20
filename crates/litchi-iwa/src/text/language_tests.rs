@@ -1,7 +1,7 @@
 use super::{TextLanguage, TextLanguageRun, TextPosition};
-use crate::keynote::{self, KeynoteEditor};
-use crate::numbers::{self, NumbersEditor};
-use crate::pages::PagesEditor;
+use crate::keynote::{self};
+use crate::numbers::{self};
+use crate::pages;
 use crate::shapes::{DrawablePoint, DrawableSize};
 
 const TEXT: &str = "Hello 😀\nBonjour";
@@ -20,15 +20,11 @@ fn explicit(tag: &str) -> TextLanguage {
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn scratch_text_language_runs_round_trip_in_every_suite() {
     let english = explicit("en");
     let french = explicit("fr-CA");
 
-    let mut pages = PagesEditor::builder()
+    let mut pages = pages::Editor::builder()
         .body_text("Body")
         .language("en")
         .build()
@@ -57,7 +53,7 @@ fn scratch_text_language_runs_round_trip_in_every_suite() {
     pages
         .set_text_box_text_language(pages_box.drawable_object_id, french_start(), french.clone())
         .unwrap();
-    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_text_language(pages_box.drawable_object_id, TextPosition::ZERO)
@@ -145,7 +141,7 @@ fn scratch_text_language_runs_round_trip_in_every_suite() {
             explicit("fr"),
         )
         .unwrap();
-    let numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let numbers = numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_text_language(sheet_id, numbers_box.drawable_object_id, french_start())
@@ -169,7 +165,7 @@ fn scratch_text_language_runs_round_trip_in_every_suite() {
             explicit("fr"),
         )
         .unwrap();
-    let keynote = KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let keynote = keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_text_language(0, keynote_box.drawable_object_id, french_start())
@@ -180,7 +176,7 @@ fn scratch_text_language_runs_round_trip_in_every_suite() {
 
 #[test]
 fn split_surrogate_language_updates_are_rejected_transactionally() {
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, "A😀B", POSITION, SIZE).unwrap();
     let before = pages.to_bytes().unwrap();
     assert!(

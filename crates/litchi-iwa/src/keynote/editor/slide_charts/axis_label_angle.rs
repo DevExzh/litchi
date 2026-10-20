@@ -7,7 +7,7 @@ use crate::charts::axis_label_angle::{
 };
 use crate::charts::{Axis, LabelAngle};
 
-impl KeynoteEditor {
+impl Editor {
     /// Read one slide-chart axis' normalized label angle.
     pub fn slide_chart_axis_label_angle(
         &self,
@@ -31,7 +31,7 @@ impl KeynoteEditor {
 }
 
 fn slide_chart_axis_label_angle(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
@@ -47,7 +47,7 @@ fn slide_chart_axis_label_angle(
 }
 
 fn set_slide_chart_axis_label_angle(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
@@ -63,7 +63,7 @@ fn set_slide_chart_axis_label_angle(
         axis,
         angle,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_axis_label_angle(slide_index, drawable_object_id, axis)? != angle {
         return Err(Error::InvalidFormat(
             "Keynote chart axis label-angle update failed validation".to_owned(),
@@ -106,7 +106,7 @@ mod tests {
         editor
             .set_slide_chart_axis_label_angle(0, chart.drawable_object_id, Axis::Value, expected)
             .unwrap();
-        let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_chart_axis_label_angle(0, chart.drawable_object_id, Axis::Value)

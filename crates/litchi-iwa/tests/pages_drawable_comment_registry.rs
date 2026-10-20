@@ -14,7 +14,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 
 use litchi_iwa::comments::IWorkDrawableCommentEditor;
-use litchi_iwa::pages::{self, PagesEditor, PagesTableInfo};
+use litchi_iwa::pages::{self};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Preset};
 use litchi_iwa_archive::iwa::{Archive, ArchiveObject, SnappyStream};
 use litchi_iwa_archive::package::Catalog;
@@ -84,7 +84,7 @@ fn pages_shape_package() -> TestResult<(Vec<u8>, DrawableId)> {
     Ok((pages.to_bytes()?, drawable_id))
 }
 
-fn pages_table_package() -> TestResult<(Vec<u8>, u64, u64, PagesTableInfo)> {
+fn pages_table_package() -> TestResult<(Vec<u8>, u64, u64, pages::TableInfo)> {
     let pages = pages::Builder::new()
         .body_text("Body text")
         .body_table("Cities", 5, 2)
@@ -534,12 +534,12 @@ fn assert_unrelated_content_preserved(
 
 #[derive(Debug, Clone, PartialEq)]
 struct TableSnapshot {
-    info: PagesTableInfo,
-    cells: Vec<((usize, usize), litchi_iwa::pages::PagesCellValue)>,
+    info: pages::TableInfo,
+    cells: Vec<((usize, usize), litchi_iwa::pages::CellValue)>,
     comments: Vec<((usize, usize), litchi_iwa_common::table::read::Comment)>,
 }
 
-fn table_snapshot(editor: &PagesEditor, model_object_id: u64) -> TestResult<TableSnapshot> {
+fn table_snapshot(editor: &pages::Editor, model_object_id: u64) -> TestResult<TableSnapshot> {
     let table = editor.table(model_object_id)?;
     Ok(TableSnapshot {
         info: table.info.clone(),
@@ -788,7 +788,7 @@ fn source_built_pages_comment_failures_are_atomic() -> TestResult<()> {
 #[test]
 fn source_built_pages_table_comment_lifecycle_preserves_unrelated_table() -> TestResult<()> {
     let (source, cities_id, unrelated_id, unrelated_info) = pages_table_package()?;
-    let baseline_editor = PagesEditor::from_bytes(&source)?;
+    let baseline_editor = pages::Editor::from_bytes(&source)?;
     let unrelated_before = table_snapshot(&baseline_editor, unrelated_id)?;
     assert_eq!(unrelated_before.info, unrelated_info);
 
@@ -857,7 +857,7 @@ fn source_built_pages_table_comment_lifecycle_preserves_unrelated_table() -> Tes
         "updating a Cities reply changed the unrelated table"
     );
 
-    let reopened = PagesEditor::from_bytes(&replaced_bytes)?;
+    let reopened = pages::Editor::from_bytes(&replaced_bytes)?;
     assert_eq!(table_snapshot(&reopened, unrelated_id)?, unrelated_before);
     let reopened_root = reopened
         .table_cell_comment(cities_id, 1, 1)?
@@ -894,7 +894,7 @@ fn source_built_pages_table_comment_lifecycle_preserves_unrelated_table() -> Tes
 #[test]
 fn source_built_pages_table_comment_failures_are_atomic() -> TestResult<()> {
     let (source, cities_id, unrelated_id, _) = pages_table_package()?;
-    let mut editor = PagesEditor::from_bytes(&source)?;
+    let mut editor = pages::Editor::from_bytes(&source)?;
     editor.set_table_cell_comment(cities_id, 1, 1, "Cities root")?;
     let reply_id = editor.add_table_cell_comment_reply(cities_id, 1, 1, "Cities reply")?;
     let before = editor.to_bytes()?;
@@ -942,7 +942,7 @@ fn native_saved_pages_hidden_axes_preserve_comment_thread_and_exact_reencode() -
     focused.write_to(&mut focused_bytes)?;
     assert_eq!(focused_bytes, source);
 
-    let editor = PagesEditor::from_bytes(source)?;
+    let editor = pages::Editor::from_bytes(source)?;
     assert!(editor.body_text()?.contains(NATIVE_COMMENT_BODY_MARKER));
     let tables = editor.tables()?;
     assert_eq!(tables.len(), 1);
@@ -989,7 +989,7 @@ fn native_saved_pages_hidden_axes_preserve_comment_thread_and_exact_reencode() -
     );
     assert_eq!(root.comment.reply_ids.as_ref(), [reply.storage_id]);
 
-    let reopened = PagesEditor::from_bytes(source)?;
+    let reopened = pages::Editor::from_bytes(source)?;
     let reopened_root = reopened
         .table_cell_comment(table.model_object_id, 1, 1)?
         .ok_or_else(|| io::Error::other("reopened native saved B2 root comment is missing"))?;

@@ -7,7 +7,7 @@ use crate::charts::axis_label_position_3d::{
     set_chart_3d_value_axis_label_position as set_native_3d_value_axis_label_position,
 };
 
-impl KeynoteEditor {
+impl Editor {
     /// Read one slide chart's 3D primary value-axis label position.
     pub fn slide_chart_3d_value_axis_label_position(
         &self,
@@ -51,7 +51,7 @@ impl KeynoteEditor {
             graph.info.kind,
             position,
         )?;
-        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_3d_value_axis_label_position(slide_index, drawable_object_id)?
             != position
         {
@@ -92,7 +92,7 @@ mod tests {
                 LabelPosition3d::Leading,
             )
             .unwrap();
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_chart_3d_value_axis_label_position(0, chart.drawable_object_id)

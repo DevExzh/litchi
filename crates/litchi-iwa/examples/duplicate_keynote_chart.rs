@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::keynote::KeynoteEditor;
+use litchi_iwa::keynote;
 use litchi_keynote::ChartSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = KeynoteEditor::open(input)?;
+    let mut editor = keynote::Editor::open(input)?;
     let source = editor
         .slide_charts(slide_index)?
         .into_iter()

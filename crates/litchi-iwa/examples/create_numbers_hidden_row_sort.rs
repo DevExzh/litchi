@@ -3,10 +3,7 @@ use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSet
 
 use std::path::PathBuf;
 
-use litchi_iwa::numbers::{
-    self, NumbersEditor, NumbersTableSortColumnIndex, NumbersTableSortDirection,
-    NumbersTableSortOrder, NumbersTableSortRule,
-};
+use litchi_iwa::numbers::{self};
 use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 use litchi_numbers::table::At;
 use litchi_numbers::table::cells::{Change, Input};
@@ -47,9 +44,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     )?;
     editor.set_table_hidden_axes(table, &HiddenAxes::new([AxisIndex::row(2)])?)?;
-    let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
-        NumbersTableSortColumnIndex::new(1)?,
-        NumbersTableSortDirection::Descending,
+    let order = numbers::TableSortOrder::new([numbers::TableSortRule::new(
+        numbers::TableSortColumnIndex::new(1)?,
+        numbers::TableSortDirection::Descending,
     )])?;
     let package = Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
@@ -58,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    editor = NumbersEditor::from_bytes(&bytes)?;
+    editor = numbers::Editor::from_bytes(&bytes)?;
     if !editor.apply_table_sort_order(table)? {
         return Err("expected the hidden-row table to be reordered".into());
     }
@@ -71,9 +68,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn set_focused_table_headers(
-    editor: NumbersEditor,
+    editor: numbers::Editor,
     settings: HeaderSettings,
-) -> Result<NumbersEditor, Box<dyn std::error::Error>> {
+) -> Result<numbers::Editor, Box<dyn std::error::Error>> {
     let package = Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_table_headers(SheetSelector::index(0), TableSelector::index(0))?
@@ -81,13 +78,13 @@ fn set_focused_table_headers(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(NumbersEditor::from_bytes(&bytes)?)
+    Ok(numbers::Editor::from_bytes(&bytes)?)
 }
 
 fn set_focused_table_cells(
-    editor: NumbersEditor,
+    editor: numbers::Editor,
     changes: impl IntoIterator<Item = Change>,
-) -> Result<NumbersEditor, Box<dyn std::error::Error>> {
+) -> Result<numbers::Editor, Box<dyn std::error::Error>> {
     let package = Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_table_cells(SheetSelector::index(0), TableSelector::index(0))?
@@ -95,5 +92,5 @@ fn set_focused_table_cells(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(NumbersEditor::from_bytes(&bytes)?)
+    Ok(numbers::Editor::from_bytes(&bytes)?)
 }

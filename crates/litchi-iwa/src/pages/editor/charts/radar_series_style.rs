@@ -8,7 +8,7 @@ use crate::charts::radar_series_style::{
     set_chart_radar_series_style as set_native_radar_style,
 };
 
-impl PagesEditor {
+impl Editor {
     /// Read the chart-wide Radar `Style` selection.
     pub fn body_chart_radar_series_style(
         &self,
@@ -56,7 +56,7 @@ impl PagesEditor {
             series_count,
             style,
         )?;
-        let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_radar_series_style(drawable_object_id)? != style {
             return Err(Error::InvalidFormat(
                 "Pages Radar series-style update failed validation".to_owned(),
@@ -103,7 +103,7 @@ mod tests {
             editor
                 .set_body_chart_radar_series_style(chart.drawable_object_id, style)
                 .unwrap();
-            let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+            let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
             assert_eq!(
                 reopened
                     .body_chart_radar_series_style(chart.drawable_object_id)

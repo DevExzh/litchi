@@ -2,13 +2,13 @@
 
 use std::env;
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = env::args()
         .nth(1)
         .ok_or("usage: inspect_pages_shapes <input.pages>")?;
-    let editor = PagesEditor::open(input)?;
+    let editor = pages::Editor::open(input)?;
     for (index, shape) in editor.body_shapes()?.iter().enumerate() {
         let fill = editor.body_shape_fill(shape.drawable_object_id)?;
         let stroke = editor.body_shape_stroke(shape.drawable_object_id)?;

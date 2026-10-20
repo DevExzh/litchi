@@ -31,23 +31,21 @@ pub mod editor;
 
 pub use creation::Builder;
 pub use editor::{
-    PagesAudioInfo, PagesBodyChartInfo, PagesBodyShapeInfo, PagesCellValue, PagesDrawableTextInfo,
-    PagesEditor, PagesImageInfo, PagesMovieInfo, PagesSectionInfo, PagesTable,
-    PagesTableCellParagraphList, PagesTableCellParagraphListBullet,
-    PagesTableCellParagraphListBulletGeometry, PagesTableCellParagraphListIndentation,
-    PagesTableCellParagraphListLabelColor, PagesTableCellParagraphListLevel,
-    PagesTableCellParagraphListLevelPlacement, PagesTableCellParagraphListNumberFormat,
-    PagesTableCellParagraphListNumberScale, PagesTableCellParagraphListNumberTiering,
-    PagesTableCellParagraphListNumbering, PagesTableCellParagraphListPlacement,
-    PagesTableCellParagraphTabStops, PagesTableCellTextBackground, PagesTableCellTextBaselineShift,
-    PagesTableCellTextCapitalization, PagesTableCellTextCharacterSpacing, PagesTableCellTextColor,
-    PagesTableCellTextDecorations, PagesTableCellTextFont, PagesTableCellTextLigatures,
-    PagesTableCellTextOutline, PagesTableCellTextScript, PagesTableCellTextShadow,
-    PagesTableCellTextStyle, PagesTableCellUpdate, PagesTableFormulaAxisReference,
-    PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue, PagesTableFormulaCellReference,
-    PagesTableFormulaExpression, PagesTableInfo, PagesTableSortRowRange, RemovedPagesAudio,
-    RemovedPagesBodyChart, RemovedPagesBodyShape, RemovedPagesImage, RemovedPagesMovie,
-    RemovedPagesTextBox,
+    AudioInfo, BodyChartInfo, BodyShapeInfo, CellValue, DrawableTextInfo, Editor, ImageInfo,
+    MovieInfo, RemovedPagesAudio, RemovedPagesBodyChart, RemovedPagesBodyShape, RemovedPagesImage,
+    RemovedPagesMovie, RemovedPagesTextBox, SectionInfo, Table, TableCellParagraphList,
+    TableCellParagraphListBullet, TableCellParagraphListBulletGeometry,
+    TableCellParagraphListIndentation, TableCellParagraphListLabelColor,
+    TableCellParagraphListLevel, TableCellParagraphListLevelPlacement,
+    TableCellParagraphListNumberFormat, TableCellParagraphListNumberScale,
+    TableCellParagraphListNumberTiering, TableCellParagraphListNumbering,
+    TableCellParagraphListPlacement, TableCellParagraphTabStops, TableCellTextBackground,
+    TableCellTextBaselineShift, TableCellTextCapitalization, TableCellTextCharacterSpacing,
+    TableCellTextColor, TableCellTextDecorations, TableCellTextFont, TableCellTextLigatures,
+    TableCellTextOutline, TableCellTextScript, TableCellTextShadow, TableCellTextStyle,
+    TableCellUpdate, TableFormulaAxisReference, TableFormulaBinaryOperator,
+    TableFormulaCachedValue, TableFormulaCellReference, TableFormulaExpression, TableInfo,
+    TableSortRowRange,
 };
 pub use litchi_pages::footnote::body::{Footnote, Position, Selector};
 pub use litchi_pages::{Section, SectionType};

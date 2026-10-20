@@ -7,7 +7,7 @@ use crate::charts::reference_line::{
     set_chart_reference_lines as set_native_reference_lines,
 };
 
-impl KeynoteEditor {
+impl Editor {
     /// Read ordered reference lines on one slide chart's primary value axis.
     pub fn slide_chart_reference_lines(
         &self,
@@ -29,7 +29,7 @@ impl KeynoteEditor {
 }
 
 fn slide_chart_reference_lines(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Vec<Line>> {
@@ -43,7 +43,7 @@ fn slide_chart_reference_lines(
 }
 
 fn set_slide_chart_reference_lines(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     reference_line: &[Line],
@@ -57,7 +57,7 @@ fn set_slide_chart_reference_lines(
         "Keynote",
         reference_line,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_reference_lines(slide_index, drawable_object_id)? != reference_line {
         return Err(Error::InvalidFormat(
             "Keynote chart reference-line update failed validation".to_owned(),
@@ -135,7 +135,7 @@ mod tests {
         editor
             .remove_slide_chart(0, chart_selector(&editor, &duplicate))
             .unwrap();
-        let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_chart_reference_lines(0, chart.drawable_object_id)

@@ -40,7 +40,7 @@ enum ShapeClonePlacement {
 
 /// One ordinary, non-text-box shape owned directly by a Numbers sheet.
 #[derive(Debug, Clone, PartialEq)]
-pub struct NumbersSheetShapeInfo {
+pub struct SheetShapeInfo {
     pub sheet_id: u64,
     pub drawable_object_id: u64,
     pub kind: ShapePathKind,
@@ -58,21 +58,21 @@ pub struct NumbersSheetShapeInfo {
 /// Result of removing an ordinary Numbers shape and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedNumbersSheetShape {
-    pub shape: NumbersSheetShapeInfo,
+    pub shape: SheetShapeInfo,
 }
 
 struct SheetShapeGraph {
     sheet_id: u64,
     archive_name: String,
     component_id: u64,
-    info: NumbersSheetShapeInfo,
+    info: SheetShapeInfo,
     object_ids: Vec<u64>,
     uuid_object_ids: Vec<u64>,
 }
 
-impl NumbersEditor {
+impl Editor {
     /// List ordinary non-text-box shapes owned by one reachable sheet.
-    pub fn sheet_shapes(&self, sheet_id: u64) -> Result<Vec<NumbersSheetShapeInfo>> {
+    pub fn sheet_shapes(&self, sheet_id: u64) -> Result<Vec<SheetShapeInfo>> {
         shape_infos(self, sheet_id)
     }
 
@@ -87,7 +87,7 @@ impl NumbersEditor {
         text: &str,
         position: DrawablePoint,
         size: DrawableSize,
-    ) -> Result<NumbersSheetShapeInfo> {
+    ) -> Result<SheetShapeInfo> {
         self.add_sheet_shape(sheet_id, text, position, size, Preset::Rectangle)
     }
 
@@ -103,7 +103,7 @@ impl NumbersEditor {
         position: DrawablePoint,
         size: DrawableSize,
         preset: Preset,
-    ) -> Result<NumbersSheetShapeInfo> {
+    ) -> Result<SheetShapeInfo> {
         let geometry = new_shape_geometry(position, size)?;
         self.add_sheet_shape_path(
             sheet_id,
@@ -124,7 +124,7 @@ impl NumbersEditor {
         size: DrawableSize,
         preset: Preset,
         fill: ShapeFill,
-    ) -> Result<NumbersSheetShapeInfo> {
+    ) -> Result<SheetShapeInfo> {
         let created = self.add_sheet_shape(sheet_id, text, position, size, preset)?;
         self.set_sheet_shape_fill(sheet_id, created.drawable_object_id, &fill)?;
         Ok(shape_graph(self, sheet_id, created.drawable_object_id)?.info)
@@ -140,7 +140,7 @@ impl NumbersEditor {
         sheet_id: u64,
         start: DrawablePoint,
         end: DrawablePoint,
-    ) -> Result<NumbersSheetShapeInfo> {
+    ) -> Result<SheetShapeInfo> {
         let segment = LineSegment::new(start, end)?;
         self.add_sheet_shape_path(
             sheet_id,
@@ -159,7 +159,7 @@ impl NumbersEditor {
         start: DrawablePoint,
         end: DrawablePoint,
         endpoints: Endpoints,
-    ) -> Result<NumbersSheetShapeInfo> {
+    ) -> Result<SheetShapeInfo> {
         let created = self.add_sheet_line(sheet_id, start, end)?;
         self.set_sheet_line_endpoints(sheet_id, created.drawable_object_id, endpoints)?;
         Ok(shape_graph(self, sheet_id, created.drawable_object_id)?.info)
@@ -172,7 +172,7 @@ impl NumbersEditor {
         start: DrawablePoint,
         end: DrawablePoint,
         style: LineStyle,
-    ) -> Result<NumbersSheetShapeInfo> {
+    ) -> Result<SheetShapeInfo> {
         let created = self.add_sheet_line(sheet_id, start, end)?;
         self.set_sheet_shape_stroke(sheet_id, created.drawable_object_id, style.stroke)?;
         self.set_sheet_line_endpoints(sheet_id, created.drawable_object_id, style.endpoints)?;
@@ -187,7 +187,7 @@ impl NumbersEditor {
         path_source: tsd::PathSourceArchive,
         expected_preset: Option<Preset>,
         expected_line: Option<LineSegment>,
-    ) -> Result<NumbersSheetShapeInfo> {
+    ) -> Result<SheetShapeInfo> {
         let (archive_name, _, _) = numbers_sheet(&self.package, sheet_id)?;
         let document = numbers_document(&self.package)?;
         let styles = text_box_theme_styles(
@@ -852,7 +852,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         source_drawable_object_id: u64,
-    ) -> Result<NumbersSheetShapeInfo> {
+    ) -> Result<SheetShapeInfo> {
         self.clone_sheet_shape(
             sheet_id,
             source_drawable_object_id,
@@ -866,7 +866,7 @@ impl NumbersEditor {
         source_sheet_id: u64,
         source_drawable_object_id: u64,
         target_sheet_id: u64,
-    ) -> Result<NumbersSheetShapeInfo> {
+    ) -> Result<SheetShapeInfo> {
         self.clone_sheet_shape(
             source_sheet_id,
             source_drawable_object_id,
@@ -881,7 +881,7 @@ impl NumbersEditor {
         source_drawable_object_id: u64,
         target_sheet_id: u64,
         placement: ShapeClonePlacement,
-    ) -> Result<NumbersSheetShapeInfo> {
+    ) -> Result<SheetShapeInfo> {
         let source = shape_graph(self, source_sheet_id, source_drawable_object_id)?;
         let (target_archive_name, _, _) = numbers_sheet(&self.package, target_sheet_id)?;
         if source.archive_name != target_archive_name {
@@ -1061,7 +1061,7 @@ fn new_shape_geometry(position: DrawablePoint, size: DrawableSize) -> Result<Dra
     .validate()
 }
 
-fn shape_infos(editor: &NumbersEditor, sheet_id: u64) -> Result<Vec<NumbersSheetShapeInfo>> {
+fn shape_infos(editor: &Editor, sheet_id: u64) -> Result<Vec<SheetShapeInfo>> {
     let (_, _, sheet) = numbers_sheet(editor.package(), sheet_id)?;
     let locations = object_locations(editor.package())?;
     let mut shapes = Vec::new();
@@ -1108,11 +1108,7 @@ fn shape_infos(editor: &NumbersEditor, sheet_id: u64) -> Result<Vec<NumbersSheet
 }
 
 #[allow(deprecated)]
-fn shape_graph(
-    editor: &NumbersEditor,
-    sheet_id: u64,
-    drawable_object_id: u64,
-) -> Result<SheetShapeGraph> {
+fn shape_graph(editor: &Editor, sheet_id: u64, drawable_object_id: u64) -> Result<SheetShapeGraph> {
     let (archive_name, _, sheet) = numbers_sheet(editor.package(), sheet_id)?;
     if sheet
         .drawable_infos
@@ -1317,12 +1313,12 @@ fn validate_shape_ownership(
 }
 
 fn shape_info(
-    editor: &NumbersEditor,
+    editor: &Editor,
     locations: &HashMap<u64, String>,
     sheet_id: u64,
     drawable_object_id: u64,
     shape: &tswp::ShapeInfoArchive,
-) -> Result<NumbersSheetShapeInfo> {
+) -> Result<SheetShapeInfo> {
     let storage_id = shape
         .owned_storage
         .as_ref()
@@ -1345,7 +1341,7 @@ fn shape_info(
     let line_endpoints = line_segment
         .map(|_| shape_line_endpoints(editor.package(), archive_name, drawable_object_id))
         .transpose()?;
-    Ok(NumbersSheetShapeInfo {
+    Ok(SheetShapeInfo {
         sheet_id,
         drawable_object_id,
         kind: shape_path_kind(shape)?,
@@ -1460,7 +1456,7 @@ mod tests {
             .set_sheet_shape_properties(sheet_id, created.drawable_object_id, properties.clone())
             .unwrap();
 
-        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let shape = &reopened.sheet_shapes(sheet_id).unwrap()[0];
         assert_eq!(shape.storage.storage.text(), "Made from typed objects");
         assert_eq!(shape.geometry, geometry);
@@ -1550,7 +1546,7 @@ mod tests {
                 .text(),
             "Source shape"
         );
-        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_shapes(sheet_id)
@@ -1592,7 +1588,7 @@ mod tests {
             LineSegment::new(LINE_START, LINE_END).unwrap()
         ));
 
-        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(line_segments_match(
             reopened
                 .sheet_line_segment(sheet_id, created.drawable_object_id)
@@ -1679,7 +1675,7 @@ mod tests {
                 LineStyle::new(stroke).with_endpoints(endpoints),
             )
             .unwrap();
-        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_shape_stroke(sheet_id, created.drawable_object_id)
@@ -1733,7 +1729,7 @@ mod tests {
         editor
             .set_sheet_shape_fill(sheet_id, created.drawable_object_id, &fill)
             .unwrap();
-        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_shape_fill(sheet_id, created.drawable_object_id)
@@ -1787,7 +1783,7 @@ mod tests {
             bytes
         );
 
-        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_shape_fill(sheet_id, created.drawable_object_id)
@@ -1830,7 +1826,7 @@ mod tests {
             .set_sheet_shape_effects(sheet_id, created.drawable_object_id, effects)
             .unwrap();
 
-        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_shape_effects(sheet_id, created.drawable_object_id)
@@ -1877,7 +1873,7 @@ mod tests {
             .set_sheet_shape_shadow(sheet_id, created.drawable_object_id, shadow)
             .unwrap();
 
-        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_shape_shadow(sheet_id, created.drawable_object_id)
@@ -1920,7 +1916,7 @@ mod tests {
             .set_sheet_shape_text_layout(sheet_id, created.drawable_object_id, layout)
             .unwrap();
 
-        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_shape_text_layout(sheet_id, created.drawable_object_id)
@@ -1968,7 +1964,7 @@ mod tests {
             Some(Endpoints::new(Endpoint::FilledSquare, Endpoint::OpenArrow))
         );
 
-        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let replacement = Endpoints::new(Endpoint::InvertedArrow, Endpoint::FilledCircle);
         reopened
             .set_sheet_line_endpoints(sheet_id, created.drawable_object_id, replacement)
@@ -2013,7 +2009,7 @@ mod tests {
         assert_eq!(created.kind, ShapePathKind::RoundedRectangle);
         assert_eq!(created.preset, Some(Preset::ROUNDED_RECTANGLE));
 
-        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_shape_preset(sheet_id, created.drawable_object_id)

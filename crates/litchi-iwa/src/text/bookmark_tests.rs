@@ -1,5 +1,5 @@
 use super::{TextBookmarkName, TextBookmarkSettings, TextBookmarkVisibility, TextRange};
-use crate::pages::PagesEditor;
+use crate::pages;
 
 const TEXT: &str = "Alpha 😀 Beta Gamma";
 
@@ -13,7 +13,7 @@ fn named(value: &str) -> TextBookmarkSettings {
 
 #[test]
 fn scratch_pages_body_bookmark_crud_round_trips_and_restores_exactly() {
-    let mut pages = PagesEditor::create_with_text(TEXT).unwrap();
+    let mut pages = pages::Editor::create_with_text(TEXT).unwrap();
     let baseline = pages.to_bytes().unwrap();
 
     let created = pages
@@ -23,7 +23,7 @@ fn scratch_pages_body_bookmark_crud_round_trips_and_restores_exactly() {
         pages.body_bookmarks().unwrap().as_slice(),
         std::slice::from_ref(&created)
     );
-    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     let settings = named("Methods").with_visibility(TextBookmarkVisibility::Hidden);
     let updated = pages
         .update_body_bookmark(created.id, range(9, 13), settings.clone())
@@ -47,7 +47,7 @@ fn scratch_pages_body_bookmark_crud_round_trips_and_restores_exactly() {
 
 #[test]
 fn split_surrogate_and_empty_bookmark_ranges_are_rejected_transactionally() {
-    let mut pages = PagesEditor::create_with_text("A😀B").unwrap();
+    let mut pages = pages::Editor::create_with_text("A😀B").unwrap();
     let baseline = pages.to_bytes().unwrap();
     assert!(TextRange::from_utf16_indexes(1, 1).is_err());
     assert!(
@@ -60,7 +60,7 @@ fn split_surrogate_and_empty_bookmark_ranges_are_rejected_transactionally() {
 
 #[test]
 fn replacing_bookmarked_text_reclaims_the_orphaned_object() {
-    let mut pages = PagesEditor::create_with_text(TEXT).unwrap();
+    let mut pages = pages::Editor::create_with_text(TEXT).unwrap();
     let baseline = pages.to_bytes().unwrap();
     pages
         .add_body_bookmark(range(0, 5), named("Alpha"))

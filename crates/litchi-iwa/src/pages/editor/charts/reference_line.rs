@@ -7,7 +7,7 @@ use crate::charts::reference_line::{
     set_chart_reference_lines as set_native_reference_lines,
 };
 
-impl PagesEditor {
+impl Editor {
     /// Read ordered reference lines on one body chart's primary value axis.
     pub fn body_chart_reference_lines(&self, drawable_object_id: u64) -> Result<Vec<Line>> {
         body_chart_reference_lines(self, drawable_object_id)
@@ -23,7 +23,7 @@ impl PagesEditor {
     }
 }
 
-fn body_chart_reference_lines(editor: &PagesEditor, drawable_object_id: u64) -> Result<Vec<Line>> {
+fn body_chart_reference_lines(editor: &Editor, drawable_object_id: u64) -> Result<Vec<Line>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_reference_lines(
         editor.package(),
@@ -34,7 +34,7 @@ fn body_chart_reference_lines(editor: &PagesEditor, drawable_object_id: u64) -> 
 }
 
 fn set_body_chart_reference_lines(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     reference_line: &[Line],
 ) -> Result<()> {
@@ -47,7 +47,7 @@ fn set_body_chart_reference_lines(
         "Pages",
         reference_line,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_reference_lines(drawable_object_id)? != reference_line {
         return Err(Error::InvalidFormat(
             "Pages chart reference-line update failed validation".to_owned(),
@@ -129,7 +129,7 @@ mod tests {
         editor
             .remove_body_chart(duplicate.drawable_object_id)
             .unwrap();
-        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_chart_reference_lines(chart.drawable_object_id)

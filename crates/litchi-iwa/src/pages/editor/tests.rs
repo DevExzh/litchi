@@ -27,7 +27,7 @@ fn native_unicode_body_discovery_preserves_sections_and_exact_source() {
             .join("../../test-data/iwork/pages/body-sections-unicode.pages"),
     )
     .expect("native two-section Pages fixture");
-    let editor = PagesEditor::from_bytes(&source).expect("native Pages discovery");
+    let editor = Editor::from_bytes(&source).expect("native Pages discovery");
     let text = editor.body_text().expect("native body text");
     let first = "Pages borrowed body 😀\nFirst section marker.";
     let second = "Second section marker — end.";
@@ -138,7 +138,7 @@ fn pages_native_discriminants_are_typed_and_lossless() {
 
 #[test]
 fn semantic_body_update_and_clear_are_transactional() {
-    let mut editor = PagesEditor::from_package(test_package("A🚀B")).unwrap();
+    let mut editor = Editor::from_package(test_package("A🚀B")).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.replace_body_text(2..3, "x").is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -150,7 +150,7 @@ fn semantic_body_update_and_clear_are_transactional() {
 
 #[test]
 fn plain_section_text_rejects_inline_object_markers_atomically() {
-    let editor = PagesEditor::create_with_text("Body").unwrap();
+    let editor = Editor::create_with_text("Body").unwrap();
     let before = editor.to_bytes().unwrap();
     let package = PagesPackage::from_bytes(&before).unwrap();
 
@@ -173,7 +173,7 @@ fn root_body_projection_preserves_unknowns_and_rejects_duplicate_references() {
         })
         .unwrap();
     let before = package.to_bytes().unwrap();
-    let editor = PagesEditor::from_package(package).unwrap();
+    let editor = Editor::from_package(package).unwrap();
     assert_eq!(editor.body_text().unwrap(), "Body");
     assert_eq!(editor.to_bytes().unwrap(), before);
 
@@ -185,7 +185,7 @@ fn root_body_projection_preserves_unknowns_and_rejects_duplicate_references() {
             Ok(())
         })
         .unwrap();
-    assert!(PagesEditor::from_package(duplicate).is_err());
+    assert!(Editor::from_package(duplicate).is_err());
 }
 
 #[test]
@@ -258,7 +258,7 @@ fn body_text_storage_keeps_malformed_optional_footnotes_opaque() {
         .unwrap();
     let before = package.to_bytes().unwrap();
 
-    let editor = PagesEditor::from_package(package).unwrap();
+    let editor = Editor::from_package(package).unwrap();
     assert_eq!(editor.body_text().unwrap(), "Body");
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
@@ -358,7 +358,7 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
         )
         .unwrap();
 
-    let mut editor = PagesEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     assert_eq!(editor.sections().len(), 1);
     assert_eq!(editor.sections()[0].name.as_deref(), Some("Chapter"));
     let package = PagesPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -380,7 +380,7 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
     let commit = edit.commit().unwrap();
     let mut edited_bytes = Vec::new();
     commit.package().write_to(&mut edited_bytes).unwrap();
-    editor = PagesEditor::from_bytes(&edited_bytes).unwrap();
+    editor = Editor::from_bytes(&edited_bytes).unwrap();
 
     let package = PagesPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let mut edit = package
@@ -395,7 +395,7 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
     let commit = edit.commit().unwrap();
     let mut edited_bytes = Vec::new();
     commit.package().write_to(&mut edited_bytes).unwrap();
-    editor = PagesEditor::from_bytes(&edited_bytes).unwrap();
+    editor = Editor::from_bytes(&edited_bytes).unwrap();
 
     let package = PagesPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let regions = (PagesPackage::header_footers)(&package).unwrap();
@@ -411,7 +411,7 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
             ))
             .is_err()
     );
-    let reparsed = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reparsed = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let package = PagesPackage::from_bytes(&reparsed.to_bytes().unwrap()).unwrap();
     let regions = (PagesPackage::header_footers)(&package).unwrap();
     assert_eq!(regions[0].template(), Template::Odd);
@@ -477,7 +477,7 @@ fn discover_structure_rejects_duplicate_valid_and_invalid_sections() {
         )
         .unwrap();
 
-    assert!(PagesEditor::from_package(package).is_err());
+    assert!(Editor::from_package(package).is_err());
 }
 
 #[test]
@@ -580,7 +580,7 @@ fn section_append_remove_is_wire_preserving_and_transactional() {
         .unwrap();
     let before = package.to_bytes().unwrap();
 
-    let mut editor = PagesEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let created = editor.append_section(section_id, "Appended").unwrap();
     assert_eq!(created.character_index, 5);
     assert_eq!(created.name.as_deref(), Some("Appended"));
@@ -769,7 +769,7 @@ fn reachable_floating_drawable_comment_crud_is_guarded() {
         )
         .unwrap();
 
-    let mut editor = PagesEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     assert_eq!(
         editor
             .drawables()
@@ -799,7 +799,7 @@ fn reachable_floating_drawable_comment_crud_is_guarded() {
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), bytes);
 
-    let mut reparsed = PagesEditor::from_bytes(&bytes).unwrap();
+    let mut reparsed = Editor::from_bytes(&bytes).unwrap();
     reparsed.clear_drawable_comment(drawable_id).unwrap();
     assert!(reparsed.drawable_comment(drawable_id).unwrap().is_none());
     assert_eq!(reparsed.body_text().unwrap(), "Body");
@@ -814,7 +814,7 @@ fn reachable_zorder_rejects_wrong_message_type_without_mutating_source() {
             Ok(())
         })
         .unwrap();
-    let editor = PagesEditor::from_package(package).unwrap();
+    let editor = Editor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     let error = editor.drawables().expect_err("wrong z-order message type");
     assert!(error.to_string().contains("type-10015"));
@@ -828,7 +828,7 @@ fn reachable_zorder_rejects_malformed_nested_reference_atomically() {
         payload.clear();
         append_length_delimited(payload, 1, &[0x08, 0x40, 0x08]);
     });
-    let editor = PagesEditor::from_package(package).unwrap();
+    let editor = Editor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.drawables().is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -846,7 +846,7 @@ fn reachable_zorder_accepts_unknown_balanced_groups_and_preserves_source() {
         append_length_delimited(payload, 1, &reference(64).encode_to_vec());
         payload.extend_from_slice(&[0xa3, 0x03, 0x08, 0x01, 0xa4, 0x03]);
     });
-    let editor = PagesEditor::from_package(package).unwrap();
+    let editor = Editor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     let drawables = editor.drawables().unwrap();
     assert!(drawables.iter().any(|drawable| drawable.id.get() == 64));
@@ -873,7 +873,7 @@ fn update_zorder_payload(package: &mut IWorkPackage, update: impl FnOnce(&mut Ve
 
 #[test]
 fn reachable_drawable_text_crud_covers_placeholders_and_text_boxes() {
-    let mut editor = PagesEditor::from_package(floating_text_package()).unwrap();
+    let mut editor = Editor::from_package(floating_text_package()).unwrap();
     let text = editor.drawable_text_storages().unwrap();
     assert_eq!(text.len(), 2);
     assert_eq!(text[0].drawable_object_id, 60);
@@ -927,7 +927,7 @@ fn drawable_text_updates_preserve_unknown_wire_and_restore_exactly() {
             Ok(object.replace_message(0, message).map(|_| ())?)
         })
         .unwrap();
-    let mut editor = PagesEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let baseline = editor
         .package()
         .archive("Index/Document.iwa")
@@ -969,7 +969,7 @@ fn ambiguous_drawable_text_ownership_fails_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = PagesEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.drawable_text_storages().is_err());
     assert!(editor.set_drawable_text(60, "rejected").is_err());
@@ -978,7 +978,7 @@ fn ambiguous_drawable_text_ownership_fails_transactionally() {
 
 #[test]
 fn text_box_geometry_updates_are_guarded_and_byte_exact() {
-    let mut editor = PagesEditor::from_package(anchored_text_box_package()).unwrap();
+    let mut editor = Editor::from_package(anchored_text_box_package()).unwrap();
     let original = editor.text_box_geometry(64).unwrap();
     assert_eq!(
         original,
@@ -1024,7 +1024,7 @@ fn text_box_geometry_updates_are_guarded_and_byte_exact() {
 
 #[test]
 fn text_box_properties_updates_are_guarded_and_byte_exact() {
-    let mut editor = PagesEditor::from_package(anchored_text_box_package()).unwrap();
+    let mut editor = Editor::from_package(anchored_text_box_package()).unwrap();
     let original = editor.text_box_properties(64).unwrap();
     assert_eq!(original, DrawableProperties::default());
     let baseline = editor.to_bytes().unwrap();
@@ -1058,7 +1058,7 @@ fn text_box_properties_updates_are_guarded_and_byte_exact() {
 
 #[test]
 fn body_anchored_text_box_duplicate_delete_is_independent_and_exact() {
-    let mut editor = PagesEditor::from_package(anchored_text_box_package()).unwrap();
+    let mut editor = Editor::from_package(anchored_text_box_package()).unwrap();
     let baseline = editor.to_bytes().unwrap();
     let source = editor.drawable_text_storages().unwrap()[0].clone();
     assert_eq!(source.drawable_object_id, 64);
@@ -1152,7 +1152,7 @@ fn text_box_duplicate_delete_tracks_package_highwater_and_document_uuids() {
         )
         .unwrap();
 
-    let mut editor = PagesEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let baseline = editor.to_bytes().unwrap();
     let created = editor.duplicate_text_box(64, 0, "Metadata clone").unwrap();
     let graph = editor.text_box_graph(created.drawable_object_id).unwrap();
@@ -1199,7 +1199,7 @@ fn text_box_graph_crud_preserves_unknown_fields_and_rejects_external_owners() {
             Ok(())
         })
         .unwrap();
-    let mut editor = PagesEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let baseline = editor.to_bytes().unwrap();
     let created = editor.duplicate_text_box(64, 11, "Unknowns").unwrap();
     let graph = editor.text_box_graph(created.drawable_object_id).unwrap();
@@ -1221,7 +1221,7 @@ fn text_box_graph_crud_preserves_unknown_fields_and_rejects_external_owners() {
             Ok(archive.insert_object(external)?)
         })
         .unwrap();
-    let mut editor = PagesEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.remove_text_box(64).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -1253,7 +1253,7 @@ fn ambiguous_text_box_anchor_and_zorder_fail_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = PagesEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.duplicate_text_box(64, 0, "rejected").is_err());
     assert!(editor.remove_text_box(64).is_err());
@@ -1276,7 +1276,7 @@ fn ambiguous_text_box_anchor_and_zorder_fail_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = PagesEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.remove_text_box(64).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -1481,33 +1481,33 @@ fn floating_text_package() -> IWorkPackage {
     package
 }
 
-fn pages_package(editor: &PagesEditor) -> PagesPackage {
+fn pages_package(editor: &Editor) -> PagesPackage {
     PagesPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap()
 }
 
-fn section_text(editor: &PagesEditor, index: usize) -> String {
+fn section_text(editor: &Editor, index: usize) -> String {
     pages_package(editor)
         .section_text(SectionSelector::index(index))
         .unwrap()
         .to_owned()
 }
 
-fn set_section_text(editor: &mut PagesEditor, index: usize, replacement: &str) {
+fn set_section_text(editor: &mut Editor, index: usize, replacement: &str) {
     let package = pages_package(editor);
     let commit = package
         .set_section_text(SectionSelector::index(index), replacement)
         .unwrap();
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes).unwrap();
-    *editor = PagesEditor::from_bytes(&bytes).unwrap();
+    *editor = Editor::from_bytes(&bytes).unwrap();
 }
 
-fn clear_section_text(editor: &mut PagesEditor, index: usize) {
+fn clear_section_text(editor: &mut Editor, index: usize) {
     set_section_text(editor, index, "");
 }
 
 fn replace_section_text(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     index: usize,
     range: Range<usize>,
     replacement: &str,
@@ -1526,7 +1526,7 @@ fn replace_section_text(
         .package()
         .write_to(&mut bytes)
         .map_err(|error| error.to_string())?;
-    *editor = PagesEditor::from_bytes(&bytes).map_err(|error| error.to_string())?;
+    *editor = Editor::from_bytes(&bytes).map_err(|error| error.to_string())?;
     Ok(())
 }
 

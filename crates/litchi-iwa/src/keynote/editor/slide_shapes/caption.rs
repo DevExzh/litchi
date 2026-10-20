@@ -24,7 +24,7 @@ pub(super) struct SlideShapeCaptionSlot {
     pub(super) object_ids: Vec<u64>,
 }
 
-impl KeynoteEditor {
+impl Editor {
     /// Read the native title and caption attached to one ordinary slide shape.
     pub fn slide_shape_title_caption(
         &self,
@@ -103,7 +103,7 @@ impl KeynoteEditor {
 }
 
 pub(super) fn slide_shape_title_caption(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<DrawableTitleCaption> {
@@ -133,7 +133,7 @@ pub(super) fn slide_shape_title_caption(
 }
 
 pub(super) fn slide_shape_caption_slot(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
     kind: DrawableCaptionKind,
@@ -274,7 +274,7 @@ pub(super) fn caption_slot_from_reference(
 }
 
 fn set_slide_shape_caption(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     text: &str,
@@ -317,7 +317,7 @@ fn set_slide_shape_caption(
         set_package_last_object_identifier(&mut staged, ids.last())?;
         staged
     };
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_shape_title_caption(slide_index, drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Keynote shape title/caption update failed validation".to_owned(),
@@ -328,7 +328,7 @@ fn set_slide_shape_caption(
 }
 
 fn remove_slide_shape_caption(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     kind: DrawableCaptionKind,
@@ -355,7 +355,7 @@ fn remove_slide_shape_caption(
     )?;
     add_component_object_uuids(&mut staged, source.component_id, &[standin_id])?;
     set_package_last_object_identifier(&mut staged, standin_id)?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_shape_title_caption(slide_index, drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Keynote shape title/caption removal failed validation".to_owned(),
@@ -422,7 +422,7 @@ fn insert_slide_shape_caption_standin(
 }
 
 fn slide_shape_caption_theme(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
 ) -> Result<(CaptionThemeStyle, Option<String>)> {
     let graph = ObjectGraph::read(editor.package())?;
@@ -628,7 +628,7 @@ mod tests {
             DrawableTitleCaption::default()
         );
 
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_shape_title_caption(0, duplicate.drawable_object_id)

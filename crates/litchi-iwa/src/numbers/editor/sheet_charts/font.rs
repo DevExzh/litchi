@@ -8,7 +8,7 @@ use crate::charts::font::{
 };
 use crate::charts::{ChartFont, ChartFontSize};
 
-impl NumbersEditor {
+impl Editor {
     /// Read the uniform effective font used by one sheet chart.
     pub fn sheet_chart_font(&self, sheet_id: u64, drawable_object_id: u64) -> Result<ChartFont> {
         let graph = chart_graph(self, sheet_id, drawable_object_id)?;
@@ -36,7 +36,7 @@ impl NumbersEditor {
             "Numbers",
             &font,
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_font(sheet_id, drawable_object_id)? != font {
             return Err(Error::InvalidFormat(
                 "Numbers chart font update failed validation".to_owned(),
@@ -62,7 +62,7 @@ impl NumbersEditor {
         )? {
             return Ok(false);
         }
-        *self = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        *self = Editor::from_bytes(&staged.to_bytes()?)?;
         Ok(true)
     }
 
@@ -97,7 +97,7 @@ impl NumbersEditor {
             "Numbers",
             size,
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_font_size(sheet_id, drawable_object_id)? != size {
             return Err(Error::InvalidFormat(
                 "Numbers chart font-size update failed validation".to_owned(),
@@ -123,7 +123,7 @@ impl NumbersEditor {
         )? {
             return Ok(false);
         }
-        *self = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        *self = Editor::from_bytes(&staged.to_bytes()?)?;
         Ok(true)
     }
 }

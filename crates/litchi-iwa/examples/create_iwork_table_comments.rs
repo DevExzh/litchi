@@ -49,7 +49,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    editor = litchi_iwa::numbers::NumbersEditor::from_bytes(&bytes)?;
+    editor = litchi_iwa::numbers::Editor::from_bytes(&bytes)?;
     editor.save(output)?;
     Ok(())
 }

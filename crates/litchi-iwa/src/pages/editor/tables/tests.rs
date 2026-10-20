@@ -39,7 +39,7 @@ use litchi_pages::{BodyTableSelector, Package as PagesPackage};
 const SOURCE_BUILT_TABLE_INFO_OBJECT_ID: u64 = 9;
 
 fn pages_table_header_settings(
-    editor: &PagesEditor,
+    editor: &Editor,
     selector: BodyTableSelector<'_>,
 ) -> Result<HeaderSettings> {
     let package = PagesPackage::from_bytes(&editor.to_bytes()?)
@@ -50,7 +50,7 @@ fn pages_table_header_settings(
 }
 
 fn set_pages_table_header_settings(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     selector: BodyTableSelector<'_>,
     settings: HeaderSettings,
 ) -> Result<()> {
@@ -70,11 +70,11 @@ fn set_pages_table_header_settings(
             .map_err(|error| Error::Io(error.into_io_error()))?;
         bytes
     };
-    *editor = PagesEditor::from_bytes(&bytes)?;
+    *editor = Editor::from_bytes(&bytes)?;
     Ok(())
 }
 
-fn set_pages_table_name(editor: &mut PagesEditor, model_object_id: u64, name: &str) -> Result<()> {
+fn set_pages_table_name(editor: &mut Editor, model_object_id: u64, name: &str) -> Result<()> {
     let table_position = editor
         .tables()?
         .iter()
@@ -112,12 +112,12 @@ fn set_pages_table_name(editor: &mut PagesEditor, model_object_id: u64, name: &s
             "Pages table name failed focused-package verification".to_owned(),
         ));
     }
-    *editor = PagesEditor::from_bytes(&bytes)?;
+    *editor = Editor::from_bytes(&bytes)?;
     Ok(())
 }
 
 fn pages_table_dimension_size(
-    editor: &PagesEditor,
+    editor: &Editor,
     selector: BodyTableSelector<'_>,
     dimension: Dimension,
 ) -> Result<Size> {
@@ -129,7 +129,7 @@ fn pages_table_dimension_size(
 }
 
 fn set_pages_table_dimension_size(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     selector: BodyTableSelector<'_>,
     dimension: Dimension,
     size: Size,
@@ -150,12 +150,12 @@ fn set_pages_table_dimension_size(
             .map_err(|error| Error::Io(error.into_io_error()))?;
         bytes
     };
-    *editor = PagesEditor::from_bytes(&bytes)?;
+    *editor = Editor::from_bytes(&bytes)?;
     Ok(())
 }
 
 fn pages_table_sort_order(
-    editor: &PagesEditor,
+    editor: &Editor,
     selector: BodyTableSelector<'_>,
 ) -> Result<Option<Order>> {
     let package = PagesPackage::from_bytes(&editor.to_bytes()?)
@@ -166,7 +166,7 @@ fn pages_table_sort_order(
 }
 
 fn set_pages_table_sort_order(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     selector: BodyTableSelector<'_>,
     order: Order,
 ) -> Result<()> {
@@ -186,12 +186,12 @@ fn set_pages_table_sort_order(
             .map_err(|error| Error::Io(error.into_io_error()))?;
         bytes
     };
-    *editor = PagesEditor::from_bytes(&bytes)?;
+    *editor = Editor::from_bytes(&bytes)?;
     Ok(())
 }
 
 fn clear_pages_table_sort_order(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     selector: BodyTableSelector<'_>,
 ) -> Result<()> {
     let bytes = {
@@ -210,20 +210,17 @@ fn clear_pages_table_sort_order(
             .map_err(|error| Error::Io(error.into_io_error()))?;
         bytes
     };
-    *editor = PagesEditor::from_bytes(&bytes)?;
+    *editor = Editor::from_bytes(&bytes)?;
     Ok(())
 }
 
-fn focused_pages_package(editor: &PagesEditor) -> Result<PagesPackage> {
+fn focused_pages_package(editor: &Editor) -> Result<PagesPackage> {
     let package = PagesPackage::from_bytes(&editor.to_bytes()?)
         .map_err(|error| Error::InvalidFormat(format!("Pages hidden-axis package: {error}")))?;
     Ok(package)
 }
 
-fn pages_table_hidden_axes(
-    editor: &PagesEditor,
-    selector: BodyTableSelector<'_>,
-) -> Result<HiddenAxes> {
+fn pages_table_hidden_axes(editor: &Editor, selector: BodyTableSelector<'_>) -> Result<HiddenAxes> {
     let package = focused_pages_package(editor)?;
     package
         .body_table_hidden_axes(selector)
@@ -231,7 +228,7 @@ fn pages_table_hidden_axes(
 }
 
 fn set_pages_table_hidden_axes(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     selector: BodyTableSelector<'_>,
     hidden: HiddenAxes,
 ) -> Result<()> {
@@ -247,12 +244,12 @@ fn set_pages_table_hidden_axes(
         .package()
         .write_to(&mut bytes)
         .map_err(|error| Error::Io(error.into_io_error()))?;
-    *editor = PagesEditor::from_bytes(&bytes)?;
+    *editor = Editor::from_bytes(&bytes)?;
     Ok(())
 }
 
 fn pages_table_row_height(
-    editor: &PagesEditor,
+    editor: &Editor,
     selector: BodyTableSelector<'_>,
     row: usize,
 ) -> Result<Size> {
@@ -260,7 +257,7 @@ fn pages_table_row_height(
 }
 
 fn set_pages_table_row_height(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     selector: BodyTableSelector<'_>,
     row: usize,
     size: Size,
@@ -269,7 +266,7 @@ fn set_pages_table_row_height(
 }
 
 fn pages_table_column_width(
-    editor: &PagesEditor,
+    editor: &Editor,
     selector: BodyTableSelector<'_>,
     column: usize,
 ) -> Result<Size> {
@@ -277,7 +274,7 @@ fn pages_table_column_width(
 }
 
 fn set_pages_table_column_width(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     selector: BodyTableSelector<'_>,
     column: usize,
     size: Size,
@@ -319,7 +316,7 @@ fn native_body_table_discovery_preserves_the_source_package() {
     let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/pages/body-table-visible.pages");
     let source = std::fs::read(path).expect("native visible-table fixture");
-    let editor = PagesEditor::from_bytes(&source).expect("native Pages editor");
+    let editor = Editor::from_bytes(&source).expect("native Pages editor");
     let tables = editor.tables().expect("bounded native table discovery");
     assert_eq!(tables.len(), 1);
     assert_eq!((tables[0].rows, tables[0].columns), (5, 4));
@@ -345,7 +342,7 @@ fn native_body_table_deletion_delegates_to_focused_package() {
     let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/pages/body-table-catalog-native.pages");
     let source = std::fs::read(path).expect("native catalog fixture");
-    let mut editor = PagesEditor::from_bytes(&source).expect("native Pages editor");
+    let mut editor = Editor::from_bytes(&source).expect("native Pages editor");
     let selected = editor
         .tables()
         .expect("native body-table discovery")
@@ -375,7 +372,7 @@ fn native_body_table_deletion_preserves_focused_dependency_refusal() {
     let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/pages/body-table-cross-reference-native.pages");
     let source = std::fs::read(path).expect("native cross-reference fixture");
-    let mut editor = PagesEditor::from_bytes(&source).expect("native Pages editor");
+    let mut editor = Editor::from_bytes(&source).expect("native Pages editor");
     let selected = editor
         .tables()
         .expect("native body-table discovery")
@@ -453,7 +450,7 @@ fn source_built_table_has_no_conditional_highlighting_and_clear_is_idempotent() 
         .clear_table_cell_conditional_highlighting(model_id, 1, 1)
         .unwrap();
     assert!(
-        PagesEditor::from_bytes(&editor.to_bytes().unwrap())
+        Editor::from_bytes(&editor.to_bytes().unwrap())
             .unwrap()
             .table_cell_conditional_highlighting(model_id, 1, 1)
             .unwrap()
@@ -514,7 +511,7 @@ fn source_built_table_roundtrips_cell_border_crud() {
         .set_table_cell_border(model_id, 1, 1, BorderSide::Right, stroke)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.table_cell_borders(model_id, 1, 1).unwrap().right,
         Some(stroke)
@@ -542,7 +539,7 @@ fn source_built_table_roundtrips_cell_fill_crud() {
     );
     editor.set_table_cell_fill(model_id, 1, 1, &fill).unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.table_cell_fill(model_id, 1, 1).unwrap(), fill);
     assert!(reopened.reset_table_cell_fill(model_id, 1, 1).unwrap());
     assert_eq!(reopened.table_cell_fill(model_id, 1, 1).unwrap(), inherited);
@@ -556,17 +553,17 @@ fn source_built_table_roundtrips_cell_layout_crud() {
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
     let inherited = editor.table_cell_layout(model_id, 1, 1).unwrap();
-    let layout = PagesTableCellLayout::default()
-        .with_text_wrap(PagesTableCellTextWrap::Wrapped)
-        .with_vertical_alignment(PagesTableCellVerticalAlignment::Bottom)
-        .with_insets(PagesTableCellInsets::uniform(
-            PagesTableCellInset::from_points(5.0).unwrap(),
+    let layout = TableCellLayout::default()
+        .with_text_wrap(TableCellTextWrap::Wrapped)
+        .with_vertical_alignment(TableCellVerticalAlignment::Bottom)
+        .with_insets(TableCellInsets::uniform(
+            TableCellInset::from_points(5.0).unwrap(),
         ));
     editor
         .set_table_cell_layout(model_id, 1, 1, layout)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.table_cell_layout(model_id, 1, 1).unwrap(), layout);
     assert!(reopened.reset_table_cell_layout(model_id, 1, 1).unwrap());
     assert_eq!(
@@ -599,7 +596,7 @@ fn source_built_table_roundtrips_number_format_crud() {
         .set_table_cell_number_format(model_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.table_cell_number_format(model_id, 1, 1).unwrap(),
         Some(format)
@@ -639,7 +636,7 @@ fn source_built_table_roundtrips_percentage_data_format() {
         .set_table_cell_percentage_format(model_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
         DataFormat::Percentage(format)
@@ -685,7 +682,7 @@ fn source_built_table_roundtrips_currency_format_crud() {
         .set_table_cell_currency_format(model_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.table_cell_currency_format(model_id, 1, 1).unwrap(),
         Some(format)
@@ -721,7 +718,7 @@ fn source_built_table_roundtrips_scientific_format_crud() {
         .set_table_cell_scientific_format(model_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .table_cell_scientific_format(model_id, 1, 1)
@@ -759,7 +756,7 @@ fn source_built_table_roundtrips_fraction_format_crud() {
         .set_table_cell_fraction_format(model_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.table_cell_fraction_format(model_id, 1, 1).unwrap(),
         Some(format)
@@ -800,7 +797,7 @@ fn source_built_table_roundtrips_numeral_system_format_crud() {
         .set_table_cell_numeral_system_format(model_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .table_cell_numeral_system_format(model_id, 1, 1)
@@ -838,7 +835,7 @@ fn source_built_table_roundtrips_date_time_format_crud() {
         .set_table_cell_date_time_format(model_id, 1, 1, format.clone())
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .table_cell_date_time_format(model_id, 1, 1)
@@ -877,7 +874,7 @@ fn source_built_table_roundtrips_duration_format_crud() {
         .set_table_cell_duration_format(model_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.table_cell_duration_format(model_id, 1, 1).unwrap(),
         Some(format)
@@ -904,7 +901,7 @@ fn source_built_table_roundtrips_checkbox_format_crud() {
         .set_table_cell_checkbox_format(model_id, 1, 1, Checkbox)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.table_cell_checkbox_format(model_id, 1, 1).unwrap(),
         Some(Checkbox)
@@ -935,7 +932,7 @@ fn source_built_table_roundtrips_star_rating_format_crud() {
         .set_table_cell_star_rating_format(model_id, 1, 1, StarRating)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .table_cell_star_rating_format(model_id, 1, 1)
@@ -970,7 +967,7 @@ fn source_built_table_roundtrips_slider_format_crud() {
         .set_table_cell_slider_format(model_id, 1, 1, format.clone())
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.table_cell_slider_format(model_id, 1, 1).unwrap(),
         Some(format)
@@ -1003,7 +1000,7 @@ fn source_built_table_roundtrips_stepper_format_crud() {
         .set_table_cell_stepper_format(model_id, 1, 1, format.clone())
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.table_cell_stepper_format(model_id, 1, 1).unwrap(),
         Some(format)
@@ -1035,7 +1032,7 @@ fn source_built_table_roundtrips_text_format_crud() {
         .unwrap();
     editor.set_table_cell_text_format(model_id, 1, 1).unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.table_cell_text_format(model_id, 1, 1).unwrap(),
         Some(TextFormat)
@@ -1077,7 +1074,7 @@ fn source_built_table_roundtrips_custom_format_crud() {
         .set_table_cell_custom_format(model_id, 1, 1, format.clone())
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.table_cell_custom_format(model_id, 1, 1).unwrap(),
         Some(format)
@@ -1107,7 +1104,7 @@ fn source_built_table_roundtrips_pop_up_menu_format_crud() {
         .set_table_cell_pop_up_menu_format(model_id, 1, 1, format.clone())
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .table_cell_pop_up_menu_format(model_id, 1, 1)
@@ -1153,8 +1150,8 @@ fn source_built_table_roundtrips_cell_updates() {
             .set_table_cells(
                 model_id,
                 [
-                    PagesTableCellUpdate::new(0, 0, CellValue::Text("Header".to_owned()),),
-                    PagesTableCellUpdate::new(
+                    TableCellUpdate::new(0, 0, CellValue::Text("Header".to_owned()),),
+                    TableCellUpdate::new(
                         1,
                         1,
                         CellValue::number(42.5).expect("finite test number"),
@@ -1170,14 +1167,14 @@ fn source_built_table_roundtrips_cell_updates() {
             .set_table_cells(
                 model_id,
                 [
-                    PagesTableCellUpdate::new(2, 0, CellValue::Boolean(true)),
-                    PagesTableCellUpdate::clear(2, 0),
+                    TableCellUpdate::new(2, 0, CellValue::Boolean(true)),
+                    TableCellUpdate::clear(2, 0),
                 ],
             )
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before_invalid_batch);
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = reopened.table(model_id).unwrap();
     assert_eq!(
         table.get_cell(0, 0),
@@ -1203,13 +1200,9 @@ fn source_built_table_duplication_clones_formula_storage_and_attachment() {
         .set_table_cells(
             source.model_object_id,
             [
-                PagesTableCellUpdate::new(0, 0, CellValue::Text("Category".to_owned())),
-                PagesTableCellUpdate::new(1, 0, CellValue::Text("Travel".to_owned())),
-                PagesTableCellUpdate::new(
-                    1,
-                    1,
-                    CellValue::number(125.0).expect("finite test number"),
-                ),
+                TableCellUpdate::new(0, 0, CellValue::Text("Category".to_owned())),
+                TableCellUpdate::new(1, 0, CellValue::Text("Travel".to_owned())),
+                TableCellUpdate::new(1, 1, CellValue::number(125.0).expect("finite test number")),
             ],
         )
         .unwrap();
@@ -1218,14 +1211,14 @@ fn source_built_table_duplication_clones_formula_storage_and_attachment() {
             source.model_object_id,
             2,
             1,
-            PagesTableFormulaExpression::function(
+            TableFormulaExpression::function(
                 "SUM",
                 [
-                    PagesTableFormulaExpression::Number(100.0),
-                    PagesTableFormulaExpression::Number(25.0),
+                    TableFormulaExpression::Number(100.0),
+                    TableFormulaExpression::Number(25.0),
                 ],
             ),
-            PagesTableFormulaCachedValue::number(125.0).expect("finite cached formula number"),
+            TableFormulaCachedValue::number(125.0).expect("finite cached formula number"),
         )
         .unwrap();
 
@@ -1279,7 +1272,7 @@ fn source_built_table_duplication_clones_formula_storage_and_attachment() {
     );
     assert_eq!(editor.to_bytes().unwrap(), before_invalid);
 
-    let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.tables().unwrap().len(), 3);
     let mut reopened = reopened;
     reopened.remove_table(copied.model_object_id).unwrap();
@@ -1347,7 +1340,7 @@ fn focused_source_built_table_roundtrips_hidden_axes_transactionally() {
     let reopened = PagesPackage::from_bytes(&set_bytes).unwrap();
     assert_eq!(reopened.body_table_hidden_axes(by_name).unwrap(), hidden);
     assert_eq!(reopened.body_table_hidden_axes(by_index).unwrap(), hidden);
-    let reopened_editor = PagesEditor::from_bytes(&set_bytes).unwrap();
+    let reopened_editor = Editor::from_bytes(&set_bytes).unwrap();
     assert!(
         reopened_editor
             .body_text()
@@ -1434,16 +1427,16 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         .set_table_cells(
             model_id,
             [
-                PagesTableCellUpdate::new(0, 0, CellValue::Text("Name".to_owned())),
-                PagesTableCellUpdate::new(0, 1, CellValue::Text("Marker".to_owned())),
-                PagesTableCellUpdate::new(1, 0, CellValue::Text("zebra".to_owned())),
-                PagesTableCellUpdate::new(1, 1, CellValue::Text("last".to_owned())),
-                PagesTableCellUpdate::new(2, 0, CellValue::Text("apple".to_owned())),
-                PagesTableCellUpdate::new(2, 1, CellValue::Text("first apple".to_owned())),
-                PagesTableCellUpdate::new(3, 0, CellValue::Text("banana".to_owned())),
-                PagesTableCellUpdate::new(3, 1, CellValue::Text("middle".to_owned())),
-                PagesTableCellUpdate::new(4, 0, CellValue::Text("apple".to_owned())),
-                PagesTableCellUpdate::new(4, 1, CellValue::Text("second apple".to_owned())),
+                TableCellUpdate::new(0, 0, CellValue::Text("Name".to_owned())),
+                TableCellUpdate::new(0, 1, CellValue::Text("Marker".to_owned())),
+                TableCellUpdate::new(1, 0, CellValue::Text("zebra".to_owned())),
+                TableCellUpdate::new(1, 1, CellValue::Text("last".to_owned())),
+                TableCellUpdate::new(2, 0, CellValue::Text("apple".to_owned())),
+                TableCellUpdate::new(2, 1, CellValue::Text("first apple".to_owned())),
+                TableCellUpdate::new(3, 0, CellValue::Text("banana".to_owned())),
+                TableCellUpdate::new(3, 1, CellValue::Text("middle".to_owned())),
+                TableCellUpdate::new(4, 0, CellValue::Text("apple".to_owned())),
+                TableCellUpdate::new(4, 1, CellValue::Text("second apple".to_owned())),
             ],
         )
         .unwrap();
@@ -1522,7 +1515,7 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         hidden
     );
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages_table_sort_order(&reopened, BodyTableSelector::index(0)).unwrap(),
         Some(order.clone())
@@ -1649,24 +1642,24 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
     package
         .insert_entry("Index/CalculationEngine-82.iwa", engine)
         .unwrap();
-    let mut editor = PagesEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     editor
         .set_table_formula(
             model_id,
             1,
             1,
-            PagesTableFormulaExpression::function(
+            TableFormulaExpression::function(
                 "SUM",
                 [
-                    PagesTableFormulaExpression::Number(1.0),
-                    PagesTableFormulaExpression::Number(2.0),
+                    TableFormulaExpression::Number(1.0),
+                    TableFormulaExpression::Number(2.0),
                 ],
             ),
-            PagesTableFormulaCachedValue::number(3.0).expect("finite cached formula number"),
+            TableFormulaCachedValue::number(3.0).expect("finite cached formula number"),
         )
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.table_formula(model_id, 1, 1).unwrap().as_deref(),
         Some("=SUM(1,2)")
@@ -1676,14 +1669,14 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
             model_id,
             1,
             1,
-            PagesTableFormulaExpression::function(
+            TableFormulaExpression::function(
                 "SUM",
                 [
-                    PagesTableFormulaExpression::Number(3.0),
-                    PagesTableFormulaExpression::Number(4.0),
+                    TableFormulaExpression::Number(3.0),
+                    TableFormulaExpression::Number(4.0),
                 ],
             ),
-            PagesTableFormulaCachedValue::number(7.0).expect("finite cached formula number"),
+            TableFormulaCachedValue::number(7.0).expect("finite cached formula number"),
         )
         .unwrap();
     assert_eq!(
@@ -1698,8 +1691,8 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
                 model_id,
                 usize::MAX,
                 1,
-                PagesTableFormulaExpression::Number(1.0),
-                PagesTableFormulaCachedValue::number(1.0).expect("finite cached formula number"),
+                TableFormulaExpression::Number(1.0),
+                TableFormulaCachedValue::number(1.0).expect("finite cached formula number"),
             )
             .is_err()
     );
@@ -1731,8 +1724,8 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
             model_id,
             2,
             2,
-            PagesTableFormulaExpression::cell(PagesTableFormulaCellReference::relative(1, 1)),
-            PagesTableFormulaCachedValue::number(7.0).expect("finite cached formula number"),
+            TableFormulaExpression::cell(TableFormulaCellReference::relative(1, 1)),
+            TableFormulaCachedValue::number(7.0).expect("finite cached formula number"),
         )
         .unwrap();
     set_pages_table_row_height(&mut editor, BodyTableSelector::index(0), 1, row_size).unwrap();
@@ -1745,7 +1738,7 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
     editor
         .insert_table_column(model_id, ColumnInsertion::body(1))
         .unwrap();
-    let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = reopened.table(model_id).unwrap();
     assert_eq!((table.info.rows, table.info.columns), (5, 5));
     assert_eq!(
@@ -1808,14 +1801,14 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
             model_id,
             3,
             1,
-            PagesTableFormulaExpression::function(
+            TableFormulaExpression::function(
                 "SUM",
-                [PagesTableFormulaExpression::range(
-                    PagesTableFormulaCellReference::relative(1, 1),
-                    PagesTableFormulaCellReference::relative(2, 1),
+                [TableFormulaExpression::range(
+                    TableFormulaCellReference::relative(1, 1),
+                    TableFormulaCellReference::relative(2, 1),
                 )],
             ),
-            PagesTableFormulaCachedValue::number(3.0).expect("finite cached formula number"),
+            TableFormulaCachedValue::number(3.0).expect("finite cached formula number"),
         )
         .unwrap();
     let mut package = editor.into_package();
@@ -1823,7 +1816,7 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
     package
         .insert_entry("Index/CalculationEngine-42-2.iwa", engine)
         .unwrap();
-    let mut editor = PagesEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let baseline = editor.to_bytes().unwrap();
 
     editor
@@ -1943,7 +1936,7 @@ fn inserts_independent_table_and_shifts_existing_anchor() {
     package
         .insert_entry("Index/CalculationEngine-83.iwa", engine)
         .unwrap();
-    let mut editor = PagesEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
 
     let inserted = editor.add_table(anchor, "Inserted", 4, 3).unwrap();
     assert_eq!(inserted.anchor_character_index, anchor);
@@ -1969,7 +1962,7 @@ fn inserts_independent_table_and_shifts_existing_anchor() {
             CellValue::Text("inserted only".to_owned()),
         )
         .unwrap();
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .table(source.model_object_id)
@@ -2019,7 +2012,7 @@ fn inserts_and_removes_first_table_without_a_template() {
             CellValue::Text("bootstrapped".to_owned()),
         )
         .unwrap();
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .table(created.model_object_id)
@@ -2051,7 +2044,7 @@ fn first_table_bootstrap_rejects_reserved_id_collision_transactionally() {
             archive.insert_object(object).map_err(Error::from)
         })
         .unwrap();
-    let mut editor = PagesEditor::from_package(package).unwrap();
+    let mut editor = Editor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.add_table(0, "Collision", 2, 2).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -2102,7 +2095,7 @@ fn source_built_table_roundtrips_focused_rename_and_resize() {
     set_pages_table_name(&mut editor, model_id, "Renamed").unwrap();
     assert_eq!(editor.to_bytes().unwrap(), renamed);
     editor.resize_table(model_id, 5, 4).unwrap();
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let info = reopened.tables().unwrap().remove(0);
     assert_eq!(info.name, "Renamed");
     assert_eq!((info.rows, info.columns), (5, 4));
@@ -2145,7 +2138,7 @@ fn source_built_table_roundtrips_layout_crud_transactionally() {
     )
     .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages_table_header_settings(&reopened, BodyTableSelector::index(0)).unwrap(),
         settings
@@ -2257,7 +2250,7 @@ fn source_built_table_deletion_removes_private_graph_and_anchor() {
     for identifier in removed_ids {
         assert!(find_object_archive(editor.package(), identifier).is_err());
     }
-    let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert!(reopened.tables().unwrap().is_empty());
     assert_eq!(reopened.body_text().unwrap(), body);
 }
@@ -2295,7 +2288,7 @@ fn source_built_popup_table_deletion_prunes_private_control_storage() {
     let retained_format = PopUpMenu::new(["Open", "Closed"])
         .unwrap()
         .with_initial_selection(PopUpMenuInitialSelection::Blank);
-    let object_ids = |editor: &PagesEditor| {
+    let object_ids = |editor: &Editor| {
         editor
             .package()
             .iwa_entry_names()

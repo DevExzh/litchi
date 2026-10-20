@@ -1,6 +1,6 @@
 use std::env;
 
-use litchi_iwa::keynote::{self, KeynoteTableCellUpdate, KeynoteTableCellValue};
+use litchi_iwa::keynote::{self};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_keynote::slide::table::formula::{FormulaCachedValue, FormulaExpression};
 
@@ -24,10 +24,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         0,
         source.model_object_id,
         [
-            KeynoteTableCellUpdate::new(0, 0, KeynoteTableCellValue::Text("Category".to_owned())),
-            KeynoteTableCellUpdate::new(0, 1, KeynoteTableCellValue::Text("Cost".to_owned())),
-            KeynoteTableCellUpdate::new(1, 0, KeynoteTableCellValue::Text("Travel".to_owned())),
-            KeynoteTableCellUpdate::new(1, 1, KeynoteTableCellValue::number(125.0)?),
+            keynote::TableCellUpdate::new(
+                0,
+                0,
+                keynote::TableCellValue::Text("Category".to_owned()),
+            ),
+            keynote::TableCellUpdate::new(0, 1, keynote::TableCellValue::Text("Cost".to_owned())),
+            keynote::TableCellUpdate::new(1, 0, keynote::TableCellValue::Text("Travel".to_owned())),
+            keynote::TableCellUpdate::new(1, 1, keynote::TableCellValue::number(125.0)?),
         ],
     )?;
     editor.set_slide_table_formula(
@@ -51,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         copy.model_object_id,
         1,
         0,
-        KeynoteTableCellValue::Text("Lodging".to_owned()),
+        keynote::TableCellValue::Text("Lodging".to_owned()),
     )?;
     editor.save(&output)?;
     println!("created {output} with {} and {}", source.name, copy.name);

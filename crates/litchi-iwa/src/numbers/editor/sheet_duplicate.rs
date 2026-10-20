@@ -36,7 +36,7 @@ enum SheetDrawableClone {
     },
 }
 
-impl NumbersEditor {
+impl Editor {
     /// Duplicate a populated sheet immediately after its source.
     ///
     /// Sheet settings and unknown wire fields are retained. Populated tables,
@@ -46,7 +46,7 @@ impl NumbersEditor {
     /// writable object storage is independent.
     /// Unsupported drawable kinds and cross-table formula edges are rejected
     /// transactionally.
-    pub fn duplicate_sheet(&mut self, selector: SheetSelector<'_>) -> Result<NumbersSheetInfo> {
+    pub fn duplicate_sheet(&mut self, selector: SheetSelector<'_>) -> Result<SheetInfo> {
         let sheet_id = super::selectors::sheet_id(self, selector)?;
         let sheets = self.sheets()?;
         let source = sheets
@@ -211,7 +211,7 @@ impl NumbersEditor {
     }
 }
 
-/// Place one table produced by [`NumbersEditor::duplicate_table`] while
+/// Place one table produced by [`Editor::duplicate_table`] while
 /// keeping the focused compatibility seam private to populated-sheet
 /// duplication.
 ///
@@ -219,10 +219,10 @@ impl NumbersEditor {
 /// built snapshots use the focused compatibility ingress; exact snapshots use
 /// the strict focused package reader and public relocation transaction. Both
 /// routes are terminal after focused admission, and the same bit is passed to
-/// [`NumbersEditor::from_validation_bytes`] so validation preserves provenance.
+/// [`Editor::from_validation_bytes`] so validation preserves provenance.
 fn place_cloned_table(
-    editor: &mut NumbersEditor,
-    cloned: &NumbersTableInfo,
+    editor: &mut Editor,
+    cloned: &TableInfo,
     target_sheet_id: u64,
     target_sheet_name: &str,
 ) -> Result<()> {
@@ -268,14 +268,14 @@ fn place_cloned_table(
             .map_err(|error| Error::Io(error.into_io_error()))?;
         bytes
     };
-    let verified = NumbersEditor::from_validation_bytes(&bytes, source_built)?;
+    let verified = Editor::from_validation_bytes(&bytes, source_built)?;
     let verified_owner = find_table_owner(verified.package(), table_id)?;
     let verified_table = verified
         .tables()?
         .into_iter()
         .find(|candidate| candidate.object_id == table_id)
         .ok_or_else(|| Error::InvalidFormat("Moved Numbers table disappeared".to_owned()))?;
-    // `NumbersTableInfo::index` is rooted in workbook table order. Moving a
+    // `TableInfo::index` is rooted in workbook table order. Moving a
     // later clone behind an earlier clone legitimately changes that position;
     // the owner check below plus `duplicate_sheet`'s final drawable-order
     // validation prove placement. Identity, name, dimensions, and appearance
@@ -296,7 +296,7 @@ fn place_cloned_table(
 }
 
 fn classify_sheet_drawables(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     sheet: &tn::SheetArchive,
 ) -> Result<Vec<SheetDrawableClone>> {
@@ -507,9 +507,7 @@ mod tests {
     use std::time::Duration;
 
     use super::*;
-    use crate::numbers::{
-        self, NumbersSheetAudioOptions, NumbersSheetImageOptions, NumbersSheetMovieOptions,
-    };
+    use crate::numbers::{self, SheetAudioOptions, SheetImageOptions, SheetMovieOptions};
     use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, RgbaColor, ShapeFill};
     use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
     use litchi_iwa_common::shape::path::Preset;
@@ -555,7 +553,7 @@ mod tests {
                 MOVIE,
                 "probe.png",
                 MOVIE_POSTER,
-                NumbersSheetMovieOptions::new(MOVIE_POSITION, MOVIE_SIZE, Duration::from_secs(8))
+                SheetMovieOptions::new(MOVIE_POSITION, MOVIE_SIZE, Duration::from_secs(8))
                     .with_natural_size(MOVIE_NATURAL_SIZE),
             )
             .unwrap();
@@ -650,7 +648,7 @@ mod tests {
             Some("Native movie title")
         );
 
-        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let reopened_copy = reopened
             .sheet_movies(duplicate.object_id)
             .unwrap()
@@ -677,7 +675,7 @@ mod tests {
                 source_sheet.object_id,
                 "probe.aiff",
                 AUDIO,
-                NumbersSheetAudioOptions::new(AUDIO_POSITION, Duration::from_millis(2_200)),
+                SheetAudioOptions::new(AUDIO_POSITION, Duration::from_millis(2_200)),
             )
             .unwrap();
 
@@ -727,7 +725,7 @@ mod tests {
             source.playback
         );
 
-        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let reopened_copy = reopened.sheet_audio(duplicate.object_id).unwrap().remove(0);
         assert_eq!(reopened_copy.position, MOVED_AUDIO_POSITION);
         assert_eq!(reopened_copy.playback, copied_playback);
@@ -814,7 +812,7 @@ mod tests {
             SOURCE_SHAPE_FILL
         );
 
-        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let reopened_source = reopened
             .sheet_shapes(source_sheet.object_id)
             .unwrap()
@@ -849,7 +847,7 @@ mod tests {
                 source_sheet.object_id,
                 "litchi_logo.png",
                 include_bytes!("../../../../../media/litchi_logo.png"),
-                NumbersSheetImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
+                SheetImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
             )
             .unwrap();
 
@@ -890,7 +888,7 @@ mod tests {
             moved
         );
 
-        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.sheet_images(source_sheet.object_id).unwrap().len(),
             1

@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::keynote::KeynoteEditor;
+use litchi_iwa::keynote;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = arguments.next().ok_or("missing output path")?;
     let requested: Option<usize> = arguments.next().map(|value| value.parse()).transpose()?;
 
-    let mut editor = KeynoteEditor::open(input)?;
+    let mut editor = keynote::Editor::open(input)?;
     let layouts = editor.slide_layouts()?;
     let layout = match requested {
         Some(index) => layouts.get(index).ok_or("layout index is out of range")?,

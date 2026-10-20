@@ -2,7 +2,7 @@ use std::path::Path;
 
 use litchi_iwa::keynote;
 use litchi_iwa::numbers;
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::text::TextPosition;
 use litchi_iwa_text::date_time::{
@@ -18,10 +18,6 @@ const SIZE: DrawableSize = DrawableSize {
     height: 120.0,
 };
 
-#[expect(
-    deprecated,
-    reason = "demonstrates the legacy raw-ID Keynote editor API, which takes native object IDs; litchi_keynote::Package has no equivalent text-box route yet"
-)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
         .nth(1)
@@ -33,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|value| value.to_str())
     {
         Some("pages") => {
-            let mut editor = PagesEditor::create_with_text(PREFIX)?;
+            let mut editor = pages::Editor::create_with_text(PREFIX)?;
             editor.insert_body_date_time_field(position, display()?, settings()?)?;
             editor.save(output)?;
         },

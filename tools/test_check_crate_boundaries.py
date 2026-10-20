@@ -2217,8 +2217,8 @@ def add_numbers_table_move_canonical_scaffold(root: Path) -> None:
     duplicate.parent.mkdir(parents=True, exist_ok=True)
     duplicate.write_text(
         "fn place_cloned_table(\n"
-        "    editor: &mut NumbersEditor,\n"
-        "    cloned: &NumbersTableInfo,\n"
+        "    editor: &mut Editor,\n"
+        "    cloned: &TableInfo,\n"
         "    target_sheet_id: u64,\n"
         "    target_sheet_name: &str,\n"
         ") -> Result<()> {\n"
@@ -2240,7 +2240,7 @@ def add_numbers_table_move_canonical_scaffold(root: Path) -> None:
         "        ).map_err(|error| Error::InvalidFormat(error.to_string()))?;\n"
         "        commit.to_bytes()?\n"
         "    };\n"
-        "    let verified = NumbersEditor::from_validation_bytes(&bytes, source_built)?;\n"
+        "    let verified = Editor::from_validation_bytes(&bytes, source_built)?;\n"
         "    let verified_owner = find_table_owner(verified.package(), table_id)?;\n"
         "    let verified_table = verified.tables()?.into_iter().find(|candidate| candidate.object_id == table_id).ok_or_else(|| Error::InvalidFormat(\"missing\".into()))?;\n"
         "    if verified_owner.sheet_id != target_sheet_id || verified_table != *cloned {\n"
@@ -3880,7 +3880,7 @@ def add_scientific_format_selector_context_host(
         "    let FocusedScientificFormatLocation::Owner { source, sheet, table, position } = location else { return Err(Unsupported); };\n"
         "    source.edit_table_cell_scientific_format(sheet, table, position).set(format).commit()\n"
         "}\n"
-        "impl NumbersEditor {\n"
+        "impl Editor {\n"
         "#[deprecated(note = \"legacy compatibility shell\")]\n"
         "pub fn table_cell_scientific_format(&self, table_id: u64, row: usize, column: usize) -> Result<Option<Scientific>> { focused_scientific_format() }\n"
         "#[deprecated(note = \"legacy compatibility shell\")]\n"
@@ -3929,7 +3929,7 @@ def add_currency_format_selector_context_host(
         "    let FocusedCurrencyFormatLocation::Owner { source, sheet, table, position } = location else { return Err(Unsupported); };\n"
         "    source.edit_table_cell_currency_format(sheet, table, position).set(format).commit()\n"
         "}\n"
-        "impl NumbersEditor {\n"
+        "impl Editor {\n"
         "#[deprecated(note = \"legacy compatibility shell\")]\n"
         "pub fn table_cell_currency_format(&self, table_id: u64, row: usize, column: usize) -> Result<Option<Currency>> { focused_currency_format() }\n"
         "#[deprecated(note = \"legacy compatibility shell\")]\n"
@@ -5183,7 +5183,7 @@ def add_keynote_chart_arrangement_canonical_scaffold(root: Path) -> None:
     host.parent.mkdir(parents=True, exist_ok=True)
     host.write_text(
         "use litchi_keynote::{ChartArrangement, ChartSelector, Package as FocusedKeynotePackage, SlideSelector};\n"
-        "impl KeynoteEditor {\n"
+        "impl Editor {\n"
         "    pub fn slide_chart_arrangement_by_selector(&self, slide_index: usize, selector: ChartSelector) -> Result<ChartArrangement> {\n"
         "        focused_chart_arrangement_package(self)?.slide_chart_arrangement(SlideSelector::index(slide_index), selector)\n"
         "    }\n"
@@ -5192,8 +5192,8 @@ def add_keynote_chart_arrangement_canonical_scaffold(root: Path) -> None:
         "        package.edit_slide_chart_arrangement(SlideSelector::index(slide_index), selector).set(arrangement).commit()\n"
         "    }\n"
         "}\n"
-        "fn focused_chart_arrangement_package(editor: &KeynoteEditor) -> Result<FocusedKeynotePackage> { let _ = editor; todo!() }\n"
-        "fn focused_chart_arrangements(editor: &KeynoteEditor, slide_index: usize) -> Result<Box<[ChartArrangement]>> {\n"
+        "fn focused_chart_arrangement_package(editor: &Editor) -> Result<FocusedKeynotePackage> { let _ = editor; todo!() }\n"
+        "fn focused_chart_arrangements(editor: &Editor, slide_index: usize) -> Result<Box<[ChartArrangement]>> {\n"
         "    let package = FocusedKeynotePackage::from_bytes(bytes)?;\n"
         "    package.slide_chart_arrangements(SlideSelector::index(slide_index))\n"
         "}\n",
@@ -5203,8 +5203,8 @@ def add_keynote_chart_arrangement_canonical_scaffold(root: Path) -> None:
     listing = root / boundaries.IWA_KEYNOTE_CHART_ARRANGEMENT_LISTING_SOURCE
     listing.parent.mkdir(parents=True, exist_ok=True)
     listing.write_text(
-        "impl KeynoteEditor {\n"
-        "    pub fn slide_charts(&self, slide_index: usize) -> Result<Vec<KeynoteSlideChartInfo>> {\n"
+        "impl Editor {\n"
+        "    pub fn slide_charts(&self, slide_index: usize) -> Result<Vec<SlideChartInfo>> {\n"
         "        arrangement::fill_focused_chart_arrangements(self, slide_index, &mut charts, &positions)?;\n"
         "        Ok(charts)\n"
         "    }\n"
@@ -5498,7 +5498,7 @@ def add_keynote_chart_axis_value_settings_canonical_scaffold(root: Path) -> None
     host = root / boundaries.IWA_KEYNOTE_CHART_AXIS_VALUE_SETTINGS_SOURCE
     host.parent.mkdir(parents=True, exist_ok=True)
     host.write_text(
-        "impl KeynoteEditor {\n"
+        "impl Editor {\n"
         "    pub fn slide_chart_value_axis_settings_by_selector(&self, "
         "selector: ChartSelector, value: ValueAxisSettings) { "
         "focused_chart_axis_value_settings_package(self)?.slide_chart_value_axis_settings(selector, value); }\n"
@@ -7482,7 +7482,7 @@ def add_pages_table_hidden_axes_canonical_scaffold(
         "fn create_numbers() { editor.table_hidden_axes(selector); }\n"
         "fn create_pages() {\n"
         "    editor.set_table_hidden_axes(model_object_id, &hidden);\n"
-        "    PagesEditor::open(output)?.table_hidden_axes(model_object_id)?;\n"
+        "    Editor::open(output)?.table_hidden_axes(model_object_id)?;\n"
         "}\n"
         "fn create_keynote() { editor.set_table_hidden_axes(selector, &hidden); }\n",
         encoding="utf-8",
@@ -7672,7 +7672,7 @@ def add_pages_table_hidden_axes_retirement_evidence(
             "        .set(hidden.clone()).commit().unwrap();\n"
             "    let mut bytes = Vec::new();\n"
             "    commit.package().write_to(&mut bytes).unwrap();\n"
-            "    editor = PagesEditor::from_bytes(&bytes).unwrap();\n"
+            "    editor = Editor::from_bytes(&bytes).unwrap();\n"
             "    let reopened = PagesPackage::from_bytes(&bytes).unwrap();\n"
             "    assert_eq!(reopened.body_table_hidden_axes(selector).unwrap(), hidden);\n"
             "    let invalid = HiddenAxes::new([AxisIndex::row(4)]).unwrap();\n"
@@ -7701,7 +7701,7 @@ def add_pages_table_hidden_axes_retirement_evidence(
             "        .commit().unwrap();\n"
             "    let mut bytes = Vec::new();\n"
             "    commit.package().write_to(&mut bytes).unwrap();\n"
-            "    editor = PagesEditor::from_bytes(&bytes).unwrap();\n"
+            "    editor = Editor::from_bytes(&bytes).unwrap();\n"
             "    let _ = PagesPackage::open(output).unwrap()\n"
             "        .body_table_hidden_axes(selector).unwrap();\n"
             "}\n",
@@ -7721,7 +7721,7 @@ def add_pages_table_hidden_axes_retirement_evidence(
         host_test = root / boundaries.PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_SOURCE
         host_test.write_text(
             "use litchi_pages::{BodyTableSelector, Package as PagesPackage};\n"
-            "use litchi_iwa::pages::{self, PagesEditor};\n"
+            "use litchi_iwa::pages::{self, Editor};\n"
             "use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};\n"
             "#[test]\n"
             "fn focused_source_built_table_roundtrips_hidden_axes_transactionally() {\n"
@@ -7732,7 +7732,7 @@ def add_pages_table_hidden_axes_retirement_evidence(
             "    let commit = package.edit_body_table_hidden_axes(selector).unwrap().set(hidden.clone()).commit().unwrap();\n"
             "    let mut bytes = Vec::new();\n"
             "    commit.package().write_to(&mut bytes).unwrap();\n"
-            "    editor = PagesEditor::from_bytes(&bytes).unwrap();\n"
+            "    editor = Editor::from_bytes(&bytes).unwrap();\n"
             "    let reopened = PagesPackage::from_bytes(&bytes).unwrap();\n"
             "    assert_eq!(reopened.body_table_hidden_axes(selector).unwrap(), hidden);\n"
             "    let invalid = HiddenAxes::new([AxisIndex::row(4)]).unwrap();\n"
@@ -7755,7 +7755,7 @@ def add_pages_table_hidden_axes_retirement_evidence(
             "        .commit().unwrap();\n"
             "    let mut bytes = Vec::new();\n"
             "    commit.package().write_to(&mut bytes).unwrap();\n"
-            "    editor = PagesEditor::from_bytes(&bytes).unwrap();\n"
+            "    editor = Editor::from_bytes(&bytes).unwrap();\n"
             "    let _ = PagesPackage::open(output).unwrap().body_table_hidden_axes(selector).unwrap();\n"
             "}\n",
             encoding="utf-8",
@@ -10356,7 +10356,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             example = root / boundaries.IWORK_EXAMPLE_SOURCES[0]
             example.parent.mkdir(parents=True)
             example.write_text(
-                "use litchi_iwa::numbers::NumbersEditor;\n"
+                "use litchi_iwa::numbers::Editor;\n"
                 "fn main() { let _ = table.id(); }\n",
                 encoding="utf-8",
             )
@@ -10827,19 +10827,22 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(boundaries.audit_iwa_keynote_source_topology(root), [])
 
-    def test_iwa_keynote_slide_info_native_text_ids_require_deprecation(self) -> None:
+    def test_iwa_keynote_slide_info_native_ids_are_documented_not_deprecated(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             host = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
             host.parent.mkdir(parents=True)
             host.write_text(
-                "pub struct KeynoteSlideInfo {\n"
+                "pub struct SlideInfo {\n"
                 "    pub node_id: u64,\n"
+                "    /// Native slide object identity.\n"
                 "    pub slide_id: u64,\n"
-                "    pub title_storage_id: Option<TextStorageId>,\n"
-                "    #[allow(dead_code)]\n"
-                "    pub body_storage_id: Option<TextStorageId>,\n"
+                "    /// Native title text-storage identity.\n"
                 "    #[deprecated(note = \"compatibility\")]\n"
+                "    pub title_storage_id: Option<TextStorageId>,\n"
+                "    /// Native body text-storage identity.\n"
+                "    pub body_storage_id: Option<TextStorageId>,\n"
+                "    /// Native speaker-notes text-storage identity.\n"
                 "    pub notes_storage_id: Option<TextStorageId>,\n"
                 "}\n",
                 encoding="utf-8",
@@ -10848,32 +10851,28 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertEqual(
                 boundaries.audit_iwa_keynote_slide_info_source_topology(root),
                 [
-                    "litchi-iwa Keynote slide info native field must remain deprecated "
-                    "body_storage_id: "
-                    "crates/litchi-iwa/src/keynote/editor.rs:6",
-                    "litchi-iwa Keynote slide info native field must remain deprecated "
-                    "node_id: "
+                    "litchi-iwa Keynote slide info native field must be documented as a "
+                    "native identity node_id: "
                     "crates/litchi-iwa/src/keynote/editor.rs:2",
-                    "litchi-iwa Keynote slide info native field must remain deprecated "
-                    "slide_id: "
-                    "crates/litchi-iwa/src/keynote/editor.rs:3",
-                    "litchi-iwa Keynote slide info native field must remain deprecated "
+                    "litchi-iwa Keynote slide info native field must not be deprecated "
                     "title_storage_id: "
-                    "crates/litchi-iwa/src/keynote/editor.rs:4",
+                    "crates/litchi-iwa/src/keynote/editor.rs:7",
                 ],
             )
 
             host.write_text(
-                "pub struct KeynoteSlideInfo {\n"
-                "    #[deprecated(note = \"compatibility\")]\n"
+                "pub struct SlideInfo {\n"
+                "    /// Native slide-node object identity.\n"
+                "    ///\n"
+                "    /// The migration host addresses native objects by it.\n"
                 "    pub node_id: u64,\n"
-                "    #[deprecated(note = \"compatibility\")]\n"
+                "    /// Native slide object identity.\n"
                 "    pub slide_id: u64,\n"
-                "    #[deprecated(note = \"compatibility\")]\n"
+                "    /// Native title text-storage identity.\n"
                 "    pub title_storage_id: Option<TextStorageId>,\n"
-                "    #[deprecated(note = \"compatibility\")]\n"
+                "    /// Native body text-storage identity.\n"
                 "    pub body_storage_id: Option<TextStorageId>,\n"
-                "    #[deprecated(note = \"compatibility\")]\n"
+                "    /// Native speaker-notes text-storage identity.\n"
                 "    pub notes_storage_id: Option<TextStorageId>,\n"
                 "}\n",
                 encoding="utf-8",
@@ -10882,16 +10881,17 @@ class BoundaryPolicyTests(unittest.TestCase):
                 boundaries.audit_iwa_keynote_slide_info_source_topology(root), []
             )
 
-    def test_iwa_keynote_slide_text_info_drawable_id_requires_deprecation(self) -> None:
+    def test_iwa_keynote_slide_text_info_drawable_id_is_documented_not_deprecated(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             host = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
             host.parent.mkdir(parents=True)
             host.write_text(
-                "pub struct KeynoteSlideTextInfo {\n"
+                "pub struct SlideTextInfo {\n"
                 "    pub slide_index: usize,\n"
+                "    #[deprecated(note = \"compatibility\")]\n"
                 "    pub drawable_object_id: u64,\n"
-                "    pub role: KeynoteSlideTextRole,\n"
+                "    pub role: SlideTextRole,\n"
                 "}\n",
                 encoding="utf-8",
             )
@@ -10899,18 +10899,21 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertEqual(
                 boundaries.audit_iwa_keynote_slide_text_info_source_topology(root),
                 [
-                    "litchi-iwa Keynote slide text info native field must remain "
+                    "litchi-iwa Keynote slide text info native field must be documented "
+                    "as a native identity drawable_object_id: "
+                    "crates/litchi-iwa/src/keynote/editor.rs:4",
+                    "litchi-iwa Keynote slide text info native field must not be "
                     "deprecated drawable_object_id: "
-                    "crates/litchi-iwa/src/keynote/editor.rs:3"
+                    "crates/litchi-iwa/src/keynote/editor.rs:4",
                 ],
             )
 
             host.write_text(
-                "pub struct KeynoteSlideTextInfo {\n"
+                "pub struct SlideTextInfo {\n"
                 "    pub slide_index: usize,\n"
-                "    #[deprecated(note = \"compatibility\")]\n"
+                "    /// Native identity of the drawable that owns the storage.\n"
                 "    pub drawable_object_id: u64,\n"
-                "    pub role: KeynoteSlideTextRole,\n"
+                "    pub role: SlideTextRole,\n"
                 "}\n",
                 encoding="utf-8",
             )
@@ -11075,7 +11078,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             host = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
             host.parent.mkdir(parents=True, exist_ok=True)
             host.write_text(
-                "impl NumbersEditor {\n"
+                "impl Editor {\n"
                 "    pub fn cell_comment(&self, table_id: u64, row: usize, column: usize) {}\n"
                 "}\n",
                 encoding="utf-8",
@@ -11105,7 +11108,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 )
             )
             self.assertTrue(
-                any("NumbersEditor::cell_comment method returned" in item for item in violations),
+                any("Editor::cell_comment method returned" in item for item in violations),
                 violations,
             )
             self.assertTrue(
@@ -11592,10 +11595,10 @@ class BoundaryPolicyTests(unittest.TestCase):
                         "let updated = package",
                         "    .r#set_show_settings",
                         "    (",
-                        "let direct = crate::keynote::KeynoteEditor",
+                        "let direct = crate::keynote::Editor",
                         "    ::",
                         "    show_settings(",
-                        "let direct = r#KeynoteEditor::r#set_show_settings(",
+                        "let direct = r#Editor::r#set_show_settings(",
                         "let current = editor.show_settings(",
                     ]
                 )
@@ -11636,7 +11639,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                     "set_show_settings(",
                     "editor.show_settings_snapshot(",
                     "editor.set_show_settings_for_show(",
-                    "KeynoteEditor::show_settings_snapshot(",
+                    "Editor::show_settings_snapshot(",
                     "Package::show_settings(",
                     "Package::set_show_settings(",
                     "package.show_settings(",
@@ -12214,7 +12217,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             caller.write_text(
                 "keynote.r#soundtrack_settings();\n"
                 "canvas\n    .\n    set_soundtrack_settings(settings);\n"
-                "crate::nested::KeynoteEditor::\n"
+                "crate::nested::Editor::\n"
                 "    r#soundtrack_settings();\n",
                 encoding="utf-8",
             )
@@ -13513,10 +13516,10 @@ class BoundaryPolicyTests(unittest.TestCase):
                         "    (",
                         "editor.r#set_slide_transition(",
                         "reopened.r#clear_slide_transition(",
-                        "crate::keynote::KeynoteEditor",
+                        "crate::keynote::Editor",
                         "    ::",
                         "    slide_transition(",
-                        "r#KeynoteEditor::r#set_slide_transition(",
+                        "r#Editor::r#set_slide_transition(",
                         "other.clear_slide_transition(",
                         "Run `clear_keynote_transition`.",
                         "Run edit_keynote_transition.rs.",
@@ -14354,7 +14357,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "mod slide_background_wire;\n"
                 "pub use litchi_iwa_common::color::{RgbColorSpace, Rgba};\n"
                 "pub use litchi_keynote::background::{Angle, Background, Gradient, Kind, Opaque, Stop};\n"
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn slide_background(&self) {}\n"
                 "    pub fn slide_background_override(&self) {}\n"
                 "    pub fn set_slide_background(&mut self) {}\n"
@@ -14640,7 +14643,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             readme.parent.mkdir(parents=True)
             readme.write_text(
                 "editor.r#remove_slide(0)?;\n"
-                "KeynoteEditor::remove_slide(&mut editor, 0)?;\n"
+                "Editor::remove_slide(&mut editor, 0)?;\n"
                 "Run `remove_keynote_slide` or remove_keynote_slide.rs.\n",
                 encoding="utf-8",
             )
@@ -15120,7 +15123,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             readme.write_text(
                 "keynote.r#set_slide_text_placeholder_visible(1);\n"
                 "canvas\n    .\n    set_slide_title_visible(true);\n"
-                "crate::nested::KeynoteEditor::\n"
+                "crate::nested::Editor::\n"
                 "    r#set_slide_body_visible(false);\n"
                 "set_keynote_placeholder_visibility\n"
                 "set_keynote_placeholder_visibility.rs\n",
@@ -15179,7 +15182,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "pub fn set_slide_layout() {}\n"
                 "pub fn slide_number_visible() {}\n"
                 "pub fn set_slide_number_visible() {}\n"
-                "pub struct KeynoteSlideInfo;\n",
+                "pub struct SlideInfo;\n",
                 encoding="utf-8",
             )
             other_owner = root / "crates/litchi-pages/src/editor.rs"
@@ -15337,7 +15340,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             readme.write_text(
                 "editor.r#set_slide_number_visible(true);\n"
                 "canvas\n    .\n    set_slide_number_visible(false);\n"
-                "crate::nested::KeynoteEditor::\n"
+                "crate::nested::Editor::\n"
                 "    r#set_slide_number_visible(true);\n"
                 "set_keynote_slide_number\n"
                 "set_keynote_slide_number.rs\n",
@@ -15379,7 +15382,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 'const RAW: &str = r#"mod r#slide_number {}"#;\n'
                 "/* outer /* mod slide_number; */ still comment */\n"
                 "mod slide_numbers;\n"
-                "pub struct KeynoteSlideInfo {\n"
+                "pub struct SlideInfo {\n"
                 "    pub is_slide_number_visible: Option<bool>,\n"
                 "}\n"
                 "pub struct KeynoteSlideLayout {\n"
@@ -16667,7 +16670,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 violations,
             )
             self.assertTrue(
-                any("NumbersEditor::move_table" in violation for violation in violations),
+                any("Editor::move_table" in violation for violation in violations),
                 violations,
             )
 
@@ -16722,7 +16725,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 violations,
             )
             self.assertTrue(
-                any("NumbersEditor::move_table" in item for item in violations),
+                any("Editor::move_table" in item for item in violations),
                 violations,
             )
 
@@ -17016,7 +17019,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             readme.write_text(
                 "numbers.r#move_sheet(0, 1);\n"
                 "numbers_editor\n  .\n  move_sheet(1, 0);\n"
-                "crate::nested::NumbersEditor::\n  r#move_sheet(0, 1);\n"
+                "crate::nested::Editor::\n  r#move_sheet(0, 1);\n"
                 "move_numbers_sheet\n"
                 "move_numbers_sheet.rs\n",
                 encoding="utf-8",
@@ -17793,7 +17796,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             path.write_text(
                 "\n".join(
                     [
-                        "pub struct NumbersTableInfo {",
+                        "pub struct TableInfo {",
                         "    pub r#lock_state: LockState,",
                         "}",
                     ]
@@ -17826,18 +17829,18 @@ class BoundaryPolicyTests(unittest.TestCase):
                     path.write_text(
                         "\n".join(
                             [
-                                "/* pub struct NumbersTableInfo {",
+                                "/* pub struct TableInfo {",
                                 "    pub lock_state: LockState,",
                                 "} */",
                                 'const NOTE: &str = r#"',
-                                "pub struct NumbersTableInfo {",
+                                "pub struct TableInfo {",
                                 "    pub lock_state: LockState,",
                                 "}",
                                 '"#;',
                                 "pub struct OtherNumbersTableInfo {",
                                 "    pub lock_state: LockState,",
                                 "}",
-                                "pub struct NumbersTableInfo {",
+                                "pub struct TableInfo {",
                                 f"    {permitted_field}",
                                 "}",
                             ]
@@ -17848,7 +17851,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                     focused = root / "crates/litchi-numbers/src/table.rs"
                     focused.parent.mkdir(parents=True)
                     focused.write_text(
-                        "pub struct NumbersTableInfo {\n"
+                        "pub struct TableInfo {\n"
                         "    pub lock_state: LockState,\n"
                         "}\n",
                         encoding="utf-8",
@@ -17856,7 +17859,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                     pages = root / "crates/litchi-iwa/src/pages/model.rs"
                     pages.parent.mkdir(parents=True)
                     pages.write_text(
-                        "pub struct NumbersTableInfo {\n"
+                        "pub struct TableInfo {\n"
                         "    pub lock_state: LockState,\n"
                         "}\n",
                         encoding="utf-8",
@@ -18024,10 +18027,10 @@ class BoundaryPolicyTests(unittest.TestCase):
                         "    r#rename_sheet",
                         "    (",
                         "numbers_editor.r#rename_table(",
-                        "crate::numbers::NumbersEditor",
+                        "crate::numbers::Editor",
                         "    ::",
                         "    rename_sheet(",
-                        "r#NumbersEditor::r#rename_table(",
+                        "r#Editor::r#rename_table(",
                         "Run `rename_numbers_items`.",
                         "cargo run --example rename_numbers_items.rs",
                     ]
@@ -18204,7 +18207,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             host.write_text(
                 "// pub fn sheet_image_adjustments() {}\n"
                 'const NOTE: &str = "pub fn set_sheet_image_adjustments() {}";\n'
-                "pub struct NumbersSheetImageInfo {\n"
+                "pub struct SheetImageInfo {\n"
                 "    pub image_adjustments: ImageAdjustments,\n"
                 "}\n"
                 "pub fn sheet_images() {}\n"
@@ -18776,10 +18779,10 @@ class BoundaryPolicyTests(unittest.TestCase):
                         "    r#table_header_settings",
                         "    (",
                         "numbers_editor.r#set_table_header_settings(",
-                        "crate::numbers::NumbersEditor",
+                        "crate::numbers::Editor",
                         "    ::",
                         "    set_table_header_settings(",
-                        "r#NumbersEditor::r#table_header_settings(",
+                        "r#Editor::r#table_header_settings(",
                         "Run `edit_numbers_table_headers`.",
                         "cargo run --example edit_numbers_table_headers.rs",
                     ]
@@ -19627,7 +19630,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             source.parent.mkdir(parents=True)
             source.write_text(
                 "pub struct numbers::Builder;\n"
-                "pub struct NumbersEditor;\n"
+                "pub struct Editor;\n"
                 "pub struct NumbersTable;\n"
                 "pub struct TableDataExtractor;\n"
                 "fn direct() -> (litchi_numbers::Document, litchi_numbers::Package, "
@@ -19929,7 +19932,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             module.parent.mkdir(parents=True)
             module.write_text(
                 "pub use creation::Builder;\n"
-                "pub use editor::PagesEditor;\n"
+                "pub use editor::Editor;\n"
                 "use litchi_pages::{Document as FocusedDocument, "
                 "Package as FocusedPackage};\n"
                 "fn read(_: FocusedDocument, _: FocusedPackage) {}\n",
@@ -19943,7 +19946,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 path = root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(
-                    "use litchi_iwa::pages::{self, PagesEditor};\n"
+                    "use litchi_iwa::pages::{self, Editor};\n"
                     "use litchi_pages::{Document, Package};\n"
                     "pub struct PagesDocuments;\n"
                     "pub struct LegacyPagesDocumentStats;\n"
@@ -19952,7 +19955,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 )
             readme = root / boundaries.IWA_PAGES_README
             readme.write_text(
-                "Use `pages::Builder`, `PagesEditor`, "
+                "Use `pages::Builder`, `Editor`, "
                 "`litchi_pages::Document`, or `litchi_pages::Package`.\n",
                 encoding="utf-8",
             )
@@ -20556,7 +20559,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             editor = root / boundaries.RETIRED_IWA_KEYNOTE_CHART_TITLE_MODULE_SOURCE
             editor.parent.mkdir(parents=True, exist_ok=True)
             editor.write_text(
-                "fn focused_chart_catalog(editor: &KeynoteEditor) {\n"
+                "fn focused_chart_catalog(editor: &Editor) {\n"
                 "    let _ = editor;\n"
                 "}\n",
                 encoding="utf-8",
@@ -20662,7 +20665,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             example = root / boundaries.IWA_KEYNOTE_CHART_CAPTION_EXAMPLE_ROOT / "caption.rs"
             example.parent.mkdir(parents=True, exist_ok=True)
             example.write_text(
-                "fn demo(editor: &mut KeynoteEditor) {\n"
+                "fn demo(editor: &mut Editor) {\n"
                 "    editor.set_slide_chart_caption(0, 9, \"caption\");\n"
                 "}\n"
                 "fn raw_caption(drawable_object_id: u64) {}\n",
@@ -21140,7 +21143,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertTrue(any("raw-ID method must be retired" in item for item in violations), violations)
 
             source.write_text(
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn slide_movie_caption_by_selector(&self, selector: MovieSelector) { package.slide_movie_caption(selector); }\n"
                 "    pub fn set_slide_movie_caption_by_selector(&mut self, selector: impl Into<MovieSelector>, caption: &str) { package.edit_slide_movie_caption(selector).set(caption).commit(); }\n"
                 "    pub fn remove_slide_movie_caption_by_selector(&mut self, selector: impl Into<MovieSelector>) { package.edit_slide_movie_caption(selector).clear().commit(); }\n"
@@ -21166,7 +21169,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertTrue(any("legacy graph/fallback marker" in item for item in violations), violations)
 
             source.write_text(
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn slide_movie_caption_by_selector(&self, selector: MovieSelector) { package.slide_movie_caption(selector); }\n"
                 "    pub fn set_slide_movie_caption_by_selector(&mut self, selector: MovieSelector, caption: &str) { self.set_slide_movie_caption(selector, caption); }\n"
                 "    pub fn remove_slide_movie_caption_by_selector(&mut self, selector: MovieSelector) { package.edit_slide_movie_caption(selector).clear().commit(); }\n"
@@ -21188,7 +21191,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             )
 
             source.write_text(
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn slide_movie_caption_by_selector(&self, selector: MovieSelector) { package.slide_movie_caption(selector); }\n"
                 "    pub fn set_slide_movie_caption_by_selector(&mut self, selector: MovieSelector, caption: &str) { package.edit_slide_movie_caption(selector).set(caption).commit(); }\n"
                 "    pub fn remove_slide_movie_caption_by_selector(&mut self, selector: MovieSelector) { package.edit_slide_movie_caption(selector).clear().commit(); }\n"
@@ -21415,7 +21418,7 @@ fn rewrite_movie_caption_operation(
             self.assertTrue(any("raw-ID method/graph helper must be retired" in item for item in violations), violations)
 
             source.write_text(
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn slide_movie_title_by_selector(&self, selector: MovieSelector) { package.slide_movie_title(selector); }\n"
                 "    pub fn set_slide_movie_title_by_selector(&mut self, selector: impl Into<MovieSelector>, title: &str) { package.edit_slide_movie_title(selector).set(title).commit(); }\n"
                 "    pub fn remove_slide_movie_title_by_selector(&mut self, selector: impl Into<MovieSelector>) { package.edit_slide_movie_title(selector).clear().commit(); }\n"
@@ -21946,7 +21949,7 @@ fn rewrite_movie_title_operation(
             host = root / "crates/litchi-iwa/src/keynote/editor/slide_audio.rs"
             host.parent.mkdir(parents=True, exist_ok=True)
             host.write_text(
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn slide_audio_position(&self, slide_index: usize, audio_id: u64) {}\n"
                 "    pub fn set_slide_audio_position(&mut self, slide_index: usize, audio_id: u64, position: Point) {}\n"
                 "}\n",
@@ -22130,7 +22133,7 @@ fn rewrite_movie_title_operation(
             host = root / "crates/litchi-iwa/src/keynote/editor/slide_movies.rs"
             host.parent.mkdir(parents=True, exist_ok=True)
             host.write_text(
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn slide_movie_properties(&self) {}\n"
                 "    pub fn set_slide_movie_properties(&mut self) {}\n"
                 "}\n"
@@ -22618,7 +22621,7 @@ fn rewrite_movie_title_operation(
             host = root / "crates/litchi-iwa/src/keynote/editor.rs"
             host.parent.mkdir(parents=True, exist_ok=True)
             host.write_text(
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn replace_slide_movie_data(&mut self, slide_index: usize, movie_id: u64, data: &[u8]) {}\n"
                 "    pub fn replace_slide_movie_poster(&mut self, slide_index: usize, movie_id: u64, data: &[u8]) {}\n"
                 "    pub fn replace_slide_audio_data(&mut self, slide_index: usize, audio_id: u64, data: &[u8]) {}\n"
@@ -22696,7 +22699,7 @@ fn rewrite_movie_title_operation(
             other_tests = root / "crates/litchi-iwa/src/keynote/other/tests.rs"
             other_tests.parent.mkdir(parents=True, exist_ok=True)
             other_tests.write_text(
-                "fn stale_test_wrapper(editor: &mut KeynoteEditor) {\n"
+                "fn stale_test_wrapper(editor: &mut Editor) {\n"
                 "    editor.remove_slide_movie(slide, movie);\n"
                 "}\n",
                 encoding="utf-8",
@@ -22706,14 +22709,14 @@ fn rewrite_movie_title_operation(
             )
             self.assertTrue(any("other/tests.rs" in item for item in violations), violations)
             other_tests.write_text(
-                "fn generic_test_helper(editor: &mut KeynoteEditor) {\n"
+                "fn generic_test_helper(editor: &mut Editor) {\n"
                 "    editor.duplicate_slide_media(slide, media);\n"
                 "}\n",
                 encoding="utf-8",
             )
             host = root / "crates/litchi-iwa/src/keynote/editor.rs"
             host.write_text(
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    fn create_media(&mut self) { self.duplicate_slide_media(slide, media); }\n"
                 "    fn remove_media(&mut self) { self.remove_slide_media(slide, media); }\n"
                 "    fn read_media(&self) { self.slide_movies(slide); self.slide_audio(slide); }\n"
@@ -22731,7 +22734,7 @@ fn rewrite_movie_title_operation(
             )
 
             host.write_text(
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn duplicate_slide_movie(&mut self, slide: usize, movie: u64) {}\n"
                 "    fn wrapped_remove(&mut self, slide: usize, audio: u64) {\n"
                 "        self.remove_slide_audio(slide, audio);\n"
@@ -22762,7 +22765,7 @@ fn rewrite_movie_title_operation(
             stale_example = root / "crates/litchi-iwa/examples/stale_keynote_media.rs"
             stale_example.parent.mkdir(parents=True, exist_ok=True)
             stale_example.write_text(
-                "fn stale(editor: &mut KeynoteEditor) {\n"
+                "fn stale(editor: &mut Editor) {\n"
                 "    editor.remove_slide_movie(slide, movie);\n"
                 "}\n",
                 encoding="utf-8",
@@ -25299,7 +25302,7 @@ fn rewrite_movie_title_operation(
             host.write_text(
                 "use crate::numbers::editor::rename_table_in_package;\n"
                 "pub fn rename_slide_table(&mut self, slide_index: usize, model_object_id: u64, name: &str) {}\n"
-                "fn raw() { editor.rename_slide_table(0, 7, name); KeynoteEditor::rename_slide_table(0, 7, name); crate::numbers::editor::rename_table_in_package(&mut staged, 7, name); }\n"
+                "fn raw() { editor.rename_slide_table(0, 7, name); Editor::rename_slide_table(0, 7, name); crate::numbers::editor::rename_table_in_package(&mut staged, 7, name); }\n"
                 "fn focused() { package.slide_table_name(slide, table); package.edit_slide_table_name(slide, table); package.apply_slide_table_name(&patch); }\n"
                 "// editor.rename_slide_table(0, 7, name);\n"
                 'const DOC: &str = "crate::numbers::editor::rename_table_in_package(x, id, name)";\n'
@@ -30842,7 +30845,7 @@ fn rewrite_movie_title_operation(
             host.parent.mkdir(parents=True, exist_ok=True)
             host.write_text(
                 "use super::slide_movies::graph::{audio_creation_values, audio_objects};\n"
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn add_slide_audio(&mut self) {}\n"
                 "}\n"
                 "fn create() { editor.add_slide_audio(); audio_creation_values(); audio_objects(); }\n",
@@ -31048,7 +31051,7 @@ fn rewrite_movie_title_operation(
             host = root / "crates/litchi-iwa/src/keynote/editor.rs"
             host.parent.mkdir(parents=True, exist_ok=True)
             host.write_text(
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn add_slide_movie(&mut self) {}\n"
                 "}\n"
                 "fn create() { editor.add_slide_movie(); }\n",
@@ -31096,7 +31099,7 @@ fn rewrite_movie_title_operation(
             host = root / "crates/litchi-iwa/src/keynote/editor.rs"
             host.parent.mkdir(parents=True, exist_ok=True)
             host.write_text(
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn add_slide_movie(&mut self) {}\n"
                 "}\n",
                 encoding="utf-8",
@@ -31510,7 +31513,7 @@ fn rewrite_movie_title_operation(
             host.parent.mkdir(parents=True, exist_ok=True)
             host.write_text(
                 "pub fn set_body_footnote_text() {}\n"
-                "fn compatibility_bridge(editor: &mut PagesEditor) {\n"
+                "fn compatibility_bridge(editor: &mut Editor) {\n"
                 "    editor.set_body_footnote_text();\n"
                 "}\n",
                 encoding="utf-8",
@@ -31519,7 +31522,7 @@ fn rewrite_movie_title_operation(
             examples.mkdir(parents=True, exist_ok=True)
             (examples / "aliases.rs").write_text(
                 "fn main() { pages.set_body_footnote_text(); }\n"
-                "fn ufcs() { PagesEditor::set_body_footnote_text(); }\n",
+                "fn ufcs() { Editor::set_body_footnote_text(); }\n",
                 encoding="utf-8",
             )
 
@@ -31551,7 +31554,7 @@ fn rewrite_movie_title_operation(
                 "    pub fn set_body_footnote_text() {}\n"
                 "}\n"
                 "// editor.set_body_footnote_text();\n"
-                'const NOTE: &str = "PagesEditor::set_body_footnote_text()";\n'
+                'const NOTE: &str = "Editor::set_body_footnote_text()";\n'
                 "pub fn body_footnote_graphs() {}\n",
                 encoding="utf-8",
             )
@@ -31650,7 +31653,7 @@ fn rewrite_movie_title_operation(
             host.write_text(
                 "pub fn insert_body_footnote() {}\n"
                 "pub fn remove_body_footnote() {}\n"
-                "fn bridge(editor: &mut PagesEditor) {\n"
+                "fn bridge(editor: &mut Editor) {\n"
                 "    editor.insert_body_footnote();\n"
                 "    editor.remove_body_footnote();\n"
                 "}\n",
@@ -31682,10 +31685,10 @@ fn rewrite_movie_title_operation(
                 "pub fn body_footnotes() {}\n"
                 "pub fn insert_body_footnote() {}\n"
                 "pub fn remove_body_footnote() {}\n"
-                "fn bridge(editor: &mut PagesEditor) {\n"
+                "fn bridge(editor: &mut Editor) {\n"
                 "    editor.body_footnotes();\n"
                 "    editor.insert_body_footnote();\n"
-                "    PagesEditor::remove_body_footnote();\n"
+                "    Editor::remove_body_footnote();\n"
                 "    focused_body_footnote_package();\n"
                 "    focused_body_footnote_limits();\n"
                 "    publish_focused_body_footnote_commit();\n"
@@ -31705,8 +31708,8 @@ fn rewrite_movie_title_operation(
             readme.parent.mkdir(parents=True, exist_ok=True)
             readme.write_text(
                 "pages.insert_body_footnote();\n"
-                "PagesEditor::remove_body_footnote();\n"
-                "PagesEditor::body_footnotes();\n",
+                "Editor::remove_body_footnote();\n"
+                "Editor::body_footnotes();\n",
                 encoding="utf-8",
             )
 
@@ -31768,7 +31771,7 @@ fn rewrite_movie_title_operation(
                 "    fn focused_body_footnote_package() {}\n"
                 "    fn focused_body_footnote_limits() {}\n"
                 "    fn publish_focused_body_footnote_commit() {}\n"
-                "    fn test_only(editor: &mut PagesEditor) {\n"
+                "    fn test_only(editor: &mut Editor) {\n"
                 "        editor.body_footnotes();\n"
                 "        editor.remove_body_footnote();\n"
                 "        focused_body_footnote_package();\n"
@@ -31777,7 +31780,7 @@ fn rewrite_movie_title_operation(
                 "    }\n"
                 "}\n"
                 "// editor.insert_body_footnote();\n"
-                'const NOTE: &str = "PagesEditor::remove_body_footnote()";\n'
+                'const NOTE: &str = "Editor::remove_body_footnote()";\n'
                 "pub fn body_footnote_graphs() {}\n",
                 encoding="utf-8",
             )
@@ -32333,7 +32336,7 @@ fn rewrite_movie_title_operation(
             readme = root / boundaries.IWA_PAGES_README
             readme.parent.mkdir(parents=True, exist_ok=True)
             readme.write_text(
-                "PagesEditor::body_table_lock_state(model_object_id);\n",
+                "Editor::body_table_lock_state(model_object_id);\n",
                 encoding="utf-8",
             )
 
@@ -32735,7 +32738,7 @@ fn rewrite_movie_title_operation(
             readme = root / boundaries.IWA_PAGES_README
             readme.parent.mkdir(parents=True, exist_ok=True)
             readme.write_text(
-                "PagesEditor::table_header_settings(model_object_id);\n",
+                "Editor::table_header_settings(model_object_id);\n",
                 encoding="utf-8",
             )
 
@@ -34597,7 +34600,7 @@ fn rewrite_movie_title_operation(
                 "fn create_numbers() { editor.table_hidden_axes(); }\n"
                 "fn create_pages() {\n"
                 "    editor.set_table_hidden_axes(model_object_id, &hidden);\n"
-                "    PagesEditor::open(output)?.table_hidden_axes(model_object_id)?;\n"
+                "    Editor::open(output)?.table_hidden_axes(model_object_id)?;\n"
                 "}\n"
                 "fn create_keynote() { editor.set_table_hidden_axes(); }\n",
                 encoding="utf-8",
@@ -34699,7 +34702,7 @@ fn rewrite_movie_title_operation(
             with owner.open("a", encoding="utf-8") as stream:
                 stream.write(
                     "\nfn hidden_axes_host_fallback() {\n"
-                    "    let _ = litchi_iwa::PagesEditor::table_hidden_axes;\n"
+                    "    let _ = litchi_iwa::Editor::table_hidden_axes;\n"
                     "    let _ = litchi_pages::Package::body_table_hidden_axes;\n"
                     "    crate::table_hidden_axes::table_hidden_axes(package, model_object_id);\n"
                     "}\n"
@@ -35583,7 +35586,7 @@ fn rewrite_movie_title_operation(
             readme = root / boundaries.IWA_PAGES_README
             readme.parent.mkdir(parents=True, exist_ok=True)
             readme.write_text(
-                "PagesEditor::table_title_settings(model_object_id);\n",
+                "Editor::table_title_settings(model_object_id);\n",
                 encoding="utf-8",
             )
 
@@ -36814,7 +36817,7 @@ fn rewrite_movie_title_operation(
                 "numbers.table_title_settings(sheet, table);\n"
                 "numbers_editor\n  .\n  "
                 "set_table_title_settings(sheet, table, value);\n"
-                "crate::NumbersEditor::table_title_settings(sheet, table);\n"
+                "crate::Editor::table_title_settings(sheet, table);\n"
                 "edit_numbers_table_title\n"
                 "edit_numbers_table_title.rs\n",
                 encoding="utf-8",
@@ -37914,7 +37917,7 @@ fn rewrite_movie_title_operation(
             host = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "editor/table_dimension.rs"
             host.parent.mkdir(parents=True)
             host.write_text(
-                "impl NumbersEditor {\n"
+                "impl Editor {\n"
                 + "".join(
                     f"pub fn {name}(&self, value: Dimension) -> Size {{ todo!() }}\n"
                     for name in boundaries.RETIRED_IWA_NUMBERS_TABLE_DIMENSION_METHODS
@@ -38245,7 +38248,7 @@ fn rewrite_movie_title_operation(
                 "pages.section_settings(selector);\n"
                 "editor\n  .\n  set_section_settings(selector, value);\n"
                 "other.set_section_name(selector, name);\n"
-                "crate::PagesEditor::section_settings(selector);\n"
+                "crate::Editor::section_settings(selector);\n"
                 "set_pages_section_settings\n"
                 "set_pages_section_settings.rs\n",
                 encoding="utf-8",
@@ -38558,7 +38561,7 @@ fn rewrite_movie_title_operation(
                 "pages.section_background(selector);\n"
                 "editor\n  .\n  set_section_background(selector, value);\n"
                 "other.set_section_background(selector, value);\n"
-                "crate::PagesEditor::section_background(selector);\n"
+                "crate::Editor::section_background(selector);\n"
                 "set_pages_section_background\n"
                 "set_pages_section_background.rs\n",
                 encoding="utf-8",
@@ -39553,7 +39556,7 @@ fn rewrite_movie_title_operation(
             table = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
             table.parent.mkdir(parents=True, exist_ok=True)
             table.write_text(
-                "impl NumbersEditor {\n"
+                "impl Editor {\n"
                 "    #[deprecated]\n"
                 "    pub fn set_cell_comment(&mut self, table_id: u64, row: usize, "
                 "column: usize, text: impl Into<String>) -> Result<()> {\n"
@@ -39581,7 +39584,7 @@ fn rewrite_movie_title_operation(
             selectors = root / boundaries.IWA_NUMBERS_CELL_COMMENT_SELECTOR_SOURCE
             selectors.parent.mkdir(parents=True, exist_ok=True)
             selectors.write_text(
-                "fn selector_mapping(_: &NumbersEditor, _: u64) -> Result<(SheetSelector<'static>, TableSelector<'static>)> {\n"
+                "fn selector_mapping(_: &Editor, _: u64) -> Result<(SheetSelector<'static>, TableSelector<'static>)> {\n"
                 "    let sheet = SheetSelector::index(0);\n"
                 "    let table = TableSelector::index(0);\n"
                 "    Ok((sheet, table))\n"
@@ -39604,7 +39607,7 @@ fn rewrite_movie_title_operation(
             table = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
             table.parent.mkdir(parents=True, exist_ok=True)
             table.write_text(
-                "impl NumbersEditor {\n"
+                "impl Editor {\n"
                 "    pub fn set_cell_comment(&mut self, table_id: u64, row: usize, "
                 "column: usize, text: impl Into<String>) -> Result<()> {\n"
                 "        set_cell_comment_in_package(&mut self.package, table_id, row, column, text.into())\n"
@@ -39633,7 +39636,7 @@ fn rewrite_movie_title_operation(
             table = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
             table.parent.mkdir(parents=True, exist_ok=True)
             table.write_text(
-                "impl NumbersEditor {\n"
+                "impl Editor {\n"
                 "    pub fn set_cell_comment(&mut self, table_id: u64, row: usize, "
                 "column: usize, text: impl Into<String>) -> Result<()> {\n"
                 "        self.set_cell_comment_focused(table_id, row, column, text.into().as_str())\n"
@@ -39654,7 +39657,7 @@ fn rewrite_movie_title_operation(
             selectors = root / boundaries.IWA_NUMBERS_CELL_COMMENT_SELECTOR_SOURCE
             selectors.parent.mkdir(parents=True, exist_ok=True)
             selectors.write_text(
-                "fn selector_mapping(_: &NumbersEditor, _: u64) -> Result<(SheetSelector<'static>, TableSelector<'static>)> {\n"
+                "fn selector_mapping(_: &Editor, _: u64) -> Result<(SheetSelector<'static>, TableSelector<'static>)> {\n"
                 "    (SheetSelector::index(0), TableSelector::index(0))\n"
                 "}\n",
                 encoding="utf-8",
@@ -39680,7 +39683,7 @@ fn rewrite_movie_title_operation(
             table = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
             table.parent.mkdir(parents=True, exist_ok=True)
             table.write_text(
-                "impl NumbersEditor {\n"
+                "impl Editor {\n"
                 "    pub fn set_cell_comment(&mut self, table_id: u64, row: usize, "
                 "column: usize, text: impl Into<String>) -> Result<()> {\n"
                 "        let source = litchi_numbers::Package::from_bytes(&self.to_bytes()?)?;\n"
@@ -39699,7 +39702,7 @@ fn rewrite_movie_title_operation(
             selectors = root / boundaries.IWA_NUMBERS_CELL_COMMENT_SELECTOR_SOURCE
             selectors.parent.mkdir(parents=True, exist_ok=True)
             selectors.write_text(
-                "fn selector_mapping(_: &NumbersEditor, _: u64) -> Result<(SheetSelector<'static>, TableSelector<'static>)> {\n"
+                "fn selector_mapping(_: &Editor, _: u64) -> Result<(SheetSelector<'static>, TableSelector<'static>)> {\n"
                 "    let sheet = SheetSelector::index(0);\n"
                 "    let table = TableSelector::index(0);\n"
                 "    Ok((sheet, table))\n"
@@ -39718,7 +39721,7 @@ fn rewrite_movie_title_operation(
     def _write_iwa_comment_clear_retirement_fixture(self, root: Path) -> tuple[Path, Path]:
         table = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
         table.parent.mkdir(parents=True, exist_ok=True)
-        table.write_text("impl NumbersEditor { fn unrelated(&self) {} }\n", encoding="utf-8")
+        table.write_text("impl Editor { fn unrelated(&self) {} }\n", encoding="utf-8")
         example = root / boundaries.IWA_NUMBERS_CELL_COMMENT_CLEAR_EXAMPLE
         example.parent.mkdir(parents=True, exist_ok=True)
         example.write_text(
@@ -39743,7 +39746,7 @@ fn rewrite_movie_title_operation(
             table, _example = self._write_iwa_comment_clear_retirement_fixture(root)
             table.write_text(
                 "fn clear_cell_comment_with_focused_owner() {}\n"
-                "impl NumbersEditor { pub fn clear_cell_comment(&mut self, table_id: u64) {} }\n",
+                "impl Editor { pub fn clear_cell_comment(&mut self, table_id: u64) {} }\n",
                 encoding="utf-8",
             )
             violations = boundaries.audit_iwa_numbers_cell_comment_clear_retirement_source_topology(root)
@@ -41355,7 +41358,7 @@ fn rewrite_movie_title_operation(
                 "    match format { Some(value) => focused_set_data_format(&source, sheet, table, position, value), None => focused_clear_data_format(&source, sheet, table, position) };\n"
                 "    verify_focused_data_format();\n"
                 "}\n"
-                "impl NumbersEditor {\n"
+                "impl Editor {\n"
                 "    pub fn table_cell_data_format(&self) {\n"
                 "        if CellControl::try_from(()).is_ok() { focused_control_format(); }\n"
                 "    }\n"
@@ -41383,14 +41386,14 @@ fn rewrite_movie_title_operation(
                 "    commit_exact_focused_data_format_with_location(format);\n",
             )
             delegated = delegated.replace(
-                "}\nimpl NumbersEditor {",
+                "}\nimpl Editor {",
                 "}\n"
                 "fn commit_exact_focused_data_format_with_location(format: Option<CellControl>) {\n"
                 "    let (source, sheet, table, position, _) = focused_cell_location();\n"
                 "    match format { Some(value) => focused_set_data_format(&source, sheet, table, position, value), None => focused_clear_data_format(&source, sheet, table, position) };\n"
                 "    verify_focused_data_format();\n"
                 "}\n"
-                "impl NumbersEditor {",
+                "impl Editor {",
             )
             bridge.write_text(delegated, encoding="utf-8")
             self.assertEqual(
@@ -43099,7 +43102,7 @@ fn rewrite_movie_title_operation(
             host = root / boundaries.IWA_KEYNOTE_CHART_AXIS_TITLE_SOURCE
             host.parent.mkdir(parents=True, exist_ok=True)
             host.write_text(
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn slide_chart_axis_title(&self, drawable_object_id: u64, axis: Axis) {}\n"
                 "    pub fn set_slide_chart_axis_title(&mut self, drawable_object_id: u64, axis: Axis) {}\n"
                 "    pub fn remove_slide_chart_axis_title(&mut self, drawable_object_id: u64, axis: Axis) {}\n"
@@ -43273,7 +43276,7 @@ fn rewrite_movie_title_operation(
             add_keynote_chart_axis_value_settings_canonical_scaffold(root)
             host = root / boundaries.IWA_KEYNOTE_CHART_AXIS_VALUE_SETTINGS_SOURCE
             host.write_text(
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn slide_chart_value_axis_bounds(&self, drawable_object_id: u64) {}\n"
                 "    pub fn set_slide_chart_value_axis_bounds(&mut self, drawable_object_id: u64, bounds: Bounds) {}\n"
                 "    pub fn slide_chart_value_axis_steps(&self, drawable_object_id: u64) {}\n"
@@ -43682,7 +43685,7 @@ fn rewrite_movie_title_operation(
             host = root / boundaries.IWA_KEYNOTE_CHART_LEGEND_SOURCE
             host.parent.mkdir(parents=True, exist_ok=True)
             host.write_text(
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn slide_chart_legend_visible(&self, object_id: u64) {}\n"
                 "    pub fn set_slide_chart_legend_visible(&mut self, object_id: u64) {}\n"
                 "    fn set_chart_legend_visible(&mut self) {}\n"
@@ -43696,7 +43699,7 @@ fn rewrite_movie_title_operation(
             self.assertTrue(any("direct helper set_chart_legend_visible" in item for item in violations), violations)
 
             host.write_text(
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn slide_chart_legend_fill(&self) {}\n"
                 "    pub fn set_slide_chart_legend_fill(&mut self) {}\n"
                 "    #[cfg(test)]\n"
@@ -43937,7 +43940,7 @@ fn rewrite_movie_title_operation(
             numbers = root / boundaries.RETIRED_IWA_NUMBERS_CHART_ARRANGEMENT_HOST_ROOT
             numbers.mkdir(parents=True, exist_ok=True)
             (numbers / "arrangement.rs").write_text(
-                "impl NumbersEditor {\n"
+                "impl Editor {\n"
                 "    pub fn sheet_chart_arrangement(&self, id: u64) {}\n"
                 "    pub fn set_sheet_chart_arrangement(&mut self, id: u64) {}\n"
                 "}\n",
@@ -43946,7 +43949,7 @@ fn rewrite_movie_title_operation(
             pages = root / boundaries.RETIRED_IWA_PAGES_CHART_ARRANGEMENT_HOST_ROOT
             pages.mkdir(parents=True, exist_ok=True)
             (pages / "arrangement.rs").write_text(
-                "impl PagesEditor {\n"
+                "impl Editor {\n"
                 "    pub fn body_chart_arrangement(&self, id: u64) {}\n"
                 "    pub fn set_body_chart_arrangement(&mut self, id: u64) {}\n"
                 "}\n",
@@ -44120,7 +44123,7 @@ fn rewrite_movie_title_operation(
                 "    chart_arrangement as read_native_arrangement,\n"
                 "    set_chart_arrangement as set_native_arrangement,\n"
                 "};\n"
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn slide_chart_arrangement(&self, slide_index: usize, drawable_object_id: u64) -> Result<ChartArrangement> {\n"
                 "        read_native_arrangement(self.package(), drawable_object_id)\n"
                 "    }\n"
@@ -44128,7 +44131,7 @@ fn rewrite_movie_title_operation(
                 "        parse_wire_fields(bytes); set_native_arrangement(self.package(), drawable_object_id, arrangement)\n"
                 "    }\n"
                 "}\n"
-                "fn chart_selector_for_drawable(editor: &KeynoteEditor, slide_index: usize, drawable_object_id: u64) -> Result<ChartSelector> { let _ = (editor, slide_index, drawable_object_id); todo!() }\n"
+                "fn chart_selector_for_drawable(editor: &Editor, slide_index: usize, drawable_object_id: u64) -> Result<ChartSelector> { let _ = (editor, slide_index, drawable_object_id); todo!() }\n"
                 "#[cfg(test)]\n"
                 "fn set_slide_chart_arrangement(&mut self) {}\n"
                 "// fn slide_chart_arrangement(&self, drawable_object_id: u64) {}\n"
@@ -44156,12 +44159,12 @@ fn rewrite_movie_title_operation(
 
             host.write_text(
                 "use litchi_keynote::{ChartArrangement, Package as FocusedKeynotePackage, SlideSelector};\n"
-                "fn focused_chart_arrangement_package(editor: &KeynoteEditor) -> Result<FocusedKeynotePackage> { let _ = editor; todo!() }\n",
+                "fn focused_chart_arrangement_package(editor: &Editor) -> Result<FocusedKeynotePackage> { let _ = editor; todo!() }\n",
                 encoding="utf-8",
             )
             host.write_text(
                 host.read_text(encoding="utf-8")
-                + "fn focused_chart_arrangements(editor: &KeynoteEditor, slide_index: usize) -> Result<Box<[ChartArrangement]>> {\n"
+                + "fn focused_chart_arrangements(editor: &Editor, slide_index: usize) -> Result<Box<[ChartArrangement]>> {\n"
                 + "    let package = FocusedKeynotePackage::from_bytes(bytes)?;\n"
                 + "    package.slide_chart_arrangements(SlideSelector::index(slide_index))\n"
                 + "}\n",
@@ -44170,8 +44173,8 @@ fn rewrite_movie_title_operation(
             listing = root / boundaries.IWA_KEYNOTE_CHART_ARRANGEMENT_LISTING_SOURCE
             listing_source = listing.read_text(encoding="utf-8")
             listing.write_text(
-                "impl KeynoteEditor {\n"
-                "    pub fn slide_charts(&self, slide_index: usize) -> Result<Vec<KeynoteSlideChartInfo>> {\n"
+                "impl Editor {\n"
+                "    pub fn slide_charts(&self, slide_index: usize) -> Result<Vec<SlideChartInfo>> {\n"
                 "        Ok(charts)\n"
                 "    }\n"
                 "}\n",
@@ -44205,12 +44208,12 @@ fn rewrite_movie_title_operation(
 
             host.write_text(
                 "use litchi_keynote::{Package as FocusedKeynotePackage, SlideSelector};\n"
-                "fn focused_chart_arrangement_package(editor: &KeynoteEditor) -> Result<FocusedKeynotePackage> { let _ = editor; todo!() }\n",
+                "fn focused_chart_arrangement_package(editor: &Editor) -> Result<FocusedKeynotePackage> { let _ = editor; todo!() }\n",
                 encoding="utf-8",
             )
             host.write_text(
                 host.read_text(encoding="utf-8")
-                + "fn focused_chart_arrangements(editor: &KeynoteEditor, slide_index: usize) -> Result<Box<[ChartArrangement]>> {\n"
+                + "fn focused_chart_arrangements(editor: &Editor, slide_index: usize) -> Result<Box<[ChartArrangement]>> {\n"
                 + "    let package = focused_chart_arrangement_package(editor)?;\n"
                 + "    package.slide_chart_arrangements(SlideSelector::index(slide_index))\n"
                 + "}\n",
@@ -45110,7 +45113,7 @@ fn rewrite_movie_title_operation(
             pages = root / "crates/litchi-iwa/src/pages/editor/tables/semantic.rs"
             pages.parent.mkdir(parents=True, exist_ok=True)
             pages.write_text(
-                "impl PagesEditor {\n"
+                "impl Editor {\n"
                 "    pub fn table_cell_date_time_format(&self) {}\n"
                 "    pub fn set_table_cell_date_time_format(&mut self) {}\n"
                 "    pub fn reset_table_cell_date_time_format(&mut self) {}\n"
@@ -45120,7 +45123,7 @@ fn rewrite_movie_title_operation(
             keynote = root / "crates/litchi-iwa/src/keynote/editor/slide_tables.rs"
             keynote.parent.mkdir(parents=True, exist_ok=True)
             keynote.write_text(
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn slide_table_cell_date_time_format(&self) {}\n"
                 "}\n",
                 encoding="utf-8",
@@ -45132,10 +45135,10 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
-            # A returned NumbersEditor method is retired as soon as the
+            # A returned Editor method is retired as soon as the
             # focused owner is present.
             host.write_text(
-                "impl NumbersEditor {\n"
+                "impl Editor {\n"
                 + "\n".join(
                     f"pub fn {method}(&self) {{}}"
                     for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_METHODS
@@ -45423,7 +45426,7 @@ fn rewrite_movie_title_operation(
             pages = root / "crates/litchi-iwa/src/pages/editor/tables/semantic.rs"
             pages.parent.mkdir(parents=True, exist_ok=True)
             pages.write_text(
-                "impl PagesEditor {\n"
+                "impl Editor {\n"
                 "    pub fn table_cell_duration_format(&self) {}\n"
                 "    pub fn set_table_cell_duration_format(&mut self) {}\n"
                 "    pub fn reset_table_cell_duration_format(&mut self) {}\n"
@@ -45433,7 +45436,7 @@ fn rewrite_movie_title_operation(
             keynote = root / "crates/litchi-iwa/src/keynote/editor/slide_tables.rs"
             keynote.parent.mkdir(parents=True, exist_ok=True)
             keynote.write_text(
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn slide_table_cell_duration_format(&self) {}\n"
                 "}\n",
                 encoding="utf-8",
@@ -45446,7 +45449,7 @@ fn rewrite_movie_title_operation(
             )
 
             host.write_text(
-                "impl NumbersEditor {\n"
+                "impl Editor {\n"
                 + "\n".join(
                     f"pub fn {method}(&self) {{}}"
                     for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_DURATION_FORMAT_METHODS
@@ -45614,7 +45617,7 @@ fn rewrite_movie_title_operation(
             pages = root / "crates/litchi-iwa/src/pages/editor/tables/semantic.rs"
             pages.parent.mkdir(parents=True, exist_ok=True)
             pages.write_text(
-                "impl PagesEditor {\n"
+                "impl Editor {\n"
                 "    pub fn table_cell_custom_format(&self) {}\n"
                 "    pub fn set_table_cell_custom_format(&mut self) {}\n"
                 "    pub fn reset_table_cell_custom_format(&mut self) {}\n"
@@ -45624,7 +45627,7 @@ fn rewrite_movie_title_operation(
             keynote = root / "crates/litchi-iwa/src/keynote/editor/slide_tables.rs"
             keynote.parent.mkdir(parents=True, exist_ok=True)
             keynote.write_text(
-                "impl KeynoteEditor {\n"
+                "impl Editor {\n"
                 "    pub fn slide_table_cell_custom_format(&self) {}\n"
                 "}\n",
                 encoding="utf-8",
@@ -45644,10 +45647,10 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
-            # A returned NumbersEditor method is retired as soon as the
+            # A returned Editor method is retired as soon as the
             # focused owner is present.
             source.write_text(
-                "impl NumbersEditor {\n"
+                "impl Editor {\n"
                 + "".join(
                     f"pub fn {method}(&self) {{}}\n"
                     for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CUSTOM_FORMAT_METHODS
@@ -46106,7 +46109,7 @@ fn rewrite_movie_title_operation(
                 + "pub type TextCommit = Commit;\n"
                 + "pub fn raw_text_format(table_id: TableId, row: usize, "
                 + "source_bytes: Vec<u8>, view: WireView, archive: Archive) {}\n"
-                + "pub fn monolith(editor: NumbersEditor) {}\n",
+                + "pub fn monolith(editor: Editor) {}\n",
                 encoding="utf-8",
             )
             package = root / boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_EXPORT_SOURCES[1]
@@ -46127,7 +46130,7 @@ fn rewrite_movie_title_operation(
                 "wire type WireView",
                 "archive/IWA type Archive",
                 "raw helper raw_text_format",
-                "monolithic host type NumbersEditor",
+                "monolithic host type Editor",
                 "exposes its public package owner module",
                 "retains root aliases via glob",
             ):
@@ -46151,7 +46154,7 @@ fn rewrite_movie_title_operation(
             )
 
             host.write_text(
-                "impl NumbersEditor {\n"
+                "impl Editor {\n"
                 + "".join(
                     f"pub fn {method}(&self) {{}}\n"
                     for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_TEXT_FORMAT_METHODS
@@ -46508,7 +46511,7 @@ fn rewrite_movie_title_operation(
             )
 
             host.write_text(
-                "impl NumbersEditor {\n"
+                "impl Editor {\n"
                 + "".join(f"pub fn {method}(&self) {{}}\n" for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_METHODS)
                 + "}\n"
                 + "".join(f"fn {helper}() {{}}\n" for helper in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_FOCUSED_HELPERS),
@@ -46807,7 +46810,7 @@ fn rewrite_movie_title_operation(
             )
 
             host.write_text(
-                "impl NumbersEditor {\n"
+                "impl Editor {\n"
                 + "".join(f"pub fn {method}(&self) {{}}\n" for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_METHODS)
                 + "}\n"
                 + "".join(f"fn {helper}() {{}}\n" for helper in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_FOCUSED_HELPERS),
@@ -47145,7 +47148,7 @@ fn rewrite_movie_title_operation(
             )
 
             host.write_text(
-                "impl NumbersEditor {\n"
+                "impl Editor {\n"
                 "pub fn table_cell_fraction_format(&self) {}\n"
                 "pub fn set_table_cell_fraction_format(&mut self) {}\n"
                 "pub fn reset_table_cell_fraction_format(&mut self) {}\n"
@@ -47222,7 +47225,7 @@ fn rewrite_movie_title_operation(
                 + "pub type PercentageFormatEdit = Edit;\n"
                 + "pub fn raw_percentage_format(table_id: TableId, row: usize, source_bytes: Vec<u8>, view: WireView, archive: Archive) {}\n"
                 + "pub fn opaque_percentage_bytes(data: Vec<u8>, boxed: Box<[u8]>, borrowed: Cow<'_, [u8]>) {}\n"
-                + "pub fn monolith(editor: NumbersEditor) {}\n",
+                + "pub fn monolith(editor: Editor) {}\n",
                 encoding="utf-8",
             )
             package = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_EXPORT_SOURCES[1]
@@ -47243,7 +47246,7 @@ fn rewrite_movie_title_operation(
                 "archive/IWA type Archive",
                 "raw helper raw_percentage_format",
                 "opaque raw byte container type Vec<u8>",
-                "monolithic host type NumbersEditor",
+                "monolithic host type Editor",
                 "exposes its package owner module",
                 "retains root aliases via glob",
             ):
@@ -47399,7 +47402,7 @@ fn rewrite_movie_title_operation(
             )
 
             host.write_text(
-                "impl NumbersEditor {\n"
+                "impl Editor {\n"
                 + "".join(f"pub fn {method}(&self) {{}}\n" for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_METHODS)
                 + "}\n"
                 + "".join(f"fn {helper}() {{}}\n" for helper in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_FOCUSED_HELPERS),
@@ -47507,7 +47510,7 @@ fn rewrite_movie_title_operation(
             )
             owner.write_text(
                 owner.read_text(encoding="utf-8")
-                + "pub fn monolith(editor: NumbersEditor) {}\n",
+                + "pub fn monolith(editor: Editor) {}\n",
                 encoding="utf-8",
             )
             violations = boundaries.audit_numbers_table_cell_number_format_facade_source_topology(
@@ -47518,7 +47521,7 @@ fn rewrite_movie_title_operation(
                 violations,
             )
             self.assertTrue(
-                any("monolithic host type NumbersEditor" in item for item in violations),
+                any("monolithic host type Editor" in item for item in violations),
                 violations,
             )
 
@@ -47614,7 +47617,7 @@ fn rewrite_movie_title_operation(
             )
 
             host.write_text(
-                "impl NumbersEditor {\n"
+                "impl Editor {\n"
                 + "".join(
                     f"pub fn {method}(&self) {{}}\n"
                     for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_METHODS
@@ -47649,7 +47652,7 @@ fn rewrite_movie_title_operation(
             )
 
             host.write_text(
-                "fn production_number_route(editor: &NumbersEditor) {\n"
+                "fn production_number_route(editor: &Editor) {\n"
                 "    editor.table_cell_number_format();\n"
                 "    editor.set_table_cell_number_format();\n"
                 "    editor.reset_table_cell_number_format();\n"
@@ -49865,7 +49868,7 @@ fn rewrite_movie_title_operation(
                 root,
                 pages_source=(
                     "use litchi_iwa_common::table::model::Table;\n"
-                    "pub struct PagesTable { semantic_table: Table }\n"
+                    "pub struct Table { semantic_table: Table }\n"
                 ),
             )
 
@@ -49881,7 +49884,7 @@ fn rewrite_movie_title_operation(
 
             (root / "crates/litchi-iwa/src/pages/editor/tables/semantic.rs").write_text(
                 "use litchi_iwa_common::table::read::TableRead;\n"
-                "pub struct PagesTable {\n"
+                "pub struct Table {\n"
                 "    table_read: TableRead,\n"
                 "}\n",
                 encoding="utf-8",

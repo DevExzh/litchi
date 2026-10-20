@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::{self, KeynoteEditor};
+use litchi_iwa::keynote::{self};
 use litchi_iwa::numbers;
 use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let locked_keynote = lock.commit()?;
     let mut keynote_bytes = Vec::new();
     locked_keynote.package().write_to(&mut keynote_bytes)?;
-    keynote = KeynoteEditor::from_bytes(&keynote_bytes)?;
+    keynote = keynote::Editor::from_bytes(&keynote_bytes)?;
     keynote.save(&keynote_path)?;
     assert_eq!(
         litchi_keynote::Package::open(&keynote_path)?.slide_table_lock_state(

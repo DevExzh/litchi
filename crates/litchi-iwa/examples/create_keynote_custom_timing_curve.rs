@@ -1,9 +1,6 @@
 //! Create a Keynote presentation with a native editable custom action timing curve.
 
-use litchi_iwa::keynote::{
-    self, KeynoteBuildSettings, KeynoteBuildTimingCurve, KeynoteMotionPathPoint,
-    KeynoteRotationDirection,
-};
+use litchi_iwa::keynote::{self};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
@@ -19,11 +16,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .into_iter()
         .next()
         .ok_or("the initial slide has no drawable")?;
-    let settings = KeynoteBuildSettings::rotate_action(720.0, KeynoteRotationDirection::Clockwise)
-        .with_custom_timing_curve(KeynoteBuildTimingCurve::cubic(
-            KeynoteMotionPathPoint::new(0.18, 0.04),
-            KeynoteMotionPathPoint::new(0.82, 0.96),
-        ))?;
+    let settings =
+        keynote::BuildSettings::rotate_action(720.0, keynote::RotationDirection::Clockwise)
+            .with_custom_timing_curve(keynote::BuildTimingCurve::cubic(
+                keynote::MotionPathPoint::new(0.18, 0.04),
+                keynote::MotionPathPoint::new(0.82, 0.96),
+            ))?;
     keynote.add_slide_build(0, drawable.id.get(), settings)?;
     keynote.save(output)?;
     Ok(())

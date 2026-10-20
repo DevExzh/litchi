@@ -5,7 +5,7 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use litchi_iwa::numbers::{self, NumbersSheetMovieOptions};
+use litchi_iwa::numbers::{self};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 
@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &movie,
         poster_filename,
         &poster,
-        NumbersSheetMovieOptions::new(
+        numbers::SheetMovieOptions::new(
             DrawablePoint { x: 420.0, y: 180.0 },
             DrawableSize {
                 width: 320.0,

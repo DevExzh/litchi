@@ -10,7 +10,7 @@ use crate::charts::axis_style::{
 use litchi_iwa_common::chart::axis::style::Visibility;
 use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
 
-impl PagesEditor {
+impl Editor {
     /// Read whether Pages shows minor tick marks for one native body-chart axis.
     pub fn body_chart_axis_minor_tick_marks_visible(
         &self,
@@ -51,7 +51,7 @@ impl PagesEditor {
 }
 
 fn body_chart_axis_minor_tick_marks_visible(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
     axis: Axis,
 ) -> Result<Visibility> {
@@ -66,7 +66,7 @@ fn body_chart_axis_minor_tick_marks_visible(
 }
 
 fn set_body_chart_axis_minor_tick_marks_visible(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     axis: Axis,
     visible: Visibility,
@@ -81,7 +81,7 @@ fn set_body_chart_axis_minor_tick_marks_visible(
         axis,
         visible,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_axis_minor_tick_marks_visible(drawable_object_id, axis)? != visible {
         return Err(Error::InvalidFormat(
             "Pages chart axis minor-tick-mark update failed validation".to_owned(),
@@ -92,7 +92,7 @@ fn set_body_chart_axis_minor_tick_marks_visible(
 }
 
 fn body_chart_axis_tick_mark_location(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
     axis: Axis,
 ) -> Result<TickMarkLocation> {
@@ -107,7 +107,7 @@ fn body_chart_axis_tick_mark_location(
 }
 
 fn set_body_chart_axis_tick_mark_location(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     axis: Axis,
     location: TickMarkLocation,
@@ -122,7 +122,7 @@ fn set_body_chart_axis_tick_mark_location(
         axis,
         location,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_axis_tick_mark_location(drawable_object_id, axis)? != location {
         return Err(Error::InvalidFormat(
             "Pages chart axis tick-mark-location update failed validation".to_owned(),

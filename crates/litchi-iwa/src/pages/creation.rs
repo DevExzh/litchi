@@ -9,7 +9,7 @@ use prost::Message;
 
 use litchi_pages::section::{PageNumbering, Start};
 
-use super::editor::PagesEditor;
+use super::editor::Editor;
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::identity::IWorkDocumentIdentity;
 use crate::protobuf::{tp, tsa, tsd, tsk, tsp, tss, tst, tswp};
@@ -494,7 +494,7 @@ impl Builder {
     /// Append one empty native table to the initial document body.
     ///
     /// The table owns independent cell storage and is immediately writable
-    /// through [`PagesEditor::set_table_cell`](super::editor::PagesEditor::set_table_cell).
+    /// through [`Editor::set_table_cell`](super::editor::Editor::set_table_cell).
     pub fn body_table(mut self, name: impl Into<String>, rows: usize, columns: usize) -> Self {
         self.initial_tables.push(InitialPagesTable {
             name: name.into(),
@@ -505,8 +505,8 @@ impl Builder {
     }
 
     /// Build a mutable editor for the new document.
-    pub fn build(self) -> Result<PagesEditor> {
-        PagesEditor::from_package(self.build_package()?)
+    pub fn build(self) -> Result<Editor> {
+        Editor::from_package(self.build_package()?)
     }
 
     /// Build the underlying package for lower-level IWA manipulation.
@@ -543,7 +543,7 @@ impl Builder {
         }
         insert_property_lists(&mut package, &identity)?;
         if self.initial_tables.len() > 1 {
-            let mut editor = PagesEditor::from_package(package)?;
+            let mut editor = Editor::from_package(package)?;
             for table in &self.initial_tables[1..] {
                 let anchor = editor.body_text()?.encode_utf16().count();
                 editor.add_table(anchor, &table.name, table.rows, table.columns)?;
@@ -1814,7 +1814,7 @@ mod tests {
 
         editor.set_body_text("Updated through CRUD").unwrap();
         let encoded = editor.to_bytes().unwrap();
-        let reopened = PagesEditor::from_bytes(&encoded).unwrap();
+        let reopened = Editor::from_bytes(&encoded).unwrap();
         assert_eq!(reopened.body_text().unwrap(), "Updated through CRUD");
         assert_eq!(reopened.sections().len(), 1);
     }
@@ -1870,10 +1870,7 @@ mod tests {
                 .all(|name| !name.starts_with("preview"))
         );
         assert_eq!(
-            PagesEditor::from_package(package)
-                .unwrap()
-                .body_text()
-                .unwrap(),
+            Editor::from_package(package).unwrap().body_text().unwrap(),
             ""
         );
     }

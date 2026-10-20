@@ -9,7 +9,7 @@ use crate::charts::series_error_bars::{
 };
 use litchi_iwa_common::chart::error_bar::Series;
 
-impl PagesEditor {
+impl Editor {
     /// Read every body chart series' error bars in native series order.
     pub fn body_chart_series_error_bars(&self, drawable_object_id: u64) -> Result<Vec<Series>> {
         body_chart_series_error_bars(self, drawable_object_id)
@@ -57,10 +57,7 @@ impl PagesEditor {
     }
 }
 
-fn body_chart_series_error_bars(
-    editor: &PagesEditor,
-    drawable_object_id: u64,
-) -> Result<Vec<Series>> {
+fn body_chart_series_error_bars(editor: &Editor, drawable_object_id: u64) -> Result<Vec<Series>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
         graph.info.kind,
@@ -79,7 +76,7 @@ fn body_chart_series_error_bars(
 }
 
 fn set_body_chart_series_error_bars(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     values: &[Series],
 ) -> Result<()> {
@@ -116,7 +113,7 @@ fn set_body_chart_series_error_bars(
         "Pages",
         &expected,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_series_error_bars(drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Pages chart series error-bar update failed validation".to_owned(),

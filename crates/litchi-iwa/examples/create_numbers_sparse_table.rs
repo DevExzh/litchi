@@ -1,6 +1,6 @@
 //! Create a source-built Numbers workbook with cells across sparse tile boundaries.
 
-use litchi_iwa::numbers::{self, NumbersEditor};
+use litchi_iwa::numbers::{self};
 use litchi_numbers::table::At;
 use litchi_numbers::table::cells::{Change, Input};
 use litchi_numbers::{Package, SheetSelector, TableSelector};
@@ -29,9 +29,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn set_focused_table_cells(
-    editor: NumbersEditor,
+    editor: numbers::Editor,
     changes: impl IntoIterator<Item = Change>,
-) -> Result<NumbersEditor, Box<dyn std::error::Error>> {
+) -> Result<numbers::Editor, Box<dyn std::error::Error>> {
     let package = Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_table_cells(SheetSelector::index(0), TableSelector::index(0))?
@@ -39,5 +39,5 @@ fn set_focused_table_cells(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(NumbersEditor::from_bytes(&bytes)?)
+    Ok(numbers::Editor::from_bytes(&bytes)?)
 }

@@ -7,7 +7,7 @@ use crate::charts::radar_grid_shape::{
     set_chart_radar_grid_shape as set_native_chart_radar_grid_shape,
 };
 
-impl PagesEditor {
+impl Editor {
     /// Read one radar chart's `Radar Chart Grid Shape`.
     pub fn body_chart_radar_grid_shape(
         &self,
@@ -49,7 +49,7 @@ impl PagesEditor {
             graph.info.kind,
             shape,
         )?;
-        let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_radar_grid_shape(drawable_object_id)? != shape {
             return Err(Error::InvalidFormat(
                 "Pages radar chart grid-shape update failed validation".to_owned(),
@@ -90,7 +90,7 @@ mod tests {
         editor
             .set_body_chart_radar_grid_shape(chart.drawable_object_id, ChartRadarGridShape::Curved)
             .unwrap();
-        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_chart_radar_grid_shape(chart.drawable_object_id)

@@ -17,7 +17,7 @@ use litchi_iwa_protos::{
 
 #[derive(Debug, Clone)]
 pub(super) struct SlideTableGraph {
-    pub(super) info: KeynoteSlideTableInfo,
+    pub(super) info: SlideTableInfo,
     pub(super) slide_archive: String,
     pub(super) slide_component_id: u64,
 }
@@ -52,10 +52,10 @@ struct CatalogTableModelFacts {
 }
 
 pub(super) fn require_table_model(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     model_object_id: u64,
-) -> Result<KeynoteSlideTableInfo> {
+) -> Result<SlideTableInfo> {
     let mut matches = editor
         .slide_tables(slide_index)?
         .into_iter()
@@ -82,7 +82,7 @@ pub(super) fn require_table_model(
 /// mixed current/legacy candidates are rejected by the catalog's strict role
 /// census rather than being retried through an eager graph.
 pub(super) fn slide_table_graph(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<SlideTableGraph> {
@@ -339,7 +339,7 @@ fn decode_catalog_slide_identifier(
 /// node/slide semantic decodes remain constant when a slide contains many
 /// tables.
 pub(super) fn slide_table_graph_from_catalog_context(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     catalog: &mut KeynoteObjectCatalog,
     slide_index: usize,
     drawable_object_id: u64,
@@ -418,7 +418,7 @@ pub(super) fn slide_table_graph_from_catalog_context(
         )?
     };
     Ok(SlideTableGraph {
-        info: KeynoteSlideTableInfo {
+        info: SlideTableInfo {
             slide_index,
             slide_id: context.slide_id,
             drawable_object_id,
@@ -1302,7 +1302,7 @@ mod tests {
         assert_eq!(package.to_bytes().expect("source bytes"), before);
     }
 
-    fn unmark_source_built_document(editor: KeynoteEditor) -> KeynoteEditor {
+    fn unmark_source_built_document(editor: Editor) -> Editor {
         let mut package = editor.into_package();
         package
             .update_archive("Index/Document.iwa", |archive| {
@@ -1329,7 +1329,7 @@ mod tests {
                 Ok(())
             })
             .expect("unmark source-built document");
-        KeynoteEditor::from_bytes(&package.to_bytes().expect("unmarked package bytes"))
+        Editor::from_bytes(&package.to_bytes().expect("unmarked package bytes"))
             .expect("reopen unmarked package")
     }
 
@@ -1342,8 +1342,8 @@ mod tests {
                 .is_none()
         );
 
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().expect("builder bytes"))
-            .expect("reopen builder");
+        let reopened =
+            Editor::from_bytes(&editor.to_bytes().expect("builder bytes")).expect("reopen builder");
         assert!(
             focused_table_appearance_package(reopened.package())
                 .expect("reopened source-built route")
@@ -1408,7 +1408,7 @@ mod tests {
         let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/iwork/keynote/table-discovery.key");
         let source = std::fs::read(fixture).expect("native Keynote fixture");
-        let editor = KeynoteEditor::from_bytes(&source).expect("native Keynote editor");
+        let editor = Editor::from_bytes(&source).expect("native Keynote editor");
         let focused = litchi_keynote::Package::from_bytes(&source).expect("focused native package");
         let expected = focused
             .__slide_table_appearances(0)
@@ -1461,7 +1461,7 @@ mod tests {
         let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/iwork/keynote/table-discovery.key");
         let source = std::fs::read(fixture).expect("native Keynote fixture");
-        let editor = KeynoteEditor::from_bytes(&source).expect("native Keynote editor");
+        let editor = Editor::from_bytes(&source).expect("native Keynote editor");
         let before = editor.to_bytes().expect("native package bytes");
         assert_eq!(before, source);
         let listed = editor.slide_tables(0).expect("native table listing");

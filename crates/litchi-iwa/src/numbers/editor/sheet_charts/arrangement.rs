@@ -14,9 +14,9 @@ use litchi_numbers::{ChartSelector, Package as FocusedNumbersPackage, SheetSelec
 /// walk supplies the same source order, so the focused batch is read once and
 /// then copied into the already validated graph records.
 pub(super) fn fill_focused_chart_arrangements(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
-    charts: &mut [NumbersSheetChartInfo],
+    charts: &mut [SheetChartInfo],
     chart_positions: &[usize],
 ) -> Result<()> {
     if charts.is_empty() && chart_positions.is_empty() {
@@ -47,7 +47,7 @@ pub(super) fn fill_focused_chart_arrangements(
 /// position. This is used by lifecycle methods that return one graph record;
 /// ordinary listing uses the batch helper above.
 pub(super) fn focused_chart_arrangement_for_drawable(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<ChartArrangement> {
@@ -57,7 +57,7 @@ pub(super) fn focused_chart_arrangement_for_drawable(
 }
 
 fn focused_chart_arrangement_at(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_index: usize,
     chart_count: usize,
     chart_position: usize,
@@ -75,17 +75,14 @@ fn focused_chart_arrangement_at(
         .map_err(map_focused_chart_arrangement_error)
 }
 
-fn focused_chart_arrangements(
-    editor: &NumbersEditor,
-    sheet_id: u64,
-) -> Result<Box<[ChartArrangement]>> {
+fn focused_chart_arrangements(editor: &Editor, sheet_id: u64) -> Result<Box<[ChartArrangement]>> {
     let sheet_index = sheet_index(editor, sheet_id)?;
     focused_chart_arrangement_package(editor)?
         .sheet_chart_arrangements(SheetSelector::index(sheet_index))
         .map_err(map_focused_chart_arrangement_error)
 }
 
-fn focused_chart_arrangement_package(editor: &NumbersEditor) -> Result<FocusedNumbersPackage> {
+fn focused_chart_arrangement_package(editor: &Editor) -> Result<FocusedNumbersPackage> {
     let bytes = editor.to_bytes()?;
     FocusedNumbersPackage::from_bytes(&bytes).map_err(|error| {
         Error::InvalidFormat(format!(
@@ -102,7 +99,7 @@ fn map_focused_chart_arrangement_error(
     ))
 }
 
-fn sheet_index(editor: &NumbersEditor, sheet_id: u64) -> Result<usize> {
+fn sheet_index(editor: &Editor, sheet_id: u64) -> Result<usize> {
     editor
         .sheets()?
         .into_iter()
@@ -114,7 +111,7 @@ fn sheet_index(editor: &NumbersEditor, sheet_id: u64) -> Result<usize> {
 /// Resolve a host chart graph to the focused package's semantic sheet and
 /// chart positions. Native identifiers remain private to this adapter.
 pub(super) fn focused_chart_data_target(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<(usize, usize)> {
@@ -127,7 +124,7 @@ pub(super) fn focused_chart_data_target(
 /// the host's source-order ownership checks. This is intentionally private;
 /// focused callers only receive `ChartSelector` positions.
 fn chart_position(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<(usize, usize)> {
@@ -350,7 +347,7 @@ mod tests {
 
         let mut candidate_bytes = Vec::new();
         changed.package().write_to(&mut candidate_bytes).unwrap();
-        let reopened = NumbersEditor::from_bytes(&candidate_bytes).unwrap();
+        let reopened = Editor::from_bytes(&candidate_bytes).unwrap();
         let mut expected_listing = baseline_listing.clone();
         expected_listing[TARGET_POSITION].arrangement = replacement;
         assert_eq!(reopened.sheet_charts(sheet_id).unwrap(), expected_listing);
@@ -365,7 +362,7 @@ mod tests {
     }
 
     fn set_focused_arrangement(
-        editor: &mut NumbersEditor,
+        editor: &mut Editor,
         chart_position: usize,
         arrangement: ChartArrangement,
     ) {
@@ -381,7 +378,7 @@ mod tests {
             .unwrap();
         let mut bytes = Vec::new();
         commit.package().write_to(&mut bytes).unwrap();
-        *editor = NumbersEditor::from_bytes(&bytes).unwrap();
+        *editor = Editor::from_bytes(&bytes).unwrap();
     }
 
     fn data() -> ChartData {

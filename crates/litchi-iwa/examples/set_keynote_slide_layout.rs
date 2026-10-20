@@ -1,6 +1,6 @@
 use std::env;
 
-use litchi_iwa::keynote::KeynoteEditor;
+use litchi_iwa::keynote;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = env::args().skip(1);
@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("too many arguments".into());
     }
 
-    let mut editor = KeynoteEditor::open(input)?;
+    let mut editor = keynote::Editor::open(input)?;
     let layouts = editor.slide_layouts()?;
     let matches = layouts
         .iter()

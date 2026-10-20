@@ -2,12 +2,8 @@
 
 use std::env;
 
-use litchi_iwa::keynote::{KeynoteEditor, KeynoteSlideTextRole};
+use litchi_iwa::keynote::{self};
 
-#[expect(
-    deprecated,
-    reason = "demonstrates the legacy raw-ID Keynote editor API, which takes native object IDs; litchi_keynote::Package has no equivalent text-box route yet"
-)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
     let input = arguments.next().ok_or(
@@ -21,11 +17,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = KeynoteEditor::open(input)?;
+    let mut editor = keynote::Editor::open(input)?;
     let source = editor
         .slide_text_storages(slide_index)?
         .into_iter()
-        .filter(|item| item.role == KeynoteSlideTextRole::TextBox)
+        .filter(|item| item.role == keynote::SlideTextRole::TextBox)
         .nth(text_box_index)
         .ok_or("text-box index is out of bounds")?;
     let created = editor.duplicate_slide_text_box(slide_index, source.drawable_object_id, &text)?;

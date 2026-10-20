@@ -23,7 +23,7 @@ use graph::*;
 
 /// Semantic role of an image drawable owned directly by a Keynote slide.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteSlideImageKind {
+pub enum SlideImageKind {
     /// Ordinary file-backed image inserted by the user or this crate.
     File,
     /// Image materialized from the selected slide layout.
@@ -32,10 +32,10 @@ pub enum KeynoteSlideImageKind {
 
 /// One image drawable owned directly by a Keynote slide.
 #[derive(Debug, Clone, PartialEq)]
-pub struct KeynoteSlideImageInfo {
+pub struct SlideImageInfo {
     pub slide_index: usize,
     pub drawable_object_id: u64,
-    pub kind: KeynoteSlideImageKind,
+    pub kind: SlideImageKind,
     /// Embedded image data referenced by this drawable.
     pub image_data_identifier: MediaAssetId,
     /// Embedded thumbnail data, when the native archive provides one.
@@ -52,14 +52,14 @@ pub struct KeynoteSlideImageInfo {
 /// Result of removing one slide-owned image and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedKeynoteSlideImage {
-    pub image: KeynoteSlideImageInfo,
+    pub image: SlideImageInfo,
     /// Assets culled because the removed image held their final package reference.
     pub removed_data_identifiers: Vec<MediaAssetId>,
 }
 
-impl KeynoteEditor {
+impl Editor {
     /// List image drawables directly owned by one slide in drawable order.
-    pub fn slide_images(&self, slide_index: usize) -> Result<Vec<KeynoteSlideImageInfo>> {
+    pub fn slide_images(&self, slide_index: usize) -> Result<Vec<SlideImageInfo>> {
         image_infos(self, slide_index)
     }
 
@@ -74,7 +74,7 @@ impl KeynoteEditor {
         preferred_filename: &str,
         data: &[u8],
         options: ImageOptions,
-    ) -> Result<KeynoteSlideImageInfo> {
+    ) -> Result<SlideImageInfo> {
         let geometry = image_creation_values(options)?;
         let context = image_creation_context(self, slide_index)?;
         let ids = ImageObjectIds::allocate(next_object_identifier(self.package())?)?;
@@ -133,7 +133,7 @@ impl KeynoteEditor {
                 Error::InvalidFormat("Keynote image creation failed validation".to_owned())
             })?;
         let created_graph = image_graph(&verified, slide_index, ids.drawable)?;
-        if created.kind != KeynoteSlideImageKind::File
+        if created.kind != SlideImageKind::File
             || created.image_data_identifier != asset.data_identifier
             || created.geometry != geometry
             || created.original_size != Some(options.natural_size())
@@ -374,7 +374,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         source_drawable_object_id: u64,
-    ) -> Result<KeynoteSlideImageInfo> {
+    ) -> Result<SlideImageInfo> {
         let source = require_file_image(self, slide_index, source_drawable_object_id)?;
         let mut staged = self.package().clone();
         let first_identifier = next_object_identifier(&staged)?;
@@ -465,7 +465,7 @@ impl KeynoteEditor {
                 Ok((data_identifier, new_object_identifier))
             })
             .collect::<Result<Vec<_>>>()?;
-        if created.kind != KeynoteSlideImageKind::File
+        if created.kind != SlideImageKind::File
             || created.image_data_identifier != source.info.image_data_identifier
             || created.thumbnail_data_identifier != source.info.thumbnail_data_identifier
             || created.geometry != geometry
@@ -581,7 +581,7 @@ impl KeynoteEditor {
 }
 
 fn set_slide_image_caption(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     text: &str,
@@ -619,7 +619,7 @@ fn set_slide_image_caption(
         set_package_last_object_identifier(&mut staged, ids.last())?;
         staged
     };
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     let actual = verified.slide_image_title_caption(slide_index, drawable_object_id)?;
     let expected = match kind {
         DrawableCaptionKind::Caption => crate::DrawableTitleCaption {
@@ -641,7 +641,7 @@ fn set_slide_image_caption(
 }
 
 fn remove_slide_image_caption(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     kind: DrawableCaptionKind,
@@ -663,7 +663,7 @@ fn remove_slide_image_caption(
     )?;
     add_component_object_uuids(&mut staged, source.component_id, &[standin_id])?;
     set_package_last_object_identifier(&mut staged, standin_id)?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     let actual = verified.slide_image_title_caption(slide_index, drawable_object_id)?;
     let expected = match kind {
         DrawableCaptionKind::Caption => crate::DrawableTitleCaption {
@@ -726,7 +726,7 @@ mod tests {
         let created = editor
             .add_slide_image(0, "lena.png", &original, options())
             .unwrap();
-        assert_eq!(created.kind, KeynoteSlideImageKind::File);
+        assert_eq!(created.kind, SlideImageKind::File);
         assert_eq!(created.thumbnail_data_identifier, None);
         assert_eq!(created.original_size, Some(NATURAL_IMAGE_SIZE));
         assert_eq!(created.natural_size, Some(NATURAL_IMAGE_SIZE));
@@ -735,7 +735,7 @@ mod tests {
             original
         );
 
-        let roundtripped = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let roundtripped = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             roundtripped.slide_images(0).unwrap(),
             std::slice::from_ref(&created)
@@ -846,7 +846,7 @@ mod tests {
             .unwrap();
         let mut changed_bytes = Vec::new();
         changed.package().write_to(&mut changed_bytes).unwrap();
-        editor = KeynoteEditor::from_bytes(&changed_bytes).unwrap();
+        editor = Editor::from_bytes(&changed_bytes).unwrap();
         assert_eq!(
             editor.slide_images(0).unwrap()[0].image_adjustments,
             changed_adjustments
@@ -865,7 +865,7 @@ mod tests {
             .unwrap();
         let mut restored_bytes = Vec::new();
         restored.package().write_to(&mut restored_bytes).unwrap();
-        editor = KeynoteEditor::from_bytes(&restored_bytes).unwrap();
+        editor = Editor::from_bytes(&restored_bytes).unwrap();
         assert_eq!(
             editor.slide_images(0).unwrap()[0].image_adjustments,
             created.image_adjustments
@@ -894,7 +894,7 @@ mod tests {
         );
         assert!(editor.slide_images(0).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
@@ -958,7 +958,7 @@ mod tests {
         editor
             .set_slide_image_caption(0, image.drawable_object_id, "Recreated caption")
             .unwrap();
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_image_title_caption(0, image.drawable_object_id)
@@ -1019,7 +1019,7 @@ mod tests {
                 .iter()
                 .all(|identifier| !duplicate_graph.uuid_object_ids.contains(identifier))
         );
-        assert_eq!(duplicate.kind, KeynoteSlideImageKind::File);
+        assert_eq!(duplicate.kind, SlideImageKind::File);
         assert_eq!(duplicate.slide_index, source.slide_index);
         assert_eq!(
             duplicate.image_data_identifier,
@@ -1106,7 +1106,7 @@ mod tests {
             editor.extract_media(source.image_data_identifier).unwrap(),
             replacement
         );
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.slide_images(0).unwrap().len(), 2);
         assert_eq!(
             reopened
@@ -1133,7 +1133,7 @@ mod tests {
         );
         assert!(editor.slide_images(0).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]

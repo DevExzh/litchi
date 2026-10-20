@@ -1,13 +1,13 @@
 use std::env;
 
-use litchi_iwa::keynote::KeynoteEditor;
+use litchi_iwa::keynote;
 use litchi_keynote::slide::table::dimension::Dimension;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = env::args()
         .nth(1)
         .ok_or("usage: list_keynote_tables <presentation.key>")?;
-    let editor = KeynoteEditor::open(input)?;
+    let editor = keynote::Editor::open(input)?;
     let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
     for slide in editor.slides()? {
         for (table_index, info) in editor.slide_tables(slide.index)?.into_iter().enumerate() {

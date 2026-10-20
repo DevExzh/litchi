@@ -2,11 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::keynote::{
-    BuildAcceleration, BuildStart, KeynoteBuildSettings, KeynoteEditor, KeynoteFlipDirection,
-    KeynoteHorizontalBuildDirection, KeynoteJiggleIntensity, KeynoteKeyboardDirection,
-    KeynoteMotionPath, KeynoteMotionPathPoint, KeynoteRotationDirection, KeynoteSwooshDirection,
-};
+use litchi_iwa::keynote::{self, BuildAcceleration, BuildStart};
 use litchi_keynote::{Seconds, build};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -17,12 +13,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let operation = arguments.next().ok_or(usage())?;
     let object_id = arguments.next().ok_or(usage())?.parse::<u64>()?;
 
-    let mut editor = KeynoteEditor::open(input)?;
+    let mut editor = keynote::Editor::open(input)?;
     match operation.as_str() {
         "add" => {
             let mut settings = match arguments.next().as_deref() {
-                None | Some("in") => KeynoteBuildSettings::appear_in(),
-                Some("out") => KeynoteBuildSettings::appear_out(),
+                None | Some("in") => keynote::BuildSettings::appear_in(),
+                Some("out") => keynote::BuildSettings::appear_out(),
                 Some(_) => return Err(usage().into()),
             };
             if let Some(effect) = arguments.next() {
@@ -40,11 +36,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "add-rotate" => {
             let total_degrees = arguments.next().ok_or(usage())?.parse()?;
             let direction = match arguments.next().ok_or(usage())?.as_str() {
-                "clockwise" => KeynoteRotationDirection::Clockwise,
-                "counterclockwise" => KeynoteRotationDirection::Counterclockwise,
+                "clockwise" => keynote::RotationDirection::Clockwise,
+                "counterclockwise" => keynote::RotationDirection::Counterclockwise,
                 _ => return Err(usage().into()),
             };
-            let mut settings = KeynoteBuildSettings::rotate_action(total_degrees, direction);
+            let mut settings = keynote::BuildSettings::rotate_action(total_degrees, direction);
             if let Some(acceleration) = arguments.next() {
                 settings.set_action_acceleration(parse_acceleration(&acceleration)?)?;
             }
@@ -59,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         "add-scale" => {
             let scale_factor = arguments.next().ok_or(usage())?.parse()?;
-            let mut settings = KeynoteBuildSettings::scale_action(scale_factor);
+            let mut settings = keynote::BuildSettings::scale_action(scale_factor);
             if let Some(acceleration) = arguments.next() {
                 settings.set_action_acceleration(parse_acceleration(&acceleration)?)?;
             }
@@ -74,7 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         "add-opacity" => {
             let opacity_percent = arguments.next().ok_or(usage())?.parse()?;
-            let mut settings = KeynoteBuildSettings::opacity_action(opacity_percent);
+            let mut settings = keynote::BuildSettings::opacity_action(opacity_percent);
             if let Some(acceleration) = arguments.next() {
                 settings.set_action_acceleration(parse_acceleration(&acceleration)?)?;
             }
@@ -95,7 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "no-align" => false,
                 _ => return Err(usage().into()),
             };
-            let mut settings = KeynoteBuildSettings::move_action(delta_x, delta_y);
+            let mut settings = keynote::BuildSettings::move_action(delta_x, delta_y);
             settings.set_move_alignment(align_to_path)?;
             if let Some(acceleration) = arguments.next() {
                 settings.set_action_acceleration(parse_acceleration(&acceleration)?)?;
@@ -116,13 +112,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let control_1_y = arguments.next().ok_or(usage())?.parse()?;
             let control_2_x = arguments.next().ok_or(usage())?.parse()?;
             let control_2_y = arguments.next().ok_or(usage())?.parse()?;
-            let mut path = KeynoteMotionPath::straight(delta_x, delta_y);
+            let mut path = keynote::MotionPath::straight(delta_x, delta_y);
             path.subpaths[0].nodes[0].out_control_point =
-                KeynoteMotionPathPoint::new(control_1_x, control_1_y);
+                keynote::MotionPathPoint::new(control_1_x, control_1_y);
             path.subpaths[0].nodes[1].in_control_point =
-                KeynoteMotionPathPoint::new(control_2_x, control_2_y);
+                keynote::MotionPathPoint::new(control_2_x, control_2_y);
             path.recalculate_natural_size();
-            let settings = KeynoteBuildSettings::move_along_path(path);
+            let settings = keynote::BuildSettings::move_along_path(path);
             let build = editor.add_slide_build(slide_index, object_id, settings)?;
             println!(
                 "added Bézier Move action {} with chunk {}",
@@ -136,7 +132,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &mut editor,
                 slide_index,
                 object_id,
-                KeynoteBuildSettings::blink_action(repeat_count, fade),
+                keynote::BuildSettings::blink_action(repeat_count, fade),
                 arguments.next(),
                 "Blink",
             )?;
@@ -152,7 +148,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &mut editor,
                 slide_index,
                 object_id,
-                KeynoteBuildSettings::bounce_action(repeat_count, decay),
+                keynote::BuildSettings::bounce_action(repeat_count, decay),
                 arguments.next(),
                 "Bounce",
             )?;
@@ -160,31 +156,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "add-flip" => {
             let repeat_count = arguments.next().ok_or(usage())?.parse()?;
             let direction = match arguments.next().ok_or(usage())?.as_str() {
-                "left-to-right" => KeynoteFlipDirection::LeftToRight,
-                "right-to-left" => KeynoteFlipDirection::RightToLeft,
+                "left-to-right" => keynote::FlipDirection::LeftToRight,
+                "right-to-left" => keynote::FlipDirection::RightToLeft,
                 _ => return Err(usage().into()),
             };
             add_typed_build(
                 &mut editor,
                 slide_index,
                 object_id,
-                KeynoteBuildSettings::flip_action(repeat_count, direction),
+                keynote::BuildSettings::flip_action(repeat_count, direction),
                 arguments.next(),
                 "Flip",
             )?;
         },
         "add-jiggle" => {
             let intensity = match arguments.next().ok_or(usage())?.as_str() {
-                "small" => KeynoteJiggleIntensity::Small,
-                "medium" => KeynoteJiggleIntensity::Medium,
-                "large" => KeynoteJiggleIntensity::Large,
+                "small" => keynote::JiggleIntensity::Small,
+                "medium" => keynote::JiggleIntensity::Medium,
+                "large" => keynote::JiggleIntensity::Large,
                 _ => return Err(usage().into()),
             };
             add_typed_build(
                 &mut editor,
                 slide_index,
                 object_id,
-                KeynoteBuildSettings::jiggle_action(intensity),
+                keynote::BuildSettings::jiggle_action(intensity),
                 arguments.next(),
                 "Jiggle",
             )?;
@@ -195,7 +191,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &mut editor,
                 slide_index,
                 object_id,
-                KeynoteBuildSettings::pop_action(scale_percent),
+                keynote::BuildSettings::pop_action(scale_percent),
                 arguments.next(),
                 "Pop",
             )?;
@@ -207,15 +203,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &mut editor,
                 slide_index,
                 object_id,
-                KeynoteBuildSettings::pulse_action(repeat_count, scale_percent),
+                keynote::BuildSettings::pulse_action(repeat_count, scale_percent),
                 arguments.next(),
                 "Pulse",
             )?;
         },
         "add-keyboard-in" | "add-keyboard-out" => {
             let direction = match arguments.next().ok_or(usage())?.as_str() {
-                "forward" => KeynoteKeyboardDirection::Forward,
-                "backward" => KeynoteKeyboardDirection::Backward,
+                "forward" => keynote::KeyboardDirection::Forward,
+                "backward" => keynote::KeyboardDirection::Backward,
                 _ => return Err(usage().into()),
             };
             let show_cursor = parse_toggle(
@@ -224,9 +220,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "no-cursor",
             )?;
             let settings = if operation == "add-keyboard-in" {
-                KeynoteBuildSettings::keyboard_in(direction, show_cursor)
+                keynote::BuildSettings::keyboard_in(direction, show_cursor)
             } else {
-                KeynoteBuildSettings::keyboard_out(direction, show_cursor)
+                keynote::BuildSettings::keyboard_out(direction, show_cursor)
             };
             add_typed_build(
                 &mut editor,
@@ -239,9 +235,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         "add-shimmer-in" | "add-shimmer-out" => {
             let settings = if operation == "add-shimmer-in" {
-                KeynoteBuildSettings::shimmer_in()
+                keynote::BuildSettings::shimmer_in()
             } else {
-                KeynoteBuildSettings::shimmer_out()
+                keynote::BuildSettings::shimmer_out()
             };
             add_typed_build(
                 &mut editor,
@@ -254,9 +250,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         "add-dissolve-in" | "add-dissolve-out" => {
             let settings = if operation == "add-dissolve-in" {
-                KeynoteBuildSettings::dissolve_in()
+                keynote::BuildSettings::dissolve_in()
             } else {
-                KeynoteBuildSettings::dissolve_out()
+                keynote::BuildSettings::dissolve_out()
             };
             add_typed_build(
                 &mut editor,
@@ -269,15 +265,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         "add-skid-in" | "add-skid-out" | "add-trace-in" | "add-trace-out" => {
             let direction = match arguments.next().ok_or(usage())?.as_str() {
-                "left-to-right" => KeynoteHorizontalBuildDirection::LeftToRight,
-                "right-to-left" => KeynoteHorizontalBuildDirection::RightToLeft,
+                "left-to-right" => keynote::HorizontalBuildDirection::LeftToRight,
+                "right-to-left" => keynote::HorizontalBuildDirection::RightToLeft,
                 _ => return Err(usage().into()),
             };
             let settings = match operation.as_str() {
-                "add-skid-in" => KeynoteBuildSettings::skid_in(direction),
-                "add-skid-out" => KeynoteBuildSettings::skid_out(direction),
-                "add-trace-in" => KeynoteBuildSettings::trace_in(direction),
-                "add-trace-out" => KeynoteBuildSettings::trace_out(direction),
+                "add-skid-in" => keynote::BuildSettings::skid_in(direction),
+                "add-skid-out" => keynote::BuildSettings::skid_out(direction),
+                "add-trace-in" => keynote::BuildSettings::trace_in(direction),
+                "add-trace-out" => keynote::BuildSettings::trace_out(direction),
                 _ => unreachable!(),
             };
             add_typed_build(
@@ -295,15 +291,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         "add-swoosh-in" | "add-swoosh-out" => {
             let direction = match arguments.next().ok_or(usage())?.as_str() {
-                "center" => KeynoteSwooshDirection::Center,
-                "from-left" => KeynoteSwooshDirection::FromLeft,
-                "from-right" => KeynoteSwooshDirection::FromRight,
+                "center" => keynote::SwooshDirection::Center,
+                "from-left" => keynote::SwooshDirection::FromLeft,
+                "from-right" => keynote::SwooshDirection::FromRight,
                 _ => return Err(usage().into()),
             };
             let settings = if operation == "add-swoosh-in" {
-                KeynoteBuildSettings::swoosh_in(direction)
+                keynote::BuildSettings::swoosh_in(direction)
             } else {
-                KeynoteBuildSettings::swoosh_out(direction)
+                keynote::BuildSettings::swoosh_out(direction)
             };
             add_typed_build(
                 &mut editor,
@@ -402,10 +398,10 @@ fn usage() -> &'static str {
 }
 
 fn add_typed_build(
-    editor: &mut KeynoteEditor,
+    editor: &mut keynote::Editor,
     slide_index: usize,
     object_id: u64,
-    mut settings: KeynoteBuildSettings,
+    mut settings: keynote::BuildSettings,
     duration: Option<String>,
     name: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {

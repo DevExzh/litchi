@@ -10,7 +10,7 @@ use crate::{IWorkPackage, IWorkThemeArchive, IWorkThemeExtensions, Result};
 use plist::Value;
 use prost::Message;
 
-use super::editor::KeynoteEditor;
+use super::editor::Editor;
 
 mod slide_number;
 
@@ -402,8 +402,8 @@ impl Builder {
     }
 
     /// Build a mutable editor for the generated presentation.
-    pub fn build(self) -> Result<KeynoteEditor> {
-        KeynoteEditor::from_package(self.build_package()?)
+    pub fn build(self) -> Result<Editor> {
+        Editor::from_package(self.build_package()?)
     }
 
     /// Build the underlying package for lower-level IWA manipulation.
@@ -568,7 +568,7 @@ fn install_table_template(package: &mut IWorkPackage, language: &str, locale: &s
     Ok(())
 }
 
-impl KeynoteEditor {
+impl Editor {
     pub fn builder() -> Builder {
         Builder::new()
     }
@@ -2040,7 +2040,7 @@ mod tests {
         let mut notes = body.package().edit_slide_notes(selector).unwrap();
         notes.set("Notes").unwrap();
         let notes = notes.commit().unwrap();
-        let reopened = KeynoteEditor::from_bytes(&focused_bytes(notes.package())).unwrap();
+        let reopened = Editor::from_bytes(&focused_bytes(notes.package())).unwrap();
         let slide = &reopened.slides().unwrap()[0];
         assert_eq!(slide.title.as_deref(), Some("Updated"));
         assert_eq!(slide.body.as_deref(), Some("Body"));
@@ -2049,7 +2049,7 @@ mod tests {
 
     #[test]
     fn generated_presentation_can_add_slides() {
-        let mut editor = KeynoteEditor::create().unwrap();
+        let mut editor = Editor::create().unwrap();
         let layout = editor.default_slide_layout().unwrap();
         let created = editor.add_slide(layout).unwrap();
         assert_eq!(created.index, 1);
@@ -2070,7 +2070,7 @@ mod tests {
         notes.set("Created notes").unwrap();
         let notes = notes.commit().unwrap();
 
-        let editor = KeynoteEditor::from_bytes(&focused_bytes(notes.package())).unwrap();
+        let editor = Editor::from_bytes(&focused_bytes(notes.package())).unwrap();
         let slides = editor.slides().unwrap();
         let created = &slides[1];
         assert_eq!(created.title.as_deref(), Some("Second — 東京"));
@@ -2080,7 +2080,7 @@ mod tests {
 
     #[test]
     fn focused_slide_deletion_rejects_generated_child_backlinks_atomically() {
-        let mut editor = KeynoteEditor::create().unwrap();
+        let mut editor = Editor::create().unwrap();
         let layout = editor.default_slide_layout().unwrap();
         editor.add_slide(layout).unwrap();
 
@@ -2108,7 +2108,7 @@ mod tests {
 
     #[test]
     fn generated_presentation_materializes_native_slide_number_placeholders() {
-        let hidden = KeynoteEditor::create().unwrap();
+        let hidden = Editor::create().unwrap();
         let hidden = FocusedKeynotePackage::from_bytes(&hidden.to_bytes().unwrap()).unwrap();
         assert_eq!(
             hidden

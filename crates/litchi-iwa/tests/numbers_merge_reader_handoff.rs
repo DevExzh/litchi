@@ -7,10 +7,7 @@
 
 use std::error::Error as StdError;
 
-use litchi_iwa::{
-    Error as IwaError,
-    numbers::{self, NumbersEditor},
-};
+use litchi_iwa::{Error as IwaError, numbers};
 use litchi_iwa_archive::{
     Limits as ArchiveLimits,
     iwa::{Archive, RawMessage, SnappyStream},
@@ -36,7 +33,7 @@ fn expected_merges() -> Vec<Region> {
     vec![Region::new(10, 1, 2, 2).expect("native merge geometry is valid")]
 }
 
-fn native_table_model_id(editor: &NumbersEditor) -> TestResult<u64> {
+fn native_table_model_id(editor: &numbers::Editor) -> TestResult<u64> {
     let mut model_ids = Vec::new();
     for name in editor.package().iwa_entry_names() {
         for object in editor.package().archive(name)?.objects {
@@ -220,7 +217,7 @@ fn host_merge_read_matches_focused_reader_and_preserves_native_bytes() -> TestRe
         expected
     );
 
-    let host = NumbersEditor::from_bytes(NATIVE)?;
+    let host = numbers::Editor::from_bytes(NATIVE)?;
     let model_id = native_table_model_id(&host)?;
     assert_eq!(host.table_cell_merges(model_id)?, expected);
     assert_eq!(host.to_bytes()?, NATIVE);
@@ -241,7 +238,7 @@ fn host_merge_read_does_not_materialize_unneeded_bnc_tiles() -> TestResult {
         "focused metadata reads must stop before the selected table tile"
     );
 
-    let host = NumbersEditor::from_bytes(&malformed)?;
+    let host = numbers::Editor::from_bytes(&malformed)?;
     let model_id = native_table_model_id(&host)?;
     assert_eq!(
         host.table_cell_merges(model_id)?,
@@ -256,7 +253,7 @@ fn host_merge_read_does_not_materialize_unneeded_bnc_tiles() -> TestResult {
 fn host_merge_read_retains_source_after_input_path_is_removed() -> TestResult {
     let file = tempfile::NamedTempFile::new()?;
     std::fs::write(file.path(), NATIVE)?;
-    let host = NumbersEditor::open(file.path())?;
+    let host = numbers::Editor::open(file.path())?;
     let model_id = native_table_model_id(&host)?;
     drop(file);
 
@@ -274,7 +271,7 @@ fn host_merge_read_does_not_mask_a_focused_root_edge_error() -> TestResult {
         Err(litchi_numbers::table::merge::transaction::Error::InvalidSource)
     ));
 
-    let host = NumbersEditor::from_bytes(&malformed)?;
+    let host = numbers::Editor::from_bytes(&malformed)?;
     let error = host
         .table_cell_merges(table_id)
         .expect_err("the focused handoff must reject an undeclared model edge");

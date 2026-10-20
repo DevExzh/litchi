@@ -114,7 +114,7 @@ fn fixture(relative: &str) -> Vec<u8> {
 /// complete Pages body-chart graph. The title transaction must reject it
 /// before publication, after the graph checks have succeeded.
 fn mutate_pages_chart_non_style(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     mutate: impl FnOnce(&mut Vec<u8>),
 ) {
@@ -158,10 +158,10 @@ fn mutate_pages_chart_non_style(
             Ok(())
         })
         .unwrap();
-    *editor = PagesEditor::from_package(package).unwrap();
+    *editor = Editor::from_package(package).unwrap();
 }
 
-fn pages_chart_non_style_data(editor: &PagesEditor, drawable_object_id: u64) -> Vec<u8> {
+fn pages_chart_non_style_data(editor: &Editor, drawable_object_id: u64) -> Vec<u8> {
     let graph = body_chart_graph(editor, drawable_object_id).unwrap();
     let archive = editor.package().archive(&graph.archive_name).unwrap();
     let chart_object = archive.object(drawable_object_id).unwrap();
@@ -188,7 +188,7 @@ fn pages_chart_non_style_data(editor: &PagesEditor, drawable_object_id: u64) -> 
         .clone()
 }
 
-fn pages_chart_caption_data(editor: &PagesEditor, drawable_object_id: u64) -> Vec<u8> {
+fn pages_chart_caption_data(editor: &Editor, drawable_object_id: u64) -> Vec<u8> {
     let graph = body_chart_graph(editor, drawable_object_id).unwrap();
     let archive = editor.package().archive(&graph.archive_name).unwrap();
     archive
@@ -203,7 +203,7 @@ fn pages_chart_caption_data(editor: &PagesEditor, drawable_object_id: u64) -> Ve
 }
 
 fn mutate_pages_chart_caption(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     mutate: impl FnOnce(&mut Vec<u8>),
 ) {
@@ -231,7 +231,7 @@ fn mutate_pages_chart_caption(
             Ok(())
         })
         .unwrap();
-    *editor = PagesEditor::from_package(package).unwrap();
+    *editor = Editor::from_package(package).unwrap();
 }
 
 fn raw_fields(data: &[u8], number: u32) -> Vec<Vec<u8>> {
@@ -259,7 +259,7 @@ fn test_varint_width(value: u64) -> usize {
     test_encode_varint(value).len()
 }
 
-fn pages_chart_caption_reference(editor: &PagesEditor, drawable_object_id: u64) -> u64 {
+fn pages_chart_caption_reference(editor: &Editor, drawable_object_id: u64) -> u64 {
     let data = pages_chart_caption_data(editor, drawable_object_id);
     pages_chart_caption_reference_from_data(&data)
 }
@@ -276,7 +276,7 @@ fn pages_chart_caption_reference_from_data(data: &[u8]) -> u64 {
 }
 
 fn pages_chart_caption_reference_in_archive(
-    editor: &PagesEditor,
+    editor: &Editor,
     archive_name: &str,
     drawable_object_id: u64,
 ) -> u64 {
@@ -294,7 +294,7 @@ fn pages_chart_caption_reference_in_archive(
 }
 
 fn pages_chart_message_info(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
 ) -> crate::archive::MessageInfo {
     let graph = body_chart_graph(editor, drawable_object_id).unwrap();
@@ -308,11 +308,7 @@ fn pages_chart_message_info(
     object.archive_info.message_infos[message_index].clone()
 }
 
-fn pages_archive_header(
-    editor: &PagesEditor,
-    archive_name: &str,
-    object_identifier: u64,
-) -> Vec<u8> {
+fn pages_archive_header(editor: &Editor, archive_name: &str, object_identifier: u64) -> Vec<u8> {
     let compressed = editor.package().entry(archive_name).unwrap();
     let source = crate::snappy::SnappyStream::decompress(compressed)
         .unwrap()
@@ -340,7 +336,7 @@ fn test_decode_varint(source: &[u8]) -> (usize, usize) {
 }
 
 fn inject_pages_archive_unknown_header(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     archive_name: &str,
     object_identifier: u64,
 ) -> Vec<u8> {
@@ -374,11 +370,11 @@ fn inject_pages_archive_unknown_header(
             crate::snappy::SnappyStream::compress(&rewritten).unwrap(),
         )
         .unwrap();
-    *editor = PagesEditor::from_package(package).unwrap();
+    *editor = Editor::from_package(package).unwrap();
     unknown
 }
 
-fn reserve_pages_three_byte_caption_identifier(editor: &mut PagesEditor, archive_name: &str) {
+fn reserve_pages_three_byte_caption_identifier(editor: &mut Editor, archive_name: &str) {
     let next = crate::package_metadata::next_object_identifier(editor.package()).unwrap();
     if next < 16_383 {
         let mut package = editor.package().clone();
@@ -394,12 +390,12 @@ fn reserve_pages_three_byte_caption_identifier(editor: &mut PagesEditor, archive
                 Ok(())
             })
             .unwrap();
-        *editor = PagesEditor::from_package(package).unwrap();
+        *editor = Editor::from_package(package).unwrap();
     }
 }
 
 fn mutate_pages_caption_metadata(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     old_reference_id: u64,
     replacement_id: u64,
@@ -474,7 +470,7 @@ fn mutate_pages_caption_metadata(
             Ok(())
         })
         .unwrap();
-    *editor = PagesEditor::from_package(package).unwrap();
+    *editor = Editor::from_package(package).unwrap();
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -489,7 +485,7 @@ enum PagesCaptionMetadataMode {
     AuthorizedField,
 }
 
-fn pages_caption_storage_id(editor: &PagesEditor, drawable_object_id: u64) -> u64 {
+fn pages_caption_storage_id(editor: &Editor, drawable_object_id: u64) -> u64 {
     let reference_id = pages_chart_caption_reference(editor, drawable_object_id);
     let archive_name = find_object_archive(editor.package(), reference_id).unwrap();
     let archive = editor.package().archive(&archive_name).unwrap();
@@ -509,7 +505,7 @@ fn pages_caption_storage_id(editor: &PagesEditor, drawable_object_id: u64) -> u6
 }
 
 fn make_pages_caption_storage_shared(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     source_drawable_object_id: u64,
     shared_drawable_object_id: u64,
 ) {
@@ -562,11 +558,11 @@ fn make_pages_caption_storage_shared(
             Ok(())
         })
         .unwrap();
-    *editor = PagesEditor::from_package(package).unwrap();
+    *editor = Editor::from_package(package).unwrap();
 }
 
 fn make_pages_caption_info_shared(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     source_drawable_object_id: u64,
     shared_drawable_object_id: u64,
 ) {
@@ -612,11 +608,11 @@ fn make_pages_caption_info_shared(
             Ok(())
         })
         .unwrap();
-    *editor = PagesEditor::from_package(package).unwrap();
+    *editor = Editor::from_package(package).unwrap();
 }
 
 fn move_pages_caption_aggregate_owner_to_unrelated_object(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     unrelated_object_id: u64,
 ) {
@@ -647,7 +643,7 @@ fn move_pages_caption_aggregate_owner_to_unrelated_object(
             Ok(())
         })
         .unwrap();
-    *editor = PagesEditor::from_package(package).unwrap();
+    *editor = Editor::from_package(package).unwrap();
 }
 
 fn assert_only_title_fields_changed(before: &[u8], after: &[u8]) {
@@ -681,7 +677,7 @@ fn assert_only_title_fields_changed(before: &[u8], after: &[u8]) {
     }
 }
 
-fn mutate_pages_chart_title_standin(editor: &mut PagesEditor, drawable_object_id: u64) {
+fn mutate_pages_chart_title_standin(editor: &mut Editor, drawable_object_id: u64) {
     let graph = body_chart_graph(editor, drawable_object_id).unwrap();
     let archive_name = graph.archive_name.clone();
     let title_id = {
@@ -721,13 +717,10 @@ fn mutate_pages_chart_title_standin(editor: &mut PagesEditor, drawable_object_id
             Ok(())
         })
         .unwrap();
-    *editor = PagesEditor::from_package(package).unwrap();
+    *editor = Editor::from_package(package).unwrap();
 }
 
-fn normalize_private_chart_styles_like_pages(
-    editor: &PagesEditor,
-    drawable_object_id: u64,
-) -> PagesEditor {
+fn normalize_private_chart_styles_like_pages(editor: &Editor, drawable_object_id: u64) -> Editor {
     let graph = body_chart_graph(editor, drawable_object_id).unwrap();
     let source_group = graph
         .archive_groups
@@ -791,12 +784,12 @@ fn normalize_private_chart_styles_like_pages(
         )
         .unwrap();
     }
-    PagesEditor::from_package(package).unwrap()
+    Editor::from_package(package).unwrap()
 }
 
 #[test]
 fn scratch_document_supports_body_chart_crud() {
-    let mut editor = PagesEditor::create_with_text("Quarterly results").unwrap();
+    let mut editor = Editor::create_with_text("Quarterly results").unwrap();
     let anchor = "Quarterly results".encode_utf16().count();
     assert!(editor.body_charts().unwrap().is_empty());
 
@@ -856,7 +849,7 @@ fn scratch_document_supports_body_chart_crud() {
         .set_body_chart_geometry(created.drawable_object_id, changed_geometry)
         .unwrap();
 
-    let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let charts = reopened.body_charts().unwrap();
     assert_eq!(charts.len(), 1);
     assert_eq!(charts[0].kind, Kind::Bar2d);
@@ -870,12 +863,12 @@ fn scratch_document_supports_body_chart_crud() {
     assert_eq!(removed.chart.drawable_object_id, created.drawable_object_id);
     assert_eq!(editor.body_text().unwrap(), "Quarterly results");
     assert!(editor.body_charts().unwrap().is_empty());
-    PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
 }
 
 #[test]
 fn pages_normalized_chart_styles_support_full_lifecycle_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart").unwrap();
+    let mut editor = Editor::create_with_text("Chart").unwrap();
     let source = editor
         .add_body_chart(5, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -904,7 +897,7 @@ fn pages_normalized_chart_styles_support_full_lifecycle_crud() {
         .unwrap();
     editor.remove_body_chart(source.drawable_object_id).unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.body_charts().unwrap().len(), 1);
     assert_eq!(
         reopened
@@ -921,7 +914,7 @@ fn pages_normalized_chart_styles_support_full_lifecycle_crud() {
 
 #[test]
 fn chart_creation_rejects_invalid_inputs_transactionally() {
-    let mut editor = PagesEditor::create_with_text("Body").unwrap();
+    let mut editor = Editor::create_with_text("Body").unwrap();
     let baseline = editor.to_bytes().unwrap();
     assert!(
         editor
@@ -954,7 +947,7 @@ fn chart_creation_rejects_invalid_inputs_transactionally() {
 
 #[test]
 fn removing_an_earlier_chart_preserves_later_chart_and_anchor() {
-    let mut editor = PagesEditor::create_with_text("Body").unwrap();
+    let mut editor = Editor::create_with_text("Body").unwrap();
     let first = editor
         .add_body_chart(4, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -982,7 +975,7 @@ fn removing_an_earlier_chart_preserves_later_chart_and_anchor() {
 
 #[test]
 fn duplicate_body_chart_clones_the_private_graph_and_inline_data() {
-    let mut editor = PagesEditor::create_with_text("Body").unwrap();
+    let mut editor = Editor::create_with_text("Body").unwrap();
     let source = editor
         .add_body_chart(4, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -1060,7 +1053,7 @@ fn duplicate_body_chart_clones_the_private_graph_and_inline_data() {
 
 #[test]
 fn scratch_document_supports_native_chart_caption_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart captions").unwrap();
+    let mut editor = Editor::create_with_text("Chart captions").unwrap();
     let source = editor
         .add_body_chart(
             "Chart captions".encode_utf16().count(),
@@ -1120,7 +1113,7 @@ fn scratch_document_supports_native_chart_caption_crud() {
         None
     );
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_caption(duplicate.drawable_object_id)
@@ -1143,7 +1136,7 @@ fn scratch_document_supports_native_chart_caption_crud() {
 fn pages_chart_caption_rewrite_preserves_unknown_chart_fields() {
     const UNKNOWN_CHART_FIELD: u32 = 4_096;
 
-    let mut editor = PagesEditor::create_with_text("Chart caption wire").unwrap();
+    let mut editor = Editor::create_with_text("Chart caption wire").unwrap();
     let chart = editor
         .add_body_chart(
             "Chart caption wire".encode_utf16().count(),
@@ -1177,7 +1170,7 @@ fn pages_chart_caption_rewrite_preserves_unknown_chart_fields() {
 
 #[test]
 fn pages_chart_caption_retarget_preserves_unknown_archive_header_and_metadata_on_width_growth() {
-    let mut editor = PagesEditor::create_with_text("Chart caption header").unwrap();
+    let mut editor = Editor::create_with_text("Chart caption header").unwrap();
     let chart = editor
         .add_body_chart(
             "Chart caption header".encode_utf16().count(),
@@ -1255,7 +1248,7 @@ fn pages_chart_caption_reference_transition_requires_exact_aggregate_and_field_m
         PagesCaptionMetadataMode::DataReference,
     ];
     for mode in modes {
-        let mut editor = PagesEditor::create_with_text("Chart caption metadata").unwrap();
+        let mut editor = Editor::create_with_text("Chart caption metadata").unwrap();
         let chart = editor
             .add_body_chart(
                 "Chart caption metadata".encode_utf16().count(),
@@ -1286,7 +1279,7 @@ fn pages_chart_caption_reference_transition_requires_exact_aggregate_and_field_m
         assert_eq!(editor.to_bytes().unwrap(), before);
     }
 
-    let mut editor = PagesEditor::create_with_text("Chart caption authorized").unwrap();
+    let mut editor = Editor::create_with_text("Chart caption authorized").unwrap();
     let chart = editor
         .add_body_chart(
             "Chart caption authorized".encode_utf16().count(),
@@ -1331,7 +1324,7 @@ fn pages_chart_caption_reference_transition_requires_exact_aggregate_and_field_m
 
 #[test]
 fn pages_chart_caption_rejects_two_caption_infos_sharing_one_storage_atomically() {
-    let mut editor = PagesEditor::create_with_text("Shared caption storage").unwrap();
+    let mut editor = Editor::create_with_text("Shared caption storage").unwrap();
     let source = editor
         .add_body_chart(
             "Shared caption storage".encode_utf16().count(),
@@ -1366,7 +1359,7 @@ fn pages_chart_caption_rejects_two_caption_infos_sharing_one_storage_atomically(
 
 #[test]
 fn pages_chart_caption_rejects_two_chart_payloads_sharing_one_caption_info_atomically() {
-    let mut editor = PagesEditor::create_with_text("Shared caption info").unwrap();
+    let mut editor = Editor::create_with_text("Shared caption info").unwrap();
     let source = editor
         .add_body_chart(
             "Shared caption info".encode_utf16().count(),
@@ -1421,7 +1414,7 @@ fn pages_chart_caption_rejects_two_chart_payloads_sharing_one_caption_info_atomi
 
 #[test]
 fn pages_chart_caption_rejects_caption_info_owner_on_unrelated_object_atomically() {
-    let mut editor = PagesEditor::create_with_text("Unrelated caption owner").unwrap();
+    let mut editor = Editor::create_with_text("Unrelated caption owner").unwrap();
     let source = editor
         .add_body_chart(
             "Unrelated caption owner".encode_utf16().count(),
@@ -1457,7 +1450,7 @@ fn pages_chart_caption_rejects_caption_info_owner_on_unrelated_object_atomically
 
 #[test]
 fn scratch_document_supports_native_chart_title_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart titles").unwrap();
+    let mut editor = Editor::create_with_text("Chart titles").unwrap();
     let source = editor
         .add_body_chart(
             "Chart titles".encode_utf16().count(),
@@ -1521,7 +1514,7 @@ fn scratch_document_supports_native_chart_title_crud() {
         None
     );
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_title(duplicate.drawable_object_id)
@@ -1545,7 +1538,7 @@ fn pages_chart_title_rewrite_is_field_local_and_lossless() {
     const UNKNOWN_OUTER_FIELD: u32 = 4_096;
     const UNKNOWN_GENERATED_FIELD: u32 = 4_097;
 
-    let mut editor = PagesEditor::create_with_text("Chart titles").unwrap();
+    let mut editor = Editor::create_with_text("Chart titles").unwrap();
     let chart = editor
         .add_body_chart(
             "Chart titles".encode_utf16().count(),
@@ -1609,7 +1602,7 @@ fn pages_chart_title_rewrite_is_field_local_and_lossless() {
 
 #[test]
 fn pages_chart_title_rejects_duplicate_selected_field_without_publication() {
-    let mut editor = PagesEditor::create_with_text("Chart titles").unwrap();
+    let mut editor = Editor::create_with_text("Chart titles").unwrap();
     let chart = editor
         .add_body_chart(
             "Chart titles".encode_utf16().count(),
@@ -1645,7 +1638,7 @@ fn pages_chart_title_rejects_duplicate_selected_field_without_publication() {
 
 #[test]
 fn pages_chart_title_rejects_non_standin_title_graph_without_publication() {
-    let mut editor = PagesEditor::create_with_text("Chart titles").unwrap();
+    let mut editor = Editor::create_with_text("Chart titles").unwrap();
     let chart = editor
         .add_body_chart(
             "Chart titles".encode_utf16().count(),
@@ -1670,7 +1663,7 @@ fn pages_chart_title_rejects_non_standin_title_graph_without_publication() {
 
 #[test]
 fn scratch_document_supports_native_chart_axis_title_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart axis titles").unwrap();
+    let mut editor = Editor::create_with_text("Chart axis titles").unwrap();
     let source = editor
         .add_body_chart(
             "Chart axis titles".encode_utf16().count(),
@@ -1767,7 +1760,7 @@ fn scratch_document_supports_native_chart_axis_title_crud() {
         );
     }
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_axis_title(duplicate.drawable_object_id, Axis::Category)
@@ -1796,7 +1789,7 @@ fn scratch_document_supports_native_chart_axis_title_crud() {
 
 #[test]
 fn scratch_document_supports_native_chart_value_axis_bounds_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart value-axis bounds").unwrap();
+    let mut editor = Editor::create_with_text("Chart value-axis bounds").unwrap();
     let source = editor
         .add_body_chart(
             "Chart value-axis bounds".encode_utf16().count(),
@@ -1848,7 +1841,7 @@ fn scratch_document_supports_native_chart_value_axis_bounds_crud() {
         minimum_only
     );
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_value_axis_bounds(source.drawable_object_id)
@@ -1877,7 +1870,7 @@ fn scratch_document_supports_native_chart_value_axis_bounds_crud() {
 
 #[test]
 fn scratch_document_supports_native_chart_border_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart borders").unwrap();
+    let mut editor = Editor::create_with_text("Chart borders").unwrap();
     let source = editor
         .add_body_chart(
             "Chart borders".encode_utf16().count(),
@@ -1923,7 +1916,7 @@ fn scratch_document_supports_native_chart_border_crud() {
         .set_body_chart_border_visible(source.drawable_object_id, false)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert!(
         !reopened
             .body_chart_border_visible(source.drawable_object_id)
@@ -1945,7 +1938,7 @@ fn scratch_document_supports_native_chart_border_crud() {
 
 #[test]
 fn scratch_document_supports_native_chart_rounded_corner_crud() {
-    let mut editor = PagesEditor::create_with_text("Rounded chart corners").unwrap();
+    let mut editor = Editor::create_with_text("Rounded chart corners").unwrap();
     let source = editor
         .add_body_chart(
             "Rounded chart corners".encode_utf16().count(),
@@ -1996,7 +1989,7 @@ fn scratch_document_supports_native_chart_rounded_corner_crud() {
         .set_body_chart_rounded_corners(source.drawable_object_id, changed)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_rounded_corners(source.drawable_object_id)
@@ -2020,7 +2013,7 @@ fn scratch_document_supports_native_chart_rounded_corner_crud() {
 
 #[test]
 fn scratch_document_supports_native_chart_gap_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart gaps").unwrap();
+    let mut editor = Editor::create_with_text("Chart gaps").unwrap();
     let source = editor
         .add_body_chart(
             "Chart gaps".encode_utf16().count(),
@@ -2064,7 +2057,7 @@ fn scratch_document_supports_native_chart_gap_crud() {
         .set_body_chart_gap_spacing(source.drawable_object_id, changed)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_gap_spacing(source.drawable_object_id)
@@ -2088,7 +2081,7 @@ fn scratch_document_supports_native_chart_gap_crud() {
 
 #[test]
 fn scratch_document_supports_native_chart_value_axis_steps_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart value-axis steps").unwrap();
+    let mut editor = Editor::create_with_text("Chart value-axis steps").unwrap();
     let source = editor
         .add_body_chart(
             "Chart value-axis steps".encode_utf16().count(),
@@ -2146,7 +2139,7 @@ fn scratch_document_supports_native_chart_value_axis_steps_crud() {
         major_only
     );
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_value_axis_steps(source.drawable_object_id)
@@ -2175,7 +2168,7 @@ fn scratch_document_supports_native_chart_value_axis_steps_crud() {
 
 #[test]
 fn scratch_document_supports_native_chart_value_axis_minimum_label_visibility_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart minimum label").unwrap();
+    let mut editor = Editor::create_with_text("Chart minimum label").unwrap();
     let source = editor
         .add_body_chart(
             "Chart minimum label".encode_utf16().count(),
@@ -2232,7 +2225,7 @@ fn scratch_document_supports_native_chart_value_axis_minimum_label_visibility_cr
             AxisVisibility::Visible,
         )
         .unwrap();
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert!(
         reopened
             .body_chart_value_axis_minimum_label_visible(source.drawable_object_id)
@@ -2264,7 +2257,7 @@ fn scratch_document_supports_native_chart_value_axis_minimum_label_visibility_cr
 
 #[test]
 fn scratch_document_supports_native_chart_category_axis_series_names_visibility_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart series names").unwrap();
+    let mut editor = Editor::create_with_text("Chart series names").unwrap();
     let source = editor
         .add_body_chart(
             "Chart series names".encode_utf16().count(),
@@ -2309,7 +2302,7 @@ fn scratch_document_supports_native_chart_category_axis_series_names_visibility_
     editor
         .set_body_chart_category_axis_series_names_visible(source.drawable_object_id, false)
         .unwrap();
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert!(
         !reopened
             .body_chart_category_axis_series_names_visible(source.drawable_object_id)
@@ -2335,7 +2328,7 @@ fn scratch_document_supports_native_chart_category_axis_series_names_visibility_
 
 #[test]
 fn scratch_document_supports_native_chart_axis_label_visibility_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart axis labels").unwrap();
+    let mut editor = Editor::create_with_text("Chart axis labels").unwrap();
     let source = editor
         .add_body_chart(
             "Chart axis labels".encode_utf16().count(),
@@ -2387,7 +2380,7 @@ fn scratch_document_supports_native_chart_axis_label_visibility_crud() {
             .unwrap();
     }
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     for axis in [Axis::Category, Axis::Value] {
         assert!(
             reopened
@@ -2415,7 +2408,7 @@ fn scratch_document_supports_native_chart_axis_label_visibility_crud() {
 
 #[test]
 fn scratch_document_supports_native_chart_axis_line_visibility_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart axis lines").unwrap();
+    let mut editor = Editor::create_with_text("Chart axis lines").unwrap();
     let source = editor
         .add_body_chart(
             "Chart axis lines".encode_utf16().count(),
@@ -2470,7 +2463,7 @@ fn scratch_document_supports_native_chart_axis_line_visibility_crud() {
             .unwrap();
     }
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     for axis in [Axis::Category, Axis::Value] {
         assert!(
             reopened
@@ -2492,7 +2485,7 @@ fn scratch_document_supports_native_chart_axis_line_visibility_crud() {
 
 #[test]
 fn scratch_document_supports_native_chart_axis_major_gridline_visibility_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart major gridlines").unwrap();
+    let mut editor = Editor::create_with_text("Chart major gridlines").unwrap();
     let source = editor
         .add_body_chart(
             "Chart major gridlines".encode_utf16().count(),
@@ -2571,7 +2564,7 @@ fn scratch_document_supports_native_chart_axis_major_gridline_visibility_crud() 
         )
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     for axis in [Axis::Category, Axis::Value] {
         assert_eq!(
             reopened
@@ -2595,7 +2588,7 @@ fn scratch_document_supports_native_chart_axis_major_gridline_visibility_crud() 
 
 #[test]
 fn scratch_document_supports_native_chart_axis_minor_gridline_visibility_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart minor gridlines").unwrap();
+    let mut editor = Editor::create_with_text("Chart minor gridlines").unwrap();
     let source = editor
         .add_body_chart(
             "Chart minor gridlines".encode_utf16().count(),
@@ -2655,7 +2648,7 @@ fn scratch_document_supports_native_chart_axis_minor_gridline_visibility_crud() 
             .unwrap();
     }
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     for axis in [Axis::Category, Axis::Value] {
         assert!(
             !reopened
@@ -2677,7 +2670,7 @@ fn scratch_document_supports_native_chart_axis_minor_gridline_visibility_crud() 
 
 #[test]
 fn scratch_document_supports_native_chart_axis_minor_tick_mark_visibility_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart minor tick marks").unwrap();
+    let mut editor = Editor::create_with_text("Chart minor tick marks").unwrap();
     let source = editor
         .add_body_chart(
             "Chart minor tick marks".encode_utf16().count(),
@@ -2744,7 +2737,7 @@ fn scratch_document_supports_native_chart_axis_minor_tick_mark_visibility_crud()
             .unwrap();
     }
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     for axis in [Axis::Category, Axis::Value] {
         assert!(
             reopened
@@ -2779,7 +2772,7 @@ fn scratch_document_supports_native_chart_axis_minor_tick_mark_visibility_crud()
 
 #[test]
 fn scratch_document_supports_native_chart_axis_tick_mark_location_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart tick-mark locations").unwrap();
+    let mut editor = Editor::create_with_text("Chart tick-mark locations").unwrap();
     let source = editor
         .add_body_chart(
             "Chart tick-mark locations".encode_utf16().count(),
@@ -2869,7 +2862,7 @@ fn scratch_document_supports_native_chart_axis_tick_mark_location_crud() {
         )
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_axis_tick_mark_location(source.drawable_object_id, Axis::Category)
@@ -2901,7 +2894,7 @@ fn scratch_document_supports_native_chart_axis_tick_mark_location_crud() {
 
 #[test]
 fn scratch_document_supports_native_chart_legend_visibility_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart legends").unwrap();
+    let mut editor = Editor::create_with_text("Chart legends").unwrap();
     let source = editor
         .add_body_chart(
             "Chart legends".encode_utf16().count(),
@@ -2957,7 +2950,7 @@ fn scratch_document_supports_native_chart_legend_visibility_crud() {
             .unwrap()
     );
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert!(
         reopened
             .body_chart_legend_visible(source.drawable_object_id)
@@ -2979,7 +2972,7 @@ fn scratch_document_supports_native_chart_legend_visibility_crud() {
 
 #[test]
 fn scratch_document_supports_exact_chart_legend_fill_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart legend fill").unwrap();
+    let mut editor = Editor::create_with_text("Chart legend fill").unwrap();
     let chart = editor
         .add_body_chart(
             "Chart legend fill".encode_utf16().count(),
@@ -3005,7 +2998,7 @@ fn scratch_document_supports_exact_chart_legend_fill_crud() {
     assert_eq!(editor.body_chart_legend_fill(object_id).unwrap(), solid);
     assert!(editor.body_chart_legend_visible(object_id).unwrap());
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.body_chart_legend_fill(object_id).unwrap(), solid);
     reopened
         .set_body_chart_legend_fill(object_id, &ChartLegendFill::Inherited)
@@ -3039,7 +3032,7 @@ fn scratch_document_supports_exact_chart_legend_frame_crud() {
         .unwrap();
     assert_eq!(editor.body_chart_legend_frame(object_id).unwrap(), frame);
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.body_chart_legend_frame(object_id).unwrap(), frame);
     reopened
         .set_body_chart_legend_frame(object_id, ChartLegendFrame::Automatic)
@@ -3077,7 +3070,7 @@ fn scratch_document_supports_exact_chart_legend_typography_crud() {
         eighteen
     );
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.body_chart_legend_font(object_id).unwrap(), bold);
     let italic = ChartLegendFont::Font(
         ChartFont::named("AvenirNext-Italic")
@@ -3110,7 +3103,7 @@ fn scratch_document_supports_exact_chart_legend_typography_crud() {
 
 #[test]
 fn scratch_document_supports_exact_chart_legend_stroke_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart legend stroke").unwrap();
+    let mut editor = Editor::create_with_text("Chart legend stroke").unwrap();
     let chart = editor
         .add_body_chart(
             "Chart legend stroke".encode_utf16().count(),
@@ -3138,7 +3131,7 @@ fn scratch_document_supports_exact_chart_legend_stroke_crud() {
     assert_eq!(editor.body_chart_legend_stroke(object_id).unwrap(), stroke);
     assert!(editor.body_chart_legend_visible(object_id).unwrap());
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.body_chart_legend_stroke(object_id).unwrap(),
         stroke
@@ -3151,7 +3144,7 @@ fn scratch_document_supports_exact_chart_legend_stroke_crud() {
 
 #[test]
 fn scratch_document_supports_exact_chart_legend_shadow_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart legend shadow").unwrap();
+    let mut editor = Editor::create_with_text("Chart legend shadow").unwrap();
     let chart = editor
         .add_body_chart(
             "Chart legend shadow".encode_utf16().count(),
@@ -3183,7 +3176,7 @@ fn scratch_document_supports_exact_chart_legend_shadow_crud() {
     assert_eq!(editor.body_chart_legend_shadow(object_id).unwrap(), shadow);
     assert!(editor.body_chart_legend_visible(object_id).unwrap());
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.body_chart_legend_shadow(object_id).unwrap(),
         shadow
@@ -3196,7 +3189,7 @@ fn scratch_document_supports_exact_chart_legend_shadow_crud() {
 
 #[test]
 fn scratch_document_supports_native_chart_value_axis_scale_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart value-axis scale").unwrap();
+    let mut editor = Editor::create_with_text("Chart value-axis scale").unwrap();
     let source = editor
         .add_body_chart(
             "Chart value-axis scale".encode_utf16().count(),
@@ -3245,7 +3238,7 @@ fn scratch_document_supports_native_chart_value_axis_scale_crud() {
         .set_body_chart_value_axis_scale(source.drawable_object_id, Scale::Linear)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_value_axis_scale(source.drawable_object_id)
@@ -3268,7 +3261,7 @@ fn scratch_document_supports_native_chart_value_axis_scale_crud() {
 
 #[test]
 fn scratch_document_supports_native_chart_border_stroke_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart border stroke").unwrap();
+    let mut editor = Editor::create_with_text("Chart border stroke").unwrap();
     let source = editor
         .add_body_chart(
             "Chart border stroke".encode_utf16().count(),
@@ -3316,7 +3309,7 @@ fn scratch_document_supports_native_chart_border_stroke_crud() {
         .set_body_chart_border_stroke(duplicate.drawable_object_id, None)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_border_stroke(source.drawable_object_id)
@@ -3341,7 +3334,7 @@ fn scratch_document_supports_native_chart_border_stroke_crud() {
 #[test]
 fn scratch_document_supports_native_chart_background_fill_crud() {
     let image_bytes = fixture("test-data/images/png/lena.png");
-    let mut editor = PagesEditor::create_with_text("Chart background fill").unwrap();
+    let mut editor = Editor::create_with_text("Chart background fill").unwrap();
     let source = editor
         .add_body_chart(
             "Chart background fill".encode_utf16().count(),
@@ -3387,7 +3380,7 @@ fn scratch_document_supports_native_chart_background_fill_crud() {
         .set_body_chart_background_fill(source.drawable_object_id, &customized)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_background_fill(source.drawable_object_id)
@@ -3421,7 +3414,7 @@ fn scratch_document_supports_native_chart_background_fill_crud() {
 #[test]
 fn scratch_document_supports_inherited_series_fill_crud() {
     let image_bytes = fixture("test-data/images/png/lena.png");
-    let mut editor = PagesEditor::create_with_text("Chart").unwrap();
+    let mut editor = Editor::create_with_text("Chart").unwrap();
     let source = editor
         .add_body_chart(5, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -3472,7 +3465,7 @@ fn scratch_document_supports_inherited_series_fill_crud() {
         defaults[0]
     );
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_series_fill(source.drawable_object_id, first)
@@ -3505,7 +3498,7 @@ fn scratch_document_supports_inherited_series_fill_crud() {
 
 #[test]
 fn scratch_document_supports_inherited_series_stroke_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart").unwrap();
+    let mut editor = Editor::create_with_text("Chart").unwrap();
     let source = editor
         .add_body_chart(5, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -3548,7 +3541,7 @@ fn scratch_document_supports_inherited_series_stroke_crud() {
         None
     );
 
-    let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_series_stroke(source.drawable_object_id, first)
@@ -3571,7 +3564,7 @@ fn scratch_document_supports_inherited_series_stroke_crud() {
 
 #[test]
 fn scratch_document_supports_native_chart_shadow_crud() {
-    let mut editor = PagesEditor::create_with_text("Chart shadow").unwrap();
+    let mut editor = Editor::create_with_text("Chart shadow").unwrap();
     let source = editor
         .add_body_chart(
             "Chart shadow".encode_utf16().count(),
@@ -3612,7 +3605,7 @@ fn scratch_document_supports_native_chart_shadow_crud() {
         .set_body_chart_shadow(source.drawable_object_id, ChartShadow::None)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_shadow(source.drawable_object_id)
@@ -3639,7 +3632,7 @@ fn scratch_document_supports_native_chart_shadow_crud() {
 
 #[test]
 fn scratch_document_supports_native_pie_start_angle_crud() {
-    let mut editor = PagesEditor::create_with_text("Pie rotation").unwrap();
+    let mut editor = Editor::create_with_text("Pie rotation").unwrap();
     let source = editor
         .add_body_chart(
             "Pie rotation".encode_utf16().count(),
@@ -3684,7 +3677,7 @@ fn scratch_document_supports_native_pie_start_angle_crud() {
         .set_body_chart_pie_start_angle(source.drawable_object_id, ChartPieStartAngle::HALF_TURN)
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_pie_start_angle(source.drawable_object_id)
@@ -3740,7 +3733,7 @@ fn scratch_document_supports_native_pie_start_angle_crud() {
 
 #[test]
 fn scratch_document_supports_native_donut_inner_radius_crud() {
-    let mut editor = PagesEditor::create_with_text("Donut radius").unwrap();
+    let mut editor = Editor::create_with_text("Donut radius").unwrap();
     let source = editor
         .add_body_chart(
             "Donut radius".encode_utf16().count(),
@@ -3809,7 +3802,7 @@ fn scratch_document_supports_native_donut_inner_radius_crud() {
             ChartDonutInnerRadius::MINIMUM,
         )
         .unwrap();
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_donut_inner_radius(source.drawable_object_id)
@@ -3839,7 +3832,7 @@ fn scratch_document_supports_native_donut_inner_radius_crud() {
 
 #[test]
 fn scratch_document_supports_native_pie_wedge_explosion_crud() {
-    let mut editor = PagesEditor::create_with_text("Revenue").unwrap();
+    let mut editor = Editor::create_with_text("Revenue").unwrap();
     let source = editor
         .add_body_chart(7, Kind::Pie2d, pie_data(), POSITION, SIZE)
         .unwrap();
@@ -3902,7 +3895,7 @@ fn scratch_document_supports_native_pie_wedge_explosion_crud() {
         )
         .unwrap();
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_pie_wedge_explosion(
@@ -3966,7 +3959,7 @@ fn scratch_document_supports_native_pie_wedge_explosion_crud() {
 
 #[test]
 fn scratch_document_supports_native_pie_label_visibility_crud() {
-    let mut editor = PagesEditor::create_with_text("Revenue").unwrap();
+    let mut editor = Editor::create_with_text("Revenue").unwrap();
     let source = editor
         .add_body_chart(7, Kind::Pie2d, pie_data(), POSITION, SIZE)
         .unwrap();
@@ -4041,7 +4034,7 @@ fn scratch_document_supports_native_pie_label_visibility_crud() {
             LabelVisibility::VALUES_ONLY,
         )
         .unwrap();
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_pie_label_visibilities(duplicate.drawable_object_id)
@@ -4066,7 +4059,7 @@ fn scratch_document_supports_native_pie_label_visibility_crud() {
 
 #[test]
 fn scratch_document_supports_native_pie_label_distance_crud() {
-    let mut editor = PagesEditor::create_with_text("Revenue").unwrap();
+    let mut editor = Editor::create_with_text("Revenue").unwrap();
     let source = editor
         .add_body_chart(7, Kind::Pie2d, pie_data(), POSITION, SIZE)
         .unwrap();
@@ -4195,7 +4188,7 @@ fn scratch_document_supports_native_pie_label_distance_crud() {
             LeaderLineVisibility::Visible,
         )
         .unwrap();
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_pie_label_distances(duplicate.drawable_object_id)
@@ -4262,7 +4255,7 @@ fn scratch_document_supports_native_pie_label_distance_crud() {
 fn scratch_document_supports_native_series_value_label_crud() {
     const BODY_TEXT: &str = "Chart value labels";
 
-    let mut editor = PagesEditor::create_with_text(BODY_TEXT).unwrap();
+    let mut editor = Editor::create_with_text(BODY_TEXT).unwrap();
     let source = editor
         .add_body_chart(
             BODY_TEXT.encode_utf16().count(),
@@ -4320,7 +4313,7 @@ fn scratch_document_supports_native_series_value_label_crud() {
             Visibility::Hidden,
         )
         .unwrap();
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_series_value_label_visibilities(source.drawable_object_id)
@@ -4365,7 +4358,7 @@ fn scratch_document_supports_native_series_value_label_crud() {
 fn scratch_document_supports_native_series_value_label_location_crud() {
     const BODY_TEXT: &str = "Chart value-label Location";
 
-    let mut editor = PagesEditor::create_with_text(BODY_TEXT).unwrap();
+    let mut editor = Editor::create_with_text(BODY_TEXT).unwrap();
     let source = editor
         .add_body_chart(
             BODY_TEXT.encode_utf16().count(),
@@ -4426,7 +4419,7 @@ fn scratch_document_supports_native_series_value_label_location_crud() {
             ChartSeriesValueLabelLocation::Top,
         )
         .unwrap();
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_series_value_label_locations(source.drawable_object_id)
@@ -4471,7 +4464,7 @@ fn scratch_document_supports_native_series_value_label_location_crud() {
 fn scratch_document_supports_native_series_value_label_affix_crud() {
     const BODY_TEXT: &str = "Chart value-label affixes";
 
-    let mut editor = PagesEditor::create_with_text(BODY_TEXT).unwrap();
+    let mut editor = Editor::create_with_text(BODY_TEXT).unwrap();
     let source = editor
         .add_body_chart(
             BODY_TEXT.encode_utf16().count(),
@@ -4528,7 +4521,7 @@ fn scratch_document_supports_native_series_value_label_affix_crud() {
             .unwrap();
     }
 
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_series_value_label_affixes(source.drawable_object_id)
@@ -4570,7 +4563,7 @@ fn scratch_document_supports_native_series_value_label_affix_crud() {
 fn scratch_document_supports_native_series_value_label_number_format_crud() {
     const BODY_TEXT: &str = "Chart value-label number formats";
 
-    let mut editor = PagesEditor::create_with_text(BODY_TEXT).unwrap();
+    let mut editor = Editor::create_with_text(BODY_TEXT).unwrap();
     let source = editor
         .add_body_chart(
             BODY_TEXT.encode_utf16().count(),
@@ -4625,7 +4618,7 @@ fn scratch_document_supports_native_series_value_label_number_format_crud() {
             NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
         )
         .unwrap();
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_series_value_label_number_formats(source.drawable_object_id)
@@ -4670,7 +4663,7 @@ fn scratch_document_supports_native_series_value_label_number_format_crud() {
 fn scratch_document_supports_native_series_value_label_auto_fit_crud() {
     const BODY_TEXT: &str = "Chart value-label Auto-Fit";
 
-    let mut editor = PagesEditor::create_with_text(BODY_TEXT).unwrap();
+    let mut editor = Editor::create_with_text(BODY_TEXT).unwrap();
     let source = editor
         .add_body_chart(
             BODY_TEXT.encode_utf16().count(),
@@ -4723,7 +4716,7 @@ fn scratch_document_supports_native_series_value_label_auto_fit_crud() {
             ChartSeriesValueLabelAutoFit::Enabled,
         )
         .unwrap();
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_series_value_label_auto_fits(source.drawable_object_id)
@@ -4768,7 +4761,7 @@ fn scratch_document_supports_native_series_value_label_auto_fit_crud() {
 fn scratch_document_supports_native_series_trendline_crud() {
     const BODY_TEXT: &str = "Chart series trendlines";
 
-    let mut editor = PagesEditor::create_with_text(BODY_TEXT).unwrap();
+    let mut editor = Editor::create_with_text(BODY_TEXT).unwrap();
     let source = editor
         .add_body_chart(
             BODY_TEXT.encode_utf16().count(),
@@ -4830,7 +4823,7 @@ fn scratch_document_supports_native_series_trendline_crud() {
             )
             .unwrap();
     }
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_series_trendlines(source.drawable_object_id)
@@ -4871,7 +4864,7 @@ fn scratch_document_supports_native_series_trendline_crud() {
 fn scratch_document_supports_native_series_error_bar_crud() {
     const BODY_TEXT: &str = "Chart series error bars";
 
-    let mut editor = PagesEditor::create_with_text(BODY_TEXT).unwrap();
+    let mut editor = Editor::create_with_text(BODY_TEXT).unwrap();
     let source = editor
         .add_body_chart(
             BODY_TEXT.encode_utf16().count(),
@@ -4955,7 +4948,7 @@ fn scratch_document_supports_native_series_error_bar_crud() {
     editor
         .set_body_chart_series_error_bar_auto_fits(source.drawable_object_id, &default_auto_fits)
         .unwrap();
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .body_chart_series_error_bars(source.drawable_object_id)

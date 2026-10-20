@@ -1,8 +1,6 @@
 //! Apply or redirect the persisted sort order of the first Numbers table.
 
-use litchi_iwa::numbers::{
-    NumbersEditor, NumbersTableSortDirection, NumbersTableSortOrder, NumbersTableSortRule,
-};
+use litchi_iwa::numbers::{self};
 use litchi_numbers::{Package, SheetSelector, TableSelector};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -13,8 +11,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             input,
             output,
             Some(match direction.as_str() {
-                "ascending" => NumbersTableSortDirection::Ascending,
-                "descending" => NumbersTableSortDirection::Descending,
+                "ascending" => numbers::TableSortDirection::Ascending,
+                "descending" => numbers::TableSortDirection::Descending,
                 _ => return Err("direction must be ascending or descending".into()),
             }),
         ),
@@ -26,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     };
 
-    let mut editor = NumbersEditor::open(input)?;
+    let mut editor = numbers::Editor::open(input)?;
     editor
         .tables()?
         .first()
@@ -36,12 +34,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let package = Package::from_bytes(&editor.to_bytes()?)?;
         let current = (Package::table_sort_order)(&package, SheetSelector::index(0), table)?
             .ok_or("the table has no persisted sort order")?;
-        let redirected = NumbersTableSortOrder::with_scope(
+        let redirected = numbers::TableSortOrder::with_scope(
             current.scope(),
             current
                 .rules()
                 .iter()
-                .map(|rule| NumbersTableSortRule::new(rule.column(), direction)),
+                .map(|rule| numbers::TableSortRule::new(rule.column(), direction)),
         )?;
         let package = Package::from_bytes(&editor.to_bytes()?)?;
         let commit = package
@@ -50,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .commit()?;
         let mut bytes = Vec::new();
         commit.package().write_to(&mut bytes)?;
-        editor = NumbersEditor::from_bytes(&bytes)?;
+        editor = numbers::Editor::from_bytes(&bytes)?;
     }
     editor.apply_table_sort_order(table)?;
     editor.save(output)?;

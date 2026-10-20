@@ -1,6 +1,6 @@
 use std::env;
 
-use litchi_iwa::keynote::{self, KeynoteEditor, KeynoteTableCellUpdate, KeynoteTableCellValue};
+use litchi_iwa::keynote::{self};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_keynote::slide::table::dimension::{Dimension, Size};
 use litchi_keynote::slide::table::formula::{
@@ -43,11 +43,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         for (column, value) in values.into_iter().enumerate() {
             let value = if row == 0 || column == 0 {
-                KeynoteTableCellValue::Text(value.to_owned())
+                keynote::TableCellValue::Text(value.to_owned())
             } else {
-                KeynoteTableCellValue::number(value.parse()?)?
+                keynote::TableCellValue::number(value.parse()?)?
             };
-            updates.push(KeynoteTableCellUpdate::new(row, column, value));
+            updates.push(keynote::TableCellUpdate::new(row, column, value));
         }
     }
     editor.set_slide_table_cells(0, table.model_object_id, updates)?;
@@ -96,11 +96,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         0,
         table.model_object_id,
         [
-            KeynoteTableCellUpdate::new(3, 0, KeynoteTableCellValue::Text("Central".to_owned())),
-            KeynoteTableCellUpdate::new(3, 1, KeynoteTableCellValue::number(105.0)?),
-            KeynoteTableCellUpdate::new(3, 2, KeynoteTableCellValue::Text("review".to_owned())),
-            KeynoteTableCellUpdate::new(3, 3, KeynoteTableCellValue::number(139.0)?),
-            KeynoteTableCellUpdate::new(0, 2, KeynoteTableCellValue::Text("Status".to_owned())),
+            keynote::TableCellUpdate::new(
+                3,
+                0,
+                keynote::TableCellValue::Text("Central".to_owned()),
+            ),
+            keynote::TableCellUpdate::new(3, 1, keynote::TableCellValue::number(105.0)?),
+            keynote::TableCellUpdate::new(3, 2, keynote::TableCellValue::Text("review".to_owned())),
+            keynote::TableCellUpdate::new(3, 3, keynote::TableCellValue::number(139.0)?),
+            keynote::TableCellUpdate::new(0, 2, keynote::TableCellValue::Text("Status".to_owned())),
         ],
     )?;
     editor.save(&output)?;
@@ -109,9 +113,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn set_focused_keynote_table_headers(
-    editor: KeynoteEditor,
+    editor: keynote::Editor,
     settings: KeynoteHeaderSettings,
-) -> Result<KeynoteEditor, Box<dyn std::error::Error>> {
+) -> Result<keynote::Editor, Box<dyn std::error::Error>> {
     let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_slide_table_headers(
@@ -122,14 +126,14 @@ fn set_focused_keynote_table_headers(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(KeynoteEditor::from_bytes(&bytes)?)
+    Ok(keynote::Editor::from_bytes(&bytes)?)
 }
 
 fn set_focused_keynote_table_dimension(
-    editor: KeynoteEditor,
+    editor: keynote::Editor,
     dimension: Dimension,
     size: Size,
-) -> Result<KeynoteEditor, Box<dyn std::error::Error>> {
+) -> Result<keynote::Editor, Box<dyn std::error::Error>> {
     let source = editor.to_bytes()?;
     let package = litchi_keynote::Package::from_bytes(&source)?;
     let result = package
@@ -156,7 +160,7 @@ fn set_focused_keynote_table_dimension(
     };
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    let reopened = KeynoteEditor::from_bytes(&bytes)?;
+    let reopened = keynote::Editor::from_bytes(&bytes)?;
     let package = litchi_keynote::Package::from_bytes(&bytes)?;
     if package.slide_table_dimension_size(
         litchi_keynote::SlideSelector::index(0),
@@ -170,9 +174,9 @@ fn set_focused_keynote_table_dimension(
 }
 
 fn set_focused_keynote_table_title(
-    editor: KeynoteEditor,
+    editor: keynote::Editor,
     settings: TableTitleSettings,
-) -> Result<KeynoteEditor, Box<dyn std::error::Error>> {
+) -> Result<keynote::Editor, Box<dyn std::error::Error>> {
     let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_slide_table_title(
@@ -183,5 +187,5 @@ fn set_focused_keynote_table_title(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(KeynoteEditor::from_bytes(&bytes)?)
+    Ok(keynote::Editor::from_bytes(&bytes)?)
 }

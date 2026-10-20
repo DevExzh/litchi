@@ -24,7 +24,7 @@ use graph::*;
 
 /// One ordinary image drawable owned directly by a Numbers sheet.
 #[derive(Debug, Clone, PartialEq)]
-pub struct NumbersSheetImageInfo {
+pub struct SheetImageInfo {
     pub sheet_id: u64,
     pub drawable_object_id: u64,
     pub image_data_identifier: MediaAssetId,
@@ -40,7 +40,7 @@ pub struct NumbersSheetImageInfo {
 
 /// Typed layout metadata for a newly created Numbers sheet image.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct NumbersSheetImageOptions {
+pub struct SheetImageOptions {
     /// Top-left position on the sheet, in points.
     pub position: DrawablePoint,
     /// Displayed image size, in points.
@@ -49,7 +49,7 @@ pub struct NumbersSheetImageOptions {
     pub natural_size: DrawableSize,
 }
 
-impl NumbersSheetImageOptions {
+impl SheetImageOptions {
     /// Create options whose displayed and natural dimensions are identical.
     pub const fn new(position: DrawablePoint, size: DrawableSize) -> Self {
         Self {
@@ -70,7 +70,7 @@ impl NumbersSheetImageOptions {
 /// Result of removing one sheet-owned image and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedNumbersSheetImage {
-    pub image: NumbersSheetImageInfo,
+    pub image: SheetImageInfo,
     /// Assets culled because the removed image held their final package reference.
     pub removed_data_identifiers: Vec<MediaAssetId>,
 }
@@ -81,9 +81,9 @@ enum ImageClonePlacement {
     Preserve,
 }
 
-impl NumbersEditor {
+impl Editor {
     /// List ordinary image drawables owned directly by one reachable sheet.
-    pub fn sheet_images(&self, sheet_id: u64) -> Result<Vec<NumbersSheetImageInfo>> {
+    pub fn sheet_images(&self, sheet_id: u64) -> Result<Vec<SheetImageInfo>> {
         image_infos(self, sheet_id)
     }
 
@@ -97,8 +97,8 @@ impl NumbersEditor {
         sheet_id: u64,
         preferred_filename: &str,
         data: &[u8],
-        options: NumbersSheetImageOptions,
-    ) -> Result<NumbersSheetImageInfo> {
+        options: SheetImageOptions,
+    ) -> Result<SheetImageInfo> {
         let geometry = image_creation_values(options)?;
         let context = image_creation_context(self, sheet_id)?;
         let ids = ImageObjectIds::allocate(next_object_identifier(&self.package)?)?;
@@ -400,7 +400,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         source_drawable_object_id: u64,
-    ) -> Result<NumbersSheetImageInfo> {
+    ) -> Result<SheetImageInfo> {
         self.clone_sheet_image(
             sheet_id,
             source_drawable_object_id,
@@ -414,7 +414,7 @@ impl NumbersEditor {
         source_sheet_id: u64,
         source_drawable_object_id: u64,
         target_sheet_id: u64,
-    ) -> Result<NumbersSheetImageInfo> {
+    ) -> Result<SheetImageInfo> {
         self.clone_sheet_image(
             source_sheet_id,
             source_drawable_object_id,
@@ -429,7 +429,7 @@ impl NumbersEditor {
         source_drawable_object_id: u64,
         target_sheet_id: u64,
         placement: ImageClonePlacement,
-    ) -> Result<NumbersSheetImageInfo> {
+    ) -> Result<SheetImageInfo> {
         let source = image_graph(self, source_sheet_id, source_drawable_object_id)?;
         let (target_archive_name, _, _) = numbers_sheet(&self.package, target_sheet_id)?;
         if target_archive_name != source.archive_name {
@@ -668,7 +668,7 @@ impl NumbersEditor {
 }
 
 fn set_sheet_image_caption(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     text: &str,
@@ -707,7 +707,7 @@ fn set_sheet_image_caption(
         set_package_last_object_identifier(&mut staged, ids.last())?;
         staged
     };
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     let actual = verified.sheet_image_title_caption(sheet_id, drawable_object_id)?;
     let expected = match kind {
         DrawableCaptionKind::Caption => crate::DrawableTitleCaption {
@@ -729,7 +729,7 @@ fn set_sheet_image_caption(
 }
 
 fn remove_sheet_image_caption(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     kind: DrawableCaptionKind,
@@ -752,7 +752,7 @@ fn remove_sheet_image_caption(
     )?;
     add_component_object_uuids(&mut staged, source.component_id, &[standin_id])?;
     set_package_last_object_identifier(&mut staged, standin_id)?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     let actual = verified.sheet_image_title_caption(sheet_id, drawable_object_id)?;
     let expected = match kind {
         DrawableCaptionKind::Caption => crate::DrawableTitleCaption {
@@ -797,9 +797,8 @@ mod tests {
     };
     const UPDATED_ANGLE_DEGREES: f32 = 9.0;
 
-    fn options() -> NumbersSheetImageOptions {
-        NumbersSheetImageOptions::new(IMAGE_POSITION, IMAGE_SIZE)
-            .with_natural_size(NATURAL_IMAGE_SIZE)
+    fn options() -> SheetImageOptions {
+        SheetImageOptions::new(IMAGE_POSITION, IMAGE_SIZE).with_natural_size(NATURAL_IMAGE_SIZE)
     }
 
     fn sheet_selector(raw: u64) -> ObjectId {
@@ -810,10 +809,7 @@ mod tests {
         DrawableId::from_raw(raw).expect("fixture drawable identifiers are non-zero")
     }
 
-    fn focused_image_adjustments(
-        editor: &NumbersEditor,
-        image_position: usize,
-    ) -> ImageAdjustments {
+    fn focused_image_adjustments(editor: &Editor, image_position: usize) -> ImageAdjustments {
         let package = FocusedNumbersPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         package
             .sheet_image_adjustments(
@@ -824,7 +820,7 @@ mod tests {
     }
 
     fn set_focused_image_adjustments(
-        editor: &mut NumbersEditor,
+        editor: &mut Editor,
         image_position: usize,
         adjustments: ImageAdjustments,
     ) {
@@ -841,7 +837,7 @@ mod tests {
             .unwrap();
         let mut bytes = Vec::new();
         commit.package().write_to(&mut bytes).unwrap();
-        *editor = NumbersEditor::from_bytes(&bytes).unwrap();
+        *editor = Editor::from_bytes(&bytes).unwrap();
     }
 
     #[test]
@@ -873,7 +869,7 @@ mod tests {
             original
         );
 
-        let roundtripped = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let roundtripped = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             roundtripped.sheet_images(sheet_id).unwrap(),
             std::slice::from_ref(&created)
@@ -1025,7 +1021,7 @@ mod tests {
         );
         assert!(editor.sheet_images(sheet_id).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
@@ -1087,7 +1083,7 @@ mod tests {
         editor
             .set_sheet_image_caption(sheet_id, image.drawable_object_id, "Recreated caption")
             .unwrap();
-        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_image_title_caption(sheet_id, image.drawable_object_id)
@@ -1243,7 +1239,7 @@ mod tests {
             editor.extract_media(source.image_data_identifier).unwrap(),
             replacement
         );
-        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.sheet_images(sheet_id).unwrap().len(), 2);
         assert_eq!(
             reopened
@@ -1270,13 +1266,13 @@ mod tests {
         );
         assert!(editor.sheet_images(sheet_id).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
     fn invalid_image_creation_and_geometry_are_transactional() {
         let original = fixture("test-data/images/png/lena.png");
-        let mut editor = NumbersEditor::create().unwrap();
+        let mut editor = Editor::create().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let baseline = editor.to_bytes().unwrap();
 

@@ -12,7 +12,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use litchi_iwa::numbers::{NumbersEditor, UnverifiedTopologyEdit};
+use litchi_iwa::numbers::{self, UnverifiedTopologyEdit};
 use litchi_iwa_archive::iwa::{Archive, SnappyStream};
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_archive::{ComponentCatalog, Limits};
@@ -171,7 +171,7 @@ fn ops(body_rows: usize, body_columns: usize) -> Vec<Op> {
 }
 
 fn host(source: &[u8], table: &str, op: Op) -> Result<Vec<u8>, String> {
-    let mut editor = NumbersEditor::from_bytes(source).map_err(|error| error.to_string())?;
+    let mut editor = numbers::Editor::from_bytes(source).map_err(|error| error.to_string())?;
     let edit = match op {
         Op::InsertRow(insertion) => UnverifiedTopologyEdit::InsertRow(insertion),
         Op::InsertColumn(insertion) => UnverifiedTopologyEdit::InsertColumn(insertion),
@@ -909,7 +909,7 @@ fn leaf_topology_matches_the_host_editor_on_tables_with_formulas() -> TestResult
         let source = source.as_slice();
         let package = Package::from_bytes(source)?;
         let name = name.as_str();
-        if NumbersEditor::from_bytes(source).is_err() {
+        if numbers::Editor::from_bytes(source).is_err() {
             *summary
                 .entry(format!("skipped file: host cannot open {name}"))
                 .or_default() += 1;

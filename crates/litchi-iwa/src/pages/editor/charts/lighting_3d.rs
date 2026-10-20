@@ -7,7 +7,7 @@ use crate::charts::lighting_3d::{
     set_chart_3d_lighting_style as set_native_chart_3d_lighting_style,
 };
 
-impl PagesEditor {
+impl Editor {
     /// Read one body chart's native Lighting Style choice.
     pub fn body_chart_3d_lighting_style(
         &self,
@@ -49,7 +49,7 @@ impl PagesEditor {
             graph.info.kind,
             style,
         )?;
-        let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_3d_lighting_style(drawable_object_id)? != style {
             return Err(Error::InvalidFormat(
                 "Pages chart 3D lighting-style update failed validation".to_owned(),
@@ -93,7 +93,7 @@ mod tests {
                 Chart3dLightingStyle::MediumCenter,
             )
             .unwrap();
-        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_chart_3d_lighting_style(chart.drawable_object_id)

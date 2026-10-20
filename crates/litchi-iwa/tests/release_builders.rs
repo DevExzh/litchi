@@ -4,7 +4,7 @@
 //! release builds; run with `cargo test --release -p litchi-iwa --test
 //! release_builders` to cover the optimized profile.
 
-use litchi_iwa::numbers::{self, NumbersEditor};
+use litchi_iwa::numbers::{self};
 
 #[test]
 fn numbers_builder_builds() {
@@ -15,5 +15,5 @@ fn numbers_builder_builds() {
 
 #[test]
 fn numbers_editor_creates() {
-    NumbersEditor::create().expect("create");
+    numbers::Editor::create().expect("create");
 }

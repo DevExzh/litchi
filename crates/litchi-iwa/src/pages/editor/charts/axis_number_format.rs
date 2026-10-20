@@ -7,7 +7,7 @@ use crate::charts::axis_number_format::{
 };
 use crate::charts::{Axis, NumberFormat};
 
-impl PagesEditor {
+impl Editor {
     /// Read the decimal-number format of one native body-chart axis.
     pub fn body_chart_axis_number_format(
         &self,
@@ -29,7 +29,7 @@ impl PagesEditor {
 }
 
 fn body_chart_axis_number_format(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
     axis: Axis,
 ) -> Result<NumberFormat> {
@@ -44,7 +44,7 @@ fn body_chart_axis_number_format(
 }
 
 fn set_body_chart_axis_number_format(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     axis: Axis,
     format: NumberFormat,
@@ -59,7 +59,7 @@ fn set_body_chart_axis_number_format(
         axis,
         format,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_axis_number_format(drawable_object_id, axis)? != format {
         return Err(Error::InvalidFormat(
             "Pages chart axis number-format update failed validation".to_owned(),
@@ -107,7 +107,7 @@ mod tests {
         editor
             .set_body_chart_axis_number_format(chart.drawable_object_id, Axis::Value, expected)
             .unwrap();
-        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_chart_axis_number_format(chart.drawable_object_id, Axis::Value)

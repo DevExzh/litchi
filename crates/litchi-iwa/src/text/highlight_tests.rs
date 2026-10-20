@@ -1,7 +1,7 @@
 use super::{TextPosition, TextRange};
-use crate::keynote::{self, KeynoteEditor};
-use crate::numbers::{self, NumbersEditor};
-use crate::pages::PagesEditor;
+use crate::keynote::{self};
+use crate::numbers::{self};
+use crate::pages;
 use crate::shapes::{DrawablePoint, DrawableSize};
 
 const TEXT: &str = "Alpha 😀 Beta Gamma";
@@ -23,7 +23,7 @@ fn text_range(value: &str) -> TextRange {
 
 #[test]
 fn highlight_crud_round_trips_and_restores_pages_exactly() {
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, TEXT, POSITION, SIZE).unwrap();
     let baseline = pages.to_bytes().unwrap();
 
@@ -38,7 +38,7 @@ fn highlight_crud_round_trips_and_restores_pages_exactly() {
         std::slice::from_ref(&created)
     );
     let after_create = pages.to_bytes().unwrap();
-    let mut pages = PagesEditor::from_bytes(&after_create).unwrap();
+    let mut pages = pages::Editor::from_bytes(&after_create).unwrap();
     let updated = pages
         .update_text_box_highlight(text_box.drawable_object_id, created.id, text_range("Beta"))
         .unwrap();
@@ -67,10 +67,6 @@ fn highlight_crud_round_trips_and_restores_pages_exactly() {
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn scratch_highlights_work_in_numbers_and_keynote() {
     let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
@@ -81,7 +77,7 @@ fn scratch_highlights_work_in_numbers_and_keynote() {
     let numbers_highlight = numbers
         .add_sheet_text_box_highlight(sheet_id, numbers_box.drawable_object_id, text_range("Beta"))
         .unwrap();
-    let mut numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_highlights(sheet_id, numbers_box.drawable_object_id)
@@ -104,7 +100,7 @@ fn scratch_highlights_work_in_numbers_and_keynote() {
     let keynote_highlight = keynote
         .add_slide_text_box_highlight(0, keynote_box.drawable_object_id, text_range("Gamma"))
         .unwrap();
-    let mut keynote = KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_highlights(0, keynote_box.drawable_object_id)
@@ -120,7 +116,7 @@ fn scratch_highlights_work_in_numbers_and_keynote() {
 
 #[test]
 fn split_surrogate_highlight_ranges_are_rejected_transactionally() {
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, "A😀B", POSITION, SIZE).unwrap();
     let invalid = TextRange::from_utf16_indexes(1, 2).unwrap();
     let before = pages.to_bytes().unwrap();
@@ -134,7 +130,7 @@ fn split_surrogate_highlight_ranges_are_rejected_transactionally() {
 
 #[test]
 fn replacing_highlighted_text_reclaims_the_annotation_graph() {
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, TEXT, POSITION, SIZE).unwrap();
     let baseline = pages.to_bytes().unwrap();
     pages
@@ -154,7 +150,7 @@ fn replacing_highlighted_text_reclaims_the_annotation_graph() {
 
 #[test]
 fn adjacent_highlights_keep_independent_ranges_and_lifecycles() {
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, "Alpha Beta", POSITION, SIZE).unwrap();
     let baseline = pages.to_bytes().unwrap();
     let first = pages

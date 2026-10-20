@@ -1,9 +1,6 @@
 use std::env;
 
-use litchi_iwa::pages::{
-    self, PagesCellValue, PagesTableCellUpdate, PagesTableFormulaCachedValue,
-    PagesTableFormulaExpression,
-};
+use litchi_iwa::pages::{self};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
@@ -17,24 +14,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_table_cells(
         source.model_object_id,
         [
-            PagesTableCellUpdate::new(0, 0, PagesCellValue::Text("Category".to_owned())),
-            PagesTableCellUpdate::new(0, 1, PagesCellValue::Text("Cost".to_owned())),
-            PagesTableCellUpdate::new(1, 0, PagesCellValue::Text("Travel".to_owned())),
-            PagesTableCellUpdate::new(1, 1, PagesCellValue::number(125.0)?),
+            pages::TableCellUpdate::new(0, 0, pages::CellValue::Text("Category".to_owned())),
+            pages::TableCellUpdate::new(0, 1, pages::CellValue::Text("Cost".to_owned())),
+            pages::TableCellUpdate::new(1, 0, pages::CellValue::Text("Travel".to_owned())),
+            pages::TableCellUpdate::new(1, 1, pages::CellValue::number(125.0)?),
         ],
     )?;
     editor.set_table_formula(
         source.model_object_id,
         2,
         1,
-        PagesTableFormulaExpression::function(
+        pages::TableFormulaExpression::function(
             "SUM",
             [
-                PagesTableFormulaExpression::Number(100.0),
-                PagesTableFormulaExpression::Number(25.0),
+                pages::TableFormulaExpression::Number(100.0),
+                pages::TableFormulaExpression::Number(25.0),
             ],
         ),
-        PagesTableFormulaCachedValue::number(125.0)?,
+        pages::TableFormulaCachedValue::number(125.0)?,
     )?;
 
     let anchor = editor.body_text()?.encode_utf16().count();
@@ -43,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         copy.model_object_id,
         1,
         0,
-        PagesCellValue::Text("Lodging".to_owned()),
+        pages::CellValue::Text("Lodging".to_owned()),
     )?;
     editor.save(&output)?;
     println!("created {output} with {} and {}", source.name, copy.name);

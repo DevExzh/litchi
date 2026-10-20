@@ -6,7 +6,7 @@ use crate::charts::axis::{
     set_chart_category_axis_series_names_visible as set_native_chart_category_axis_series_names_visible,
 };
 
-impl KeynoteEditor {
+impl Editor {
     /// Read whether Keynote shows series names on a native slide chart category axis.
     pub fn slide_chart_category_axis_series_names_visible(
         &self,
@@ -33,7 +33,7 @@ impl KeynoteEditor {
 }
 
 fn slide_chart_category_axis_series_names_visible(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<bool> {
@@ -47,7 +47,7 @@ fn slide_chart_category_axis_series_names_visible(
 }
 
 fn set_slide_chart_category_axis_series_names_visible(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     visible: bool,
@@ -61,7 +61,7 @@ fn set_slide_chart_category_axis_series_names_visible(
         "Keynote",
         visible,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_category_axis_series_names_visible(slide_index, drawable_object_id)?
         != visible
     {

@@ -378,12 +378,12 @@ fn native_language_value(language: &TextLanguage) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pages::PagesEditor;
+    use crate::pages;
     use crate::shapes::{DrawablePoint, DrawableSize};
     use crate::wire::{append_length_delimited_field, parse_wire_fields, patch_varint_field};
 
     fn fixture() -> (IWorkPackage, u64, String) {
-        let mut pages = PagesEditor::create_with_text("Body").unwrap();
+        let mut pages = pages::Editor::create_with_text("Body").unwrap();
         let text_box = pages
             .add_text_box(
                 4,

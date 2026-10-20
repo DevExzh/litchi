@@ -7,7 +7,7 @@ use crate::charts::radar_grid_shape::{
     set_chart_radar_grid_shape as set_native_chart_radar_grid_shape,
 };
 
-impl NumbersEditor {
+impl Editor {
     /// Read one radar chart's `Radar Chart Grid Shape`.
     pub fn sheet_chart_radar_grid_shape(
         &self,
@@ -51,7 +51,7 @@ impl NumbersEditor {
             graph.info.kind,
             shape,
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_radar_grid_shape(sheet_id, drawable_object_id)? != shape {
             return Err(Error::InvalidFormat(
                 "Numbers radar chart grid-shape update failed validation".to_owned(),

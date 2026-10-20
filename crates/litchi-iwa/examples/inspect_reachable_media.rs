@@ -2,9 +2,9 @@ use std::env;
 use std::path::Path;
 
 use litchi_iwa::EmbeddedMediaAsset;
-use litchi_iwa::keynote::KeynoteEditor;
-use litchi_iwa::numbers::NumbersEditor;
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::keynote;
+use litchi_iwa::numbers;
+use litchi_iwa::pages;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = env::args()
@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|extension| extension.to_str())
     {
         Some("key") => {
-            let editor = KeynoteEditor::open(&input)?;
+            let editor = keynote::Editor::open(&input)?;
             print_assets("presentation", &editor.media_assets()?);
             for slide in editor.slides()? {
                 print_assets(
@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         },
         Some("numbers") => {
-            let editor = NumbersEditor::open(&input)?;
+            let editor = numbers::Editor::open(&input)?;
             print_assets("spreadsheet", &editor.media_assets()?);
             for sheet in editor.sheets()? {
                 print_assets(
@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         },
         Some("pages") => {
-            let editor = PagesEditor::open(&input)?;
+            let editor = pages::Editor::open(&input)?;
             print_assets("document", &editor.media_assets()?);
             for section in editor.sections() {
                 print_assets(

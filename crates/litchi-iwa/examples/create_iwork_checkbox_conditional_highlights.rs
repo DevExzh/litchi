@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::{self, KeynoteEditor};
-use litchi_iwa::numbers::{self, NumbersEditor};
-use litchi_iwa::pages::{self, PagesEditor};
+use litchi_iwa::keynote::{self};
+use litchi_iwa::numbers::{self};
+use litchi_iwa::pages::{self};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
 use litchi_iwa_common::table::cell::conditional_highlight::{Condition, Rule, Style};
 use litchi_numbers::cell::Value as CellValue;
@@ -76,7 +76,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     }
     editor.save(output)?;
 
-    let reopened = NumbersEditor::open(output)?;
+    let reopened = numbers::Editor::open(output)?;
     for (column, rule) in [CHECKED_COLUMN, UNCHECKED_COLUMN].into_iter().zip(&rules) {
         assert_eq!(
             reopened.cell_conditional_highlight_rules(table_id, CHECKBOX_ROW, column)?,
@@ -87,7 +87,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn set_numbers_cell_control(
-    editor: &mut NumbersEditor,
+    editor: &mut numbers::Editor,
     row: usize,
     column: usize,
     control: CellControl,
@@ -104,12 +104,12 @@ fn set_numbers_cell_control(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    *editor = NumbersEditor::from_bytes(&bytes)?;
+    *editor = numbers::Editor::from_bytes(&bytes)?;
     Ok(())
 }
 
 fn set_numbers_cells(
-    editor: &mut NumbersEditor,
+    editor: &mut numbers::Editor,
     updates: impl IntoIterator<Item = litchi_numbers::cell::Update>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let changes = updates
@@ -126,7 +126,7 @@ fn set_numbers_cells(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    *editor = NumbersEditor::from_bytes(&bytes)?;
+    *editor = numbers::Editor::from_bytes(&bytes)?;
     Ok(())
 }
 
@@ -184,7 +184,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     }
     editor.save(output)?;
 
-    let reopened = PagesEditor::open(output)?;
+    let reopened = pages::Editor::open(output)?;
     for (column, rule) in [CHECKED_COLUMN, UNCHECKED_COLUMN].into_iter().zip(&rules) {
         assert_eq!(
             reopened.table_cell_conditional_highlight_rules(table_id, CHECKBOX_ROW, column)?,
@@ -237,7 +237,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     }
     editor.save(output)?;
 
-    let reopened = KeynoteEditor::open(output)?;
+    let reopened = keynote::Editor::open(output)?;
     for (column, rule) in [CHECKED_COLUMN, UNCHECKED_COLUMN].into_iter().zip(&rules) {
         assert_eq!(
             reopened.slide_table_cell_conditional_highlight_rules(

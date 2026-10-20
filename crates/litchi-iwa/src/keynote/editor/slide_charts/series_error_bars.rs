@@ -9,7 +9,7 @@ use crate::charts::series_error_bars::{
 };
 use litchi_iwa_common::chart::error_bar::Series;
 
-impl KeynoteEditor {
+impl Editor {
     /// Read every series' error bars in native series order.
     pub fn slide_chart_series_error_bars(
         &self,
@@ -64,7 +64,7 @@ impl KeynoteEditor {
 }
 
 fn slide_chart_series_error_bars(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Vec<Series>> {
@@ -86,7 +86,7 @@ fn slide_chart_series_error_bars(
 }
 
 fn set_slide_chart_series_error_bars(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     values: &[Series],
@@ -124,7 +124,7 @@ fn set_slide_chart_series_error_bars(
         "Keynote",
         &expected,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_series_error_bars(slide_index, drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Keynote chart series error-bar update failed validation".to_owned(),

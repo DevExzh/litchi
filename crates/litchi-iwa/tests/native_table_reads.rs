@@ -2,7 +2,7 @@
 
 use std::error::Error;
 
-use litchi_iwa::{keynote::KeynoteEditor, pages::PagesEditor};
+use litchi_iwa::{keynote, pages};
 use litchi_iwa_common::table::{
     cell::value::Value, coordinate::At, merge::Region, read::TableRead,
 };
@@ -45,7 +45,7 @@ fn cells(read: &TableRead) -> Vec<((usize, usize), Value)> {
 #[test]
 fn native_pages_selector_adapter_preserves_semantics_and_source() -> TestResult {
     let focused = litchi_pages::Package::from_bytes(PAGES)?;
-    let host = PagesEditor::from_bytes(PAGES)?;
+    let host = pages::Editor::from_bytes(PAGES)?;
     let catalog = host.tables()?;
     assert_eq!(catalog.len(), 2);
     for (position, info) in catalog.iter().enumerate() {
@@ -97,7 +97,7 @@ fn native_pages_selector_adapter_preserves_semantics_and_source() -> TestResult 
 #[test]
 fn native_keynote_selector_adapter_preserves_semantics_and_merge() -> TestResult {
     let focused = litchi_keynote::Package::from_bytes(KEYNOTE)?;
-    let host = KeynoteEditor::from_bytes(KEYNOTE)?;
+    let host = keynote::Editor::from_bytes(KEYNOTE)?;
     let catalog = host.slide_tables(0)?;
     assert_eq!(catalog.len(), 1);
     let legacy = host.slide_table(0, catalog[0].model_object_id)?;

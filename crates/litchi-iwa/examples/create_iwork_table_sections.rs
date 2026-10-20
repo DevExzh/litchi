@@ -3,8 +3,8 @@ use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSet
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::{self, KeynoteEditor};
-use litchi_iwa::numbers::{self, NumbersEditor};
+use litchi_iwa::keynote::{self};
+use litchi_iwa::numbers::{self};
 use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_keynote::slide::table::headers::{
@@ -69,9 +69,9 @@ fn create_numbers(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std
 }
 
 fn set_focused_table_headers(
-    editor: NumbersEditor,
+    editor: numbers::Editor,
     settings: HeaderSettings,
-) -> Result<NumbersEditor, Box<dyn std::error::Error>> {
+) -> Result<numbers::Editor, Box<dyn std::error::Error>> {
     let package = Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_table_headers(SheetSelector::index(0), TableSelector::index(0))?
@@ -79,7 +79,7 @@ fn set_focused_table_headers(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(NumbersEditor::from_bytes(&bytes)?)
+    Ok(numbers::Editor::from_bytes(&bytes)?)
 }
 
 fn create_pages(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -146,7 +146,7 @@ fn create_keynote(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std
 }
 
 fn set_pages_table_headers(
-    editor: &mut litchi_iwa::pages::PagesEditor,
+    editor: &mut litchi_iwa::pages::Editor,
     settings: PagesHeaderSettings,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let package = PagesPackage::from_bytes(&editor.to_bytes()?)?;
@@ -156,14 +156,14 @@ fn set_pages_table_headers(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    *editor = litchi_iwa::pages::PagesEditor::from_bytes(&bytes)?;
+    *editor = litchi_iwa::pages::Editor::from_bytes(&bytes)?;
     Ok(())
 }
 
 fn set_focused_keynote_table_headers(
-    editor: KeynoteEditor,
+    editor: keynote::Editor,
     settings: KeynoteHeaderSettings,
-) -> Result<KeynoteEditor, Box<dyn std::error::Error>> {
+) -> Result<keynote::Editor, Box<dyn std::error::Error>> {
     let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_slide_table_headers(
@@ -174,7 +174,7 @@ fn set_focused_keynote_table_headers(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(KeynoteEditor::from_bytes(&bytes)?)
+    Ok(keynote::Editor::from_bytes(&bytes)?)
 }
 
 fn section_values() -> Vec<TableCellUpdate> {
@@ -193,7 +193,7 @@ fn section_values() -> Vec<TableCellUpdate> {
 }
 
 fn set_numbers_cells(
-    editor: &mut NumbersEditor,
+    editor: &mut numbers::Editor,
     updates: impl IntoIterator<Item = litchi_numbers::cell::Update>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let changes = updates
@@ -210,7 +210,7 @@ fn set_numbers_cells(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    *editor = NumbersEditor::from_bytes(&bytes)?;
+    *editor = numbers::Editor::from_bytes(&bytes)?;
     Ok(())
 }
 

@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = PagesEditor::open(input)?;
+    let mut editor = pages::Editor::open(input)?;
     let mut geometry = editor.text_box_geometry(drawable_id)?;
     geometry.position = Some(DrawablePoint { x, y });
     geometry.size = Some(DrawableSize { width, height });

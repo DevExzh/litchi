@@ -13,12 +13,12 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
-pub use conditional_highlight::PagesTableCellConditionalHighlightInfo;
+pub use conditional_highlight::TableCellConditionalHighlightInfo;
 pub use formula::{
-    PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
-    PagesTableFormulaCellReference, PagesTableFormulaExpression,
+    TableFormulaAxisReference, TableFormulaBinaryOperator, TableFormulaCachedValue,
+    TableFormulaCellReference, TableFormulaExpression,
 };
-pub use sort::PagesTableSortRowRange;
+pub use sort::TableSortRowRange;
 use std::collections::HashSet;
 
 use super::*;
@@ -31,42 +31,42 @@ const OBJECT_REPLACEMENT_CHARACTER: u16 = 0xfffc;
 const INLINE_TABLE_DUPLICATE_OFFSET: f32 = 0.0;
 
 /// Strongly typed cell value shared by Pages and Numbers table storage.
-pub type PagesCellValue = litchi_iwa_common::table::cell::value::Value;
+pub type CellValue = litchi_iwa_common::table::cell::value::Value;
 /// One mutation in a transactional Pages table-cell batch.
-pub type PagesTableCellUpdate = litchi_iwa_common::table::cell::value::Update;
-pub use crate::shapes::RgbaColor as PagesTableCellTextColor;
-pub use crate::text::Background as PagesTableCellTextBackground;
-pub use crate::text::Outline as PagesTableCellTextOutline;
-pub use crate::text::ParagraphList as PagesTableCellParagraphList;
-pub use crate::text::ParagraphListBullet as PagesTableCellParagraphListBullet;
-pub use crate::text::ParagraphListBulletGeometry as PagesTableCellParagraphListBulletGeometry;
-pub use crate::text::ParagraphListIndentation as PagesTableCellParagraphListIndentation;
-pub use crate::text::ParagraphListLabelColor as PagesTableCellParagraphListLabelColor;
-pub use crate::text::ParagraphListLevel as PagesTableCellParagraphListLevel;
-pub use crate::text::ParagraphListLevelPlacement as PagesTableCellParagraphListLevelPlacement;
-pub use crate::text::ParagraphListNumberFormat as PagesTableCellParagraphListNumberFormat;
-pub use crate::text::ParagraphListNumberScale as PagesTableCellParagraphListNumberScale;
-pub use crate::text::ParagraphListNumberTiering as PagesTableCellParagraphListNumberTiering;
-pub use crate::text::ParagraphListNumbering as PagesTableCellParagraphListNumbering;
-pub use crate::text::ParagraphListPlacement as PagesTableCellParagraphListPlacement;
-pub use crate::text::ParagraphTabStops as PagesTableCellParagraphTabStops;
-pub use crate::text::Shadow as PagesTableCellTextShadow;
-pub use crate::text::TextBaselineShift as PagesTableCellTextBaselineShift;
-pub use crate::text::TextCapitalization as PagesTableCellTextCapitalization;
-pub use crate::text::TextCharacterSpacing as PagesTableCellTextCharacterSpacing;
-pub use crate::text::TextDecorations as PagesTableCellTextDecorations;
-pub use crate::text::TextFont as PagesTableCellTextFont;
-pub use crate::text::TextLigatures as PagesTableCellTextLigatures;
-pub use crate::text::TextScript as PagesTableCellTextScript;
-pub use crate::text::TextStyle as PagesTableCellTextStyle;
+pub type TableCellUpdate = litchi_iwa_common::table::cell::value::Update;
+pub use crate::shapes::RgbaColor as TableCellTextColor;
+pub use crate::text::Background as TableCellTextBackground;
+pub use crate::text::Outline as TableCellTextOutline;
+pub use crate::text::ParagraphList as TableCellParagraphList;
+pub use crate::text::ParagraphListBullet as TableCellParagraphListBullet;
+pub use crate::text::ParagraphListBulletGeometry as TableCellParagraphListBulletGeometry;
+pub use crate::text::ParagraphListIndentation as TableCellParagraphListIndentation;
+pub use crate::text::ParagraphListLabelColor as TableCellParagraphListLabelColor;
+pub use crate::text::ParagraphListLevel as TableCellParagraphListLevel;
+pub use crate::text::ParagraphListLevelPlacement as TableCellParagraphListLevelPlacement;
+pub use crate::text::ParagraphListNumberFormat as TableCellParagraphListNumberFormat;
+pub use crate::text::ParagraphListNumberScale as TableCellParagraphListNumberScale;
+pub use crate::text::ParagraphListNumberTiering as TableCellParagraphListNumberTiering;
+pub use crate::text::ParagraphListNumbering as TableCellParagraphListNumbering;
+pub use crate::text::ParagraphListPlacement as TableCellParagraphListPlacement;
+pub use crate::text::ParagraphTabStops as TableCellParagraphTabStops;
+pub use crate::text::Shadow as TableCellTextShadow;
+pub use crate::text::TextBaselineShift as TableCellTextBaselineShift;
+pub use crate::text::TextCapitalization as TableCellTextCapitalization;
+pub use crate::text::TextCharacterSpacing as TableCellTextCharacterSpacing;
+pub use crate::text::TextDecorations as TableCellTextDecorations;
+pub use crate::text::TextFont as TableCellTextFont;
+pub use crate::text::TextLigatures as TableCellTextLigatures;
+pub use crate::text::TextScript as TableCellTextScript;
+pub use crate::text::TextStyle as TableCellTextStyle;
 pub use litchi_iwa_common::shape::stroke::Stroke;
 pub use litchi_iwa_common::table::cell::BorderSide;
 pub use litchi_iwa_common::table::cell::Borders;
 pub use litchi_iwa_common::table::cell::layout::{
-    Inset as PagesTableCellInset, Insets as PagesTableCellInsets, Layout as PagesTableCellLayout,
-    TextWrap as PagesTableCellTextWrap, VerticalAlignment as PagesTableCellVerticalAlignment,
+    Inset as TableCellInset, Insets as TableCellInsets, Layout as TableCellLayout,
+    TextWrap as TableCellTextWrap, VerticalAlignment as TableCellVerticalAlignment,
 };
 
-pub use semantic::{PagesTable, PagesTableInfo};
+pub use semantic::{Table, TableInfo};
 use storage::{PagesTableGraph, body_table_graphs, clone_body_table_attachment};
 use validation::decode_unique_table_model;

@@ -8,7 +8,7 @@ use crate::charts::font::{
 };
 use crate::charts::{ChartFont, ChartFontSize};
 
-impl PagesEditor {
+impl Editor {
     /// Read the uniform effective font used by one body chart.
     pub fn body_chart_font(&self, drawable_object_id: u64) -> Result<ChartFont> {
         let graph = body_chart_graph(self, drawable_object_id)?;
@@ -31,7 +31,7 @@ impl PagesEditor {
             "Pages",
             &font,
         )?;
-        let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_font(drawable_object_id)? != font {
             return Err(Error::InvalidFormat(
                 "Pages chart font update failed validation".to_owned(),
@@ -53,7 +53,7 @@ impl PagesEditor {
         )? {
             return Ok(false);
         }
-        *self = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+        *self = Editor::from_bytes(&staged.to_bytes()?)?;
         Ok(true)
     }
 
@@ -83,7 +83,7 @@ impl PagesEditor {
             "Pages",
             size,
         )?;
-        let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_font_size(drawable_object_id)? != size {
             return Err(Error::InvalidFormat(
                 "Pages chart font-size update failed validation".to_owned(),
@@ -105,7 +105,7 @@ impl PagesEditor {
         )? {
             return Ok(false);
         }
-        *self = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+        *self = Editor::from_bytes(&staged.to_bytes()?)?;
         Ok(true)
     }
 }

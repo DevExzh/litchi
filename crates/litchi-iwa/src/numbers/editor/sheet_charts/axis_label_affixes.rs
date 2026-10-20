@@ -7,7 +7,7 @@ use crate::charts::axis_label_affixes::{
 };
 use crate::charts::{Axis, LabelAffixes};
 
-impl NumbersEditor {
+impl Editor {
     /// Read the prefix and suffix applied to one sheet-chart axis' labels.
     pub fn sheet_chart_axis_label_affixes(
         &self,
@@ -31,7 +31,7 @@ impl NumbersEditor {
 }
 
 fn sheet_chart_axis_label_affixes(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -47,7 +47,7 @@ fn sheet_chart_axis_label_affixes(
 }
 
 fn set_sheet_chart_axis_label_affixes(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -63,7 +63,7 @@ fn set_sheet_chart_axis_label_affixes(
         axis,
         &affixes,
     )?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_axis_label_affixes(sheet_id, drawable_object_id, axis)? != affixes {
         return Err(Error::InvalidFormat(
             "Numbers chart axis label-affix update failed validation".to_owned(),
@@ -112,7 +112,7 @@ mod tests {
                 expected.clone(),
             )
             .unwrap();
-        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_axis_label_affixes(sheet_id, chart.drawable_object_id, Axis::Value,)

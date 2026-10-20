@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::{self, KeynoteEditor};
-use litchi_iwa::numbers::{self, NumbersEditor};
-use litchi_iwa::pages::{self, PagesEditor};
+use litchi_iwa::keynote::{self};
+use litchi_iwa::numbers::{self};
+use litchi_iwa::pages::{self};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
 use litchi_iwa::text::{
     Alignment, Background, IndentPoints, Indents, LineSpacing, LineSpacingMultiple,
@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let numbers = NumbersEditor::open(output.join("table-layouts.numbers"))?;
+    let numbers = numbers::Editor::open(output.join("table-layouts.numbers"))?;
     let numbers_table = numbers.tables()?.remove(0);
     assert_eq!(
         numbers.table_cell_text_alignment(numbers_table.id(), ROW, COLUMN)?,
@@ -204,7 +204,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         custom_list_label_color()?
     );
 
-    let pages = PagesEditor::open(output.join("table-layouts.pages"))?;
+    let pages = pages::Editor::open(output.join("table-layouts.pages"))?;
     let pages_table = pages.tables()?.remove(0);
     assert_eq!(
         pages.table_cell_text_alignment(pages_table.model_object_id, ROW, COLUMN)?,
@@ -355,7 +355,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         custom_list_label_color()?
     );
 
-    let keynote = KeynoteEditor::open(output.join("table-layouts.key"))?;
+    let keynote = keynote::Editor::open(output.join("table-layouts.key"))?;
     let keynote_table = keynote.slide_tables(0)?.remove(0);
     assert_eq!(
         keynote.slide_table_cell_text_alignment(0, keynote_table.model_object_id, ROW, COLUMN)?,
@@ -1030,7 +1030,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn set_numbers_cell(
-    editor: &mut NumbersEditor,
+    editor: &mut numbers::Editor,
     row: usize,
     column: usize,
     value: CellValue,
@@ -1042,7 +1042,7 @@ fn set_numbers_cell(
 }
 
 fn set_numbers_cells(
-    editor: &mut NumbersEditor,
+    editor: &mut numbers::Editor,
     updates: impl IntoIterator<Item = litchi_numbers::cell::Update>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let changes = updates
@@ -1059,7 +1059,7 @@ fn set_numbers_cells(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    *editor = NumbersEditor::from_bytes(&bytes)?;
+    *editor = numbers::Editor::from_bytes(&bytes)?;
     Ok(())
 }
 

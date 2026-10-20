@@ -1404,7 +1404,7 @@ mod tests {
         numbers
             .set_table_cell_paragraph_list(numbers_table, ROW, COLUMN, ParagraphList::Bullet)
             .unwrap();
-        let mut numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        let mut numbers = Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
         assert_eq!(
             numbers
                 .table_cell_paragraph_list(numbers_table, ROW, COLUMN)
@@ -1433,7 +1433,7 @@ mod tests {
         pages
             .set_table_cell_paragraph_list(pages_table, ROW, COLUMN, ParagraphList::Numbered)
             .unwrap();
-        let pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let pages = crate::pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages
                 .table_cell_paragraph_list(pages_table, ROW, COLUMN)
@@ -1473,8 +1473,7 @@ mod tests {
                 ParagraphList::Bullet,
             )
             .unwrap();
-        let keynote =
-            crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
             keynote
                 .slide_table_cell_paragraph_list(0, table.model_object_id, ROW, COLUMN,)
@@ -1542,7 +1541,7 @@ mod tests {
         numbers
             .set_table_cell_paragraph_lists(numbers_table, ROW, COLUMN, &expected)
             .unwrap();
-        let numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        let numbers = Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
         assert_eq!(
             numbers
                 .table_cell_paragraph_lists(numbers_table, ROW, COLUMN)
@@ -1566,7 +1565,7 @@ mod tests {
         pages
             .set_table_cell_paragraph_lists(pages_table, ROW, COLUMN, &expected)
             .unwrap();
-        let pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let pages = crate::pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages
                 .table_cell_paragraph_lists(pages_table, ROW, COLUMN)
@@ -1600,8 +1599,7 @@ mod tests {
         keynote
             .set_slide_table_cell_paragraph_lists(0, table.model_object_id, ROW, COLUMN, &expected)
             .unwrap();
-        let keynote =
-            crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
             keynote
                 .slide_table_cell_paragraph_lists(0, table.model_object_id, ROW, COLUMN,)
@@ -1660,7 +1658,7 @@ mod tests {
                 indentation,
             )
             .unwrap();
-        let mut numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        let mut numbers = Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
         assert_eq!(
             numbers
                 .table_cell_paragraph_list_bullet(numbers_table, ROW, COLUMN, paragraph)
@@ -1770,7 +1768,7 @@ mod tests {
                 indentation,
             )
             .unwrap();
-        let pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let pages = crate::pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages
                 .table_cell_paragraph_list_bullet(pages_table, ROW, COLUMN, paragraph)
@@ -1852,8 +1850,7 @@ mod tests {
                 indentation,
             )
             .unwrap();
-        let keynote =
-            crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
             keynote
                 .slide_table_cell_paragraph_list_bullet(
@@ -2080,7 +2077,7 @@ mod tests {
                 ParagraphListLevel::ONE,
             )
             .unwrap();
-        let mut numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        let mut numbers = Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
         assert_eq!(
             numbers
                 .table_cell_paragraph_list_levels(numbers_table, ROW, COLUMN)
@@ -2123,7 +2120,7 @@ mod tests {
                 ParagraphListLevel::ONE,
             )
             .unwrap();
-        let pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let pages = crate::pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages
                 .table_cell_paragraph_list_levels(pages_table, ROW, COLUMN)
@@ -2173,8 +2170,7 @@ mod tests {
                 ParagraphListLevel::ONE,
             )
             .unwrap();
-        let keynote =
-            crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
             keynote
                 .slide_table_cell_paragraph_list_levels(0, table.model_object_id, ROW, COLUMN,)
@@ -2208,7 +2204,7 @@ mod tests {
         numbers
             .set_table_cell_paragraph_list_numbering(numbers_table, ROW, COLUMN, paragraph, restart)
             .unwrap();
-        let mut numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        let mut numbers = Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
         assert_eq!(
             numbers
                 .table_cell_paragraph_list_numbering(numbers_table, ROW, COLUMN, paragraph)
@@ -2250,7 +2246,7 @@ mod tests {
         pages
             .set_table_cell_paragraph_list_numbering(pages_table, ROW, COLUMN, paragraph, restart)
             .unwrap();
-        let pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let pages = crate::pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages
                 .table_cell_paragraph_list_numbering(pages_table, ROW, COLUMN, paragraph)
@@ -2300,8 +2296,7 @@ mod tests {
                 restart,
             )
             .unwrap();
-        let keynote =
-            crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
             keynote
                 .slide_table_cell_paragraph_list_numbering(

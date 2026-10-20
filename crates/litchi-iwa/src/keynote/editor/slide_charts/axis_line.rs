@@ -8,7 +8,7 @@ use crate::charts::axis_style::{
 use litchi_iwa_common::chart::axis::Axis;
 use litchi_iwa_common::chart::axis::style::Visibility;
 
-impl KeynoteEditor {
+impl Editor {
     /// Read whether Keynote shows the line for one native slide-chart axis.
     pub fn slide_chart_axis_line_visible(
         &self,
@@ -32,7 +32,7 @@ impl KeynoteEditor {
 }
 
 fn slide_chart_axis_line_visible(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
@@ -48,7 +48,7 @@ fn slide_chart_axis_line_visible(
 }
 
 fn set_slide_chart_axis_line_visible(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
@@ -64,7 +64,7 @@ fn set_slide_chart_axis_line_visible(
         axis,
         visible,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_axis_line_visible(slide_index, drawable_object_id, axis)? != visible {
         return Err(Error::InvalidFormat(
             "Keynote chart axis-line update failed validation".to_owned(),

@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use litchi_iwa::numbers::{self, NumbersSheetMovieOptions};
+use litchi_iwa::numbers::{self};
 use litchi_iwa::shapes::{DrawableFlipAxis, DrawablePoint, DrawableSize};
 
 const MOVIE_DURATION: Duration = Duration::from_secs(8);
@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &movie,
         poster_filename,
         &poster,
-        NumbersSheetMovieOptions::new(MOVIE_POSITION, MOVIE_SIZE, MOVIE_DURATION),
+        numbers::SheetMovieOptions::new(MOVIE_POSITION, MOVIE_SIZE, MOVIE_DURATION),
     )?;
     editor.flip_sheet_movie(
         sheet_id,

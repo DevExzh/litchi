@@ -94,25 +94,20 @@ const MAX_OPERATION_CACHED_DRAWABLE_STORAGES: usize = 1_024;
 
 /// Writable text targets resolved from one slide in presentation order.
 #[derive(Debug, Clone, PartialEq)]
-pub struct KeynoteSlideInfo {
+pub struct SlideInfo {
     pub index: usize,
-    /// Native slide-node object identity retained for migration-host graph work.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy native Keynote slide-node object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility"
-    )]
+    /// Native slide-node object identity (`KN.SlideNodeArchive`).
+    ///
+    /// The migration host addresses native objects by these identities; for
+    /// selector-first semantic reads and edits use `litchi_keynote::Package`.
     pub node_id: u64,
-    /// Native slide object identity retained for migration-host graph work.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility"
-    )]
+    /// Native slide object identity (`KN.SlideArchive`).
     pub slide_id: u64,
     pub name: Option<String>,
     /// Theme layout currently selected for this slide.
     ///
     /// Legacy slides without a template relationship report `None`.
-    pub layout: Option<KeynoteSlideLayoutInfo>,
+    pub layout: Option<SlideLayoutInfo>,
     pub is_skipped: bool,
     pub is_slide_number_visible: Option<bool>,
     /// Whether the layout-provided title placeholder participates in this slide.
@@ -126,32 +121,20 @@ pub struct KeynoteSlideInfo {
     /// placeholders retain their storage, so [`Self::body`] remains readable.
     pub is_body_visible: Option<bool>,
     pub transition: Option<TransitionSettings>,
-    /// Native title-storage identity retained for migration-host graph work.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy native Keynote text-storage ID; use litchi_keynote::Package slide selectors for semantic title reads and edits; retained for migration-host compatibility"
-    )]
+    /// Native title text-storage identity, when the slide has a title placeholder.
     pub title_storage_id: Option<TextStorageId>,
     pub title: Option<String>,
-    /// Native body-storage identity retained for migration-host graph work.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy native Keynote text-storage ID; use litchi_keynote::Package slide selectors for semantic body reads and edits; retained for migration-host compatibility"
-    )]
+    /// Native body text-storage identity, when the slide has a body placeholder.
     pub body_storage_id: Option<TextStorageId>,
     pub body: Option<String>,
-    /// Native speaker-notes storage identity retained for migration-host graph work.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy native Keynote text-storage ID; use litchi_keynote::Package slide selectors for semantic speaker-notes reads and edits; retained for migration-host compatibility"
-    )]
+    /// Native speaker-notes text-storage identity, when the slide has notes.
     pub notes_storage_id: Option<TextStorageId>,
     pub notes: Option<String>,
 }
 
 /// Validated native identities carried by the migration-host slide snapshot.
 ///
-/// The public fields on [`KeynoteSlideInfo`] remain only as deprecated
+/// The public fields on [`SlideInfo`] remain only as deprecated
 /// compatibility data. Object identifiers are validated at the compatibility
 /// boundary, while text-storage identifiers retain their dedicated type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -165,7 +148,7 @@ struct KeynoteSlideNativeIds {
 
 #[derive(Debug)]
 struct KeynoteSlideProjection {
-    layout: Option<KeynoteSlideLayoutInfo>,
+    layout: Option<SlideLayoutInfo>,
     is_title_visible: Option<bool>,
     is_body_visible: Option<bool>,
     transition: Option<TransitionSettings>,
@@ -198,12 +181,8 @@ impl KeynoteSlideNativeIds {
     }
 }
 
-impl KeynoteSlideInfo {
+impl SlideInfo {
     /// Construct the public compatibility snapshot from validated identities.
-    #[expect(
-        deprecated,
-        reason = "the deprecated native fields are populated once at the migration-host compatibility boundary"
-    )]
     fn from_native_parts(
         index: usize,
         ids: KeynoteSlideNativeIds,
@@ -232,10 +211,6 @@ impl KeynoteSlideInfo {
     }
 
     /// Borrow the validated native identities needed by compatibility routes.
-    #[expect(
-        deprecated,
-        reason = "the deprecated native fields are read only at the migration-host compatibility boundary"
-    )]
     fn native_ids(&self) -> Result<KeynoteSlideNativeIds> {
         KeynoteSlideNativeIds::from_raw(
             self.node_id,
@@ -249,9 +224,9 @@ impl KeynoteSlideInfo {
 
 /// Stable identity of a slide layout in the presentation theme.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct KeynoteSlideLayoutId(ObjectId);
+pub struct SlideLayoutId(ObjectId);
 
-impl KeynoteSlideLayoutId {
+impl SlideLayoutId {
     /// Construct a layout identity, rejecting Keynote's null reference sentinel.
     pub const fn new(raw: u64) -> Option<Self> {
         match ObjectId::new(raw) {
@@ -267,15 +242,15 @@ impl KeynoteSlideLayoutId {
 
 /// A theme-provided Keynote slide layout.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct KeynoteSlideLayoutInfo {
-    pub id: KeynoteSlideLayoutId,
+pub struct SlideLayoutInfo {
+    pub id: SlideLayoutId,
     pub name: String,
     pub is_default: bool,
 }
 
 /// Semantic role of a writable text-bearing drawable owned by a slide.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteSlideTextRole {
+pub enum SlideTextRole {
     Title,
     Body,
     TextBox,
@@ -285,28 +260,23 @@ pub enum KeynoteSlideTextRole {
 
 /// A writable text storage owned by a drawable on one Keynote slide.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct KeynoteSlideTextInfo {
+pub struct SlideTextInfo {
     pub slide_index: usize,
-    /// Native drawable identity retained for migration-host graph work.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility"
-    )]
+    /// Native identity of the drawable that owns the storage.
+    ///
+    /// The migration host addresses native objects by this identity; for
+    /// selector-first slide text use `litchi_keynote::Package`.
     pub drawable_object_id: u64,
-    pub role: KeynoteSlideTextRole,
+    pub role: SlideTextRole,
     pub storage: TextStorageInfo,
 }
 
-impl KeynoteSlideTextInfo {
+impl SlideTextInfo {
     /// Construct the public compatibility snapshot from a validated drawable ID.
-    #[expect(
-        deprecated,
-        reason = "the deprecated native drawable field is populated once at the migration-host compatibility boundary"
-    )]
     fn from_native_parts(
         slide_index: usize,
         drawable: ObjectId,
-        role: KeynoteSlideTextRole,
+        role: SlideTextRole,
         storage: TextStorageInfo,
     ) -> Self {
         Self {
@@ -318,10 +288,6 @@ impl KeynoteSlideTextInfo {
     }
 
     /// Return the validated drawable identity for a compatibility route.
-    #[expect(
-        deprecated,
-        reason = "the deprecated native drawable field is read only at the migration-host compatibility boundary"
-    )]
     fn drawable_id(&self) -> Result<ObjectId> {
         ObjectId::new(self.drawable_object_id).ok_or_else(|| {
             Error::InvalidFormat("Keynote drawable has a null object identifier".to_owned())
@@ -337,7 +303,7 @@ impl KeynoteSlideTextInfo {
 /// A Keynote text box removed from a slide with its final text state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RemovedKeynoteTextBox {
-    pub text: KeynoteSlideTextInfo,
+    pub text: SlideTextInfo,
 }
 
 #[derive(Debug, Clone)]
@@ -374,23 +340,23 @@ fn required_length_delimited_payload<'a>(
 
 /// Rotation direction for a Keynote Rotate action build.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteRotationDirection {
+pub enum RotationDirection {
     Clockwise,
     Counterclockwise,
 }
 
 /// Typed parameters for Keynote's object Rotate action.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct KeynoteRotationAction {
+pub struct RotationAction {
     /// Total rotation in degrees. For example, two full turns plus 90° is 810°.
     pub total_degrees: f64,
-    pub direction: KeynoteRotationDirection,
+    pub direction: RotationDirection,
     pub acceleration: BuildAcceleration,
 }
 
 /// Typed parameters for Keynote's object Scale action.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct KeynoteScaleAction {
+pub struct ScaleAction {
     /// Final size as a factor of the object's original size (`1.5` is 150%).
     pub scale_factor: f64,
     pub acceleration: BuildAcceleration,
@@ -398,7 +364,7 @@ pub struct KeynoteScaleAction {
 
 /// Typed parameters for Keynote's object Opacity action.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct KeynoteOpacityAction {
+pub struct OpacityAction {
     /// Final opacity in Keynote percentage points (`37.0` is 37%).
     pub opacity_percent: f64,
     pub acceleration: BuildAcceleration,
@@ -406,7 +372,7 @@ pub struct KeynoteOpacityAction {
 
 /// Node kind used by Keynote's editable Bézier motion paths.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteMotionPathNodeType {
+pub enum MotionPathNodeType {
     Sharp,
     Bezier,
     Smooth,
@@ -414,12 +380,12 @@ pub enum KeynoteMotionPathNodeType {
 
 /// A point in a Keynote motion path, measured in slide points from its origin.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct KeynoteMotionPathPoint {
+pub struct MotionPathPoint {
     pub x: f32,
     pub y: f32,
 }
 
-impl KeynoteMotionPathPoint {
+impl MotionPathPoint {
     pub const fn new(x: f32, y: f32) -> Self {
         Self { x, y }
     }
@@ -427,51 +393,51 @@ impl KeynoteMotionPathPoint {
 
 /// One editable node and its absolute-in-path Bézier control points.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct KeynoteMotionPathNode {
-    pub in_control_point: KeynoteMotionPathPoint,
-    pub point: KeynoteMotionPathPoint,
-    pub out_control_point: KeynoteMotionPathPoint,
-    pub node_type: KeynoteMotionPathNodeType,
+pub struct MotionPathNode {
+    pub in_control_point: MotionPathPoint,
+    pub point: MotionPathPoint,
+    pub out_control_point: MotionPathPoint,
+    pub node_type: MotionPathNodeType,
 }
 
-impl KeynoteMotionPathNode {
+impl MotionPathNode {
     /// A sharp node whose control points coincide with the node.
     pub const fn sharp(x: f32, y: f32) -> Self {
-        let point = KeynoteMotionPathPoint::new(x, y);
+        let point = MotionPathPoint::new(x, y);
         Self {
             in_control_point: point,
             point,
             out_control_point: point,
-            node_type: KeynoteMotionPathNodeType::Sharp,
+            node_type: MotionPathNodeType::Sharp,
         }
     }
 }
 
 /// One continuous or closed subpath in a Keynote motion path.
 #[derive(Debug, Clone, PartialEq)]
-pub struct KeynoteMotionSubpath {
-    pub nodes: Vec<KeynoteMotionPathNode>,
+pub struct MotionSubpath {
+    pub nodes: Vec<MotionPathNode>,
     pub closed: bool,
 }
 
 /// Editable motion geometry stored inline in a Keynote Move action.
 #[derive(Debug, Clone, PartialEq)]
-pub struct KeynoteMotionPath {
-    pub subpaths: Vec<KeynoteMotionSubpath>,
+pub struct MotionPath {
+    pub subpaths: Vec<MotionSubpath>,
     pub natural_width: f32,
     pub natural_height: f32,
     pub horizontal_flip: bool,
     pub vertical_flip: bool,
 }
 
-impl KeynoteMotionPath {
+impl MotionPath {
     /// A native-compatible straight path from the object's current position.
     pub fn straight(delta_x: f32, delta_y: f32) -> Self {
         Self {
-            subpaths: vec![KeynoteMotionSubpath {
+            subpaths: vec![MotionSubpath {
                 nodes: vec![
-                    KeynoteMotionPathNode::sharp(0.0, 0.0),
-                    KeynoteMotionPathNode::sharp(delta_x, delta_y),
+                    MotionPathNode::sharp(0.0, 0.0),
+                    MotionPathNode::sharp(delta_x, delta_y),
                 ],
                 closed: false,
             }],
@@ -512,36 +478,36 @@ impl KeynoteMotionPath {
 /// elapsed time on the horizontal axis and animation progress on the vertical
 /// axis, matching Keynote's native custom-curve payload.
 #[derive(Debug, Clone, PartialEq)]
-pub struct KeynoteBuildTimingCurve {
-    pub path: KeynoteMotionPath,
+pub struct BuildTimingCurve {
+    pub path: MotionPath,
 }
 
-impl KeynoteBuildTimingCurve {
+impl BuildTimingCurve {
     /// Construct a one-segment cubic Bézier timing curve.
     ///
     /// The control points are normalized to the timing-curve coordinate space;
     /// callers can use [`Self::from_path`] for a multi-segment curve.
     pub fn cubic(
-        first_control_point: KeynoteMotionPathPoint,
-        second_control_point: KeynoteMotionPathPoint,
+        first_control_point: MotionPathPoint,
+        second_control_point: MotionPathPoint,
     ) -> Self {
-        let origin = KeynoteMotionPathPoint::new(0.0, 0.0);
-        let destination = KeynoteMotionPathPoint::new(1.0, 1.0);
+        let origin = MotionPathPoint::new(0.0, 0.0);
+        let destination = MotionPathPoint::new(1.0, 1.0);
         Self {
-            path: KeynoteMotionPath {
-                subpaths: vec![KeynoteMotionSubpath {
+            path: MotionPath {
+                subpaths: vec![MotionSubpath {
                     nodes: vec![
-                        KeynoteMotionPathNode {
+                        MotionPathNode {
                             in_control_point: origin,
                             point: origin,
                             out_control_point: first_control_point,
-                            node_type: KeynoteMotionPathNodeType::Bezier,
+                            node_type: MotionPathNodeType::Bezier,
                         },
-                        KeynoteMotionPathNode {
+                        MotionPathNode {
                             in_control_point: second_control_point,
                             point: destination,
                             out_control_point: destination,
-                            node_type: KeynoteMotionPathNodeType::Bezier,
+                            node_type: MotionPathNodeType::Bezier,
                         },
                     ],
                     closed: false,
@@ -557,35 +523,35 @@ impl KeynoteBuildTimingCurve {
     /// Construct a linear timing curve.
     pub fn linear() -> Self {
         Self::cubic(
-            KeynoteMotionPathPoint::new(0.0, 0.0),
-            KeynoteMotionPathPoint::new(1.0, 1.0),
+            MotionPathPoint::new(0.0, 0.0),
+            MotionPathPoint::new(1.0, 1.0),
         )
     }
 
     /// Wrap an explicitly constructed native-compatible timing path.
-    pub fn from_path(path: KeynoteMotionPath) -> Self {
+    pub fn from_path(path: MotionPath) -> Self {
         Self { path }
     }
 }
 
 /// Typed parameters for Keynote's object Move action.
 #[derive(Debug, Clone, PartialEq)]
-pub struct KeynoteMoveAction {
-    pub path: KeynoteMotionPath,
+pub struct MoveAction {
+    pub path: MotionPath,
     pub align_to_path: bool,
     pub acceleration: BuildAcceleration,
 }
 
 /// Horizontal direction used by Keynote's Flip emphasis action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteFlipDirection {
+pub enum FlipDirection {
     LeftToRight,
     RightToLeft,
 }
 
 /// Intensity used by Keynote's Jiggle emphasis action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteJiggleIntensity {
+pub enum JiggleIntensity {
     Small,
     Medium,
     Large,
@@ -593,7 +559,7 @@ pub enum KeynoteJiggleIntensity {
 
 /// Typed parameters for Keynote's object-emphasis actions.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum KeynoteEmphasisAction {
+pub enum EmphasisAction {
     Blink {
         repeat_count: u32,
         fade: bool,
@@ -604,10 +570,10 @@ pub enum KeynoteEmphasisAction {
     },
     Flip {
         repeat_count: u32,
-        direction: KeynoteFlipDirection,
+        direction: FlipDirection,
     },
     Jiggle {
-        intensity: KeynoteJiggleIntensity,
+        intensity: JiggleIntensity,
     },
     Pop {
         scale_percent: f64,
@@ -620,28 +586,28 @@ pub enum KeynoteEmphasisAction {
 
 /// Text traversal direction used by Keynote's Keyboard build effect.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteKeyboardDirection {
+pub enum KeyboardDirection {
     Forward,
     Backward,
 }
 
 /// Typed parameters for Keynote's Keyboard build-in/build-out effect.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct KeynoteKeyboardBuild {
-    pub direction: KeynoteKeyboardDirection,
+pub struct KeyboardBuild {
+    pub direction: KeyboardDirection,
     pub show_cursor: bool,
 }
 
 /// Horizontal traversal used by Keynote's Skid and Trace builds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteHorizontalBuildDirection {
+pub enum HorizontalBuildDirection {
     LeftToRight,
     RightToLeft,
 }
 
 /// Origin used by Keynote's Swoosh build.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteSwooshDirection {
+pub enum SwooshDirection {
     Center,
     FromLeft,
     FromRight,
@@ -649,18 +615,12 @@ pub enum KeynoteSwooshDirection {
 
 /// Typed native Build In / Build Out effects with no opaque parameters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteObjectBuildEffect {
+pub enum ObjectBuildEffect {
     Dissolve,
     Shimmer,
-    Skid {
-        direction: KeynoteHorizontalBuildDirection,
-    },
-    Swoosh {
-        direction: KeynoteSwooshDirection,
-    },
-    Trace {
-        direction: KeynoteHorizontalBuildDirection,
-    },
+    Skid { direction: HorizontalBuildDirection },
+    Swoosh { direction: SwooshDirection },
+    Trace { direction: HorizontalBuildDirection },
 }
 
 /// Raw native parameters shared by Keynote build effects that do not yet have
@@ -670,7 +630,7 @@ pub enum KeynoteObjectBuildEffect {
 /// lossless CRUD for newer or effect-specific builds while their user-facing
 /// semantics are still being mapped.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub struct KeynoteBuildCustomParameters {
+pub struct BuildCustomParameters {
     pub bounce: Option<bool>,
     pub motion_blur: Option<bool>,
     pub include_endpoints: Option<bool>,
@@ -679,7 +639,7 @@ pub struct KeynoteBuildCustomParameters {
     pub travel_distance: Option<f64>,
 }
 
-impl KeynoteBuildCustomParameters {
+impl BuildCustomParameters {
     fn is_empty(self) -> bool {
         self == Self::default()
     }
@@ -691,7 +651,7 @@ impl KeynoteBuildCustomParameters {
 /// `apple:bc-appear` or `apple:dissolve character`. Keeping them as strings
 /// preserves effects introduced by newer Keynote releases.
 #[derive(Debug, Clone, PartialEq)]
-pub struct KeynoteBuildSettings {
+pub struct BuildSettings {
     pub(crate) delivery: String,
     pub(crate) animation_type: String,
     pub(crate) effect: String,
@@ -706,30 +666,30 @@ pub struct KeynoteBuildSettings {
     pub(crate) delivery_option: Option<i32>,
     pub(crate) event_trigger: Option<u32>,
     /// Present for Keynote's native `apple:action-rotation` action effect.
-    pub(crate) rotation: Option<KeynoteRotationAction>,
+    pub(crate) rotation: Option<RotationAction>,
     /// Present for Keynote's native `apple:action-scale` action effect.
-    pub(crate) scale: Option<KeynoteScaleAction>,
+    pub(crate) scale: Option<ScaleAction>,
     /// Present for Keynote's native `apple:action-opacity` action effect.
-    pub(crate) opacity: Option<KeynoteOpacityAction>,
+    pub(crate) opacity: Option<OpacityAction>,
     /// Present for Keynote's native `apple:action-motion-path` action effect.
-    pub(crate) move_action: Option<KeynoteMoveAction>,
+    pub(crate) move_action: Option<MoveAction>,
     /// Present for Keynote's Blink/Bounce/Flip/Jiggle/Pop/Pulse actions.
-    pub(crate) emphasis: Option<KeynoteEmphasisAction>,
+    pub(crate) emphasis: Option<EmphasisAction>,
     /// Present for Keynote's native `apple:keyboard` build-in/build-out effect.
-    pub(crate) keyboard: Option<KeynoteKeyboardBuild>,
+    pub(crate) keyboard: Option<KeyboardBuild>,
     /// Present for typed Dissolve, Shimmer, Skid, Swoosh, and Trace builds.
-    pub(crate) object_effect: Option<KeynoteObjectBuildEffect>,
+    pub(crate) object_effect: Option<ObjectBuildEffect>,
     /// Inline curve for a typed action whose acceleration is
     /// [`BuildAcceleration::Custom`].
     ///
     /// `None` preserves an opaque app-native custom curve while updating an
     /// existing build. New custom-curve actions require `Some`.
-    pub(crate) timing_curve: Option<KeynoteBuildTimingCurve>,
+    pub(crate) timing_curve: Option<BuildTimingCurve>,
     /// Raw parameters for native effects without a dedicated typed model.
-    pub(crate) custom_parameters: KeynoteBuildCustomParameters,
+    pub(crate) custom_parameters: BuildCustomParameters,
 }
 
-impl KeynoteBuildSettings {
+impl BuildSettings {
     /// Project the native adapter state into the bounded archive-free model.
     ///
     /// Native identifiers, presence bits, and opaque parameter fields stay in
@@ -835,7 +795,7 @@ impl KeynoteBuildSettings {
     }
 
     /// Replace the editable path of a typed Move action.
-    pub fn set_move_path(&mut self, path: KeynoteMotionPath) -> Result<()> {
+    pub fn set_move_path(&mut self, path: MotionPath) -> Result<()> {
         if self.move_action.is_none() {
             return Err(Error::ParseError(
                 "Keynote Move path requires a typed Move action".to_owned(),
@@ -937,7 +897,7 @@ impl KeynoteBuildSettings {
             keyboard: None,
             object_effect: None,
             timing_curve: None,
-            custom_parameters: KeynoteBuildCustomParameters::default(),
+            custom_parameters: BuildCustomParameters::default(),
         }
     }
 
@@ -949,11 +909,7 @@ impl KeynoteBuildSettings {
         }
     }
 
-    fn text_object_build(
-        animation_type: &str,
-        effect: KeynoteObjectBuildEffect,
-        duration: f64,
-    ) -> Self {
+    fn text_object_build(animation_type: &str, effect: ObjectBuildEffect, duration: f64) -> Self {
         Self {
             animation_type: animation_type.to_owned(),
             effect: object_build_effect_identifier(effect).to_owned(),
@@ -964,7 +920,7 @@ impl KeynoteBuildSettings {
         }
     }
 
-    fn object_build(animation_type: &str, effect: KeynoteObjectBuildEffect, duration: f64) -> Self {
+    fn object_build(animation_type: &str, effect: ObjectBuildEffect, duration: f64) -> Self {
         Self {
             text_delivery: None,
             delivery_option: None,
@@ -974,62 +930,62 @@ impl KeynoteBuildSettings {
 
     /// Native-compatible Dissolve Build In.
     pub fn dissolve_in() -> Self {
-        Self::text_object_build("In", KeynoteObjectBuildEffect::Dissolve, 1.0)
+        Self::text_object_build("In", ObjectBuildEffect::Dissolve, 1.0)
     }
 
     /// Native-compatible Dissolve Build Out.
     pub fn dissolve_out() -> Self {
-        Self::text_object_build("Out", KeynoteObjectBuildEffect::Dissolve, 1.0)
+        Self::text_object_build("Out", ObjectBuildEffect::Dissolve, 1.0)
     }
 
     /// Native-compatible Shimmer Build In.
     pub fn shimmer_in() -> Self {
-        Self::object_build("In", KeynoteObjectBuildEffect::Shimmer, 1.5)
+        Self::object_build("In", ObjectBuildEffect::Shimmer, 1.5)
     }
 
     /// Native-compatible Shimmer Build Out.
     pub fn shimmer_out() -> Self {
-        Self::object_build("Out", KeynoteObjectBuildEffect::Shimmer, 1.5)
+        Self::object_build("Out", ObjectBuildEffect::Shimmer, 1.5)
     }
 
     /// Native-compatible Skid Build In.
-    pub fn skid_in(direction: KeynoteHorizontalBuildDirection) -> Self {
-        Self::object_build("In", KeynoteObjectBuildEffect::Skid { direction }, 1.25)
+    pub fn skid_in(direction: HorizontalBuildDirection) -> Self {
+        Self::object_build("In", ObjectBuildEffect::Skid { direction }, 1.25)
     }
 
     /// Native-compatible Skid Build Out.
-    pub fn skid_out(direction: KeynoteHorizontalBuildDirection) -> Self {
-        Self::object_build("Out", KeynoteObjectBuildEffect::Skid { direction }, 1.25)
+    pub fn skid_out(direction: HorizontalBuildDirection) -> Self {
+        Self::object_build("Out", ObjectBuildEffect::Skid { direction }, 1.25)
     }
 
     /// Native-compatible Swoosh Build In.
-    pub fn swoosh_in(direction: KeynoteSwooshDirection) -> Self {
-        Self::object_build("In", KeynoteObjectBuildEffect::Swoosh { direction }, 1.0)
+    pub fn swoosh_in(direction: SwooshDirection) -> Self {
+        Self::object_build("In", ObjectBuildEffect::Swoosh { direction }, 1.0)
     }
 
     /// Native-compatible Swoosh Build Out.
-    pub fn swoosh_out(direction: KeynoteSwooshDirection) -> Self {
-        Self::object_build("Out", KeynoteObjectBuildEffect::Swoosh { direction }, 1.0)
+    pub fn swoosh_out(direction: SwooshDirection) -> Self {
+        Self::object_build("Out", ObjectBuildEffect::Swoosh { direction }, 1.0)
     }
 
     /// Native-compatible Trace Build In.
-    pub fn trace_in(direction: KeynoteHorizontalBuildDirection) -> Self {
-        Self::object_build("In", KeynoteObjectBuildEffect::Trace { direction }, 2.0)
+    pub fn trace_in(direction: HorizontalBuildDirection) -> Self {
+        Self::object_build("In", ObjectBuildEffect::Trace { direction }, 2.0)
     }
 
     /// Native-compatible Trace Build Out.
-    pub fn trace_out(direction: KeynoteHorizontalBuildDirection) -> Self {
-        Self::object_build("Out", KeynoteObjectBuildEffect::Trace { direction }, 2.0)
+    pub fn trace_out(direction: HorizontalBuildDirection) -> Self {
+        Self::object_build("Out", ObjectBuildEffect::Trace { direction }, 2.0)
     }
 
     /// Native-compatible Rotate action with Keynote's default ease-in/out curve.
-    pub fn rotate_action(total_degrees: f64, direction: KeynoteRotationDirection) -> Self {
+    pub fn rotate_action(total_degrees: f64, direction: RotationDirection) -> Self {
         Self {
             animation_type: "Action".to_owned(),
             effect: ROTATE_ACTION_EFFECT.to_owned(),
             text_delivery: None,
             delivery_option: None,
-            rotation: Some(KeynoteRotationAction {
+            rotation: Some(RotationAction {
                 total_degrees,
                 direction,
                 acceleration: BuildAcceleration::EaseInOut,
@@ -1049,7 +1005,7 @@ impl KeynoteBuildSettings {
             text_delivery: None,
             delivery_option: None,
             rotation: None,
-            scale: Some(KeynoteScaleAction {
+            scale: Some(ScaleAction {
                 scale_factor,
                 acceleration: BuildAcceleration::EaseInOut,
             }),
@@ -1068,7 +1024,7 @@ impl KeynoteBuildSettings {
             delivery_option: None,
             rotation: None,
             scale: None,
-            opacity: Some(KeynoteOpacityAction {
+            opacity: Some(OpacityAction {
                 opacity_percent,
                 acceleration: BuildAcceleration::EaseInOut,
             }),
@@ -1079,11 +1035,11 @@ impl KeynoteBuildSettings {
 
     /// Native-compatible straight Move action with Keynote's default curve.
     pub fn move_action(delta_x: f32, delta_y: f32) -> Self {
-        Self::move_along_path(KeynoteMotionPath::straight(delta_x, delta_y))
+        Self::move_along_path(MotionPath::straight(delta_x, delta_y))
     }
 
     /// Native-compatible Move action along an arbitrary editable Bézier path.
-    pub fn move_along_path(path: KeynoteMotionPath) -> Self {
+    pub fn move_along_path(path: MotionPath) -> Self {
         Self {
             animation_type: "Action".to_owned(),
             effect: MOVE_ACTION_EFFECT.to_owned(),
@@ -1092,7 +1048,7 @@ impl KeynoteBuildSettings {
             rotation: None,
             scale: None,
             opacity: None,
-            move_action: Some(KeynoteMoveAction {
+            move_action: Some(MoveAction {
                 path,
                 align_to_path: false,
                 acceleration: BuildAcceleration::EaseInOut,
@@ -1106,10 +1062,7 @@ impl KeynoteBuildSettings {
     /// This changes the action's acceleration to
     /// [`BuildAcceleration::Custom`]. It returns an error when this is
     /// not a Rotate, Scale, Opacity, or Move action.
-    pub fn with_custom_timing_curve(
-        mut self,
-        timing_curve: KeynoteBuildTimingCurve,
-    ) -> Result<Self> {
+    pub fn with_custom_timing_curve(mut self, timing_curve: BuildTimingCurve) -> Result<Self> {
         self.set_custom_timing_curve(timing_curve)?;
         Ok(self)
     }
@@ -1119,7 +1072,7 @@ impl KeynoteBuildSettings {
     /// This changes the action's acceleration to
     /// [`BuildAcceleration::Custom`]. It returns an error when this is
     /// not a Rotate, Scale, Opacity, or Move action.
-    pub fn set_custom_timing_curve(&mut self, timing_curve: KeynoteBuildTimingCurve) -> Result<()> {
+    pub fn set_custom_timing_curve(&mut self, timing_curve: BuildTimingCurve) -> Result<()> {
         validate_timing_curve(&timing_curve)?;
         let acceleration = if let Some(action) = self.rotation.as_mut() {
             &mut action.acceleration
@@ -1143,7 +1096,7 @@ impl KeynoteBuildSettings {
     pub fn blink_action(repeat_count: u32, fade: bool) -> Self {
         Self::emphasis_action(
             BLINK_ACTION_EFFECT,
-            KeynoteEmphasisAction::Blink { repeat_count, fade },
+            EmphasisAction::Blink { repeat_count, fade },
         )
     }
 
@@ -1151,7 +1104,7 @@ impl KeynoteBuildSettings {
     pub fn bounce_action(repeat_count: u32, decay: bool) -> Self {
         Self::emphasis_action(
             BOUNCE_ACTION_EFFECT,
-            KeynoteEmphasisAction::Bounce {
+            EmphasisAction::Bounce {
                 repeat_count,
                 decay,
             },
@@ -1159,10 +1112,10 @@ impl KeynoteBuildSettings {
     }
 
     /// Native-compatible Flip emphasis action.
-    pub fn flip_action(repeat_count: u32, direction: KeynoteFlipDirection) -> Self {
+    pub fn flip_action(repeat_count: u32, direction: FlipDirection) -> Self {
         Self::emphasis_action(
             FLIP_ACTION_EFFECT,
-            KeynoteEmphasisAction::Flip {
+            EmphasisAction::Flip {
                 repeat_count,
                 direction,
             },
@@ -1170,19 +1123,14 @@ impl KeynoteBuildSettings {
     }
 
     /// Native-compatible Jiggle emphasis action.
-    pub fn jiggle_action(intensity: KeynoteJiggleIntensity) -> Self {
-        Self::emphasis_action(
-            JIGGLE_ACTION_EFFECT,
-            KeynoteEmphasisAction::Jiggle { intensity },
-        )
+    pub fn jiggle_action(intensity: JiggleIntensity) -> Self {
+        Self::emphasis_action(JIGGLE_ACTION_EFFECT, EmphasisAction::Jiggle { intensity })
     }
 
     /// Native-compatible Pop emphasis action.
     pub fn pop_action(scale_percent: f64) -> Self {
-        let mut settings = Self::emphasis_action(
-            POP_ACTION_EFFECT,
-            KeynoteEmphasisAction::Pop { scale_percent },
-        );
+        let mut settings =
+            Self::emphasis_action(POP_ACTION_EFFECT, EmphasisAction::Pop { scale_percent });
         settings.duration = 0.5;
         settings
     }
@@ -1191,7 +1139,7 @@ impl KeynoteBuildSettings {
     pub fn pulse_action(repeat_count: u32, scale_percent: f64) -> Self {
         Self::emphasis_action(
             PULSE_ACTION_EFFECT,
-            KeynoteEmphasisAction::Pulse {
+            EmphasisAction::Pulse {
                 repeat_count,
                 scale_percent,
             },
@@ -1199,18 +1147,18 @@ impl KeynoteBuildSettings {
     }
 
     /// Native-compatible Keyboard build-in settings.
-    pub fn keyboard_in(direction: KeynoteKeyboardDirection, show_cursor: bool) -> Self {
+    pub fn keyboard_in(direction: KeyboardDirection, show_cursor: bool) -> Self {
         Self::keyboard_build("In", direction, show_cursor)
     }
 
     /// Native-compatible Keyboard build-out settings.
-    pub fn keyboard_out(direction: KeynoteKeyboardDirection, show_cursor: bool) -> Self {
+    pub fn keyboard_out(direction: KeyboardDirection, show_cursor: bool) -> Self {
         Self::keyboard_build("Out", direction, show_cursor)
     }
 
     fn keyboard_build(
         animation_type: &str,
-        direction: KeynoteKeyboardDirection,
+        direction: KeyboardDirection,
         show_cursor: bool,
     ) -> Self {
         Self {
@@ -1220,7 +1168,7 @@ impl KeynoteBuildSettings {
             direction: Some(native_keyboard_direction(direction)),
             text_delivery: None,
             delivery_option: None,
-            keyboard: Some(KeynoteKeyboardBuild {
+            keyboard: Some(KeyboardBuild {
                 direction,
                 show_cursor,
             }),
@@ -1228,9 +1176,9 @@ impl KeynoteBuildSettings {
         }
     }
 
-    fn emphasis_action(effect: &str, emphasis: KeynoteEmphasisAction) -> Self {
+    fn emphasis_action(effect: &str, emphasis: EmphasisAction) -> Self {
         let direction = match emphasis {
-            KeynoteEmphasisAction::Flip { direction, .. } => Some(native_flip_direction(direction)),
+            EmphasisAction::Flip { direction, .. } => Some(native_flip_direction(direction)),
             _ => None,
         };
         Self {
@@ -1250,7 +1198,7 @@ impl KeynoteBuildSettings {
 }
 
 fn apply_semantic_build_effect(
-    settings: &mut KeynoteBuildSettings,
+    settings: &mut BuildSettings,
     effect: litchi_keynote::build::Effect,
 ) -> Result<()> {
     effect
@@ -1266,7 +1214,7 @@ fn apply_semantic_build_effect(
     settings.keyboard = None;
     settings.object_effect = None;
     settings.timing_curve = None;
-    settings.custom_parameters = KeynoteBuildCustomParameters::default();
+    settings.custom_parameters = BuildCustomParameters::default();
 
     match effect {
         litchi_keynote::build::Effect::Appear => {
@@ -1294,33 +1242,33 @@ fn apply_semantic_build_effect(
             settings.effect = action.identifier().to_owned();
             match action {
                 litchi_keynote::build::Action::Rotate(action) => {
-                    settings.rotation = Some(KeynoteRotationAction {
+                    settings.rotation = Some(RotationAction {
                         total_degrees: action.total_degrees(),
                         direction: match action.direction() {
                             litchi_keynote::build::RotationDirection::Clockwise => {
-                                KeynoteRotationDirection::Clockwise
+                                self::RotationDirection::Clockwise
                             },
                             litchi_keynote::build::RotationDirection::Counterclockwise => {
-                                KeynoteRotationDirection::Counterclockwise
+                                self::RotationDirection::Counterclockwise
                             },
                         },
                         acceleration: action.acceleration(),
                     });
                 },
                 litchi_keynote::build::Action::Scale(action) => {
-                    settings.scale = Some(KeynoteScaleAction {
+                    settings.scale = Some(ScaleAction {
                         scale_factor: action.factor(),
                         acceleration: action.acceleration(),
                     });
                 },
                 litchi_keynote::build::Action::Opacity(action) => {
-                    settings.opacity = Some(KeynoteOpacityAction {
+                    settings.opacity = Some(OpacityAction {
                         opacity_percent: action.percent(),
                         acceleration: action.acceleration(),
                     });
                 },
                 litchi_keynote::build::Action::Move(action) => {
-                    settings.move_action = Some(KeynoteMoveAction {
+                    settings.move_action = Some(MoveAction {
                         path: native_motion_path_from_semantic(action.path())?,
                         align_to_path: action.align_to_path(),
                         acceleration: action.acceleration(),
@@ -1352,20 +1300,20 @@ fn apply_semantic_build_effect(
             settings.direction = Some(builds::native_keyboard_direction(
                 match keyboard.direction() {
                     litchi_keynote::build::KeyboardDirection::Forward => {
-                        KeynoteKeyboardDirection::Forward
+                        self::KeyboardDirection::Forward
                     },
                     litchi_keynote::build::KeyboardDirection::Backward => {
-                        KeynoteKeyboardDirection::Backward
+                        self::KeyboardDirection::Backward
                     },
                 },
             ));
-            settings.keyboard = Some(KeynoteKeyboardBuild {
+            settings.keyboard = Some(KeyboardBuild {
                 direction: match keyboard.direction() {
                     litchi_keynote::build::KeyboardDirection::Forward => {
-                        KeynoteKeyboardDirection::Forward
+                        self::KeyboardDirection::Forward
                     },
                     litchi_keynote::build::KeyboardDirection::Backward => {
-                        KeynoteKeyboardDirection::Backward
+                        self::KeyboardDirection::Backward
                     },
                 },
                 show_cursor: keyboard.show_cursor(),
@@ -1401,55 +1349,55 @@ fn apply_semantic_build_effect(
 )]
 fn native_emphasis_action(
     emphasis: litchi_keynote::build::Emphasis,
-) -> Result<(KeynoteEmphasisAction, Option<u32>)> {
+) -> Result<(EmphasisAction, Option<u32>)> {
     use litchi_keynote::build::{FlipDirection, JiggleIntensity};
 
     match emphasis {
         litchi_keynote::build::Emphasis::Blink(action) => Ok((
-            KeynoteEmphasisAction::Blink {
+            EmphasisAction::Blink {
                 repeat_count: action.repeat_count(),
                 fade: action.fade(),
             },
             None,
         )),
         litchi_keynote::build::Emphasis::Bounce(action) => Ok((
-            KeynoteEmphasisAction::Bounce {
+            EmphasisAction::Bounce {
                 repeat_count: action.repeat_count(),
                 decay: action.decay(),
             },
             None,
         )),
         litchi_keynote::build::Emphasis::Flip(action) => Ok((
-            KeynoteEmphasisAction::Flip {
+            EmphasisAction::Flip {
                 repeat_count: action.repeat_count(),
                 direction: match action.direction() {
-                    FlipDirection::LeftToRight => KeynoteFlipDirection::LeftToRight,
-                    FlipDirection::RightToLeft => KeynoteFlipDirection::RightToLeft,
+                    FlipDirection::LeftToRight => self::FlipDirection::LeftToRight,
+                    FlipDirection::RightToLeft => self::FlipDirection::RightToLeft,
                 },
             },
             Some(builds::native_flip_direction(match action.direction() {
-                FlipDirection::LeftToRight => KeynoteFlipDirection::LeftToRight,
-                FlipDirection::RightToLeft => KeynoteFlipDirection::RightToLeft,
+                FlipDirection::LeftToRight => self::FlipDirection::LeftToRight,
+                FlipDirection::RightToLeft => self::FlipDirection::RightToLeft,
             })),
         )),
         litchi_keynote::build::Emphasis::Jiggle(action) => Ok((
-            KeynoteEmphasisAction::Jiggle {
+            EmphasisAction::Jiggle {
                 intensity: match action.intensity() {
-                    JiggleIntensity::Small => KeynoteJiggleIntensity::Small,
-                    JiggleIntensity::Medium => KeynoteJiggleIntensity::Medium,
-                    JiggleIntensity::Large => KeynoteJiggleIntensity::Large,
+                    JiggleIntensity::Small => self::JiggleIntensity::Small,
+                    JiggleIntensity::Medium => self::JiggleIntensity::Medium,
+                    JiggleIntensity::Large => self::JiggleIntensity::Large,
                 },
             },
             None,
         )),
         litchi_keynote::build::Emphasis::Pop(action) => Ok((
-            KeynoteEmphasisAction::Pop {
+            EmphasisAction::Pop {
                 scale_percent: action.scale_percent(),
             },
             None,
         )),
         litchi_keynote::build::Emphasis::Pulse(action) => Ok((
-            KeynoteEmphasisAction::Pulse {
+            EmphasisAction::Pulse {
                 repeat_count: action.repeat_count(),
                 scale_percent: action.scale_percent(),
             },
@@ -1471,54 +1419,38 @@ fn native_emphasis_action(
 )]
 fn native_object_build_effect(
     effect: litchi_keynote::build::ObjectEffect,
-) -> Result<KeynoteObjectBuildEffect> {
+) -> Result<ObjectBuildEffect> {
     use litchi_keynote::build::{HorizontalDirection, SwooshDirection};
 
     match effect {
-        litchi_keynote::build::ObjectEffect::Dissolve => Ok(KeynoteObjectBuildEffect::Dissolve),
-        litchi_keynote::build::ObjectEffect::Shimmer => Ok(KeynoteObjectBuildEffect::Shimmer),
-        litchi_keynote::build::ObjectEffect::Skid(direction) => {
-            Ok(KeynoteObjectBuildEffect::Skid {
-                direction: match direction {
-                    HorizontalDirection::LeftToRight => {
-                        KeynoteHorizontalBuildDirection::LeftToRight
-                    },
-                    HorizontalDirection::RightToLeft => {
-                        KeynoteHorizontalBuildDirection::RightToLeft
-                    },
-                },
-            })
-        },
-        litchi_keynote::build::ObjectEffect::Swoosh(direction) => {
-            Ok(KeynoteObjectBuildEffect::Swoosh {
-                direction: match direction {
-                    SwooshDirection::Center => KeynoteSwooshDirection::Center,
-                    SwooshDirection::FromLeft => KeynoteSwooshDirection::FromLeft,
-                    SwooshDirection::FromRight => KeynoteSwooshDirection::FromRight,
-                },
-            })
-        },
-        litchi_keynote::build::ObjectEffect::Trace(direction) => {
-            Ok(KeynoteObjectBuildEffect::Trace {
-                direction: match direction {
-                    HorizontalDirection::LeftToRight => {
-                        KeynoteHorizontalBuildDirection::LeftToRight
-                    },
-                    HorizontalDirection::RightToLeft => {
-                        KeynoteHorizontalBuildDirection::RightToLeft
-                    },
-                },
-            })
-        },
+        litchi_keynote::build::ObjectEffect::Dissolve => Ok(ObjectBuildEffect::Dissolve),
+        litchi_keynote::build::ObjectEffect::Shimmer => Ok(ObjectBuildEffect::Shimmer),
+        litchi_keynote::build::ObjectEffect::Skid(direction) => Ok(ObjectBuildEffect::Skid {
+            direction: match direction {
+                HorizontalDirection::LeftToRight => HorizontalBuildDirection::LeftToRight,
+                HorizontalDirection::RightToLeft => HorizontalBuildDirection::RightToLeft,
+            },
+        }),
+        litchi_keynote::build::ObjectEffect::Swoosh(direction) => Ok(ObjectBuildEffect::Swoosh {
+            direction: match direction {
+                SwooshDirection::Center => self::SwooshDirection::Center,
+                SwooshDirection::FromLeft => self::SwooshDirection::FromLeft,
+                SwooshDirection::FromRight => self::SwooshDirection::FromRight,
+            },
+        }),
+        litchi_keynote::build::ObjectEffect::Trace(direction) => Ok(ObjectBuildEffect::Trace {
+            direction: match direction {
+                HorizontalDirection::LeftToRight => HorizontalBuildDirection::LeftToRight,
+                HorizontalDirection::RightToLeft => HorizontalBuildDirection::RightToLeft,
+            },
+        }),
         _ => Err(Error::ParseError(
             "Keynote object effect variant is not supported by this adapter".to_owned(),
         )),
     }
 }
 
-fn native_motion_path_from_semantic(
-    path: &litchi_keynote::build::Path,
-) -> Result<KeynoteMotionPath> {
+fn native_motion_path_from_semantic(path: &litchi_keynote::build::Path) -> Result<MotionPath> {
     let finite_f32 = |value: f64| -> Result<f32> {
         if !value.is_finite() || value.abs() > f64::from(f32::MAX) {
             return Err(Error::ParseError(
@@ -1527,8 +1459,8 @@ fn native_motion_path_from_semantic(
         }
         Ok(value as f32)
     };
-    let point = |point: litchi_keynote::build::Point| -> Result<KeynoteMotionPathPoint> {
-        Ok(KeynoteMotionPathPoint::new(
+    let point = |point: litchi_keynote::build::Point| -> Result<MotionPathPoint> {
+        Ok(MotionPathPoint::new(
             finite_f32(point.x())?,
             finite_f32(point.y())?,
         ))
@@ -1541,31 +1473,25 @@ fn native_motion_path_from_semantic(
                 .nodes()
                 .iter()
                 .map(|node| {
-                    Ok(KeynoteMotionPathNode {
+                    Ok(MotionPathNode {
                         in_control_point: point(node.in_control_point())?,
                         point: point(node.point())?,
                         out_control_point: point(node.out_control_point())?,
                         node_type: match node.kind() {
-                            litchi_keynote::build::NodeKind::Sharp => {
-                                KeynoteMotionPathNodeType::Sharp
-                            },
-                            litchi_keynote::build::NodeKind::Bezier => {
-                                KeynoteMotionPathNodeType::Bezier
-                            },
-                            litchi_keynote::build::NodeKind::Smooth => {
-                                KeynoteMotionPathNodeType::Smooth
-                            },
+                            litchi_keynote::build::NodeKind::Sharp => MotionPathNodeType::Sharp,
+                            litchi_keynote::build::NodeKind::Bezier => MotionPathNodeType::Bezier,
+                            litchi_keynote::build::NodeKind::Smooth => MotionPathNodeType::Smooth,
                         },
                     })
                 })
                 .collect::<Result<Vec<_>>>()?;
-            Ok(KeynoteMotionSubpath {
+            Ok(MotionSubpath {
                 nodes,
                 closed: subpath.closed(),
             })
         })
         .collect::<Result<Vec<_>>>()?;
-    let native = KeynoteMotionPath {
+    let native = MotionPath {
         subpaths,
         natural_width: finite_f32(path.natural_width())?,
         natural_height: finite_f32(path.natural_height())?,
@@ -1582,7 +1508,7 @@ fn build_in_or_out(animation_type: &str) -> &'static str {
 
 /// One timing chunk owned by a Keynote build.
 #[derive(Debug, Clone, PartialEq)]
-pub struct KeynoteBuildChunkInfo {
+pub struct BuildChunkInfo {
     pub object_id: u64,
     pub delay: Option<f64>,
     pub duration: Option<f64>,
@@ -1593,12 +1519,12 @@ pub struct KeynoteBuildChunkInfo {
 
 /// A drawable build and its timing chunks in slide build order.
 #[derive(Debug, Clone, PartialEq)]
-pub struct KeynoteBuildInfo {
+pub struct BuildInfo {
     pub slide_index: usize,
     pub object_id: u64,
     pub drawable_object_id: u64,
-    pub settings: KeynoteBuildSettings,
-    pub chunks: Vec<KeynoteBuildChunkInfo>,
+    pub settings: BuildSettings,
+    pub chunks: Vec<BuildChunkInfo>,
 }
 
 #[derive(Debug)]
@@ -1635,7 +1561,7 @@ impl CachedSlideGraph {
 /// Decode state shared by the reads that make up one editor operation.
 ///
 /// The cache owns no mutable package state and is never stored on
-/// [`KeynoteEditor`]. Dropping this value at the end of the operation is the
+/// [`Editor`]. Dropping this value at the end of the operation is the
 /// invalidation boundary for all entries, including after a staged mutation.
 struct KeynoteOperation {
     graph: ObjectGraph,
@@ -1776,11 +1702,11 @@ impl KeynoteOperation {
 
 /// Transactional editor for a Keynote package.
 #[derive(Debug, Clone)]
-pub struct KeynoteEditor {
+pub struct Editor {
     text: IWorkTextEditor,
 }
 
-impl KeynoteEditor {
+impl Editor {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         Self::from_package(IWorkPackage::open(path)?)
     }
@@ -1797,15 +1723,12 @@ impl KeynoteEditor {
         Ok(editor)
     }
 
-    pub fn slides(&self) -> Result<Vec<KeynoteSlideInfo>> {
+    pub fn slides(&self) -> Result<Vec<SlideInfo>> {
         let mut operation = KeynoteOperation::new(self.package())?;
         self.slides_with_operation(&mut operation)
     }
 
-    fn slides_with_operation(
-        &self,
-        operation: &mut KeynoteOperation,
-    ) -> Result<Vec<KeynoteSlideInfo>> {
+    fn slides_with_operation(&self, operation: &mut KeynoteOperation) -> Result<Vec<SlideInfo>> {
         let show_identifier = operation.document_show_identifier()?;
         let show = operation.show_snapshot(show_identifier)?;
         let node_identifiers = show.slide_node_identifiers();
@@ -1924,7 +1847,7 @@ impl KeynoteEditor {
                 notes_storage: notes_storage_id,
                 ..native_ids
             };
-            slides.push(KeynoteSlideInfo::from_native_parts(
+            slides.push(SlideInfo::from_native_parts(
                 index,
                 native_ids,
                 node,
@@ -1947,9 +1870,9 @@ impl KeynoteEditor {
     ///
     /// This includes title and body placeholders, ordinary text boxes, and
     /// text-bearing shapes in slide ownership order. Speaker notes are exposed separately on
-    /// [`KeynoteSlideInfo`] because they are owned by `KN.NoteArchive` rather
+    /// [`SlideInfo`] because they are owned by `KN.NoteArchive` rather
     /// than a drawable.
-    pub fn slide_text_storages(&self, slide_index: usize) -> Result<Vec<KeynoteSlideTextInfo>> {
+    pub fn slide_text_storages(&self, slide_index: usize) -> Result<Vec<SlideTextInfo>> {
         let mut operation = KeynoteOperation::new(self.package())?;
         let slides = self.slides_with_operation(&mut operation)?;
         slides.get(slide_index).ok_or_else(|| {
@@ -1992,9 +1915,9 @@ impl KeynoteEditor {
                     ))
                 })?;
                 let role = if title == Some(drawable_id) {
-                    KeynoteSlideTextRole::Title
+                    SlideTextRole::Title
                 } else if body == Some(drawable_id) {
-                    KeynoteSlideTextRole::Body
+                    SlideTextRole::Body
                 } else {
                     let shape: tswp::ShapeInfoArchive = operation.graph.decode_type(
                         drawable_id,
@@ -2002,8 +1925,8 @@ impl KeynoteEditor {
                         "TSWP.ShapeInfoArchive",
                     )?;
                     match shape.is_text_box {
-                        Some(true) => KeynoteSlideTextRole::TextBox,
-                        Some(false) => KeynoteSlideTextRole::Shape,
+                        Some(true) => SlideTextRole::TextBox,
+                        Some(false) => SlideTextRole::Shape,
                         None => {
                             return Err(Error::InvalidFormat(format!(
                                 "Keynote shape {drawable_id} has no text-box classification"
@@ -2016,7 +1939,7 @@ impl KeynoteEditor {
                         "Keynote slide {slide_index} has a null drawable identifier"
                     ))
                 })?;
-                result.push(KeynoteSlideTextInfo::from_native_parts(
+                result.push(SlideTextInfo::from_native_parts(
                     slide_index,
                     drawable_id,
                     role,
@@ -4071,7 +3994,7 @@ impl KeynoteEditor {
         slide_index: usize,
         source_drawable_object_id: u64,
         text: &str,
-    ) -> Result<KeynoteSlideTextInfo> {
+    ) -> Result<SlideTextInfo> {
         let source = self.text_box_graph(slide_index, source_drawable_object_id)?;
         let mut staged = self.package().clone();
         let first_identifier = next_object_identifier(&staged)?;
@@ -4136,7 +4059,7 @@ impl KeynoteEditor {
                 Error::InvalidFormat("Keynote text-box duplication failed validation".to_owned())
             })?;
         let created_graph = verified.text_box_graph(slide_index, new_drawable_id)?;
-        if created.role != KeynoteSlideTextRole::TextBox
+        if created.role != SlideTextRole::TextBox
             || created.storage.id != new_storage_id
             || created.storage.storage.text() != text
             || created_graph.object_ids.len() != source.object_ids.len()
@@ -4221,7 +4144,7 @@ impl KeynoteEditor {
     }
 
     /// List semantic object builds and their timing chunks for one slide.
-    pub fn slide_builds(&self, slide_index: usize) -> Result<Vec<KeynoteBuildInfo>> {
+    pub fn slide_builds(&self, slide_index: usize) -> Result<Vec<BuildInfo>> {
         let slides = self.slides()?;
         let slide_info = slides.get(slide_index).ok_or_else(|| {
             Error::ParseError(format!(
@@ -4261,7 +4184,7 @@ impl KeynoteEditor {
             }
         }
 
-        let mut chunks_by_build = HashMap::<u64, Vec<KeynoteBuildChunkInfo>>::new();
+        let mut chunks_by_build = HashMap::<u64, Vec<BuildChunkInfo>>::new();
         let mut chunk_ids = HashSet::with_capacity(slide.build_chunks.len());
         for reference in &slide.build_chunks {
             let chunk_id = reference.identifier;
@@ -4304,7 +4227,7 @@ impl KeynoteEditor {
             chunks_by_build
                 .entry(build_id)
                 .or_default()
-                .push(KeynoteBuildChunkInfo {
+                .push(BuildChunkInfo {
                     object_id: chunk_id,
                     delay: chunk.delay,
                     duration: chunk.duration,
@@ -4365,7 +4288,7 @@ impl KeynoteEditor {
                     "Keynote build {build_id} has invalid typed parameters"
                 )));
             }
-            builds.push(KeynoteBuildInfo {
+            builds.push(BuildInfo {
                 slide_index,
                 object_id: build_id,
                 drawable_object_id,
@@ -4404,8 +4327,8 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        settings: KeynoteBuildSettings,
-    ) -> Result<KeynoteBuildInfo> {
+        settings: BuildSettings,
+    ) -> Result<BuildInfo> {
         validate_build_settings(&settings)?;
         if typed_action_acceleration(&settings) == Some(BuildAcceleration::Custom)
             && settings.timing_curve.is_none()
@@ -4498,7 +4421,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         build_object_id: u64,
-        settings: KeynoteBuildSettings,
+        settings: BuildSettings,
     ) -> Result<()> {
         validate_build_settings(&settings)?;
         let slides = self.slides()?;
@@ -4609,7 +4532,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         build_object_id: u64,
-    ) -> Result<KeynoteBuildInfo> {
+    ) -> Result<BuildInfo> {
         let slides = self.slides()?;
         let slide = slides.get(slide_index).ok_or_else(|| {
             Error::ParseError(format!(
@@ -4706,7 +4629,7 @@ impl KeynoteEditor {
     /// All object IDs internal to the dedicated slide component are remapped.
     /// External style and media references are shared, while stale thumbnails
     /// are removed from the new slide node so Keynote can regenerate them.
-    pub fn duplicate_slide(&mut self, slide_index: usize) -> Result<KeynoteSlideInfo> {
+    pub fn duplicate_slide(&mut self, slide_index: usize) -> Result<SlideInfo> {
         let slides = self.slides()?;
         let source = slides.get(slide_index).ok_or_else(|| {
             Error::ParseError(format!(
@@ -4859,7 +4782,7 @@ impl KeynoteEditor {
             set_package_last_object_identifier(&mut staged, next_identifier - 1)?;
         }
 
-        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         let created = verified
             .slides()?
             .into_iter()
@@ -4995,7 +4918,7 @@ impl KeynoteEditor {
                     "drawable object {drawable_object_id} does not own writable text on Keynote slide {slide_index}"
                 ))
             })?;
-        if text.role != KeynoteSlideTextRole::TextBox {
+        if text.role != SlideTextRole::TextBox {
             return Err(Error::InvalidFormat(format!(
                 "Keynote slide drawable {drawable_object_id} is a {:?} placeholder, not an ordinary text box",
                 text.role
@@ -5265,27 +5188,24 @@ pub use litchi_keynote::transition::{
     Acceleration, AccelerationKind, AnimationParameters, CustomParameters, Direction, MosaicType,
     TextDelivery, TextDeliveryKind,
 };
-pub use slide_charts::{KeynoteSlideChartInfo, RemovedKeynoteSlideChart};
+pub use slide_charts::{RemovedKeynoteSlideChart, SlideChartInfo};
 use slide_graph::*;
-pub use slide_images::{KeynoteSlideImageInfo, KeynoteSlideImageKind, RemovedKeynoteSlideImage};
-pub use slide_shapes::{KeynoteSlideShapeInfo, RemovedKeynoteSlideShape};
+pub use slide_images::{RemovedKeynoteSlideImage, SlideImageInfo, SlideImageKind};
+pub use slide_shapes::{RemovedKeynoteSlideShape, SlideShapeInfo};
 pub use slide_tables::{
-    KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableCellConditionalHighlightInfo,
-    KeynoteTableCellInset, KeynoteTableCellInsets, KeynoteTableCellLayout,
-    KeynoteTableCellParagraphList, KeynoteTableCellParagraphListBullet,
-    KeynoteTableCellParagraphListBulletGeometry, KeynoteTableCellParagraphListIndentation,
-    KeynoteTableCellParagraphListLabelColor, KeynoteTableCellParagraphListLevel,
-    KeynoteTableCellParagraphListLevelPlacement, KeynoteTableCellParagraphListNumberFormat,
-    KeynoteTableCellParagraphListNumberScale, KeynoteTableCellParagraphListNumberTiering,
-    KeynoteTableCellParagraphListNumbering, KeynoteTableCellParagraphListPlacement,
-    KeynoteTableCellParagraphTabStops, KeynoteTableCellTextBackground,
-    KeynoteTableCellTextBaselineShift, KeynoteTableCellTextCapitalization,
-    KeynoteTableCellTextCharacterSpacing, KeynoteTableCellTextColor,
-    KeynoteTableCellTextDecorations, KeynoteTableCellTextFont, KeynoteTableCellTextLigatures,
-    KeynoteTableCellTextOutline, KeynoteTableCellTextScript, KeynoteTableCellTextShadow,
-    KeynoteTableCellTextStyle, KeynoteTableCellTextWrap, KeynoteTableCellUpdate,
-    KeynoteTableCellValue, KeynoteTableCellVerticalAlignment, KeynoteTableDimension,
-    KeynoteTableDimensionSize, KeynoteTablePoints, RemovedKeynoteSlideTable,
+    RemovedKeynoteSlideTable, SlideTable, SlideTableInfo, TableCellConditionalHighlightInfo,
+    TableCellInset, TableCellInsets, TableCellLayout, TableCellParagraphList,
+    TableCellParagraphListBullet, TableCellParagraphListBulletGeometry,
+    TableCellParagraphListIndentation, TableCellParagraphListLabelColor,
+    TableCellParagraphListLevel, TableCellParagraphListLevelPlacement,
+    TableCellParagraphListNumberFormat, TableCellParagraphListNumberScale,
+    TableCellParagraphListNumberTiering, TableCellParagraphListNumbering,
+    TableCellParagraphListPlacement, TableCellParagraphTabStops, TableCellTextBackground,
+    TableCellTextBaselineShift, TableCellTextCapitalization, TableCellTextCharacterSpacing,
+    TableCellTextColor, TableCellTextDecorations, TableCellTextFont, TableCellTextLigatures,
+    TableCellTextOutline, TableCellTextScript, TableCellTextShadow, TableCellTextStyle,
+    TableCellTextWrap, TableCellUpdate, TableCellValue, TableCellVerticalAlignment, TableDimension,
+    TableDimensionSize, TablePoints,
 };
 #[cfg(test)]
 mod operation_cache_tests;

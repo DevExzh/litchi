@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::{self, KeynoteEditor};
-use litchi_iwa::numbers::{self, NumbersEditor};
-use litchi_iwa::pages::{self, PagesEditor};
+use litchi_iwa::keynote::{self};
+use litchi_iwa::numbers::{self};
+use litchi_iwa::pages::{self};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 use litchi_numbers::{
@@ -40,7 +40,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     set_numbers_cells(&mut editor, table_cells())?;
     editor.set_table_hidden_axes(TableSelector::index(0), &hidden)?;
     editor.save(output)?;
-    if NumbersEditor::open(output)?.table_hidden_axes(TableSelector::index(0))? != hidden {
+    if numbers::Editor::open(output)?.table_hidden_axes(TableSelector::index(0))? != hidden {
         return Err("Numbers hidden axes failed reopen validation".into());
     }
     Ok(())
@@ -61,7 +61,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    editor = PagesEditor::from_bytes(&bytes)?;
+    editor = pages::Editor::from_bytes(&bytes)?;
     editor.save(output)?;
     let reopened = PagesPackage::from_bytes(&std::fs::read(output)?)?;
     if reopened.body_table_hidden_axes(BodyTableSelector::index(0))? != hidden {
@@ -87,7 +87,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_table_cells(0, table.model_object_id, table_cells())?;
     editor.set_slide_table_hidden_axes(0, table.model_object_id, &hidden)?;
     editor.save(output)?;
-    if KeynoteEditor::open(output)?.slide_table_hidden_axes(0, table.model_object_id)? != hidden {
+    if keynote::Editor::open(output)?.slide_table_hidden_axes(0, table.model_object_id)? != hidden {
         return Err("Keynote hidden axes failed reopen validation".into());
     }
     Ok(())
@@ -111,7 +111,7 @@ fn table_cells() -> [TableCellUpdate; 12] {
 }
 
 fn set_numbers_cells(
-    editor: &mut NumbersEditor,
+    editor: &mut numbers::Editor,
     updates: impl IntoIterator<Item = litchi_numbers::cell::Update>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let changes = updates
@@ -128,7 +128,7 @@ fn set_numbers_cells(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    *editor = NumbersEditor::from_bytes(&bytes)?;
+    *editor = numbers::Editor::from_bytes(&bytes)?;
     Ok(())
 }
 

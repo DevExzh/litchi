@@ -11,9 +11,9 @@ use std::sync::Arc;
 
 use litchi_iwa::Document;
 use litchi_iwa::application::Application;
-use litchi_iwa::keynote::{self, KeynoteEditor};
-use litchi_iwa::numbers::{self, NumbersEditor};
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::keynote::{self};
+use litchi_iwa::numbers::{self};
+use litchi_iwa::pages;
 use litchi_keynote::Package as KeynotePackage;
 use litchi_numbers::Workbook as NumbersSemanticDocument;
 use litchi_pages::Document as PagesSemanticDocument;
@@ -26,7 +26,7 @@ fn builders_emit_packages_that_all_public_readers_can_open() -> Result<(), Box<d
     let directory = tempdir()?;
 
     let pages_path = directory.path().join("generated.pages");
-    PagesEditor::create_with_text("Generated Pages verification document")?.save(&pages_path)?;
+    pages::Editor::create_with_text("Generated Pages verification document")?.save(&pages_path)?;
     verify_package(&pages_path, Application::Pages)?;
 
     let numbers_path = directory.path().join("generated.numbers");
@@ -76,7 +76,7 @@ fn verify_package(path: &Path, expected: Application) -> Result<(), Box<dyn Erro
 
     match expected {
         Application::Pages => {
-            PagesEditor::open(path)?;
+            pages::Editor::open(path)?;
             let specialized = litchi_pages::Package::open(path)?.document();
             let snapshot = specialized.clone();
             let specialized_stats = specialized
@@ -114,7 +114,7 @@ fn verify_package(path: &Path, expected: Application) -> Result<(), Box<dyn Erro
             );
         },
         Application::Numbers => {
-            NumbersEditor::open(path)?;
+            numbers::Editor::open(path)?;
             let specialized = NumbersSemanticDocument::open(path)?;
             let snapshot = specialized.snapshot();
             let specialized_stats = specialized
@@ -158,7 +158,7 @@ fn verify_package(path: &Path, expected: Application) -> Result<(), Box<dyn Erro
             );
         },
         Application::Keynote => {
-            KeynoteEditor::open(path)?;
+            keynote::Editor::open(path)?;
             let specialized = KeynotePackage::open(path)?;
             let snapshot = specialized.snapshot();
             let specialized_stats = specialized.stats()?;

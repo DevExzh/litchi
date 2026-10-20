@@ -8,7 +8,7 @@ use crate::table_hidden_axes::{
 use litchi_iwa_common::table::axis::HiddenAxes;
 use litchi_numbers::TableSelector;
 
-impl NumbersEditor {
+impl Editor {
     /// Read the canonical user-hidden rows and columns of one attached table.
     pub fn table_hidden_axes(&self, selector: TableSelector<'_>) -> Result<HiddenAxes> {
         let table_id = super::selectors::table_id(self, selector)?;

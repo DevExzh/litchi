@@ -6,7 +6,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use super::NumbersEditor;
+use super::Editor;
 use crate::archive::ArchiveObject;
 use crate::{Error, IWorkPackage, Result};
 use litchi_numbers::{Dimensions, Sheet, SheetSelector, Table, TableSelector, Workbook};
@@ -24,7 +24,7 @@ struct SheetSelectorAdapter {
 }
 
 impl SheetSelectorAdapter {
-    fn from_editor(editor: &NumbersEditor) -> Result<Self> {
+    fn from_editor(editor: &Editor) -> Result<Self> {
         let source = editor.sheets()?;
         let source_names = source
             .iter()
@@ -82,7 +82,7 @@ struct TableSelectorAdapter {
 }
 
 impl TableSelectorAdapter {
-    fn from_editor(editor: &NumbersEditor) -> Result<Self> {
+    fn from_editor(editor: &Editor) -> Result<Self> {
         let descriptors = super::table_models(&editor.package)?;
         let source_names = descriptors
             .iter()
@@ -276,7 +276,7 @@ pub(super) struct FocusedTableSelectorIndex {
 
 impl FocusedTableSelectorIndex {
     pub(super) fn from_descriptors(
-        editor: &NumbersEditor,
+        editor: &Editor,
         descriptors: &[super::model::TableDescriptor],
     ) -> Result<Self> {
         let mut table_info_models = HashMap::new();
@@ -502,18 +502,18 @@ fn table_selector_error(selector: TableSelector<'_>) -> Error {
 }
 
 /// Resolve a semantic sheet selector to its native object identifier.
-pub(super) fn sheet_id(editor: &NumbersEditor, selector: SheetSelector<'_>) -> Result<u64> {
+pub(super) fn sheet_id(editor: &Editor, selector: SheetSelector<'_>) -> Result<u64> {
     SheetSelectorAdapter::from_editor(editor)?.native_id(selector)
 }
 
 /// Resolve a semantic table selector to its native model object identifier.
-pub(super) fn table_id(editor: &NumbersEditor, selector: TableSelector<'_>) -> Result<u64> {
+pub(super) fn table_id(editor: &Editor, selector: TableSelector<'_>) -> Result<u64> {
     TableSelectorAdapter::from_editor(editor)?.native_id(selector)
 }
 
 /// Return the semantic catalog position of a native table identifier for
 /// adapter-internal follow-up operations.
-pub(super) fn table_index(editor: &NumbersEditor, native_id: u64) -> Result<usize> {
+pub(super) fn table_index(editor: &Editor, native_id: u64) -> Result<usize> {
     super::table_models(&editor.package)?
         .iter()
         .position(|table| table.object_id == native_id)
@@ -523,7 +523,7 @@ pub(super) fn table_index(editor: &NumbersEditor, native_id: u64) -> Result<usiz
 /// Resolve one legacy native table identifier to selector-first sheet and
 /// table positions without exposing that identifier to the focused owner.
 pub(super) fn focused_table_location(
-    editor: &NumbersEditor,
+    editor: &Editor,
     native_id: u64,
 ) -> Result<(SheetSelector<'static>, TableSelector<'static>)> {
     let owner = super::find_table_owner(editor.package(), native_id)?;
@@ -581,7 +581,7 @@ pub(super) fn focused_table_location(
 /// focused Numbers reader, while all native identifiers remain private to this
 /// adapter.
 pub(super) fn focused_merge_table_indices(
-    editor: &NumbersEditor,
+    editor: &Editor,
     native_id: u64,
 ) -> Result<Option<(usize, usize)>> {
     let package = editor.package();
@@ -790,7 +790,7 @@ mod tests {
         editor
             .add_empty_table(SheetSelector::index(0), "Second", 3, 1)
             .unwrap();
-        let exact = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let exact = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let descriptors = super::super::table_models(exact.package()).unwrap();
         let index = FocusedTableSelectorIndex::from_descriptors(&exact, &descriptors).unwrap();
 
@@ -819,7 +819,7 @@ mod tests {
             .table_dimensions(2, 2)
             .build()
             .unwrap();
-        let exact = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let exact = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let mut descriptors = super::super::table_models(exact.package()).unwrap();
         let descriptor = descriptors.pop().unwrap();
         descriptors.push(super::super::model::TableDescriptor {
@@ -842,7 +842,7 @@ mod tests {
         editor
             .add_empty_table(SheetSelector::name("Archive"), "Second", 2, 2)
             .unwrap();
-        let exact = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let exact = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let mut descriptors = super::super::table_models(exact.package()).unwrap();
         assert_eq!(descriptors.len(), 2);
         let first_model = descriptors[0].object_id;

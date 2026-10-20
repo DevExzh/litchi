@@ -16,7 +16,7 @@ enum ChartCaptionGraphLayout {
     Componentized,
 }
 
-impl NumbersEditor {
+impl Editor {
     /// Read the native caption attached to one sheet chart.
     pub fn sheet_chart_caption(
         &self,
@@ -51,7 +51,7 @@ impl NumbersEditor {
 }
 
 fn sheet_chart_caption(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Option<String>> {
@@ -66,7 +66,7 @@ fn sheet_chart_caption(
 }
 
 pub(super) fn sheet_chart_caption_slot(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<DrawableCaptionSlot> {
@@ -97,7 +97,7 @@ pub(super) fn sheet_chart_caption_slot(
 }
 
 fn set_sheet_chart_caption(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
     text: &str,
@@ -147,7 +147,7 @@ fn set_sheet_chart_caption(
         set_package_last_object_identifier(&mut staged, ids.last())?;
         staged
     };
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_caption(sheet_id, drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Numbers chart caption update failed validation".to_owned(),
@@ -158,7 +158,7 @@ fn set_sheet_chart_caption(
 }
 
 fn remove_sheet_chart_caption(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<bool> {
@@ -178,7 +178,7 @@ fn remove_sheet_chart_caption(
     )?;
     add_component_object_uuids(&mut staged, source.component_id, &[standin_id])?;
     set_package_last_object_identifier(&mut staged, standin_id)?;
-    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified
         .sheet_chart_caption(sheet_id, drawable_object_id)?
         .is_some()
@@ -191,9 +191,7 @@ fn remove_sheet_chart_caption(
     Ok(true)
 }
 
-fn sheet_chart_caption_theme(
-    editor: &NumbersEditor,
-) -> Result<(CaptionThemeStyle, Option<String>)> {
+fn sheet_chart_caption_theme(editor: &Editor) -> Result<(CaptionThemeStyle, Option<String>)> {
     let document = numbers_document(&editor.package)?;
     let theme_id = document.theme.identifier;
     let stylesheet_id = document.stylesheet.identifier;

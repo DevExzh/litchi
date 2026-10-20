@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::Path;
 
-use litchi_iwa::numbers::{self, NumbersSheetImageOptions};
+use litchi_iwa::numbers::{self};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
 const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 180.0 };
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sheet_id,
         image_filename,
         &image,
-        NumbersSheetImageOptions::new(IMAGE_POSITION, DISPLAYED_IMAGE_SIZE)
+        numbers::SheetImageOptions::new(IMAGE_POSITION, DISPLAYED_IMAGE_SIZE)
             .with_natural_size(ORIGINAL_IMAGE_SIZE),
     )?;
     editor.restore_sheet_image_original_size(sheet_id, created.drawable_object_id)?;

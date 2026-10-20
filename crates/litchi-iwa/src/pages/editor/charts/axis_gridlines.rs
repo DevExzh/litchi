@@ -15,7 +15,7 @@ use crate::charts::{ChartAxisGridline, ChartAxisGridlineStroke};
 use litchi_iwa_common::chart::axis::Axis;
 use litchi_iwa_common::chart::axis::style::Visibility;
 
-impl PagesEditor {
+impl Editor {
     /// Read whether Pages shows major gridlines for one native body-chart axis.
     pub fn body_chart_axis_major_gridlines_visible(
         &self,
@@ -91,7 +91,7 @@ impl PagesEditor {
             gridline,
             stroke,
         )?;
-        let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_axis_gridline_stroke(drawable_object_id, axis, gridline)? != stroke {
             return Err(Error::InvalidFormat(
                 "Pages chart axis gridline-stroke update failed validation".to_owned(),
@@ -103,7 +103,7 @@ impl PagesEditor {
 }
 
 fn body_chart_axis_major_gridlines_visible(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
     axis: Axis,
 ) -> Result<Visibility> {
@@ -118,7 +118,7 @@ fn body_chart_axis_major_gridlines_visible(
 }
 
 fn set_body_chart_axis_major_gridlines_visible(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     axis: Axis,
     visible: Visibility,
@@ -133,7 +133,7 @@ fn set_body_chart_axis_major_gridlines_visible(
         axis,
         visible,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_axis_major_gridlines_visible(drawable_object_id, axis)? != visible {
         return Err(Error::InvalidFormat(
             "Pages chart axis major-gridline update failed validation".to_owned(),
@@ -144,7 +144,7 @@ fn set_body_chart_axis_major_gridlines_visible(
 }
 
 fn body_chart_axis_minor_gridlines_visible(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
     axis: Axis,
 ) -> Result<Visibility> {
@@ -159,7 +159,7 @@ fn body_chart_axis_minor_gridlines_visible(
 }
 
 fn set_body_chart_axis_minor_gridlines_visible(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     axis: Axis,
     visible: Visibility,
@@ -174,7 +174,7 @@ fn set_body_chart_axis_minor_gridlines_visible(
         axis,
         visible,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_axis_minor_gridlines_visible(drawable_object_id, axis)? != visible {
         return Err(Error::InvalidFormat(
             "Pages chart axis minor-gridline update failed validation".to_owned(),
