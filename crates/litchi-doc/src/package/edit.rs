@@ -17,7 +17,7 @@ use super::{Error as PackageError, OpenOptions, Package, model::EditProfile};
 use crate::body_text;
 use crate::parts::dofr::DofrPatch;
 use crate::parts::protection::ProtectionPolicy;
-use crate::parts::saved_selection::{SavedSelectionPatch, SavedSelectionTransaction};
+use crate::parts::saved_selection::{SavedSelectionEdit, SavedSelectionPatch};
 use crate::tracked_revision::Limits;
 use litchi_core::Position;
 use std::fmt;
@@ -514,7 +514,7 @@ impl Edit {
     /// Edit the optional `Selsf` record through its typed transaction.
     pub fn edit_saved_selection(
         &mut self,
-        edit: impl FnOnce(&mut SavedSelectionTransaction) -> crate::package::Result<()>,
+        edit: impl FnOnce(&mut SavedSelectionEdit) -> crate::package::Result<()>,
     ) -> Result<bool> {
         self.inner.edit_saved_selection(edit).map_err(Error::from)
     }

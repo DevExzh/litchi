@@ -1248,7 +1248,7 @@ impl RevisionEditor {
     pub(crate) fn preflight_dofr_patch(&self, patch: &DofrPatch) -> Result<bool> {
         let fib = FileInformationBlock::parse(&self.word)?;
         patch.preflight_table_stream(&fib, &self.table)?;
-        Ok(patch.changed())
+        Ok(!patch.is_noop())
     }
 
     /// Whether this source carries inert binary VBA signature metadata in
@@ -1269,7 +1269,7 @@ impl RevisionEditor {
         let fib = FileInformationBlock::parse(&self.word)?;
         patch.preflight_table_stream(&fib, &self.table)?;
         patch.validate_main_story_bound(self.main_ccp)?;
-        Ok(patch.changed())
+        Ok(!patch.is_noop())
     }
 
     /// Applies a source-checked, same-length saved-selection patch and
@@ -1281,7 +1281,7 @@ impl RevisionEditor {
         let fib = FileInformationBlock::parse(&self.word)?;
         patch.preflight_table_stream(&fib, &self.table)?;
         patch.validate_main_story_bound(self.main_ccp)?;
-        if !patch.changed() {
+        if patch.is_noop() {
             return Ok(false);
         }
         if self.signed {
@@ -1297,7 +1297,7 @@ impl RevisionEditor {
     pub(crate) fn apply_dofr_patch(&mut self, patch: &DofrPatch) -> Result<bool> {
         let fib = FileInformationBlock::parse(&self.word)?;
         patch.preflight_table_stream(&fib, &self.table)?;
-        if !patch.changed() {
+        if patch.is_noop() {
             return Ok(false);
         }
         if self.signed {

@@ -15,17 +15,14 @@ fn public_auxiliary_table_apis_expose_bounded_typed_data() {
     selection_bytes[32..34].copy_from_slice(&(-100i16).to_le_bytes());
     selection_bytes[34..36].copy_from_slice(&100i16.to_le_bytes());
     let selection = SavedSelection::parse_bytes(&selection_bytes).unwrap();
-    let mut transaction = selection.transaction();
+    let mut transaction = selection.edit();
     transaction
         .set_range(2, 6)
         .unwrap()
         .set_geometry(SelectionGeometry::Block { first: 1, limit: 2 })
         .unwrap();
     let commit = transaction.commit().unwrap();
-    assert_eq!(
-        commit.patch().apply(&selection).unwrap(),
-        *commit.snapshot()
-    );
+    assert_eq!(commit.patch().apply(&selection).unwrap(), *commit.package());
 
     let mut pgp = Vec::new();
     pgp.extend_from_slice(&1u16.to_le_bytes());

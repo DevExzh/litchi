@@ -286,10 +286,7 @@ fn body_saved_selection_edit_is_source_bound_reversible_and_atomic() {
         .expect("saved-selection record");
 
     let mut no_op = source.edit().expect("no-op edit");
-    let no_op_patch = selection
-        .transaction()
-        .commit()
-        .expect("no-op Selsf transaction");
+    let no_op_patch = selection.edit().commit().expect("no-op Selsf transaction");
     assert!(
         !no_op
             .apply_saved_selection_patch(no_op_patch.patch())
@@ -302,14 +299,14 @@ fn body_saved_selection_edit_is_source_bound_reversible_and_atomic() {
         &no_op_commit.snapshot().bytes_shared()
     ));
 
-    let mut transaction = selection.transaction();
+    let mut transaction = selection.edit();
     transaction
         .set_range(0, 1)
         .expect("valid range")
         .set_cp_anchor(1)
         .expect("valid anchor");
     let selection_commit = transaction.commit().expect("selection commit");
-    assert!(selection_commit.changed());
+    assert!(selection_commit.diagnostics().changed());
     let patch = selection_commit.patch().clone();
 
     let mut edit = source.edit().expect("source edit");
@@ -410,7 +407,7 @@ fn body_saved_selection_bounds_and_length_changes_are_checked_before_publish() {
         .expect("valid saved-selection read")
         .expect("saved-selection record");
     let max_cp = i32::MAX as u32;
-    let mut invalid_replacement = selection.transaction();
+    let mut invalid_replacement = selection.edit();
     invalid_replacement
         .set_cp_anchor(max_cp)
         .expect("structurally valid replacement anchor")
@@ -548,10 +545,7 @@ fn body_saved_selection_edit_refuses_signed_changed_source_but_allows_noop() {
         .expect("saved-selection record");
 
     let mut no_op = source.edit().expect("signed no-op edit");
-    let no_op_patch = selection
-        .transaction()
-        .commit()
-        .expect("no-op Selsf transaction");
+    let no_op_patch = selection.edit().commit().expect("no-op Selsf transaction");
     assert!(
         !no_op
             .apply_saved_selection_patch(no_op_patch.patch())
@@ -560,7 +554,7 @@ fn body_saved_selection_edit_refuses_signed_changed_source_but_allows_noop() {
     let no_op_commit = no_op.commit().expect("signed no-op commit");
     assert_eq!(no_op_commit.snapshot().bytes(), source.bytes());
 
-    let mut transaction = selection.transaction();
+    let mut transaction = selection.edit();
     transaction.set_cp_anchor(1).expect("valid anchor");
     let patch = transaction
         .commit()

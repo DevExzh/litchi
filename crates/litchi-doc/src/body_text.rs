@@ -32,8 +32,8 @@ use crate::package::{Error as PackageError, OpenOptions as PackageOpenOptions};
 use crate::parts::dofr::{DofrArray, DofrPatch};
 use crate::parts::protection::ProtectionPolicy;
 use crate::parts::saved_selection::{
-    FIB_INDEX_WSS, SavedSelection, SavedSelectionPatch, SavedSelectionSpliceError,
-    SavedSelectionTransaction,
+    FIB_INDEX_WSS, SavedSelection, SavedSelectionEdit, SavedSelectionPatch,
+    SavedSelectionSpliceError,
 };
 use crate::tracked_revision::{
     Limits, ParagraphCopy, Revision, RevisionEditor, RevisionKind, RevisionMetadata,
@@ -1985,7 +1985,7 @@ impl Edit {
     /// reported as a missing semantic target.
     pub fn edit_saved_selection(
         &mut self,
-        edit: impl FnOnce(&mut SavedSelectionTransaction) -> crate::package::Result<()>,
+        edit: impl FnOnce(&mut SavedSelectionEdit) -> crate::package::Result<()>,
     ) -> Result<bool> {
         let source = self
             .editor
@@ -1993,7 +1993,7 @@ impl Edit {
             .map_err(Error::Invalid)?
             .ok_or(Error::Refused(Refusal::TargetNotFound))?
             .with_owner(self.source.bytes_shared());
-        let mut transaction = source.transaction();
+        let mut transaction = source.edit();
         edit(&mut transaction).map_err(Error::Invalid)?;
         let commit = transaction.commit().map_err(Error::Invalid)?;
         self.apply_saved_selection_patch(commit.patch())
@@ -2051,7 +2051,7 @@ impl Edit {
             return Err(Error::Refused(Refusal::SignedSource));
         }
         self.ensure_operation_capacity()?;
-        let mut transaction = source.transaction();
+        let mut transaction = source.edit();
         transaction
             .replace_record_bytes(index, replacement)
             .map_err(Error::Invalid)?;
@@ -6960,7 +6960,7 @@ mod tests {
         let stale_commit = stale.commit().expect("second edit");
         let mut mismatched = stale_commit.snapshot().edit().expect("mismatched edit");
         let source_patch = selection
-            .transaction()
+            .edit()
             .commit()
             .expect("no-op selection patch")
             .patch()

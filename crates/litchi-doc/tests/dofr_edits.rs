@@ -239,7 +239,7 @@ fn changed_frame_patch(source: &Snapshot, replacement_value: u32) -> litchi_doc:
         .expect("Dofr records");
     let mut replacement = records.get(1).expect("frame record").bytes().to_vec();
     replacement[20..24].copy_from_slice(&replacement_value.to_le_bytes());
-    let mut transaction = records.transaction();
+    let mut transaction = records.edit();
     transaction
         .replace_record_bytes(1, &replacement)
         .expect("record replacement");
