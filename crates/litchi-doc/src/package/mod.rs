@@ -1,5 +1,6 @@
 //! Package implementation for legacy Word documents (.doc).
 
+mod body;
 mod codec;
 pub mod edit;
 pub mod metadata;
@@ -13,6 +14,7 @@ pub(crate) mod raw {
 #[cfg(test)]
 mod tests;
 
+pub use body::{History, JoinedEdits, ThreeWayPlan};
 pub use edit::{Commit, Diagnostics, Edit, EditOptions, LimitKind, Patch};
 pub(crate) use model::preflight_declared_streams;
 pub use model::{

@@ -272,7 +272,7 @@ impl Diagnostics {
 /// Reversible exact-source package patch produced by a primary [`Edit`].
 #[derive(Clone, PartialEq, Eq)]
 pub struct Patch {
-    inner: body_text::Patch,
+    pub(super) inner: body_text::Patch,
 }
 
 impl fmt::Debug for Patch {
@@ -417,15 +417,15 @@ impl Edit {
                 body_text::Refusal::Encrypted,
             )));
         }
-        let source = package.body_source(
-            body_text::OpenOptions::default()
-                .source_limits(package.source_limits())
-                .revision_limits(options.revision_limits)
-                .transaction_limits(options.transaction_limits)
-                .protection_policy(options.protection_policy),
-        )?;
+        let source = package.body_snapshot(&options)?;
         let inner = source.edit().map_err(Error::from)?;
         Ok(Self { package, inner })
+    }
+
+    /// A primary edit of `package` over a body edit already staged from its
+    /// body snapshot (a composition, a merge plan or a durable replay).
+    pub(crate) fn from_body(package: Package, inner: body_text::Edit) -> Self {
+        Self { package, inner }
     }
 
     /// Immutable package snapshot that authorizes this transaction.
@@ -688,6 +688,59 @@ impl Edit {
         let body_commit = self.inner.commit_with_package().map_err(Error::from)?;
         commit_from_body(package, body_commit)
     }
+
+    /// Publish the checked package commit while reporting deterministic,
+    /// content-free phase boundaries to `observer` (the opt-in profiling
+    /// equivalent of [`Self::commit`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::commit`].
+    #[cfg(feature = "performance-diagnostics")]
+    pub fn commit_profiled(
+        self,
+        observer: impl FnMut(body_text::DiagnosticEvent),
+    ) -> Result<Commit> {
+        self.commit_profiled_with_cfb_observer(observer, |_| {})
+    }
+
+    /// [`Self::commit_profiled`] with a separate in-memory CFB observer.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::commit`].
+    #[cfg(feature = "performance-diagnostics")]
+    pub fn commit_profiled_with_cfb_observer(
+        self,
+        observer: impl FnMut(body_text::DiagnosticEvent),
+        cfb_observer: impl FnMut(body_text::CfbParseEvent),
+    ) -> Result<Commit> {
+        let source = self.package;
+        let (snapshot, body_patch) = self
+            .inner
+            .commit_profiled_with_cfb_observer(observer, cfb_observer)
+            .map_err(Error::from)?
+            .into_parts();
+        let patch = Patch::from_body(body_patch);
+        let diagnostics = Diagnostics::from_patch(&patch.inner);
+        let profile = EditProfile::from_snapshot(&snapshot);
+        let package = if snapshot.bytes() == source.to_bytes().map_err(Error::Package)?.as_slice() {
+            source
+        } else {
+            Package::from_bytes_with_options(
+                snapshot.bytes(),
+                OpenOptions::default()
+                    .source_limits(snapshot.source_limits())
+                    .leniency(source.leniency()),
+            )
+            .map_err(Error::Package)?
+        };
+        Ok(Commit::new(
+            package.with_edit_profile(profile),
+            patch,
+            diagnostics,
+        ))
+    }
 }
 
 impl Package {
@@ -698,6 +751,17 @@ impl Package {
     /// the same options is the value a fresh open returns, and every edit
     /// starts from its own transaction over it. A memo hit still checks that
     /// the retained source has its captured version, as the copy does.
+    /// The body-text snapshot of this package under the edit `options`.
+    pub(crate) fn body_snapshot(&self, options: &EditOptions) -> Result<body_text::Snapshot> {
+        self.body_source(
+            body_text::OpenOptions::default()
+                .source_limits(self.source_limits())
+                .revision_limits(options.revision_limits)
+                .transaction_limits(options.transaction_limits)
+                .protection_policy(options.protection_policy.clone()),
+        )
+    }
+
     fn body_source(&self, options: body_text::OpenOptions) -> Result<body_text::Snapshot> {
         let memo = || {
             self.body_source

@@ -164,6 +164,11 @@ pub mod revision;
 /// Layered route-slip lifecycle and protection metadata.
 pub mod route_slip;
 mod scoped;
+
+#[cfg(test)]
+extern crate self as litchi_doc;
+#[cfg(test)]
+mod internal_tests;
 pub mod section;
 pub mod shape;
 pub mod table;

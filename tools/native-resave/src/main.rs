@@ -134,9 +134,9 @@ fn missing(message: &str) -> std::io::Error {
 #[cfg(feature = "doc")]
 fn generate_doc(output: &Path) -> Result<()> {
     let source = fixture("test-data/ole/doc/NoHeadFoot.doc");
-    let snapshot = litchi_doc::body_text::Snapshot::from_bytes(fs::read(source)?)?;
+    let snapshot = litchi_doc::Package::from_bytes(&fs::read(source)?)?;
     let paragraph = snapshot
-        .paragraphs(litchi_doc::body_text::Projection::All)?
+        .body_paragraphs(litchi_doc::body_text::Projection::All)?
         .into_iter()
         .find(|paragraph| !paragraph.text().is_empty())
         .ok_or_else(|| missing("DOC has no nonempty ordinary paragraph"))?;
@@ -144,15 +144,15 @@ fn generate_doc(output: &Path) -> Result<()> {
     let mut edit = snapshot.edit()?;
     edit.replace_paragraph(paragraph.position(), SENTINEL)?;
     let commit = edit.commit()?;
-    fs::write(output, commit.package().finish())?;
+    fs::write(output, commit.package().to_bytes()?)?;
     readback_doc(output)
 }
 
 #[cfg(feature = "doc")]
 fn readback_doc(input: &Path) -> Result<()> {
-    let snapshot = litchi_doc::body_text::Snapshot::from_bytes(fs::read(input)?)?;
+    let snapshot = litchi_doc::Package::from_bytes(&fs::read(input)?)?;
     let found = snapshot
-        .paragraphs(litchi_doc::body_text::Projection::All)?
+        .body_paragraphs(litchi_doc::body_text::Projection::All)?
         .into_iter()
         .any(|paragraph| paragraph.text() == SENTINEL);
     if !found {
