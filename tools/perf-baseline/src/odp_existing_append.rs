@@ -513,9 +513,13 @@ fn verify_patch_contract(
     let body = appended_body(shape);
     transaction.add(&title, &body)?;
     let commit = transaction.commit()?;
-    let replayed = source.apply(commit.patch())?;
+    let replayed = source.apply(commit.patch())?.into_package();
     let replay_ok = replayed.as_bytes() == expected_output;
-    let inverse_ok = replayed.apply(&commit.patch().inverse())?.as_bytes() == source.as_bytes();
+    let inverse_ok = replayed
+        .apply(&commit.patch().inverse())?
+        .into_package()
+        .as_bytes()
+        == source.as_bytes();
     let stale = litchi_odp::authoring::edit::Package::from_bytes(stale_bytes)?;
     let stale_refused = matches!(
         stale.apply(commit.patch()),

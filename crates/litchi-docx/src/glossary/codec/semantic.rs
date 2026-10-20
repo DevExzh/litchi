@@ -41,7 +41,11 @@ pub(in crate::glossary) fn project(n: &Node) -> Result<Catalog> {
         noattrs(parts)?;
         for p in kids(parts)? {
             if out.entries.len() >= MAX_PARTS {
-                return Err(invalid("glossary entry limit exceeded"));
+                return Err(crate::Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::Entry,
+                    actual: (out.entries.len()).saturating_add(1),
+                    maximum: MAX_PARTS,
+                });
             }
             out.entries.push(parse_entry(p, &mut semantic_bytes)?);
         }
@@ -98,7 +102,11 @@ pub(in crate::glossary) fn extract_producer_entries(
                 if node.ns.as_ref() == conformance.word() && node.l == "docPart" =>
             {
                 if producer_nodes.len() >= MAX_PARTS {
-                    return Err(invalid("glossary producer entry limit exceeded"));
+                    return Err(crate::Error::GlossaryLimit {
+                        kind: crate::glossary::LimitKind::ProducerEntry,
+                        actual: (producer_nodes.len()).saturating_add(1),
+                        maximum: MAX_PARTS,
+                    });
                 }
                 producer_nodes
                     .try_reserve(1)
@@ -332,7 +340,11 @@ pub(in crate::glossary) fn parse_props(n: &Node) -> Result<Props> {
         let children = kids(node)?;
         for (count, child) in children.into_iter().enumerate() {
             if count >= MAX_VALUES {
-                return Err(invalid("type limit exceeded"));
+                return Err(crate::Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::Type,
+                    actual: (count).saturating_add(1),
+                    maximum: MAX_VALUES,
+                });
             }
             expect(child, "type")?;
             let value = parse_type(&wval(child)?)?;
@@ -353,7 +365,11 @@ pub(in crate::glossary) fn parse_props(n: &Node) -> Result<Props> {
         }
         for (count, child) in children.into_iter().enumerate() {
             if count >= MAX_VALUES {
-                return Err(invalid("behavior limit exceeded"));
+                return Err(crate::Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::Behavior,
+                    actual: (count).saturating_add(1),
+                    maximum: MAX_VALUES,
+                });
             }
             expect(child, "behavior")?;
             let value = parse_behavior(&wval(child)?)?;

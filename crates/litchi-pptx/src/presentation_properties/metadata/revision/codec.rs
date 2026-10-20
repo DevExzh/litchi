@@ -196,7 +196,7 @@ pub fn load(package: &OpcPackage) -> Result<Option<Part>> {
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store(package: &mut OpcPackage, value: &Part) -> Result<()> {
+pub(crate) fn store(package: &mut OpcPackage, value: &Part) -> Result<()> {
     if load(package)?.is_some() {
         return Err(invalid("package already contains Revision Information"));
     }

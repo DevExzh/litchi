@@ -13,7 +13,9 @@ use super::transaction::Transaction as Draft;
 use super::{Border, BorderSide, Conformance, Key, Layout, Screen, Settings};
 use crate::package::family::{Staged, graph_family};
 
-graph_family!("web-settings");
+graph_family!("web-settings", own_limits);
+
+pub use super::limit::LimitKind;
 
 /// A staged web-settings change over one package snapshot. The source is
 /// never changed: [`Self::commit`] publishes a new package, and dropping

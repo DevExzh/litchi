@@ -32,7 +32,7 @@ pub struct Authored {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn add(
+pub(crate) fn add(
     package: &mut OpcPackage,
     name: &str,
     colors: &Palette,
@@ -65,7 +65,11 @@ pub fn add(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn attach(package: &mut OpcPackage, master_name: &str, theme_name: &str) -> Result<String> {
+pub(crate) fn attach(
+    package: &mut OpcPackage,
+    master_name: &str,
+    theme_name: &str,
+) -> Result<String> {
     let master_uri = uri(master_name, "theme master")?;
     let theme_uri = uri(theme_name, "theme part")?;
     require_type(package, &master_uri, ct::PML_SLIDE_MASTER)?;
@@ -122,7 +126,11 @@ pub fn load_summary(package: &OpcPackage, theme_name: &str) -> Result<super::par
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn put_colors(package: &mut OpcPackage, theme_name: &str, colors: &Palette) -> Result<()> {
+pub(crate) fn put_colors(
+    package: &mut OpcPackage,
+    theme_name: &str,
+    colors: &Palette,
+) -> Result<()> {
     let uri = uri(theme_name, "theme part")?;
     require_type(package, &uri, ct::OFC_THEME)?;
     let original = package.get_part(&uri)?.blob().to_vec();
@@ -157,7 +165,7 @@ pub fn put_colors(package: &mut OpcPackage, theme_name: &str, colors: &Palette) 
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn put_fonts(package: &mut OpcPackage, theme_name: &str, fonts: &FontSet) -> Result<()> {
+pub(crate) fn put_fonts(package: &mut OpcPackage, theme_name: &str, fonts: &FontSet) -> Result<()> {
     let uri = uri(theme_name, "theme part")?;
     require_type(package, &uri, ct::OFC_THEME)?;
     let original = package.get_part(&uri)?.blob().to_vec();
@@ -192,7 +200,7 @@ pub fn put_fonts(package: &mut OpcPackage, theme_name: &str, fonts: &FontSet) ->
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn put_override(
+pub(crate) fn put_override(
     package: &mut OpcPackage,
     parent_name: &str,
     value: &Override,
@@ -278,7 +286,7 @@ pub fn load_override(package: &OpcPackage, parent_name: &str) -> Result<Option<O
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn remove_override(package: &mut OpcPackage, parent_name: &str) -> Result<bool> {
+pub(crate) fn remove_override(package: &mut OpcPackage, parent_name: &str) -> Result<bool> {
     let parent_uri = uri(parent_name, "theme override parent")?;
     let parent = package.get_part(&parent_uri)?;
     let Some(relationship) = parent

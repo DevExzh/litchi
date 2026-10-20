@@ -586,7 +586,7 @@ fn alternating_ascii_case(name: &str) -> String {
 fn parse_call(name: &str, argument_list: &str) -> Formula {
     let source = format!("of:={name}({argument_list})");
     FormulaParser::new(&source)
-        .parse()
+        .parse(&Default::default())
         .unwrap_or_else(|error| panic!("standard function {name} should lex: {error}"))
 }
 
@@ -673,7 +673,7 @@ fn prior_compatibility_names_remain_recognized() {
 fn ordinary_cell_references_remain_cell_reference_tokens() {
     for source in ["=A1", "=AA10", "=Sheet1.A1", "=$A$1", "=.A1"] {
         let formula = FormulaParser::new(source)
-            .parse()
+            .parse(&Default::default())
             .unwrap_or_else(|error| panic!("cell reference should parse: {source}: {error}"));
         assert!(
             matches!(formula.tokens.as_slice(), [Token::CellRef(_)]),
@@ -686,7 +686,7 @@ fn ordinary_cell_references_remain_cell_reference_tokens() {
     // opening parenthesis it remains a cell reference; the call test above
     // exercises the required function-call precedence.
     let bare = FormulaParser::new("=LOG10")
-        .parse()
+        .parse(&Default::default())
         .expect("bare A1-shaped identifier should remain valid");
     assert!(matches!(
         bare.tokens.as_slice(),
@@ -729,7 +729,9 @@ fn unknown_malformed_and_non_catalog_names_are_rejected() {
         "=LOG10\u{200B}()",
     ] {
         assert!(
-            FormulaParser::new(source).parse().is_err(),
+            FormulaParser::new(source)
+                .parse(&Default::default())
+                .is_err(),
             "malformed or non-ASCII function name unexpectedly parsed: {source:?}"
         );
     }
@@ -762,7 +764,7 @@ fn text_arguments_retain_unicode_and_require_a_terminating_quote() {
 
     assert!(
         FormulaParser::new("of:=SUM(\"unterminated)")
-            .parse()
+            .parse(&Default::default())
             .is_err(),
         "an unterminated formula string must be rejected"
     );

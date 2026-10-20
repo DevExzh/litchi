@@ -429,66 +429,62 @@ fn related_order_fixture() -> Vec<u8> {
                 part.set_blob(named.into_bytes());
             }
 
-            let conformance = pptx::comments::Conformance::Transitional;
-            pptx::comments::add_presentation_comment_author(
-                opc,
-                pptx::comments::Author::new(1, "Ada", "AD"),
-                conformance,
-            )?;
-            for (index, (_, _, text, _)) in slides.iter().enumerate() {
-                let slide_name = format!("/ppt/slides/slide{}.xml", index + 1);
-                pptx::comments::add_presentation_comment(
-                    opc,
-                    &slide_name,
-                    pptx::comments::Comment::new(1, *text, 100, 200).with_index(index as u32 + 1),
-                    conformance,
-                )?;
-            }
-
-            const MODERN_AUTHOR: &str = "{11111111-1111-4111-8111-111111111111}";
-            pptx::modern_comments::add_modern_comment_author(
-                opc,
-                pptx::modern_comments::Author {
-                    id: MODERN_AUTHOR.into(),
-                    name: "Grace".into(),
-                    initials: Some("GR".into()),
-                    user_id: "grace@example.test".into(),
-                    provider_id: "litchi-test".into(),
-                    namespace_declarations: Vec::new(),
-                    extension_xml: None,
-                },
-            )?;
-            for (index, (_, _, _, title)) in slides.iter().enumerate() {
-                let slide_name =
-                    opc::PackURI::new(format!("/ppt/slides/slide{}.xml", index + 1)).unwrap();
-                pptx::modern_comments::add_modern_comment(
-                    opc,
-                    &slide_name,
-                    pptx::modern_comments::Comment {
-                        id: format!("{{22222222-2222-4222-8222-22222222220{}}}", index + 1),
-                        author_id: MODERN_AUTHOR.into(),
-                        status: None,
-                        created: format!("2026-10-10T10:0{}:00Z", index),
-                        start_date: None,
-                        due_date: None,
-                        assigned_to: None,
-                        complete: None,
-                        title: Some((*title).into()),
-                        namespace_declarations: Vec::new(),
-                        anchors: Vec::new(),
-                        position: None,
-                        reply_list_namespace_declarations: Vec::new(),
-                        replies: Vec::new(),
-                        reply_list_present: false,
-                        text_body_xml: None,
-                        extension_xml: None,
-                    },
-                )?;
-            }
             Ok(())
         })
         .unwrap();
     let package = opc_edit.commit().unwrap().into_package();
+    let mut edit = package.edit_comments().unwrap();
+    let conformance = pptx::comments::Conformance::Transitional;
+    edit.add_author(pptx::comments::Author::new(1, "Ada", "AD"), conformance)
+        .unwrap();
+    for (index, (_, _, text, _)) in slides.iter().enumerate() {
+        edit.add(
+            index,
+            pptx::comments::Comment::new(1, *text, 100, 200).with_index(index as u32 + 1),
+            conformance,
+        )
+        .unwrap();
+    }
+
+    let package = edit.commit().unwrap().into_package();
+    let mut edit = package.edit_modern_comments().unwrap();
+    const MODERN_AUTHOR: &str = "{11111111-1111-4111-8111-111111111111}";
+    edit.add_author(pptx::modern_comments::Author {
+        id: MODERN_AUTHOR.into(),
+        name: "Grace".into(),
+        initials: Some("GR".into()),
+        user_id: "grace@example.test".into(),
+        provider_id: "litchi-test".into(),
+        namespace_declarations: Vec::new(),
+        extension_xml: None,
+    })
+    .unwrap();
+    for (index, (_, _, _, title)) in slides.iter().enumerate() {
+        edit.add(
+            index,
+            pptx::modern_comments::Comment {
+                id: format!("{{22222222-2222-4222-8222-22222222220{}}}", index + 1),
+                author_id: MODERN_AUTHOR.into(),
+                status: None,
+                created: format!("2026-10-10T10:0{}:00Z", index),
+                start_date: None,
+                due_date: None,
+                assigned_to: None,
+                complete: None,
+                title: Some((*title).into()),
+                namespace_declarations: Vec::new(),
+                anchors: Vec::new(),
+                position: None,
+                reply_list_namespace_declarations: Vec::new(),
+                replies: Vec::new(),
+                reply_list_present: false,
+                text_body_xml: None,
+                extension_xml: None,
+            },
+        )
+        .unwrap();
+    }
+    let package = edit.commit().unwrap().into_package();
     package.to_bytes().unwrap()
 }
 

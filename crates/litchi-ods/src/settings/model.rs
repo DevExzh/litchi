@@ -57,7 +57,7 @@ impl<'xml> Snapshot<'xml> {
 
     /// Start an isolated transaction against this immutable snapshot.
     #[must_use]
-    pub fn transaction(&self) -> Transaction<'xml> {
+    pub(crate) fn transaction(&self) -> Transaction<'xml> {
         Transaction::from_snapshot(self)
     }
 }

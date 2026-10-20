@@ -90,7 +90,7 @@ pub fn load_math_from_package(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn put_math_to_package(
+pub(crate) fn put_math_to_package(
     package: &mut OpcPackage,
     value: crate::presentation_properties::math::Properties,
 ) -> Result<Option<crate::presentation_properties::math::Properties>> {
@@ -157,7 +157,7 @@ pub fn put_math_to_package(
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn remove_math_from_package(
+pub(crate) fn remove_math_from_package(
     package: &mut OpcPackage,
 ) -> Result<Option<crate::presentation_properties::math::Properties>> {
     let previous = load_math_from_package(package)?;

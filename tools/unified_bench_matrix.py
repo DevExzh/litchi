@@ -2560,6 +2560,8 @@ W1_DOCX_OPS = {
     "set / title": ("metadata set", SINGLE, "unified/native"),
     "File::edit 1k paragraph text sets": ("batch", BATCH, "unified/native (one leaf edit)"),
     "File::batch 1k paragraph text sets": ("batch", BATCH, "unified/native (one leaf edit)"),
+    "File::batch 1k paragraph text sets (eager owner)": ("batch", BATCH,
+                                                          "unified/native (one leaf edit)"),
     "save (to_bytes) after one set": ("save", SINGLE, "unified/native"),
     "repeated save of one package (second to_bytes)": ("save", SINGLE, "unified/native"),
 }
@@ -2589,6 +2591,55 @@ def p0355():
                            b, a, [a / b], regression("0355"),
                            f"docx_w1_contract:{name}:{slug(scen)}:after-before",
                            src([base, head]), comparison="after/before"))
+    return out
+
+
+FAMILY_LINE = re.compile(r"^docx-family (.+?): median (\d+) ns, min (\d+) ns, output (\d+) bytes, sha256 ([0-9a-f]{64})$")
+
+
+@needs("0355a")
+def p0355a():
+    """Record 0355a §5: docx_w1_contract_bench at the 0355a head (the P1
+    batch coalescing; unified/leaf rows) and against the 0355 tree
+    (3e686506f3, after/before per leg), and source_family_bench (each
+    source-backed family, open → edit → commit → write, against the same
+    edit through the record-0355 stream publisher). Release, pinned, ABBA
+    (base, head, head, base)."""
+    res = RES / "0355a"
+    base, head = res / "docx-w1-contract-base.txt", res / "docx-w1-contract-head.txt"
+    out = native_lines("0355a", "docx_w1_contract", head, W1_DOCX_OPS)
+    legs: dict = {}
+    for leg, path in (("before", base), ("after", head)):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            m = NATIVE_LINE.match(line.strip())
+            if m:
+                slot = legs.setdefault(m.group(2), {"before": ([], []), "after": ([], [])})[leg]
+                slot[0].append(int(m.group(3)))
+                slot[1].append(int(m.group(4)))
+    for scen, v in legs.items():
+        if not v["before"][0] or not v["after"][0]:
+            continue
+        op = W1_DOCX_OPS.get(scen, ("set",))[0]
+        for index, name in ((0, "leaf"), (1, "unified")):
+            b, a = us(med(v["before"][index])), us(med(v["after"][index]))
+            out.append(row("0355a", "docx", op, f"{scen} ({name} leg, 0355a head vs 0355)", "",
+                           b, a, [a / b], regression("0355a"),
+                           f"docx_w1_contract:{name}:{slug(scen)}:0355a-after-before",
+                           src([base, head]), comparison="after/before"))
+    fbase, fhead = res / "source-family-base.txt", res / "source-family-head.txt"
+    fam: dict = {}
+    for leg, path in (("before", fbase), ("after", fhead)):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            m = FAMILY_LINE.match(line.strip())
+            if m:
+                fam.setdefault(m.group(1), {"before": [], "after": []})[leg].append(int(m.group(2)))
+    for scen, v in fam.items():
+        b, a = us(med(v["before"])), us(med(v["after"]))
+        ratios = [x / y for x, y in zip(v["after"], v["before"])]
+        out.append(row("0355a", "docx", "save", f"{scen} (source-backed family vs publisher)",
+                       "1,000 paragraphs + 2 MiB media", b, a, ratios, regression("0355a"),
+                       f"source_family:{slug(scen)}:after-before", src([fbase, fhead]),
+                       comparison="after/before (family commit + write_to vs publish_*_to_stream)"))
     return out
 
 
@@ -2628,14 +2679,13 @@ CONTRACT_0356 = {
 }
 
 
-@needs("0356")
-def p0356():
-    """Record 0356 §5: the PPTX batch routes of record 0348 re-measured after
-    the record 0351 API contract (three runs each, superseding the 0348
-    rows), and pptx_contract_bench, one source built on the base tree and on
-    the branch, run A-B-B-A three times: after/before rows per scenario
-    (median of the after runs over the median of the before runs)."""
-    base = RES / "0356"
+def pptx_contract_rows(record):
+    """The PPTX batch routes of record 0348 re-measured (three runs each,
+    superseding the earlier rows) and pptx_contract_bench, one source built
+    on the base tree and on the branch, run A-B-B-A three times: after/before
+    rows per scenario (median of the after runs over the median of the
+    before runs). Records 0356 and 0356a."""
+    base = RES / record
     out = []
     for series, glob in (("pptx_p0_final", "pptx-p0-final-bench-run*.jsonl"),
                          ("pptx_p0", "pptx-p0-bench-run*.jsonl")):
@@ -2647,7 +2697,7 @@ def p0356():
             n = int(n)
             state = f", {handle[0]} handle" if handle else ""
             label = f"{family.replace('_', ' ')} ({owner} owner{state}; one File::batch vs one leaf edit)"
-            out.append(row("0356", "pptx", "batch", label, f"{n} ops",
+            out.append(row(record, "pptx", "batch", label, f"{n} ops",
                            med(i["leaf_median_us"] for i in items),
                            med(i["unified_median_us"] for i in items), [i["ratio"] for i in items],
                            BATCH if n >= 1000 else SCALING, f"{series}:{scen}", src(paths)))
@@ -2662,11 +2712,130 @@ def p0356():
         a = med(r["median_us"] for r in a_items)
         if b is None:
             continue
-        out.append(row("0356", "pptx", op, f"{route.replace('_', ' ')} ({fixture})", "",
-                       b, a, [a / b], regression("0356"), f"pptx_contract:{scen}", srcs,
+        out.append(row(record, "pptx", op, f"{route.replace('_', ' ')} ({fixture})", "",
+                       b, a, [a / b], regression(record), f"pptx_contract:{scen}", srcs,
                        comparison=f"after/before ({leg} leg)"))
     return out
 
+
+W6_ODF_OPS = {"open_get": "open", "set": "set", "batch1k": "batch"}
+
+
+@needs("0358")
+def p0358():
+    """Record 0358 §8 (W6 ODF contract): odf_w6_probe, one source built on
+    the wave's base (trunk) and head, run A-B-B-A pinned in release; one
+    after/before row per unified route (median of the after runs over the
+    median of the before runs)."""
+    base = RES / "0358"
+    legs: dict = {"before": {}, "after": {}}
+    paths = sorted(base.glob("probe-*-*.json"))
+    for path in paths:
+        leg = path.name.split("-")[1]
+        for r in load_json(path):
+            legs[leg].setdefault(r["scenario"], []).append(r["median_us"])
+    out = []
+    for scen, after in legs["after"].items():
+        before = legs["before"].get(scen)
+        if not before:
+            continue
+        fmt, op = scen.split("/")
+        b, a = med(before), med(after)
+        size = "1k ops" if op == "batch1k" else ""
+        out.append(row("0358", fmt, W6_ODF_OPS.get(op, op), f"File {op.replace('_', ' ')} ({fmt}, W6 head vs base)",
+                       size, b, a, [a / b], regression("0358"), f"odf_w6_probe:{scen}:after-before",
+                       src(paths), comparison="after/before"))
+    return out
+
+
+@needs("0357a")
+def p0357a():
+    """Record 0357a: record-sized scoped-family patches (1,000 retained
+    single-op external-media commits, after vs before) and the restored
+    source-backed text splice (after vs before on the primary edit; the
+    splice itself has no before leg)."""
+    out = []
+    path = RES / "0357a" / "summary.json"
+    s = load_json(path)
+    for key, op, label in (("commit_median_us", "set", "scoped commit (external media path)"),
+                           ("apply_median_us", "set", "scoped patch apply"),
+                           ("inverse_apply_median_us", "set", "scoped patch inverse apply")):
+        b, a = s["before"][key], s["after"][key]
+        out.append(row("0357a", "ppt", op, f"{label}, after vs before", "1,000 patches",
+                       b, a, [a / b], regression("0357a"),
+                       f"scoped_patch:{slug(label)}:after-before", src([path]),
+                       comparison="after/before"))
+    path = RES / "0357a" / "text" / "summary.json"
+    p = load_json(path)["probe"]
+    b, a = p["before/primary"]["total_us"], p["after/primary"]["total_us"]
+    out.append(row("0357a", "ppt", "set", "open + set_shape_text + commit + write_to, after vs before",
+                   "1,000 shapes", b, a, [a / b], regression("0357a"),
+                   "text_splice:primary:after-before", src([path]), comparison="after/before"))
+    return out
+
+
+
+@needs("0357b")
+def p0357b():
+    """Record 0357b: incremental block-root digests for the scoped-family
+    patch (0357a-F1). The same probe as 0357a, ABC-CBA over the pre-0357a
+    base, the 0357a tip and this record; the rows compare this record with
+    the pre-0357a base, continuing the 0357a series, plus the first commit
+    on a never-hashed package (a once-per-package cost, no budget)."""
+    out = []
+    path = RES / "0357b" / "summary.json"
+    s = load_json(path)
+    for key, op, label in (("commit_median_us", "set", "scoped commit (external media path)"),
+                           ("apply_median_us", "set", "scoped patch apply"),
+                           ("inverse_apply_median_us", "set", "scoped patch inverse apply")):
+        b, a = s["base"][key], s["b"][key]
+        out.append(row("0357b", "ppt", op, f"{label}, after vs before", "1,000 patches",
+                       b, a, [a / b], regression("0357b"),
+                       f"scoped_patch:{slug(label)}:after-before", src([path]),
+                       comparison="after/before"))
+    b, a = s["base"]["first_commit_median_us"], s["b"]["first_commit_median_us"]
+    out.append(row("0357b", "ppt", "set",
+                   "first scoped commit on a never-hashed package, after vs before",
+                   "200 packages", b, a, [a / b], NONE,
+                   "scoped_patch:first_commit_never_hashed:after-before", src([path]),
+                   comparison="after/before",
+                   explanation="Record 0357b §3: once per package, the first scoped commit "
+                               "builds the source's block list (one SHA-256 pass over the "
+                               "43,520-byte source); every later commit or apply of that "
+                               "package or of a package published from it reuses it. "
+                               "The 0357a tip paid two whole-image hashes here."))
+    return out
+
+
+@needs("0356")
+def p0356():
+    """Record 0356 §5 (see pptx_contract_rows)."""
+    return pptx_contract_rows("0356")
+
+
+@needs("0356a")
+def p0356a():
+    """Record 0356a §4: the 0356 routes on the review follow-ups, against
+    trunk 184dd4d908 (record 0356 merged)."""
+    return pptx_contract_rows("0356a")
+
+
+@needs("0356b")
+def p0356b():
+    """Record 0356b §4: the source-backed cross-slide-copy routes after the
+    copy moved from `SourceBackedPresentationEditor` onto
+    `source::Package::edit_cross_slide_copy`, perf-baseline built on
+    3e392d750f (before) and on the branch (after), run A-B-B-A three times:
+    after/before per case (median of the per-run p50s)."""
+    path = RES / "0356b" / "summary.json"
+    out = []
+    for case, v in load_json(path)["cases"].items():
+        b, a = v["before_median_us"], v["after_median_us"]
+        out.append(row("0356b", "pptx", "save", f"{case} (cross-slide copy, after vs before)",
+                       "", b, a, [a / b], regression("0356b"),
+                       f"perf_baseline:{case}:after-before", src([path]),
+                       comparison="after/before"))
+    return out
 
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
@@ -2676,7 +2845,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0306, p0307, p0308, p0309, p0310, p0311, p0312,
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
-           p0347, p0348, p0355, p0356, p0357]
+           p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0357, p0357a, p0357b, p0358]
 
 
 

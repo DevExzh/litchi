@@ -188,3 +188,38 @@ fn committed_changes_can_be_undone_and_redone() {
     assert_eq!(redone.bytes(), commit.snapshot().bytes());
     assert!(commit.changes().undo(&source).is_err());
 }
+
+fn notes_layout(slide_id: u32, flags: u16) -> Record {
+    let mut data = [0u8; 8];
+    data[..4].copy_from_slice(&slide_id.to_le_bytes());
+    data[4..6].copy_from_slice(&flags.to_le_bytes());
+    // The reserved field is ignored: real decks carry nonzero bytes there.
+    data[6..8].copy_from_slice(&0x3012u16.to_le_bytes());
+    container(
+        RecordType::Notes.as_u16(),
+        vec![atom(RecordType::NotesAtom.as_u16(), 1, 0, &data), drawing()],
+    )
+}
+
+/// `[MS-PPT]` 2.5.12 asks for a null `slideIdRef` in the notes master;
+/// PowerPoint writes 0x80000000 (and other producers 0x80000001) with
+/// `fMasterScheme` set. Both are notes masters; a slide reference is a
+/// notes slide.
+#[test]
+fn notes_masters_accept_null_and_master_domain_slide_references() {
+    for (slide_id, flags) in [(0, 0), (0x8000_0000, 0), (0x8000_0000, 2), (0x8000_0001, 7)] {
+        let record = notes_layout(slide_id, flags);
+        assert!(Snapshot::from_record(Context::Notes, record.clone()).is_ok());
+        let document = container(RecordType::Document.as_u16(), vec![record]);
+        assert_eq!(
+            inventory(&document).unwrap().entries()[0].context(),
+            Context::Notes
+        );
+    }
+    for (slide_id, flags) in [(0, 1), (0x100, 0), (0x7fff_ffff, 2), (1, 0)] {
+        assert!(Snapshot::from_record(Context::Notes, notes_layout(slide_id, flags)).is_err());
+    }
+    // A notes slide (a SlideId reference) is not a master.
+    let document = container(RecordType::Document.as_u16(), vec![notes_layout(0x100, 0)]);
+    assert_eq!(inventory(&document).unwrap().len(), 0);
+}

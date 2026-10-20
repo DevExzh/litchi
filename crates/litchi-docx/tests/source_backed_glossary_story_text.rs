@@ -579,7 +579,7 @@ fn glossary_selector_name_limits_accept_exact_and_refuse_one_over() {
         open(&fixture(Dialect::Transitional, Mutation::Valid))
             .story_text_snapshot(StorySelector::glossary_by_name(over)),
         Err(source_backed::StoryTextError::Limit {
-            resource: "glossary selector name bytes",
+            kind: source_backed::story_text::LimitKind::GlossarySelectorNameBytes,
             actual,
             maximum: MAX_GLOSSARY_SELECTOR_NAME_BYTES,
         }) if actual == MAX_GLOSSARY_SELECTOR_NAME_BYTES + 1
@@ -598,7 +598,7 @@ fn glossary_selector_name_limits_accept_exact_and_refuse_one_over() {
             StorySelector::glossary_by_name_and_id(over, Id::new(ALPHA_ID).unwrap())
         ),
         Err(source_backed::StoryTextError::Limit {
-            resource: "glossary selector name bytes",
+            kind: source_backed::story_text::LimitKind::GlossarySelectorNameBytes,
             actual,
             maximum: MAX_GLOSSARY_SELECTOR_NAME_BYTES,
         }) if actual == MAX_GLOSSARY_SELECTOR_NAME_BYTES + 1
@@ -626,7 +626,11 @@ fn glossary_entry_edit_splices_only_selected_body_and_round_trips() {
         );
         let mut output = Vec::new();
         let publication = package
-            .publish_story_text_commit_to_stream(&mut output, &commit)
+            .apply_story_text(&commit.patch().clone().into())
+            .and_then(|committed| {
+                committed.package().write_to(&mut output)?;
+                Ok(committed)
+            })
             .unwrap();
         let reopened = open(&output);
         assert_eq!(
@@ -658,7 +662,15 @@ fn glossary_entry_edit_splices_only_selected_body_and_round_trips() {
             part(&source, "/word/document.xml"),
             part(&output, "/word/document.xml")
         );
-        assert!(publication.snapshot().paragraph_text(0).unwrap().is_some());
+        assert_eq!(
+            publication
+                .package()
+                .story_text_snapshot(alpha_by_name())
+                .unwrap()
+                .extract_text()
+                .unwrap(),
+            "changed"
+        );
     }
 }
 
@@ -671,7 +683,8 @@ fn glossary_noop_and_inverse_preserve_the_complete_artifact() {
     assert!(commit.patch().is_noop());
     let mut exact = Vec::new();
     package
-        .publish_story_text_commit_to_stream(&mut exact, &commit)
+        .apply_story_text(&commit.patch().clone().into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut exact)?))
         .unwrap();
     assert_eq!(exact, source);
 
@@ -684,11 +697,16 @@ fn glossary_noop_and_inverse_preserve_the_complete_artifact() {
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     let publication = package
-        .publish_story_text_commit_to_stream(&mut output, &commit)
+        .apply_story_text(&commit.patch().clone().into())
+        .and_then(|committed| {
+            committed.package().write_to(&mut output)?;
+            Ok(committed)
+        })
         .unwrap();
     let mut restored = Vec::new();
     open(&output)
-        .publish_story_text_inverse_to_stream(&mut restored, &publication)
+        .apply_story_text(&publication.patch().inverse())
+        .and_then(|committed| Ok(committed.package().write_to(&mut restored)?))
         .unwrap();
     assert_eq!(restored, source);
 }
@@ -793,7 +811,8 @@ fn glossary_signed_change_refuses_but_signed_noop_is_exact() {
     let commit = commit.commit().unwrap();
     let mut exact = Vec::new();
     package
-        .publish_story_text_commit_to_stream(&mut exact, &commit)
+        .apply_story_text(&commit.patch().clone().into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut exact)?))
         .unwrap();
     assert_eq!(exact, source);
 
@@ -807,7 +826,11 @@ fn glossary_signed_change_refuses_but_signed_noop_is_exact() {
     let mut refused = Vec::new();
     assert!(
         package
-            .publish_story_text_commit_to_stream(&mut refused, &commit)
+            .apply_story_text(&commit.patch().clone().into())
+            .and_then(|committed| {
+                committed.package().write_to(&mut refused)?;
+                Ok(committed)
+            })
             .is_err()
     );
     assert!(refused.is_empty());
@@ -927,7 +950,7 @@ fn glossary_quote_namespace_wrapper_has_exact_and_one_under_boundaries() {
     assert!(matches!(
         snapshot.edit(),
         Err(source_backed::StoryTextError::Limit {
-            resource: "wrapped story XML bytes",
+            kind: source_backed::story_text::LimitKind::WrappedStoryXmlBytes,
             ..
         })
     ));
@@ -974,7 +997,11 @@ fn glossary_publication_sink_failure_does_not_panic_and_complex_edit_is_refused(
     let commit = edit.commit().unwrap();
     assert!(
         open(&source)
-            .publish_story_text_commit_to_stream(PartialWriter { writes: 0 }, &commit)
+            .apply_story_text(&commit.patch().clone().into())
+            .and_then(|committed| {
+                committed.package().write_to(PartialWriter { writes: 0 })?;
+                Ok(committed)
+            })
             .is_err()
     );
 }
@@ -1029,7 +1056,11 @@ fn glossary_source_mutation_and_foreign_patch_are_rejected() {
     let mut refused = Vec::new();
     assert!(
         package
-            .publish_story_text_commit_to_stream(&mut refused, &commit)
+            .apply_story_text(&commit.patch().clone().into())
+            .and_then(|committed| {
+                committed.package().write_to(&mut refused)?;
+                Ok(committed)
+            })
             .is_err()
     );
     assert!(refused.is_empty());
@@ -1159,7 +1190,11 @@ fn glossary_batch_is_general_n_canonical_and_preserves_siblings() {
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     let publication = package
-        .publish_glossary_text_batch_commit_to_stream(&mut output, &commit)
+        .apply_glossary_text_batch(&commit.patch().clone().into())
+        .and_then(|committed| {
+            committed.package().write_to(&mut output)?;
+            Ok(committed)
+        })
         .unwrap();
     let raw = String::from_utf8(part(&output, "/word/glossary/document.xml")).unwrap();
     assert!(raw.contains("alpha changed") && raw.contains("gamma changed"));
@@ -1205,20 +1240,25 @@ fn glossary_batch_is_general_n_canonical_and_preserves_siblings() {
     let deterministic_commit = deterministic_edit.commit().unwrap();
     let mut deterministic = Vec::new();
     deterministic_package
-        .publish_glossary_text_batch_commit_to_stream(&mut deterministic, &deterministic_commit)
+        .apply_glossary_text_batch(&deterministic_commit.patch().clone().into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut deterministic)?))
         .unwrap();
     assert_eq!(output, deterministic);
 
     let recaptured = open(&output)
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    assert_eq!(
-        publication.snapshot().part_fingerprint(),
-        recaptured.part_fingerprint()
-    );
+    let committed = publication
+        .package()
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    assert_eq!(committed.part_fingerprint(), recaptured.part_fingerprint());
     let inverse_target = publication
-        .inverse_patch()
-        .apply(publication.snapshot())
+        .package()
+        .apply_glossary_text_batch(&publication.patch().inverse())
+        .unwrap()
+        .package()
+        .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
     assert_eq!(
         inverse_target.extract_text(0).unwrap().as_deref(),
@@ -1312,7 +1352,8 @@ fn glossary_batch_noop_inverse_and_limits_are_atomic() {
     assert!(commit.patch().is_noop());
     let mut exact = Vec::new();
     package
-        .publish_glossary_text_batch_commit_to_stream(&mut exact, &commit)
+        .apply_glossary_text_batch(&commit.patch().clone().into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut exact)?))
         .unwrap();
     assert_eq!(exact, source);
 
@@ -1326,11 +1367,16 @@ fn glossary_batch_noop_inverse_and_limits_are_atomic() {
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     let publication = package
-        .publish_glossary_text_batch_commit_to_stream(&mut output, &commit)
+        .apply_glossary_text_batch(&commit.patch().clone().into())
+        .and_then(|committed| {
+            committed.package().write_to(&mut output)?;
+            Ok(committed)
+        })
         .unwrap();
     let mut restored = Vec::new();
     open(&output)
-        .publish_glossary_text_batch_inverse_to_stream(&mut restored, &publication)
+        .apply_glossary_text_batch(&publication.patch().inverse())
+        .and_then(|committed| Ok(committed.package().write_to(&mut restored)?))
         .unwrap();
     assert_eq!(restored, source);
 
@@ -1366,7 +1412,7 @@ fn glossary_batch_noop_inverse_and_limits_are_atomic() {
             .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(output_limited))
             .glossary_text_batch_snapshot(glossary_triplet()),
         Err(source_backed::StoryTextError::Limit {
-            resource: "glossary batch entry bytes",
+            kind: source_backed::story_text::LimitKind::GlossaryBatchEntryBytes,
             maximum: 1,
             ..
         })
@@ -1457,7 +1503,11 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
     let mut refused = Vec::new();
     assert!(
         package
-            .publish_glossary_text_batch_commit_to_stream(&mut refused, &commit)
+            .apply_glossary_text_batch(&commit.patch().clone().into())
+            .and_then(|committed| {
+                committed.package().write_to(&mut refused)?;
+                Ok(committed)
+            })
             .is_err()
     );
     assert!(refused.is_empty());
@@ -1550,7 +1600,8 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
         .unwrap();
     let mut exact = Vec::new();
     signed
-        .publish_glossary_text_batch_commit_to_stream(&mut exact, &noop)
+        .apply_glossary_text_batch(&noop.patch().clone().into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut exact)?))
         .unwrap();
     assert_eq!(exact, fixture(Dialect::Transitional, Mutation::Signed));
 
@@ -1566,7 +1617,11 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
     let mut refused = Vec::new();
     assert!(
         signed
-            .publish_glossary_text_batch_commit_to_stream(&mut refused, &commit)
+            .apply_glossary_text_batch(&commit.patch().clone().into())
+            .and_then(|committed| {
+                committed.package().write_to(&mut refused)?;
+                Ok(committed)
+            })
             .is_err()
     );
     assert!(refused.is_empty());
@@ -1581,7 +1636,11 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
     let commit = edit.commit().unwrap();
     assert!(
         package
-            .publish_glossary_text_batch_commit_to_stream(PartialWriter { writes: 0 }, &commit)
+            .apply_glossary_text_batch(&commit.patch().clone().into())
+            .and_then(|committed| {
+                committed.package().write_to(PartialWriter { writes: 0 })?;
+                Ok(committed)
+            })
             .is_err()
     );
 }

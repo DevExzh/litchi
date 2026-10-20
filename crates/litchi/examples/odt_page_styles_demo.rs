@@ -52,7 +52,7 @@ fn main() -> Result<()> {
 
     builder.add_heading("Appendix", 2)?;
     builder.add_paragraph(
-        "Use MutableDocument if you need to reopen and edit existing ODT files after generation.",
+        "Use Package::edit if you need to reopen and edit existing ODT files after generation.",
     )?;
 
     builder.build()?.save(output_file)?;

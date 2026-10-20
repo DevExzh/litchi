@@ -23,12 +23,15 @@ use std::path::Path;
 use std::sync::Arc;
 
 /// The immutable state retained by one canonical package.
-#[derive(Clone)]
 struct PackageInner {
     shared: Arc<SharedOleFile>,
     presentation: Presentation,
     source_limits: SourceLimits,
     leniency: crate::leniency::Leniency,
+    /// The digest facts of the exact package bytes (block digests, block
+    /// root, signature presence), computed once on demand or seeded by the
+    /// scoped publisher that produced them (records 0357a, 0357b).
+    exact: crate::scoped::ExactCache,
 }
 
 /// An immutable, cheaply cloned legacy PowerPoint package.
@@ -247,6 +250,7 @@ impl Package {
                 presentation,
                 source_limits: limits,
                 leniency,
+                exact: crate::scoped::ExactCache::default(),
             }),
         })
     }
@@ -255,6 +259,23 @@ impl Package {
         bytes: Vec<u8>,
         options: OpenOptions<'_>,
     ) -> Result<Self> {
+        Self::from_owned_bytes(bytes, options)
+    }
+
+    /// Open a package from owned bytes under explicit policies, without the
+    /// copy [`Self::from_bytes_with_options`] makes; the input limit applies.
+    pub(crate) fn from_owned_bytes_with_options(
+        bytes: Vec<u8>,
+        options: OpenOptions<'_>,
+    ) -> Result<Self> {
+        let maximum = options.source_limits_value().max_input_bytes();
+        if bytes.len() > maximum {
+            return Err(Error::Limit {
+                kind: super::SourceLimitKind::InputBytes,
+                observed: bytes.len(),
+                maximum,
+            });
+        }
         Self::from_owned_bytes(bytes, options)
     }
 
@@ -277,8 +298,15 @@ impl Package {
                 presentation,
                 source_limits,
                 leniency: options.leniency_value(),
+                exact: crate::scoped::ExactCache::default(),
             }),
         }
+    }
+
+    /// The digest facts of the package's exact bytes, for the scoped
+    /// families' patches (record 0357b).
+    pub(crate) fn exact(&self) -> &crate::scoped::ExactCache {
+        &self.inner.exact
     }
 
     /// Seed the presentation's one-slide shape memo with shapes proven equal

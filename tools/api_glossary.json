@@ -426,6 +426,24 @@
           "name": "into_workbook",
           "scope": "litchi_docx",
           "replacement": "(record 0351)"
+        },
+        {
+          "name": "_to_stream",
+          "scope": "litchi_docx",
+          "replacement": "commit the family edit to a source-backed Package and call write_to (record 0355a)",
+          "match": "suffix"
+        },
+        {
+          "name": "publish_",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "commit the family edit to a Package; Package::write_to is the only output (record 0355a)",
+          "match": "prefix"
+        },
+        {
+          "name": "Publication",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "a family Commit holds the new Package, its Patch and Diagnostics (record 0355a)",
+          "match": "suffix"
         }
       ],
       "families": [
@@ -450,7 +468,21 @@
         "litchi_docx::styles::effects",
         "litchi_docx::task_panes",
         "litchi_docx::web",
-        "litchi_docx::package::story"
+        "litchi_docx::package::story",
+        "litchi_docx::alt",
+        "litchi_docx::source_backed::alt_chunk_payload",
+        "litchi_docx::source_backed::document_variables",
+        "litchi_docx::source_backed::glossary_text",
+        "litchi_docx::source_backed::hyperlink_detachment",
+        "litchi_docx::source_backed::hyperlink_redaction",
+        "litchi_docx::source_backed::paragraph_stream",
+        "litchi_docx::source_backed::plain_paragraph_copy",
+        "litchi_docx::source_backed::plain_paragraph_removal",
+        "litchi_docx::source_backed::section_layout",
+        "litchi_docx::source_backed::story_hyperlink_redaction",
+        "litchi_docx::source_backed::story_text_edit",
+        "litchi_docx::source_backed::svg",
+        "litchi_docx::source_backed::tail_append"
       ],
       "immutable_owners": [
         "litchi_docx::Document",
@@ -782,6 +814,24 @@
           "name": "into_workbook",
           "scope": "litchi_docx",
           "replacement": "(record 0351)"
+        },
+        {
+          "name": "_to_stream",
+          "scope": "litchi_docx",
+          "replacement": "commit the family edit to a source-backed Package and call write_to (record 0355a)",
+          "match": "suffix"
+        },
+        {
+          "name": "publish_",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "commit the family edit to a Package; Package::write_to is the only output (record 0355a)",
+          "match": "prefix"
+        },
+        {
+          "name": "Publication",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "a family Commit holds the new Package, its Patch and Diagnostics (record 0355a)",
+          "match": "suffix"
         }
       ],
       "families": [
@@ -807,7 +857,21 @@
         "litchi_docx::task_panes",
         "litchi_docx::vba",
         "litchi_docx::web",
-        "litchi_docx::package::story"
+        "litchi_docx::package::story",
+        "litchi_docx::alt",
+        "litchi_docx::source_backed::alt_chunk_payload",
+        "litchi_docx::source_backed::document_variables",
+        "litchi_docx::source_backed::glossary_text",
+        "litchi_docx::source_backed::hyperlink_detachment",
+        "litchi_docx::source_backed::hyperlink_redaction",
+        "litchi_docx::source_backed::paragraph_stream",
+        "litchi_docx::source_backed::plain_paragraph_copy",
+        "litchi_docx::source_backed::plain_paragraph_removal",
+        "litchi_docx::source_backed::section_layout",
+        "litchi_docx::source_backed::story_hyperlink_redaction",
+        "litchi_docx::source_backed::story_text_edit",
+        "litchi_docx::source_backed::svg",
+        "litchi_docx::source_backed::tail_append"
       ],
       "immutable_owners": [
         "litchi_docx::Document",
@@ -1872,36 +1936,6 @@
           "replacement": "use open_with_options with OpenOptions (record 0252)"
         },
         {
-          "name": "open_with_limits",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_cache_limits",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_limits_and_cache_limits",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_execution_context",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_limits_and_execution_context",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_limits_and_cache_limits_and_execution_context",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
           "name": "StaleSource",
           "scope": "litchi_pptx::Error",
           "replacement": "Error::PatchConflict (ADR 0034 §6; record 0252)"
@@ -1968,6 +2002,131 @@
           "name": "ReadonlyRecommended",
           "scope": "litchi_pptx",
           "replacement": "use ReadOnlyRecommended (record 0351 / 0356)"
+        },
+        {
+          "name": "SourceBackedSlideBatchCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideBatchEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideBatchPatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideBatchSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlidePatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideOrderCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideOrderEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideOrderPatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideOrderSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentPatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgPatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedPresentationEditor",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
+        },
+        {
+          "name": "SourceBackedCrossSlideCopyPlan",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
+        },
+        {
+          "name": "SourceBackedCrossSlideCopySnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
+        },
+        {
+          "name": "SourceBackedSlideRemovalPlan",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
+        },
+        {
+          "name": "SourceBackedIntoEditorError",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
         }
       ],
       "families": [
@@ -2003,11 +2162,25 @@
         "litchi_pptx::presentation::embedded::controls::slide",
         "litchi_pptx::presentation::embedded::ole::slide",
         "litchi_pptx::comments::collaboration::presence",
-        "litchi_pptx::comments::collaboration::threading"
+        "litchi_pptx::comments::collaboration::threading",
+        "litchi_pptx::comments",
+        "litchi_pptx::modern_comments",
+        "litchi_pptx::shape::theme",
+        "litchi_pptx::presentation::embedded::ink",
+        "litchi_pptx::presentation::embedded::ole",
+        "litchi_pptx::media_parts",
+        "litchi_pptx::chart",
+        "litchi_pptx::laser",
+        "litchi_pptx::presentation_properties::metadata::revision",
+        "litchi_pptx::presentation_properties::metadata::slide_sync",
+        "litchi_pptx::source",
+        "litchi_pptx::source::svg",
+        "litchi_pptx::source::cross_slide_copy"
       ],
       "immutable_owners": [
         "litchi_pptx::Presentation",
-        "litchi_pptx::Package"
+        "litchi_pptx::Package",
+        "litchi_pptx::source::Package"
       ],
       "family_methods": true
     },
@@ -2502,36 +2675,6 @@
           "replacement": "use open_with_options with OpenOptions (record 0252)"
         },
         {
-          "name": "open_with_limits",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_cache_limits",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_limits_and_cache_limits",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_execution_context",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_limits_and_execution_context",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
-          "name": "open_with_limits_and_cache_limits_and_execution_context",
-          "scope": "litchi_pptx::SourceBackedPresentationEditor",
-          "replacement": "use open_with_options with OpenOptions (record 0252)"
-        },
-        {
           "name": "StaleSource",
           "scope": "litchi_pptx::Error",
           "replacement": "Error::PatchConflict (ADR 0034 §6; record 0252)"
@@ -2598,6 +2741,131 @@
           "name": "ReadonlyRecommended",
           "scope": "litchi_pptx",
           "replacement": "use ReadOnlyRecommended (record 0351 / 0356)"
+        },
+        {
+          "name": "SourceBackedSlideBatchCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideBatchEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideBatchPatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideBatchSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlidePatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideOrderCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideOrderEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideOrderPatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSlideOrderSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentPatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgCommit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgEdit",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgPatch",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedSvgSnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package::edit or edit_svg_images, committing a new source::Package (record 0356a)"
+        },
+        {
+          "name": "SourceBackedPresentationEditor",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
+        },
+        {
+          "name": "SourceBackedCrossSlideCopyPlan",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
+        },
+        {
+          "name": "SourceBackedCrossSlideCopySnapshot",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
+        },
+        {
+          "name": "SourceBackedSlideRemovalPlan",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
+        },
+        {
+          "name": "SourceBackedIntoEditorError",
+          "scope": "litchi_pptx",
+          "replacement": "use source::Package (edit, edit_cross_slide_copy, edit_svg_images), record 0356b"
         }
       ],
       "families": [
@@ -2633,11 +2901,26 @@
         "litchi_pptx::presentation::embedded::controls::slide",
         "litchi_pptx::presentation::embedded::ole::slide",
         "litchi_pptx::comments::collaboration::presence",
-        "litchi_pptx::comments::collaboration::threading"
+        "litchi_pptx::comments::collaboration::threading",
+        "litchi_pptx::comments",
+        "litchi_pptx::modern_comments",
+        "litchi_pptx::shape::theme",
+        "litchi_pptx::presentation::embedded::ink",
+        "litchi_pptx::presentation::embedded::ole",
+        "litchi_pptx::media_parts",
+        "litchi_pptx::chart",
+        "litchi_pptx::laser",
+        "litchi_pptx::presentation_properties::metadata::revision",
+        "litchi_pptx::presentation_properties::metadata::slide_sync",
+        "litchi_pptx::presentation::embedded::vba",
+        "litchi_pptx::source",
+        "litchi_pptx::source::svg",
+        "litchi_pptx::source::cross_slide_copy"
       ],
       "immutable_owners": [
         "litchi_pptx::Presentation",
-        "litchi_pptx::Package"
+        "litchi_pptx::Package",
+        "litchi_pptx::source::Package"
       ],
       "family_methods": true
     },
@@ -6673,6 +6956,11 @@
           "name": "snapshot",
           "scope": "litchi_ppt::chart::GraphPackage",
           "replacement": "GraphPackage::view"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::text_edit",
+          "replacement": "use commit.diagnostics().changed() (record 0357a)"
         }
       ],
       "families": [
@@ -6689,7 +6977,8 @@
         "litchi_ppt::client_data",
         "litchi_ppt::master::metadata",
         "litchi_ppt::master_layout",
-        "litchi_ppt::embedded::object"
+        "litchi_ppt::embedded::object",
+        "litchi_ppt::text_edit"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
@@ -7506,6 +7795,11 @@
           "name": "snapshot",
           "scope": "litchi_ppt::chart::GraphPackage",
           "replacement": "GraphPackage::view"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::text_edit",
+          "replacement": "use commit.diagnostics().changed() (record 0357a)"
         }
       ],
       "families": [
@@ -7522,7 +7816,8 @@
         "litchi_ppt::client_data",
         "litchi_ppt::master::metadata",
         "litchi_ppt::master_layout",
-        "litchi_ppt::embedded::object"
+        "litchi_ppt::embedded::object",
+        "litchi_ppt::text_edit"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
@@ -8349,6 +8644,12 @@
           "name": "into_snapshot",
           "scope": "litchi_odf_common",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_odf_common",
+          "replacement": "limits travel in OpenOptions/EditOptions or as a required argument (record 0351 §2.5)",
+          "match": "suffix"
         }
       ],
       "families": []
@@ -8654,16 +8955,102 @@
           "name": "is_changed",
           "scope": "litchi_odt",
           "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_odt",
+          "replacement": "drop the Edit or call Edit::reset (record 0351 §2.3)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_odt",
+          "replacement": "use the focused module's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_odt",
+          "replacement": "a commit publishes the Package: Commit::{package, into_package} (record 0351 §2.3)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_odt",
+          "replacement": "stage the change in an Edit or a builder draft; no Mutable* types (record 0351 §2.1)",
+          "match": "prefix"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_odt",
+          "replacement": "limits travel in OpenOptions/EditOptions or as a required argument (record 0351 §2.5)",
+          "match": "suffix"
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_odt::flat",
+          "replacement": "flat limits fold into SourceLimits/SemanticLimits in OpenOptions (record 0358)"
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_odt::generic::flat",
+          "replacement": "flat limits fold into SourceLimits/SemanticLimits in OpenOptions (record 0358)"
+        },
+        {
+          "name": "FlatDocument",
+          "scope": "litchi_odt",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatDocument",
+          "scope": "litchi_odt::generic",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatEdit",
+          "scope": "litchi_odt",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatCommit",
+          "scope": "litchi_odt",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatPatch",
+          "scope": "litchi_odt",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatLimits",
+          "scope": "litchi_odt",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatDiagnostic",
+          "scope": "litchi_odt",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
         }
       ],
       "families": [
         "litchi_odt::metadata",
-        "litchi_odt::transaction"
+        "litchi_odt::transaction",
+        "litchi_odt::flat",
+        "litchi_odt::generic",
+        "litchi_odt::generic::flat",
+        "litchi_odt::odc"
       ],
       "immutable_owners": [
         "litchi_odt::Package",
         "litchi_odt::Document",
-        "litchi_odt::flat::Document"
+        "litchi_odt::flat::Document",
+        "litchi_odt::generic::Package",
+        "litchi_odt::generic::flat::Document",
+        "litchi_odt::odc::Document"
       ],
       "family_methods": true
     },
@@ -8839,48 +9226,6 @@
           "recursive": false
         },
         {
-          "name": "open",
-          "scope": "litchi_ods::MutableSpreadsheet",
-          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
-          "recursive": false
-        },
-        {
-          "name": "from_bytes",
-          "scope": "litchi_ods::MutableSpreadsheet",
-          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
-          "recursive": false
-        },
-        {
-          "name": "from_spreadsheet",
-          "scope": "litchi_ods::MutableSpreadsheet",
-          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
-          "recursive": false
-        },
-        {
-          "name": "spreadsheet",
-          "scope": "litchi_ods::MutableSpreadsheet",
-          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
-          "recursive": false
-        },
-        {
-          "name": "document_snapshot",
-          "scope": "litchi_ods::MutableSpreadsheet",
-          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
-          "recursive": false
-        },
-        {
-          "name": "apply_document_patch",
-          "scope": "litchi_ods::MutableSpreadsheet",
-          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
-          "recursive": false
-        },
-        {
-          "name": "edit_document",
-          "scope": "litchi_ods::MutableSpreadsheet",
-          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
-          "recursive": false
-        },
-        {
           "name": "from_path",
           "scope": "litchi_ods::SourceBackedSpreadsheet",
           "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
@@ -8986,16 +9331,90 @@
           "scope": "litchi_ods",
           "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
           "match": "suffix"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ods",
+          "replacement": "drop the Edit or call Edit::reset (record 0351 §2.3)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ods",
+          "replacement": "use the focused module's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ods",
+          "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_ods",
+          "replacement": "a commit publishes the Package: Commit::{package, into_package} (record 0351 §2.3)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_ods",
+          "replacement": "stage the change in an Edit or a builder draft; no Mutable* types (record 0351 §2.1)",
+          "match": "prefix"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_ods",
+          "replacement": "limits travel in OpenOptions/EditOptions or as a required argument (record 0351 §2.5)",
+          "match": "suffix"
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_ods::flat",
+          "replacement": "flat limits fold into SourceLimits/SemanticLimits in OpenOptions (record 0358)"
+        },
+        {
+          "name": "FlatSpreadsheet",
+          "scope": "litchi_ods",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatEdit",
+          "scope": "litchi_ods",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatCommit",
+          "scope": "litchi_ods",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatPatch",
+          "scope": "litchi_ods",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatSnapshot",
+          "scope": "litchi_ods",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatLimits",
+          "scope": "litchi_ods",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
         }
       ],
       "families": [
         "litchi_ods::document",
-        "litchi_ods::metadata"
+        "litchi_ods::metadata",
+        "litchi_ods::flat"
       ],
       "immutable_owners": [
         "litchi_ods::Package",
         "litchi_ods::Workbook",
-        "litchi_ods::FlatSpreadsheet"
+        "litchi_ods::flat::Workbook"
       ],
       "family_methods": true
     },
@@ -9053,7 +9472,7 @@
         },
         {
           "name": "from_read_at_with_limits",
-          "scope": "litchi_odp::SourceBackedTailAppendEdit",
+          "scope": "litchi_odp::tail_append::Edit",
           "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
           "recursive": false
         },
@@ -9378,16 +9797,55 @@
           "scope": "litchi_odp",
           "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
           "match": "prefix"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_odp",
+          "replacement": "drop the Edit or call Edit::reset (record 0351 §2.3)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_odp",
+          "replacement": "use the focused module's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_odp",
+          "replacement": "a commit publishes the Package: Commit::{package, into_package} (record 0351 §2.3)"
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_odp::flat",
+          "replacement": "flat limits fold into SourceLimits/SemanticLimits in OpenOptions (record 0358)"
+        },
+        {
+          "name": "FlatPresentation",
+          "scope": "litchi_odp",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatSnapshot",
+          "scope": "litchi_odp",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatTransaction",
+          "scope": "litchi_odp",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
         }
       ],
       "families": [
         "litchi_odp::edit",
-        "litchi_odp::metadata"
+        "litchi_odp::metadata",
+        "litchi_odp::flat"
       ],
       "immutable_owners": [
         "litchi_odp::Package",
         "litchi_odp::Presentation",
-        "litchi_odp::FlatPresentation"
+        "litchi_odp::flat::Presentation"
       ],
       "family_methods": true
     },
@@ -9844,7 +10302,9 @@
       ],
       "families": [
         "litchi_odm::metadata",
-        "litchi_odm::transaction"
+        "litchi_odm::transaction",
+        "litchi_odm::title",
+        "litchi_odm::link"
       ],
       "immutable_owners": [
         "litchi_odm::Package",
@@ -9998,16 +10458,63 @@
           "scope": "litchi_odi",
           "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
           "match": "prefix"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_odi",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names (record 0351)",
+          "match": "suffix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_odi",
+          "replacement": "a commit publishes the Package: Commit::{package, into_package} (record 0351 §2.3)"
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_odi::flat",
+          "replacement": "flat limits fold into SourceLimits/SemanticLimits in OpenOptions (record 0358)"
+        },
+        {
+          "name": "FlatImage",
+          "scope": "litchi_odi",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatImageEdit",
+          "scope": "litchi_odi",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatImageCommit",
+          "scope": "litchi_odi",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatImagePatch",
+          "scope": "litchi_odi",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatImageTransaction",
+          "scope": "litchi_odi",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
         }
       ],
       "families": [
         "litchi_odi",
-        "litchi_odi::metadata"
+        "litchi_odi::metadata",
+        "litchi_odi::flat"
       ],
       "immutable_owners": [
         "litchi_odi::Package",
         "litchi_odi::Image",
-        "litchi_odi::FlatImage"
+        "litchi_odi::flat::Image"
       ],
       "family_methods": true
     },
@@ -10538,16 +11045,63 @@
           "scope": "litchi_odg",
           "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
           "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_odg",
+          "replacement": "a commit publishes the Package: Commit::{package, into_package} (record 0351 §2.3)"
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_odg::flat",
+          "replacement": "flat limits fold into SourceLimits/SemanticLimits in OpenOptions (record 0358)"
+        },
+        {
+          "name": "FlatDrawing",
+          "scope": "litchi_odg",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatDrawingEdit",
+          "scope": "litchi_odg",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatDrawingCommit",
+          "scope": "litchi_odg",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatDrawingPatch",
+          "scope": "litchi_odg",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatPage",
+          "scope": "litchi_odg",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatShape",
+          "scope": "litchi_odg",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
         }
       ],
       "families": [
         "litchi_odg::edit",
-        "litchi_odg::metadata"
+        "litchi_odg::metadata",
+        "litchi_odg::flat"
       ],
       "immutable_owners": [
         "litchi_odg::Package",
         "litchi_odg::Drawing",
-        "litchi_odg::FlatDrawing"
+        "litchi_odg::flat::Drawing"
       ],
       "family_methods": true
     },
@@ -10743,16 +11297,63 @@
           "scope": "litchi_odc",
           "replacement": "stage changes in an Edit (opened) or a Builder (fresh); no Mutable* draft types (record 0351)",
           "match": "prefix"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_odc",
+          "replacement": "a commit publishes the Package: Commit::{package, into_package} (record 0351 §2.3)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_odc",
+          "replacement": "limits travel in OpenOptions/EditOptions or as a required argument (record 0351 §2.5)",
+          "match": "suffix"
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_odc::flat",
+          "replacement": "flat limits fold into SourceLimits/SemanticLimits in OpenOptions (record 0358)"
+        },
+        {
+          "name": "FlatChart",
+          "scope": "litchi_odc",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatChartEdit",
+          "scope": "litchi_odc",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatChartCommit",
+          "scope": "litchi_odc",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatChartPatch",
+          "scope": "litchi_odc",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
+        },
+        {
+          "name": "FlatLimits",
+          "scope": "litchi_odc",
+          "replacement": "flat owners and families live at flat::<Projection> without the prefix (record 0358)",
+          "recursive": false
         }
       ],
       "families": [
         "litchi_odc",
-        "litchi_odc::metadata"
+        "litchi_odc::metadata",
+        "litchi_odc::flat"
       ],
       "immutable_owners": [
         "litchi_odc::Package",
         "litchi_odc::Chart",
-        "litchi_odc::FlatChart"
+        "litchi_odc::flat::Chart"
       ],
       "family_methods": true
     },
@@ -10953,6 +11554,12 @@
           "name": "into_snapshot",
           "scope": "litchi_odf_formula",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_odf_formula",
+          "replacement": "limits travel in OpenOptions/EditOptions or as a required argument (record 0351 §2.5)",
+          "match": "suffix"
         }
       ],
       "families": [

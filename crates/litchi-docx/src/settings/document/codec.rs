@@ -994,9 +994,11 @@ pub(crate) fn patch_attached_template(
 
 fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
     if xml.len() > MAX_SETTINGS_XML_BYTES {
-        return Err(Error::InvalidFormat(format!(
-            "settings XML exceeds {MAX_SETTINGS_XML_BYTES} bytes"
-        )));
+        return Err(Error::SettingsLimit {
+            kind: crate::settings::LimitKind::XmlBytes,
+            actual: xml.len(),
+            maximum: MAX_SETTINGS_XML_BYTES,
+        });
     }
     std::str::from_utf8(xml).map_err(|_source_error| {
         Error::InvalidFormat("lossless settings mutation currently requires UTF-8 XML".into())
@@ -1055,9 +1057,11 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
                 .checked_add(1)
                 .ok_or_else(|| Error::InvalidFormat("settings XML node count overflow".into()))?;
             if nodes > MAX_SETTINGS_XML_NODES {
-                return Err(Error::InvalidFormat(format!(
-                    "settings XML exceeds {MAX_SETTINGS_XML_NODES} nodes"
-                )));
+                return Err(Error::SettingsLimit {
+                    kind: crate::settings::LimitKind::XmlNodes,
+                    actual: nodes,
+                    maximum: MAX_SETTINGS_XML_NODES,
+                });
             }
         }
 
@@ -1067,9 +1071,11 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
                     Error::InvalidFormat("settings XML nesting is too deep".into())
                 })?;
                 if depth > MAX_SETTINGS_XML_DEPTH {
-                    return Err(Error::InvalidFormat(format!(
-                        "settings XML exceeds depth {MAX_SETTINGS_XML_DEPTH}"
-                    )));
+                    return Err(Error::SettingsLimit {
+                        kind: crate::settings::LimitKind::XmlDepth,
+                        actual: depth,
+                        maximum: MAX_SETTINGS_XML_DEPTH,
+                    });
                 }
                 if depth == 1 {
                     capture_settings_root(
@@ -1155,9 +1161,11 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
                     Error::InvalidFormat("settings XML nesting is too deep".into())
                 })?;
                 if child_depth > MAX_SETTINGS_XML_DEPTH {
-                    return Err(Error::InvalidFormat(format!(
-                        "settings XML exceeds depth {MAX_SETTINGS_XML_DEPTH}"
-                    )));
+                    return Err(Error::SettingsLimit {
+                        kind: crate::settings::LimitKind::XmlDepth,
+                        actual: child_depth,
+                        maximum: MAX_SETTINGS_XML_DEPTH,
+                    });
                 }
                 if child_depth == 1 {
                     capture_settings_root(

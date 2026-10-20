@@ -81,7 +81,7 @@ pub fn related<'a>(package: &'a OpcPackage, source: &dyn OpcPart) -> Result<Vec<
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn add(package: &mut OpcPackage, source_name: &str, chart: &Chart) -> Result<String> {
+pub(crate) fn add(package: &mut OpcPackage, source_name: &str, chart: &Chart) -> Result<String> {
     let source_uri = uri(source_name, "chart source")?;
     let source = package.get_part(&source_uri)?;
     let _ = source;

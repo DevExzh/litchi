@@ -1,6 +1,6 @@
 use litchi_odt::{
     core::PackageWriter,
-    generic::{FlatDocument, Package},
+    generic::{Package, flat::Document as FlatDocument},
     variable_declaration::{Declaration, Kind, Value},
 };
 

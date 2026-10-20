@@ -3,7 +3,7 @@ mod support;
 use litchi_core::Metadata;
 use litchi_odf_common::calculation::{Iteration, IterationStatus, Settings};
 use litchi_odf_common::core::OwnedPackage;
-use litchi_ods::{Builder, MutableSpreadsheet, Package};
+use litchi_ods::{Builder, Package, builder::Workbook as Draft};
 use std::num::NonZeroUsize;
 
 const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -66,7 +66,7 @@ fn facade_round_trips_typed_metadata_and_calculation_settings() {
             .contains("vendor:opaque")
     );
 
-    let mut mutable = MutableSpreadsheet::from_workbook(
+    let mut mutable = Draft::from_workbook(
         Package::from_bytes(&bytes)
             .expect("test fixture or operation should succeed")
             .workbook()
@@ -91,7 +91,11 @@ fn facade_round_trips_typed_metadata_and_calculation_settings() {
         })
         .expect("test fixture or operation should succeed");
 
-    let output = mutable.to_bytes();
+    let output = mutable
+        .build()
+        .expect("the draft builds")
+        .as_bytes()
+        .to_vec();
     let reopened = Package::from_bytes(&output)
         .expect("test fixture or operation should succeed")
         .workbook()
@@ -136,7 +140,7 @@ fn facade_round_trips_typed_metadata_and_calculation_settings() {
         support::compact_xml_fixture(SETTINGS).as_bytes()
     );
 
-    let mut clear = MutableSpreadsheet::from_workbook(
+    let mut clear = Draft::from_workbook(
         Package::from_bytes(&package(CONTENT, Some(META), None))
             .expect("test fixture or operation should succeed")
             .workbook()
@@ -145,7 +149,7 @@ fn facade_round_trips_typed_metadata_and_calculation_settings() {
     clear
         .clear_metadata()
         .expect("test fixture or operation should succeed");
-    let cleared = Package::from_bytes(&clear.to_bytes())
+    let cleared = Package::from_bytes(clear.build().expect("the draft builds").as_bytes())
         .expect("test fixture or operation should succeed")
         .workbook()
         .expect("test fixture or operation should succeed");
@@ -154,7 +158,7 @@ fn facade_round_trips_typed_metadata_and_calculation_settings() {
 
 #[test]
 fn facade_edits_are_atomic_and_builder_writes_new_parts() {
-    let mut mutable = MutableSpreadsheet::from_workbook(
+    let mut mutable = Draft::from_workbook(
         Package::from_bytes(&package(CONTENT, Some(META), None))
             .expect("test fixture or operation should succeed")
             .workbook()

@@ -87,7 +87,7 @@ pub fn load<'k>(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn put<'k>(
+pub(crate) fn put<'k>(
     package: &mut OpcPackage,
     owner: &PackURI,
     key: impl Into<crate::shape::Key<'k>>,
@@ -249,7 +249,7 @@ pub fn put<'k>(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn remove<'k>(
+pub(crate) fn remove<'k>(
     package: &mut OpcPackage,
     owner: &PackURI,
     key: impl Into<crate::shape::Key<'k>>,

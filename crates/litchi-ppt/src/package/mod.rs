@@ -1,6 +1,6 @@
 //! Package implementation for legacy `PowerPoint` presentations (`.ppt`).
 
-mod codec;
+pub(crate) mod codec;
 pub(crate) mod model;
 mod owner;
 pub(crate) use model::Reader;

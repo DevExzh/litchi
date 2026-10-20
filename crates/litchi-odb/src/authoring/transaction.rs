@@ -1976,6 +1976,14 @@ pub struct Commit {
 }
 
 impl Commit {
+    pub(crate) fn replayed(snapshot: crate::Package, patch: Patch) -> Self {
+        Self {
+            changed: !patch.is_noop(),
+            snapshot,
+            patch,
+        }
+    }
+
     fn unchanged(snapshot: crate::Package) -> Self {
         Self {
             patch: Patch {
@@ -5377,7 +5385,11 @@ fn validate_extension(xml: &str) -> Result<()> {
     if xml.starts_with("<?xml") || xml.contains("<!DOCTYPE") {
         return invalid("ODB producer extension must be one inert element subtree");
     }
-    litchi_odf_common::compact_xml::validate(xml.as_bytes()).map_err(Error::from)?;
+    litchi_odf_common::compact_xml::validate(
+        xml.as_bytes(),
+        litchi_odf_common::compact_xml::Limits::default(),
+    )
+    .map_err(Error::from)?;
     let nodes = scan(xml)?;
     let roots = nodes.iter().filter(|node| node.parent.is_none()).count();
     if roots != 1 {

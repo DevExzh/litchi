@@ -59,12 +59,17 @@ fn section_note_annotation_splices_are_source_bound_and_reversible() {
     let durable = Patch::from_bytes(&wire).unwrap();
     assert_eq!(durable.structure_changes().len(), 3);
     assert_eq!(
-        source.apply(&durable).unwrap().as_bytes(),
+        source.apply(&durable).unwrap().into_package().as_bytes(),
         commit.package().as_bytes()
     );
     let inverse = Patch::from_bytes(&durable.inverse().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        commit.package().apply(&inverse).unwrap().as_bytes(),
+        commit
+            .package()
+            .apply(&inverse)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 }
@@ -143,12 +148,17 @@ fn structure_lifecycle_and_table_append_are_durable_and_exactly_reversible() {
     assert_eq!(commit.patch().structure_lifecycle_changes().len(), 4 + 3);
     let durable = Patch::from_bytes(&commit.patch().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        source.apply(&durable).unwrap().as_bytes(),
+        source.apply(&durable).unwrap().into_package().as_bytes(),
         commit.package().as_bytes()
     );
     let inverse = Patch::from_bytes(&durable.inverse().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        commit.package().apply(&inverse).unwrap().as_bytes(),
+        commit
+            .package()
+            .apply(&inverse)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 }
@@ -222,12 +232,17 @@ fn removing_an_earlier_structure_remaps_later_text_identity_and_patch_wire() {
 
     let durable = Patch::from_bytes(&commit.patch().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        source.apply(&durable).unwrap().as_bytes(),
+        source.apply(&durable).unwrap().into_package().as_bytes(),
         commit.package().as_bytes()
     );
     let inverse = Patch::from_bytes(&durable.inverse().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        commit.package().apply(&inverse).unwrap().as_bytes(),
+        commit
+            .package()
+            .apply(&inverse)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 }

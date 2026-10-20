@@ -324,7 +324,11 @@ fn test_generate_meta_xml() {
 
     let meta_xml = builder.generate_meta_xml();
     assert_eq!(meta_xml, builder.generate_meta_xml());
-    litchi_odf_common::compact_xml::validate(meta_xml.as_bytes()).unwrap();
+    litchi_odf_common::compact_xml::validate(
+        meta_xml.as_bytes(),
+        litchi_odf_common::compact_xml::Limits::default(),
+    )
+    .unwrap();
     assert!(meta_xml.contains("office:document-meta"));
     assert!(meta_xml.contains("Litchi/"));
     assert!(meta_xml.contains("My Title"));
@@ -347,7 +351,11 @@ fn default_metadata_xml_has_no_ambient_timestamp() {
     let meta_xml = builder.generate_meta_xml();
     assert!(!meta_xml.contains("<meta:creation-date>"));
     assert!(!meta_xml.contains("<dc:date>"));
-    litchi_odf_common::compact_xml::validate(meta_xml.as_bytes()).unwrap();
+    litchi_odf_common::compact_xml::validate(
+        meta_xml.as_bytes(),
+        litchi_odf_common::compact_xml::Limits::default(),
+    )
+    .unwrap();
 }
 
 #[test]

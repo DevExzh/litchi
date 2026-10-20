@@ -1,5 +1,5 @@
 use litchi_core::Result;
-use litchi_ods::document::{LogicalRowEdit, PublicationRoute};
+use litchi_ods::document::{LogicalRowOperation, PublicationRoute};
 use litchi_ods::names::{Expression, Scope};
 use litchi_ods::{Builder, Cell, CellValue, Package, Sheet};
 
@@ -54,10 +54,10 @@ fn unified_commit_diagnostics_attribute_noop_splice_and_replay() -> Result<()> {
     assert_eq!(diagnostics.operation_count(), 1);
     assert_ne!(commit.package().as_bytes(), snapshot.as_bytes());
 
-    let replay = snapshot.apply(commit.patch())?;
+    let replay = snapshot.apply(commit.patch())?.into_package();
     assert_eq!(replay.as_bytes(), commit.package().as_bytes());
     let restored = replay.apply(&commit.patch().inverse())?;
-    assert_eq!(restored.as_bytes(), snapshot.as_bytes());
+    assert_eq!(restored.into_package().as_bytes(), snapshot.as_bytes());
     Ok(())
 }
 
@@ -73,7 +73,7 @@ fn logical_rebuild_is_not_reclassified_by_a_later_noop_splice() -> Result<()> {
     // helper therefore returns the current candidate bytes unchanged.
     edit.edit_logical_rows(
         "Data",
-        &[LogicalRowEdit::Move {
+        &[LogicalRowOperation::Move {
             at: 0,
             count: 1,
             to: 0,

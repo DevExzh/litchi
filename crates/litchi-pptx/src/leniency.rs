@@ -72,7 +72,7 @@
 //!   stamped with the owner part name when read through a part view.
 //! * A slide transition ([`crate::transition::Transition`], from
 //!   [`crate::transition::read`] or
-//!   [`crate::SourceBackedSlideSnapshot::transition`]) carries the repairs
+//!   [`crate::source::Slide::transition`]) carries the repairs
 //!   its read applied in
 //!   [`crate::transition::Transition::tolerance_report`]; the snapshot
 //!   stamps its slide part name. The report shares the value's retained
@@ -189,7 +189,7 @@
 //! missing `id`/`r:id`, an ID outside `ST_SlideId` (256..2^31), a stray
 //! `p:sldId` outside the list, repeated lists, XML well-formedness, and the
 //! slide-count limit stay hard errors. The lossless edit planners —
-//! [`crate::SourceBackedPresentationEditor`], cross-presentation copy, and
+//! [`crate::source::Package`], cross-presentation copy, and
 //! the opened-presentation transactions — keep the strict contract and
 //! refuse a slide list that needed a repair.
 //!

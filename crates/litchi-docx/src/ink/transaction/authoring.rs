@@ -1,5 +1,6 @@
 //! Batch source-preserving host authoring over one immutable edit snapshot.
 
+use crate::ink::LimitKind;
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -33,7 +34,7 @@ enum StructuralEdit {
 
 pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
     bound(
-        "annotations",
+        LimitKind::Annotations,
         edit.base
             .snapshot
             .annotations()
@@ -99,7 +100,7 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
                         "annotation host contains unmodeled sibling or fallback dependencies",
                     ));
                 }
-                push(&mut removal_hosts, host_index, "Ink selected removals")?;
+                push(&mut removal_hosts, host_index, LimitKind::SelectedRemovals)?;
             }
             if let Ok(replacement_index) = edit
                 .replacements
@@ -143,14 +144,14 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
                 push(
                     &mut targets,
                     NewTarget::ink(replacement.payload.shared_source(), previous.content_type()),
-                    "Ink authored targets",
+                    LimitKind::AuthoredTargets,
                 )?;
                 let image_target = if let Some(image) = &replacement.fallback {
                     let index = targets.len();
                     push(
                         &mut targets,
                         NewTarget::image(image.shared_source(), image.content_type()),
-                        "Ink authored targets",
+                        LimitKind::AuthoredTargets,
                     )?;
                     Some(index)
                 } else {
@@ -163,7 +164,7 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
                         ink_target,
                         image_target,
                     },
-                    "Ink replacement plans",
+                    LimitKind::ReplacementPlans,
                 )?;
             }
         }
@@ -185,14 +186,14 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
                     addition.payload.shared_source(),
                     addition.style.content_type(),
                 ),
-                "Ink authored targets",
+                LimitKind::AuthoredTargets,
             )?;
             let image_target = if let Some(image) = addition.style.fallback() {
                 let index = targets.len();
                 push(
                     &mut targets,
                     NewTarget::image(image.shared_source(), image.content_type()),
-                    "Ink authored targets",
+                    LimitKind::AuthoredTargets,
                 )?;
                 Some(index)
             } else {
@@ -205,7 +206,7 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
                     ink_target,
                     image_target,
                 },
-                "Ink insertion plans",
+                LimitKind::InsertionPlans,
             )?;
         }
         if removal_hosts.is_empty() && replacement_plans.is_empty() && addition_plans.is_empty() {
@@ -231,7 +232,7 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
                     .saturating_mul(2),
             );
         bound(
-            "edit staged bytes",
+            LimitKind::EditStagedBytes,
             staged_bytes.saturating_add(initial),
             edit.limits.max_staged_bytes,
         )?;
@@ -249,7 +250,7 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
                     hosts[plan.host_index].anchor_span.clone(),
                     added_targets[plan.ink_target].relationship_id(),
                 ),
-                "Ink relationship retargets",
+                LimitKind::RelationshipRetargets,
             )?;
         }
         let retargeted = placement::retarget_many(
@@ -278,7 +279,7 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
                 push(
                     &mut fallback_targets,
                     (range, added_targets[image_target].relationship_id()),
-                    "Ink fallback retargets",
+                    LimitKind::FallbackRetargets,
                 )?;
             }
         }
@@ -373,7 +374,7 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
                     start_tag: tag.clone(),
                     edit: operation,
                 },
-                "Ink XML updates",
+                LimitKind::XmlUpdates,
             )?;
         }
         let after =
@@ -394,7 +395,7 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
                 push(
                     &mut removed_ids,
                     relationship.r_id().to_owned(),
-                    "Ink released relationship IDs",
+                    LimitKind::ReleasedRelationshipIDs,
                 )?;
             }
         }
@@ -412,7 +413,7 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
             .saturating_add(added.retained_bytes()?)
             .saturating_add(cleanup.retained_bytes()?);
         bound(
-            "edit staged bytes",
+            LimitKind::EditStagedBytes,
             staged_bytes,
             edit.limits.max_staged_bytes,
         )?;
@@ -437,7 +438,7 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
                     removed: cleanup,
                 },
             },
-            "Ink authored story changes",
+            LimitKind::AuthoredStoryChanges,
         )?;
     }
     if inserted != edit.additions.len()
@@ -491,7 +492,7 @@ fn wrap_run(
         .len()
         .saturating_add(fragment.len())
         .saturating_add(6);
-    bound("Ink authored run bytes", length, maximum)?;
+    bound(LimitKind::AuthoredRunBytes, length, maximum)?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(length)
@@ -511,13 +512,14 @@ fn push_structural(
     operation: StructuralEdit,
 ) -> Result<()> {
     let order = items.len();
-    push(items, (tag, order, operation), "Ink structural edits")
+    push(items, (tag, order, operation), LimitKind::StructuralEdits)
 }
 
-fn push<T>(items: &mut Vec<T>, value: T, resource: &'static str) -> Result<()> {
-    items
-        .try_reserve(1)
-        .map_err(|source| Error::Allocation { resource, source })?;
+fn push<T>(items: &mut Vec<T>, value: T, resource: LimitKind) -> Result<()> {
+    items.try_reserve(1).map_err(|source| Error::Allocation {
+        resource: resource.as_str(),
+        source,
+    })?;
     items.push(value);
     Ok(())
 }

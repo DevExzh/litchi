@@ -1761,7 +1761,12 @@ impl Edit {
         conformance: crate::media_parts::Conformance,
     ) -> Result<()> {
         let selected = self.resolve_slide(slide.into())?;
-        crate::media_parts::store(&mut self.working, &selected.part_name, media, conformance)
+        crate::media_parts::package::store(
+            &mut self.working,
+            &selected.part_name,
+            media,
+            conformance,
+        )
     }
 
     /// Add a slide master and all required theme relationships.

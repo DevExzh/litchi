@@ -18,7 +18,10 @@ Build the input with, per crate (sequentially; RUSTC_BOOTSTRAP=1):
   cargo rustdoc -p <crate> --lib --all-features -- -Zunstable-options \
       --output-format json --document-hidden-items
 then run: tools/api_debt_inventory.py target/doc/litchi_docx.json ... > out.tsv
-A wave is done for a category when its crate has no rows left in it.
+A wave is done for a category when its crate has no rows left in it. A
+`Commit` that aliases `litchi_core::edit::Commit` has the triad accessors
+(record 0356 P4), and a type under a `builder` module is an authoring draft,
+whose `&mut self` methods are allowed (0351 §2.1 rule 7; record 0356b).
 """
 from __future__ import annotations
 
@@ -33,6 +36,8 @@ import check_api_glossary as gate  # noqa: E402
 OWNERS = {"Package", "Workbook", "Document", "Presentation", "Drawing", "Chart",
           "Spreadsheet", "Image", "Database", "Formula", "FlatDrawing",
           "FlatPresentation", "MutableDocument"}
+CORE_COMMIT = ("litchi_core", "edit", "Commit")
+CORE_COMMIT_METHODS = frozenset({"package", "into_package", "patch", "diagnostics", "into_parts"})
 DRAFT_NAMES = {"Reader", "Workbook", "Spreadsheet", "Presentation", "Document"}
 OUTPUT_PREFIXES = ("save", "to_", "write_to")
 SIGNATURE = {"sign", "sign_with", "resign", "resign_with", "unsign"}
@@ -107,13 +112,14 @@ def rows(document, crate: str):
         owner = path[-2] if len(path) > 1 else ""
         if kind == "function":
             receiver = gate.self_receiver(item["inner"]["function"]) or "fn"
-            if receiver == "&mut self" and owner in OWNERS:
+            draft = "builder" in path[:-1]
+            if receiver == "&mut self" and owner in OWNERS and not draft:
                 if owner == "MutableDocument":
                     target = "primary Edit (opened) / Builder (fresh)"
                 else:
                     target = target_family(name)
                 yield "mut_owner", text, receiver, target
-            elif receiver == "&mut self" and crate != "litchi_iwa" and (
+            elif receiver == "&mut self" and crate != "litchi_iwa" and not draft and (
                     owner.startswith(("Mutable", "Flat")) or owner in DRAFT_NAMES):
                 yield "mut_draft", text, receiver, "Builder draft or Edit verb; no Mutable* type"
             if name.endswith("_with_limits"):
@@ -128,6 +134,10 @@ def rows(document, crate: str):
                 yield "is_changed", text, receiver, "delete: diagnostics().changed() / patch.is_noop()"
         elif kind in ("struct", "enum", "type_alias"):
             members = methods.get(path, set())
+            if surface.foreign.get(path) == CORE_COMMIT:
+                # An alias of the shared commit (record 0356 P4): rustdoc lists
+                # its accessors in litchi-core, whose unit tests check them.
+                members = members | CORE_COMMIT_METHODS
             if name.endswith("Commit"):
                 missing = [m for m in ("package", "into_package", "patch", "diagnostics", "into_parts")
                            if m not in members]

@@ -166,7 +166,11 @@ fn one_transaction_updates_tree_styles_resources_metadata_and_dependencies() {
             .any(|resource| resource.path() == "Pictures/cover.png")
     );
     assert_eq!(
-        changed.apply(&commit.patch().inverse()).unwrap().as_bytes(),
+        changed
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
     assert!(Package::from_bytes(changed.as_bytes()).is_ok());
@@ -208,6 +212,7 @@ fn section_and_style_create_delete_are_reversible() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         without_section.as_bytes()
     );
@@ -278,7 +283,10 @@ fn transfer_durable_stale_and_three_way_plan_share_the_strong_boundary() {
         .plan_three_way(transfer_commit.patch())
         .unwrap();
     assert!(metadata_plan.can_commit());
-    let merged = source.apply(&metadata_plan.commit().unwrap()).unwrap();
+    let merged = source
+        .apply(&metadata_plan.commit().unwrap())
+        .unwrap()
+        .into_package();
     assert_eq!(
         merged.document().metadata().unwrap().description.as_deref(),
         Some("planned")
@@ -385,7 +393,11 @@ fn linked_section_transfer_and_subtree_cleanup_close_package_dependencies() {
     );
     assert!(Package::from_bytes(cleaned.as_bytes()).is_ok());
     assert_eq!(
-        changed.apply(&commit.patch().inverse()).unwrap().as_bytes(),
+        changed
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         destination.as_bytes()
     );
 }
@@ -442,7 +454,10 @@ fn final_security_graph_atomic_style_cleanup_and_named_plans_are_checked() {
         .plan_three_way(description_commit.patch())
         .unwrap();
     assert!(metadata_plan.can_commit());
-    let metadata_merged = source.apply(&metadata_plan.commit().unwrap()).unwrap();
+    let metadata_merged = source
+        .apply(&metadata_plan.commit().unwrap())
+        .unwrap()
+        .into_package();
     assert_eq!(
         metadata_merged
             .document()
@@ -474,7 +489,10 @@ fn final_security_graph_atomic_style_cleanup_and_named_plans_are_checked() {
             .plan_three_way(title_commit.patch())
             .unwrap(),
     ] {
-        let merged = source.apply(&plan.commit().unwrap()).unwrap();
+        let merged = source
+            .apply(&plan.commit().unwrap())
+            .unwrap()
+            .into_package();
         assert_eq!(merged.document().title(), Some("Planned title"));
         assert_eq!(
             merged.document().metadata().unwrap().author.as_deref(),
@@ -495,6 +513,7 @@ fn final_security_graph_atomic_style_cleanup_and_named_plans_are_checked() {
     let identical = source.apply(&identical_plan.commit().unwrap()).unwrap();
     assert_eq!(
         identical
+            .into_package()
             .document()
             .section_tree()
             .sections()
@@ -662,6 +681,7 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
         renamed
             .apply(&index_commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         master.as_bytes()
     );
@@ -681,7 +701,8 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
     let title_commit = title_edit.commit().unwrap();
     let merged = master
         .apply(&index_commit.patch().merge(title_commit.patch()).unwrap())
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(merged.document().title(), Some("Index merge"));
     assert_eq!(
         merged.document().structure().generated_indexes()[0].name(),
@@ -730,6 +751,7 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
         body_changed
             .apply(&body_commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         master.as_bytes()
     );
@@ -751,7 +773,8 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
     assert_eq!(body_history.current().as_bytes(), body_changed.as_bytes());
     let merged_body = master
         .apply(&body_commit.patch().merge(index_commit.patch()).unwrap())
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(
         merged_body.document().structure().generated_indexes()[0].name(),
         Some("Renamed Contents")
@@ -794,6 +817,7 @@ fn common_master_structure_local_references_and_active_write_policy_are_explicit
             .package()
             .apply(&container_commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         master.as_bytes()
     );
@@ -874,7 +898,11 @@ fn collision_safe_transfer_renames_complete_style_and_resource_closures_atomical
             .contains("fo:margin-left=\"1cm\"")
     );
     assert_eq!(
-        changed.apply(&commit.patch().inverse()).unwrap().as_bytes(),
+        changed
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         destination.as_bytes()
     );
 
@@ -894,7 +922,7 @@ fn collision_safe_transfer_renames_complete_style_and_resource_closures_atomical
         .unwrap()
         .commit()
         .unwrap();
-    let merged = destination.apply(&merged).unwrap();
+    let merged = destination.apply(&merged).unwrap().into_package();
     assert_eq!(merged.document().title(), Some("parallel metadata"));
     assert!(
         merged
@@ -975,7 +1003,11 @@ fn styles_owned_transfer_creates_a_compact_styles_part_when_absent() {
             .any(|style| { style.name() == "NamedSection" && style.parent() == Some("NamedBase") })
     );
     assert_eq!(
-        changed.apply(&commit.patch().inverse()).unwrap().as_bytes(),
+        changed
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         destination.as_bytes()
     );
     let durable = commit.patch().durable().unwrap();
@@ -994,7 +1026,8 @@ fn styles_owned_transfer_creates_a_compact_styles_part_when_absent() {
     let title_commit = title_edit.commit().unwrap();
     let merged = destination
         .apply(&commit.patch().merge(title_commit.patch()).unwrap())
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(merged.document().title(), Some("parallel styles owner"));
     assert!(merged.document().styles_xml().is_some());
     assert!(Package::from_bytes(changed.as_bytes()).is_ok());

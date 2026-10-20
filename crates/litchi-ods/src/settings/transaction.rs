@@ -9,7 +9,7 @@ use super::codec::replace;
 use super::model::Snapshot;
 
 /// An isolated mutable draft derived from an immutable [`Snapshot`].
-pub struct Transaction<'xml> {
+pub(crate) struct Transaction<'xml> {
     pub(crate) source: &'xml str,
     pub(crate) original: Option<Settings>,
     pub(crate) draft: Option<Settings>,
@@ -29,12 +29,13 @@ impl<'xml> Transaction<'xml> {
     /// Read the current draft without exposing mutable fields outside the
     /// editor boundary.
     #[must_use]
-    pub fn calculation(&self) -> Option<&Settings> {
+    pub(crate) fn calculation(&self) -> Option<&Settings> {
         self.draft.as_ref()
     }
 
+    #[cfg(test)]
     /// Open a contextual editor for replacement, update, or removal.
-    pub fn editor(&mut self) -> Editor<'_, 'xml> {
+    pub(crate) fn editor(&mut self) -> Editor<'_, 'xml> {
         Editor { transaction: self }
     }
 
@@ -42,14 +43,14 @@ impl<'xml> Transaction<'xml> {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn replace(&mut self, settings: Settings) -> Result<()> {
+    pub(crate) fn replace(&mut self, settings: Settings) -> Result<()> {
         settings.validate()?;
         self.draft = Some(settings);
         Ok(())
     }
 
     /// Remove the calculation-settings element from the package content.
-    pub fn remove(&mut self) {
+    pub(crate) fn remove(&mut self) {
         self.draft = None;
     }
 
@@ -58,11 +59,10 @@ impl<'xml> Transaction<'xml> {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn commit(self) -> Result<Commit<'xml>> {
+    pub(crate) fn commit(self) -> Result<Commit<'xml>> {
         if self.draft == self.original {
             return Ok(Commit {
                 xml: Cow::Borrowed(self.source),
-                calculation: self.draft,
                 changed: false,
             });
         }
@@ -72,7 +72,6 @@ impl<'xml> Transaction<'xml> {
         let xml = replace(self.source, &self.location, self.draft.as_ref())?;
         Ok(Commit {
             xml: Cow::Owned(xml),
-            calculation: self.draft,
             changed: true,
         })
     }
@@ -98,6 +97,7 @@ impl Editor<'_, '_> {
         self.transaction.replace(settings)
     }
 
+    #[cfg(test)]
     /// Apply a checked in-place update to the current value.  If no value is
     /// present, the editor starts from the common default settings value.
     ///
@@ -119,43 +119,31 @@ impl Editor<'_, '_> {
 }
 
 /// The result of publishing a calculation-settings transaction.
-pub struct Commit<'xml> {
+pub(crate) struct Commit<'xml> {
     xml: Cow<'xml, str>,
-    calculation: Option<Settings>,
     changed: bool,
 }
 
 impl Commit<'_> {
+    #[cfg(test)]
     /// Borrow the resulting content XML.  This is the original source for a
     /// no-op commit and the rebuilt XML for a changed commit.
     #[must_use]
-    pub fn content_xml(&self) -> &str {
+    pub(crate) fn content_xml(&self) -> &str {
         &self.xml
-    }
-
-    /// Return the typed value that is now represented by the result.
-    #[must_use]
-    pub fn calculation(&self) -> Option<&Settings> {
-        self.calculation.as_ref()
     }
 
     /// Whether the transaction required an XML rebuild.
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         self.changed
     }
 }
 
 impl<'xml> Commit<'xml> {
-    /// Consume the result while retaining a borrow for no-op commits.
-    #[must_use]
-    pub fn into_xml(self) -> Cow<'xml, str> {
-        self.xml
-    }
-
     /// Consume the result into package-owned UTF-8 XML.
     #[must_use]
-    pub fn into_owned(self) -> String {
+    pub(crate) fn into_owned(self) -> String {
         self.xml.into_owned()
     }
 }

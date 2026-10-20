@@ -466,8 +466,8 @@ fn styled() -> String {
         )
 }
 
-fn edit(build: impl FnOnce(&mut TextPropertyEdit)) -> TextPropertyEdit {
-    let mut properties = TextPropertyEdit::new();
+fn edit(build: impl FnOnce(&mut TextPropertyUpdate)) -> TextPropertyUpdate {
+    let mut properties = TextPropertyUpdate::new();
     build(&mut properties);
     properties
 }

@@ -4,7 +4,7 @@ use litchi_core::Result;
 use litchi_odf_common::{constants, core::PackageWriter, package::raw_identical_members};
 use litchi_ods::{
     Cell, CellValue, Package, Row,
-    document::{LogicalRowEdit, Patch},
+    document::{LogicalRowOperation, Patch},
 };
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -75,12 +75,12 @@ fn sequential_batch_splits_repeats_moves_rows_and_is_durable() -> Result<()> {
     edit.edit_logical_rows(
         "Data",
         &[
-            LogicalRowEdit::Insert {
+            LogicalRowOperation::Insert {
                 at: 0,
                 rows: vec![text_row("X")],
             },
-            LogicalRowEdit::Remove { at: 3, count: 1 },
-            LogicalRowEdit::Move {
+            LogicalRowOperation::Remove { at: 3, count: 1 },
+            LogicalRowOperation::Move {
                 at: 0,
                 count: 1,
                 to: 4,
@@ -100,22 +100,26 @@ fn sequential_batch_splits_repeats_moves_rows_and_is_durable() -> Result<()> {
     assert!(content.contains("<t:table-column t:number-columns-repeated=\"2\""));
     assert!(content.contains("t:visibility=\"collapse\""));
     assert_eq!(
-        snapshot.apply(commit.patch())?.as_bytes(),
+        snapshot.apply(commit.patch())?.into_package().as_bytes(),
         commit.package().as_bytes()
     );
     let wire = commit.patch().to_deterministic_json()?;
     let decoded = Patch::from_deterministic_json(&wire, snapshot.limits())?;
     assert_eq!(
-        snapshot.apply(&decoded)?.as_bytes(),
+        snapshot.apply(&decoded)?.into_package().as_bytes(),
         commit.package().as_bytes()
     );
     let inverse_wire = decoded.inverse().to_deterministic_json()?;
     let inverse = Patch::from_deterministic_json(&inverse_wire, snapshot.limits())?;
-    assert_eq!(commit.package().apply(&inverse)?.as_bytes(), source);
+    assert_eq!(
+        commit.package().apply(&inverse)?.into_package().as_bytes(),
+        source
+    );
     assert_eq!(
         commit
             .package()
             .apply(&commit.patch().inverse())?
+            .into_package()
             .as_bytes(),
         source
     );
@@ -139,7 +143,7 @@ fn first_middle_last_only_and_large_repeat_stay_physically_bounded() -> Result<(
     let mut edit = snapshot.edit()?;
     edit.edit_logical_rows(
         "Data",
-        &[LogicalRowEdit::Insert {
+        &[LogicalRowOperation::Insert {
             at: 500_000,
             rows: vec![text_row("middle")],
         }],
@@ -159,16 +163,16 @@ fn first_middle_last_only_and_large_repeat_stay_physically_bounded() -> Result<(
     edges.edit_logical_rows(
         "Data",
         &[
-            LogicalRowEdit::Insert {
+            LogicalRowOperation::Insert {
                 at: 0,
                 rows: vec![text_row("first")],
             },
-            LogicalRowEdit::Insert {
+            LogicalRowOperation::Insert {
                 at: 1_000_002,
                 rows: vec![text_row("last")],
             },
-            LogicalRowEdit::Remove { at: 0, count: 1 },
-            LogicalRowEdit::Remove {
+            LogicalRowOperation::Remove { at: 0, count: 1 },
+            LogicalRowOperation::Remove {
                 at: 1_000_001,
                 count: 1,
             },
@@ -179,7 +183,7 @@ fn first_middle_last_only_and_large_repeat_stay_physically_bounded() -> Result<(
     let only = package_with_content(&ordinary_content(r#"<t:table-row/>"#));
     let only_snapshot = Package::from_bytes(&only)?;
     let mut remove_only = only_snapshot.edit()?;
-    remove_only.edit_logical_rows("Data", &[LogicalRowEdit::Remove { at: 0, count: 1 }])?;
+    remove_only.edit_logical_rows("Data", &[LogicalRowOperation::Remove { at: 0, count: 1 }])?;
     let removed = remove_only.commit()?;
     assert_eq!(
         Package::from_bytes(removed.package().as_bytes())?
@@ -200,7 +204,7 @@ fn namespace_aliased_self_closing_table_opens_without_losing_its_start_tag() -> 
     let mut edit = snapshot.edit()?;
     edit.edit_logical_rows(
         "Data",
-        &[LogicalRowEdit::Insert {
+        &[LogicalRowOperation::Insert {
             at: 0,
             rows: vec![text_row("created")],
         }],
@@ -222,7 +226,7 @@ fn namespace_aliased_self_closing_table_opens_without_losing_its_start_tag() -> 
     let mut explicit_edit = explicit_snapshot.edit()?;
     explicit_edit.edit_logical_rows(
         "Data",
-        &[LogicalRowEdit::Insert {
+        &[LogicalRowOperation::Insert {
             at: 0,
             rows: vec![text_row("explicit")],
         }],
@@ -250,7 +254,7 @@ fn no_op_and_late_batch_failure_leave_exact_candidate_unchanged() -> Result<()> 
     let mut noop = snapshot.edit()?;
     noop.edit_logical_rows(
         "Data",
-        &[LogicalRowEdit::Move {
+        &[LogicalRowOperation::Move {
             at: 0,
             count: 1,
             to: 0,
@@ -266,11 +270,11 @@ fn no_op_and_late_batch_failure_leave_exact_candidate_unchanged() -> Result<()> 
             .edit_logical_rows(
                 "Data",
                 &[
-                    LogicalRowEdit::Insert {
+                    LogicalRowOperation::Insert {
                         at: 1,
                         rows: vec![text_row("temporary")],
                     },
-                    LogicalRowEdit::Remove {
+                    LogicalRowOperation::Remove {
                         at: usize::MAX,
                         count: 1,
                     },
@@ -282,7 +286,7 @@ fn no_op_and_late_batch_failure_leave_exact_candidate_unchanged() -> Result<()> 
         failed
             .edit_logical_rows(
                 "Data",
-                &[LogicalRowEdit::Remove {
+                &[LogicalRowOperation::Remove {
                     at: usize::MAX,
                     count: 0,
                 }]
@@ -292,7 +296,10 @@ fn no_op_and_late_batch_failure_leave_exact_candidate_unchanged() -> Result<()> 
     assert_eq!(failed.as_bytes(), before);
     assert!(
         failed
-            .edit_logical_rows("Missing", &[LogicalRowEdit::Remove { at: 0, count: 1 }])
+            .edit_logical_rows(
+                "Missing",
+                &[LogicalRowOperation::Remove { at: 0, count: 1 }]
+            )
             .is_err()
     );
     Ok(())
@@ -304,12 +311,12 @@ fn logical_row_edit_count_accepts_below_and_exact_limit_and_rejects_above() -> R
     let source = package_with_content(&ordinary_content(r#"<t:table-row/>"#));
     let snapshot = Package::from_bytes(&source)?;
     for count in [LIMIT - 1, LIMIT] {
-        let operations = vec![LogicalRowEdit::Remove { at: 0, count: 0 }; count];
+        let operations = vec![LogicalRowOperation::Remove { at: 0, count: 0 }; count];
         let mut edit = snapshot.edit()?;
         edit.edit_logical_rows("Data", &operations)?;
         assert_eq!(edit.as_bytes(), source);
     }
-    let operations = vec![LogicalRowEdit::Remove { at: 0, count: 0 }; LIMIT + 1];
+    let operations = vec![LogicalRowOperation::Remove { at: 0, count: 0 }; LIMIT + 1];
     let mut refused = snapshot.edit()?;
     assert!(refused.edit_logical_rows("Data", &operations).is_err());
     assert_eq!(refused.as_bytes(), source);
@@ -338,7 +345,7 @@ fn source_and_inserted_style_references_are_refused_atomically() -> Result<()> {
         assert!(
             edit.edit_logical_rows(
                 "Data",
-                &[LogicalRowEdit::Insert {
+                &[LogicalRowOperation::Insert {
                     at: 0,
                     rows: vec![text_row("unsafe")],
                 }]
@@ -352,7 +359,7 @@ fn source_and_inserted_style_references_are_refused_atomically() -> Result<()> {
     let mut noop = styled_noop.edit()?;
     noop.edit_logical_rows(
         "Data",
-        &[LogicalRowEdit::Move {
+        &[LogicalRowOperation::Move {
             at: 0,
             count: 1,
             to: 0,
@@ -373,7 +380,7 @@ fn source_and_inserted_style_references_are_refused_atomically() -> Result<()> {
         assert!(
             edit.edit_logical_rows(
                 "Data",
-                &[LogicalRowEdit::Insert {
+                &[LogicalRowOperation::Insert {
                     at: 0,
                     rows: vec![row],
                 }]
@@ -422,7 +429,7 @@ fn every_unrewritten_dependency_domain_is_refused_atomically() -> Result<()> {
         assert!(
             edit.edit_logical_rows(
                 "Data",
-                &[LogicalRowEdit::Insert {
+                &[LogicalRowOperation::Insert {
                     at: 0,
                     rows: vec![text_row("unsafe")],
                 }]
@@ -449,7 +456,7 @@ fn every_unrewritten_dependency_domain_is_refused_atomically() -> Result<()> {
     let mut style_edit = style_snapshot.edit()?;
     assert!(
         style_edit
-            .edit_logical_rows("Data", &[LogicalRowEdit::Remove { at: 0, count: 1 }])
+            .edit_logical_rows("Data", &[LogicalRowOperation::Remove { at: 0, count: 1 }])
             .is_err()
     );
     assert_eq!(style_edit.as_bytes(), style_source);

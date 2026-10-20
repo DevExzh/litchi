@@ -101,11 +101,15 @@ fn an_exact_no_op_commit_is_the_source_byte_for_byte() {
     assert_eq!(changed.package().document().structure().items().len(), 2);
     let (published, patch) = changed.into_parts();
     assert_eq!(
-        package.apply(&patch).unwrap().as_bytes(),
+        package.apply(&patch).unwrap().into_package().as_bytes(),
         published.as_bytes()
     );
     assert_eq!(
-        published.apply(&patch.inverse()).unwrap().as_bytes(),
+        published
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         bytes.as_slice()
     );
     assert_eq!(
@@ -214,7 +218,8 @@ fn caller_selected_limits_are_typed() {
 #[test]
 fn a_prepared_package_is_adopted_and_another_family_is_refused() {
     let bytes = built(&["prepared"]).to_bytes().unwrap();
-    let prepared = litchi_odf_common::detect::prepared(bytes.clone()).unwrap();
+    let prepared =
+        litchi_odf_common::detect::prepared(bytes.clone(), SourceLimits::default()).unwrap();
     let adopted = Package::from_prepared_package(prepared).unwrap();
     assert_eq!(adopted.as_bytes(), bytes.as_slice());
 
@@ -225,7 +230,7 @@ fn a_prepared_package_is_adopted_and_another_family_is_refused() {
         .unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     let text = writer.finish_to_bytes().unwrap();
-    let prepared = litchi_odf_common::detect::prepared(text).unwrap();
+    let prepared = litchi_odf_common::detect::prepared(text, SourceLimits::default()).unwrap();
     assert!(matches!(
         Package::from_prepared_package(prepared).unwrap_err(),
         Error::Core(litchi_core::Error::UnexpectedFormat { .. })

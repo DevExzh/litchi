@@ -473,7 +473,7 @@ fn edit_limits_and_dirty_state_refuse_before_publication() {
     assert!(matches!(
         too_small.commit(),
         Err(Error::InkLimit {
-            resource: "edit staged bytes",
+            kind: litchi_docx::ink::LimitKind::EditStagedBytes,
             ..
         })
     ));

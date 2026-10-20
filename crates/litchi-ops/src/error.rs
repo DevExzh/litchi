@@ -1227,6 +1227,19 @@ impl Classify for litchi_docx::Error {
             Self::Opc(error) => error.classify(),
             Self::Io(error) => error.classify(),
             Self::InkLimit { .. }
+            | Self::AltChunkLimit { .. }
+            | Self::GlossaryLimit { .. }
+            | Self::ContentControlLimit { .. }
+            | Self::ConflictLimit { .. }
+            | Self::ChartLimit { .. }
+            | Self::FontLimit { .. }
+            | Self::BibliographyLimit { .. }
+            | Self::WebLimit { .. }
+            | Self::StoryLimit { .. }
+            | Self::NumberingLimit { .. }
+            | Self::MailMergeLimit { .. }
+            | Self::StylesWithEffectsLimit { .. }
+            | Self::SettingsLimit { .. }
             | Self::RevisionLimit { .. }
             | Self::BlockReadLimit { .. }
             | Self::ExternalHyperlinkDetachmentLimit { .. }
@@ -1505,7 +1518,7 @@ impl Classify for litchi_doc::Error {
     }
 }
 
-#[cfg(feature = "doc")]
+#[cfg(any(feature = "doc", feature = "ppt"))]
 impl Classify for litchi_core::patch::PatchError {
     fn classify(&self) -> Class {
         use litchi_core::patch::PatchError;
@@ -1792,6 +1805,7 @@ impl Classify for litchi_ppt::package::edit::Error {
             Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
             Self::PatchConflict => Class::of(Code::InvalidInput),
+            Self::Durable(error) => error.classify(),
             _ => Class::of(Code::InternalError),
         }
     }
@@ -1870,6 +1884,9 @@ impl Classify for litchi_odf_common::Error {
         match self {
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
             Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
+            Self::Refused(refusal) => refusal.classify(),
+            Self::PatchConflict { .. } => Class::of(Code::InvalidInput),
+            Self::Signed => Class::of(Code::DocumentProtected),
             Self::Core(error) => error.classify(),
             _ => Class::of(Code::InternalError),
         }
@@ -2046,6 +2063,8 @@ impl Classify for litchi_ppt::text_edit::Error {
             // unsupported containers, is unsupported content: a signed
             // handle is refused before it reaches the leaf.
             Self::Refused(refusal) => refusal.kind().classify(),
+            Self::PatchConflict => Class::of(Code::InvalidInput),
+            Self::Signed => Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION),
         }
     }
 }

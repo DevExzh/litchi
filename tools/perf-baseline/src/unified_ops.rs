@@ -3485,7 +3485,12 @@ fn run_detection(
                 let started = Instant::now();
                 let observed = match entry.leg {
                     Leg::Unified => litchi_ops::detect::detect_format_from_reader(&mut reader),
-                    Leg::Leaf => litchi_odf_common::detect::reader(&mut reader),
+                    Leg::Leaf => litchi_odf_common::detect::reader(
+                        &mut reader,
+                        litchi_odf_common::detect::Limits::default(),
+                    )
+                    .ok()
+                    .flatten(),
                 };
                 let duration = started.elapsed();
                 (
@@ -3500,7 +3505,12 @@ fn run_detection(
                     Leg::Unified => {
                         litchi_ops::detect::detect_file_format_from_bytes(&corpus.archive)
                     },
-                    Leg::Leaf => litchi_odf_common::detect::bytes(&corpus.archive),
+                    Leg::Leaf => litchi_odf_common::detect::bytes(
+                        &corpus.archive,
+                        litchi_odf_common::detect::Limits::default(),
+                    )
+                    .ok()
+                    .flatten(),
                 };
                 (observed, started.elapsed(), None)
             },

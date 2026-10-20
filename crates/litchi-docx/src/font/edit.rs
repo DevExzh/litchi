@@ -22,7 +22,9 @@
 use super::{Conformance, Table};
 use crate::package::family::{graph_edit, graph_family};
 
-graph_family!("font-table");
+graph_family!("font-table", own_limits);
+
+pub use super::limit::LimitKind;
 graph_edit!("font-table", edit_fonts, apply_fonts);
 
 impl Edit {

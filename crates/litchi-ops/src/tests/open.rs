@@ -899,7 +899,10 @@ mod zip_candidates {
 
         let bytes = uncertain_ooxml_odf_polyglot(mimetype);
         assert_eq!(
-            litchi_odf_common::detect::packaged_has_ooxml_catalog(&bytes),
+            litchi_odf_common::detect::packaged_has_ooxml_catalog(
+                &bytes,
+                litchi_odf_common::detect::CatalogProbeLimits::default()
+            ),
             None
         );
         reset_opc_probe_count();

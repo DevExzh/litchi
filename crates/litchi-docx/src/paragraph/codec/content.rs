@@ -202,7 +202,6 @@ impl Paragraph {
     ///
     /// # Errors
     /// Returns an error for malformed revision XML or an exceeded resource limit.
-    #[cfg(test)]
     pub(crate) fn revisions_bounded(
         &self,
         limits: crate::revision::Limits,

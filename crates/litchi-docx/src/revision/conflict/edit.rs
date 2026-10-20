@@ -14,7 +14,32 @@ use litchi_opc::PackURI;
 use super::transaction::{Draft, Operation};
 use crate::package::family::{Staged, graph_family};
 
-graph_family!("conflict-markup");
+graph_family!("conflict-markup", own_limits);
+
+pub use super::limit::LimitKind;
+
+/// Options of a conflict-markup edit (record 0355a).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: Option<super::Limits>,
+}
+
+impl EditOptions {
+    /// Bound the edit's story snapshot and its rewrite (including
+    /// `max_output_bytes`) by `limits` instead of the package's semantic
+    /// conflict limits.
+    #[must_use]
+    pub const fn limits(mut self, limits: super::Limits) -> Self {
+        self.limits = Some(limits);
+        self
+    }
+
+    /// The configured limits; `None` uses the package's semantic limits.
+    #[must_use]
+    pub const fn limits_value(&self) -> Option<super::Limits> {
+        self.limits
+    }
+}
 
 /// A staged conflict-markup change of one story over one package snapshot.
 /// The source is never changed: [`Self::commit`] publishes a new package,
@@ -23,6 +48,7 @@ graph_family!("conflict-markup");
 pub struct Edit {
     staged: Staged,
     story: Option<PackURI>,
+    limits: super::Limits,
     draft: Option<Draft>,
 }
 
@@ -37,9 +63,9 @@ impl Edit {
         if self.draft.is_none() {
             let package = self.staged.working();
             let snapshot = match &self.story {
-                None => package.conflicts()?,
+                None => package.conflicts_bounded(self.limits)?,
                 Some(part) => package
-                    .conflict_stories()?
+                    .conflict_stories_bounded(self.limits)?
                     .into_iter()
                     .find(|story| story.part() == part)
                     .ok_or_else(|| crate::Error::PartNotFound(format!("conflict story {part}")))?
@@ -159,9 +185,23 @@ impl crate::Package {
     /// Stage a conflict-markup change of the main story. O(1).
     #[must_use]
     pub fn edit_conflicts(&self) -> Edit {
+        self.edit_conflicts_with_options(EditOptions::default())
+    }
+
+    /// Stage a conflict-markup change of the main story under `options`.
+    /// O(1).
+    #[must_use]
+    pub fn edit_conflicts_with_options(&self, options: EditOptions) -> Edit {
+        self.conflict_edit(None, options)
+    }
+
+    fn conflict_edit(&self, story: Option<PackURI>, options: EditOptions) -> Edit {
         Edit {
             staged: Staged::new(self),
-            story: None,
+            story,
+            limits: options
+                .limits
+                .unwrap_or_else(|| self.semantic_limits().conflicts_value()),
             draft: None,
         }
     }
@@ -170,11 +210,14 @@ impl crate::Package {
     /// [`Self::conflict_stories`]). O(1).
     #[must_use]
     pub fn edit_story_conflicts(&self, part: &PackURI) -> Edit {
-        Edit {
-            staged: Staged::new(self),
-            story: Some(part.clone()),
-            draft: None,
-        }
+        self.edit_story_conflicts_with_options(part, EditOptions::default())
+    }
+
+    /// Stage a conflict-markup change of the story part `part` under
+    /// `options`. O(1).
+    #[must_use]
+    pub fn edit_story_conflicts_with_options(&self, part: &PackURI, options: EditOptions) -> Edit {
+        self.conflict_edit(Some(part.clone()), options)
     }
 
     /// Replay a conflict-markup patch onto this package, which must hold the

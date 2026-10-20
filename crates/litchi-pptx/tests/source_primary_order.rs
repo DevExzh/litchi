@@ -12,7 +12,7 @@ use litchi_core::{
     Resource,
 };
 use litchi_opc::{OpcPackage, PackURI, SourceLimits};
-use litchi_pptx::{Error, SourceBackedPresentationEditor, builder::Builder, source::Package};
+use litchi_pptx::{Error, builder::Builder, source::Package};
 
 const SIGNED_FIXTURE: &[u8] =
     include_bytes!("../../../test-data/poi/test-data/xmldsign/hello-world-signed.pptx");
@@ -322,15 +322,12 @@ fn standalone_source_order_publishes_modeled_properties_and_custom_show() {
     let with_custom_show = with_presentation_root_suffix(&stock, CUSTOM_SHOW_SUFFIX);
     let bytes = with_pres_props(&with_custom_show, MODELED_PRES_PROPS);
     let before_pres_props = member_bytes(&bytes, "/ppt/presProps.xml");
-    let editor =
-        SourceBackedPresentationEditor::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
-    let mut edit = editor.edit_slide_order().unwrap();
+    let package = Package::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let mut edit = package.edit().unwrap();
     assert!(edit.move_slide(Position::new(0), Position::new(2)).unwrap());
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
-    editor
-        .publish_slide_order_commit_to_stream(&mut output, &commit)
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
 
     assert_eq!(
         member_bytes(&output, "/ppt/presProps.xml"),

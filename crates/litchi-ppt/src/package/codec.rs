@@ -377,7 +377,7 @@ impl<R: Read + Seek> Reader<R> {
     }
 }
 
-fn is_signature_component(name: &str) -> bool {
+pub(crate) fn is_signature_component(name: &str) -> bool {
     [
         "_xmlsignatures",
         "_signatures",

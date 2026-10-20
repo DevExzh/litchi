@@ -256,25 +256,6 @@ impl From<ValidationReportError> for OdfValidationError {
     }
 }
 
-/// Validate borrowed ODF package bytes under default finite input and report
-/// bounds without changing or retaining the package.
-///
-/// The immutable slice is the source-identity bracket for the entire call.
-/// ZIP metadata is bounded-indexed once. A separate allocation-free raw-header
-/// pass checks path spelling and the mimetype local header; ordinary package
-/// payloads remain unread.
-///
-/// # Errors
-///
-/// Returns an error only if a bounded allocation or report construction fails.
-pub fn validate_package(data: &[u8]) -> Result<ValidateReport, OdfValidationError> {
-    validate_package_with_limits(
-        data,
-        OdfValidationLimits::default(),
-        ValidationLimits::default(),
-    )
-}
-
 /// Validate borrowed ODF package bytes under explicit finite input and report
 /// bounds without changing or retaining the package.
 ///
@@ -289,7 +270,7 @@ pub fn validate_package(data: &[u8]) -> Result<ValidateReport, OdfValidationErro
 /// # Errors
 ///
 /// Returns an error only if a bounded allocation or report construction fails.
-pub fn validate_package_with_limits(
+pub fn validate_package(
     data: &[u8],
     input_limits: OdfValidationLimits,
     report_limits: ValidationLimits,

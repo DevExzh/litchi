@@ -1,6 +1,6 @@
 //! Immutable chart package ownership and bounded content-part rebuilding.
 
-use crate::FlatChart;
+use crate::flat::Chart as FlatChart;
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::{
     OpenOptions, compact_xml,
@@ -95,7 +95,10 @@ impl Snapshot {
                 "ODC package exceeds the caller-selected byte limit".into(),
             ));
         }
-        let archive = OwnedPackage::from_bytes_with_limits(bytes, SourceLimits::default())?;
+        let archive = OwnedPackage::from_bytes_with_options(
+            bytes,
+            OpenOptions::new().source_limits(SourceLimits::default()),
+        )?;
         Self::from_archive(archive, limits, OpenOptions::new()).map_err(Error::from)
     }
 
@@ -104,7 +107,7 @@ impl Snapshot {
         reader: impl std::io::Read,
         options: OpenOptions,
     ) -> std::result::Result<Self, litchi_odf_common::Error> {
-        let archive = OwnedPackage::from_reader_with_limits(reader, options.source_limits_value())?;
+        let archive = OwnedPackage::from_reader_with_options(reader, options)?;
         Self::from_owned_with_options(archive, options)
     }
 
@@ -113,7 +116,7 @@ impl Snapshot {
         bytes: Vec<u8>,
         options: OpenOptions,
     ) -> std::result::Result<Self, litchi_odf_common::Error> {
-        let archive = OwnedPackage::from_bytes_with_limits(bytes, options.source_limits_value())?;
+        let archive = OwnedPackage::from_bytes_with_options(bytes, options)?;
         Self::from_owned_with_options(archive, options)
     }
 
@@ -237,7 +240,7 @@ impl Snapshot {
     pub(crate) fn rebuild(
         &self,
         content: &str,
-        content_splice: Option<&crate::FlatChartPatch>,
+        content_splice: Option<&crate::flat::Patch>,
         styles: StylesReplacement<'_>,
         replacements: &[ResourceReplacement<'_>],
     ) -> Result<Self> {
@@ -255,8 +258,7 @@ impl Snapshot {
             compact_xml::Limits::new(self.0.limits.max_content_bytes(), self.0.limits.max_depth())
                 .map_err(Error::from)?;
         if content_splice.is_none() {
-            compact_xml::validate_with_limits(content.as_bytes(), compact_limits)
-                .map_err(Error::from)?;
+            compact_xml::validate(content.as_bytes(), compact_limits).map_err(Error::from)?;
         }
         crate::codec::validate(content)?;
         let mut writer = PackageWriter::new_bounded(self.0.limits.max_package_bytes());
@@ -273,8 +275,7 @@ impl Snapshot {
                 }
             },
             StylesReplacement::Replace(xml) => {
-                compact_xml::validate_with_limits(xml.as_bytes(), compact_limits)
-                    .map_err(Error::from)?;
+                compact_xml::validate(xml.as_bytes(), compact_limits).map_err(Error::from)?;
                 crate::codec::validate_styles(xml, self.0.limits)?;
                 writer.add_file("styles.xml", xml.as_bytes())?;
             },
@@ -353,7 +354,7 @@ fn validate_manifest_contract(
 
 fn publish_content_splice<W: Write>(
     source: &OwnedPackage,
-    patch: &crate::FlatChartPatch,
+    patch: &crate::flat::Patch,
     content: &str,
     writer: &mut PackageWriter<W>,
 ) -> Result<()> {
@@ -444,7 +445,7 @@ pub(crate) fn validate_authored_resource(
         || media_type == "text/xml"
         || media_type.ends_with("+xml");
     if is_xml {
-        compact_xml::validate_with_limits(bytes, limits).map_err(Error::from)?;
+        compact_xml::validate(bytes, limits).map_err(Error::from)?;
     }
     Ok(())
 }

@@ -156,15 +156,6 @@ impl From<Error> for litchi_core::Error {
     }
 }
 
-/// Validate freshly authored XML using the default resource limits.
-///
-/// # Errors
-///
-/// Returns a typed [`Error`] for malformed, non-compact, or over-limit input.
-pub fn validate(xml: &[u8]) -> Result<(), Error> {
-    validate_with_limits(xml, Limits::default())
-}
-
 /// Validate freshly authored XML without normalizing any source bytes.
 ///
 /// This rejects indentation text containing line breaks or tabs, line breaks
@@ -176,7 +167,7 @@ pub fn validate(xml: &[u8]) -> Result<(), Error> {
 /// # Errors
 ///
 /// Returns a typed [`Error`] for malformed, non-compact, or over-limit input.
-pub fn validate_with_limits(xml: &[u8], requested_limits: Limits) -> Result<(), Error> {
+pub fn validate(xml: &[u8], requested_limits: Limits) -> Result<(), Error> {
     let limits = Limits::new(requested_limits.max_bytes, requested_limits.max_depth)?;
     if xml.len() > limits.max_bytes {
         return Err(Error::new(ErrorKind::InputTooLarge, xml.len()));
@@ -363,20 +354,18 @@ fn source_offset(position: u64) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        ErrorKind, HARD_MAX_BYTES, HARD_MAX_DEPTH, Limits, validate, validate_with_limits,
-    };
+    use super::{ErrorKind, HARD_MAX_BYTES, HARD_MAX_DEPTH, Limits, validate};
 
     #[test]
     fn accepts_compact_xml_and_semantic_whitespace() -> Result<(), super::Error> {
-        validate(b"<?xml version=\"1.0\"?><a value=\"quoted /> and > stay semantic\">word\nword<![CDATA[\n]]><b xml:space=\"preserve\">\n  </b><!--\n--><?p semantic  data\nkept?></a>")
+        validate(b"<?xml version=\"1.0\"?><a value=\"quoted /> and > stay semantic\">word\nword<![CDATA[\n]]><b xml:space=\"preserve\">\n  </b><!--\n--><?p semantic  data\nkept?></a>", Limits::default())
     }
 
     #[test]
     fn accepts_only_predefined_general_references() -> Result<(), super::Error> {
-        validate(b"<a>&amp;&lt;&gt;&apos;&quot;</a>")?;
+        validate(b"<a>&amp;&lt;&gt;&apos;&quot;</a>", Limits::default())?;
         assert_eq!(
-            validate(b"<a>&undeclared;</a>")
+            validate(b"<a>&undeclared;</a>", Limits::default())
                 .err()
                 .map(|error| error.kind()),
             Some(ErrorKind::MalformedXml)
@@ -387,45 +376,51 @@ mod tests {
     #[test]
     fn rejects_formatting_whitespace_and_spaced_empty_elements() {
         assert_eq!(
-            validate(b"<a>\n<b/></a>").err().map(|error| error.kind()),
+            validate(b"<a>\n<b/></a>", Limits::default())
+                .err()
+                .map(|error| error.kind()),
             Some(ErrorKind::FormattingWhitespace)
         );
         assert_eq!(
-            validate(b"<a><b /></a>").err().map(|error| error.kind()),
+            validate(b"<a><b /></a>", Limits::default())
+                .err()
+                .map(|error| error.kind()),
             Some(ErrorKind::SpacedEmptyElement)
         );
         assert_eq!(
-            validate(b"<a\nvalue=\"x\"/>")
+            validate(b"<a\nvalue=\"x\"/>", Limits::default())
                 .err()
                 .map(|error| error.kind()),
             Some(ErrorKind::FormattingWhitespace)
         );
         assert_eq!(
-            validate(b"<a  value=\"x\"/>")
+            validate(b"<a  value=\"x\"/>", Limits::default())
                 .err()
                 .map(|error| error.kind()),
             Some(ErrorKind::FormattingWhitespace)
         );
         assert_eq!(
-            validate(b"<?xml  version=\"1.0\"?><a/>")
+            validate(b"<?xml  version=\"1.0\"?><a/>", Limits::default())
                 .err()
                 .map(|error| error.kind()),
             Some(ErrorKind::FormattingWhitespace)
         );
         assert_eq!(
-            validate(b"<?xml version =\"1.0\"?><a/>")
+            validate(b"<?xml version =\"1.0\"?><a/>", Limits::default())
                 .err()
                 .map(|error| error.kind()),
             Some(ErrorKind::FormattingWhitespace)
         );
         assert_eq!(
-            validate(b"<a><?p\tdata?></a>")
+            validate(b"<a><?p\tdata?></a>", Limits::default())
                 .err()
                 .map(|error| error.kind()),
             Some(ErrorKind::FormattingWhitespace)
         );
         assert_eq!(
-            validate(b"<a><?p ?></a>").err().map(|error| error.kind()),
+            validate(b"<a><?p ?></a>", Limits::default())
+                .err()
+                .map(|error| error.kind()),
             Some(ErrorKind::FormattingWhitespace)
         );
     }
@@ -433,43 +428,51 @@ mod tests {
     #[test]
     fn reports_security_and_resource_failures() -> Result<(), super::Error> {
         assert_eq!(
-            validate(b"<!DOCTYPE a><a/>")
+            validate(b"<!DOCTYPE a><a/>", Limits::default())
                 .err()
                 .map(|error| error.kind()),
             Some(ErrorKind::DocumentType)
         );
         assert_eq!(
-            validate(b"<a>").err().map(|error| error.kind()),
+            validate(b"<a>", Limits::default())
+                .err()
+                .map(|error| error.kind()),
             Some(ErrorKind::MalformedXml)
         );
         assert_eq!(
-            validate(b"").err().map(|error| error.kind()),
+            validate(b"", Limits::default())
+                .err()
+                .map(|error| error.kind()),
             Some(ErrorKind::MalformedXml)
         );
         assert_eq!(
-            validate(b"<a/><b/>").err().map(|error| error.kind()),
+            validate(b"<a/><b/>", Limits::default())
+                .err()
+                .map(|error| error.kind()),
             Some(ErrorKind::MalformedXml)
         );
         assert_eq!(
-            validate_with_limits(b"<a/>", Limits::new(3, 1)?)
+            validate(b"<a/>", Limits::new(3, 1)?)
                 .err()
                 .map(|error| error.kind()),
             Some(ErrorKind::InputTooLarge)
         );
         assert_eq!(
-            validate_with_limits(b"<a><b/></a>", Limits::new(32, 1)?)
+            validate(b"<a><b/></a>", Limits::new(32, 1)?)
                 .err()
                 .map(|error| error.kind()),
             Some(ErrorKind::DepthLimit)
         );
         assert_eq!(
-            validate(b"<![CDATA[outside]]><a/>")
+            validate(b"<![CDATA[outside]]><a/>", Limits::default())
                 .err()
                 .map(|error| error.kind()),
             Some(ErrorKind::MalformedXml)
         );
         assert_eq!(
-            validate(b"&outside;<a/>").err().map(|error| error.kind()),
+            validate(b"&outside;<a/>", Limits::default())
+                .err()
+                .map(|error| error.kind()),
             Some(ErrorKind::MalformedXml)
         );
         assert!(Limits::new(HARD_MAX_BYTES, HARD_MAX_DEPTH).is_ok());

@@ -1299,9 +1299,13 @@ fn document_revision_queries_cover_final_sections_grids_and_numbering_after_reop
         ..Limits::default()
     };
     assert!(matches!(
-        document.revisions_bounded(limits),
+        reopened
+            .with_semantic_limits(crate::SemanticLimits::default().revisions(limits))
+            .document()
+            .unwrap()
+            .revisions(),
         Err(Error::RevisionLimit {
-            resource: "records",
+            kind: crate::revision::LimitKind::Records,
             ..
         })
     ));
@@ -1339,9 +1343,13 @@ fn document_revision_queries_cover_final_sections_grids_and_numbering_after_reop
             .collect::<Vec<_>>()
     );
     assert!(matches!(
-        pinned_document.revisions_bounded(limits),
+        pinned
+            .with_semantic_limits(crate::SemanticLimits::default().revisions(limits))
+            .document()
+            .unwrap()
+            .revisions(),
         Err(Error::RevisionLimit {
-            resource: "records",
+            kind: crate::revision::LimitKind::Records,
             ..
         })
     ));

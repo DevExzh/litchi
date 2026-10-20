@@ -120,14 +120,17 @@ fn first_middle_last_moves_preserve_exact_fragments_and_durable_inverse() -> Res
     let wire = commit.patch().to_deterministic_json()?;
     let durable = Patch::from_deterministic_json(&wire, snapshot.limits())?;
     assert_eq!(
-        snapshot.apply(&durable)?.as_bytes(),
+        snapshot.apply(&durable)?.into_package().as_bytes(),
         commit.package().as_bytes()
     );
     let inverse = Patch::from_deterministic_json(
         &durable.inverse().to_deterministic_json()?,
         snapshot.limits(),
     )?;
-    assert_eq!(commit.package().apply(&inverse)?.as_bytes(), source);
+    assert_eq!(
+        commit.package().apply(&inverse)?.into_package().as_bytes(),
+        source
+    );
     let stale = Package::from_bytes(&package(&content(&table("Other", "x"), ""), &[]))?;
     assert!(stale.apply(&durable).is_err());
     Ok(())

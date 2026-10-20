@@ -50,7 +50,7 @@ fn sync_container(record: &mut Record) -> Result<()> {
     Ok(())
 }
 
-fn encode_record(record: &Record, force_children: bool) -> Result<Vec<u8>> {
+pub(crate) fn encode_record(record: &Record, force_children: bool) -> Result<Vec<u8>> {
     let payload = if force_children || record.record_type == RecordType::SlideListWithText {
         let mut payload = Vec::new();
         for child in &record.children {

@@ -77,9 +77,12 @@ fn real_master_fixture_title_transaction_is_reversible_and_preserves_opaque_part
     );
     assert!(!changed_meta.contains('\n'));
 
-    let reapplied = source.apply_title(commit.patch()).unwrap();
+    let reapplied = source.apply_title(commit.patch()).unwrap().into_package();
     assert_eq!(reapplied.as_bytes(), changed.as_bytes());
-    let restored = changed.apply_title(&commit.patch().inverse()).unwrap();
+    let restored = changed
+        .apply_title(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.as_bytes(), source.as_bytes());
 }
 

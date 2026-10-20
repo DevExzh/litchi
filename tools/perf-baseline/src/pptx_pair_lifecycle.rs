@@ -906,7 +906,7 @@ fn read_point(
 fn phase(
     label: &'static str,
     source_view: Option<&litchi_pptx::SourceBackedPresentation>,
-    destination_editor: Option<&litchi_pptx::SourceBackedPresentationEditor>,
+    destination_editor: Option<&litchi_pptx::SourceBackedPresentation>,
     source_provider: Option<&ProviderSource>,
     destination_provider: Option<&ProviderSource>,
     source_before: &mut Option<pptx_range_source::PptxRangeSourceSnapshot>,
@@ -1227,7 +1227,7 @@ fn run_iteration(
     let destination_allocation_region = crate::allocation_metrics::begin();
     let destination_started = std::time::Instant::now();
     let mut destination_editor = Some(
-        litchi_pptx::SourceBackedPresentationEditor::from_read_at_with_options(
+        litchi_pptx::SourceBackedPresentation::from_read_at_with_options(
             destination_read,
             litchi_pptx::OpenOptions::default()
                 .source_limits(read_limits)
@@ -1235,6 +1235,11 @@ fn run_iteration(
                 .execution_context(destination_context.context.clone()),
         )?,
     );
+    let destination_package = litchi_pptx::source::Package::from_presentation(
+        destination_editor
+            .as_ref()
+            .ok_or("destination presentation is open")?,
+    )?;
     let open_destination_ns = crate::elapsed_ns(destination_started.elapsed())?;
     let open_destination_allocation_metrics = destination_allocation_region.finish();
     if source_view.slide_count() <= inputs.manifest.source_slide
@@ -1262,15 +1267,12 @@ fn run_iteration(
 
     let plan_allocation_region = crate::allocation_metrics::begin();
     let plan_started = std::time::Instant::now();
-    let plan = destination_editor
-        .as_ref()
-        .ok_or("destination editor was consumed before planning")?
-        .plan_cross_slide_copy(
-            &source_view,
-            inputs.manifest.source_slide,
-            inputs.manifest.destination_slide,
-            inputs.manifest.insertion_position,
-        )?;
+    let plan = destination_package.plan_cross_slide_copy(
+        &source_view,
+        inputs.manifest.source_slide,
+        inputs.manifest.destination_slide,
+        inputs.manifest.insertion_position,
+    )?;
     let plan_ns = crate::elapsed_ns(plan_started.elapsed())?;
     let plan_allocation_metrics = plan_allocation_region.finish();
     if plan.source_position() != inputs.manifest.source_slide
@@ -1297,10 +1299,10 @@ fn run_iteration(
 
     let publication_allocation_region = crate::allocation_metrics::begin();
     let publication_started = std::time::Instant::now();
-    let published = destination_editor
-        .take()
-        .ok_or("destination editor was consumed before publication")?
-        .publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
+    drop(destination_editor.take());
+    let mut cross_copy = destination_package.edit_cross_slide_copy()?;
+    let published = cross_copy.stage(&plan)?;
+    cross_copy.commit()?.package().write_to(&mut sink)?;
     let publication_ns = crate::elapsed_ns(publication_started.elapsed())?;
     let publication_allocation_metrics = publication_allocation_region.finish();
     let publication_sink = sink.summary();

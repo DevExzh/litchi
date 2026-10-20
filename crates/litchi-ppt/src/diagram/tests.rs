@@ -413,7 +413,11 @@ fn package_diagram_edits_publish_replay_and_invert_exactly() {
     assert_eq!(edit.changes().len(), 2);
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
-    assert_eq!(commit.patch().before_bytes(), source_bytes.as_slice());
+    assert_eq!(commit.patch().source_len(), source_bytes.len());
+    assert_eq!(
+        commit.patch().target_len(),
+        commit.package().to_bytes().unwrap().len()
+    );
     let published = commit.package().edit_diagrams(slide).unwrap();
     let build = published.builds().next().unwrap();
     assert_eq!(build.id(), moved);
@@ -455,4 +459,31 @@ fn package_diagram_edits_publish_replay_and_invert_exactly() {
         panic!("a slide without a build list must be refused");
     };
     assert_eq!(refusal.kind(), RefusalKind::UnsupportedTarget);
+}
+
+#[test]
+fn package_diagram_edits_admit_a_signed_package_and_refuse_a_changed_commit() {
+    use litchi_core::Position;
+
+    let (source, _, _) = package_with_diagram();
+    let signed = crate::scoped::signed(&source);
+    let bytes = signed.to_bytes().unwrap();
+    let slide = Position::new(0);
+    let id = signed
+        .edit_diagrams(slide)
+        .unwrap()
+        .builds()
+        .next()
+        .unwrap()
+        .id();
+
+    let no_op = signed.edit_diagrams(slide).unwrap().commit().unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), bytes);
+
+    let mut edit = signed.edit_diagrams(slide).unwrap();
+    edit.set_mode(id, BuildType::Down).unwrap();
+    assert!(matches!(edit.commit(), Err(Error::Signed)));
+    assert_eq!(signed.to_bytes().unwrap(), bytes);
 }

@@ -1,0 +1,16 @@
+{"median_us":1619.628,"min_us":1607.179,"scenario":"open/leaf/comments"}
+{"median_us":738.024,"min_us":725.244,"scenario":"open/unified/comments"}
+{"median_us":12168.287,"min_us":12119.577,"scenario":"save/leaf/comments"}
+{"median_us":26101.692,"min_us":25826.851000000002,"scenario":"save_twice/leaf/comments"}
+{"median_us":2.9699999999999998,"min_us":2.92,"scenario":"save/unified/comments"}
+{"median_us":754.7139999999999,"min_us":741.284,"scenario":"save_twice/unified/comments"}
+{"median_us":278.352,"min_us":270.512,"scenario":"open/leaf/deck20"}
+{"median_us":231.891,"min_us":226.121,"scenario":"open/unified/deck20"}
+{"median_us":715.5640000000001,"min_us":705.874,"scenario":"save/leaf/deck20"}
+{"median_us":1838.68,"min_us":1809.67,"scenario":"save_twice/leaf/deck20"}
+{"median_us":0.33,"min_us":0.3,"scenario":"save/unified/deck20"}
+{"median_us":233.62099999999998,"min_us":229.382,"scenario":"save_twice/unified/deck20"}
+{"median_us":465.932,"min_us":457.273,"scenario":"set/unified/deck20"}
+{"median_us":540.4929999999999,"min_us":532.153,"scenario":"set_save/unified/deck20"}
+{"median_us":14171.867,"min_us":14095.257,"scenario":"batch1k/unified/run_format"}
+{"median_us":10457.298,"min_us":10380.297,"scenario":"batch1k/unified/shape_text"}

@@ -92,25 +92,8 @@ impl Package {
         body_marker: &str,
         family_name: &str,
     ) -> Result<Self> {
-        Self::open_with_limits(
-            path,
-            SourceLimits::default(),
-            mimetype,
-            body_marker,
-            family_name,
-        )
-    }
-
-    /// Open a package from a path under explicit finite archive limits.
-    pub fn open_with_limits(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        mimetype: &str,
-        body_marker: &str,
-        family_name: &str,
-    ) -> Result<Self> {
         let file = fs::File::open(path)?;
-        Self::from_reader_with_limits(file, limits, mimetype, body_marker, family_name)
+        Self::from_reader(file, mimetype, body_marker, family_name)
     }
 
     /// Open a password-protected package from a path under the default finite
@@ -126,27 +109,6 @@ impl Package {
         Self::open_with_zeroizing_password(
             path,
             SourceLimits::default(),
-            password,
-            mimetype,
-            body_marker,
-            family_name,
-        )
-    }
-
-    /// Open a password-protected package from a path with explicit finite
-    /// archive limits.
-    pub fn open_with_limits_and_password(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        password: impl Into<String>,
-        mimetype: &str,
-        body_marker: &str,
-        family_name: &str,
-    ) -> Result<Self> {
-        let password = zeroizing_password(password);
-        Self::open_with_zeroizing_password(
-            path,
-            limits,
             password,
             mimetype,
             body_marker,
@@ -180,25 +142,8 @@ impl Package {
         body_marker: &str,
         family_name: &str,
     ) -> Result<Self> {
-        Self::from_reader_with_limits(
-            reader,
-            SourceLimits::default(),
-            mimetype,
-            body_marker,
-            family_name,
-        )
-    }
-
-    /// Read a package from a stream under explicit finite archive limits.
-    pub fn from_reader_with_limits(
-        reader: impl std::io::Read,
-        limits: SourceLimits,
-        mimetype: &str,
-        body_marker: &str,
-        family_name: &str,
-    ) -> Result<Self> {
         Self::from_owned_package(
-            OwnedPackage::from_reader_with_limits(reader, limits)?,
+            OwnedPackage::from_reader(reader)?,
             mimetype,
             body_marker,
             family_name,
@@ -218,27 +163,6 @@ impl Package {
         Self::from_reader_with_zeroizing_password(
             reader,
             SourceLimits::default(),
-            password,
-            mimetype,
-            body_marker,
-            family_name,
-        )
-    }
-
-    /// Read a password-protected package from a stream with explicit finite
-    /// archive limits.
-    pub fn from_reader_with_limits_and_password(
-        reader: impl std::io::Read,
-        limits: SourceLimits,
-        password: impl Into<String>,
-        mimetype: &str,
-        body_marker: &str,
-        family_name: &str,
-    ) -> Result<Self> {
-        let password = zeroizing_password(password);
-        Self::from_reader_with_zeroizing_password(
-            reader,
-            limits,
             password,
             mimetype,
             body_marker,
@@ -274,25 +198,8 @@ impl Package {
         body_marker: &str,
         family_name: &str,
     ) -> Result<Self> {
-        Self::from_bytes_with_limits(
-            bytes,
-            SourceLimits::default(),
-            mimetype,
-            body_marker,
-            family_name,
-        )
-    }
-
-    /// Decode a package from bytes under explicit finite archive limits.
-    pub fn from_bytes_with_limits(
-        bytes: Vec<u8>,
-        limits: SourceLimits,
-        mimetype: &str,
-        body_marker: &str,
-        family_name: &str,
-    ) -> Result<Self> {
         Self::from_owned_package(
-            OwnedPackage::from_bytes_with_limits(bytes, limits)?,
+            OwnedPackage::from_bytes(bytes)?,
             mimetype,
             body_marker,
             family_name,
@@ -311,25 +218,8 @@ impl Package {
         body_marker: &str,
         family_name: &str,
     ) -> Result<Self> {
-        Self::from_shared_bytes_with_limits(
-            bytes,
-            SourceLimits::default(),
-            mimetype,
-            body_marker,
-            family_name,
-        )
-    }
-
-    /// Decode shared package bytes under explicit finite archive limits.
-    pub fn from_shared_bytes_with_limits(
-        bytes: Arc<Vec<u8>>,
-        limits: SourceLimits,
-        mimetype: &str,
-        body_marker: &str,
-        family_name: &str,
-    ) -> Result<Self> {
         Self::from_owned_package(
-            OwnedPackage::from_shared_bytes_with_limits(bytes, limits)?,
+            OwnedPackage::from_shared_bytes(bytes)?,
             mimetype,
             body_marker,
             family_name,
@@ -354,27 +244,6 @@ impl Package {
         Self::from_bytes_with_zeroizing_password(
             bytes,
             SourceLimits::default(),
-            password,
-            mimetype,
-            body_marker,
-            family_name,
-        )
-    }
-
-    /// Decode a password-protected package from bytes with explicit finite
-    /// archive limits.
-    pub fn from_bytes_with_limits_and_password(
-        bytes: Vec<u8>,
-        limits: SourceLimits,
-        password: impl Into<String>,
-        mimetype: &str,
-        body_marker: &str,
-        family_name: &str,
-    ) -> Result<Self> {
-        let password = zeroizing_password(password);
-        Self::from_bytes_with_zeroizing_password(
-            bytes,
-            limits,
             password,
             mimetype,
             body_marker,
@@ -541,7 +410,7 @@ impl Package {
         body_marker: &str,
         family_name: &str,
     ) -> std::result::Result<Self, crate::Error> {
-        let archive = OwnedPackage::from_reader_with_limits(reader, options.source_limits_value())?;
+        let archive = OwnedPackage::from_reader_with_options(reader, options)?;
         Self::from_owned_package_with_options(archive, options, mimetype, body_marker, family_name)
     }
 
@@ -557,7 +426,7 @@ impl Package {
         body_marker: &str,
         family_name: &str,
     ) -> std::result::Result<Self, crate::Error> {
-        let archive = OwnedPackage::from_bytes_with_limits(bytes, options.source_limits_value())?;
+        let archive = OwnedPackage::from_bytes_with_options(bytes, options)?;
         Self::from_owned_package_with_options(archive, options, mimetype, body_marker, family_name)
     }
 
@@ -575,10 +444,10 @@ impl Package {
         body_marker: &str,
         family_name: &str,
     ) -> std::result::Result<Self, crate::Error> {
-        Self::from_bytes_with_limits_and_password(
+        Self::from_bytes_with_zeroizing_password(
             bytes,
             options.source_limits_value(),
-            password,
+            zeroizing_password(password),
             mimetype,
             body_marker,
             family_name,

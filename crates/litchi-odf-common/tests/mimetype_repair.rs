@@ -296,7 +296,12 @@ fn add_descriptor_to_second_member(mut source: Vec<u8>) -> Vec<u8> {
 fn valid_plan_is_bounded_deterministic_and_non_destructive() {
     let source = remove_central_extra(package(0x5455, &[1, 0, 0, 0, 0]));
     let source_before = source.clone();
-    let report = validate_package(&source).unwrap();
+    let report = validate_package(
+        &source,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     let plan = plan_mimetype_local_extra(&source, &report, OdfRepairLimits::default()).unwrap();
     assert_eq!(plan.action().field_id(), 0x5455);
     assert_eq!(plan.action().field_bytes(), 9);
@@ -313,7 +318,17 @@ fn valid_plan_is_bounded_deterministic_and_non_destructive() {
     let publication = plan.write_to(&mut output).unwrap();
     assert_eq!(publication.bytes(), output.len() as u64);
     assert_eq!(output.len(), plan.output_len() as usize);
-    assert_eq!(validate_package(&output).unwrap().issues().len(), 0);
+    assert_eq!(
+        validate_package(
+            &output,
+            litchi_odf_common::OdfValidationLimits::default(),
+            litchi_core::ValidationLimits::default()
+        )
+        .unwrap()
+        .issues()
+        .len(),
+        0
+    );
     assert_eq!(source, source_before);
 }
 
@@ -321,7 +336,12 @@ fn valid_plan_is_bounded_deterministic_and_non_destructive() {
 fn typed_preview_reports_effects_and_apply_inverse_restores_exact_source() {
     let source = remove_central_extra(package(0x5455, &[1, 0, 0, 0, 0]));
     let source_before = source.clone();
-    let report = validate_package(&source).unwrap();
+    let report = validate_package(
+        &source,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     let plan = plan_odf_repair(&source, &report, OdfRepairLimits::default()).unwrap();
     let preview = plan.preview();
     assert_eq!(preview.schema(), MIMETYPE_REPAIR_PLAN_SCHEMA);
@@ -355,7 +375,12 @@ fn typed_preview_reports_effects_and_apply_inverse_restores_exact_source() {
     let mut target = Vec::new();
     patch.write_to(&mut target).unwrap();
     assert_eq!(target, patch.target_bytes());
-    let canonical_report = validate_package(&target).unwrap();
+    let canonical_report = validate_package(
+        &target,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(canonical_report.issues().is_empty());
     let canonical_before = target.clone();
     assert!(matches!(
@@ -383,7 +408,12 @@ fn typed_preview_reports_effects_and_apply_inverse_restores_exact_source() {
 fn stale_or_foreign_reports_are_refused() {
     let source = remove_central_extra(package(0x5455, &[1, 0, 0, 0, 0]));
     let foreign = remove_central_extra(package(0x5455, &[1, 1, 0, 0, 0]));
-    let report = validate_package(&foreign).unwrap();
+    let report = validate_package(
+        &foreign,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(matches!(
         plan_mimetype_local_extra(&source, &report, OdfRepairLimits::default()),
         Err(RepairError::ReportMismatch)
@@ -393,25 +423,45 @@ fn stale_or_foreign_reports_are_refused() {
 #[test]
 fn unsupported_unknown_and_malformed_extras_are_refused() {
     let source = remove_central_extra(package(0x1234, &[1, 2]));
-    let report = validate_package(&source).unwrap();
+    let report = validate_package(
+        &source,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(plan_mimetype_local_extra(&source, &report, OdfRepairLimits::default()).is_err());
     let mut malformed = remove_central_extra(package(0x5455, &[1, 0, 0, 0, 0]));
     malformed[42] = 8;
-    let report = validate_package(&malformed).unwrap();
+    let report = validate_package(
+        &malformed,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(plan_mimetype_local_extra(&malformed, &report, OdfRepairLimits::default()).is_err());
 }
 
 #[test]
 fn central_extra_and_wrong_member_order_are_not_repair_targets() {
     let central_extra = package(0x5455, &[1, 0, 0, 0, 0]);
-    let central_report = validate_package(&central_extra).unwrap();
+    let central_report = validate_package(
+        &central_extra,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(
         plan_mimetype_local_extra(&central_extra, &central_report, OdfRepairLimits::default())
             .is_err()
     );
 
     let wrong_order = package_with_mimetype_last();
-    let wrong_order_report = validate_package(&wrong_order).unwrap();
+    let wrong_order_report = validate_package(
+        &wrong_order,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(
         plan_mimetype_local_extra(
             &wrong_order,
@@ -427,13 +477,23 @@ fn local_and_central_padding_are_refused_before_candidate_allocation() {
     let source = remove_central_extra(package(0x5455, &[1, 0, 0, 0, 0]));
 
     let local_padding = insert_local_padding(source.clone());
-    let report = validate_package(&local_padding).unwrap();
+    let report = validate_package(
+        &local_padding,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(
         plan_mimetype_local_extra(&local_padding, &report, OdfRepairLimits::default()).is_err()
     );
 
     let central_padding = insert_central_padding(source);
-    let report = validate_package(&central_padding).unwrap();
+    let report = validate_package(
+        &central_padding,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(
         plan_mimetype_local_extra(&central_padding, &report, OdfRepairLimits::default()).is_err()
     );
@@ -443,24 +503,54 @@ fn local_and_central_padding_are_refused_before_candidate_allocation() {
 fn untouched_data_descriptor_span_is_raw_preserved() {
     let source =
         add_descriptor_to_second_member(remove_central_extra(package(0x5455, &[1, 0, 0, 0, 0])));
-    let report = validate_package(&source).unwrap();
+    let report = validate_package(
+        &source,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     let plan = plan_mimetype_local_extra(&source, &report, OdfRepairLimits::default()).unwrap();
     let mut output = Vec::new();
     plan.write_to(&mut output).unwrap();
-    assert_eq!(validate_package(&output).unwrap().issues().len(), 0);
+    assert_eq!(
+        validate_package(
+            &output,
+            litchi_odf_common::OdfValidationLimits::default(),
+            litchi_core::ValidationLimits::default()
+        )
+        .unwrap()
+        .issues()
+        .len(),
+        0
+    );
 }
 
 #[test]
 fn directory_entries_are_preserved_while_digest_count_excludes_them() {
     let source = remove_central_extra(package_with_directory(0x5455, &[1, 0, 0, 0, 0]));
     let source_before = source.clone();
-    let report = validate_package(&source).unwrap();
+    let report = validate_package(
+        &source,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     let plan = plan_mimetype_local_extra(&source, &report, OdfRepairLimits::default()).unwrap();
     assert_eq!(plan.member_count(), 4);
     let mut output = Vec::new();
     plan.write_to(&mut output).unwrap();
     assert_eq!(source, source_before);
-    assert_eq!(validate_package(&output).unwrap().issues().len(), 0);
+    assert_eq!(
+        validate_package(
+            &output,
+            litchi_odf_common::OdfValidationLimits::default(),
+            litchi_core::ValidationLimits::default()
+        )
+        .unwrap()
+        .issues()
+        .len(),
+        0
+    );
     let output_archive = soapberry_zip::ZipArchive::from_slice(&output).unwrap();
     assert_eq!(
         output_archive
@@ -476,7 +566,12 @@ fn directory_entries_are_preserved_while_digest_count_excludes_them() {
 fn package_wide_xml_security_scan_blocks_dtd_external_and_plus_xml_members() {
     let dtd = b"<!DOCTYPE root [<!ENTITY secret SYSTEM 'file:///secret'>]><root/>";
     let dtd_source = package_with_xml_member("styles.xml", "text/xml", dtd);
-    let dtd_report = validate_package(&dtd_source).unwrap();
+    let dtd_report = validate_package(
+        &dtd_source,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     assert_eq!(dtd_report.issues().len(), 1);
     assert!(matches!(
         plan_mimetype_local_extra(&dtd_source, &dtd_report, OdfRepairLimits::default()),
@@ -487,7 +582,12 @@ fn package_wide_xml_security_scan_blocks_dtd_external_and_plus_xml_members() {
 
     let external = b"<root href=\"https://example.invalid/out\"/>";
     let external_source = package_with_xml_member("metadata.rdf", "application/rdf+xml", external);
-    let external_report = validate_package(&external_source).unwrap();
+    let external_report = validate_package(
+        &external_source,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     assert_eq!(external_report.issues().len(), 1);
     assert!(matches!(
         plan_mimetype_local_extra(
@@ -501,7 +601,12 @@ fn package_wide_xml_security_scan_blocks_dtd_external_and_plus_xml_members() {
     ));
 
     let malformed = package_with_xml_member("settings.bin", "application/custom+xml", b"<root>");
-    let malformed_report = validate_package(&malformed).unwrap();
+    let malformed_report = validate_package(
+        &malformed,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     assert_eq!(malformed_report.issues().len(), 1);
     assert!(matches!(
         plan_mimetype_local_extra(&malformed, &malformed_report, OdfRepairLimits::default()),
@@ -518,11 +623,25 @@ fn package_wide_xml_security_scan_accepts_safe_references_and_uppercase_xml_type
         "application/custom+XML",
         br#"<?xml version="1.0"?><root href="Pictures/a.png">safe &amp; &#x41;</root>"#,
     );
-    let report = validate_package(&source).unwrap();
+    let report = validate_package(
+        &source,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     let plan = plan_mimetype_local_extra(&source, &report, OdfRepairLimits::default()).unwrap();
     let mut output = Vec::new();
     plan.write_to(&mut output).unwrap();
-    assert!(validate_package(&output).unwrap().issues().is_empty());
+    assert!(
+        validate_package(
+            &output,
+            litchi_odf_common::OdfValidationLimits::default(),
+            litchi_core::ValidationLimits::default()
+        )
+        .unwrap()
+        .issues()
+        .is_empty()
+    );
 }
 
 #[test]
@@ -550,7 +669,7 @@ fn package_wide_xml_security_scan_rejects_base_rdf_pi_and_invalid_characters() {
         br#"<table:dde-link xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"/>"#.as_slice(),
     ] {
         let source = package_with_xml_member("styles.xml", "text/xml", xml);
-        let report = validate_package(&source).unwrap();
+        let report = validate_package(&source, litchi_odf_common::OdfValidationLimits::default(), litchi_core::ValidationLimits::default()).unwrap();
         assert!(plan_mimetype_local_extra(&source, &report, OdfRepairLimits::default()).is_err());
     }
 
@@ -559,7 +678,12 @@ fn package_wide_xml_security_scan_rejects_base_rdf_pi_and_invalid_characters() {
         "text/xml",
         br#"<root office:dde-topic="external" xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"/>"#,
     );
-    let report = validate_package(&dde).unwrap();
+    let report = validate_package(
+        &dde,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(plan_mimetype_local_extra(&dde, &report, OdfRepairLimits::default()).is_err());
 }
 
@@ -642,7 +766,12 @@ impl Write for ShortSink {
 #[test]
 fn short_writes_are_retried_without_losing_progress() {
     let source = remove_central_extra(package(0x5455, &[1, 0, 0, 0, 0]));
-    let report = validate_package(&source).unwrap();
+    let report = validate_package(
+        &source,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     let plan = plan_mimetype_local_extra(&source, &report, OdfRepairLimits::default()).unwrap();
     let mut sink = ShortSink {
         bytes: Vec::new(),
@@ -655,7 +784,12 @@ fn short_writes_are_retried_without_losing_progress() {
 #[test]
 fn zero_sink_reports_typed_uncommitted_output() {
     let source = remove_central_extra(package(0x5455, &[1, 0, 0, 0, 0]));
-    let report = validate_package(&source).unwrap();
+    let report = validate_package(
+        &source,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     let plan = plan_mimetype_local_extra(&source, &report, OdfRepairLimits::default()).unwrap();
     let mut sink = ZeroSink;
     let result = plan.write_to(&mut sink);
@@ -668,7 +802,12 @@ fn zero_sink_reports_typed_uncommitted_output() {
 #[test]
 fn interrupted_writes_are_retried_and_flush_failure_reports_complete_prefix() {
     let source = remove_central_extra(package(0x5455, &[1, 0, 0, 0, 0]));
-    let report = validate_package(&source).unwrap();
+    let report = validate_package(
+        &source,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     let plan = plan_mimetype_local_extra(&source, &report, OdfRepairLimits::default()).unwrap();
     let mut interrupted = InterruptedSink {
         interrupted: false,
@@ -700,7 +839,12 @@ fn interrupted_writes_are_retried_and_flush_failure_reports_complete_prefix() {
 #[test]
 fn plan_limits_are_enforced_before_publication() {
     let source = remove_central_extra(package(0x5455, &[1, 0, 0, 0, 0]));
-    let report = validate_package(&source).unwrap();
+    let report = validate_package(
+        &source,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(matches!(
         plan_mimetype_local_extra(
             &source,
@@ -751,7 +895,12 @@ fn plan_limits_are_enforced_before_publication() {
 #[test]
 fn raw_central_preflight_rejects_metadata_and_record_limits_before_indexing() {
     let source = remove_central_extra(package(0x5455, &[1, 0, 0, 0, 0]));
-    let report = validate_package(&source).unwrap();
+    let report = validate_package(
+        &source,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     let metadata_limits = OdfRepairLimits::default().with_max_metadata_bytes(512);
     assert!(matches!(
         plan_mimetype_local_extra(&source, &report, metadata_limits),
@@ -762,7 +911,12 @@ fn raw_central_preflight_rejects_metadata_and_record_limits_before_indexing() {
     ));
 
     let directory_source = remove_central_extra(package_with_directory(0x5455, &[1, 0, 0, 0, 0]));
-    let directory_report = validate_package(&directory_source).unwrap();
+    let directory_report = validate_package(
+        &directory_source,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     let member_limits = OdfRepairLimits::new(
         directory_source.len() as u64,
         directory_source.len() as u64,
@@ -786,7 +940,12 @@ fn raw_central_preflight_rejects_metadata_and_record_limits_before_indexing() {
 #[test]
 fn aggregate_metadata_budget_accepts_exact_and_rejects_one_over() {
     let source = remove_central_extra(package(0x5455, &[1, 0, 0, 0, 0]));
-    let report = validate_package(&source).unwrap();
+    let report = validate_package(
+        &source,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     let raw_name_bytes = b"mimetype".len() + b"META-INF/manifest.xml".len() + b"content.xml".len();
     // One fixed estimate for each retained catalog/layout entry, plus the
     // copied-name accounting and complete raw central records.
@@ -812,7 +971,12 @@ fn aggregate_metadata_budget_accepts_exact_and_rejects_one_over() {
 #[test]
 fn decoded_manifest_metadata_is_charged_at_exact_and_one_over_boundaries() {
     let source = remove_central_extra(package(0x5455, &[1, 0, 0, 0, 0]));
-    let report = validate_package(&source).unwrap();
+    let report = validate_package(
+        &source,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     let base = package_metadata_base(3, &["mimetype", "META-INF/manifest.xml", "content.xml"]);
     let exact = base + package_manifest_metadata_bytes();
     assert!(

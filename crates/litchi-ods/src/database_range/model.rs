@@ -97,7 +97,7 @@ impl<'source> Catalog<'source> {
 
     /// Start an isolated clone-staged transaction over this catalog.
     #[must_use]
-    pub fn transaction(&self) -> Transaction<'source> {
+    pub(crate) fn transaction(&self) -> Transaction<'source> {
         Transaction::from_catalog(self)
     }
 }

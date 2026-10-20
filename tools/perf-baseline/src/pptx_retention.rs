@@ -595,7 +595,7 @@ fn validate_owned_plan(
 }
 
 fn validate_source_plan(
-    plan: &litchi_pptx::SourceBackedCrossSlideCopyPlan,
+    plan: &litchi_pptx::source::cross_slide_copy::Plan,
     corpus: &crate::PptxSourceBackedCrossCopyCorpus,
 ) -> Result<(), Box<dyn Error>> {
     if plan.source_position() != corpus.source_slide
@@ -711,9 +711,10 @@ fn run_source_backed_iteration(
     let inputs_and_sink_ready = capture_checkpoint()?;
 
     let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+    let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+    let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
     if source_view.slide_count() != crate::PPTX_CROSS_COPY_SOURCE_SLIDE_COUNT
-        || editor.slide_count() != corpus.destination_slide_count
+        || editor_view.slide_count() != corpus.destination_slide_count
     {
         return Err("source-backed setup changed the prevalidated slide counts".into());
     }
@@ -728,7 +729,9 @@ fn run_source_backed_iteration(
     validate_source_plan(&plan, corpus)?;
     let planned = capture_checkpoint()?;
 
-    let published = editor.publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
+    let mut editor_copy = editor.edit_cross_slide_copy()?;
+    let published = editor_copy.stage(&plan)?;
+    editor_copy.commit()?.package().write_to(&mut sink)?;
     if published.destination_slide_count() != corpus.destination_slide_count + 1
         || published.insertion_position() != corpus.insertion_position
         || published.name() != corpus.source_slide_name

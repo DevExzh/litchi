@@ -14,9 +14,12 @@
 //! [`Error`](crate::slide_order::Error)/[`Refusal`](crate::slide_order::Refusal)
 //! they return, and [`Snapshot`](crate::slide_order::Snapshot), an immutable
 //! whole-artifact read view of the slide list and its slide-level state.
+//! Its durable patches, patch joins and three-way planning are reached
+//! through `package::edit::Patch::{to_durable, join}` and
+//! `Package::{apply_durable, plan_three_way}` (record 0357a).
 #![allow(
     dead_code,
-    reason = "crate-private native owner of the primary edit (record 0357): its history, composition, three-way and durable-patch surfaces keep their tests until a Package-level route promotes them"
+    reason = "crate-private native owner of the primary edit (record 0357); its durable, join and three-way surfaces are public through package::edit (record 0357a), the rest stays exercised by the unit tests"
 )]
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -25,14 +28,10 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 pub use litchi_core::Position;
-pub(crate) use litchi_core::patch::{CompositionLimits, HistoryLimits, SubEditJoinFailure};
 
 use crate::document_structure;
 use crate::package::{Error as PackageError, OpenOptions, SourceLimits};
 use crate::raw::Reader;
-
-/// Explicit bounded undo/redo history for slide-order snapshots.
-pub(crate) type History = litchi_core::patch::History<Snapshot>;
 
 /// Maximum automatic slide-advance delay permitted by `[MS-PPT]` 2.6.6.
 pub const MAX_SLIDE_ADVANCE_MS: u32 = 86_399_000;
@@ -294,6 +293,13 @@ pub enum Refusal {
         element: &'static str,
         reason: &'static str,
     },
+    /// A patch operation (a join, or a durable conversion) is not supported
+    /// for the content of this patch (record 0357a).
+    UnsupportedPatch { reason: &'static str },
+    /// Two joined patches write the same semantic target (record 0357b),
+    /// named as a three-way plan names it (for example
+    /// `document/master-list`), so their order would decide the result.
+    JoinConflict { target: String },
 }
 
 impl fmt::Display for Refusal {
@@ -363,6 +369,12 @@ impl fmt::Display for Refusal {
             Self::InvalidElementValue { element, reason } => {
                 write!(formatter, "PPT {element} value is invalid: {reason}")
             },
+            Self::UnsupportedPatch { reason } => {
+                write!(formatter, "PPT patch operation is not supported: {reason}")
+            },
+            Self::JoinConflict { target } => {
+                write!(formatter, "PPT joined patches both write {target}")
+            },
         }
     }
 }
@@ -386,7 +398,9 @@ impl Refusal {
             | Self::UnsupportedSlideAdvance { .. }
             | Self::UnsupportedSlideVisibility { .. }
             | Self::UnsupportedSlideTransitionVisual { .. } => RefusalKind::UnsupportedTarget,
-            Self::UncommittedSlideDependency => RefusalKind::UnsupportedOperation,
+            Self::UncommittedSlideDependency
+            | Self::UnsupportedPatch { .. }
+            | Self::JoinConflict { .. } => RefusalKind::UnsupportedOperation,
             Self::UnsupportedSource
             | Self::RepairedUserEditChain
             | Self::ReviewHistoryDependency
@@ -544,15 +558,6 @@ where
     result
 }
 
-#[derive(Clone, PartialEq, Eq)]
-struct Lineage(Arc<[u8]>);
-
-impl fmt::Debug for Lineage {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("Lineage(..)")
-    }
-}
-
 mod artifact {
     //! Exact artifact bytes bound to the lazily memoized SHA-256 of exactly
     //! those bytes.
@@ -648,8 +653,6 @@ mod artifact {
 use artifact::Artifact;
 
 mod blank;
-#[cfg(test)]
-mod durable_tests;
 mod elements;
 pub(crate) mod records;
 
@@ -1095,60 +1098,6 @@ impl Snapshot {
         })
     }
 
-    /// Prepares one independently composable move against this exact source.
-    ///
-    /// Moves whose inclusive affected position ranges do not intersect can be
-    /// joined; overlapping moves produce the common deterministic conflict
-    /// set rather than using last-writer-wins behavior.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed source/position refusal or a common composition bound
-    /// error.
-    pub(crate) fn prepare_move(
-        &self,
-        limits: CompositionLimits,
-        identifier: impl Into<String>,
-        from: Position,
-        destination: Position,
-    ) -> Result<PreparedMove> {
-        self.require_editable()?;
-        self.require_position(from)?;
-        self.require_position(destination)?;
-        let move_ = Move { from, destination };
-        let start = from.get().min(destination.get());
-        let end = from.get().max(destination.get());
-        let writes = (start..=end).map(|position| format!("slide-order/position:{position}"));
-        let inner = litchi_core::patch::SubEdit::new(
-            self.lineage(),
-            limits,
-            identifier,
-            std::iter::empty(),
-            writes,
-            move_,
-        )?;
-        Ok(PreparedMove { inner })
-    }
-
-    /// Starts a bounded composition of independently prepared moves.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed refusal when this source cannot be safely republished.
-    pub(crate) fn compose(&self, limits: CompositionLimits) -> Result<Composition> {
-        self.require_editable()?;
-        Ok(Composition {
-            source: self.clone(),
-            joined: litchi_core::patch::JoinedSubEdits::new(self.lineage(), limits),
-        })
-    }
-
-    /// Starts explicit bounded undo/redo history at this snapshot.
-    #[must_use]
-    pub(crate) fn history(&self, limits: HistoryLimits) -> History {
-        History::new(self.clone(), limits)
-    }
-
     /// Plans a dependency-checked transfer from `donor` without mutating
     /// either presentation.
     ///
@@ -1316,10 +1265,6 @@ impl Snapshot {
             return Err(Error::Refused(Refusal::SlideNotFound { position }));
         }
         Ok(())
-    }
-
-    fn lineage(&self) -> Lineage {
-        Lineage(self.shared_bytes())
     }
 
     /// Lowercase hexadecimal SHA-256 of the exact artifact, computed on first
@@ -1810,7 +1755,7 @@ pub(crate) struct ThreeWayPlan {
 }
 
 impl ThreeWayPlan {
-    fn new(left: &Patch, right: &Patch) -> Self {
+    pub(crate) fn new(left: &Patch, right: &Patch) -> Self {
         let left_effects = patch_effects(left);
         let right_effects = patch_effects(right);
         let conflicts = left_effects
@@ -1849,6 +1794,119 @@ enum StructuralChange {
     Move(Change),
     Remove(ListChange),
     Insert(ListChange),
+    /// A `DocumentContainer` edit outside the slide list (record 0357a),
+    /// with the slide-order fingerprint it was staged at (record 0357b:
+    /// the edit leaves the slide order alone, so the fingerprint holds on
+    /// both sides and binds its durable operation in either direction).
+    Document(DocumentChange, [u8; 32]),
+}
+
+/// A staged `DocumentContainer` edit that leaves the slide list order alone:
+/// master order, the custom table-style atom and `fNonOutlineData`
+/// (record 0357a).
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DocumentChange {
+    /// The master list became `order` (each entry a previous position).
+    Masters { order: Vec<usize> },
+    /// A custom table-style atom was inserted.
+    InsertStyles {
+        record: crate::Record,
+        placement: document_structure::CustomTableStylesPlacement,
+    },
+    /// The custom table-style atom was removed.
+    RemoveStyles {
+        record: crate::Record,
+        placement: document_structure::CustomTableStylesPlacement,
+    },
+    /// The custom table-style atom was replaced in place.
+    ReplaceStyles {
+        before: crate::Record,
+        after: crate::Record,
+    },
+    /// The custom table-style atom moved around the `EndDocumentAtom`.
+    MoveStyles {
+        before: document_structure::CustomTableStylesPlacement,
+        after: document_structure::CustomTableStylesPlacement,
+    },
+    /// One slide's `SlidePersistAtom.fNonOutlineData` changed.
+    NonOutlineData {
+        position: usize,
+        before: bool,
+        after: bool,
+    },
+}
+
+impl DocumentChange {
+    fn inverse(&self) -> Self {
+        match self {
+            Self::Masters { order } => {
+                let mut inverse = vec![0; order.len()];
+                for (position, previous) in order.iter().enumerate() {
+                    inverse[*previous] = position;
+                }
+                Self::Masters { order: inverse }
+            },
+            Self::InsertStyles { record, placement } => Self::RemoveStyles {
+                record: record.clone(),
+                placement: *placement,
+            },
+            Self::RemoveStyles { record, placement } => Self::InsertStyles {
+                record: record.clone(),
+                placement: *placement,
+            },
+            Self::ReplaceStyles { before, after } => Self::ReplaceStyles {
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::MoveStyles { before, after } => Self::MoveStyles {
+                before: *after,
+                after: *before,
+            },
+            Self::NonOutlineData {
+                position,
+                before,
+                after,
+            } => Self::NonOutlineData {
+                position: *position,
+                before: *after,
+                after: *before,
+            },
+        }
+    }
+
+    fn replay(&self, document: &mut document_structure::Transaction) -> Result<()> {
+        match self {
+            Self::Masters { order } => document.reorder_masters(order)?,
+            Self::InsertStyles { record, placement } => {
+                document.insert_custom_table_styles(record.clone(), *placement)?;
+            },
+            Self::RemoveStyles { .. } => {
+                document.remove_custom_table_styles()?;
+            },
+            Self::ReplaceStyles { after, .. } => {
+                document.replace_custom_table_styles(after.clone())?;
+            },
+            Self::MoveStyles { after, .. } => document.move_custom_table_styles(*after)?,
+            Self::NonOutlineData {
+                position, after, ..
+            } => document.set_slide_non_outline_data(*position, *after)?,
+        }
+        Ok(())
+    }
+
+    /// The semantic target this change writes, for three-way planning.
+    fn effect(&self) -> String {
+        match self {
+            Self::Masters { .. } => "document/master-list".to_owned(),
+            Self::InsertStyles { .. }
+            | Self::RemoveStyles { .. }
+            | Self::ReplaceStyles { .. }
+            | Self::MoveStyles { .. } => "document/custom-table-styles".to_owned(),
+            Self::NonOutlineData { position, .. } => {
+                format!("slide-list/position:{position}/non-outline-data")
+            },
+        }
+    }
 }
 
 /// Isolated failure-atomic edit over one opened presentation's slide order.
@@ -2040,6 +2098,221 @@ impl Transaction {
         };
         self.changes.push(change);
         self.structural.push(StructuralChange::Move(change));
+        Ok(())
+    }
+
+    /// Reorders the main and title masters (record 0357a): the master list
+    /// becomes `order`, each entry a current zero-based master position.
+    ///
+    /// Slides, notes and title masters reference masters by `masterId`, which
+    /// is unchanged, so every reference keeps its master. The identity order
+    /// is an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidElementValue`] unless `order` is a permutation of
+    /// the master positions; [`Refusal::Signed`] for a change on a signed
+    /// source.
+    pub(crate) fn reorder_masters(&mut self, order: &[usize]) -> Result<()> {
+        let count = self.document.masters()?.len();
+        let mut seen = vec![false; count];
+        if order.len() != count
+            || !order
+                .iter()
+                .all(|index| *index < count && !std::mem::replace(&mut seen[*index], true))
+        {
+            return Err(Error::Refused(Refusal::InvalidElementValue {
+                element: "master order",
+                reason: "it is not a permutation of the master positions",
+            }));
+        }
+        if order
+            .iter()
+            .enumerate()
+            .all(|(position, index)| position == *index)
+        {
+            return Ok(());
+        }
+        self.require_change_allowed()?;
+        self.document.reorder_masters(order)?;
+        self.push_document(DocumentChange::Masters {
+            order: order.to_vec(),
+        })?;
+        Ok(())
+    }
+
+    /// Moves one master to a final zero-based position (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::ElementNotFound`] for a position outside the master list.
+    pub(crate) fn move_master(&mut self, from: Position, destination: Position) -> Result<()> {
+        let count = self.document.masters()?.len();
+        if from.get() >= count || destination.get() >= count {
+            return Err(Error::Refused(Refusal::ElementNotFound {
+                element: "master",
+            }));
+        }
+        let mut order: Vec<_> = (0..count).collect();
+        let value = order.remove(from.get());
+        order.insert(destination.get(), value);
+        self.reorder_masters(&order)
+    }
+
+    /// Moves the master with `masterId` `master_id` to a final position
+    /// (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::ElementNotFound`] when no master has that id.
+    pub(crate) fn move_master_id(&mut self, master_id: u32, destination: Position) -> Result<()> {
+        let from = self
+            .document
+            .masters()?
+            .iter()
+            .position(|master| master.master_id() == master_id)
+            .ok_or(Error::Refused(Refusal::ElementNotFound {
+                element: "master",
+            }))?;
+        self.move_master(Position::new(from), destination)
+    }
+
+    fn custom_table_styles(
+        &self,
+    ) -> Result<Option<document_structure::CustomTableStylesPlacement>> {
+        Ok(self.document.structure()?.custom_table_styles)
+    }
+
+    fn require_custom_table_styles(
+        &self,
+    ) -> Result<document_structure::CustomTableStylesPlacement> {
+        self.custom_table_styles()?
+            .ok_or(Error::Refused(Refusal::ElementNotFound {
+                element: "custom table styles",
+            }))
+    }
+
+    /// Inserts a `RoundTripCustomTableStyles12Atom` before or after the
+    /// `EndDocumentAtom` (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidElementValue`] for a record that is not such an
+    /// atom, and [`Refusal::UnsupportedElement`] when the document already
+    /// has one.
+    pub(crate) fn insert_custom_table_styles(
+        &mut self,
+        record: crate::Record,
+        placement: document_structure::CustomTableStylesPlacement,
+    ) -> Result<()> {
+        require_custom_table_styles_record(&record)?;
+        if self.custom_table_styles()?.is_some() {
+            return Err(Error::Refused(Refusal::UnsupportedElement {
+                element: "custom table styles",
+                reason: "the document already has a custom table-style atom",
+            }));
+        }
+        self.require_change_allowed()?;
+        self.document
+            .insert_custom_table_styles(record.clone(), placement)?;
+        self.push_document(DocumentChange::InsertStyles { record, placement })?;
+        Ok(())
+    }
+
+    /// Removes the custom table-style atom and returns it (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::ElementNotFound`] when the document has none.
+    pub(crate) fn remove_custom_table_styles(&mut self) -> Result<crate::Record> {
+        let placement = self.require_custom_table_styles()?;
+        self.require_change_allowed()?;
+        let record = self.document.remove_custom_table_styles()?;
+        self.push_document(DocumentChange::RemoveStyles {
+            record: record.clone(),
+            placement,
+        })?;
+        Ok(record)
+    }
+
+    /// Replaces the custom table-style atom in place and returns the
+    /// previous one (record 0357a). An equal record is an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::ElementNotFound`] when the document has none and
+    /// [`Refusal::InvalidElementValue`] for a record that is not such an
+    /// atom.
+    pub(crate) fn replace_custom_table_styles(
+        &mut self,
+        record: crate::Record,
+    ) -> Result<crate::Record> {
+        require_custom_table_styles_record(&record)?;
+        self.require_custom_table_styles()?;
+        let mut probe = self.document.clone();
+        let before = probe.replace_custom_table_styles(record.clone())?;
+        if before == record {
+            return Ok(before);
+        }
+        self.require_change_allowed()?;
+        self.document = probe;
+        self.push_document(DocumentChange::ReplaceStyles {
+            before: before.clone(),
+            after: record,
+        })?;
+        Ok(before)
+    }
+
+    /// Moves the custom table-style atom before or after the
+    /// `EndDocumentAtom` (record 0357a). Its current placement is an exact
+    /// no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::ElementNotFound`] when the document has none.
+    pub(crate) fn move_custom_table_styles(
+        &mut self,
+        placement: document_structure::CustomTableStylesPlacement,
+    ) -> Result<()> {
+        let before = self.require_custom_table_styles()?;
+        if before == placement {
+            return Ok(());
+        }
+        self.require_change_allowed()?;
+        self.document.move_custom_table_styles(placement)?;
+        self.push_document(DocumentChange::MoveStyles {
+            before,
+            after: placement,
+        })?;
+        Ok(())
+    }
+
+    /// Sets one slide's `SlidePersistAtom.fNonOutlineData` flag
+    /// ([MS-PPT] 2.4.14.5; record 0357a). It does not hide the slide. The
+    /// current value is an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::SlideNotFound`] for a position outside the slide list.
+    pub(crate) fn set_slide_non_outline_data(
+        &mut self,
+        position: Position,
+        present: bool,
+    ) -> Result<()> {
+        self.require_position(position)?;
+        let slide = self.document.slides()?[position.get()];
+        let before = slide.flags() & (1 << 2) != 0;
+        if before == present {
+            return Ok(());
+        }
+        self.require_change_allowed()?;
+        self.document
+            .set_slide_non_outline_data(position.get(), present)?;
+        self.push_document(DocumentChange::NonOutlineData {
+            position: position.get(),
+            before,
+            after: present,
+        })?;
         Ok(())
     }
 
@@ -3225,6 +3498,15 @@ impl Transaction {
     fn order_fingerprint(&self) -> Result<String> {
         order_digest(&self.document).map(hex_digest)
     }
+
+    /// Record a staged document-structure edit with the slide-order
+    /// fingerprint its durable operation binds (record 0357b).
+    fn push_document(&mut self, change: DocumentChange) -> Result<()> {
+        let order = order_digest(&self.document)?;
+        self.structural
+            .push(StructuralChange::Document(change, order));
+        Ok(())
+    }
 }
 
 /// Successful immutable target and its reversible source-checked patch.
@@ -3415,6 +3697,238 @@ impl Patch {
             .into());
         }
         Ok(self.after.clone())
+    }
+
+    /// An exact byte patch from `before` to `after` that retains no semantic
+    /// operations (the result of a durable replay, record 0357a).
+    pub(crate) fn exact(before: Snapshot, after: Snapshot) -> Self {
+        Self {
+            before,
+            after,
+            changes: Vec::new(),
+            structural: Vec::new(),
+            visibility_changes: Vec::new(),
+            advance_changes: Vec::new(),
+            transition_visual_changes: Vec::new(),
+            text_changes: Vec::new(),
+            anchor_changes: Vec::new(),
+            media_path_changes: Vec::new(),
+            media_playback_changes: Vec::new(),
+            formatting: Vec::new(),
+            formatting_first: true,
+            structural_before: StructuralArtifact::Before,
+            structural_after: StructuralArtifact::After,
+        }
+    }
+
+    /// Refuses a patch whose operations a join cannot replay by value
+    /// (record 0357b): slide insertions and removals shift every later
+    /// position, element record edits replace persisted records the other
+    /// patch may also rewrite, and an inverse patch that edits both
+    /// formatting and structure resolves its formatting targets after its
+    /// structure.
+    fn require_joinable(&self) -> Result<()> {
+        let refuse = |reason| Err(Error::Refused(Refusal::UnsupportedPatch { reason }));
+        if self.structural.iter().any(|change| {
+            matches!(
+                change,
+                StructuralChange::Remove(_) | StructuralChange::Insert(_)
+            )
+        }) {
+            return refuse("slide insertions and removals cannot be joined");
+        }
+        if self
+            .formatting
+            .iter()
+            .any(|change| matches!(change, FormattingChange::Element(_)))
+        {
+            return refuse("element record edits cannot be joined");
+        }
+        if !self.formatting_first && !self.formatting.is_empty() && !self.structural.is_empty() {
+            return refuse("an inverse patch with formatting and structure cannot be joined");
+        }
+        Ok(())
+    }
+
+    /// The slide positions a patch permutes: the union of the inclusive
+    /// ranges of its moves. Positions outside it are fixed points of every
+    /// move.
+    fn moved_positions(&self) -> BTreeSet<usize> {
+        self.changes
+            .iter()
+            .flat_map(|change| {
+                let start = change.from.get().min(change.destination.get());
+                let end = change.from.get().max(change.destination.get());
+                start..=end
+            })
+            .collect()
+    }
+
+    /// The slide-list positions a patch's structure depends on: its moved
+    /// positions and the slides whose `fNonOutlineData` it sets. A
+    /// position outside the moved set reads the same slide in every frame
+    /// of the patch.
+    fn slide_list_positions(&self) -> BTreeSet<usize> {
+        let mut positions = self.moved_positions();
+        positions.extend(self.structural.iter().filter_map(|change| match change {
+            StructuralChange::Document(DocumentChange::NonOutlineData { position, .. }, _) => {
+                Some(*position)
+            },
+            _ => None,
+        }));
+        positions
+    }
+
+    /// The semantic targets a patch writes, as three-way plans name them,
+    /// plus its speaker-notes bodies.
+    fn join_effects(&self) -> BTreeSet<String> {
+        let mut effects = patch_effects(self);
+        effects.extend(self.formatting.iter().filter_map(|change| match change {
+            FormattingChange::NotesText(notes) => {
+                Some(format!("slide:{}/notes-text", notes.slide.get()))
+            },
+            _ => None,
+        }));
+        effects
+    }
+
+    /// Stage this patch's formatting changes, by value, in `transaction`
+    /// (whose structure is still the source's, so source positions are the
+    /// projected positions).
+    fn replay_formatting(&self, transaction: &mut Transaction) -> Result<()> {
+        for change in &self.formatting {
+            match change {
+                FormattingChange::Text(text) => {
+                    transaction.set_shape_text(text.target, text.after.clone())?;
+                },
+                FormattingChange::NotesText(notes) => {
+                    transaction.set_notes_text(notes.slide, notes.after.clone())?;
+                },
+                FormattingChange::Anchor(anchor) => {
+                    transaction.set_shape_anchor(anchor.target, anchor.after)?;
+                },
+                FormattingChange::SlideVisibility(visibility) => {
+                    transaction.set_slide_hidden(visibility.target, visibility.after)?;
+                },
+                FormattingChange::SlideAdvance(advance) => {
+                    transaction.set_slide_advance(advance.target, advance.after)?;
+                },
+                FormattingChange::SlideTransitionVisual(visual) => {
+                    transaction.set_slide_transition_visual(visual.target, visual.after)?;
+                },
+                FormattingChange::MediaPath(media) => {
+                    transaction.set_external_media_path(media.id, media.after.clone())?;
+                },
+                FormattingChange::MediaPlayback(media) => {
+                    transaction.set_external_media_playback(media.id, media.after)?;
+                },
+                FormattingChange::Element(_) => {
+                    return Err(Error::Refused(Refusal::UnsupportedPatch {
+                        reason: "element record edits cannot be joined",
+                    }));
+                },
+            }
+        }
+        Ok(())
+    }
+
+    /// Stage this patch's slide moves and document-structure edits, in
+    /// order, in `transaction`.
+    fn replay_structure(&self, transaction: &mut Transaction) -> Result<()> {
+        for change in &self.structural {
+            match change {
+                StructuralChange::Move(move_change) => {
+                    transaction.move_slide(move_change.from, move_change.destination)?;
+                },
+                StructuralChange::Document(document, _) => match document {
+                    DocumentChange::Masters { order } => transaction.reorder_masters(order)?,
+                    DocumentChange::InsertStyles { record, placement } => {
+                        transaction.insert_custom_table_styles(record.clone(), *placement)?;
+                    },
+                    DocumentChange::RemoveStyles { .. } => {
+                        transaction.remove_custom_table_styles()?;
+                    },
+                    DocumentChange::ReplaceStyles { after, .. } => {
+                        transaction.replace_custom_table_styles(after.clone())?;
+                    },
+                    DocumentChange::MoveStyles { after, .. } => {
+                        transaction.move_custom_table_styles(*after)?;
+                    },
+                    DocumentChange::NonOutlineData {
+                        position, after, ..
+                    } => {
+                        transaction.set_slide_non_outline_data(Position::new(*position), *after)?
+                    },
+                },
+                StructuralChange::Remove(_) | StructuralChange::Insert(_) => {
+                    return Err(Error::Refused(Refusal::UnsupportedPatch {
+                        reason: "slide insertions and removals cannot be joined",
+                    }));
+                },
+            }
+        }
+        Ok(())
+    }
+
+    /// Joins two independently prepared patches over this patch's exact
+    /// source into one patch (records 0357a, 0357b).
+    ///
+    /// Both patches must start from the same exact artifact. They may hold
+    /// slide moves, master reorders, custom table-style edits,
+    /// `fNonOutlineData` changes, and the formatting edits (shape and notes
+    /// text, anchors, slide visibility, advance and visual transition,
+    /// external media path and playback). The two must commute:
+    ///
+    /// - neither patch's slide-list positions (moved ranges and
+    ///   `fNonOutlineData` slides) may meet the other's moved positions, so
+    ///   every position reads the same slide in both patches;
+    /// - no semantic target is written by both (two master reorders, two
+    ///   custom table-style edits, the same shape's text, the same slide's
+    ///   flag or notes, ...), since their order would decide the result.
+    ///
+    /// The joined patch stages both patches' formatting changes by value on
+    /// the source (they name source slide positions), then `self`'s
+    /// structure and `other`'s, in one native commit.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::UnsupportedPatch`] for another source, an operation a join
+    /// cannot replay ([`Self::require_joinable`]), or positions that meet a
+    /// moved range; [`Refusal::JoinConflict`] for a target both write; the
+    /// native commit's error otherwise.
+    pub(crate) fn join(&self, other: &Self) -> Result<Self> {
+        if self.before.bytes() != other.before.bytes() {
+            return Err(Error::Refused(Refusal::UnsupportedPatch {
+                reason: "joined patches start from different artifacts",
+            }));
+        }
+        self.require_joinable()?;
+        other.require_joinable()?;
+        if !self
+            .slide_list_positions()
+            .is_disjoint(&other.moved_positions())
+            || !other
+                .slide_list_positions()
+                .is_disjoint(&self.moved_positions())
+        {
+            return Err(Error::Refused(Refusal::UnsupportedPatch {
+                reason: "joined slide moves overlap",
+            }));
+        }
+        let left = self.join_effects();
+        if let Some(target) = other
+            .join_effects()
+            .into_iter()
+            .find(|target| left.contains(target))
+        {
+            return Err(Error::Refused(Refusal::JoinConflict { target }));
+        }
+        let mut transaction = self.before.edit()?;
+        self.replay_formatting(&mut transaction)?;
+        other.replay_formatting(&mut transaction)?;
+        self.replay_structure(&mut transaction)?;
+        other.replay_structure(&mut transaction)?;
+        Ok(transaction.commit()?.patch)
     }
 
     /// Returns the exact-source-checked inverse patch.
@@ -3812,6 +4326,25 @@ impl Patch {
                         )?,
                     )
                 },
+                // Master order, custom table styles and fNonOutlineData
+                // (record 0357b): bound like the slide-list operations, to
+                // the structural artifact and the slide order they run at.
+                StructuralChange::Document(change, order) => (
+                    durable_document_operation(
+                        limits,
+                        change,
+                        self.structural_artifact_digest(&self.structural_before),
+                        *order,
+                        &mut forward_blobs,
+                    )?,
+                    durable_document_operation(
+                        limits,
+                        &change.inverse(),
+                        self.structural_artifact_digest(&self.structural_after),
+                        *order,
+                        &mut reverse_blobs,
+                    )?,
+                ),
             };
             structural_operations.push(ReversibleOperation::new(forward, inverse));
         }
@@ -3834,142 +4367,6 @@ impl Patch {
             forward_blobs,
             reverse_blobs,
         )
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Move {
-    from: Position,
-    destination: Position,
-}
-
-/// One independently prepared move retaining its exact source lineage.
-pub(crate) struct PreparedMove {
-    inner: litchi_core::patch::SubEdit<Lineage, Move>,
-}
-
-impl PreparedMove {
-    /// Stable caller-selected composition identifier.
-    #[must_use]
-    pub(crate) fn identifier(&self) -> &str {
-        self.inner.id()
-    }
-
-    /// Source position in the immutable base order.
-    #[must_use]
-    pub(crate) const fn from(&self) -> Position {
-        self.inner.payload().from
-    }
-
-    /// Final destination in the immutable base order.
-    #[must_use]
-    pub(crate) const fn destination(&self) -> Position {
-        self.inner.payload().destination
-    }
-}
-
-impl fmt::Debug for PreparedMove {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("PreparedMove")
-            .field("identifier", &self.identifier())
-            .field("from", &self.from())
-            .field("destination", &self.destination())
-            .finish()
-    }
-}
-
-/// Recoverable failure to join one prepared slide move.
-pub(crate) struct JoinError {
-    failure: Box<SubEditJoinFailure>,
-    rejected: Box<PreparedMove>,
-}
-
-impl JoinError {
-    /// Structured common composition refusal.
-    #[must_use]
-    pub(crate) const fn failure(&self) -> &SubEditJoinFailure {
-        &self.failure
-    }
-
-    /// Recovers the rejected prepared move.
-    #[must_use]
-    pub(crate) fn into_rejected(self) -> PreparedMove {
-        *self.rejected
-    }
-}
-
-impl fmt::Debug for JoinError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("JoinError")
-            .field("failure", &self.failure)
-            .field("rejected", &self.rejected)
-            .finish()
-    }
-}
-
-/// Bounded deterministic composition of provably disjoint slide moves.
-pub(crate) struct Composition {
-    source: Snapshot,
-    joined: litchi_core::patch::JoinedSubEdits<Lineage, Move>,
-}
-
-impl Composition {
-    /// Joins a move when its source lineage and affected position range are
-    /// compatible with every accepted move.
-    ///
-    /// # Errors
-    ///
-    /// Returns the structured common refusal and retains the rejected work.
-    pub(crate) fn join(
-        &mut self,
-        incoming: PreparedMove,
-    ) -> std::result::Result<&mut Self, JoinError> {
-        if let Err(error) = self.joined.join(incoming.inner) {
-            let (failure, rejected) = error.into_parts();
-            return Err(JoinError {
-                failure: Box::new(failure),
-                rejected: Box::new(PreparedMove { inner: rejected }),
-            });
-        }
-        Ok(self)
-    }
-
-    /// Number of accepted independently prepared moves.
-    #[must_use]
-    pub(crate) fn len(&self) -> usize {
-        self.joined.len()
-    }
-
-    /// Whether no move has been accepted.
-    #[must_use]
-    pub(crate) fn is_empty(&self) -> bool {
-        self.joined.is_empty()
-    }
-
-    /// Atomically commits every accepted move in deterministic identifier
-    /// order and returns one durable-capable patch.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if staging or whole-package publication fails.
-    pub(crate) fn commit(self) -> Result<Commit> {
-        let mut transaction = self.source.edit()?;
-        for edit in self.joined.into_sub_edits() {
-            let move_ = edit.into_payload();
-            transaction.move_slide(move_.from, move_.destination)?;
-        }
-        transaction.commit()
-    }
-}
-
-impl fmt::Debug for Composition {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("Composition")
-            .field("moves", &self.joined.len())
-            .finish_non_exhaustive()
     }
 }
 
@@ -4309,6 +4706,243 @@ fn durable_insert_operation(
         preconditions,
         serde_json::Value::String(blob.to_string()),
     )
+}
+
+/// The durable name of a custom table-style placement.
+const fn placement_name(placement: document_structure::CustomTableStylesPlacement) -> &'static str {
+    match placement {
+        document_structure::CustomTableStylesPlacement::BeforeEndDocument => "before-end-document",
+        document_structure::CustomTableStylesPlacement::AfterEndDocument => "after-end-document",
+    }
+}
+
+fn parse_placement(
+    value: Option<&serde_json::Value>,
+) -> Result<document_structure::CustomTableStylesPlacement> {
+    match value.and_then(serde_json::Value::as_str) {
+        Some("before-end-document") => {
+            Ok(document_structure::CustomTableStylesPlacement::BeforeEndDocument)
+        },
+        Some("after-end-document") => {
+            Ok(document_structure::CustomTableStylesPlacement::AfterEndDocument)
+        },
+        _ => Err(invalid_durable_patch(
+            "custom table-style placement is invalid",
+        )),
+    }
+}
+
+/// One durable document-structure operation (record 0357b). Every one is
+/// bound to the structural artifact and the slide order it runs at, like
+/// the slide-list operations, and to the state it replaces where the change
+/// carries it: the SHA-256 of the custom table-style atom it removes or
+/// replaces, the placement it moves from, and the `fNonOutlineData` value it
+/// overwrites. Atoms travel as blobs. Master order is a permutation of
+/// zero-based master positions; no native identifier is serialized.
+fn durable_document_operation(
+    limits: litchi_core::patch::PatchLimits,
+    change: &DocumentChange,
+    artifact: &str,
+    order: [u8; 32],
+    blobs: &mut litchi_core::patch::BlobBundle,
+) -> std::result::Result<litchi_core::patch::PatchOperation, litchi_core::patch::PatchError> {
+    use serde_json::Value;
+
+    let encode = |record: &crate::Record| {
+        document_structure::encode_record(record, false).map_err(|_error| {
+            litchi_core::patch::PatchError::InvalidText {
+                field: "custom table-style atom",
+            }
+        })
+    };
+    let mut preconditions = structural_preconditions(artifact, order);
+    let document = "document".to_owned();
+    let (op, target, value) = match change {
+        DocumentChange::Masters { order: positions } => {
+            let positions = positions
+                .iter()
+                .map(|position| u64::try_from(*position).map(Value::from))
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(|_error| litchi_core::patch::PatchError::InvalidText {
+                    field: "master position",
+                })?;
+            (
+                "document-structure.master-order.set",
+                document,
+                Value::Array(positions),
+            )
+        },
+        DocumentChange::InsertStyles { record, placement } => {
+            let blob = blobs.insert(encode(record)?)?;
+            (
+                "document-structure.custom-table-styles.insert",
+                document,
+                serde_json::json!({
+                    "placement": placement_name(*placement),
+                    "record": blob.as_hex(),
+                }),
+            )
+        },
+        DocumentChange::RemoveStyles { record, .. } => {
+            preconditions.insert(
+                "styles_sha256".to_owned(),
+                Value::String(artifact_hash(&encode(record)?)),
+            );
+            (
+                "document-structure.custom-table-styles.remove",
+                document,
+                Value::Null,
+            )
+        },
+        DocumentChange::ReplaceStyles { before, after } => {
+            preconditions.insert(
+                "styles_sha256".to_owned(),
+                Value::String(artifact_hash(&encode(before)?)),
+            );
+            let blob = blobs.insert(encode(after)?)?;
+            (
+                "document-structure.custom-table-styles.replace",
+                document,
+                Value::String(blob.as_hex()),
+            )
+        },
+        DocumentChange::MoveStyles { before, after } => {
+            preconditions.insert(
+                "placement".to_owned(),
+                Value::String(placement_name(*before).to_owned()),
+            );
+            (
+                "document-structure.custom-table-styles.move",
+                document,
+                Value::String(placement_name(*after).to_owned()),
+            )
+        },
+        DocumentChange::NonOutlineData {
+            position,
+            before,
+            after,
+        } => {
+            preconditions.insert("non_outline_data".to_owned(), Value::Bool(*before));
+            (
+                "document-structure.slide-non-outline-data.set",
+                format!("slide:{position}"),
+                Value::Bool(*after),
+            )
+        },
+    };
+    litchi_core::patch::PatchOperation::new(limits, op, target, preconditions, value)
+}
+
+/// Replay one durable document-structure operation (record 0357b) in the
+/// structural transaction, after its artifact and slide-order
+/// preconditions were checked.
+fn apply_durable_document(
+    transaction: &mut Transaction,
+    operation: &litchi_core::patch::PatchOperation,
+    blobs: &litchi_core::patch::BlobBundle,
+) -> Result<()> {
+    let mismatch = || {
+        Error::from(PackageError::InvalidFormat(
+            "PPT durable document-structure precondition does not match".into(),
+        ))
+    };
+    let precondition = |name: &str| operation.preconditions.get(name);
+    let styles_digest = || {
+        precondition("styles_sha256")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| invalid_durable_patch("missing custom table-style precondition"))
+    };
+    let check_styles = |record: &crate::Record, expected: &str| -> Result<()> {
+        let bytes = document_structure::encode_record(record, false)?;
+        if artifact_hash(&bytes) == expected {
+            Ok(())
+        } else {
+            Err(mismatch())
+        }
+    };
+    let styles_record = |value: Option<&serde_json::Value>| -> Result<crate::Record> {
+        let blob = value
+            .and_then(serde_json::Value::as_str)
+            .and_then(|hex| blob_by_hex(blobs, hex))
+            .ok_or_else(|| invalid_durable_patch("custom table-style blob is missing"))?;
+        let (record, consumed) = crate::Record::parse(blob, 0)
+            .map_err(|_error| invalid_durable_patch("custom table-style blob is not a record"))?;
+        if consumed != blob.len() {
+            return Err(invalid_durable_patch(
+                "custom table-style blob is not exactly one record",
+            ));
+        }
+        Ok(record)
+    };
+    let count = operation.preconditions.len();
+    let on_document = operation.target == "document";
+    let value = &operation.value;
+    match operation.op.as_str() {
+        "document-structure.master-order.set" if count == 2 && on_document => {
+            let order = value
+                .as_array()
+                .and_then(|positions| {
+                    positions
+                        .iter()
+                        .map(|position| {
+                            position
+                                .as_u64()
+                                .and_then(|position| usize::try_from(position).ok())
+                        })
+                        .collect::<Option<Vec<_>>>()
+                })
+                .ok_or_else(|| invalid_durable_patch("master order must be positions"))?;
+            transaction.reorder_masters(&order)
+        },
+        "document-structure.custom-table-styles.insert" if count == 2 && on_document => {
+            let object = value
+                .as_object()
+                .filter(|object| object.len() == 2)
+                .ok_or_else(|| invalid_durable_patch("custom table-style insertion is invalid"))?;
+            let placement = parse_placement(object.get("placement"))?;
+            let record = styles_record(object.get("record"))?;
+            transaction.insert_custom_table_styles(record, placement)
+        },
+        "document-structure.custom-table-styles.remove"
+            if count == 3 && on_document && value.is_null() =>
+        {
+            let expected = styles_digest()?;
+            let removed = transaction.remove_custom_table_styles()?;
+            check_styles(&removed, expected)
+        },
+        "document-structure.custom-table-styles.replace" if count == 3 && on_document => {
+            let expected = styles_digest()?;
+            let record = styles_record(Some(value))?;
+            let before = transaction.replace_custom_table_styles(record)?;
+            check_styles(&before, expected)
+        },
+        "document-structure.custom-table-styles.move" if count == 3 && on_document => {
+            let before = parse_placement(precondition("placement"))?;
+            let after = parse_placement(Some(value))?;
+            if transaction.require_custom_table_styles()? != before {
+                return Err(mismatch());
+            }
+            transaction.move_custom_table_styles(after)
+        },
+        "document-structure.slide-non-outline-data.set" if count == 3 => {
+            let position = parse_target(&operation.target)?;
+            let before = precondition("non_outline_data")
+                .and_then(serde_json::Value::as_bool)
+                .ok_or_else(|| invalid_durable_patch("missing fNonOutlineData precondition"))?;
+            let after = value
+                .as_bool()
+                .ok_or_else(|| invalid_durable_patch("fNonOutlineData value must be a flag"))?;
+            transaction.require_position(position)?;
+            let current = transaction.document.slides()?[position.get()].flags() & (1 << 2) != 0;
+            if current != before {
+                return Err(mismatch());
+            }
+            transaction.set_slide_non_outline_data(position, after)
+        },
+        _ => Err(invalid_durable_patch(
+            "unsupported document-structure operation vocabulary",
+        )),
+    }
 }
 
 fn structural_preconditions(
@@ -4796,6 +5430,9 @@ fn apply_durable_structural(
         )
         .into());
     }
+    if operation.op.starts_with("document-structure.") {
+        return apply_durable_document(transaction, operation, blobs);
+    }
     let position = parse_target(&operation.target)?;
     match operation.op.as_str() {
         "slide-order.move" if operation.preconditions.len() == 2 => {
@@ -4881,6 +5518,25 @@ fn parse_shape_target(value: &str) -> Result<crate::text_edit::Target> {
             .map_err(|_error| invalid_durable_patch("shape-text position exceeds this platform"))
     };
     Ok(crate::text_edit::Target::new(parse(slide)?, parse(shape)?))
+}
+
+/// A `RoundTripCustomTableStyles12Atom` header the document validator
+/// accepts (instance 0, no children, a consistent length).
+fn require_custom_table_styles_record(record: &crate::Record) -> Result<()> {
+    if record.record_type != crate::consts::RecordType::RoundTripCustomTableStyles12Atom
+        || record.record_type_raw
+            != crate::consts::RecordType::RoundTripCustomTableStyles12Atom.as_u16()
+        || record.instance != 0
+        || record.version > 0x000f
+        || !record.children.is_empty()
+        || usize::try_from(record.data_length).ok() != Some(record.data.len())
+    {
+        return Err(Error::Refused(Refusal::InvalidElementValue {
+            element: "custom table styles",
+            reason: "the record is not a RoundTripCustomTableStyles12Atom",
+        }));
+    }
+    Ok(())
 }
 
 fn order_digest(transaction: &document_structure::Transaction) -> Result<[u8; 32]> {
@@ -7370,6 +8026,9 @@ fn inverse_structural(structural_change: &StructuralChange) -> StructuralChange 
             after_order: list_change.before_order,
             payload: normalized_payload(&list_change.payload),
         }),
+        StructuralChange::Document(change, order) => {
+            StructuralChange::Document(change.inverse(), *order)
+        },
     }
 }
 
@@ -7397,6 +8056,7 @@ fn replay_structural_changes(
                     insert_change.payload.group.clone(),
                 )?;
             },
+            StructuralChange::Document(change, _) => change.replay(document)?,
         }
     }
     Ok(())
@@ -7461,6 +8121,9 @@ fn patch_effects(patch: &Patch) -> BTreeSet<String> {
                             .map(|shape_id| format!("drawing/shape-id:{shape_id}")),
                     );
                 }
+            },
+            StructuralChange::Document(change, _) => {
+                effects.insert(change.effect());
             },
         }
     }
@@ -7868,7 +8531,7 @@ mod tests {
     }
 
     #[test]
-    fn real_fixture_reorders_reopens_and_round_trips_durable_history() {
+    fn real_fixture_reorders_reopens_and_round_trips_durable_undo_redo() {
         let bytes = fixture("basic_test_ppt_file.ppt");
         let original_text = slide_texts(&bytes);
         let source = Snapshot::from_bytes(bytes).unwrap();
@@ -7899,14 +8562,10 @@ mod tests {
         let durably_restored = commit.snapshot().apply_durable(&decoded.inverse()).unwrap();
         assert_eq!(slide_texts(durably_restored.bytes()), original_text);
 
-        let mut history = source.history(HistoryLimits::new(4, 4096));
-        history
-            .record(commit.snapshot().clone(), wire.len() as u64)
-            .unwrap();
-        assert!(history.undo());
-        assert_eq!(history.current(), &source);
-        assert!(history.redo());
-        assert_eq!(history.current(), commit.snapshot());
+        // Undo and redo are the inverse and the patch applied again.
+        let undone = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+        assert_eq!(undone, source);
+        assert_eq!(commit.patch().apply(&undone).unwrap(), *commit.snapshot());
     }
 
     #[test]
@@ -7948,42 +8607,32 @@ mod tests {
     }
 
     #[test]
-    fn common_composition_joins_disjoint_moves_and_refuses_overlap() {
+    fn joined_move_patches_commute_and_overlap_is_refused() {
         let source = Snapshot::from_bytes(fixture("45543.ppt")).unwrap();
-        let limits = CompositionLimits::new(8, 32, 64, 32);
-        let first = source
-            .prepare_move(
-                limits,
-                "move-opening-pair",
-                Position::new(0),
-                Position::new(1),
-            )
-            .unwrap();
-        let second = source
-            .prepare_move(
-                limits,
-                "move-later-pair",
-                Position::new(4),
-                Position::new(5),
-            )
-            .unwrap();
-        let overlapping = source
-            .prepare_move(
-                limits,
-                "overlap-opening-pair",
-                Position::new(1),
-                Position::new(2),
-            )
-            .unwrap();
-        let mut composition = source.compose(limits).unwrap();
-        composition.join(first).unwrap().join(second).unwrap();
-        let failure = composition.join(overlapping).unwrap_err();
-        assert!(matches!(failure.failure(), SubEditJoinFailure::Overlap(_)));
-        let commit = composition.commit().unwrap();
-        assert_eq!(commit.snapshot().slide_count(), source.slide_count());
-        assert_eq!(commit.patch().changes().len(), 2);
-        let durable = commit.patch().to_durable(patch_limits()).unwrap();
-        assert_eq!(source.apply_durable(&durable).unwrap(), *commit.snapshot());
+        let moved = |from: usize, destination: usize| {
+            let mut edit = source.edit().unwrap();
+            edit.move_slide(Position::new(from), Position::new(destination))
+                .unwrap();
+            edit.commit().unwrap().patch
+        };
+        let first = moved(0, 1);
+        let second = moved(4, 5);
+        let overlapping = moved(1, 2);
+        let joined = first.join(&second).unwrap();
+        assert_eq!(joined.changes().len(), 2);
+        assert_eq!(
+            slide_texts(joined.apply(&source).unwrap().bytes()),
+            slide_texts(second.join(&first).unwrap().apply(&source).unwrap().bytes())
+        );
+        assert!(matches!(
+            joined.join(&overlapping),
+            Err(Error::Refused(Refusal::UnsupportedPatch { .. }))
+        ));
+        let durable = joined.to_durable(patch_limits()).unwrap();
+        assert_eq!(
+            source.apply_durable(&durable).unwrap(),
+            joined.apply(&source).unwrap()
+        );
     }
 
     #[test]
@@ -9253,7 +9902,7 @@ mod tests {
     }
 
     #[test]
-    fn genuine_corpus_slide_advance_reopens_reverses_merges_and_uses_history() {
+    fn genuine_corpus_slide_advance_reopens_reverses_merges_and_undoes() {
         let cases = genuine_advance_cases();
         let producer_files = cases
             .iter()
@@ -9337,14 +9986,10 @@ mod tests {
         assert_eq!(restored.slide_advance(position).unwrap(), before);
         assert_eq!(slide_texts(restored.bytes()), slide_texts(source.bytes()));
 
-        let mut history = source.history(HistoryLimits::new(4, 64 * 1024));
-        history
-            .record(commit.snapshot().clone(), wire.len() as u64)
-            .unwrap();
-        assert!(history.undo());
-        assert_eq!(history.current(), &source);
-        assert!(history.redo());
-        assert_eq!(history.current(), commit.snapshot());
+        // Undo and redo are the inverse and the patch applied again.
+        let undone = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+        assert_eq!(undone, source);
+        assert_eq!(commit.patch().apply(&undone).unwrap(), *commit.snapshot());
 
         let mut competing_edit = source.edit().unwrap();
         competing_edit

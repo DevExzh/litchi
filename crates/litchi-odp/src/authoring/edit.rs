@@ -117,6 +117,21 @@ pub enum CryptoRefusal {
     UsePasswordOpening,
 }
 
+impl CryptoRefusal {
+    /// The refusal class litchi-ops reports for this reason (record 0351
+    /// §2.4): the editor does not implement the lifecycle operation.
+    #[must_use]
+    pub const fn kind(self) -> litchi_core::edit::RefusalKind {
+        match self {
+            Self::SignatureVerificationUnavailable
+            | Self::SignatureAuthoringUnavailable
+            | Self::SignatureRemovalUnavailable
+            | Self::EncryptionAuthoringUnavailable
+            | Self::UsePasswordOpening => litchi_core::edit::RefusalKind::UnsupportedOperation,
+        }
+    }
+}
+
 /// Typed availability result for one cryptographic lifecycle operation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -322,10 +337,10 @@ impl Package {
         options: OpenOptions,
     ) -> std::result::Result<Self, PackageError> {
         let password = zeroize::Zeroizing::new(password.into());
-        let package = OwnedPackage::from_reader_with_limits_and_password(
+        let package = OwnedPackage::from_reader_with_password_and_options(
             File::open(path)?,
-            options.source_limits_value(),
             password.as_str(),
+            options,
         )?;
         Self::from_opened(package, options)
     }
@@ -350,7 +365,10 @@ impl Package {
     ) -> std::result::Result<Self, PackageError> {
         let limits = options.source_limits_value();
         check_input_bytes(bytes.len(), limits)?;
-        let package = OwnedPackage::from_bytes_with_limits(copy_input(bytes)?, limits)?;
+        let package = OwnedPackage::from_bytes_with_options(
+            copy_input(bytes)?,
+            OpenOptions::new().source_limits(limits),
+        )?;
         Self::from_opened(package, options)
     }
 
@@ -380,10 +398,10 @@ impl Package {
         let password = zeroize::Zeroizing::new(password.into());
         let limits = options.source_limits_value();
         check_input_bytes(bytes.len(), limits)?;
-        let package = OwnedPackage::from_bytes_with_limits_and_password(
+        let package = OwnedPackage::from_bytes_with_password_and_options(
             copy_input(bytes)?,
-            limits,
             password.as_str(),
+            OpenOptions::new().source_limits(limits),
         )?;
         Self::from_opened(package, options)
     }
@@ -407,7 +425,7 @@ impl Package {
         reader: impl Read,
         options: OpenOptions,
     ) -> std::result::Result<Self, PackageError> {
-        let package = OwnedPackage::from_reader_with_limits(reader, options.source_limits_value())?;
+        let package = OwnedPackage::from_reader_with_options(reader, options)?;
         Self::from_opened(package, options)
     }
 
@@ -555,10 +573,17 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns an error when this package is not byte-identical to the patch
-    /// source or its signature/encryption policy makes it read-only.
-    pub fn apply(&self, patch: &Patch) -> std::result::Result<Self, PackageError> {
-        Ok(patch.apply(self)?)
+    /// Returns [`PackageError::PatchConflict`] when this package is not
+    /// byte-identical to the patch source, or an error when its
+    /// signature/encryption policy makes it read-only.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, PackageError> {
+        if !same_source(&patch.before, self) {
+            return Err(PackageError::patch_conflict(
+                "odp.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(Commit::replayed(patch.apply(self)?, patch.clone()))
     }
 
     /// Atomically replace `path` with this package (full durability).
@@ -3631,6 +3656,16 @@ pub struct Commit {
 }
 
 impl Commit {
+    pub(crate) fn replayed(snapshot: Package, patch: Patch) -> Self {
+        Self {
+            changed: !patch.is_noop(),
+            snapshot,
+            patch,
+            #[cfg(test)]
+            publication_audit_hit: false,
+        }
+    }
+
     fn unchanged(snapshot: Package) -> Self {
         let patch = Patch {
             before: snapshot.clone(),

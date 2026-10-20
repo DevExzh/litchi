@@ -734,8 +734,9 @@ impl PackageWriter<io::Cursor<Vec<u8>>> {
     }
 
     /// Create an in-memory writer with explicit finite ZIP transport limits.
+    #[cfg(test)]
     #[must_use]
-    pub fn new_with_limits(limits: PackageWriterLimits) -> Self {
+    pub(crate) fn new_with_limits(limits: PackageWriterLimits) -> Self {
         Self::with_writer_and_limits(io::Cursor::new(Vec::new()), limits)
     }
 }

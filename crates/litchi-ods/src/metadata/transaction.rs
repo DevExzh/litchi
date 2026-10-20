@@ -8,7 +8,7 @@ use litchi_odf_common::core::{MetaXmlPatch, Structure, metadata::Metadata};
 use super::model::Snapshot;
 
 /// An isolated metadata draft derived from an immutable [`Snapshot`].
-pub struct Transaction<'source> {
+pub(crate) struct Transaction<'source> {
     source: Option<&'source str>,
     source_odf: Metadata,
     original: CoreMetadata,
@@ -29,7 +29,7 @@ impl<'source> Transaction<'source> {
 
     /// Borrow the current ergonomic metadata draft.
     #[must_use]
-    pub fn metadata(&self) -> &CoreMetadata {
+    pub(crate) fn metadata(&self) -> &CoreMetadata {
         &self.draft
     }
 
@@ -41,20 +41,21 @@ impl<'source> Transaction<'source> {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn replace(&mut self, metadata: CoreMetadata) -> Result<()> {
+    pub(crate) fn replace(&mut self, metadata: CoreMetadata) -> Result<()> {
         validate_supported_change(&self.original, &metadata)?;
         self.draft = metadata;
         self.remove_part = false;
         Ok(())
     }
 
+    #[cfg(test)]
     /// Open a short-lived semantic editor for common CRUD operations.
-    pub fn editor(&mut self) -> Editor<'_, 'source> {
+    pub(crate) fn editor(&mut self) -> Editor<'_, 'source> {
         Editor { transaction: self }
     }
 
     /// Remove the complete physical `meta.xml` part.
-    pub fn remove(&mut self) {
+    pub(crate) fn remove(&mut self) {
         self.remove_part = true;
         self.draft = CoreMetadata::default();
     }
@@ -63,18 +64,16 @@ impl<'source> Transaction<'source> {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn commit(self) -> Result<XmlCommit<'source>> {
+    pub(crate) fn commit(self) -> Result<XmlCommit<'source>> {
         if self.remove_part {
             return Ok(XmlCommit {
                 xml: None,
-                value: self.draft,
                 changed: self.source.is_some(),
             });
         }
         if supported_equal(&self.original, &self.draft) {
             return Ok(XmlCommit {
                 xml: self.source.map(Cow::Borrowed),
-                value: self.draft,
                 changed: false,
             });
         }
@@ -98,7 +97,6 @@ impl<'source> Transaction<'source> {
         Metadata::from_xml(&xml)?;
         Ok(XmlCommit {
             xml: Some(Cow::Owned(xml)),
-            value: self.draft,
             changed: true,
         })
     }
@@ -236,39 +234,28 @@ impl Editor<'_, '_> {
 }
 
 /// The result of publishing a metadata transaction.
-pub struct XmlCommit<'source> {
+pub(crate) struct XmlCommit<'source> {
     xml: Option<Cow<'source, str>>,
-    value: CoreMetadata,
     changed: bool,
 }
 
 impl XmlCommit<'_> {
+    #[cfg(test)]
     /// Borrow the new metadata XML, or `None` when the part is absent.
     #[must_use]
-    pub fn xml(&self) -> Option<&str> {
+    pub(crate) fn xml(&self) -> Option<&str> {
         self.xml.as_deref()
-    }
-
-    /// Borrow the new ergonomic projection.
-    #[must_use]
-    pub fn metadata(&self) -> &CoreMetadata {
-        &self.value
     }
 
     /// Whether the transaction changed the physical part.
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         self.changed
     }
 }
 
 impl<'source> XmlCommit<'source> {
-    #[must_use]
-    pub fn into_xml(self) -> Option<Cow<'source, str>> {
-        self.xml
-    }
-
-    pub fn into_owned_xml(self) -> Option<String> {
+    pub(crate) fn into_owned_xml(self) -> Option<String> {
         self.xml.map(Cow::into_owned)
     }
 }

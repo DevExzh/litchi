@@ -1,7 +1,7 @@
 use litchi_odc::{
     AxisSpec, AxisUpdate, Builder, ChartErrorCategory, ChartPackageKind, ChartStyleProperty,
-    ChartStyleValue, ChartSymbolName, ChartSymbolType, Definition, Limits, Package,
-    chart::Dimension,
+    ChartStyleValue, ChartSymbolName, ChartSymbolType, Definition, OpenOptions, Package,
+    SemanticLimits, chart::Dimension,
 };
 use litchi_odf_common::core::OwnedPackage;
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
@@ -140,7 +140,7 @@ fn chart_style_properties_are_typed_atomic_and_exact() -> TestResult<()> {
     let commit = edit.commit()?;
     assert_eq!(commit.patch().style_property_changes().len(), 6);
     let decoded =
-        litchi_odc::Patch::from_bytes(&commit.patch().to_bytes(), source.chart().limits())?;
+        litchi_odc::Patch::from_bytes(&commit.patch().to_bytes(), source.chart().options())?;
     let mut decoded_changes = decoded.style_property_changes().to_vec();
     let mut committed_changes = commit.patch().style_property_changes().to_vec();
     decoded_changes.sort_by_key(|change| (change.style_name().to_owned(), change.property()));
@@ -162,7 +162,10 @@ fn chart_style_properties_are_typed_atomic_and_exact() -> TestResult<()> {
             && styles.contains("chart:tick-marks-minor-inner=\"true\"")
     }));
     assert_eq!(
-        changed.apply(&commit.patch().inverse())?.as_bytes(),
+        changed
+            .apply(&commit.patch().inverse())?
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 
@@ -406,7 +409,9 @@ fn disjoint_chart_style_patches_join_and_transfer_by_property() -> TestResult<()
     let right_chart = right_commit.into_package();
     let merged = left_patch.join(&right_patch)?;
     assert!(merged.is_merged(), "disjoint typed style writes must join");
-    let merged_chart = source.apply(merged.patch().expect("merged patch"))?;
+    let merged_chart = source
+        .apply(merged.patch().expect("merged patch"))?
+        .into_package();
     assert_eq!(
         merged_chart
             .chart()
@@ -425,7 +430,9 @@ fn disjoint_chart_style_patches_join_and_transfer_by_property() -> TestResult<()
         transferred.is_merged(),
         "disjoint typed style writes must transfer"
     );
-    let transferred_chart = right_chart.apply(transferred.patch().expect("transferred patch"))?;
+    let transferred_chart = right_chart
+        .apply(transferred.patch().expect("transferred patch"))?
+        .into_package();
     assert_eq!(
         transferred_chart
             .chart()
@@ -452,9 +459,13 @@ fn typed_style_publication_rejects_output_above_content_limit_before_rebuild() -
         .with_styles_xml(padded_styles.clone())
         .build()?;
     let content_limit = unconstrained.chart().styles_xml().map_or(0, str::len);
-    let limits = Limits::new().with_content_bytes(content_limit)?;
+    let limits = OpenOptions::new().semantic_limits(
+        SemanticLimits::builder()
+            .max_content_bytes(u64::try_from(content_limit)?)?
+            .build()?,
+    );
     let bounded = Builder::new()
-        .with_limits(limits)
+        .with_options(limits)
         .with_definition(definition())
         .with_styles_xml(padded_styles)
         .build()?;
@@ -526,7 +537,9 @@ fn composed_style_changes_collapse_replays_and_survive_wire_roundtrip() -> TestR
 
     let transferred = composed.transfer_to(&source)?;
     assert!(transferred.is_merged());
-    let transferred_chart = source.apply(transferred.patch().expect("transferred patch"))?;
+    let transferred_chart = source
+        .apply(transferred.patch().expect("transferred patch"))?
+        .into_package();
     assert_eq!(
         transferred_chart
             .chart()
@@ -540,7 +553,7 @@ fn composed_style_changes_collapse_replays_and_survive_wire_roundtrip() -> TestR
         Some(ChartStyleValue::Boolean(false))
     );
 
-    let durable = litchi_odc::Patch::from_bytes(&composed.to_bytes(), source.chart().limits())?;
+    let durable = litchi_odc::Patch::from_bytes(&composed.to_bytes(), source.chart().options())?;
     assert_eq!(
         durable.style_property_changes(),
         composed.style_property_changes()
@@ -564,7 +577,7 @@ fn durable_added_style_falls_back_to_lossless_whole_part_join_and_transfer() -> 
     style_edit.set_styles_xml(added_styles.clone());
     let style_commit = style_edit.commit()?;
     let durable =
-        litchi_odc::Patch::from_bytes(&style_commit.patch().to_bytes(), source.chart().limits())?;
+        litchi_odc::Patch::from_bytes(&style_commit.patch().to_bytes(), source.chart().options())?;
     assert!(
         durable
             .style_property_changes()
@@ -574,7 +587,9 @@ fn durable_added_style_falls_back_to_lossless_whole_part_join_and_transfer() -> 
 
     let transferred = durable.transfer_to(&source)?;
     assert!(transferred.is_merged());
-    let transferred_chart = source.apply(transferred.patch().expect("transferred patch"))?;
+    let transferred_chart = source
+        .apply(transferred.patch().expect("transferred patch"))?
+        .into_package();
     assert_eq!(
         transferred_chart.chart().styles_xml(),
         Some(added_styles.as_str())
@@ -585,7 +600,9 @@ fn durable_added_style_falls_back_to_lossless_whole_part_join_and_transfer() -> 
     let right = right_edit.commit()?;
     let joined = durable.join(right.patch())?;
     assert!(joined.is_merged());
-    let joined_chart = source.apply(joined.patch().expect("joined patch"))?;
+    let joined_chart = source
+        .apply(joined.patch().expect("joined patch"))?
+        .into_package();
     assert_eq!(
         joined_chart.chart().styles_xml(),
         Some(added_styles.as_str())
@@ -604,7 +621,7 @@ fn durable_added_style_falls_back_to_lossless_whole_part_join_and_transfer() -> 
     invalid_edit.set_styles_xml(invalid_styles);
     let invalid_commit = invalid_edit.commit()?;
     assert!(
-        litchi_odc::Patch::from_bytes(&invalid_commit.patch().to_bytes(), source.chart().limits())
+        litchi_odc::Patch::from_bytes(&invalid_commit.patch().to_bytes(), source.chart().options())
             .is_err()
     );
     Ok(())
@@ -633,7 +650,7 @@ fn durable_symbol_image_child_uses_whole_part_join_and_transfer() -> TestResult<
     edit.set_styles_xml(image_styles.clone());
     let committed = edit.commit()?;
     let durable =
-        litchi_odc::Patch::from_bytes(&committed.patch().to_bytes(), source.chart().limits())?;
+        litchi_odc::Patch::from_bytes(&committed.patch().to_bytes(), source.chart().options())?;
     assert!(
         durable
             .style_property_changes()
@@ -643,7 +660,9 @@ fn durable_symbol_image_child_uses_whole_part_join_and_transfer() -> TestResult<
 
     let transferred = durable.transfer_to(&source)?;
     assert!(transferred.is_merged());
-    let transferred_chart = source.apply(transferred.patch().expect("transferred patch"))?;
+    let transferred_chart = source
+        .apply(transferred.patch().expect("transferred patch"))?
+        .into_package();
     assert_eq!(
         transferred_chart.chart().styles_xml(),
         Some(image_styles.as_str())
@@ -654,7 +673,9 @@ fn durable_symbol_image_child_uses_whole_part_join_and_transfer() -> TestResult<
     let right = right_edit.commit()?;
     let joined = durable.join(right.patch())?;
     assert!(joined.is_merged());
-    let joined_chart = source.apply(joined.patch().expect("joined patch"))?;
+    let joined_chart = source
+        .apply(joined.patch().expect("joined patch"))?
+        .into_package();
     assert_eq!(
         joined_chart.chart().styles_xml(),
         Some(image_styles.as_str())
@@ -737,7 +758,7 @@ fn composed_whole_style_then_typed_style_uses_final_whole_part() -> TestResult<(
     assert!(transferred.is_merged());
     let chart = source.apply(transferred.patch().expect("transferred patch"))?;
     assert_eq!(
-        chart.chart().styles_xml(),
+        chart.into_package().chart().styles_xml(),
         typed.package().chart().styles_xml()
     );
     Ok(())

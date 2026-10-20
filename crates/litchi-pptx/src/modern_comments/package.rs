@@ -131,7 +131,7 @@ mod comments {
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.
-    pub fn store_modern_comment(package: &mut OpcPackage, value: &Part) -> Result<()> {
+    pub(crate) fn store_modern_comment(package: &mut OpcPackage, value: &Part) -> Result<()> {
         load_modern_comments(package)?;
         validate_relationship_id(&value.relationship_id)?;
         let slide_name = PackURI::new(&value.slide_part_name).map_err(invalid)?;
@@ -202,7 +202,7 @@ mod comments {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn add_modern_comment(
+    pub(crate) fn add_modern_comment(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
         comment: Comment,
@@ -269,7 +269,7 @@ mod comments {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn update_modern_comment<F>(
+    pub(crate) fn update_modern_comment<F>(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
         comment_id: &str,
@@ -333,7 +333,7 @@ mod comments {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace_modern_comment(
+    pub(crate) fn replace_modern_comment(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
         comment_id: &str,
@@ -359,7 +359,7 @@ mod comments {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn remove_modern_comment(
+    pub(crate) fn remove_modern_comment(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
         comment_id: &str,
@@ -413,7 +413,7 @@ mod comments {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn reorder_modern_comments(
+    pub(crate) fn reorder_modern_comments(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
         ordered_comment_ids: &[String],
@@ -486,7 +486,7 @@ mod comments {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn add_modern_comment_reply(
+    pub(crate) fn add_modern_comment_reply(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
         comment_id: &str,
@@ -517,7 +517,7 @@ mod comments {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn update_modern_comment_reply<F>(
+    pub(crate) fn update_modern_comment_reply<F>(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
         comment_id: &str,
@@ -579,7 +579,7 @@ mod comments {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn update_modern_comment_extensions<F>(
+    pub(crate) fn update_modern_comment_extensions<F>(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
         comment_id: &str,
@@ -641,7 +641,7 @@ mod comments {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn update_modern_comment_reply_extensions<F>(
+    pub(crate) fn update_modern_comment_reply_extensions<F>(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
         comment_id: &str,
@@ -685,7 +685,7 @@ mod comments {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace_modern_comment_reply(
+    pub(crate) fn replace_modern_comment_reply(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
         comment_id: &str,
@@ -718,7 +718,7 @@ mod comments {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn remove_modern_comment_reply(
+    pub(crate) fn remove_modern_comment_reply(
         package: &mut OpcPackage,
         slide_part_name: &PackURI,
         comment_id: &str,
@@ -1087,7 +1087,7 @@ mod authors {
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.
-    pub fn store_modern_comment_authors(
+    pub(crate) fn store_modern_comment_authors(
         package: &mut OpcPackage,
         value: &AuthorPart,
     ) -> Result<()> {
@@ -1160,7 +1160,7 @@ mod authors {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn add_modern_comment_author(
+    pub(crate) fn add_modern_comment_author(
         package: &mut OpcPackage,
         author: Author,
     ) -> Result<AuthorPart> {
@@ -1228,7 +1228,7 @@ mod authors {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn update_modern_comment_author<F>(
+    pub(crate) fn update_modern_comment_author<F>(
         package: &mut OpcPackage,
         author_id: &str,
         update: F,
@@ -1268,7 +1268,7 @@ mod authors {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace_modern_comment_author(
+    pub(crate) fn replace_modern_comment_author(
         package: &mut OpcPackage,
         author_id: &str,
         replacement: Author,
@@ -1291,7 +1291,10 @@ mod authors {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn remove_modern_comment_author(package: &mut OpcPackage, author_id: &str) -> Result<bool> {
+    pub(crate) fn remove_modern_comment_author(
+        package: &mut OpcPackage,
+        author_id: &str,
+    ) -> Result<bool> {
         let graph = load_modern_comment_graph(package)?;
         let Some(mut part) = graph.authors.clone() else {
             return Ok(false);
@@ -1341,7 +1344,7 @@ mod authors {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn reorder_modern_comment_authors(
+    pub(crate) fn reorder_modern_comment_authors(
         package: &mut OpcPackage,
         ordered_author_ids: &[String],
     ) -> Result<Vec<Author>> {
@@ -1458,17 +1461,22 @@ mod authors {
     }
 }
 
-pub use authors::{
-    add_modern_comment_author, find_modern_comment_author, load_modern_comment_authors,
-    load_modern_comment_graph, remove_modern_comment_author, reorder_modern_comment_authors,
+pub(crate) use authors::{
+    add_modern_comment_author, remove_modern_comment_author, reorder_modern_comment_authors,
     replace_modern_comment_author, store_modern_comment_authors, update_modern_comment_author,
+};
+pub use authors::{
+    find_modern_comment_author, load_modern_comment_authors, load_modern_comment_graph,
     validate_modern_comment_author_references,
 };
-pub use comments::{
-    add_modern_comment, add_modern_comment_reply, find_modern_comment, find_modern_comment_reply,
-    load_modern_comment_extensions, load_modern_comment_reply_extensions, load_modern_comments,
-    remove_modern_comment, remove_modern_comment_reply, reorder_modern_comments,
-    replace_modern_comment, replace_modern_comment_reply, store_modern_comment,
-    update_modern_comment, update_modern_comment_extensions, update_modern_comment_reply,
+pub(crate) use comments::{
+    add_modern_comment, add_modern_comment_reply, remove_modern_comment,
+    remove_modern_comment_reply, reorder_modern_comments, replace_modern_comment,
+    replace_modern_comment_reply, store_modern_comment, update_modern_comment,
+    update_modern_comment_extensions, update_modern_comment_reply,
     update_modern_comment_reply_extensions,
+};
+pub use comments::{
+    find_modern_comment, find_modern_comment_reply, load_modern_comment_extensions,
+    load_modern_comment_reply_extensions, load_modern_comments,
 };

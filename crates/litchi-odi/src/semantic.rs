@@ -1,8 +1,8 @@
 //! Deterministic semantic patches, transfer, and non-mutating merge planning.
 
 use crate::{
-    Commit, Edit, FlatImage, FlatImageCommit, FrameChange, Image, MetadataFields, Package,
-    ResourceChange, frame::Frame, map::ImageMap, source::Source,
+    Commit, Edit, FrameChange, Image, MetadataFields, Package, ResourceChange, frame::Frame,
+    map::ImageMap, source::Source,
 };
 use litchi_core::{Error, Result};
 use quick_xml::{
@@ -484,18 +484,21 @@ impl SemanticPlan {
     /// Applies this plan to flat XML and fully reopens the result.
     pub fn commit_flat(
         &self,
-        source: &FlatImage,
+        source: &crate::flat::Image,
         policy: &SecurityPolicy,
-    ) -> Result<FlatImageCommit> {
+    ) -> Result<crate::flat::Commit> {
         self.ensure_publishable(policy)?;
         ensure_current_values(&self.operations, |key| flat_value(source, key))?;
-        let mut edit = source.transaction();
+        let mut edit = source.edit();
         for operation in &self.operations {
             apply_flat_operation(&mut edit, operation)?;
         }
-        let commit = edit.commit()?;
-        let reopened = FlatImage::from_bytes(commit.snapshot().as_bytes().to_vec())?;
-        if reopened.as_bytes() != commit.snapshot().as_bytes() {
+        let commit = edit.commit_core()?;
+        let reopened = crate::flat::Image::from_flat_bytes(
+            commit.package().as_bytes().to_vec(),
+            source.bounds(),
+        )?;
+        if reopened.as_bytes() != commit.package().as_bytes() {
             return Err(invalid("ODI flat plan failed full byte reopen"));
         }
         Ok(commit)
@@ -550,7 +553,7 @@ pub struct SemanticPatch {
 
 impl SemanticPatch {
     pub(crate) fn from_flat_commit(
-        commit: &FlatImageCommit,
+        commit: &crate::flat::Commit,
         policy: &SecurityPolicy,
     ) -> Result<Self> {
         let mut operations = frame_operations(commit.patch().changes());
@@ -560,7 +563,7 @@ impl SemanticPatch {
         Self::new(
             ArtifactKind::Flat,
             commit.source().as_bytes(),
-            commit.snapshot().as_bytes(),
+            commit.package().as_bytes(),
             operations,
             policy,
         )
@@ -661,11 +664,11 @@ impl SemanticPatch {
     }
 
     /// Applies only to the exact flat source and reparses the target bytes.
-    pub fn apply_flat(&self, source: &FlatImage) -> Result<FlatImage> {
+    pub fn apply_flat(&self, source: &crate::flat::Image) -> Result<crate::flat::Image> {
         if self.kind != ArtifactKind::Flat || self.source.as_slice() != source.as_bytes() {
             return Err(invalid("stale or wrong-kind ODI semantic patch source"));
         }
-        FlatImage::from_bytes(self.target.as_ref().clone())
+        crate::flat::Image::from_flat_bytes(self.target.as_ref().clone(), source.bounds())
     }
 
     /// Applies only to the exact package source and reparses the target bytes.
@@ -690,7 +693,7 @@ impl SemanticPatch {
 
     /// Plans a three-way application against current flat semantics.
     #[must_use]
-    pub fn plan_flat(&self, current: &FlatImage) -> SemanticPlan {
+    pub fn plan_flat(&self, current: &crate::flat::Image) -> SemanticPlan {
         plan_operations(&self.operations, |key| flat_value(current, key))
     }
 
@@ -1817,7 +1820,7 @@ fn plan_operations(
     }
 }
 
-fn flat_value(image: &FlatImage, key: &OperationKey) -> Result<Option<SemanticValue>> {
+fn flat_value(image: &crate::flat::Image, key: &OperationKey) -> Result<Option<SemanticValue>> {
     match key {
         OperationKey::Frame { frame, property } => image
             .frames()
@@ -1913,10 +1916,7 @@ fn text(value: Option<&str>) -> SemanticValue {
     SemanticValue::Text(value.map(str::to_owned))
 }
 
-fn apply_flat_operation(
-    edit: &mut crate::FlatImageTransaction,
-    operation: &SemanticOperation,
-) -> Result<()> {
+fn apply_flat_operation(edit: &mut crate::flat::Edit, operation: &SemanticOperation) -> Result<()> {
     match operation.key() {
         OperationKey::Frame { frame, property } => {
             apply_frame_operation(edit, *frame, *property, operation.after())

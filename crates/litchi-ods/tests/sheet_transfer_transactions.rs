@@ -133,7 +133,7 @@ fn scalar_sheet_transfer_preserves_fragment_members_and_durable_inverse() -> Res
         let wire = commit.patch().to_deterministic_json()?;
         let durable = Patch::from_deterministic_json(&wire, destination.limits())?;
         assert_eq!(
-            destination.apply(&durable)?.as_bytes(),
+            destination.apply(&durable)?.into_package().as_bytes(),
             commit.package().as_bytes()
         );
         assert!(source.apply(&durable).is_err());
@@ -142,7 +142,7 @@ fn scalar_sheet_transfer_preserves_fragment_members_and_durable_inverse() -> Res
             destination.limits(),
         )?;
         assert_eq!(
-            commit.package().apply(&inverse)?.as_bytes(),
+            commit.package().apply(&inverse)?.into_package().as_bytes(),
             destination_bytes.as_slice()
         );
     }

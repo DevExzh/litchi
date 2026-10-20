@@ -552,17 +552,10 @@ fn assert_exact_noop(input: &Input) {
         },
         #[cfg(feature = "pptx")]
         FileFormat::Pptx => {
-            let Ok(presentation) = litchi_pptx::SourceBackedPresentation::from_read_at(source())
-                .unwrap()
-                .try_into_editor()
-            else {
-                panic!("{label}: a sole source-backed presentation builds its editor");
-            };
-            let commit = presentation.edit_slide(0).unwrap().commit();
+            let presentation = litchi_pptx::source::Package::from_read_at(source()).unwrap();
+            let commit = presentation.edit().unwrap().commit().unwrap();
             let mut output = Vec::new();
-            presentation
-                .publish_slide_commit_to_stream(&mut output, &commit)
-                .unwrap();
+            commit.package().write_to(&mut output).unwrap();
             assert_eq!(&output, bytes, "{label}: source-backed no-op");
 
             let mut package = litchi_pptx::Package::from_reader(&bytes[..]).unwrap();

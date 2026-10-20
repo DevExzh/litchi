@@ -22,7 +22,10 @@
 
 use crate::package::family::{graph_edit, graph_family};
 
-graph_family!("document-variable");
+graph_family!("document-variable", own_limits);
+
+/// The budgets of this family: the settings part it rewrites.
+pub use crate::settings::LimitKind;
 graph_edit!(
     "document-variable",
     edit_document_variables,

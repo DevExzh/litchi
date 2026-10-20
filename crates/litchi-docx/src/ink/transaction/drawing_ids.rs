@@ -1,5 +1,6 @@
 //! Package-wide collision avoidance for authored nonvisual drawing identifiers.
 
+use crate::ink::LimitKind;
 use std::collections::HashSet;
 
 use quick_xml::events::Event;
@@ -79,7 +80,7 @@ impl DrawingIds {
             return Ok(());
         }
         super::bound(
-            "drawing identifiers",
+            LimitKind::DrawingIdentifiers,
             self.used.len().saturating_add(1),
             self.maximum,
         )?;

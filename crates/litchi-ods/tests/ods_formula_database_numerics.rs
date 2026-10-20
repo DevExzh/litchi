@@ -75,7 +75,8 @@ fn check(function: &str, values: &[f64], expected: Expected) {
         source.push_str(&format!("|{value:e};1"));
     }
     source.push_str("};1;{2|1})");
-    let expression = Expression::parse(&source).expect("numeric inline fixture");
+    let expression =
+        Expression::parse(&source, &Default::default()).expect("numeric inline fixture");
     let execution = execution();
     let context = Context::new(&execution, Position::new("Main", 0, 0)).with_mode(Mode::Matrix);
     let result = value::evaluate(&expression, &NoReads, &context, &value::Limits::default())

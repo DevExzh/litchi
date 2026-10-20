@@ -30,7 +30,7 @@ fn compact_query_edit_matches_the_exact_golden_xml() {
     assert!(!commit.patch().is_applicable_to(commit.package()));
     assert!(commit.package().apply(commit.patch()).is_err());
     let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
-    assert_eq!(restored.database().content_xml(), SOURCE);
+    assert_eq!(restored.into_package().database().content_xml(), SOURCE);
 }
 
 #[test]
@@ -70,6 +70,7 @@ fn real_libreoffice_pretty_query_package_edits_losslessly_and_reopens() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         bytes
     );

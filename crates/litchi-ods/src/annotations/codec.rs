@@ -749,16 +749,6 @@ pub(crate) fn find_site<'a>(sites: &'a [Site], cell: &Cell) -> Option<&'a Site> 
     sites.iter().find(|site| site.contains(cell))
 }
 
-pub(crate) fn fingerprint(source: &str) -> u64 {
-    // FNV-1a keeps source checks deterministic and allocation-free.
-    let mut hash = 0xcbf29ce484222325u64;
-    for byte in source.as_bytes() {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x100000001b3);
-    }
-    hash
-}
-
 fn invalid(message: &str) -> Error {
     Error::InvalidFormat(message.to_string())
 }

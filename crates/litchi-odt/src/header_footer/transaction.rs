@@ -2,29 +2,23 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-use litchi_core::{History as CoreHistory, Result};
+use litchi_core::Result;
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::{NsReader, Reader};
-use serde_json::{Value, json};
 
-use super::{Kind, Master, bad, read, set_text, set_xml};
+use super::{Master, bad, read};
 use crate::page_layout::{PageLayout, parse_page_layouts, set_page_layout_xml};
 use crate::section_properties::{SectionStyleProperties, parse_section_style_properties};
 use crate::style::columns::Columns;
 
-pub use litchi_core::HistoryLimits;
-
 const MAX_XML_BYTES: usize = 64 * 1024 * 1024;
 const MAX_CHANGES: usize = 65_536;
-const MAX_DURABLE_BYTES: usize = 192 * 1024 * 1024;
-const DURABLE_FORMAT: &str = "litchi.odt.layout.v1";
 
 /// One independently mergeable advanced-layout owner.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Target {
+pub(crate) enum Target {
     /// One named page-layout definition.
     PageLayout(String),
     /// One named section-layout style, including columns and background.
@@ -81,7 +75,7 @@ impl Snapshot {
     }
 
     /// Start a clone-staged failure-atomic layout edit.
-    pub fn edit(&self) -> Transaction {
+    pub(crate) fn edit(&self) -> Transaction {
         Transaction {
             before: self.clone(),
             draft: self.source.clone(),
@@ -142,11 +136,6 @@ impl Snapshot {
             xml,
             dependencies,
         })
-    }
-
-    /// Start bounded undo/redo history at this exact layout snapshot.
-    pub fn history(&self, limits: HistoryLimits) -> History {
-        History::new(self.clone(), limits)
     }
 }
 
@@ -261,70 +250,15 @@ impl Transfer {
 
 /// A staged advanced-layout candidate derived from one immutable snapshot.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub(crate) struct Transaction {
     before: Snapshot,
     draft: String,
     changes: BTreeMap<Target, Change>,
 }
 
 impl Transaction {
-    /// Borrow the exact XML currently staged.
-    pub fn source_xml(&self) -> &str {
-        &self.draft
-    }
-
-    /// Replace one master page with a complete typed value.
-    pub fn replace_master_page(&mut self, page: &Master) -> Result<()> {
-        let target = Target::MasterPage(page.name.clone());
-        let before = owner_xml(&self.draft, &target)?;
-        let fragment = page.to_xml_fragment()?;
-        let next =
-            litchi_odf_common::style::master::writer::replace(&self.draft, &page.name, &fragment)?;
-        self.publish(target, before, Some(fragment), next)
-    }
-
-    /// Insert one complete typed master page.
-    pub fn insert_master_page(&mut self, page: &Master) -> Result<()> {
-        let target = Target::MasterPage(page.name.clone());
-        let before = owner_xml(&self.draft, &target)?;
-        let fragment = page.to_xml_fragment()?;
-        let next = litchi_odf_common::style::master::writer::insert(&self.draft, &fragment)?;
-        self.publish(target, before, Some(fragment), next)
-    }
-
-    /// Remove one named master page.
-    pub fn remove_master_page(&mut self, name: &str) -> Result<()> {
-        let target = Target::MasterPage(name.to_string());
-        let before = owner_xml(&self.draft, &target)?;
-        let next = litchi_odf_common::style::master::writer::remove(&self.draft, name)?;
-        self.publish(target, before, None, next)
-    }
-
-    /// Set plain text in one standard header/footer region.
-    pub fn set_region_text(&mut self, master: &str, kind: Kind, text: &str) -> Result<()> {
-        self.change_master(master, |source| set_text(source, master, kind, Some(text)))
-    }
-
-    /// Replace one standard header/footer region with complete validated XML.
-    pub fn set_region_xml(&mut self, master: &str, kind: Kind, xml: &str) -> Result<()> {
-        self.change_master(master, |source| set_xml(source, master, kind, xml))
-    }
-
-    /// Remove one standard header/footer region.
-    pub fn clear_region(&mut self, master: &str, kind: Kind) -> Result<()> {
-        self.change_master(master, |source| set_text(source, master, kind, None))
-    }
-
-    /// Replace one existing page-layout definition with exact validated XML.
-    pub fn replace_page_layout(&mut self, name: &str, xml: &str) -> Result<()> {
-        let target = Target::PageLayout(name.to_string());
-        let before = owner_xml(&self.draft, &target)?;
-        let next = set_page_layout_xml(&self.draft, name, xml)?;
-        self.publish(target, before, Some(xml.to_string()), next)
-    }
-
     /// Insert one compact typed section-layout style.
-    pub fn insert_section_layout(&mut self, section: &SectionLayout) -> Result<()> {
+    pub(crate) fn insert_section_layout(&mut self, section: &SectionLayout) -> Result<()> {
         let target = Target::SectionStyle(section.name().to_string());
         let before = owner_xml(&self.draft, &target)?;
         if before.is_some() {
@@ -338,7 +272,7 @@ impl Transaction {
     }
 
     /// Replace one named section-layout style with a typed compact owner.
-    pub fn replace_section_layout(&mut self, section: &SectionLayout) -> Result<()> {
+    pub(crate) fn replace_section_layout(&mut self, section: &SectionLayout) -> Result<()> {
         let target = Target::SectionStyle(section.name().to_string());
         let before = owner_xml(&self.draft, &target)?;
         let current = before
@@ -349,7 +283,7 @@ impl Transaction {
     }
 
     /// Remove one named section-layout style.
-    pub fn remove_section_layout(&mut self, name: &str) -> Result<()> {
+    pub(crate) fn remove_section_layout(&mut self, name: &str) -> Result<()> {
         let target = Target::SectionStyle(name.to_string());
         let before = owner_xml(&self.draft, &target)?;
         let current = before
@@ -359,8 +293,9 @@ impl Transaction {
         self.publish(target, before, None, next)
     }
 
+    #[cfg(test)]
     /// Insert a transferred master and layout when it has no linked dependencies.
-    pub fn insert_transfer(&mut self, transfer: &Transfer) -> Result<()> {
+    pub(crate) fn insert_transfer(&mut self, transfer: &Transfer) -> Result<()> {
         self.insert_transfer_with(transfer, |_| false)
     }
 
@@ -368,7 +303,7 @@ impl Transaction {
     ///
     /// The resolver only authorizes already-staged destination dependencies;
     /// this owner never fetches or executes linked content.
-    pub fn insert_transfer_with(
+    pub(crate) fn insert_transfer_with(
         &mut self,
         transfer: &Transfer,
         mut dependency_is_available: impl FnMut(&Dependency) -> bool,
@@ -424,13 +359,14 @@ impl Transaction {
         Ok(())
     }
 
+    #[cfg(test)]
     /// Insert a transferred section layout when it has no linked dependencies.
-    pub fn insert_section_transfer(&mut self, transfer: &SectionTransfer) -> Result<()> {
+    pub(crate) fn insert_section_transfer(&mut self, transfer: &SectionTransfer) -> Result<()> {
         self.insert_section_transfer_with(transfer, |_| false)
     }
 
     /// Insert a transferred section layout after checking every inert link.
-    pub fn insert_section_transfer_with(
+    pub(crate) fn insert_section_transfer_with(
         &mut self,
         transfer: &SectionTransfer,
         mut dependency_is_available: impl FnMut(&Dependency) -> bool,
@@ -455,14 +391,8 @@ impl Transaction {
         self.publish(target, None, Some(transfer.xml.clone()), next)
     }
 
-    /// Restore the exact source candidate and discard staged changes.
-    pub fn rollback(&mut self) {
-        self.draft.clone_from(&self.before.source);
-        self.changes.clear();
-    }
-
     /// Parse, validate, and publish the candidate atomically.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         let snapshot = Snapshot::parse(self.draft)?;
         let patch = Patch {
             source: self.before.source,
@@ -470,19 +400,7 @@ impl Transaction {
             changes: self.changes.into_values().collect(),
         };
         validate_patch(&patch)?;
-        Ok(Commit { snapshot, patch })
-    }
-
-    fn change_master(
-        &mut self,
-        name: &str,
-        edit: impl FnOnce(&str) -> Result<String>,
-    ) -> Result<()> {
-        let target = Target::MasterPage(name.to_string());
-        let before = owner_xml(&self.draft, &target)?;
-        let next = edit(&self.draft)?;
-        let after = owner_xml(&next, &target)?;
-        self.publish(target, before, after, next)
+        Ok(Commit { snapshot })
     }
 
     fn publish(
@@ -520,100 +438,20 @@ impl Transaction {
 
 /// A validated advanced-layout publication.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
-    patch: Patch,
 }
 
 impl Commit {
+    #[cfg(test)]
     /// Borrow the committed immutable snapshot.
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
-    /// Borrow the exact-source reversible patch.
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
     /// Consume the commit and return its immutable snapshot.
-    pub fn into_snapshot(self) -> Snapshot {
+    pub(crate) fn into_snapshot(self) -> Snapshot {
         self.snapshot
-    }
-}
-
-/// Commit-coupled bounded undo/redo for exact advanced-layout snapshots.
-pub struct History {
-    inner: CoreHistory<Snapshot>,
-}
-
-impl History {
-    /// Start history at one immutable layout snapshot.
-    pub fn new(current: Snapshot, limits: HistoryLimits) -> Self {
-        Self {
-            inner: CoreHistory::new(current, limits),
-        }
-    }
-
-    /// Current exact immutable snapshot.
-    pub fn current(&self) -> &Snapshot {
-        self.inner.current()
-    }
-
-    /// Start an edit against the current history head.
-    pub fn edit(&self) -> Transaction {
-        self.current().edit()
-    }
-
-    /// Commit and retain an edit only when it targets the exact current head.
-    pub fn commit(&mut self, edit: Transaction) -> Result<Commit> {
-        if edit.before.source != self.current().source {
-            return Err(bad("layout history edit does not target the current head"));
-        }
-        let commit = edit.commit()?;
-        let weight = commit.patch.durable()?.to_deterministic_json()?.len();
-        self.record(commit.snapshot.clone(), weight)?;
-        Ok(commit)
-    }
-
-    /// Apply and retain a durable patch only at the exact current head.
-    pub fn apply(&mut self, patch: &DurablePatch) -> Result<Snapshot> {
-        let wire = patch.to_deterministic_json()?;
-        let commit = patch.apply(self.current())?;
-        let snapshot = commit.into_snapshot();
-        self.record(snapshot.clone(), wire.len())?;
-        Ok(snapshot)
-    }
-
-    /// Move to the retained exact inverse snapshot.
-    pub fn undo(&mut self) -> bool {
-        self.inner.undo()
-    }
-
-    /// Reapply one retained exact snapshot.
-    pub fn redo(&mut self) -> bool {
-        self.inner.redo()
-    }
-
-    /// Whether an inverse snapshot is retained.
-    pub fn can_undo(&self) -> bool {
-        self.inner.can_undo()
-    }
-
-    /// Whether a forward snapshot is retained.
-    pub fn can_redo(&self) -> bool {
-        self.inner.can_redo()
-    }
-
-    fn record(&mut self, snapshot: Snapshot, weight: usize) -> Result<()> {
-        let weight = u64::try_from(weight)
-            .map_err(|error| bad(format!("layout history weight is out of range: {error}")))?;
-        let discarded = self
-            .inner
-            .record(snapshot, weight)
-            .map_err(|error| bad(format!("layout history retention failed: {error}")))?;
-        drop(discarded);
-        Ok(())
     }
 }
 
@@ -626,200 +464,10 @@ struct Change {
 
 /// An exact-source reversible advanced-layout patch.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct Patch {
     source: String,
     target: String,
     changes: Vec<Change>,
-}
-
-impl Patch {
-    /// Whether the patch leaves its exact XML source unchanged.
-    pub fn is_empty(&self) -> bool {
-        self.source == self.target
-    }
-
-    /// Apply only to the exact source XML from which this patch was built.
-    pub fn apply(&self, source: &Snapshot) -> Result<Commit> {
-        if source.source != self.source {
-            return Err(bad("layout patch source snapshot does not match"));
-        }
-        let snapshot = Snapshot::parse(self.target.clone())?;
-        Ok(Commit {
-            snapshot,
-            patch: self.clone(),
-        })
-    }
-
-    /// Return the exact-source patch that restores the accepted XML.
-    pub fn inverse(&self) -> Self {
-        Self {
-            source: self.target.clone(),
-            target: self.source.clone(),
-            changes: self
-                .changes
-                .iter()
-                .rev()
-                .map(|change| Change {
-                    target: change.target.clone(),
-                    before: change.after.clone(),
-                    after: change.before.clone(),
-                })
-                .collect(),
-        }
-    }
-
-    /// Convert this semantic patch into bounded canonical JSON.
-    pub fn durable(&self) -> Result<DurablePatch> {
-        DurablePatch::new(self.clone())
-    }
-
-    /// Build a target-aware three-way merge plan for two patches from one source.
-    pub fn merge(left: &Self, right: &Self) -> Result<MergePlan> {
-        if left.source != right.source {
-            return Err(bad("layout merge branches do not share one source"));
-        }
-        let source = left.source.clone();
-        let left = changes_by_target(&left.changes)?;
-        let right = changes_by_target(&right.changes)?;
-        let mut selected = BTreeMap::new();
-        let mut conflicts = BTreeSet::new();
-        for target in left
-            .keys()
-            .chain(right.keys())
-            .cloned()
-            .collect::<BTreeSet<_>>()
-        {
-            match (left.get(&target), right.get(&target)) {
-                (Some(left), Some(right)) if left.after != right.after => {
-                    conflicts.insert(target);
-                },
-                (Some(left), _) => {
-                    selected.insert(target, left.clone());
-                },
-                (None, Some(right)) => {
-                    selected.insert(target, right.clone());
-                },
-                (None, None) => {},
-            }
-        }
-        Ok(MergePlan {
-            source,
-            left,
-            right,
-            selected,
-            conflicts,
-        })
-    }
-}
-
-/// Which branch supplies a conflicting layout owner.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Resolution {
-    /// Keep the left branch owner.
-    Left,
-    /// Keep the right branch owner.
-    Right,
-}
-
-/// A target-aware advanced-layout merge with explicit conflict resolution.
-#[derive(Clone, Debug)]
-pub struct MergePlan {
-    source: String,
-    left: BTreeMap<Target, Change>,
-    right: BTreeMap<Target, Change>,
-    selected: BTreeMap<Target, Change>,
-    conflicts: BTreeSet<Target>,
-}
-
-impl MergePlan {
-    /// Return unresolved owner conflicts in deterministic order.
-    pub fn conflicts(&self) -> impl ExactSizeIterator<Item = &Target> {
-        self.conflicts.iter()
-    }
-
-    /// Resolve one conflicting owner from a named branch.
-    pub fn resolve(&mut self, target: &Target, resolution: Resolution) -> Result<()> {
-        if !self.conflicts.remove(target) {
-            return Err(bad("layout target is not an unresolved conflict"));
-        }
-        let branch = match resolution {
-            Resolution::Left => &self.left,
-            Resolution::Right => &self.right,
-        };
-        let change = branch
-            .get(target)
-            .ok_or_else(|| bad("layout merge branch is missing its conflict owner"))?;
-        self.selected.insert(target.clone(), change.clone());
-        Ok(())
-    }
-
-    /// Replay all selected semantic changes after every conflict is resolved.
-    pub fn finish(self) -> Result<Patch> {
-        if !self.conflicts.is_empty() {
-            return Err(bad("layout merge still has unresolved conflicts"));
-        }
-        let mut target = self.source.clone();
-        let changes: Vec<_> = self.selected.into_values().collect();
-        for change in &changes {
-            target = apply_change(&target, change)?;
-        }
-        let patch = Patch {
-            source: self.source,
-            target,
-            changes,
-        };
-        validate_patch(&patch)?;
-        Ok(patch)
-    }
-}
-
-/// Bounded deterministic-JSON advanced-layout patch.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DurablePatch {
-    patch: Patch,
-}
-
-impl DurablePatch {
-    fn new(patch: Patch) -> Result<Self> {
-        validate_patch(&patch)?;
-        Ok(Self { patch })
-    }
-
-    /// Parse and validate a canonical durable layout patch.
-    pub fn from_deterministic_json(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() > MAX_DURABLE_BYTES {
-            return Err(bad("durable layout patch exceeds its byte limit"));
-        }
-        let value: Value = serde_json::from_slice(bytes)
-            .map_err(|error| bad(format!("invalid durable layout patch: {error}")))?;
-        let durable = Self::new(patch_from_value(&value)?)?;
-        if durable.to_deterministic_json()? != bytes {
-            return Err(bad("durable layout patch is not canonical JSON"));
-        }
-        Ok(durable)
-    }
-
-    /// Serialize this semantic patch as canonical deterministic JSON.
-    pub fn to_deterministic_json(&self) -> Result<Vec<u8>> {
-        // Sorted members whatever `serde_json` features are unified (0349).
-        let bytes = litchi_core::canonical_json::to_vec(&patch_value(&self.patch));
-        if bytes.len() > MAX_DURABLE_BYTES {
-            return Err(bad("durable layout patch exceeds its byte limit"));
-        }
-        Ok(bytes)
-    }
-
-    /// Apply after checking the complete source layout XML.
-    pub fn apply(&self, source: &Snapshot) -> Result<Commit> {
-        self.patch.apply(source)
-    }
-
-    /// Return the durable patch that restores the exact source XML.
-    pub fn inverse(&self) -> Self {
-        Self {
-            patch: self.patch.inverse(),
-        }
-    }
 }
 
 fn validate_patch(patch: &Patch) -> Result<()> {
@@ -1247,19 +895,6 @@ fn insert_office_style_child(source: &str, fragment: &str) -> Result<String> {
     }
 }
 
-fn changes_by_target(changes: &[Change]) -> Result<BTreeMap<Target, Change>> {
-    let mut result = BTreeMap::new();
-    for change in changes {
-        if result
-            .insert(change.target.clone(), change.clone())
-            .is_some()
-        {
-            return Err(bad("layout patch repeats one semantic target"));
-        }
-    }
-    Ok(result)
-}
-
 fn linked_dependencies(xml: &str) -> Result<Vec<Dependency>> {
     const XLINK: &[u8] = b"http://www.w3.org/1999/xlink";
 
@@ -1407,100 +1042,4 @@ fn first_start_tag_close(xml: &str) -> Result<usize> {
         }
     }
     Err(bad("layout transfer root start tag is unterminated"))
-}
-
-fn patch_value(patch: &Patch) -> Value {
-    json!({
-        "changes": patch.changes.iter().map(change_value).collect::<Vec<_>>(),
-        "format": DURABLE_FORMAT,
-        "source": BASE64.encode(patch.source.as_bytes()),
-        "target": BASE64.encode(patch.target.as_bytes()),
-    })
-}
-
-fn change_value(change: &Change) -> Value {
-    let (kind, name) = match &change.target {
-        Target::PageLayout(name) => ("page-layout", name),
-        Target::SectionStyle(name) => ("section-style", name),
-        Target::MasterPage(name) => ("master-page", name),
-    };
-    json!({
-        "after": change.after.as_deref(),
-        "before": change.before.as_deref(),
-        "kind": kind,
-        "name": name,
-    })
-}
-
-fn patch_from_value(value: &Value) -> Result<Patch> {
-    let object = value
-        .as_object()
-        .ok_or_else(|| bad("durable layout patch must be an object"))?;
-    if object.len() != 4 || object.get("format").and_then(Value::as_str) != Some(DURABLE_FORMAT) {
-        return Err(bad("unknown durable layout patch envelope"));
-    }
-    let changes = object
-        .get("changes")
-        .and_then(Value::as_array)
-        .ok_or_else(|| bad("durable layout patch changes are missing"))?;
-    if changes.len() > MAX_CHANGES {
-        return Err(bad("durable layout patch exceeds its change limit"));
-    }
-    Ok(Patch {
-        source: decode_xml(object.get("source"), "source")?,
-        target: decode_xml(object.get("target"), "target")?,
-        changes: changes
-            .iter()
-            .map(change_from_value)
-            .collect::<Result<_>>()?,
-    })
-}
-
-fn change_from_value(value: &Value) -> Result<Change> {
-    let object = value
-        .as_object()
-        .ok_or_else(|| bad("durable layout change must be an object"))?;
-    if object.len() != 4 {
-        return Err(bad("durable layout change has unknown fields"));
-    }
-    let name = object
-        .get("name")
-        .and_then(Value::as_str)
-        .ok_or_else(|| bad("durable layout change name is missing"))?;
-    if name.is_empty() || name.len() > super::MAX_VALUE {
-        return Err(bad("invalid durable layout owner name"));
-    }
-    let target = match object.get("kind").and_then(Value::as_str) {
-        Some("page-layout") => Target::PageLayout(name.to_string()),
-        Some("section-style") => Target::SectionStyle(name.to_string()),
-        Some("master-page") => Target::MasterPage(name.to_string()),
-        _ => return Err(bad("unknown durable layout owner kind")),
-    };
-    Ok(Change {
-        target,
-        before: optional_xml(object.get("before"), "before")?,
-        after: optional_xml(object.get("after"), "after")?,
-    })
-}
-
-fn decode_xml(value: Option<&Value>, name: &str) -> Result<String> {
-    let value = value
-        .and_then(Value::as_str)
-        .ok_or_else(|| bad(format!("durable layout patch {name} is missing")))?;
-    let bytes = BASE64
-        .decode(value)
-        .map_err(|error| bad(format!("invalid durable layout patch {name}: {error}")))?;
-    if bytes.len() > MAX_XML_BYTES {
-        return Err(bad("durable layout XML exceeds its byte limit"));
-    }
-    String::from_utf8(bytes)
-        .map_err(|error| bad(format!("durable layout patch {name} is not UTF-8: {error}")))
-}
-
-fn optional_xml(value: Option<&Value>, name: &str) -> Result<Option<String>> {
-    match value {
-        Some(Value::Null) => Ok(None),
-        Some(Value::String(value)) if value.len() <= MAX_XML_BYTES => Ok(Some(value.clone())),
-        _ => Err(bad(format!("invalid durable layout change {name}"))),
-    }
 }

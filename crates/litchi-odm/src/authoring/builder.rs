@@ -51,13 +51,13 @@ impl Builder {
     }
 
     fn build_bytes(self) -> Result<Vec<u8>> {
-        compact_xml::validate(self.content_xml.as_bytes())?;
+        compact_xml::validate(self.content_xml.as_bytes(), compact_xml::Limits::default())?;
         crate::codec::validate(&self.content_xml)?;
         let mut content_xml = self.content_xml;
         for item in &self.body_items {
             content_xml = crate::edit_ops::append_body_item(&content_xml, item)?;
         }
-        compact_xml::validate(content_xml.as_bytes())?;
+        compact_xml::validate(content_xml.as_bytes(), compact_xml::Limits::default())?;
         crate::codec::validate(&content_xml)?;
         let mut writer = PackageWriter::new();
         writer.set_mimetype(crate::package::MIMETYPE)?;

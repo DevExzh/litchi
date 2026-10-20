@@ -2,7 +2,7 @@
 //!
 //! [`Package::edit_caption_tracks`] starts an [`Edit`] over a staged copy of the
 //! package; its verbs run on the staged graph and [`Edit::update`] stages
-//! one checked [`Draft`] of one media object's caption tracks. [`Edit::commit`] returns a
+//! one checked [`Draft`] of the caption tracks of one media picture (by slide and shape ID). [`Edit::commit`] returns a
 //! [`Commit`] with the new package, the reversible [`Patch`] and the
 //! [`Diagnostics`]; [`Package::apply_caption_tracks`] replays a patch onto an equal
 //! package. The source package never changes, an exact no-op keeps every
@@ -21,6 +21,7 @@ use super::Draft;
 )]
 use super::*;
 use crate::part_edit::{Staged, family};
+use crate::slide::Selector;
 use crate::{Package, Result};
 
 family!("media caption-track");
@@ -61,7 +62,7 @@ impl Package {
 }
 
 impl Edit<'_> {
-    /// Stage one checked [`Draft`] of one media object's caption tracks: `operation` edits the
+    /// Stage one checked [`Draft`] of the caption tracks of one media picture (by slide and shape ID): `operation` edits the
     /// draft and the validated result replaces the staged source. Any error
     /// leaves the staged graph unchanged.
     ///
@@ -69,13 +70,15 @@ impl Edit<'_> {
     ///
     /// Returns the operation's error, a validation or serialization error of
     /// the draft, or a changed edit of a signed package.
-    pub fn update<T>(
+    pub fn update<'s, T>(
         &mut self,
-        key: &MediaKey,
+        slide: impl Into<Selector<'s>>,
+        shape_id: u32,
         operation: impl FnOnce(&mut Draft) -> Result<T>,
     ) -> Result<T> {
+        let key = media_key(self.staged.opc(), slide.into(), shape_id)?;
         self.staged.update(move |opc| {
-            let mut draft = load_media(opc, key)?
+            let mut draft = load_media(opc, &key)?
                 .ok_or_else(|| {
                     Error::refused(
                         litchi_core::edit::RefusalKind::NotFound,
@@ -90,13 +93,19 @@ impl Edit<'_> {
         })
     }
 
-    /// Discover one media picture's typed TracksInfo/narration metadata.
+    /// Discover the typed TracksInfo/narration metadata of the media picture
+    /// with the shape ID `shape_id` (its `p:cNvPr/@id`) on the selected slide.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn media(&self, key: &MediaKey) -> Result<Option<Snapshot>> {
-        load_media(self.staged.opc(), key)
+    pub fn media<'s>(
+        &self,
+        slide: impl Into<Selector<'s>>,
+        shape_id: u32,
+    ) -> Result<Option<Snapshot>> {
+        let key = media_key(self.staged.opc(), slide.into(), shape_id)?;
+        load_media(self.staged.opc(), &key)
     }
 
     /// The staged caption tracks of the package.
@@ -130,4 +139,14 @@ impl Edit<'_> {
     pub fn commit(self) -> Result<Commit> {
         Ok(commit_of(self.staged.commit()?))
     }
+}
+
+/// The media key of the picture `shape_id` on the selected slide.
+fn media_key(opc: &litchi_opc::OpcPackage, slide: Selector<'_>, shape_id: u32) -> Result<MediaKey> {
+    Ok(MediaKey {
+        slide_part_name: crate::package::resolve_slide(opc, slide)?
+            .as_str()
+            .to_owned(),
+        shape_id,
+    })
 }

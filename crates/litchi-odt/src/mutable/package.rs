@@ -19,20 +19,7 @@ impl MutableDocument {
     /// # Arguments
     ///
     /// * `doc` - The document to make mutable
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use litchi_odt::Document;
-    /// use litchi_odt::mutable::MutableDocument;
-    ///
-    /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = litchi_odt::Package::open("document.odt")?.document()?;
-    /// let mut mutable_doc = MutableDocument::from_document(doc)?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn from_document(doc: Document) -> Result<Self> {
+    pub(crate) fn from_document(doc: Document) -> Result<Self> {
         let content_xml = String::from_utf8(doc.get_file("content.xml")?).map_err(|error| {
             litchi_core::Error::InvalidFormat(format!("content.xml is not UTF-8: {error}"))
         })?;
@@ -80,7 +67,7 @@ impl MutableDocument {
     ///
     /// Used by the web-template authoring model to emit the legacy
     /// `application/vnd.oasis.opendocument.text-web` MIME type.
-    pub fn set_mimetype(&mut self, mimetype: impl Into<String>) {
+    pub(crate) fn set_mimetype(&mut self, mimetype: impl Into<String>) {
         self.mimetype = mimetype.into();
     }
 }
@@ -92,28 +79,7 @@ impl MutableDocument {
     /// verbatim under `Pictures/` in the package, and referenced from a
     /// `draw:frame`/`draw:image` element with the given geometry and anchor.
     /// Returns the allocated package path of the picture part.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use litchi_odt::frame::{Anchor, Length};
-    /// use litchi_odt::mutable::MutableDocument;
-    ///
-    /// # fn main() -> litchi_core::Result<()> {
-    /// let mut doc = MutableDocument::new();
-    /// let png = b"\x89PNG\r\n\x1a\n".as_slice();
-    /// let path = doc.insert_image(
-    ///     0,
-    ///     png,
-    ///     &Length::centimeters(10.0),
-    ///     &Length::centimeters(4.0),
-    ///     Anchor::AsChar,
-    /// )?;
-    /// assert!(path.starts_with("Pictures/"));
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn insert_image(
+    pub(crate) fn insert_image(
         &mut self,
         index: usize,
         image: &[u8],
@@ -170,7 +136,7 @@ impl MutableDocument {
     ///
     /// The box is a `draw:frame` wrapping `draw:text-box`; newlines in `text`
     /// become separate paragraphs in the box story. Returns the frame name.
-    pub fn insert_text_box(
+    pub(crate) fn insert_text_box(
         &mut self,
         index: usize,
         text: &str,
@@ -374,26 +340,13 @@ impl MutableDocument {
     ///
     /// * `path` - Path where the ODT file should be saved
     ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use litchi_odt::mutable::MutableDocument;
-    ///
-    /// # fn main() -> Result<(), litchi_odt::Error> {
-    /// let mut doc = MutableDocument::new();
-    /// doc.add_paragraph("Hello!")?;
-    /// doc.save("output.odt")?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
     /// The bytes are staged in a sibling temporary file and published with
     /// one rename, so a failed save leaves an existing destination unchanged.
     ///
     /// # Errors
     ///
     /// Returns serialization or publication failures.
-    pub fn save<P: AsRef<Path>>(
+    pub(crate) fn save<P: AsRef<Path>>(
         &self,
         path: P,
     ) -> std::result::Result<(), litchi_odf_common::Error> {
@@ -406,7 +359,9 @@ impl MutableDocument {
     /// # Errors
     ///
     /// Returns serialization or archive-validation failures.
-    pub fn to_package(&self) -> std::result::Result<crate::Package, litchi_odf_common::Error> {
+    pub(crate) fn to_package(
+        &self,
+    ) -> std::result::Result<crate::Package, litchi_odf_common::Error> {
         Ok(crate::Package::from_authored(self.to_bytes()?)?)
     }
 
@@ -441,20 +396,7 @@ impl MutableDocument {
     }
 
     /// Convert the document to bytes.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use litchi_odt::mutable::MutableDocument;
-    ///
-    /// # fn main() -> litchi_core::Result<()> {
-    /// let mut doc = MutableDocument::new();
-    /// doc.add_paragraph("Hello!")?;
-    /// let bytes = doc.to_bytes()?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+    pub(crate) fn to_bytes(&self) -> Result<Vec<u8>> {
         let mut writer = PackageWriter::new();
 
         // Set MIME type

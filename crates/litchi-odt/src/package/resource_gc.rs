@@ -101,6 +101,27 @@ pub enum EmbeddedResourceGcRefusal {
     },
 }
 
+impl EmbeddedResourceGcRefusal {
+    /// The refusal class litchi-ops reports for this reason (record 0351
+    /// §2.4).
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsafePath
+            | Self::MissingArchiveEntry
+            | Self::MissingManifestEntry
+            | Self::InvalidSubdocument
+            | Self::OverlappingCandidate
+            | Self::PackageNamespaceCollision
+            | Self::UnknownReference { .. } => RefusalKind::UnsupportedContent,
+            Self::SignedPackage | Self::EncryptedPackage | Self::ProtectedDocument => {
+                RefusalKind::Protected
+            },
+        }
+    }
+}
+
 /// The deterministic decision for one candidate.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]

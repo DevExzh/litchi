@@ -110,7 +110,11 @@ fn plans_first_middle_last_orphans_and_retains_a_shared_owner() {
         assert!(identical.contains(path), "{path}");
     }
     assert_eq!(
-        source.apply(commit.patch()).unwrap().as_bytes(),
+        source
+            .apply(commit.patch())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         commit.package().as_bytes()
     );
     assert_eq!(
@@ -118,6 +122,7 @@ fn plans_first_middle_last_orphans_and_retains_a_shared_owner() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         bytes
     );

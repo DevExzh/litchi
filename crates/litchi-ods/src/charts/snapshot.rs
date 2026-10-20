@@ -66,7 +66,7 @@ impl Snapshot {
 
     /// Start a source-checked, failure-atomic edit.
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit {
             before: self.clone(),
             draft: self.charts.clone(),
@@ -114,8 +114,8 @@ impl Edit {
         Ok(())
     }
 
-    /// Restore the exact source candidate.
-    pub fn rollback(&mut self) {
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
         self.draft = self.before.charts.clone();
     }
 
@@ -123,7 +123,7 @@ impl Edit {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         let changed = self.before.charts != self.draft;
         let snapshot = if changed {
             let package_source = Archive::from_bytes(self.before.source.clone())?;
@@ -138,87 +138,21 @@ impl Edit {
         } else {
             self.before.clone()
         };
-        Ok(Commit {
-            changed,
-            patch: Patch {
-                source: self.before.source,
-                target: snapshot.source.clone(),
-                limits: snapshot.limits,
-            },
-            snapshot,
-        })
-    }
-}
-
-/// Reversible patch guarded by exact complete-package source bytes.
-#[derive(Clone, Debug)]
-pub struct Patch {
-    source: Vec<u8>,
-    target: Vec<u8>,
-    limits: Limits,
-}
-
-impl Patch {
-    /// Whether this patch is physically empty.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.source == self.target
-    }
-
-    /// Return the patch restoring the exact accepted source package.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            source: self.target.clone(),
-            target: self.source.clone(),
-            limits: self.limits,
-        }
-    }
-
-    /// Apply this patch only to its exact source snapshot.
-    ///
-    /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
-        if snapshot.source != self.source {
-            return Err(Error::InvalidFormat(
-                "ODS chart patch source snapshot does not match".to_string(),
-            ));
-        }
-        let target = Snapshot::from_bytes_with(self.target.clone(), self.limits)?;
-        Ok(Commit {
-            changed: !self.is_empty(),
-            patch: self.clone(),
-            snapshot: target,
-        })
+        Ok(Commit { snapshot })
     }
 }
 
 /// A fully rehydrated chart publication.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
 }
 
 impl Commit {
-    /// Whether package bytes changed.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
     /// Resulting immutable snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-
-    /// Reversible exact-source patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
     }
 }
 

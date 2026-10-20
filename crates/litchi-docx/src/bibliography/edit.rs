@@ -10,7 +10,9 @@
 use super::BibliographySourceBuilder;
 use crate::package::family::{graph_edit, graph_family};
 
-graph_family!("bibliography-source");
+graph_family!("bibliography-source", own_limits);
+
+pub use super::limit::LimitKind;
 graph_edit!("bibliography-source", edit_bibliography, apply_bibliography);
 
 impl Edit {

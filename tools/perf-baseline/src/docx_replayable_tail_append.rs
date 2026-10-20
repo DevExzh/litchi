@@ -14,6 +14,7 @@
 
 #![allow(clippy::module_name_repetitions)]
 
+use crate::docx_family_publication::StreamPlanPublish as _;
 use std::{
     collections::BTreeMap,
     ffi::OsString,
@@ -2193,12 +2194,12 @@ struct TimedArtifactProof {
 
 impl TimedArtifactProof {
     fn from_publication(
-        publication: &litchi_docx::source_backed::tail_append_stream::ParagraphStreamPublication,
-    ) -> Self {
-        Self {
-            length: publication.candidate_artifact_length(),
-            sha256: publication.candidate_artifact_fingerprint().into_sha256(),
-        }
+        publication: &crate::docx_family_publication::StreamPublication,
+    ) -> Result<Self, litchi_docx::source_backed::tail_append_stream::Error> {
+        Ok(Self {
+            length: publication.candidate_artifact_length()?,
+            sha256: publication.candidate_artifact_fingerprint()?.into_sha256(),
+        })
     }
 }
 
@@ -3067,14 +3068,14 @@ fn publish_alternative_plan(
         PublicationMode::CountingSink => {
             let mut output = CountingSink::new(sink_write_bytes)?;
             let publication = plan.write_to(&mut output)?;
-            let proof = TimedArtifactProof::from_publication(&publication);
+            let proof = TimedArtifactProof::from_publication(&publication)?;
             drop(publication);
             Ok((output.finish(), proof))
         },
         PublicationMode::AtomicPath => {
             let path = atomic_path.ok_or("atomic publication has no prepared destination")?;
-            let publication = plan.commit().write_to_path(path)?;
-            let proof = TimedArtifactProof::from_publication(&publication);
+            let publication = plan.write_to_path(path)?;
+            let proof = TimedArtifactProof::from_publication(&publication)?;
             drop(publication);
             Ok((SinkObservation::atomic(proof.length), proof))
         },

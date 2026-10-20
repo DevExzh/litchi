@@ -311,13 +311,16 @@ impl SourceBackedSpreadsheetCatalog {
         let package = match password {
             Some(password) => {
                 let mut password = Zeroizing::new(password);
-                SourceBackedPackage::from_read_at_with_limits_and_password(
+                SourceBackedPackage::from_read_at_with_password_and_options(
                     Arc::clone(&metered),
-                    limits,
                     std::mem::take(&mut *password),
+                    OpenOptions::new().source_limits(limits),
                 )?
             },
-            None => SourceBackedPackage::from_read_at_with_limits(Arc::clone(&metered), limits)?,
+            None => SourceBackedPackage::from_read_at_with_options(
+                Arc::clone(&metered),
+                OpenOptions::new().source_limits(limits),
+            )?,
         };
         if !semantic.is_default() {
             if let Some(size) = package.member_materialized_size("content.xml")? {

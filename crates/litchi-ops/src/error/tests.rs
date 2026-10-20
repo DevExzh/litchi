@@ -448,7 +448,7 @@ fn row_resource_limits_are_limit_exceeded() {
         );
         check(
             litchi_docx::Error::RevisionLimit {
-                resource: "revisions",
+                kind: litchi_docx::revision::LimitKind::Records,
                 actual: 11,
                 maximum: 10,
             }
@@ -1147,6 +1147,8 @@ fn ppt_text_edit_errors_are_classified() {
         TextError::Package(litchi_ppt::Error::PasswordRequired),
         Code::DocumentProtected,
     );
+    assert_code(TextError::PatchConflict, Code::InvalidInput);
+    assert_code(TextError::Signed, Code::DocumentProtected);
     let error = assert_code(
         TextError::Source(OverlayError::Allocation {
             resource: "test",
@@ -1632,6 +1634,35 @@ fn edit_refusals_classify_by_kind_alone() {
     }
 }
 
+// Record 0358 (W6): ODF refusals classify by kind alone, a patch made for
+// another base is the caller's input, and a changed write of a signed
+// package is protected.
+#[cfg(any(
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
+    feature = "odf-objects"
+))]
+#[test]
+fn odf_refusals_classify_by_kind_and_patch_conflicts_are_invalid_input() {
+    use litchi_core::edit::RefusalKind;
+    use litchi_odf_common::Error as OdfError;
+
+    use super::Classify as _;
+
+    for kind in RefusalKind::ALL.iter().copied() {
+        let error = OdfError::refused(kind, "operation", "reason");
+        assert_eq!(error.classify().code, kind.classify().code, "{kind}");
+    }
+    assert_eq!(
+        OdfError::patch_conflict("operation", "reason")
+            .classify()
+            .code,
+        Code::InvalidInput
+    );
+    assert_eq!(OdfError::Signed.classify().code, Code::DocumentProtected);
+}
+
 // Record 0351 (W1): DOCX refusals classify by kind alone, a patch made for
 // another base is the caller's input, and a broken invariant is internal.
 #[cfg(feature = "docx")]
@@ -1680,15 +1711,34 @@ fn docx_refusals_classify_by_kind_and_patch_conflicts_are_invalid_input() {
         litchi_docx::metadata::Error::PatchConflict,
         Code::InvalidInput,
     );
-    // Record 0355 §3: the document refusal reasons keep their established
-    // codes; only an invalid property value is a value error.
-    assert_code(
-        litchi_docx::document::Error::Refused {
-            position: 0,
-            reason: litchi_docx::document::Refusal::RunNotFound,
-        },
-        Code::UnsupportedCapability,
-    );
+    // Record 0355a: document refusal reasons classify by their kind.
+    for (reason, code) in [
+        (litchi_docx::document::Refusal::RunNotFound, Code::NotFound),
+        (
+            litchi_docx::document::Refusal::SectionBreak,
+            Code::UnsupportedType,
+        ),
+        (
+            litchi_docx::document::Refusal::ComplexRun,
+            Code::UnsupportedCapability,
+        ),
+        (
+            litchi_docx::document::Refusal::UnmodelledProperty,
+            Code::UnsupportedProperty,
+        ),
+        (
+            litchi_docx::document::Refusal::StructuralText,
+            Code::UnsupportedCapability,
+        ),
+    ] {
+        assert_code(
+            litchi_docx::document::Error::Refused {
+                position: 0,
+                reason,
+            },
+            code,
+        );
+    }
     assert_code(
         litchi_docx::document::Error::Refused {
             position: 0,

@@ -102,10 +102,12 @@ impl Builder {
             ))
             .into());
         }
-        compact_xml::validate(self.content_xml.as_bytes()).map_err(Error::from)?;
+        compact_xml::validate(self.content_xml.as_bytes(), compact_xml::Limits::default())
+            .map_err(Error::from)?;
         crate::codec::validate(&self.content_xml)?;
         for xml in [&self.styles_xml, &self.meta_xml].into_iter().flatten() {
-            compact_xml::validate(xml.as_bytes()).map_err(Error::from)?;
+            compact_xml::validate(xml.as_bytes(), compact_xml::Limits::default())
+                .map_err(Error::from)?;
         }
         let mut writer = PackageWriter::new_bounded(256 * 1024 * 1024);
         writer.set_mimetype(crate::package::MIMETYPE)?;

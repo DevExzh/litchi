@@ -200,7 +200,11 @@ fn delayed_managed_tail_append_publishes_after_clean_index_warm() {
     assert_eq!(before_publish.pinned_entries, 0);
 
     let mut output = Vec::new();
-    plan.write_to(&mut output).unwrap();
+    plan.commit()
+        .unwrap()
+        .package()
+        .write_to(&mut output)
+        .unwrap();
     assert!(!output.is_empty());
 
     let reopened = Package::from_read_at(Arc::new(OwnedSource::new(output))).unwrap();

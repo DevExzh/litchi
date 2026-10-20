@@ -10,7 +10,11 @@
 use super::{Disposition, Draft, Snapshot};
 use crate::package::family::{Staged, graph_family};
 
-graph_family!("tracked-revision");
+graph_family!("tracked-revision", own_limits);
+
+/// The budgets of the tracked-revision family, reported by
+/// [`crate::Error::RevisionLimit`].
+pub use crate::revision::LimitKind;
 
 /// A staged tracked-revision disposition over one package snapshot. The
 /// source is never changed: [`Self::commit`] publishes a new package, and

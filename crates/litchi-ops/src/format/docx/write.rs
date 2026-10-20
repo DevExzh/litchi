@@ -189,6 +189,12 @@ impl Docx {
         if !matches!(self.owner(), super::DocxOwner::Eager(_)) {
             return None;
         }
+        self.direct_body_paragraph(target, props)
+    }
+
+    /// [`Self::direct_paragraph`] on either owner (the batch text runs of
+    /// record 0355a read the body index both owners cache).
+    fn direct_body_paragraph(&self, target: &TargetArg<'_>, props: &Props<'_>) -> Option<Position> {
         let mut keys = props.iter();
         let (Some((key, _)), None) = (keys.next(), keys.next()) else {
             return None;

@@ -60,7 +60,11 @@ fn mutable_metadata_is_deterministic_and_preserves_source_timestamps() {
     let fresh_meta = String::from_utf8(fresh_package.get_file("meta.xml").unwrap()).unwrap();
     assert!(fresh_meta.contains("<meta:creation-date>2026-08-10T01:02:03Z</meta:creation-date>"));
     assert!(fresh_meta.contains("<dc:date>2026-08-10T04:05:06Z</dc:date>"));
-    litchi_odf_common::compact_xml::validate(fresh_meta.as_bytes()).unwrap();
+    litchi_odf_common::compact_xml::validate(
+        fresh_meta.as_bytes(),
+        litchi_odf_common::compact_xml::Limits::default(),
+    )
+    .unwrap();
 
     const SOURCE_META: &str = r#"<?xml version="1.0"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"><office:meta><meta:generator>Producer/1</meta:generator><dc:date>2024-01-02T03:04:05Z</dc:date></office:meta></office:document-meta>"#;
     let mut writer = PackageWriter::new();
@@ -85,7 +89,11 @@ fn mutable_default_metadata_has_no_ambient_timestamp() {
     let meta = String::from_utf8(package.get_file("meta.xml").unwrap()).unwrap();
     assert!(!meta.contains("<meta:creation-date>"));
     assert!(!meta.contains("<dc:date>"));
-    litchi_odf_common::compact_xml::validate(meta.as_bytes()).unwrap();
+    litchi_odf_common::compact_xml::validate(
+        meta.as_bytes(),
+        litchi_odf_common::compact_xml::Limits::default(),
+    )
+    .unwrap();
 }
 
 fn rich_note_body() -> crate::NoteBodyContent {

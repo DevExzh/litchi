@@ -1,0 +1,147 @@
+{
+  "probe": "crates/litchi-ppt/examples/scoped_patch_probe.rs",
+  "fixture": "test-data/unified-ops/0294/video.ppt",
+  "patches_per_run": 1000,
+  "first_commits_per_run": 200,
+  "builds": {
+    "base": "e673d4addb (pre-0357a, whole-artifact patch)",
+    "a": "7d22d1a18b (0357a tip, one SHA-256 of the target per commit)",
+    "b": "record 0357b (incremental block roots)"
+  },
+  "runs_per_build": 40,
+  "base": {
+    "max_rss_kb_median": 111092.0,
+    "max_rss_kb_range": [
+      110988,
+      111104
+    ],
+    "retained_patch_bytes": 98304000,
+    "retained_per_patch": 98304,
+    "source_len": 43520,
+    "target_len": 54784,
+    "commit_median_us": 194.558,
+    "commit_median_us_range": [
+      192.462,
+      198.496
+    ],
+    "commit_total_ms_median": 198.8,
+    "commit_total_ms_range": [
+      195.638,
+      202.754
+    ],
+    "apply_median_us": 23.27,
+    "apply_median_us_range": [
+      22.886,
+      24.23
+    ],
+    "inverse_apply_median_us": 20.835,
+    "inverse_apply_median_us_range": [
+      18.45,
+      24.77
+    ],
+    "first_commit_median_us": 192.803,
+    "first_commit_median_us_range": [
+      185.271,
+      205.036
+    ]
+  },
+  "a": {
+    "max_rss_kb_median": 19710.0,
+    "max_rss_kb_range": [
+      19672,
+      19912
+    ],
+    "retained_patch_bytes": 15360000,
+    "retained_per_patch": 15360,
+    "source_len": 43520,
+    "target_len": 54784,
+    "commit_median_us": 215.846,
+    "commit_median_us_range": [
+      213.816,
+      218.441
+    ],
+    "commit_total_ms_median": 223.087,
+    "commit_total_ms_range": [
+      220.471,
+      225.492
+    ],
+    "apply_median_us": 20.617,
+    "apply_median_us_range": [
+      19.64,
+      35.331
+    ],
+    "inverse_apply_median_us": 20.53,
+    "inverse_apply_median_us_range": [
+      17.795,
+      28.14
+    ],
+    "first_commit_median_us": 233.678,
+    "first_commit_median_us_range": [
+      229.897,
+      243.557
+    ]
+  },
+  "b": {
+    "max_rss_kb_median": 19712.0,
+    "max_rss_kb_range": [
+      19644,
+      20224
+    ],
+    "retained_patch_bytes": 15360000,
+    "retained_per_patch": 15360,
+    "source_len": 43520,
+    "target_len": 54784,
+    "commit_median_us": 188.814,
+    "commit_median_us_range": [
+      187.596,
+      191.746
+    ],
+    "commit_total_ms_median": 193.334,
+    "commit_total_ms_range": [
+      192.075,
+      196.506
+    ],
+    "apply_median_us": 17.54,
+    "apply_median_us_range": [
+      17.17,
+      24.83
+    ],
+    "inverse_apply_median_us": 21.547,
+    "inverse_apply_median_us_range": [
+      17.42,
+      30.2
+    ],
+    "first_commit_median_us": 213.054,
+    "first_commit_median_us_range": [
+      206.746,
+      224.071
+    ]
+  },
+  "b_over_base": {
+    "max_rss_kb_median": 0.177,
+    "retained_patch_bytes": 0.156,
+    "commit_median_us": 0.97,
+    "commit_total_ms_median": 0.973,
+    "apply_median_us": 0.754,
+    "inverse_apply_median_us": 1.034,
+    "first_commit_median_us": 1.105
+  },
+  "b_over_a": {
+    "max_rss_kb_median": 1.0,
+    "retained_patch_bytes": 1.0,
+    "commit_median_us": 0.875,
+    "commit_total_ms_median": 0.867,
+    "apply_median_us": 0.851,
+    "inverse_apply_median_us": 1.05,
+    "first_commit_median_us": 0.912
+  },
+  "a_over_base": {
+    "max_rss_kb_median": 0.177,
+    "retained_patch_bytes": 0.156,
+    "commit_median_us": 1.109,
+    "commit_total_ms_median": 1.122,
+    "apply_median_us": 0.886,
+    "inverse_apply_median_us": 0.985,
+    "first_commit_median_us": 1.212
+  }
+}

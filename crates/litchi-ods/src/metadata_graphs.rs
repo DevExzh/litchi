@@ -60,7 +60,7 @@ impl Snapshot {
 
     /// Start a clone-staged, failure-atomic package edit.
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit {
             before: self.clone(),
             candidate: self.clone(),
@@ -210,14 +210,14 @@ impl Edit {
         Ok(())
     }
 
-    /// Restore the exact source candidate.
-    pub fn rollback(&mut self) {
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
         self.candidate = self.before.clone();
     }
 
     /// Publish the fully reparsed package candidate and reversible patch.
     #[must_use]
-    pub fn commit(self) -> Commit {
+    pub(crate) fn commit(self) -> Commit {
         let patch = Patch {
             source: self.before.source,
             target: self.candidate.source.clone(),
@@ -241,13 +241,17 @@ impl Edit {
     fn require_compact_graph(&self, path: &str) -> Result<()> {
         let package = self.package()?;
         let bytes = package.package().get_file(path)?;
-        litchi_odf_common::compact_xml::validate(&bytes).map_err(Error::from)
+        litchi_odf_common::compact_xml::validate(
+            &bytes,
+            litchi_odf_common::compact_xml::Limits::default(),
+        )
+        .map_err(Error::from)
     }
 }
 
 /// An exact-source, reversible RDF graph patch.
 #[derive(Clone)]
-pub struct Patch {
+pub(crate) struct Patch {
     source: Arc<[u8]>,
     target: Arc<[u8]>,
 }
@@ -265,13 +269,13 @@ impl fmt::Debug for Patch {
 impl Patch {
     /// Return whether this patch changes package bytes.
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         self.source != self.target
     }
 
     /// Check exact applicability without mutating a snapshot.
     #[must_use]
-    pub fn is_applicable_to(&self, snapshot: &Snapshot) -> bool {
+    pub(crate) fn is_applicable_to(&self, snapshot: &Snapshot) -> bool {
         self.source.as_ref() == snapshot.as_bytes()
     }
 
@@ -280,7 +284,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error for a stale source or invalid target package.
-    pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
+    pub(crate) fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
         if !self.is_applicable_to(snapshot) {
             return Err(Error::InvalidFormat(
                 "ODS RDF patch source snapshot does not match".to_string(),
@@ -292,20 +296,11 @@ impl Patch {
             patch: self.clone(),
         })
     }
-
-    /// Return the exact-source patch that restores the accepted source.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            source: self.target.clone(),
-            target: self.source.clone(),
-        }
-    }
 }
 
 /// A validated RDF graph publication.
 #[derive(Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
 }
@@ -313,25 +308,25 @@ pub struct Commit {
 impl Commit {
     /// Return whether package bytes changed.
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         self.patch.changed()
     }
 
     /// Borrow the resulting immutable snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consume this publication into its immutable snapshot.
     #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
+    pub(crate) fn into_snapshot(self) -> Snapshot {
         self.snapshot
     }
 }
@@ -350,10 +345,18 @@ fn check_position(position: Position, length: usize) -> Result<()> {
 fn validate_authored_xml(bytes: &[u8], graph_path: Option<&str>) -> Result<()> {
     let package = Archive::from_bytes(bytes.to_vec())?;
     let manifest = package.package().get_file("META-INF/manifest.xml")?;
-    litchi_odf_common::compact_xml::validate(&manifest).map_err(Error::from)?;
+    litchi_odf_common::compact_xml::validate(
+        &manifest,
+        litchi_odf_common::compact_xml::Limits::default(),
+    )
+    .map_err(Error::from)?;
     if let Some(path) = graph_path {
         let graph = package.package().get_file(path)?;
-        litchi_odf_common::compact_xml::validate(&graph).map_err(Error::from)?;
+        litchi_odf_common::compact_xml::validate(
+            &graph,
+            litchi_odf_common::compact_xml::Limits::default(),
+        )
+        .map_err(Error::from)?;
     }
     Ok(())
 }

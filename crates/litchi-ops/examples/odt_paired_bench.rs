@@ -243,7 +243,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if count > paragraphs {
                 continue;
             }
-            let mut bold = litchi_odt::body::TextPropertyEdit::new();
+            let mut bold = litchi_odt::body::TextPropertyUpdate::new();
             bold.bold = Some(true);
             let result = paired(
                 || {
@@ -270,7 +270,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Verify the unified batch equals the leaf batch outside the clock.
         let leaf_bytes = {
             let mut edit = package.edit();
-            let mut bold = litchi_odt::body::TextPropertyEdit::new();
+            let mut bold = litchi_odt::body::TextPropertyUpdate::new();
             bold.bold = Some(true);
             for id in &ids {
                 edit.set_text_properties(*id, &bold)?;

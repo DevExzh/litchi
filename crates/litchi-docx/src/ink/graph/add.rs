@@ -6,6 +6,7 @@
 //! overrides.  The delta retains exact source tokens so a later inverse can
 //! restore lexical relationship and content-type XML after save/reopen.
 
+use crate::ink::LimitKind;
 use std::sync::Arc;
 
 use litchi_drawingml::ink as shared;
@@ -178,7 +179,7 @@ impl AddDelta {
                 .is_none_or(|count| count > limits.max_relationships)
         {
             return Err(Error::InkLimit {
-                resource: "Ink owner relationships",
+                kind: LimitKind::OwnerRelationships,
                 actual: owner_relationships.len().saturating_add(inputs.len()),
                 maximum: limits.max_relationships,
             });
@@ -579,7 +580,7 @@ fn fresh_part_name(
         }
     }
     Err(Error::InkLimit {
-        resource: "fresh Ink target names",
+        kind: LimitKind::FreshInkTargetNames,
         actual: limits.stories.max_package_parts,
         maximum: limits.stories.max_package_parts,
     })
@@ -599,7 +600,7 @@ fn fresh_relationship_id(
         }
     }
     Err(Error::InkLimit {
-        resource: "fresh Ink relationship IDs",
+        kind: LimitKind::FreshInkRelationshipIDs,
         actual: limits.max_relationships,
         maximum: limits.max_relationships,
     })

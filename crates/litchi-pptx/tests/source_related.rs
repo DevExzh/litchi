@@ -23,7 +23,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part, SourceLimitKind, TargetMode,
 };
-use litchi_pptx::chart::{self, Chart as EagerChart, Series, Type};
+use litchi_pptx::chart::{Chart as EagerChart, Series, Type};
 use litchi_pptx::presentation::related::raw;
 use litchi_pptx::shape::owned::Scene as OwnedScene;
 use litchi_pptx::{Package, SlideLayoutKind, SourceBackedPresentation, SourceLimits};
@@ -69,9 +69,6 @@ fn rich_deck() -> Vec<u8> {
     }
 
     let package = builder.build().unwrap();
-    let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
-
     let chart = EagerChart::new(Type::Bar, 914_400, 914_400, 4_572_000, 2_743_200)
         .with_title("Quarterly sales")
         .with_legend(true)
@@ -80,7 +77,12 @@ fn rich_deck() -> Vec<u8> {
                 .with_categories(vec!["Q1".into(), "Q2".into()])
                 .with_values(vec![100.0, 150.0]),
         );
-    chart::add(&mut opc, SLIDE_ONE, &chart).unwrap();
+    // SLIDE_ONE is the first slide.
+    let mut edit = package.edit_charts().unwrap();
+    edit.add(0_usize, &chart).unwrap();
+    let package = edit.commit().unwrap().into_package();
+    let bytes = package.to_bytes().unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
 
     opc.try_add_part(Box::new(BlobPart::new(
         PackURI::new(COMMENTS).unwrap(),
@@ -449,7 +451,8 @@ fn detached_snapshots_survive_source_editor_conversion_and_drop() {
         (layout, notes, comments, chart, layout_bytes)
     };
 
-    let _editor = source.try_into_editor().unwrap();
+    let _package = litchi_pptx::source::Package::from_presentation(&source).unwrap();
+    drop(source);
     assert_eq!(layout.name(), Some("Charts"));
     assert_eq!(notes.text(), Some("First note"));
     assert_eq!(comments.entries()[0].text(), "Review this slide");

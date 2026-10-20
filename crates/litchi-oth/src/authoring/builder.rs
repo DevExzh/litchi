@@ -412,7 +412,8 @@ impl Builder {
             ("styles.xml", self.styles_xml.or(typed_styles_xml)),
         ] {
             if let Some(part_xml) = optional_xml {
-                compact_xml::validate(part_xml.as_bytes()).map_err(Error::from)?;
+                compact_xml::validate(part_xml.as_bytes(), compact_xml::Limits::default())
+                    .map_err(Error::from)?;
                 writer.add_file(path, part_xml.as_bytes())?;
                 paths.push(path.to_string());
             }
@@ -864,7 +865,7 @@ pub(crate) fn render_styles(styles: &[crate::style::Style]) -> Result<String> {
         }
     }
     output.push_str("</office:styles></office:document-styles>");
-    compact_xml::validate(output.as_bytes())?;
+    compact_xml::validate(output.as_bytes(), compact_xml::Limits::default())?;
     Ok(output)
 }
 
@@ -939,6 +940,6 @@ pub(crate) fn render_metadata(metadata: &litchi_core::Metadata) -> Result<String
         output.push_str("/>");
     }
     output.push_str("</office:meta></office:document-meta>");
-    compact_xml::validate(output.as_bytes())?;
+    compact_xml::validate(output.as_bytes(), compact_xml::Limits::default())?;
     Ok(output)
 }

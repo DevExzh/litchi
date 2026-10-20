@@ -13,7 +13,7 @@ mod transaction;
 mod tests;
 
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
-pub use package::{load, load_snapshot, put, remove};
+pub use package::{load, load_snapshot};
 pub use transaction::{Revision, Snapshot};
 
 /// The Microsoft extension URI that owns `p1710:readonlyRecommended`.
@@ -21,3 +21,4 @@ pub const EXTENSION_URI: &str = "{1BD7E111-0CB8-44D6-8891-C1BB2F81B7CC}";
 
 /// The namespace URI used by the `readonlyRecommended` element.
 pub const NAMESPACE: &str = "http://schemas.microsoft.com/office/powerpoint/2017/10/main";
+pub(crate) use package::{put, remove};

@@ -132,7 +132,11 @@ fn foreign_blank_transfer_is_source_bound_reversible_and_raw_preserving() {
     let durable =
         edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
     assert_eq!(
-        destination.apply(&durable).unwrap().as_bytes(),
+        destination
+            .apply(&durable)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         commit.package().as_bytes()
     );
     assert_eq!(
@@ -140,6 +144,7 @@ fn foreign_blank_transfer_is_source_bound_reversible_and_raw_preserving() {
             .package()
             .apply(&durable.inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         destination.as_bytes()
     );

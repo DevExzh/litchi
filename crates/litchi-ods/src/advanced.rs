@@ -519,7 +519,7 @@ pub struct ChartObject {
 /// after the moved range is removed, which makes `at == to` an exact no-op.
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
-pub enum LogicalRowEdit {
+pub enum LogicalRowOperation {
     /// Insert the supplied physical row runs before one logical row position.
     Insert {
         /// Logical insertion position, including one-past-the-end.
@@ -702,7 +702,7 @@ struct SourceRowLexical {
 pub(crate) fn edit_logical_rows(
     source: &[u8],
     sheet: &str,
-    edits: &[LogicalRowEdit],
+    edits: &[LogicalRowOperation],
     max_output: usize,
 ) -> Result<Vec<u8>> {
     if edits.len() > MAX_LOGICAL_ROW_EDITS {
@@ -811,27 +811,27 @@ pub(crate) fn edit_logical_rows(
 }
 
 fn validate_trivial_logical_row_edits(
-    edits: &[LogicalRowEdit],
+    edits: &[LogicalRowOperation],
     logical_count: usize,
 ) -> Result<bool> {
     for edit in edits {
         match edit {
-            LogicalRowEdit::Insert { at, rows } if rows.is_empty() => {
+            LogicalRowOperation::Insert { at, rows } if rows.is_empty() => {
                 if *at > logical_count {
                     return invalid("ODS logical row insertion position is out of bounds");
                 }
             },
-            LogicalRowEdit::Remove { at, count: 0 } => {
+            LogicalRowOperation::Remove { at, count: 0 } => {
                 if *at > logical_count {
                     return invalid("ODS logical row removal position is out of bounds");
                 }
             },
-            LogicalRowEdit::Move { at, count: 0, to } => {
+            LogicalRowOperation::Move { at, count: 0, to } => {
                 if *at > logical_count || *to > logical_count {
                     return invalid("ODS logical row move position is out of bounds");
                 }
             },
-            LogicalRowEdit::Move { at, count, to } if at == to => {
+            LogicalRowOperation::Move { at, count, to } if at == to => {
                 let end = at
                     .checked_add(*count)
                     .ok_or_else(|| invalid_error("ODS logical row move range overflows"))?;
@@ -863,10 +863,10 @@ fn audit_table_row_layout(spans: &[Span], table: usize) -> Result<()> {
     Ok(())
 }
 
-fn apply_logical_row_edit(rows: &mut Vec<PlannedRow>, edit: &LogicalRowEdit) -> Result<()> {
+fn apply_logical_row_edit(rows: &mut Vec<PlannedRow>, edit: &LogicalRowOperation) -> Result<()> {
     let logical_count = planned_logical_count(rows)?;
     match edit {
-        LogicalRowEdit::Insert { at, rows: inserted } => {
+        LogicalRowOperation::Insert { at, rows: inserted } => {
             if *at > logical_count {
                 return invalid("ODS logical row insertion position is out of bounds");
             }
@@ -898,7 +898,7 @@ fn apply_logical_row_edit(rows: &mut Vec<PlannedRow>, edit: &LogicalRowEdit) -> 
                     .map(|row| PlannedRow { row, origin: None }),
             );
         },
-        LogicalRowEdit::Remove { at, count } => {
+        LogicalRowOperation::Remove { at, count } => {
             if *count == 0 {
                 if *at > logical_count {
                     return invalid("ODS logical row removal position is out of bounds");
@@ -915,7 +915,7 @@ fn apply_logical_row_edit(rows: &mut Vec<PlannedRow>, edit: &LogicalRowEdit) -> 
             let end_index = split_planned_boundary(rows, end)?;
             rows.drain(start_index..end_index);
         },
-        LogicalRowEdit::Move { at, count, to } => {
+        LogicalRowOperation::Move { at, count, to } => {
             if *count == 0 {
                 if *at > logical_count || *to > logical_count {
                     return invalid("ODS logical row move position is out of bounds");
@@ -6107,7 +6107,11 @@ pub(crate) fn put_chart_object(
         "{}/content.xml",
         chart.object_path
     ))?;
-    litchi_odf_common::compact_xml::validate(chart.content_xml.as_bytes()).map_err(Error::from)?;
+    litchi_odf_common::compact_xml::validate(
+        chart.content_xml.as_bytes(),
+        litchi_odf_common::compact_xml::Limits::default(),
+    )
+    .map_err(Error::from)?;
     let child = format!(
         "<draw:frame xmlns:draw=\"{DRAW}\" xmlns:xlink=\"{XLINK}\" draw:name=\"{}\"><draw:object xlink:href=\"./{}\" xlink:type=\"simple\" xlink:show=\"embed\" xlink:actuate=\"onLoad\"/></draw:frame>",
         escape_xml(&chart.name),

@@ -477,7 +477,7 @@ fn capture_source_tail_append_candidate(
     let options = append_options();
     let provider = Arc::new(MeasureBytesSource::new(source_arc(source_bytes)));
     let package = open_source_package(&provider)?;
-    let edit = litchi_odp::SourceBackedTailAppendEdit::new(package, title, body)?;
+    let edit = litchi_odp::tail_append::Edit::new(package, title, body)?;
     let plan = edit.plan(&options)?;
     let proof = plan.proof().clone();
     let mut output = Vec::new();
@@ -546,7 +546,7 @@ fn build_odp_source_tail_append_corpus_with_output(
     let stale_provider = Arc::new(MeasureBytesSource::new(source_arc(source_bytes)));
     let stale_package = open_source_package(&stale_provider)?;
     let stale_edit =
-        litchi_odp::SourceBackedTailAppendEdit::new(stale_package, title.clone(), body.clone())?;
+        litchi_odp::tail_append::Edit::new(stale_package, title.clone(), body.clone())?;
     let stale_plan = stale_edit.plan(&options)?;
     stale_provider.bump_revision();
     let mut stale_output = Vec::new();
@@ -769,7 +769,7 @@ pub(crate) fn run_odp_source_tail_append_lifecycle(
         let opened = open_started.elapsed();
         let plan_started = std::time::Instant::now();
         let edit =
-            litchi_odp::SourceBackedTailAppendEdit::new(package, iteration_title, iteration_body)?;
+            litchi_odp::tail_append::Edit::new(package, iteration_title, iteration_body)?;
         let plan = edit.plan(&iteration_options)?;
         let planned = plan_started.elapsed();
         let publication_started = std::time::Instant::now();

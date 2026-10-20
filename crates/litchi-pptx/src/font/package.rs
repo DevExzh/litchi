@@ -333,7 +333,7 @@ pub fn load(package: &OpcPackage) -> Result<Option<Fonts>> {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn put(package: &mut OpcPackage, fonts: Fonts) -> Result<bool> {
+pub(crate) fn put(package: &mut OpcPackage, fonts: Fonts) -> Result<bool> {
     validate_fonts(&fonts, true)?;
     let current = load_raw(package)?;
     let presentation = package.main_document_part()?;
@@ -359,7 +359,7 @@ pub fn put(package: &mut OpcPackage, fonts: Fonts) -> Result<bool> {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn remove(package: &mut OpcPackage) -> Result<Option<Fonts>> {
+pub(crate) fn remove(package: &mut OpcPackage) -> Result<Option<Fonts>> {
     let Some(current) = load_raw(package)? else {
         return Ok(None);
     };

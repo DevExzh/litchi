@@ -641,7 +641,7 @@ fn text_metadata_and_structural_commands_close_formatting_runs() {
       {"command":"set","path":"/body/p[1]/r[1]","props":{"bold":true}},
       {"command":"set","path":"/body/p[2]","props":{"align":"center"}},
       {"command":"meta","dumpVersion":2},
-      {"command":"set","path":"/body/p[1]/r[1]","props":{"italic":true}},
+      {"command":"set","path":"/body/p[1]/r[1]","props":{"bold":true}},
       {"command":"set","path":"/body/p[1]/r[1]","props":{"text":"changed"}},
       {"command":"remove","path":"/body/p[1]"},
       {"command":"set","path":"/body/p[1]/r[1]","props":{"bold":true}}
@@ -1629,6 +1629,89 @@ fn cached_run_command_skips_closed_nested_field_and_stops_at_end() {
                 .matches("w:dirty=\"false\"")
                 .count(),
             2
+        );
+    }
+}
+
+/// Record 0355a: `text` on direct body paragraphs joins the coalesced run.
+/// A batch still equals its items applied one at a time, including run
+/// paths inside a paragraph whose text the run replaced (a barrier), a
+/// repeated paragraph, formatting between texts, both owners, both modes,
+/// and the closure edit; a refused item keeps its wire index.
+#[test]
+fn coalesced_paragraph_text_sets_match_single_operations() {
+    let input = items(
+        r#"[
+      {"command":"set","path":"/body/p[1]","props":{"text":"one"}},
+      {"command":"set","path":"/body/p[2]","props":{"align":"right"}},
+      {"command":"set","path":"/body/p[2]","props":{"text":"two"}},
+      {"command":"set","path":"/body/p[1]/r[1]","props":{"bold":true}},
+      {"command":"set","path":"/body/p[1]","props":{"text":"again"}},
+      {"command":"set","path":"/body/p[2]/r[1]","props":{"text":"run"}},
+      {"command":"set","path":"/body/p[1]","props":{"align":"center"}},
+      {"command":"set","path":"/body/p[2]","props":{"text":"last"}}
+    ]"#,
+    );
+    for eager in [false, true] {
+        let file = open(eager);
+        let mut oracle = file.clone();
+        for item in &input {
+            let props = item.props.clone().unwrap();
+            oracle = oracle.set(item.path.as_deref().unwrap(), props).unwrap();
+        }
+        for mode in [BatchMode::Atomic, BatchMode::BestEffort] {
+            let commit = file.batch(&input, mode).unwrap();
+            assert!(commit.results.iter().all(|result| applied(result).changed));
+            assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+            assert_eq!(
+                commit
+                    .patch
+                    .inverse()
+                    .apply(&commit.file)
+                    .unwrap()
+                    .to_bytes()
+                    .unwrap(),
+                bytes()
+            );
+        }
+        let edited = file
+            .edit(|tx| {
+                for item in &input {
+                    tx.set(item.path.as_deref().unwrap(), item.props.clone().unwrap())?;
+                }
+                Ok(())
+            })
+            .unwrap()
+            .file;
+        assert_eq!(edited.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+
+        // A refused text keeps its own wire index; best effort keeps the rest.
+        let refused = items(
+            r#"[
+          {"command":"set","path":"/body/p[1]","props":{"text":"kept"}},
+          {"command":"set","path":"/body/p[2]","props":{"text":"bad\u000bvalue"}},
+          {"command":"set","path":"/body/p[2]","props":{"text":"after"}}
+        ]"#,
+        );
+        let error = file.batch(&refused, BatchMode::Atomic).unwrap_err();
+        assert_eq!(error.item(), Some(1));
+        let code = file
+            .set("/body/p[2]", props! {"text"=>"bad\u{b}value"})
+            .unwrap_err()
+            .code();
+        assert_eq!(error.code(), code);
+        let commit = file.batch(&refused, BatchMode::BestEffort).unwrap();
+        applied(&commit.results[0]);
+        failed(&commit.results[1], 1, code);
+        applied(&commit.results[2]);
+        let expected = file
+            .set("/body/p[1]", props! {"text"=>"kept"})
+            .unwrap()
+            .set("/body/p[2]", props! {"text"=>"after"})
+            .unwrap();
+        assert_eq!(
+            commit.file.to_bytes().unwrap(),
+            expected.to_bytes().unwrap()
         );
     }
 }

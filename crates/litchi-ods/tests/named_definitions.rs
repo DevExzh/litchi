@@ -1,7 +1,7 @@
 mod support;
 
 use litchi_ods::names::{Definition, Expression, Range, Scope};
-use litchi_ods::{Builder, MutableSpreadsheet, Package};
+use litchi_ods::{Builder, Package, builder::Workbook as Draft};
 
 const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <office:document-content
@@ -30,7 +30,7 @@ fn named_definitions_round_trip_in_order_and_scope() {
 
     let compact_content = support::compact_xml_fixture(CONTENT);
     let bytes = support::raw_package(&[("content.xml", compact_content.as_bytes(), "text/xml")]);
-    let mut spreadsheet = MutableSpreadsheet::from_workbook(
+    let mut spreadsheet = Draft::from_workbook(
         Package::from_bytes(&bytes)
             .expect("test fixture or operation should succeed")
             .workbook()
@@ -73,7 +73,7 @@ fn named_definitions_round_trip_in_order_and_scope() {
     spreadsheet
         .add_expression(added)
         .expect("test fixture or operation should succeed");
-    let reopened = Package::from_bytes(&spreadsheet.to_bytes())
+    let reopened = Package::from_bytes(spreadsheet.build().expect("the draft builds").as_bytes())
         .expect("test fixture or operation should succeed")
         .workbook()
         .expect("test fixture or operation should succeed");
@@ -89,7 +89,7 @@ fn named_definitions_round_trip_in_order_and_scope() {
 
 #[test]
 fn duplicate_and_invalid_definitions_are_rejected_without_mutation() {
-    let mut spreadsheet = MutableSpreadsheet::from_workbook(
+    let mut spreadsheet = Draft::from_workbook(
         Package::from_bytes(
             &Builder::new()
                 .build()

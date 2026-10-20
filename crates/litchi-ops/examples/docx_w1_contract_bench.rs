@@ -10,7 +10,8 @@
 //! `&mut Package`), so the same source builds at the wave's base and head
 //! for a before/after comparison of the leaf routes themselves.
 //!
-//! The fixture is `create()` with 1,000 paragraphs.
+//! The fixture is `create()` with 1,000 paragraphs, opened with the default
+//! (source-backed) owner; one batch leg also runs on the eager owner.
 //!
 //! Run: `cargo run --release -p litchi-ops --features docx --example
 //! docx_w1_contract_bench`.
@@ -199,6 +200,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }),
         Box::new(|| {
             black_box(unified.batch(items.clone(), BatchMode::Atomic)?);
+            Ok(())
+        }),
+    )?;
+
+    let eager = litchi_ops::open_bytes_with(
+        source.clone(),
+        &litchi_ops::OpenOptions::new().source_mode(litchi_ops::SourceMode::Eager),
+    )?;
+    pair(
+        "File::batch 1k paragraph text sets (eager owner)",
+        Box::new(|| {
+            let mut edit = package.edit()?;
+            for index in 0..PARAGRAPHS {
+                edit.replace_paragraph_text(Position::new(index), "batched")?;
+            }
+            black_box(edit.commit()?.into_package());
+            Ok(())
+        }),
+        Box::new(|| {
+            black_box(eager.batch(items.clone(), BatchMode::Atomic)?);
             Ok(())
         }),
     )?;

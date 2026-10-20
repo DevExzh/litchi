@@ -1,5 +1,6 @@
 use litchi_ods::{
-    Builder, MutableSpreadsheet, Package, Workbook,
+    Builder, Package, Workbook,
+    builder::Workbook as Draft,
     dde::{AutomaticUpdate, ConversionMode},
     scenario::OptionalSetting,
 };
@@ -89,13 +90,13 @@ fn detached_metadata_values_reject_invalid_states() {
 
 #[test]
 fn no_op_package_round_trip_preserves_compact_rich_text_xml_exactly() {
-    let spreadsheet = MutableSpreadsheet::from_workbook(spreadsheet());
+    let spreadsheet = Draft::from_workbook(spreadsheet());
     assert_eq!(spreadsheet.workbook().content_xml(), CONTENT);
     assert_eq!(
         spreadsheet.sheets()[0].rows[0].cells[0].text,
         "Pre styled link tail"
     );
-    let reopened = Package::from_bytes(&spreadsheet.to_bytes())
+    let reopened = Package::from_bytes(spreadsheet.build().expect("the draft builds").as_bytes())
         .expect("test fixture or operation should succeed")
         .workbook()
         .expect("test fixture or operation should succeed");

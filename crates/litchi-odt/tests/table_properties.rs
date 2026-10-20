@@ -70,7 +70,7 @@ fn parses_real_odfdo_and_libreoffice() {
     let lo = include_bytes!(
         "../../../test-data/libreoffice-core/xmloff/qa/unit/data/floattable-wrap-all-pages2.fodt"
     );
-    let flat = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(lo)).unwrap();
+    let flat = litchi_odt::generic::flat::Document::from_reader(Cursor::new(lo)).unwrap();
     let styles = flat.table_style_properties().unwrap();
     assert!(styles.styles.iter().any(|x| {
         x.properties

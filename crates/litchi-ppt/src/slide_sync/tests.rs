@@ -208,7 +208,11 @@ fn package_slide_sync_edits_publish_replay_and_invert_exactly() {
     assert_eq!(edit.changes().len(), 1);
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
-    assert_eq!(commit.patch().before_bytes(), source_bytes.as_slice());
+    assert_eq!(commit.patch().source_len(), source_bytes.len());
+    assert_eq!(
+        commit.patch().target_len(),
+        commit.package().to_bytes().unwrap().len()
+    );
     assert_eq!(
         commit
             .package()
@@ -262,4 +266,23 @@ fn package_slide_sync_edits_publish_replay_and_invert_exactly() {
         panic!("a missing slide must be refused");
     };
     assert_eq!(refusal.kind(), RefusalKind::NotFound);
+}
+
+#[test]
+fn package_slide_sync_edits_admit_a_signed_package_and_refuse_a_changed_commit() {
+    use litchi_core::Position;
+
+    let signed = crate::scoped::signed(&built_package());
+    let bytes = signed.to_bytes().unwrap();
+    let slide = Position::new(0);
+
+    let no_op = signed.edit_slide_sync(slide).unwrap().commit().unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), bytes);
+
+    let mut edit = signed.edit_slide_sync(slide).unwrap();
+    edit.set(synchronization()).unwrap();
+    assert!(matches!(edit.commit(), Err(Error::Signed)));
+    assert_eq!(signed.to_bytes().unwrap(), bytes);
 }

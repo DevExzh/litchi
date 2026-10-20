@@ -88,14 +88,14 @@ mod comment_tests {
         let oversized = vec![b' '; MAX_BYTES + 1];
         assert!(matches!(
             List::from_processed(&oversized),
-            Err(crate::Error::Limit {
+            Err(Error::Limit {
                 limit: MAX_BYTES,
                 ..
             })
         ));
         assert!(matches!(
             Authors::from_processed(&oversized),
-            Err(crate::Error::Limit {
+            Err(Error::Limit {
                 limit: MAX_BYTES,
                 ..
             })

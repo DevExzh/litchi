@@ -1,0 +1,6 @@
+start 12:40:55 load 10.17
+leg 1 before 12:40:58 load 9.67
+leg 2 after 12:41:00 load 9.67
+leg 3 after 12:41:02 load 9.22
+leg 4 before 12:41:04 load 9.22
+done

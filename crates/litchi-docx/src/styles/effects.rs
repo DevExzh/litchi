@@ -24,6 +24,8 @@ use crate::styles::{Style, Styles, Type};
 
 #[path = "effects/edit.rs"]
 mod edit;
+#[path = "effects/limit.rs"]
+mod limit;
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -2780,9 +2782,11 @@ fn validate_xml_with_limits(
     limits: SourceLimits,
 ) -> Result<Conformance> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(invalid(format!(
-            "stylesWithEffects XML exceeds {MAX_XML_BYTES} bytes"
-        )));
+        return Err(crate::Error::StylesWithEffectsLimit {
+            kind: LimitKind::XmlBytes,
+            actual: xml.len(),
+            maximum: MAX_XML_BYTES,
+        });
     }
     check_limit(
         limits,
@@ -2807,9 +2811,11 @@ fn validate_xml_with_limits(
             .checked_add(1)
             .ok_or_else(|| invalid("stylesWithEffects XML event count overflow"))?;
         if events > MAX_XML_EVENTS {
-            return Err(invalid(format!(
-                "stylesWithEffects XML exceeds {MAX_XML_EVENTS} events"
-            )));
+            return Err(crate::Error::StylesWithEffectsLimit {
+                kind: LimitKind::XmlEvents,
+                actual: events,
+                maximum: MAX_XML_EVENTS,
+            });
         }
         check_limit(
             limits,
@@ -2843,9 +2849,11 @@ fn validate_xml_with_limits(
                     .checked_add(1)
                     .ok_or_else(|| invalid("stylesWithEffects XML depth overflow"))?;
                 if depth > MAX_XML_DEPTH {
-                    return Err(invalid(format!(
-                        "stylesWithEffects XML exceeds {MAX_XML_DEPTH} nesting levels"
-                    )));
+                    return Err(crate::Error::StylesWithEffectsLimit {
+                        kind: LimitKind::XmlDepth,
+                        actual: depth,
+                        maximum: MAX_XML_DEPTH,
+                    });
                 }
                 check_limit(
                     limits,

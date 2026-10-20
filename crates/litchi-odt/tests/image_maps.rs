@@ -54,7 +54,7 @@ fn reads_image_maps_from_a_package() {
 #[test]
 fn reads_image_maps_from_a_flat_document() {
     let document =
-        litchi_odt::generic::FlatDocument::from_bytes(CONTENT.as_bytes().to_vec()).unwrap();
+        litchi_odt::generic::flat::Document::from_bytes(CONTENT.as_bytes().to_vec()).unwrap();
     let maps = document.image_maps().unwrap();
     assert_eq!(maps.len(), 1);
     assert_eq!(maps[0].areas.len(), 2);
@@ -67,6 +67,6 @@ fn packages_without_image_maps_report_empty() {
         "",
     );
     let document =
-        litchi_odt::generic::FlatDocument::from_bytes(plain.as_bytes().to_vec()).unwrap();
+        litchi_odt::generic::flat::Document::from_bytes(plain.as_bytes().to_vec()).unwrap();
     assert!(document.image_maps().unwrap().is_empty());
 }

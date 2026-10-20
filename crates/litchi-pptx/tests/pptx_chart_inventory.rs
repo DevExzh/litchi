@@ -6,7 +6,7 @@
 
 use litchi_opc::constants::relationship_type::{CHART, STRICT_CHART};
 use litchi_opc::{OpcError, OpcPackage, PackURI};
-use litchi_pptx::chart::{self, Chart, Series, Type};
+use litchi_pptx::chart::{Chart, Series, Type};
 use litchi_pptx::{Error, Package};
 
 #[test]
@@ -108,10 +108,9 @@ fn generated_package() -> Package {
         builder.presentation().unwrap().add_slide().unwrap();
     }
     let package = builder.build().unwrap();
-    let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
-    chart::add(&mut opc, "/ppt/slides/slide1.xml", &chart).unwrap();
-    Package::from_opc_package(opc).unwrap()
+    let mut edit = package.edit_charts().unwrap();
+    edit.add(0_usize, &chart).unwrap();
+    edit.commit().unwrap().into_package()
 }
 
 fn edit_package(package: Package, edit: impl FnOnce(&mut OpcPackage)) -> Package {

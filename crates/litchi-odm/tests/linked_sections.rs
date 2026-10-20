@@ -129,7 +129,11 @@ fn linked_section_edit_is_compact_reversible_and_source_checked() {
             .unwrap()
             .contains(&"custom/opaque.bin".to_string())
     );
-    compact_xml::validate(changed.document().content_xml().as_bytes()).unwrap();
+    compact_xml::validate(
+        changed.document().content_xml().as_bytes(),
+        compact_xml::Limits::default(),
+    )
+    .unwrap();
     assert!(!changed.document().content_xml().contains('\n'));
     assert!(!changed.document().content_xml().contains('\t'));
     assert!(!changed.document().content_xml().contains("  "));
@@ -141,13 +145,18 @@ fn linked_section_edit_is_compact_reversible_and_source_checked() {
     );
     assert!(commit.patch().is_applicable_to(&source));
     assert_eq!(
-        source.apply_link(commit.patch()).unwrap().as_bytes(),
+        source
+            .apply_link(commit.patch())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         changed.as_bytes()
     );
     assert_eq!(
         changed
             .apply_link(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );

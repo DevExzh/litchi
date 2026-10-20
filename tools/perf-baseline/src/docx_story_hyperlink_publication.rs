@@ -814,7 +814,10 @@ fn publish(
     let package = source_package(corpus.archive.clone())?;
     let plan = package.plan_story_hyperlink_redaction(target_urls, Mode::Strict)?;
     let commit = plan.apply()?;
-    package.publish_story_hyperlink_redaction_to_stream(sink, &commit)?;
+    package
+        .apply_story_hyperlink_redaction(&commit.into())?
+        .package()
+        .write_to(sink)?;
     Ok(())
 }
 
@@ -1056,7 +1059,8 @@ fn verify_refusal_gates(
     revision.fetch_add(1, Ordering::SeqCst);
     let mut stale_output = Vec::new();
     let stale_refusal = stale_package
-        .publish_story_hyperlink_redaction_to_stream(&mut stale_output, &stale_commit)
+        .apply_story_hyperlink_redaction(&stale_commit.clone().into())
+        .and_then(|committed| committed.package().write_to(&mut stale_output))
         .is_err()
         && stale_output.is_empty();
 
@@ -1067,7 +1071,8 @@ fn verify_refusal_gates(
         .apply()?;
     let mut foreign_output = Vec::new();
     let foreign_refusal = foreign_second
-        .publish_story_hyperlink_redaction_to_stream(&mut foreign_output, &foreign_commit)
+        .apply_story_hyperlink_redaction(&foreign_commit.clone().into())
+        .and_then(|committed| committed.package().write_to(&mut foreign_output))
         .is_err()
         && foreign_output.is_empty();
 
@@ -1100,7 +1105,8 @@ fn verify_refusal_gates(
         fail_after: 1,
     };
     let partial_refusal = package
-        .publish_story_hyperlink_redaction_to_stream(&mut partial, &commit)
+        .apply_story_hyperlink_redaction(&commit.clone().into())
+        .and_then(|committed| committed.package().write_to(&mut partial))
         .is_err()
         && partial.accepted > 0;
     let package = source_package(corpus.archive.clone())?;
@@ -1112,7 +1118,8 @@ fn verify_refusal_gates(
         fail_after: 0,
     };
     let zero_refusal = package
-        .publish_story_hyperlink_redaction_to_stream(&mut zero, &commit)
+        .apply_story_hyperlink_redaction(&commit.clone().into())
+        .and_then(|committed| committed.package().write_to(&mut zero))
         .is_err()
         && zero.accepted == 0;
 
@@ -1295,8 +1302,9 @@ pub(super) fn run(
             cache_diagnostics = Some(package.cache_diagnostics());
 
             let publication_started = Instant::now();
-            let publication_result =
-                package.publish_story_hyperlink_redaction_to_stream(&mut sink, &commit);
+            let publication_result = package
+                .apply_story_hyperlink_redaction(&commit.into())
+                .and_then(|committed| committed.package().write_to(&mut sink));
             let publication_ns = super::elapsed_ns(publication_started.elapsed())?;
             publication_result?;
             Ok((open_ns, plan_ns, publication_ns))
@@ -1674,7 +1682,9 @@ mod tests {
             fail_after: 1,
         };
         let region = crate::allocation_metrics::begin();
-        let result = package.publish_story_hyperlink_redaction_to_stream(&mut sink, &plan);
+        let result = package
+            .apply_story_hyperlink_redaction(&plan.clone().into())
+            .and_then(|committed| committed.package().write_to(&mut sink));
         let allocation = region
             .finish()
             .unwrap_or_else(crate::allocation_metrics::unavailable_sample);

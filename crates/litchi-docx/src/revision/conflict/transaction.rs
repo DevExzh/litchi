@@ -817,9 +817,11 @@ fn apply_splices(source: &[u8], splices: &mut [Splice], limit: usize) -> Result<
         .and_then(|size| size.checked_add(added))
         .ok_or_else(|| Error::Invalid("conflict output size overflow".into()))?;
     if output_len > limit {
-        return Err(Error::Invalid(format!(
-            "conflict output exceeds the {limit}-byte source limit"
-        )));
+        return Err(Error::ConflictLimit {
+            kind: crate::revision::conflict::LimitKind::OutputBytes,
+            actual: output_len,
+            maximum: limit,
+        });
     }
 
     let mut output = Vec::new();

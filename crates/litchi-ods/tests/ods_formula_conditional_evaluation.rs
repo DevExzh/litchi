@@ -248,7 +248,8 @@ fn scalar_execution(scope: &str) -> (Budget, CancellationSource, ExecutionContex
 }
 
 fn parse(source: &str) -> Expression {
-    Expression::parse(source).unwrap_or_else(|error| panic!("{source:?} should parse: {error}"))
+    Expression::parse(source, &Default::default())
+        .unwrap_or_else(|error| panic!("{source:?} should parse: {error}"))
 }
 
 fn evaluate(

@@ -11,6 +11,7 @@ mod cold_verified;
 mod corpus_manifest;
 pub mod docx_bounded_tail_append_compare;
 pub mod docx_edit_provider;
+mod docx_family_publication;
 pub mod docx_managed_edit;
 pub mod docx_managed_read_ahead;
 pub mod docx_owned_attribution;
@@ -18607,9 +18608,10 @@ fn publish_pptx_source_backed_cross_copy(
     let source = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(
         source_archive.to_vec(),
     )))?;
-    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(Arc::new(
+    let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(
         OwnedSource::new(destination_archive.to_vec()),
     ))?;
+    let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
     let plan = editor.plan_cross_slide_copy(
         &source,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
@@ -18622,7 +18624,9 @@ fn publish_pptx_source_backed_cross_copy(
         );
     }
     let mut output = Vec::new();
-    let snapshot = editor.publish_cross_slide_copy_to_stream(&mut output, &plan)?;
+    let mut editor_copy = editor.edit_cross_slide_copy()?;
+    let snapshot = editor_copy.stage(&plan)?;
+    editor_copy.commit()?.package().write_to(&mut output)?;
     if snapshot.destination_slide_count() != PPTX_CROSS_COPY_DESTINATION_SLIDE_COUNT + 1
         || snapshot.insertion_position() != PPTX_CROSS_COPY_INSERTION_POSITION
     {
@@ -18906,7 +18910,8 @@ fn verify_pptx_source_backed_cross_copy_gates(
     let source_read: Arc<dyn ReadAt> = source_probe.clone();
     let destination_read: Arc<dyn ReadAt> = destination_probe.clone();
     let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-    let editor_probe = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+    let editor_probe_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+    let editor_probe = litchi_pptx::source::Package::from_presentation(&editor_probe_view)?;
     let probe_plan = editor_probe.plan_cross_slide_copy(
         &source_view,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
@@ -18924,7 +18929,12 @@ fn verify_pptx_source_backed_cross_copy_gates(
         .text_and_name()?;
     source_view.check_source()?;
     let mut probe_output = Vec::new();
-    editor_probe.publish_cross_slide_copy_to_stream(&mut probe_output, &probe_plan)?;
+    let mut editor_probe_copy = editor_probe.edit_cross_slide_copy()?;
+    editor_probe_copy.stage(&probe_plan)?;
+    editor_probe_copy
+        .commit()?
+        .package()
+        .write_to(&mut probe_output)?;
     let source_after = source_probe.bytes()?;
     let source_version_after = source_probe.version()?;
     let source_version_stability_verified =
@@ -19540,7 +19550,8 @@ fn verify_pptx_source_backed_cross_copy_lifecycle_gates(
     let source_read: Arc<dyn ReadAt> = source_probe.clone();
     let destination_read: Arc<dyn ReadAt> = destination_probe.clone();
     let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-    let editor_probe = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+    let editor_probe_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+    let editor_probe = litchi_pptx::source::Package::from_presentation(&editor_probe_view)?;
     let probe_plan = editor_probe.plan_cross_slide_copy(
         &source_view,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
@@ -19558,7 +19569,12 @@ fn verify_pptx_source_backed_cross_copy_lifecycle_gates(
         .text_and_name()?;
     source_view.check_source()?;
     let mut probe_output = Vec::new();
-    editor_probe.publish_cross_slide_copy_to_stream(&mut probe_output, &probe_plan)?;
+    let mut editor_probe_copy = editor_probe.edit_cross_slide_copy()?;
+    editor_probe_copy.stage(&probe_plan)?;
+    editor_probe_copy
+        .commit()?
+        .package()
+        .write_to(&mut probe_output)?;
     let source_after = source_probe.bytes()?;
     let source_version_after = source_probe.version()?;
     let source_version_stability_verified = before == after
@@ -19630,7 +19646,8 @@ fn source_backed_cross_copy_revision_refusal(
     let source_read: Arc<dyn ReadAt> = source.clone();
     let destination_read: Arc<dyn ReadAt> = destination.clone();
     let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+    let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+    let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
     let plan = editor.plan_cross_slide_copy(
         &source_view,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
@@ -19643,7 +19660,12 @@ fn source_backed_cross_copy_revision_refusal(
         destination.replace(destination_archive.to_vec())?;
     }
     let mut output = Vec::new();
-    let result = editor.publish_cross_slide_copy_to_stream(&mut output, &plan);
+    let result = (|| -> litchi_pptx::Result<_> {
+        let mut copy = editor.edit_cross_slide_copy()?;
+        let copied = copy.stage(&plan)?;
+        copy.commit()?.package().write_to(&mut output)?;
+        Ok(copied)
+    })();
     let typed_refusal = matches!(
         result,
         Err(litchi_pptx::Error::PatchConflict)
@@ -19661,20 +19683,27 @@ fn source_backed_cross_copy_foreign_destination_refusal(
     let source = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(
         source_archive.to_vec(),
     )))?;
-    let editor_a = litchi_pptx::SourceBackedPresentationEditor::from_read_at(Arc::new(
+    let editor_a_view = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(
         OwnedSource::new(destination_archive.to_vec()),
     ))?;
+    let editor_a = litchi_pptx::source::Package::from_presentation(&editor_a_view)?;
     let plan = editor_a.plan_cross_slide_copy(
         &source,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
         PPTX_CROSS_COPY_DESTINATION_SLIDE,
         PPTX_CROSS_COPY_INSERTION_POSITION,
     )?;
-    let editor_b = litchi_pptx::SourceBackedPresentationEditor::from_read_at(Arc::new(
+    let editor_b_view = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(
         OwnedSource::new(destination_archive.to_vec()),
     ))?;
+    let editor_b = litchi_pptx::source::Package::from_presentation(&editor_b_view)?;
     let mut output = Vec::new();
-    let result = editor_b.publish_cross_slide_copy_to_stream(&mut output, &plan);
+    let result = (|| -> litchi_pptx::Result<_> {
+        let mut copy = editor_b.edit_cross_slide_copy()?;
+        let copied = copy.stage(&plan)?;
+        copy.commit()?.package().write_to(&mut output)?;
+        Ok(copied)
+    })();
     Ok(matches!(result, Err(litchi_pptx::Error::PatchConflict)) && output.is_empty())
 }
 
@@ -21060,11 +21089,11 @@ fn odt_resource_batch_image(
 }
 
 fn odt_media_archive_for_shape(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut document = litchi_odt::mutable::MutableDocument::new();
+    let mut document = litchi_odt::Builder::new();
     for index in 0..shape.docx_paragraphs() {
         document.add_paragraph(&semantic_odt_text(index, false))?;
     }
-    let base = document.to_bytes()?;
+    let base = document.build()?.to_bytes()?;
     let source = ArchiveReader::new(&base)?;
     let mut writer = litchi_odt::core::PackageWriter::new();
     writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
@@ -21654,7 +21683,11 @@ fn build_semantic_odt_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
 fn build_odf_repair_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
     let canonical = build_semantic_odt_corpus(shape)?;
     let archive = inject_mimetype_local_timestamp_extra(canonical.archive.clone())?;
-    let report = litchi_odf_common::validate_package(&archive)?;
+    let report = litchi_odf_common::validate_package(
+        &archive,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )?;
     if !report.is_complete()
         || report.issues().len() != 1
         || report.issues()[0].code() != litchi_odf_common::MIMETYPE_LOCAL_EXTRA_ISSUE
@@ -34453,7 +34486,13 @@ fn run_odf_validation_report(
         corpus,
         warmup_iterations,
         samples,
-        |bytes| Ok(litchi_odf_common::validate_package(bytes)?),
+        |bytes| {
+            Ok(litchi_odf_common::validate_package(
+                bytes,
+                litchi_odf_common::OdfValidationLimits::default(),
+                litchi_core::ValidationLimits::default(),
+            )?)
+        },
         |report, bytes| generic_validation_summary(report, bytes, None, None),
     )
 }
@@ -34463,7 +34502,11 @@ fn verify_odf_mimetype_repair(
 ) -> Result<(OdfRepairSummary, Vec<u8>), Box<dyn Error>> {
     let shape = semantic_shape(corpus)?;
     let canonical = semantic_odt_bytes(shape)?;
-    let report = litchi_odf_common::validate_package(&corpus.archive)?;
+    let report = litchi_odf_common::validate_package(
+        &corpus.archive,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )?;
     let plan = litchi_odf_common::plan_odf_repair(
         &corpus.archive,
         &report,
@@ -34512,7 +34555,11 @@ fn verify_odf_mimetype_repair(
         return Err("ODF repair patch did not refuse a stale source before output".into());
     }
 
-    let canonical_report = litchi_odf_common::validate_package(&canonical)?;
+    let canonical_report = litchi_odf_common::validate_package(
+        &canonical,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )?;
     if !canonical_report.is_complete()
         || canonical_report.has_errors()
         || !matches!(
@@ -34596,7 +34643,11 @@ fn run_odf_mimetype_repair_plan(
         // publisher's 64 KiB write request ceiling as a total memory bound.
         let mut sink = HashingDiscardSink::without_authoring_window(u64::try_from(expected.len())?);
         let started = Instant::now();
-        let report = litchi_odf_common::validate_package(&corpus.archive)?;
+        let report = litchi_odf_common::validate_package(
+            &corpus.archive,
+            litchi_odf_common::OdfValidationLimits::default(),
+            litchi_core::ValidationLimits::default(),
+        )?;
         let plan = litchi_odf_common::plan_odf_repair(
             &corpus.archive,
             &report,
@@ -35698,7 +35749,7 @@ fn verify_odt_mixed_guardrails(
     verify_odt_mixed_raw_members(source.as_bytes(), scalar.as_bytes())?;
     verify_odt_mixed_raw_members(source.as_bytes(), batch.package().as_bytes())?;
 
-    let replayed = source.apply(batch.patch())?;
+    let replayed = source.apply(batch.patch())?.into_package();
     if replayed.as_bytes() != batch.package().as_bytes() {
         return Err("ODT mixed volatile patch replay differs from batch output".into());
     }
@@ -36575,11 +36626,11 @@ fn run_odt_media_paragraph_edit_save(
         }
 
         verify_odt_media_archive(&bytes, true)?;
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT paragraph patch replay differs from commit".into());
         }
-        let restored = replayed.apply(&commit.patch().inverse())?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODT paragraph inverse did not restore the source".into());
         }
@@ -36628,11 +36679,11 @@ fn run_odt_media_line_break_edit_save(
         }
 
         verify_odt_media_line_break_archive(&bytes)?;
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT line-break patch replay differs from commit".into());
         }
-        let restored = replayed.apply(&commit.patch().inverse())?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODT line-break inverse did not restore the source".into());
         }
@@ -36676,11 +36727,11 @@ fn run_odt_media_append_run_edit_save(
         }
 
         verify_odt_media_append_run_archive(&bytes)?;
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT append-run patch replay differs from commit".into());
         }
-        let restored = replayed.apply(&commit.patch().inverse())?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODT append-run inverse did not restore the source".into());
         }
@@ -36728,11 +36779,11 @@ fn run_odt_media_append_hyperlink_edit_save(
         }
 
         verify_odt_media_append_hyperlink_archive(&bytes)?;
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT append-hyperlink patch replay differs from commit".into());
         }
-        let restored = replayed.apply(&commit.patch().inverse())?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err(
                 "media-rich ODT append-hyperlink inverse did not restore the source".into(),
@@ -36793,14 +36844,14 @@ fn run_odt_media_structural_paragraph_edit_save(
         }
 
         verify_odt_media_structural_paragraph_archive(&bytes, inserted)?;
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err(format!(
                 "media-rich ODT paragraph {operation} patch replay differs from commit"
             )
             .into());
         }
-        let restored = replayed.apply(&commit.patch().inverse())?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err(format!(
                 "media-rich ODT paragraph {operation} inverse did not restore the source"
@@ -36884,11 +36935,16 @@ fn verify_odt_embedded_resource_commit(
     let projection = verify_odt_resource_batch_archive(expected, true)?;
     verify_odt_resource_batch_raw_members(source.as_bytes(), expected)?;
 
-    let replayed = source.apply(commit.patch())?;
+    let replayed = source.apply(commit.patch())?.into_package();
     if replayed.as_bytes() != expected {
         return Err("ODT embedded-resource volatile replay differs from publication".into());
     }
-    if replayed.apply(&commit.patch().inverse())?.as_bytes() != source.as_bytes() {
+    if replayed
+        .apply(&commit.patch().inverse())?
+        .into_package()
+        .as_bytes()
+        != source.as_bytes()
+    {
         return Err("ODT embedded-resource volatile inverse did not restore source".into());
     }
     if replayed.apply(commit.patch()).is_ok() {
@@ -36984,9 +37040,13 @@ fn run_odt_embedded_resource_publication(
         if sink.bytes != expected {
             return Err("measured ODT embedded-resource publication differs from oracle".into());
         }
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != expected
-            || replayed.apply(&commit.patch().inverse())?.as_bytes() != source.as_bytes()
+            || replayed
+                .apply(&commit.patch().inverse())?
+                .into_package()
+                .as_bytes()
+                != source.as_bytes()
             || replayed.apply(commit.patch()).is_ok()
         {
             return Err("measured ODT embedded-resource patch contract differs".into());
@@ -38529,11 +38589,11 @@ fn run_odp_media_textbox_edit_save(
         }
 
         verify_odp_media_archive(&bytes, true)?;
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODP text-box patch replay differs from commit".into());
         }
-        let restored = replayed.apply(&commit.patch().inverse())?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODP text-box inverse did not restore the source".into());
         }
@@ -42190,11 +42250,11 @@ fn verify_odp_text_box_model_commit(
         case == Case::OdpMediaTextBoxBatchReplaceSave,
     )?;
 
-    let replayed = source.apply(commit.patch())?;
+    let replayed = source.apply(commit.patch())?.into_package();
     if replayed.as_bytes() != expected {
         return Err("ODP text-box model patch replay differs from publication".into());
     }
-    let restored = replayed.apply(&commit.patch().inverse())?;
+    let restored = replayed.apply(&commit.patch().inverse())?.into_package();
     if restored.as_bytes() != source.as_bytes() {
         return Err("ODP text-box model inverse did not restore exact source bytes".into());
     }
@@ -42205,11 +42265,11 @@ fn verify_odp_text_box_model_commit(
     let durable = litchi_odp::authoring::edit::Patch::from_durable_bytes(
         &commit.patch().to_durable_bytes()?,
     )?;
-    let durable_replayed = source.apply(&durable)?;
+    let durable_replayed = source.apply(&durable)?.into_package();
     if durable_replayed.as_bytes() != expected {
         return Err("durable ODP text-box model replay differs from publication".into());
     }
-    let durable_restored = durable_replayed.apply(&durable.inverse())?;
+    let durable_restored = durable_replayed.apply(&durable.inverse())?.into_package();
     if durable_restored.as_bytes() != source.as_bytes() {
         return Err("durable ODP text-box model inverse did not restore source".into());
     }
@@ -42300,9 +42360,13 @@ fn run_odp_text_box_model_publication(
         {
             return Err("measured ODP text-box model publication differs from oracle".into());
         }
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != expected
-            || replayed.apply(&commit.patch().inverse())?.as_bytes() != source.as_bytes()
+            || replayed
+                .apply(&commit.patch().inverse())?
+                .into_package()
+                .as_bytes()
+                != source.as_bytes()
             || replayed.apply(commit.patch()).is_ok()
         {
             return Err("measured ODP text-box model patch contract differs".into());
@@ -49668,10 +49732,9 @@ fn publish_docx_source_edit<W: Write>(
         return Err("DOCX source edit produced unexpected commit diagnostics".into());
     }
     let materializations = usize::try_from(package.cache_diagnostics().successful_loads)?;
-    let published = package.publish_document_commit_to_stream(writer, &commit)?;
-    if published.xml_bytes() != commit.snapshot().xml_bytes() {
-        return Err("DOCX source edit published a different snapshot".into());
-    }
+    // Record 0355a: the detached commit replays onto the package, and the
+    // committed package is written; callers compare the output bytes.
+    package.apply(commit.patch())?.write_to(writer)?;
     Ok((materializations, commit))
 }
 
@@ -49848,7 +49911,7 @@ fn docx_section_layout_signed_archive(corpus: &Corpus) -> Result<Vec<u8>, Box<dy
 fn verify_docx_section_layout_controls(
     corpus: &Corpus,
     commit: &litchi_docx::section::layout::Commit,
-    publication: &litchi_docx::section::layout::Publication,
+    publication: &litchi_docx::source_backed::section_layout::Commit,
 ) -> Result<(), Box<dyn Error>> {
     let noop_package = litchi_docx::source_backed::Package::from_read_at(Arc::new(
         OwnedSource::new(corpus.archive.clone()),
@@ -49863,7 +49926,9 @@ fn verify_docx_section_layout_controls(
         return Err("DOCX section-layout no-op control produced a changed patch".into());
     }
     let mut noop_output = Vec::new();
-    noop_package.publish_section_layout_commit_to_stream(&mut noop_output, &noop)?;
+    noop_package
+        .apply_section_layout(&noop.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut noop_output))?;
     if noop_output != corpus.archive {
         return Err("DOCX section-layout no-op publication changed source bytes".into());
     }
@@ -49871,13 +49936,16 @@ fn verify_docx_section_layout_controls(
     let foreign = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
         corpus.archive.clone(),
     )))?;
+    // Record 0355a: a detached record patch replays by content, so another
+    // package holding the same source bytes publishes the same artifact.
     let mut foreign_output = Vec::new();
-    if !matches!(
-        foreign.publish_section_layout_commit_to_stream(&mut foreign_output, commit),
-        Err(litchi_docx::Error::SectionLayoutForeignSource)
-    ) || !foreign_output.is_empty()
-    {
-        return Err("DOCX section-layout foreign-source refusal is not typed".into());
+    foreign
+        .apply_section_layout(&commit.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut foreign_output))?;
+    let mut expected_output = Vec::new();
+    publication.package().write_to(&mut expected_output)?;
+    if foreign_output != expected_output {
+        return Err("DOCX section-layout content replay differs from the commit".into());
     }
 
     let stale = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
@@ -49885,7 +49953,9 @@ fn verify_docx_section_layout_controls(
     )))?;
     let mut stale_output = Vec::new();
     if !matches!(
-        stale.publish_section_layout_inverse_to_stream(&mut stale_output, publication),
+        stale
+            .apply_section_layout(&publication.patch().inverse())
+            .and_then(|committed| committed.package().write_to(&mut stale_output)),
         Err(litchi_docx::Error::SectionLayoutStaleSource)
     ) || !stale_output.is_empty()
     {
@@ -49907,7 +49977,8 @@ fn verify_docx_section_layout_controls(
     }
     let mut signed_noop_output = Vec::new();
     signed_noop
-        .publish_section_layout_commit_to_stream(&mut signed_noop_output, &signed_noop_commit)?;
+        .apply_section_layout(&signed_noop_commit.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut signed_noop_output))?;
     if signed_noop_output != signed_archive {
         return Err("DOCX section-layout signed no-op changed source bytes".into());
     }
@@ -49929,7 +50000,9 @@ fn verify_docx_section_layout_controls(
     let signed_commit = signed_edit.commit()?;
     let mut signed_output = Vec::new();
     if !matches!(
-        signed.publish_section_layout_commit_to_stream(&mut signed_output, &signed_commit),
+        signed
+            .apply_section_layout(&signed_commit.patch().clone().into())
+            .and_then(|committed| committed.package().write_to(&mut signed_output)),
         Err(litchi_docx::Error::Opc(
             OpcError::SignedSourceRequiresExplicitPolicy
         ))
@@ -49975,7 +50048,9 @@ fn verify_docx_section_layout_controls(
         limit: 128,
     };
     if !matches!(
-        partial.publish_section_layout_commit_to_stream(&mut partial_sink, &partial_commit),
+        partial
+            .apply_section_layout(&partial_commit.patch().clone().into())
+            .and_then(|committed| committed.package().write_to(&mut partial_sink)),
         Err(litchi_docx::Error::Opc(OpcError::IncompleteOutput { .. }))
     ) || partial_sink.accepted != 128
     {
@@ -50319,8 +50394,11 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         return Err("DOCX section-layout expected commit is not changed".into());
     }
     let mut expected_output = Vec::new();
-    let expected_publication = expected_package
-        .publish_section_layout_commit_to_stream(&mut expected_output, &expected_commit)?;
+    let expected_publication =
+        expected_package.apply_section_layout(&expected_commit.patch().clone().into())?;
+    expected_publication
+        .package()
+        .write_to(&mut expected_output)?;
     verify_docx_section_layout_output(corpus, &expected_output, [3, 2, 2])?;
     verify_docx_section_layout_controls(corpus, &expected_commit, &expected_publication)?;
     let expected_digest = sha256_hex(&expected_output);
@@ -50579,7 +50657,8 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         let before_publication_after_commit = package.cache_diagnostics();
 
         let publication_started = Instant::now();
-        let publication = package.publish_section_layout_commit_to_stream(&mut sink, &commit)?;
+        let publication = package.apply_section_layout(&commit.patch().clone().into())?;
+        publication.package().write_to(&mut sink)?;
         std::hint::black_box(&publication);
         let publication_ns = elapsed_ns(publication_started.elapsed())?;
         let total_ns = preparation_ns
@@ -50658,13 +50737,6 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         {
             return Err("DOCX section-layout patch forward/inverse/stale oracle failed".into());
         }
-        if publication
-            .inverse_patch()
-            .apply(publication.snapshot())
-            .is_err()
-        {
-            return Err("DOCX section-layout publication inverse patch is not applicable".into());
-        }
         if sink.bytes != expected_output {
             return Err("DOCX section-layout publication differs from expected output".into());
         }
@@ -50673,7 +50745,10 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
             OwnedSource::new(sink.bytes.clone()),
         ))?;
         let mut restored_output = Vec::new();
-        reopened.publish_section_layout_inverse_to_stream(&mut restored_output, &publication)?;
+        reopened
+            .apply_section_layout(&publication.patch().inverse())?
+            .package()
+            .write_to(&mut restored_output)?;
         if restored_output != corpus.archive {
             return Err("DOCX section-layout inverse publication did not restore source".into());
         }
@@ -51106,26 +51181,31 @@ fn publish_pptx_source_edit<W: Write>(
     source: Arc<dyn ReadAt>,
     writer: &mut W,
 ) -> Result<usize, Box<dyn Error>> {
-    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(source)?;
+    let presentation = litchi_pptx::SourceBackedPresentation::from_read_at(source)?;
+    let package = litchi_pptx::source::Package::from_presentation(&presentation)?;
     let target_slide = PPTX_SOURCE_SLIDE_COUNT / 2;
-    let mut edit = editor.edit_slide(target_slide)?;
-    if !edit.set_shape_text(0, semantic_pptx_text(target_slide, 0, true))? {
+    let mut edit = package.edit()?;
+    if !edit.set_shape_text(
+        target_slide,
+        0_usize,
+        semantic_pptx_text(target_slide, 0, true),
+    )? {
         return Err("PPTX source edit unexpectedly reported no change".into());
     }
-    let commit = edit.commit();
+    let commit = edit.commit()?;
     if !commit.diagnostics().changed() {
         return Err("PPTX source edit produced an unchanged commit".into());
     }
-    let replayed = commit.patch().apply(commit.patch().source())?;
-    if commit.patch().inverse().apply(&replayed).is_err() {
+    let replayed = package.apply(commit.patch())?;
+    if replayed.apply(&commit.patch().inverse()).is_err() {
         return Err("PPTX source edit inverse rejected its candidate".into());
     }
-    let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-    let published = editor.publish_slide_commit_to_stream(writer, &commit)?;
-    if commit.patch().inverse().apply(&published).is_err()
-        || commit.patch().apply(&published).is_ok()
+    let materializations = usize::try_from(presentation.cache_diagnostics().successful_loads)?;
+    commit.package().write_to(&mut *writer)?;
+    if commit.package().apply(&commit.patch().inverse()).is_err()
+        || commit.package().apply(commit.patch()).is_ok()
     {
-        return Err("PPTX source edit published a different slide snapshot".into());
+        return Err("PPTX source edit published a different slide revision".into());
     }
     Ok(materializations)
 }
@@ -51236,25 +51316,26 @@ fn publish_pptx_batch_edit<W: Write>(
         .collect::<Vec<_>>();
     let replacements = pptx_batch_replacements(&texts);
     if source_backed {
-        let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(source)?;
-        let mut edit = editor.edit_slide(target_slide)?;
-        if edit.set_shape_texts(&replacements)? != PPTX_SOURCE_TEXT_BOXES_PER_SLIDE {
+        let presentation = litchi_pptx::SourceBackedPresentation::from_read_at(source)?;
+        let package = litchi_pptx::source::Package::from_presentation(&presentation)?;
+        let mut edit = package.edit()?;
+        if edit.set_shape_texts(target_slide, &replacements)? != PPTX_SOURCE_TEXT_BOXES_PER_SLIDE {
             return Err("PPTX source-backed batch changed an unexpected shape count".into());
         }
-        let commit = edit.commit();
+        let commit = edit.commit()?;
         if !commit.diagnostics().changed() {
             return Err("PPTX source-backed batch produced an unchanged commit".into());
         }
-        let replayed = commit.patch().apply(commit.patch().source())?;
-        if commit.patch().inverse().apply(&replayed).is_err() {
+        let replayed = package.apply(commit.patch())?;
+        if replayed.apply(&commit.patch().inverse()).is_err() {
             return Err("PPTX source-backed batch inverse rejected its candidate".into());
         }
-        let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-        let published = editor.publish_slide_commit_to_stream(writer, &commit)?;
-        if commit.patch().inverse().apply(&published).is_err()
-            || commit.patch().apply(&published).is_ok()
+        let materializations = usize::try_from(presentation.cache_diagnostics().successful_loads)?;
+        commit.package().write_to(&mut *writer)?;
+        if commit.package().apply(&commit.patch().inverse()).is_err()
+            || commit.package().apply(commit.patch()).is_ok()
         {
-            return Err("PPTX source-backed batch published another snapshot".into());
+            return Err("PPTX source-backed batch published another revision".into());
         }
         Ok(materializations)
     } else {
@@ -51395,8 +51476,9 @@ fn publish_pptx_multi_slide_batch_edit<W: Write>(
     source_backed: bool,
 ) -> Result<usize, Box<dyn Error>> {
     if source_backed {
-        let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(source)?;
-        let mut edit = editor.edit_slides();
+        let presentation = litchi_pptx::SourceBackedPresentation::from_read_at(source)?;
+        let package = litchi_pptx::source::Package::from_presentation(&presentation)?;
+        let mut edit = package.edit()?;
         for slide_position in pptx_multi_slide_positions() {
             let texts = (0..PPTX_SOURCE_TEXT_BOXES_PER_SLIDE)
                 .map(|shape| semantic_pptx_text(slide_position, shape, true))
@@ -51414,16 +51496,16 @@ fn publish_pptx_multi_slide_batch_edit<W: Write>(
         if !commit.diagnostics().changed() {
             return Err("PPTX source-backed multi-slide batch produced no changes".into());
         }
-        let replayed = commit.patch().apply(commit.patch().source())?;
-        if commit.patch().inverse().apply(&replayed).is_err() {
+        let replayed = package.apply(commit.patch())?;
+        if replayed.apply(&commit.patch().inverse()).is_err() {
             return Err("PPTX source-backed multi-slide inverse rejected its candidate".into());
         }
-        let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-        let published = editor.publish_slide_batch_commit_to_stream(writer, &commit)?;
-        if commit.patch().inverse().apply(&published).is_err()
-            || commit.patch().apply(&published).is_ok()
+        let materializations = usize::try_from(presentation.cache_diagnostics().successful_loads)?;
+        commit.package().write_to(&mut *writer)?;
+        if commit.package().apply(&commit.patch().inverse()).is_err()
+            || commit.package().apply(commit.patch()).is_ok()
         {
-            return Err("PPTX source-backed multi-slide published another snapshot".into());
+            return Err("PPTX source-backed multi-slide published another revision".into());
         }
         return Ok(materializations);
     }
@@ -52134,9 +52216,10 @@ fn run_pptx_source_backed_cross_copy(
         let source_read: Arc<dyn ReadAt> = source.clone();
         let destination_read: Arc<dyn ReadAt> = destination.clone();
         let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-        let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+        let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+        let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
         if source_view.slide_count() != PPTX_CROSS_COPY_SOURCE_SLIDE_COUNT
-            || editor.slide_count() != corpus.destination_slide_count
+            || editor_view.slide_count() != corpus.destination_slide_count
         {
             return Err("source-backed PPTX cross-copy setup changed slide counts".into());
         }
@@ -52165,7 +52248,9 @@ fn run_pptx_source_backed_cross_copy(
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
         let started = Instant::now();
-        let snapshot = editor.publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
+        let mut editor_copy = editor.edit_cross_slide_copy()?;
+        let snapshot = editor_copy.stage(&plan)?;
+        editor_copy.commit()?.package().write_to(&mut sink)?;
         let publication_duration = started.elapsed();
         if snapshot.destination_slide_count() != corpus.destination_slide_count + 1
             || snapshot.insertion_position() != corpus.insertion_position
@@ -52240,9 +52325,9 @@ fn run_pptx_source_backed_cross_copy(
         return Err("source-backed PPTX cross-copy measured output digests are not stable".into());
     }
     let cross_copy = PptxSourceBackedCrossCopySummary {
-        implementation: "presentation::SourceBackedPresentationEditor + SourceTopologyPlan + publish_cross_slide_copy_to_stream",
+        implementation: "source::Package::plan_cross_slide_copy + cross_slide_copy::Edit::stage + commit + write_to (record 0356b)",
         workload: "matched plain corpus / existing pptx_cross_copy_plain input",
-        timing_scope: "source-backed plan only + public publish_cross_slide_copy_to_stream; setup, reopen, verification, topology gates, and cache diagnostics excluded",
+        timing_scope: "source-backed plan only + stage + commit + write_to; setup, reopen, verification, topology gates, and cache diagnostics excluded",
         performance_claim: "none: opt-in correctness/counter evidence only; no eager/source speedup, ABBA, allocation, RSS, physical-I/O, or cold-cache claim",
         source_archive_sha256: sha256_hex(&corpus.source_archive),
         destination_archive_sha256: sha256_hex(&corpus.destination_archive),
@@ -52384,7 +52469,8 @@ fn run_pptx_source_backed_cross_copy_lifecycle(
         let started = Instant::now();
         let open_started = Instant::now();
         let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-        let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+        let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+        let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
         let open_duration = open_started.elapsed();
         let plan_started = Instant::now();
         let plan = editor.plan_cross_slide_copy(
@@ -52395,7 +52481,9 @@ fn run_pptx_source_backed_cross_copy_lifecycle(
         )?;
         let plan_duration = plan_started.elapsed();
         let publication_started = Instant::now();
-        let snapshot = editor.publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
+        let mut editor_copy = editor.edit_cross_slide_copy()?;
+        let snapshot = editor_copy.stage(&plan)?;
+        editor_copy.commit()?.package().write_to(&mut sink)?;
         let publication_duration = publication_started.elapsed();
         let duration = started.elapsed();
         let allocation_metrics = match allocation_region.finish() {
@@ -52527,7 +52615,7 @@ fn run_pptx_source_backed_cross_copy_lifecycle(
         .checked_mul(PPTX_CROSS_COPY_MEDIA_ENTRY_BYTES)
         .ok_or("source-backed PPTX lifecycle media byte count overflows usize")?;
     let cross_copy = PptxSourceBackedCrossCopyLifecycleSummary {
-        implementation: "SourceBackedPresentation::from_read_at + SourceBackedPresentationEditor::from_read_at + SourceTopologyPlan::publish_cross_slide_copy_to_stream",
+        implementation: "SourceBackedPresentation::from_read_at + source::Package::from_presentation + cross_slide_copy::Edit::stage + write_to (record 0356b)",
         workload: if corpus.media_rich {
             "matched media-rich owned cross-copy corpus"
         } else {
@@ -61610,7 +61698,9 @@ mod tests {
         }))?;
         let commit = edit.commit()?;
         let mut output = Vec::new();
-        package.publish_section_layout_commit_to_stream(&mut output, &commit)?;
+        package
+            .apply_section_layout(&commit.patch().clone().into())
+            .and_then(|committed| committed.package().write_to(&mut output))?;
         Ok(output)
     }
 
@@ -61673,7 +61763,8 @@ mod tests {
             .ok_or("DOCX section-layout diagnostic output ceiling overflows u64")?;
         let mut sink = super::CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
-        let publication = package.publish_section_layout_commit_to_stream(&mut sink, &commit)?;
+        let publication = package.apply_section_layout(&commit.patch().clone().into())?;
+        publication.package().write_to(&mut sink)?;
         let publication_snapshot = docx_read_diagnostic_snapshot(&range_source, &provider_counter)?;
         snapshots.push(("publication", publication_snapshot));
         let provider_version_at_publication = range_source.version()?;
@@ -61686,7 +61777,10 @@ mod tests {
             OwnedSource::new(sink.bytes.clone()),
         ))?;
         let mut restored_output = Vec::new();
-        reopened.publish_section_layout_inverse_to_stream(&mut restored_output, &publication)?;
+        reopened
+            .apply_section_layout(&publication.patch().inverse())?
+            .package()
+            .write_to(&mut restored_output)?;
         let inverse_source_restored = restored_output == corpus.archive;
         if !inverse_source_restored {
             return Err("DOCX section-layout diagnostic inverse did not restore source".into());

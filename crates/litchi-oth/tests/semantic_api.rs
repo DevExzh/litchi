@@ -481,7 +481,11 @@ fn exact_noop_edit_is_source_checked_and_atomic() {
     assert!(!commit.diagnostics().changed());
     assert_eq!(commit.package().as_bytes(), source.as_bytes());
     assert_eq!(
-        source.apply(commit.patch()).unwrap().as_bytes(),
+        source
+            .apply(commit.patch())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
     assert!(alternate.apply(commit.patch()).is_err());
@@ -499,6 +503,7 @@ fn exact_noop_edit_is_source_checked_and_atomic() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes(),
     );
@@ -545,6 +550,7 @@ fn paragraph_edit_is_bounded_reversible_and_preserves_unknown_content() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
@@ -703,6 +709,7 @@ fn typed_list_builder_append_composition_history_and_refusals_reopen() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes(),
     );
@@ -802,7 +809,7 @@ fn heading_list_durable_and_merge_workflows_are_source_checked() {
     let durable = Patch::from_bytes(&wire).unwrap();
     assert_eq!(durable.heading_changes()[0].before(), "Heading");
     assert_eq!(
-        source.apply(&durable).unwrap().as_bytes(),
+        source.apply(&durable).unwrap().into_package().as_bytes(),
         left_commit.package().as_bytes()
     );
     let alternate = Builder::new().build().unwrap();
@@ -810,7 +817,12 @@ fn heading_list_durable_and_merge_workflows_are_source_checked() {
     let inverse_wire = durable.inverse().to_bytes().unwrap();
     let inverse = Patch::from_bytes(&inverse_wire).unwrap();
     assert_eq!(
-        left_commit.package().apply(&inverse).unwrap().as_bytes(),
+        left_commit
+            .package()
+            .apply(&inverse)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 
@@ -832,7 +844,11 @@ fn heading_list_durable_and_merge_workflows_are_source_checked() {
         Some("Bullets")
     );
     assert_eq!(
-        source.apply(&right_durable).unwrap().as_bytes(),
+        source
+            .apply(&right_durable)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         right_commit.package().as_bytes()
     );
     let plan = Patch::plan_three_way(&source, left_commit.patch(), right_commit.patch()).unwrap();
@@ -869,6 +885,7 @@ fn heading_list_durable_and_merge_workflows_are_source_checked() {
             .package()
             .apply(&durable_restored)
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
@@ -908,13 +925,18 @@ fn rich_inline_crud_is_durable_reversible_and_reopened() {
     let durable = Patch::from_bytes(&wire).unwrap();
     assert_eq!(durable.inline_changes().len(), 1);
     assert_eq!(
-        source.apply(&durable).unwrap().as_bytes(),
+        source.apply(&durable).unwrap().into_package().as_bytes(),
         commit.package().as_bytes()
     );
     let inverse_wire = durable.inverse().to_bytes().unwrap();
     let inverse = Patch::from_bytes(&inverse_wire).unwrap();
     assert_eq!(
-        commit.package().apply(&inverse).unwrap().as_bytes(),
+        commit
+            .package()
+            .apply(&inverse)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 }
@@ -1009,12 +1031,17 @@ fn inline_boundary_splices_preserve_unknown_nested_markup_and_resource_packages(
     );
     let durable = Patch::from_bytes(&commit.patch().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        source.apply(&durable).unwrap().as_bytes(),
+        source.apply(&durable).unwrap().into_package().as_bytes(),
         commit.package().as_bytes()
     );
     let inverse = Patch::from_bytes(&durable.inverse().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        commit.package().apply(&inverse).unwrap().as_bytes(),
+        commit
+            .package()
+            .apply(&inverse)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source_bytes
     );
 
@@ -1180,6 +1207,7 @@ fn inert_form_catalog_crud_is_durable_and_atomic() {
             .package()
             .apply(&removed.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         updated.package().as_bytes()
     );
@@ -1258,6 +1286,7 @@ fn isolated_nested_list_replace_remove_is_durable() {
             .package()
             .apply(&outer_durable.inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
@@ -1338,7 +1367,11 @@ fn metadata_and_styles_are_durable_and_reversible() {
     let parts_wire = parts_commit.patch().to_bytes().unwrap();
     let parts_durable = Patch::from_bytes(&parts_wire).unwrap();
     assert_eq!(
-        source.apply(&parts_durable).unwrap().as_bytes(),
+        source
+            .apply(&parts_durable)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         parts_commit.package().as_bytes()
     );
     assert_eq!(
@@ -1346,6 +1379,7 @@ fn metadata_and_styles_are_durable_and_reversible() {
             .package()
             .apply(&parts_durable.inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
@@ -1367,6 +1401,7 @@ fn metadata_and_styles_are_durable_and_reversible() {
             .package()
             .apply(&durable_removal.inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         parts_commit.package().as_bytes()
     );
@@ -1593,12 +1628,17 @@ fn resource_reference_and_payload_crud_is_durable_mergeable_and_fail_closed() {
 
     let durable = Patch::from_bytes(&commit.patch().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        source.apply(&durable).unwrap().as_bytes(),
+        source.apply(&durable).unwrap().into_package().as_bytes(),
         commit.package().as_bytes()
     );
     let inverse = Patch::from_bytes(&durable.inverse().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        commit.package().apply(&inverse).unwrap().as_bytes(),
+        commit
+            .package()
+            .apply(&inverse)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 
@@ -1764,7 +1804,11 @@ fn exact_rich_nested_and_object_transfer_closes_dependencies() {
     assert_eq!(rich_paragraph.links()[0].href(), "https://example.test/oth");
     let rich_durable = Patch::from_bytes(&rich.patch().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        destination.apply(&rich_durable).unwrap().as_bytes(),
+        destination
+            .apply(&rich_durable)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         rich.package().as_bytes()
     );
 
@@ -1785,7 +1829,11 @@ fn exact_rich_nested_and_object_transfer_closes_dependencies() {
     ));
     let inner_list_durable = Patch::from_bytes(&inner_list.patch().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        destination.apply(&inner_list_durable).unwrap().as_bytes(),
+        destination
+            .apply(&inner_list_durable)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         inner_list.package().as_bytes()
     );
     assert_eq!(
@@ -1793,6 +1841,7 @@ fn exact_rich_nested_and_object_transfer_closes_dependencies() {
             .package()
             .apply(&inner_list_durable.inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         destination.as_bytes()
     );
@@ -1831,7 +1880,11 @@ fn exact_rich_nested_and_object_transfer_closes_dependencies() {
     );
     let nested_durable = Patch::from_bytes(&nested.patch().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        destination.apply(&nested_durable).unwrap().as_bytes(),
+        destination
+            .apply(&nested_durable)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         nested.package().as_bytes()
     );
 
@@ -1859,12 +1912,21 @@ fn exact_rich_nested_and_object_transfer_closes_dependencies() {
     );
     let object_durable = Patch::from_bytes(&object.patch().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        destination.apply(&object_durable).unwrap().as_bytes(),
+        destination
+            .apply(&object_durable)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         object.package().as_bytes()
     );
     let object_inverse = Patch::from_bytes(&object_durable.inverse().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        object.package().apply(&object_inverse).unwrap().as_bytes(),
+        object
+            .package()
+            .apply(&object_inverse)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         destination.as_bytes()
     );
 
@@ -1941,6 +2003,7 @@ fn multi_paragraph_edit_is_atomic_and_can_fill_an_empty_element() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes(),
     );
@@ -2045,6 +2108,7 @@ fn opens_and_edits_the_pretty_printed_libreoffice_web_template() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );

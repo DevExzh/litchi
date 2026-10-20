@@ -10,7 +10,9 @@
 use super::transaction::Transaction as Draft;
 use crate::package::family::{Staged, graph_family};
 
-graph_family!("numbering");
+graph_family!("numbering", own_limits);
+
+pub use super::limit::LimitKind;
 
 /// A staged numbering change over one package snapshot. The source is never
 /// changed: [`Self::commit`] publishes a new package, and dropping the edit

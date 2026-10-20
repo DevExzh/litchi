@@ -559,6 +559,9 @@ impl Slide<'_> {
             Err(crate::text_edit::Error::Refused(_)) => Ok(None),
             Err(crate::text_edit::Error::Package(error)) => Err(error),
             Err(crate::text_edit::Error::Source(error)) => Err(Error::Corrupted(error.to_string())),
+            Err(
+                error @ (crate::text_edit::Error::PatchConflict | crate::text_edit::Error::Signed),
+            ) => Err(Error::Corrupted(error.to_string())),
         }
     }
 
