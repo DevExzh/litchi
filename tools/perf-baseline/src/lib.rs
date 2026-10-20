@@ -20361,13 +20361,11 @@ fn xlsx_calculation_media_payload(index: usize) -> Vec<u8> {
 }
 
 fn xlsx_calculation_metadata_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut package = litchi_xlsx::Package::new()?;
-    let mut edit = package.edit_calculation_metadata()?;
+    let mut edit = litchi_xlsx::Package::new()?.edit_calculation_metadata()?;
     edit.set_properties(
         litchi_xlsx::calculation_properties::Properties::new().with_calculation_id(Some(7)),
     );
-    edit.commit()?;
-    let mut opc = package.into_plain_opc();
+    let mut opc = edit.commit()?.into_package().into_plain_opc();
     let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
     opc.get_part_mut(&worksheet_uri)?.set_blob(
         br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetData/><drawing r:id="rIdDrawing"/></worksheet>"#.to_vec(),
@@ -52961,16 +52959,16 @@ fn publish_xlsx_calculation_metadata_edit<W: Write>(
         let package = SourceBackedPackage::from_read_at(source)?;
         let opc = package.into_opc_package()?;
         let materializations = opc.part_count();
-        let mut package = litchi_xlsx::Package::from_opc(opc)?;
+        let package = litchi_xlsx::Package::from_opc(opc)?;
         let mut edit = package.edit_calculation_metadata()?;
         if !edit.set_properties(properties) {
             return Err("XLSX eager calculation edit reported an exact no-op".into());
         }
         let commit = edit.commit()?;
-        if !commit.changed() || commit.patch().is_empty() {
+        if !commit.diagnostics().changed() || commit.patch().is_noop() {
             return Err("XLSX eager calculation edit produced an invalid patch".into());
         }
-        package.write_to(writer)?;
+        commit.package().write_to(writer)?;
         Ok(materializations)
     }
 }
@@ -54149,16 +54147,16 @@ fn publish_xlsx_page_break_edit<W: Write>(
         let package = SourceBackedPackage::from_read_at(source)?;
         let opc = package.into_opc_package()?;
         let materializations = opc.part_count();
-        let mut package = litchi_xlsx::Package::from_opc(opc)?;
+        let package = litchi_xlsx::Package::from_opc(opc)?;
         let mut edit = package.edit_page_breaks("Sheet1")?;
         if !edit.set_horizontal(horizontal)? {
             return Err("XLSX eager page-break edit reported an exact no-op".into());
         }
         let commit = edit.commit()?;
-        if !commit.changed() || commit.patch().is_empty() {
+        if !commit.diagnostics().changed() || commit.patch().is_noop() {
             return Err("XLSX eager page-break edit produced an invalid patch".into());
         }
-        package.write_to(writer)?;
+        commit.package().write_to(writer)?;
         Ok(materializations)
     }
 }

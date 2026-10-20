@@ -216,16 +216,25 @@ fn undeclared_element_and_attribute_prefixes_are_rejected() {
 
 #[test]
 fn package_transaction_reads_back_and_reverses_page_breaks() {
-    let mut package = crate::Package::new().unwrap();
-    let mut transaction = package.edit_page_breaks("Sheet1").unwrap();
+    let source = crate::Package::new().unwrap();
+    let mut edit = source.edit_page_breaks("Sheet1").unwrap();
     let collection = Collection::horizontal([Break::new(7, 0, 0).unwrap()]).unwrap();
-    assert!(transaction.set_horizontal(collection.clone()).unwrap());
-    let commit = transaction.commit().unwrap();
+    assert!(edit.set_horizontal(collection.clone()).unwrap());
+    let commit = edit.commit().unwrap();
 
     assert_eq!(
-        commit.snapshot().page_breaks().horizontal(),
+        commit.patch().after().page_breaks().horizontal(),
         Some(&collection)
     );
+    assert!(
+        source
+            .page_breaks("Sheet1")
+            .unwrap()
+            .page_breaks()
+            .horizontal()
+            .is_none()
+    );
+    let package = commit.package().clone();
     assert_eq!(
         package
             .page_breaks("Sheet1")
@@ -235,11 +244,12 @@ fn package_transaction_reads_back_and_reverses_page_breaks() {
         Some(&collection)
     );
 
-    package
-        .apply_page_breaks_patch(&commit.patch().inverse())
-        .unwrap();
+    let restored = package
+        .apply_page_breaks(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(
-        package.page_breaks("Sheet1").unwrap().page_breaks(),
+        restored.page_breaks("Sheet1").unwrap().page_breaks(),
         &PageBreaks::new()
     );
 }

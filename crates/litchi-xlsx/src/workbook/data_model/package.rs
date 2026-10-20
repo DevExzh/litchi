@@ -7,7 +7,7 @@ use litchi_core::xml::ReaderOrigin;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use quick_xml::{Reader, events::Event};
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::package::xldm::{
     OlapProofLimits, StorageProfile, Xldm140TimeGroupingContentType, generated,
     inspect as inspect_xldm, metadata, native, olap, olapproof, prove_xldm140_closure,
@@ -103,7 +103,8 @@ fn load_shared_model(package: &OpcPackage, workbook_name: &PackURI) -> Result<Op
 /// relationship closure are checked. A model-time-grouping write additionally
 /// requires the neutral XLDM owner to prove the source and calculated-column
 /// identity closure before the descriptor is published.
-pub fn store_data_model(
+#[cfg(test)]
+pub(crate) fn store_data_model(
     package: &mut OpcPackage,
     workbook_name: &PackURI,
     value: &Model,
@@ -821,24 +822,44 @@ impl Snapshot {
     }
 }
 
-/// A clone-staged source-bound Data Model transaction.
-pub struct Transaction<'a> {
-    target: crate::package::Target<'a>,
+crate::record::record_family!("Data Model");
+
+/// A staged, source-bound Data Model edit of one [`crate::Package`].
+///
+/// Starting one reads the graph and copies no payload. Dropping the edit
+/// discards it; [`Self::commit`] publishes a new package.
+pub struct Edit {
+    target: crate::record::Source,
     before: Snapshot,
     draft: Option<ModelView>,
 }
 
-impl<'a> Transaction<'a> {
-    /// Start a transaction from the package's current Data Model graph.
-    pub fn new(target: &'a mut OpcPackage) -> Result<Self> {
-        Self::start(target.into())
+impl crate::Package {
+    /// Start a Data Model edit from the package's current graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose mutations are
+    /// refused, and the read errors of the graph.
+    pub fn edit_data_model(&self) -> Result<Edit> {
+        Edit::start(crate::record::Source::new(self, "edit_data_model")?)
     }
 
-    pub(crate) fn for_package(package: &'a mut crate::Package) -> Result<Self> {
-        Self::start(crate::package::Target::Package(package))
+    /// Apply an exact Data Model patch to a new package; this one is
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// before state and [`Error::Signed`] for a changed patch of a signed
+    /// workbook.
+    pub fn apply_data_model(&self, patch: &Patch) -> Result<Commit> {
+        crate::record::replay(self, patch, "apply_data_model")
     }
+}
 
-    fn start(target: crate::package::Target<'a>) -> Result<Self> {
+impl Edit {
+    fn start(target: crate::record::Source) -> Result<Self> {
         let before = Snapshot::load(&target)?;
         Ok(Self {
             draft: before.model.clone(),
@@ -867,7 +888,8 @@ impl<'a> Transaction<'a> {
     /// XLDM storage profile cannot prove that a changed opaque payload keeps
     /// the same inner table, relationship, column, and time-group identity
     /// closure. Creation into an empty workbook remains supported through the
-    /// outer validation performed by [`store_data_model`].
+    /// outer validation of the descriptor, storage profile and relationship
+    /// closure.
     /// Imported opaque extensions acquire explicit namespace context for the
     /// destination workbook; inspect [`Self::model`] for the staged definition.
     pub fn set(&mut self, model: Model) -> Result<bool> {
@@ -984,18 +1006,39 @@ impl<'a> Transaction<'a> {
     }
 
     /// Whether the typed model or payload differs from the source snapshot.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn changed(&self) -> bool {
         !self.before.same_semantics(self.draft.as_ref())
     }
 
-    /// Validate the source closure and atomically publish the staged model.
-    pub fn commit(mut self) -> Result<Commit> {
-        if !self.is_changed() {
-            return Ok(Commit::new(
-                self.before.clone(),
-                Patch::new(self.before.clone(), self.before.clone()),
-                false,
+    #[cfg(test)]
+    pub(crate) fn is_changed(&self) -> bool {
+        self.changed()
+    }
+
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.draft.clone_from(&self.before.model);
+    }
+
+    /// Validate the source closure and publish the staged model as a new
+    /// package. An unchanged edit returns the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`] for a changed edit of a signed workbook,
+    /// [`Error::PatchConflict`] when the source changed, and the
+    /// publication's validation errors.
+    pub fn commit(self) -> Result<Commit> {
+        self.publish().map(|(commit, _)| commit)
+    }
+
+    /// [`Self::commit`], keeping the published snapshot.
+    fn publish(self) -> Result<(Commit, Snapshot)> {
+        if !self.changed() {
+            let patch = Patch::new(self.before.clone(), self.before.clone());
+            return Ok((
+                Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
+                self.before,
             ));
         }
         if self.target.is_signed() || self.target.requires_signature_edit_policy() {
@@ -1007,7 +1050,7 @@ impl<'a> Transaction<'a> {
                 part: "Data Model source closure".into(),
             });
         }
-        let mut candidate = self.target.clone();
+        let mut candidate = OpcPackage::clone(&self.target);
         publish_data_model(
             &mut candidate,
             &self.before.workbook_name,
@@ -1018,8 +1061,11 @@ impl<'a> Transaction<'a> {
             return Err(invalid("Data Model publication changed staged semantics"));
         }
         let patch = Patch::new(self.before, snapshot.clone());
-        self.target.publish(candidate)?;
-        Ok(Commit::new(snapshot, patch, true))
+        let package = self.target.publish(candidate)?;
+        Ok((
+            Commit::new(package, patch, Diagnostics::new(true)),
+            snapshot,
+        ))
     }
 }
 
@@ -1049,7 +1095,7 @@ impl Patch {
 
     /// Whether this patch is a byte-preserving no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
@@ -1064,14 +1110,14 @@ impl Patch {
 
     /// Apply the patch atomically, restoring retained source bytes for the
     /// workbook descriptor and opaque payload.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<()> {
+    pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<()> {
         let current = Snapshot::load(target)?;
         if !current.same_source(&self.before) {
             return Err(Error::PatchConflict {
                 part: "Data Model source closure".into(),
             });
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(());
         }
         if target.is_signed() || target.requires_signature_edit_policy() {
@@ -1113,39 +1159,59 @@ impl Patch {
     }
 }
 
-/// Successful Data Model transaction publication.
-#[derive(Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
+impl crate::record::Record for Patch {
+    fn is_noop(&self) -> bool {
+        Self::is_noop(self)
+    }
+
+    fn apply_to(&self, package: &mut OpcPackage) -> Result<()> {
+        self.apply(package)
+    }
 }
 
-impl Commit {
-    fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
-        Self {
+/// A raw-graph route over [`Edit`] for the unit tests that author bare
+/// graphs.
+#[cfg(test)]
+pub(crate) struct Transaction<'a> {
+    target: crate::record::TestTarget<'a>,
+    edit: Edit,
+}
+
+#[cfg(test)]
+impl<'a> Transaction<'a> {
+    pub(crate) fn new(target: impl Into<crate::record::TestTarget<'a>>) -> Result<Self> {
+        let target = target.into();
+        let package = target.package()?;
+        let edit = package.edit_data_model()?;
+        Ok(Self { target, edit })
+    }
+
+    pub(crate) fn commit(self) -> Result<crate::record::RawCommit<Snapshot, Patch>> {
+        let (commit, snapshot) = self.edit.publish()?;
+        let changed = commit.diagnostics().changed();
+        let (package, patch) = commit.into_parts();
+        self.target.store(package);
+        Ok(crate::record::RawCommit {
             snapshot,
             patch,
             changed,
-        }
+        })
     }
+}
 
-    /// Whether the model graph changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.changed
+#[cfg(test)]
+impl std::ops::Deref for Transaction<'_> {
+    type Target = Edit;
+
+    fn deref(&self) -> &Edit {
+        &self.edit
     }
+}
 
-    /// Resulting source-bound snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Exact reversible patch produced by the transaction.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
+#[cfg(test)]
+impl std::ops::DerefMut for Transaction<'_> {
+    fn deref_mut(&mut self) -> &mut Edit {
+        &mut self.edit
     }
 }
 

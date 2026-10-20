@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use litchi_opc::OpcPackage;
+use litchi_xlsx::calculation_properties::edit::EditOptions;
 use litchi_xlsx::calculation_properties::{
-    Feature, Features, Limits, Properties, Transaction, apply_patch, parse_with_limits,
+    Feature, Features, Limits, Properties, parse_with_limits,
 };
 use litchi_xlsx::{Error, Package};
 
@@ -34,22 +34,36 @@ fn nested_workbook(depth: usize) -> Vec<u8> {
     ))
 }
 
-fn package() -> OpcPackage {
-    Package::new().expect("create package").into_plain_opc()
+fn package() -> Package {
+    Package::new().expect("create package")
 }
 
-fn source(package: &OpcPackage) -> Arc<Vec<u8>> {
+fn source(package: &Package) -> Arc<Vec<u8>> {
     package
-        .main_document_part()
-        .expect("workbook part")
-        .blob_arc()
+        .calculation_metadata()
+        .expect("calculation metadata")
+        .source_arc()
+        .expect("workbook source")
+}
+
+fn edit(
+    package: &Package,
+    limits: &Limits,
+) -> litchi_xlsx::Result<litchi_xlsx::calculation_properties::edit::Edit> {
+    package.edit_calculation_metadata_with_options(EditOptions::default().limits(*limits))
 }
 
 fn assert_limit_error(error: Error) {
     assert!(
         matches!(
             error,
-            Error::Invalid(_) | Error::MarkupCompatibility(_) | Error::Xml(_)
+            Error::Invalid(_)
+                | Error::MarkupCompatibility(_)
+                | Error::Xml(_)
+                | Error::Limit {
+                    kind: litchi_xlsx::LimitKind::CalculationProperties(_),
+                    ..
+                }
         ),
         "unexpected typed error: {error}"
     );
@@ -114,10 +128,10 @@ fn opaque_byte_limit_accepts_exact_n_and_rejects_n_plus_one() {
 }
 
 fn authored_source(calculation_id: u32, limits: &Limits) -> Result<Vec<u8>, Error> {
-    let mut package = package();
-    let mut transaction = Transaction::with_limits(&mut package, limits)?;
+    let package = package();
+    let mut transaction = edit(&package, limits)?;
     transaction.set_properties(Properties::new().with_calculation_id(Some(calculation_id)));
-    transaction.commit()?;
+    let package = transaction.commit()?.into_package();
     Ok(source(&package).as_ref().clone())
 }
 
@@ -132,9 +146,9 @@ fn output_limit_accepts_exact_n_and_failed_transaction_is_atomic_at_n_plus_one()
         .unwrap();
     assert_eq!(authored_source(1, &limits).unwrap(), exact_output);
 
-    let mut rejected = package();
+    let rejected = package();
     let before = source(&rejected);
-    let mut transaction = Transaction::with_limits(&mut rejected, &limits).unwrap();
+    let mut transaction = edit(&rejected, &limits).unwrap();
     transaction.set_properties(Properties::new().with_calculation_id(Some(10)));
     assert_limit_error(transaction.commit().unwrap_err());
     let after = source(&rejected);
@@ -144,19 +158,18 @@ fn output_limit_accepts_exact_n_and_failed_transaction_is_atomic_at_n_plus_one()
 
 #[test]
 fn failed_patch_is_atomic_and_retains_the_exact_source() {
-    let mut authored = package();
-    let mut transaction = Transaction::new(&mut authored).unwrap();
+    let authored = package();
+    let mut transaction = authored.edit_calculation_metadata().unwrap();
     transaction.set_properties(Properties::new().with_calculation_id(Some(7)));
     let patch = transaction.commit().unwrap().patch().clone();
 
-    let mut stale = package();
-    let mut transaction = Transaction::new(&mut stale).unwrap();
+    let mut transaction = package().edit_calculation_metadata().unwrap();
     transaction.set_properties(Properties::new().with_calculation_id(Some(8)));
-    transaction.commit().unwrap();
+    let stale = transaction.commit().unwrap().into_package();
     let before = source(&stale);
 
     assert!(matches!(
-        apply_patch(&mut stale, &patch),
+        stale.apply_calculation_metadata(&patch),
         Err(Error::PatchConflict { .. })
     ));
     let after = source(&stale);
@@ -200,13 +213,13 @@ fn staged_features_are_checked_by_writer_count_and_name_limits() {
     ];
 
     for (limits, names) in scenarios {
-        let mut package = package();
+        let package = package();
         let before = source(&package);
         let values = names
             .into_iter()
             .map(|name| Feature::new(name).unwrap())
             .collect::<Vec<_>>();
-        let mut transaction = Transaction::with_limits(&mut package, &limits).unwrap();
+        let mut transaction = edit(&package, &limits).unwrap();
         transaction.set_features(Features::try_from_vec(values).unwrap());
         assert_limit_error(transaction.commit().unwrap_err());
         assert!(Arc::ptr_eq(&before, &source(&package)));

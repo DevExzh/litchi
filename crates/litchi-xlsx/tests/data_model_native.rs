@@ -20,7 +20,7 @@ fn unknown_model_profile_is_retained_on_package_write() {
             feature: "XLDM header version"
         })
     ));
-    let mut package = Package::from_opc(raw.clone()).unwrap();
+    let package = Package::from_opc(raw.clone()).unwrap();
     assert!(matches!(
         package.data_model(),
         Err(Error::Unsupported {
@@ -124,14 +124,14 @@ fn native_relationship_token_removal_and_inverse_preserve_exact_xml() {
 
 #[test]
 fn native_descriptor_patch_rejects_relationship_lexical_source_changes() {
-    let mut package = Package::from_bytes(SOURCE).unwrap();
+    let package = Package::from_bytes(SOURCE).unwrap();
     let mut edit = package.edit_data_model().unwrap();
     edit.edit_definition(|definition| {
         definition.min_version_load += 1;
         Ok(())
     })
     .unwrap();
-    let patch = edit.commit().unwrap().patch().clone();
+    let (_, patch) = edit.commit().unwrap().into_parts();
     let original = soapberry_zip::office::ArchiveReader::new(SOURCE).unwrap();
     let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
     for member in original.file_names() {
@@ -150,7 +150,7 @@ fn native_descriptor_patch_rejects_relationship_lexical_source_changes() {
     let changed = writer.finish_to_bytes().unwrap();
     let mut target = OpcPackage::from_vec(changed.clone()).unwrap();
     assert!(matches!(
-        patch.apply(&mut target),
+        apply_patch(&patch, &mut target),
         Err(Error::PatchConflict { .. })
     ));
     assert_eq!(
@@ -161,7 +161,7 @@ fn native_descriptor_patch_rejects_relationship_lexical_source_changes() {
 
 #[test]
 fn public_structural_descriptor_and_payload_replacement_is_refused_without_inner_identity_proof() {
-    let mut package = Package::from_bytes(SOURCE).unwrap();
+    let package = Package::from_bytes(SOURCE).unwrap();
     let mut edit = package.edit_data_model().unwrap();
     let mut replacement = edit.model().unwrap().to_owned();
     replacement.definition.tables[0].id.push_str("-replacement");
@@ -176,7 +176,8 @@ fn public_structural_descriptor_and_payload_replacement_is_refused_without_inner
             feature: "structural Data Model edits require validated inner XLDM identity closure"
         })
     ));
-    assert!(!edit.is_changed());
+    // The refusal staged nothing.
+    assert!(edit.commit().unwrap().patch().is_noop());
 }
 
 #[test]
@@ -234,7 +235,8 @@ fn native_model_removal_retains_connections_and_restores_exact_source() {
             let mut edit = package.edit_data_model().unwrap();
             assert!(edit.remove().unwrap());
             let commit = edit.commit().unwrap();
-            assert!(commit.snapshot().model().is_none());
+            package = commit.package().clone();
+            assert!(commit.patch().after().model().is_none());
             let patch = commit.patch().clone();
             let mut output = Vec::new();
             package.write_to(&mut output).unwrap();
@@ -267,7 +269,7 @@ fn native_model_removal_retains_connections_and_restores_exact_source() {
                     part.blob()
                 );
             }
-            patch.inverse().apply(&mut reopened).unwrap();
+            apply_patch(&patch.inverse(), &mut reopened).unwrap();
             let restored = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
             let archive = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();
             for part in raw
@@ -340,7 +342,8 @@ fn native_model_removal_preserves_connections_processing_instructions_and_tokens
     let mut package = Package::from_bytes(&source).unwrap();
     let mut edit = package.edit_data_model().unwrap();
     assert!(edit.remove().unwrap());
-    let patch = edit.commit().unwrap().patch().clone();
+    let (package_after, patch) = edit.commit().unwrap().into_parts();
+    package = package_after;
 
     let mut output = Vec::new();
     package.write_to(&mut output).unwrap();
@@ -372,7 +375,7 @@ fn native_model_removal_preserves_connections_processing_instructions_and_tokens
         expected_relationships.bytes()
     );
 
-    patch.inverse().apply(&mut reopened).unwrap();
+    apply_patch(&patch.inverse(), &mut reopened).unwrap();
     let restored = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
     let actual = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();
     let expected = soapberry_zip::office::ArchiveReader::new(&source).unwrap();
@@ -428,7 +431,8 @@ fn native_removal_honors_auto_delete_and_addin_retention_with_exact_inverse() {
         let mut package = Package::from_bytes(&source).unwrap();
         let mut edit = package.edit_data_model().unwrap();
         edit.remove().unwrap();
-        let patch = edit.commit().unwrap().patch().clone();
+        let (package_after, patch) = edit.commit().unwrap().into_parts();
+        package = package_after;
         let mut output = Vec::new();
         package.write_to(&mut output).unwrap();
         let mut reopened = Package::from_bytes(&output).unwrap().into_plain_opc();
@@ -462,7 +466,7 @@ fn native_removal_honors_auto_delete_and_addin_retention_with_exact_inverse() {
                 part.blob()
             );
         }
-        patch.inverse().apply(&mut reopened).unwrap();
+        apply_patch(&patch.inverse(), &mut reopened).unwrap();
         for part in original
             .try_iter_parts()
             .map(|part| part.expect("part payload decodes"))
@@ -501,7 +505,7 @@ fn native_model_removal_refuses_query_pivot_and_cube_dependencies_atomically() {
             raw.get_part_mut(&name).unwrap().set_blob(br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><extLst><xm:f>CUBEVALUE(A1)</xm:f></extLst></worksheet>"#.to_vec());
         }
         let expected = raw.clone();
-        let mut package = Package::from_opc(raw).unwrap();
+        let package = Package::from_opc(raw).unwrap();
         let before = package.data_model().unwrap();
         let mut edit = package.edit_data_model().unwrap();
         edit.remove().unwrap();
@@ -528,17 +532,17 @@ fn native_removal_patch_rechecks_changed_dependent_parts_before_publication() {
     let mut original = OpcPackage::from_vec(SOURCE.to_vec()).unwrap();
     let name = PackURI::new("/xl/pivotCache/pivotCacheDefinition1.xml").unwrap();
     original.try_add_part(Box::new(litchi_opc::BlobPart::new(name.clone(), "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml".into(), br#"<pivotCacheDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cacheSource type="external" connectionId="1"/></pivotCacheDefinition>"#.to_vec()))).unwrap();
-    let mut package = Package::from_opc(original.clone()).unwrap();
+    let package = Package::from_opc(original.clone()).unwrap();
     let mut edit = package.edit_data_model().unwrap();
     edit.remove().unwrap();
-    let patch = edit.commit().unwrap().patch().clone();
+    let (_, patch) = edit.commit().unwrap().into_parts();
     let mut target = original;
     // Keep the part/type set unchanged so the source manifest guard passes;
     // the dependency check must notice the newly model-bound cache itself.
     target.get_part_mut(&name).unwrap().set_blob(br#"<pivotCacheDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cacheSource type="external" connectionId="4"/></pivotCacheDefinition>"#.to_vec());
     let before = target.clone();
     assert!(matches!(
-        patch.apply(&mut target),
+        apply_patch(&patch, &mut target),
         Err(Error::Unsupported { .. })
     ));
     assert_eq!(target.part_count(), before.part_count());
@@ -608,6 +612,7 @@ fn check_native_model_descriptor_round_trip(raw: OpcPackage) {
             .unwrap()
             .commit()
             .unwrap()
+            .diagnostics()
             .changed()
     );
     let version = model.definition().min_version_load + 1;
@@ -620,7 +625,10 @@ fn check_native_model_descriptor_round_trip(raw: OpcPackage) {
             })
             .is_err()
     );
-    assert!(!transaction.is_changed());
+    // The refusal staged nothing.
+    let mut refused = transaction;
+    refused.reset();
+    let mut transaction = refused;
     assert!(
         transaction
             .edit_definition(|definition| {
@@ -630,9 +638,10 @@ fn check_native_model_descriptor_round_trip(raw: OpcPackage) {
             .unwrap()
     );
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
+    package = commit.package().clone();
+    assert!(commit.diagnostics().changed());
     assert_eq!(
-        commit.snapshot().model().unwrap().payload().as_ptr(),
+        commit.patch().after().model().unwrap().payload().as_ptr(),
         model.payload().as_ptr()
     );
     let patch = commit.patch().clone();
@@ -674,7 +683,7 @@ fn check_native_model_descriptor_round_trip(raw: OpcPackage) {
             assert_eq!(after.get_part(part.partname()).unwrap().blob(), part.blob());
         }
     }
-    patch.inverse().apply(&mut after).unwrap();
+    apply_patch(&patch.inverse(), &mut after).unwrap();
     let restored = litchi_opc::PackageWriter::to_bytes(&after).unwrap();
     assert_eq!(
         soapberry_zip::office::ArchiveReader::new(&restored)
@@ -717,7 +726,7 @@ fn native_workbook_relationship_compatibility_has_exact_owner_and_target() {
         let rels = changed.get_part_mut(&workbook).unwrap().rels_mut();
         rels.remove(&edge_id);
         rels.add_relationship(reltype.into(), target.into(), edge_id.clone(), external);
-        let mut package = Package::from_opc(changed).unwrap();
+        let package = Package::from_opc(changed).unwrap();
         assert!(package.data_model().is_err());
         assert!(package.edit_data_model().is_err());
     }
@@ -864,7 +873,7 @@ fn native_removal_refuses_named_extension_and_attribute_formula_consumers() {
         )))
         .unwrap();
         let before = raw.clone();
-        let mut package = Package::from_opc(raw).unwrap();
+        let package = Package::from_opc(raw).unwrap();
         let mut edit = package.edit_data_model().unwrap();
         edit.remove().unwrap();
         assert!(
@@ -947,7 +956,8 @@ fn native_removal_deletes_final_connections_owner_and_restores_exact_inverse() {
         let mut package = Package::from_opc(original.clone()).unwrap();
         let mut edit = package.edit_data_model().unwrap();
         edit.remove().unwrap();
-        let patch = edit.commit().unwrap().patch().clone();
+        let (package_after, patch) = edit.commit().unwrap().into_parts();
+        package = package_after;
         let mut output = Vec::new();
         package.write_to(&mut output).unwrap();
         let mut reopened = OpcPackage::from_vec(output).unwrap();
@@ -962,7 +972,7 @@ fn native_removal_deletes_final_connections_owner_and_restores_exact_inverse() {
                 .any(|rel| rel.reltype().ends_with("/connections"))
         );
         let mut forward = original.clone();
-        patch.apply(&mut forward).unwrap();
+        apply_patch(&patch, &mut forward).unwrap();
         assert!(forward.get_part(&name).is_err());
         for part in original
             .try_iter_parts()
@@ -979,7 +989,7 @@ fn native_removal_deletes_final_connections_owner_and_restores_exact_inverse() {
                 part.blob()
             );
         }
-        patch.inverse().apply(&mut reopened).unwrap();
+        apply_patch(&patch.inverse(), &mut reopened).unwrap();
         let restored = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
         let actual = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();
         let expected = soapberry_zip::office::ArchiveReader::new(&source).unwrap();
@@ -1055,7 +1065,7 @@ fn final_connections_owner_removal_refuses_unowned_content_and_edges_atomically(
                 );
         }
         let before = raw.clone();
-        let mut package = Package::from_opc(raw).unwrap();
+        let package = Package::from_opc(raw).unwrap();
         if case == 2 {
             assert!(package.edit_data_model().is_err());
         } else {
@@ -1085,10 +1095,10 @@ fn final_connections_owner_removal_refuses_unowned_content_and_edges_atomically(
 fn connections_owner_removal_patch_rechecks_new_foreign_references() {
     let source = all_auto_delete_connections_source();
     let original = OpcPackage::from_vec(source).unwrap();
-    let mut package = Package::from_opc(original.clone()).unwrap();
+    let package = Package::from_opc(original.clone()).unwrap();
     let mut edit = package.edit_data_model().unwrap();
     edit.remove().unwrap();
-    let patch = edit.commit().unwrap().patch().clone();
+    let (_, patch) = edit.commit().unwrap().into_parts();
     let mut target = original;
     target.rels_mut().add_relationship(
         "urn:vendor".into(),
@@ -1098,7 +1108,7 @@ fn connections_owner_removal_patch_rechecks_new_foreign_references() {
     );
     let before = target.clone();
     assert!(matches!(
-        patch.apply(&mut target),
+        apply_patch(&patch, &mut target),
         Err(Error::Unsupported {
             feature: "Data Model removal with foreign Connections references"
         })
@@ -1144,10 +1154,11 @@ fn connections_owner_inverse_rejects_uri_reuse_even_with_unchanged_manifest() {
             .unwrap();
     }
     let source = writer.finish_to_bytes().unwrap();
-    let mut package = Package::from_bytes(&source).unwrap();
+    let package = Package::from_bytes(&source).unwrap();
     let mut edit = package.edit_data_model().unwrap();
     edit.remove().unwrap();
-    let inverse = edit.commit().unwrap().patch().inverse();
+    let (package, patch) = edit.commit().unwrap().into_parts();
+    let inverse = patch.inverse();
     let mut target = package.into_plain_opc();
     let manifest = target.source_content_types().unwrap();
     let name = PackURI::new("/xl/connections.cnx").unwrap();
@@ -1161,7 +1172,7 @@ fn connections_owner_inverse_rejects_uri_reuse_even_with_unchanged_manifest() {
     assert_eq!(target.source_content_types().unwrap(), manifest);
     let before = target.clone();
     assert!(
-        matches!(inverse.apply(&mut target), Err(Error::PatchConflict { part }) if part == "Data Model restored Connections owner")
+        matches!(apply_patch(&inverse, &mut target), Err(Error::PatchConflict { part }) if part == "Data Model restored Connections owner")
     );
     assert_eq!(target.part_count(), before.part_count());
     for part in before
@@ -1178,10 +1189,11 @@ fn connections_owner_inverse_rejects_uri_reuse_even_with_unchanged_manifest() {
 #[test]
 fn connections_owner_inverse_rejects_new_incoming_edges_to_absent_uri() {
     let source = all_auto_delete_connections_source();
-    let mut package = Package::from_bytes(&source).unwrap();
+    let package = Package::from_bytes(&source).unwrap();
     let mut edit = package.edit_data_model().unwrap();
     edit.remove().unwrap();
-    let inverse = edit.commit().unwrap().patch().inverse();
+    let (package, patch) = edit.commit().unwrap().into_parts();
+    let inverse = patch.inverse();
     let removed = package.into_plain_opc();
     let name = PackURI::new("/xl/connections.xml").unwrap();
     for (from_root, target_name) in [
@@ -1217,7 +1229,7 @@ fn connections_owner_inverse_rejects_new_incoming_edges_to_absent_uri() {
         );
         let before = target.clone();
         assert!(
-            matches!(inverse.apply(&mut target), Err(Error::PatchConflict { part }) if part == "Data Model restored Connections references")
+            matches!(apply_patch(&inverse, &mut target), Err(Error::PatchConflict { part }) if part == "Data Model restored Connections references")
         );
         assert_eq!(target.rels().to_xml(), before.rels().to_xml());
         assert_eq!(target.part_count(), before.part_count());
@@ -1241,7 +1253,8 @@ fn final_connections_owner_resolves_case_variant_owning_target() {
     let mut package = Package::from_bytes(&source).unwrap();
     let mut edit = package.edit_data_model().unwrap();
     edit.remove().unwrap();
-    let patch = edit.commit().unwrap().patch().clone();
+    let (package_after, patch) = edit.commit().unwrap().into_parts();
+    package = package_after;
     let mut output = Vec::new();
     package.write_to(&mut output).unwrap();
     let mut reopened = OpcPackage::from_vec(output).unwrap();
@@ -1250,7 +1263,7 @@ fn final_connections_owner_resolves_case_variant_owning_target() {
             .get_part(&PackURI::new("/xl/connections.xml").unwrap())
             .is_err()
     );
-    patch.inverse().apply(&mut reopened).unwrap();
+    apply_patch(&patch.inverse(), &mut reopened).unwrap();
     let restored = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
     let actual = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();
     let original = soapberry_zip::office::ArchiveReader::new(&source).unwrap();
@@ -1294,15 +1307,16 @@ fn native_model_workbook_edge_resolves_case_equivalent_target() {
     let source = native_source_with_xml_change("xl/_rels/workbook.xml.rels", |xml| {
         xml.replace("Target=\"model/item.data\"", "Target=\"model/ITEM.DATA\"")
     });
-    let mut package = Package::from_bytes(&source).unwrap();
+    let package = Package::from_bytes(&source).unwrap();
     assert!(package.data_model().unwrap().model().is_some());
     let mut edit = package.edit_data_model().unwrap();
     edit.remove().unwrap();
-    let inverse = edit.commit().unwrap().patch().inverse();
+    let (package, patch) = edit.commit().unwrap().into_parts();
+    let inverse = patch.inverse();
     let mut output = Vec::new();
     package.write_to(&mut output).unwrap();
     let mut reopened = OpcPackage::from_vec(output).unwrap();
-    inverse.apply(&mut reopened).unwrap();
+    apply_patch(&inverse, &mut reopened).unwrap();
     let restored = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
     let actual = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();
     let original = soapberry_zip::office::ArchiveReader::new(&source).unwrap();
@@ -1313,4 +1327,17 @@ fn native_model_workbook_edge_resolves_case_equivalent_target() {
             "{member}"
         );
     }
+}
+
+/// Replay a Data Model patch onto a raw graph through the package route.
+fn apply_patch(
+    patch: &litchi_xlsx::workbook::data_model::Patch,
+    target: &mut OpcPackage,
+) -> litchi_xlsx::Result<()> {
+    let package = Package::from_opc(target.clone())?;
+    *target = package
+        .apply_data_model(patch)?
+        .into_package()
+        .into_plain_opc();
+    Ok(())
 }

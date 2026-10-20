@@ -302,6 +302,15 @@ pub enum LimitKind {
     Drawing(crate::drawing::edit::LimitKind),
     /// Raw OPC edits ([`crate::opc::LimitKind`]).
     Opc(crate::opc::LimitKind),
+    /// Custom Data ([`crate::custom_data::LimitKind`]).
+    CustomData(crate::custom_data::LimitKind),
+    /// Surveys ([`crate::survey::LimitKind`]).
+    Survey(crate::survey::LimitKind),
+    /// Workbook calculation metadata
+    /// ([`crate::calculation_properties::LimitKind`]).
+    CalculationProperties(crate::calculation_properties::LimitKind),
+    /// Worksheet page breaks ([`crate::page_breaks::LimitKind`]).
+    PageBreaks(crate::page_breaks::LimitKind),
 }
 
 impl LimitKind {
@@ -333,6 +342,15 @@ impl LimitKind {
             Self::Drawing(Drawing::ImageBytes) => "bytes of one image",
             Self::Drawing(_) => "worksheet drawing",
             Self::Opc(_) => "parts changed by one raw OPC commit",
+            Self::CustomData(_) => "Custom Data budget",
+            Self::Survey(_) => "Survey budget",
+            Self::CalculationProperties(_) => "calculation-metadata budget",
+            Self::PageBreaks(crate::page_breaks::LimitKind::HorizontalBreaks) => {
+                "row breaks of one worksheet"
+            },
+            Self::PageBreaks(crate::page_breaks::LimitKind::VerticalBreaks) => {
+                "column breaks of one worksheet"
+            },
         }
     }
 }
@@ -362,6 +380,10 @@ limit_kind_from!(
     Chart(crate::chart::edit::LimitKind),
     Drawing(crate::drawing::edit::LimitKind),
     Opc(crate::opc::LimitKind),
+    CustomData(crate::custom_data::LimitKind),
+    Survey(crate::survey::LimitKind),
+    CalculationProperties(crate::calculation_properties::LimitKind),
+    PageBreaks(crate::page_breaks::LimitKind),
 );
 
 impl From<std::convert::Infallible> for Error {

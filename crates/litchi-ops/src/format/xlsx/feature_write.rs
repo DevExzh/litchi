@@ -2947,8 +2947,7 @@ impl Xlsx {
         kind: Kind,
         breaks: Vec<xlsx::page_breaks::Break>,
     ) -> Result<Commit> {
-        let mut target = source.clone();
-        let mut edit = target.edit_page_breaks(sheet)?;
+        let mut edit = source.edit_page_breaks(sheet)?;
         let changed = if breaks.is_empty() {
             if kind == Kind::RowBreak {
                 edit.remove_horizontal()
@@ -2963,8 +2962,8 @@ impl Xlsx {
             edit.set_vertical(xlsx::page_breaks::Collection::vertical(breaks).map_err(authored)?)?
         };
         let committed = edit.commit()?;
-        let changed = changed && committed.changed();
-        Ok(self.publish(source, target, changed))
+        let changed = changed && committed.diagnostics().changed();
+        Ok(self.publish(source, committed.into_package(), changed))
     }
 
     fn break_spec(

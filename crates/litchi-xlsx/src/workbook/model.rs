@@ -456,6 +456,15 @@ pub(crate) struct Inner {
 #[derive(Debug, Clone)]
 pub struct Workbook {
     pub(super) inner: Arc<Inner>,
+    /// The policies of this snapshot that do not belong to its state;
+    /// snapshots derived from it by edits share them.
+    policy: Arc<Policy>,
+}
+
+/// The semantic budgets and encryption provenance of a workbook snapshot.
+#[derive(Debug, Clone, Copy)]
+struct Policy {
+    semantic_limits: crate::SemanticLimits,
     #[cfg(feature = "encryption")]
     encryption: PackageEncryption,
 }
@@ -476,10 +485,26 @@ impl Workbook {
         Self::open_package(package, None, options)
     }
 
+    /// The semantic budgets of this snapshot.
+    pub(crate) fn semantic_limits(&self) -> &crate::SemanticLimits {
+        &self.policy.semantic_limits
+    }
+
+    /// This snapshot under the semantic budgets `limits`; the state is
+    /// shared.
+    pub(crate) fn with_semantic_limits(&self, limits: crate::SemanticLimits) -> Self {
+        let mut policy = *self.policy;
+        policy.semantic_limits = limits;
+        Self {
+            inner: Arc::clone(&self.inner),
+            policy: Arc::new(policy),
+        }
+    }
+
     /// The ingress policies the owning package was opened with.
-    #[allow(
-        dead_code,
-        reason = "read by the encrypted outputs and the semantic budgets"
+    #[cfg_attr(
+        not(feature = "encryption"),
+        allow(dead_code, reason = "read by the encrypted outputs")
     )]
     pub(crate) fn open_options(&self) -> &crate::OpenOptions {
         &self.inner.options
@@ -503,14 +528,17 @@ impl Workbook {
         options: crate::OpenOptions,
     ) -> Result<Self> {
         let mut workbook = Self::open_package(package, None, options)?;
-        workbook.encryption = encryption;
+        workbook.policy = Arc::new(Policy {
+            encryption,
+            ..*workbook.policy
+        });
         Ok(workbook)
     }
 
     /// Encryption provenance retained from the owning package.
     #[cfg(feature = "encryption")]
-    pub(crate) const fn encryption_state(&self) -> PackageEncryption {
-        self.encryption
+    pub(crate) fn encryption_state(&self) -> PackageEncryption {
+        self.policy.encryption
     }
 
     pub(crate) fn from_package_with_styles(
@@ -665,8 +693,16 @@ impl Workbook {
                 tolerance,
                 options,
             }),
-            #[cfg(feature = "encryption")]
-            encryption: source.map_or_else(PackageEncryption::plain, |source| source.encryption),
+            policy: source.map_or_else(
+                || {
+                    Arc::new(Policy {
+                        semantic_limits: options.semantic_limits,
+                        #[cfg(feature = "encryption")]
+                        encryption: PackageEncryption::plain(),
+                    })
+                },
+                |source| Arc::clone(&source.policy),
+            ),
         })
     }
 
@@ -1055,17 +1091,14 @@ impl Workbook {
         &self.inner.external_reference_ids
     }
 
-    /// Read the workbook's source-bound calculation metadata.
+    /// Read the workbook's source-bound calculation metadata under the
+    /// owning package's semantic limits
+    /// ([`crate::SemanticLimits::calculation_properties`]).
     pub fn calculation_metadata(&self) -> Result<crate::calculation_properties::Snapshot> {
-        crate::calculation_properties::Snapshot::load(&self.inner.package)
-    }
-
-    /// Read calculation metadata with a caller-supplied resource policy.
-    pub fn calculation_metadata_with_limits(
-        &self,
-        limits: &crate::calculation_properties::Limits,
-    ) -> Result<crate::calculation_properties::Snapshot> {
-        crate::calculation_properties::Snapshot::load_with_limits(&self.inner.package, limits)
+        crate::calculation_properties::Snapshot::load_with_limits(
+            &self.inner.package,
+            &self.policy.semantic_limits.calculation_properties_value(),
+        )
     }
 
     /// Persisted Office Add-in task panes, when this package contains them.
@@ -1094,7 +1127,11 @@ impl Workbook {
     /// duplicate survey ID, or malformed Survey XML.
     pub fn surveys(&self) -> Result<&[crate::survey::Part]> {
         let values = self.inner.surveys.get_or_try_init(|| {
-            crate::survey::load(&self.inner.package).map(Vec::into_boxed_slice)
+            crate::survey::load_with_limits(
+                &self.inner.package,
+                &self.policy.semantic_limits.survey_value(),
+            )
+            .map(Vec::into_boxed_slice)
         })?;
         Ok(values)
     }
@@ -1166,7 +1203,8 @@ impl Workbook {
 
     pub(crate) fn ensure_ordinary_output(&self, operation: &'static str) -> Result<()> {
         #[cfg(feature = "encryption")]
-        self.encryption
+        self.policy
+            .encryption
             .ordinary_output()
             .map_err(|source| Error::EncryptionPolicy { operation, source })?;
         #[cfg(not(feature = "encryption"))]
@@ -1180,7 +1218,8 @@ impl Workbook {
 
     #[cfg(feature = "encryption")]
     pub(crate) fn retained_mode(&self, operation: &'static str) -> Result<crate::encryption::Mode> {
-        self.encryption
+        self.policy
+            .encryption
             .require_retained_mode()
             .map_err(|source| Error::EncryptionPolicy { operation, source })
     }

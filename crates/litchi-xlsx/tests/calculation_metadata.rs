@@ -2,11 +2,10 @@ use std::sync::Arc;
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, PackURI, Part, TargetMode};
-use litchi_xlsx::calculation_properties::{
-    Feature, Features, Limits, Mode, Patch, Properties, Snapshot,
-};
+use litchi_xlsx::calculation_properties::edit::{EditOptions, Patch};
+use litchi_xlsx::calculation_properties::{Feature, Features, Limits, Mode, Properties, Snapshot};
 use litchi_xlsx::formula::Formula;
-use litchi_xlsx::{Error, Package};
+use litchi_xlsx::{Error, Package, SemanticLimits};
 
 const SIGNATURE_REL: &str =
     "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature";
@@ -27,8 +26,10 @@ fn set_metadata(package: &mut Package, properties: Properties, features: Feature
     assert!(edit.set_properties(properties));
     assert!(edit.set_features(features));
     let commit = edit.commit().expect("calculation metadata commit");
-    assert!(commit.changed());
-    commit.patch().clone()
+    assert!(commit.diagnostics().changed());
+    let (after, patch) = commit.into_parts();
+    *package = after;
+    patch
 }
 
 #[test]
@@ -109,13 +110,14 @@ fn patch_inverse_restores_exact_source_and_stale_application_is_atomic() {
         Properties::new().with_calculation_id(Some(17)),
         Features::new(Feature::new("X").unwrap()),
     );
-    assert!(!patch.is_empty());
+    assert!(!patch.is_noop());
     assert!(patch.before().properties().is_none());
     assert_eq!(patch.after().properties().unwrap().calculation_id(), 17);
 
-    changed
-        .apply_calculation_metadata_patch(&patch.inverse())
-        .expect("apply inverse");
+    changed = changed
+        .apply_calculation_metadata(&patch.inverse())
+        .expect("apply inverse")
+        .into_package();
     assert_eq!(
         changed
             .calculation_metadata()
@@ -127,14 +129,17 @@ fn patch_inverse_restores_exact_source_and_stale_application_is_atomic() {
     let mut stale = baseline;
     let mut stale_edit = stale.edit_calculation_metadata().expect("stale edit");
     stale_edit.set_properties(Properties::new().with_calculation_id(Some(99)));
-    stale_edit.commit().expect("publish stale source");
+    stale = stale_edit
+        .commit()
+        .expect("publish stale source")
+        .into_package();
     let stale_xml = stale
         .calculation_metadata()
         .expect("stale metadata")
         .source_xml()
         .to_vec();
     assert!(matches!(
-        stale.apply_calculation_metadata_patch(&patch),
+        stale.apply_calculation_metadata(&patch),
         Err(Error::PatchConflict { .. })
     ));
     assert_eq!(
@@ -158,16 +163,17 @@ fn feature_name_and_output_limits_fail_without_partial_publication() {
         ])
         .unwrap(),
     );
+    let bounded = |limits: Limits| {
+        package.with_semantic_limits(SemanticLimits::default().calculation_properties(limits))
+    };
     assert!(
-        package
-            .calculation_metadata_with_limits(&Limits::new().with_max_features(1).unwrap())
+        bounded(Limits::new().with_max_features(1).unwrap())
+            .calculation_metadata()
             .is_err()
     );
     assert!(
-        package
-            .calculation_metadata_with_limits(
-                &Limits::new().with_max_feature_name_bytes(3).unwrap()
-            )
+        bounded(Limits::new().with_max_feature_name_bytes(3).unwrap())
+            .calculation_metadata()
             .is_err()
     );
 
@@ -178,7 +184,7 @@ fn feature_name_and_output_limits_fail_without_partial_publication() {
         .to_vec();
     let limits = Limits::new().with_max_output_bytes(1).unwrap();
     let mut edit = package
-        .edit_calculation_metadata_with_limits(&limits)
+        .edit_calculation_metadata_with_options(EditOptions::default().limits(limits))
         .expect("bounded edit");
     edit.set_properties(Properties::new().with_calculation_id(Some(8)));
     assert!(edit.commit().is_err());
@@ -231,7 +237,7 @@ fn metadata_removal_restores_workbook_markup_and_preserves_unrelated_part_bytes(
     let mut remove = package.edit_calculation_metadata().expect("remove edit");
     assert!(remove.remove_properties());
     assert!(remove.remove_features());
-    remove.commit().expect("remove metadata");
+    package = remove.commit().expect("remove metadata").into_package();
     assert_eq!(
         package
             .calculation_metadata()
@@ -282,7 +288,7 @@ fn signed_no_op_is_exact_but_changed_metadata_is_refused() {
             TargetMode::Internal,
         )
         .unwrap();
-    let mut package = Package::from_opc(raw).expect("signed package");
+    let package = Package::from_opc(raw).expect("signed package");
     let source = package
         .calculation_metadata()
         .unwrap()
@@ -293,11 +299,11 @@ fn signed_no_op_is_exact_but_changed_metadata_is_refused() {
         .unwrap()
         .commit()
         .expect("signed no-op");
-    assert!(!no_op.changed());
-    assert!(no_op.patch().is_empty());
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
     assert!(Arc::ptr_eq(
         &source,
-        &no_op.snapshot().source_arc().unwrap()
+        &no_op.patch().after().source_arc().unwrap()
     ));
 
     let mut changed = package.edit_calculation_metadata().unwrap();
@@ -321,7 +327,7 @@ fn formula_edit_exposes_recalculation_invalidation_through_workbook_owner() {
             .with_calculation_completed(Some(true))
             .with_force_full_calculation(Some(false)),
     );
-    metadata.commit().unwrap();
+    package = metadata.commit().unwrap().into_package();
     let workbook = package;
     let mut edit = workbook.edit().expect("workbook edit");
     edit.sheet("Sheet1")
@@ -360,7 +366,7 @@ fn mce_projected_metadata_is_readable_but_changed_edits_are_refused() {
     raw.get_part_mut(&workbook_name)
         .unwrap()
         .set_blob(xml.clone());
-    let mut package = Package::from_opc(raw).expect("MCE fixture");
+    let package = Package::from_opc(raw).expect("MCE fixture");
     assert_eq!(
         package
             .calculation_metadata()
@@ -389,7 +395,7 @@ fn encrypted_source_refuses_metadata_mutation_until_explicit_plain_reopen() {
     let plaintext = Package::new().unwrap().to_plain_bytes().unwrap();
     let encrypted =
         litchi_xlsx::encryption::encrypt(plaintext, PASSWORD, EncryptionMode::Standard).unwrap();
-    let mut opened = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();
+    let opened = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();
     assert!(matches!(
         opened.edit_calculation_metadata(),
         Err(Error::EncryptionPolicy { .. })
@@ -399,7 +405,7 @@ fn encrypted_source_refuses_metadata_mutation_until_explicit_plain_reopen() {
     let mut plain = Package::from_bytes(&explicit_plaintext).expect("explicit plain reopen");
     let mut edit = plain.edit_calculation_metadata().expect("plain edit");
     edit.set_properties(Properties::new().with_calculation_id(Some(11)));
-    edit.commit().expect("plain metadata commit");
+    plain = edit.commit().expect("plain metadata commit").into_package();
     assert_eq!(
         plain
             .calculation_metadata()

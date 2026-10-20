@@ -10,15 +10,14 @@ use litchi_xlsx::{
 };
 
 fn two_sheet_workbook() -> Package {
-    let mut package = Package::new().unwrap();
+    let package = Package::new().unwrap();
     let mut breaks = package.edit_page_breaks("Sheet1").unwrap();
     breaks
         .set_horizontal(
             Collection::horizontal([Break::new(12, 0, 16_383).unwrap().with_manual(true)]).unwrap(),
         )
         .unwrap();
-    breaks.commit().unwrap();
-    let workbook = package;
+    let workbook = breaks.commit().unwrap().into_package();
     let mut edit = workbook.edit().unwrap();
     edit.add("Target").unwrap();
     edit.commit().unwrap().into_package()

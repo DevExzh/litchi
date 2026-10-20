@@ -120,11 +120,13 @@ pub mod pivot;
 pub mod print_options;
 pub mod query_table;
 pub mod raw;
+mod record;
 pub mod revisions;
 pub mod rich_values;
 pub mod row;
 pub mod row_visibility;
 pub mod scenarios;
+pub mod semantic_limits;
 pub mod shapes;
 pub mod sheet;
 pub mod sheet_calculation_properties;
@@ -206,9 +208,8 @@ pub use conditional_formatting::{
     parse_conditional_formattings, parse_differential_formats,
 };
 pub use custom_data::{
-    Commit as CustomDataCommit, CustomData, ExtensionList, Limits as CustomDataLimits,
-    Part as CustomDataPart, Patch as CustomDataPatch, Properties, Snapshot as CustomDataSnapshot,
-    Store, Transaction as CustomDataTransaction, parse_properties, validate_workbook_root,
+    CustomData, ExtensionList, Limits as CustomDataLimits, Part as CustomDataPart, Properties,
+    Snapshot as CustomDataSnapshot, Store, parse_properties, validate_workbook_root,
     write_properties,
 };
 pub use data_consolidation::{
@@ -296,6 +297,7 @@ pub use pivot::{
     load_pivot_table_data, load_pivot_table_data_with_limits,
 };
 pub use print_options::{PrintOptions, parse_print_options};
+pub use semantic_limits::SemanticLimits;
 pub use streaming::{
     StreamingCell, StreamingCellValue, StreamingValue, StreamingWorkbookLimits,
     StreamingWorkbookWriter,
@@ -353,16 +355,12 @@ pub use sheet_view::parse_worksheet_views;
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use style::{FontChange, LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
 pub use survey::{
-    Binding as SurveyBinding, Commit as SurveyCommit, ElementProperties as SurveyElementProperties,
-    Guid as SurveyGuid, Id as SurveyId, Limits as SurveyLimits, Part as SurveyPart,
-    Patch as SurveyPatch, Position as SurveyPosition, Question as SurveyQuestion,
-    QuestionFormat as SurveyQuestionFormat, QuestionType as SurveyQuestionType,
-    Questions as SurveyQuestions, Snapshot as SurveySnapshot, Survey,
-    Transaction as SurveyTransaction, load as load_surveys,
-    load_with_limits as load_surveys_with_limits, parse as parse_survey,
-    parse_with_limits as parse_survey_with_limits, validate as validate_survey,
-    validate_with_limits as validate_surveys_with_limits, write as write_survey,
-    write_with_limits as write_survey_with_limits,
+    Binding as SurveyBinding, ElementProperties as SurveyElementProperties, Guid as SurveyGuid,
+    Id as SurveyId, Limits as SurveyLimits, Part as SurveyPart, Position as SurveyPosition,
+    Question as SurveyQuestion, QuestionFormat as SurveyQuestionFormat,
+    QuestionType as SurveyQuestionType, Questions as SurveyQuestions, Snapshot as SurveySnapshot,
+    Survey, load as load_surveys, parse as parse_survey, validate as validate_survey,
+    write as write_survey,
 };
 pub use table::{
     Table, TableColumn, TableFormula, TableStyleInfo, TableType, TotalsRowFunction,
@@ -374,10 +372,9 @@ pub use threaded_comments::{
     validate_timestamp, write_comments, write_persons,
 };
 pub use workbook::data_model::{
-    Commit as DataModelCommit, Definition as DataModelDefinition, Model as DataModel,
-    OpaqueXml as DataModelOpaqueXml, Patch as DataModelPatch, Payload as DataModelPayload,
-    Relationship as DataModelRelationship, Snapshot as DataModelSnapshot, Table as DataModelTable,
-    Transaction as DataModelTransaction, load_data_model, parse_data_model, store_data_model,
+    Definition as DataModelDefinition, Model as DataModel, OpaqueXml as DataModelOpaqueXml,
+    Payload as DataModelPayload, Relationship as DataModelRelationship,
+    Snapshot as DataModelSnapshot, Table as DataModelTable, load_data_model, parse_data_model,
     write_data_model,
 };
 pub use workbook::{

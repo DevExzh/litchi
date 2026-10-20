@@ -123,7 +123,8 @@ impl Commit {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::calculation_properties::{Properties, Transaction};
+    use crate::calculation_properties::Properties;
+    use crate::calculation_properties::edit::Transaction;
     use litchi_opc::TargetMode;
     use litchi_opc::constants::relationship_type as rt;
 

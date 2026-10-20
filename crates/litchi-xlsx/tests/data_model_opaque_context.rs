@@ -75,15 +75,20 @@ fn public_model_import_closes_inherited_xml_context_without_rebasing_nested_over
     assert!(extension.contains("xml:space=\"preserve\""));
     assert!(extension.contains("xml:base=\"../other/\""));
 
-    let mut without_model = source;
-    without_model.remove_data_model().unwrap();
+    let mut remove = source.edit_data_model().unwrap();
+    assert!(remove.remove().unwrap());
+    let without_model = remove.commit().unwrap().into_package();
     let mut destination_bytes = Vec::new();
     without_model.write_to(&mut destination_bytes).unwrap();
     let destination_bytes = replace_workbook(&destination_bytes, |xml| {
         xml.replace(SOURCE_BASE, DESTINATION_BASE)
     });
-    let mut destination = Package::from_bytes(&destination_bytes).unwrap();
-    destination.put_data_model(model).unwrap();
+    let mut put = Package::from_bytes(&destination_bytes)
+        .unwrap()
+        .edit_data_model()
+        .unwrap();
+    assert!(put.set(model).unwrap());
+    let destination = put.commit().unwrap().into_package();
 
     let imported = String::from_utf8(
         destination
@@ -120,9 +125,10 @@ fn public_model_context_capture_survives_descriptor_edit_and_exact_inverse() {
         Ok(())
     })
     .unwrap();
-    let patch = edit.commit().unwrap().patch().clone();
+    let (package_after, patch) = edit.commit().unwrap().into_parts();
+    package = package_after;
     let mut raw = package.into_plain_opc();
-    patch.inverse().apply(&mut raw).unwrap();
+    apply_patch(&patch.inverse(), &mut raw).unwrap();
     assert_eq!(
         raw.get_part(&PackURI::new(WORKBOOK).unwrap())
             .unwrap()
@@ -160,4 +166,17 @@ fn replace_workbook(source: &[u8], replace: impl FnOnce(String) -> String) -> Ve
         writer.write_deflated(name, &bytes).unwrap();
     }
     writer.finish_to_bytes().unwrap()
+}
+
+/// Replay a Data Model patch onto a raw graph through the package route.
+fn apply_patch(
+    patch: &litchi_xlsx::workbook::data_model::Patch,
+    target: &mut OpcPackage,
+) -> litchi_xlsx::Result<()> {
+    let package = Package::from_opc(target.clone())?;
+    *target = package
+        .apply_data_model(patch)?
+        .into_package()
+        .into_plain_opc();
+    Ok(())
 }

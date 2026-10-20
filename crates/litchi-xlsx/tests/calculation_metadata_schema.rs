@@ -40,7 +40,11 @@ fn set_properties(package: &mut Package, properties: Properties) {
         .edit_calculation_metadata()
         .expect("calculation metadata edit");
     assert!(edit.set_properties(properties));
-    assert!(edit.commit().expect("metadata commit").changed());
+    *package = {
+        let commit = edit.commit().expect("metadata commit");
+        assert!(commit.diagnostics().changed());
+        commit.into_package()
+    };
 }
 
 fn set_features(package: &mut Package, features: Features) {
@@ -48,7 +52,11 @@ fn set_features(package: &mut Package, features: Features) {
         .edit_calculation_metadata()
         .expect("calculation metadata edit");
     assert!(edit.set_features(features));
-    assert!(edit.commit().expect("metadata commit").changed());
+    *package = {
+        let commit = edit.commit().expect("metadata commit");
+        assert!(commit.diagnostics().changed());
+        commit.into_package()
+    };
 }
 
 fn properties(snapshot: &Snapshot) -> &Properties {
@@ -169,7 +177,11 @@ fn existing_calc_pr_rewrite_removes_each_authored_attribute_and_then_the_tag() {
         Ok(())
     })
     .expect("edit every property");
-    assert!(edit.commit().expect("rewrite commit").changed());
+    package = {
+        let commit = edit.commit().expect("rewrite commit");
+        assert!(commit.diagnostics().changed());
+        commit.into_package()
+    };
 
     let rewritten = reopen(&package);
     let snapshot = rewritten
@@ -200,7 +212,11 @@ fn existing_calc_pr_rewrite_removes_each_authored_attribute_and_then_the_tag() {
     let mut rewritten = rewritten;
     let mut remove = rewritten.edit_calculation_metadata().expect("remove edit");
     assert!(remove.remove_properties());
-    assert!(remove.commit().expect("remove commit").changed());
+    rewritten = {
+        let commit = remove.commit().expect("remove commit");
+        assert!(commit.diagnostics().changed());
+        commit.into_package()
+    };
     let removed = reopen(&rewritten);
     let snapshot = removed.calculation_metadata().expect("removed metadata");
     assert!(snapshot.properties().is_none());
@@ -583,7 +599,7 @@ fn mce_selected_calc_features_are_readable_but_changed_edit_is_refused() {
     raw.get_part_mut(&workbook_name)
         .expect("mutable workbook")
         .set_blob(xml.clone());
-    let mut package = Package::from_opc(raw).expect("MCE fixture");
+    let package = Package::from_opc(raw).expect("MCE fixture");
     let snapshot = package.calculation_metadata().expect("projected metadata");
     assert_eq!(
         snapshot.features().unwrap().get(0).unwrap().as_str(),

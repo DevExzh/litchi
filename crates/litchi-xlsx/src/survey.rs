@@ -20,7 +20,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
-use crate::error::{Error, Result, invalid};
+use crate::error::{Result, invalid};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 mod source;
@@ -39,6 +39,22 @@ const MAX_DEPTH: usize = 256;
 const MAX_SURVEYS: usize = 4_096;
 const MAX_EXTENSION_BYTES: usize = 4 * 1024 * 1024;
 const MAX_TOTAL_TEXT_BYTES: usize = 16 * 1024 * 1024;
+
+/// A bounded dimension of the Survey family, configured by its [`Limits`]
+/// budget.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Bytes of one Survey part ([`Limits::max_part_bytes`]).
+    PartBytes,
+    /// Surveys of the workbook ([`Limits::max_surveys`]).
+    Surveys,
+    /// Questions of one Survey ([`Limits::max_questions`]).
+    Questions,
+    /// Bytes of the extension lists of one Survey
+    /// ([`Limits::max_extension_bytes`]).
+    ExtensionBytes,
+}
 
 /// Resource limits used while loading and authoring Survey parts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -597,7 +613,7 @@ impl Question {
     /// Create a question using an owning table-column name.
     ///
     /// The selector is resolved to the table's physical column UID by
-    /// [`Transaction::insert_for_table`] or [`Transaction::edit`]. It cannot be serialized directly
+    /// [`Edit::insert_for_table`] or [`Edit::edit`]. It cannot be serialized directly
     /// until that source-bound resolution has happened.
     pub fn for_column(name: impl Into<String>) -> Result<Self> {
         let name = name.into();
@@ -1576,7 +1592,11 @@ pub fn parse(xml: &[u8]) -> Result<Survey> {
 /// Parse a standalone Survey part with an explicit resource policy.
 pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Survey> {
     if xml.len() > limits.max_part_bytes() {
-        return Err(invalid("survey XML exceeds the size limit"));
+        return Err(Error::limit(
+            LimitKind::PartBytes,
+            xml.len(),
+            limits.max_part_bytes(),
+        ));
     }
     crate::source_attributes::validate_xml_characters(xml)?;
     let mut reader = NsReader::from_reader(xml);
@@ -1618,7 +1638,11 @@ pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Survey> {
                         .as_ref()
                         .is_some_and(|survey| survey.questions.len() > limits.max_questions())
                     {
-                        return Err(invalid("survey has too many questions"));
+                        return Err(Error::limit(
+                            LimitKind::Questions,
+                            limits.max_questions().saturating_add(1),
+                            limits.max_questions(),
+                        ));
                     }
                 }
             },
@@ -1676,7 +1700,11 @@ pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Survey> {
     validate_survey_with_limits(&survey, limits)?;
     let extension_bytes = survey_extension_bytes(&survey);
     if extension_bytes > limits.max_extension_bytes() {
-        return Err(invalid("survey extension list exceeds the size limit"));
+        return Err(Error::limit(
+            LimitKind::ExtensionBytes,
+            extension_bytes,
+            limits.max_extension_bytes(),
+        ));
     }
     Ok(survey)
 }
@@ -1808,7 +1836,11 @@ pub fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<Vec<Par
         .filter(|part| part.content_type() == CONTENT_TYPE)
         .collect::<Vec<_>>();
     if survey_parts.len() > limits.max_surveys() {
-        return Err(invalid("survey count exceeds the size limit"));
+        return Err(Error::limit(
+            LimitKind::Surveys,
+            survey_parts.len(),
+            limits.max_surveys(),
+        ));
     }
     for part in survey_parts {
         // The survey payload is read, so it is decoded here (ADR 0030).
@@ -2770,7 +2802,11 @@ fn validate_survey_with_limits(survey: &Survey, limits: &Limits) -> Result<()> {
         return Err(invalid("survey requires at least one question"));
     }
     if survey.questions.values.len() > limits.max_questions() {
-        return Err(invalid("survey has too many questions"));
+        return Err(Error::limit(
+            LimitKind::Questions,
+            survey.questions.values.len(),
+            limits.max_questions(),
+        ));
     }
     if !valid_guid(survey.guid.as_str()) {
         return Err(invalid("invalid survey GUID"));
@@ -2808,7 +2844,11 @@ fn validate_survey_with_limits(survey: &Survey, limits: &Limits) -> Result<()> {
     }
     validate_total_text_bytes(survey, limits)?;
     if survey_extension_bytes(survey) > limits.max_extension_bytes() {
-        return Err(invalid("survey extension list exceeds the size limit"));
+        return Err(Error::limit(
+            LimitKind::ExtensionBytes,
+            survey_extension_bytes(survey),
+            limits.max_extension_bytes(),
+        ));
     }
     Ok(())
 }
@@ -2969,7 +3009,11 @@ fn validate_properties(properties: Option<&ElementProperties>) -> Result<()> {
 fn validate_extension(extension: Option<&[u8]>, limits: &Limits) -> Result<()> {
     if let Some(extension) = extension {
         if extension.len() > limits.max_extension_bytes() {
-            return Err(invalid("survey extension list exceeds the size limit"));
+            return Err(Error::limit(
+                LimitKind::ExtensionBytes,
+                extension.len(),
+                limits.max_extension_bytes(),
+            ));
         }
         std::str::from_utf8(extension)
             .map_err(|_| invalid("survey extension list is not UTF-8"))?;
@@ -3336,30 +3380,73 @@ impl Snapshot {
     }
 }
 
-/// A clone-staged transaction over table-owned Survey parts.
-pub struct Transaction<'a> {
-    target: crate::package::Target<'a>,
+crate::record::record_family!("Survey");
+
+/// The configuration of a Survey edit.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: Option<Limits>,
+}
+
+impl EditOptions {
+    /// Bound the edit by `limits` instead of the package's semantic Survey
+    /// limits ([`crate::SemanticLimits::survey`]).
+    #[must_use]
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = Some(limits);
+        self
+    }
+}
+
+/// A staged, source-bound edit of the table-owned Survey parts of one
+/// [`crate::Package`].
+///
+/// Starting one reads the catalog and copies no part payload. Dropping the
+/// edit discards it; [`Self::commit`] publishes a new package.
+pub struct Edit {
+    target: crate::record::Source,
     before: Snapshot,
     draft: Vec<Part>,
     limits: Limits,
 }
 
-impl<'a> Transaction<'a> {
-    /// Start a transaction using the default Survey limits.
-    pub fn new(target: &'a mut OpcPackage) -> Result<Self> {
-        Self::with_limits(target, &Limits::default())
+impl crate::Package {
+    /// Start a Survey edit under the package's semantic limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose mutations are
+    /// refused, and the catalog's read errors.
+    pub fn edit_surveys(&self) -> Result<Edit> {
+        self.edit_surveys_with_options(EditOptions::default())
     }
 
-    /// Start a transaction using an explicit Survey resource policy.
-    pub fn with_limits(target: &'a mut OpcPackage, limits: &Limits) -> Result<Self> {
-        Self::start(target.into(), limits)
+    /// Start a Survey edit with explicit options.
+    ///
+    /// # Errors
+    ///
+    /// See [`Self::edit_surveys`].
+    pub fn edit_surveys_with_options(&self, options: EditOptions) -> Result<Edit> {
+        let limits = options
+            .limits
+            .unwrap_or_else(|| self.semantic_limits().survey_value());
+        Edit::start(crate::record::Source::new(self, "edit_surveys")?, &limits)
     }
 
-    pub(crate) fn for_package(package: &'a mut crate::Package, limits: &Limits) -> Result<Self> {
-        Self::start(crate::package::Target::Package(package), limits)
+    /// Apply an exact Survey patch to a new package; this one is unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// before state and [`Error::Signed`] for a changed patch of a signed
+    /// workbook.
+    pub fn apply_surveys(&self, patch: &Patch) -> Result<Commit> {
+        crate::record::replay(self, patch, "apply_surveys")
     }
+}
 
-    fn start(target: crate::package::Target<'a>, limits: &Limits) -> Result<Self> {
+impl Edit {
+    fn start(target: crate::record::Source, limits: &Limits) -> Result<Self> {
         let before = Snapshot::load_with_limits(&target, limits)?;
         Ok(Self {
             target,
@@ -3513,16 +3600,39 @@ impl<'a> Transaction<'a> {
     }
 
     /// Whether staged Survey semantics or ownership identities differ.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn changed(&self) -> bool {
         !self.before.same_semantics(&self.draft)
     }
 
-    /// Validate and atomically publish the staged Survey catalog.
-    pub fn commit(mut self) -> Result<Commit> {
-        if !self.is_changed() {
+    #[cfg(test)]
+    pub(crate) fn is_changed(&self) -> bool {
+        self.changed()
+    }
+
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.draft = self.before.entries.to_vec();
+    }
+
+    /// Validate the staged Survey catalog and publish it as a new package.
+    /// An unchanged edit returns the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`] for a changed edit of a signed workbook and
+    /// the publication's validation errors.
+    pub fn commit(self) -> Result<Commit> {
+        self.publish().map(|(commit, _)| commit)
+    }
+
+    /// [`Self::commit`], keeping the published catalog.
+    fn publish(self) -> Result<(Commit, Snapshot)> {
+        if !self.changed() {
             let patch = Patch::new(self.before.clone(), self.before.clone());
-            return Ok(Commit::new(self.before, patch, false));
+            return Ok((
+                Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
+                self.before,
+            ));
         }
         if self.target.is_signed() || self.target.requires_signature_edit_policy() {
             return Err(Error::Signed);
@@ -3533,7 +3643,7 @@ impl<'a> Transaction<'a> {
                 part: "Survey catalog".into(),
             });
         }
-        let mut candidate = self.target.clone();
+        let mut candidate = OpcPackage::clone(&self.target);
         let content_types = transition_content_types(
             &self.before.source_content_types,
             self.before.entries(),
@@ -3551,8 +3661,11 @@ impl<'a> Transaction<'a> {
             return Err(invalid("Survey publication changed the staged semantics"));
         }
         let patch = Patch::new(self.before, snapshot.clone());
-        self.target.publish(candidate)?;
-        Ok(Commit::new(snapshot, patch, true))
+        let package = self.target.publish(candidate)?;
+        Ok((
+            Commit::new(package, patch, Diagnostics::new(true)),
+            snapshot,
+        ))
     }
 
     fn validate_draft(&self) -> Result<()> {
@@ -3561,7 +3674,11 @@ impl<'a> Transaction<'a> {
 
     fn validate_draft_entries(&self, entries: &[Part]) -> Result<()> {
         if entries.len() > self.limits.max_surveys() {
-            return Err(invalid("survey count exceeds the size limit"));
+            return Err(Error::limit(
+                LimitKind::Surveys,
+                entries.len(),
+                self.limits.max_surveys(),
+            ));
         }
         let mut ids = HashSet::new();
         for (index, entry) in entries.iter().enumerate() {
@@ -3613,7 +3730,7 @@ impl Patch {
 
     /// Whether this patch preserves the exact source graph and bytes.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
@@ -3627,14 +3744,14 @@ impl Patch {
     }
 
     /// Apply this patch atomically after validating its source closure.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<()> {
+    pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<()> {
         let current = Snapshot::load_with_limits(target, &self.before.limits)?;
         if !current.same_source(&self.before) {
             return Err(Error::PatchConflict {
                 part: "Survey catalog".into(),
             });
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(());
         }
         if target.is_signed() || target.requires_signature_edit_policy() {
@@ -3658,45 +3775,66 @@ impl Patch {
     }
 }
 
-/// Successful Survey transaction publication.
-#[derive(Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
+impl crate::record::Record for Patch {
+    fn is_noop(&self) -> bool {
+        Self::is_noop(self)
+    }
+
+    fn apply_to(&self, package: &mut OpcPackage) -> Result<()> {
+        self.apply(package)
+    }
 }
 
-impl Commit {
-    fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
-        Self {
+/// A raw-graph route over [`Edit`] for the unit tests that author bare
+/// graphs.
+#[cfg(test)]
+pub(crate) struct Transaction<'a> {
+    target: crate::record::TestTarget<'a>,
+    edit: Edit,
+}
+
+#[cfg(test)]
+impl<'a> Transaction<'a> {
+    pub(crate) fn new(target: impl Into<crate::record::TestTarget<'a>>) -> Result<Self> {
+        Self::with_limits(target, &Limits::default())
+    }
+
+    pub(crate) fn with_limits(
+        target: impl Into<crate::record::TestTarget<'a>>,
+        limits: &Limits,
+    ) -> Result<Self> {
+        let target = target.into();
+        let package = target.package()?;
+        let edit = package.edit_surveys_with_options(EditOptions::default().limits(*limits))?;
+        Ok(Self { target, edit })
+    }
+
+    pub(crate) fn commit(self) -> Result<crate::record::RawCommit<Snapshot, Patch>> {
+        let (commit, snapshot) = self.edit.publish()?;
+        let changed = commit.diagnostics().changed();
+        let (package, patch) = commit.into_parts();
+        self.target.store(package);
+        Ok(crate::record::RawCommit {
             snapshot,
             patch,
             changed,
-        }
+        })
     }
+}
 
-    /// Whether Survey semantics or package ownership changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.changed
+#[cfg(test)]
+impl std::ops::Deref for Transaction<'_> {
+    type Target = Edit;
+
+    fn deref(&self) -> &Edit {
+        &self.edit
     }
+}
 
-    /// Resulting source-bound catalog.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Exact reversible patch produced by the transaction.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
+#[cfg(test)]
+impl std::ops::DerefMut for Transaction<'_> {
+    fn deref_mut(&mut self) -> &mut Edit {
+        &mut self.edit
     }
 }
 
@@ -4143,7 +4281,7 @@ mod tests {
             crate::package::Package::from_opc(as_source(&package_with_survey(xml.as_bytes())))
                 .unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_title(Some("new".into()));
@@ -4226,7 +4364,7 @@ mod tests {
         let mut package =
             crate::package::Package::from_opc(as_source(&package_with_survey(XML))).unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         assert!(
             transaction
                 .edit(0, |survey| {
@@ -4246,7 +4384,7 @@ mod tests {
             .unwrap();
         let commit = transaction.commit().unwrap();
         assert!(!commit.changed());
-        assert!(commit.patch().is_empty());
+        assert!(commit.patch().is_noop());
         assert!(
             Snapshot::load(&package.into_plain_opc())
                 .unwrap()
@@ -4260,7 +4398,7 @@ mod tests {
             crate::package::Package::from_opc(as_source(&package_with_survey(XML))).unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
         let foreign = parse(&schema_xml("<questions><question binding=\"1\"><extLst><opaque xmlns=\"urn:other\"/></extLst></question></questions>")).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey
@@ -4290,7 +4428,7 @@ mod tests {
             crate::package::Package::from_opc(as_source(&package_with_survey(xml.as_bytes())))
                 .unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_properties(Some(ElementProperties::new()));
@@ -4354,7 +4492,7 @@ mod tests {
             crate::package::Package::from_opc(as_source(&package_with_survey(xml.as_bytes())))
                 .unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_title(Some("new".into()));
@@ -4409,7 +4547,7 @@ mod tests {
         let mut package =
             crate::package::Package::from_opc(as_source(&package_with_survey(&xml))).unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_title_properties(survey.properties.clone());
@@ -4451,7 +4589,7 @@ mod tests {
             .set_blob(table.into_bytes());
         let mut package = crate::package::Package::from_opc(as_source(&opc)).unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_id(Id::new(8));
@@ -4556,7 +4694,7 @@ mod tests {
             crate::package::Package::from_opc(as_source(&package_with_survey(xml.as_bytes())))
                 .unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction.remove(0).unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.into_plain_opc()).unwrap();
@@ -4719,7 +4857,7 @@ mod tests {
     #[test]
     fn xstring_changes_save_reopen_and_restore_the_original_source() {
         let mut package = crate::package::Package::from_opc(package_with_survey(XML)).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         let title = "literal _x0041_\t\n\r\0😀";
         transaction
             .edit(0, |survey| {
@@ -4737,7 +4875,10 @@ mod tests {
             reopened.surveys().unwrap().entries()[0].survey().title(),
             Some(title)
         );
-        reopened.apply_surveys_patch(&patch.inverse()).unwrap();
+        reopened = reopened
+            .apply_surveys(&patch.inverse())
+            .unwrap()
+            .into_package();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened.into_plain_opc()).unwrap();
         let restored = OpcPackage::from_bytes(&bytes).unwrap();
         assert_eq!(
@@ -4836,7 +4977,7 @@ mod tests {
         );
         let mut package = crate::package::Package::from_opc(package_with_survey(&xml)).unwrap();
         let before = package.surveys().unwrap().entries()[0].survey().clone();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_title(Some("edited".into()));
@@ -4850,7 +4991,10 @@ mod tests {
         let after = reopened.surveys().unwrap().entries()[0].survey().clone();
         assert_eq!(after.questions, before.questions);
         assert_eq!(after.title(), Some("edited"));
-        reopened.apply_surveys_patch(&patch.inverse()).unwrap();
+        reopened = reopened
+            .apply_surveys(&patch.inverse())
+            .unwrap()
+            .into_package();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened.into_plain_opc()).unwrap();
         let restored = OpcPackage::from_bytes(&bytes).unwrap();
         assert_eq!(
@@ -5113,7 +5257,7 @@ mod tests {
             crate::package::Package::from_opc(as_source(&package_with_survey(xml.as_bytes())))
                 .unwrap();
         let before = Snapshot::load(&source_package.clone().into_plain_opc()).unwrap();
-        let mut transaction = source_package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut source_package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey
@@ -5210,7 +5354,7 @@ mod tests {
         let mut package =
             crate::package::Package::from_opc(as_source(&package_with_survey(&xml))).unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey
@@ -5264,7 +5408,7 @@ mod tests {
             crate::package::Package::from_opc(as_source(&package_with_survey(&remove_xml)))
                 .unwrap();
         let remove_before = Snapshot::load(&remove_package.clone().into_plain_opc()).unwrap();
-        let mut remove_transaction = remove_package.edit_surveys().unwrap();
+        let mut remove_transaction = Transaction::new(&mut remove_package).unwrap();
         remove_transaction
             .edit(0, |survey| {
                 survey.questions_mut().set_properties(None);
@@ -5324,7 +5468,7 @@ mod tests {
         let mut package =
             crate::package::Package::from_opc(as_source(&package_with_survey(&xml))).unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey
@@ -5348,7 +5492,7 @@ mod tests {
         let mut remove_package =
             crate::package::Package::from_opc(as_source(&package_with_survey(&xml))).unwrap();
         let remove_before = Snapshot::load(&remove_package.clone().into_plain_opc()).unwrap();
-        let mut remove_transaction = remove_package.edit_surveys().unwrap();
+        let mut remove_transaction = Transaction::new(&mut remove_package).unwrap();
         remove_transaction
             .edit(0, |survey| {
                 survey.questions_mut().remove(0);
@@ -5458,7 +5602,7 @@ mod tests {
     #[test]
     fn package_transaction_supports_edit_insert_remove_and_inverse() {
         let mut package = crate::package::Package::from_opc(package_with_survey(XML)).unwrap();
-        let mut transaction = package.edit_surveys().expect("survey transaction");
+        let mut transaction = Transaction::new(&mut package).expect("survey transaction");
         assert!(
             transaction
                 .edit(0, |survey| {
@@ -5479,16 +5623,17 @@ mod tests {
         assert_eq!(package.surveys().unwrap().len(), 2);
 
         let inverse = commit.patch().inverse();
-        package
-            .apply_surveys_patch(&inverse)
-            .expect("inverse patch");
+        package = package
+            .apply_surveys(&inverse)
+            .expect("inverse patch")
+            .into_package();
         assert_eq!(package.surveys().unwrap().len(), 1);
         assert_eq!(
             package.surveys().unwrap().entries()[0].survey().title(),
             Some("Survey")
         );
 
-        let mut transaction = package.edit_surveys().expect("second transaction");
+        let mut transaction = Transaction::new(&mut package).expect("second transaction");
         assert!(transaction.remove(0).expect("remove").is_some());
         let commit = transaction.commit().expect("remove commit");
         assert!(commit.changed());
@@ -5504,7 +5649,7 @@ mod tests {
             vec![Question::for_column("Answer").unwrap()],
         )
         .unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         let index = transaction.insert_for_table("T", survey).unwrap();
         assert_eq!(
             transaction.entries()[index].survey().questions().values()[0].binding(),
@@ -5525,7 +5670,7 @@ mod tests {
             .unwrap()
             .blob()
             .to_vec();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         assert!(
             !transaction
                 .edit(0, |survey| {
@@ -5536,7 +5681,7 @@ mod tests {
         );
         let commit = transaction.commit().unwrap();
         assert!(!commit.changed());
-        assert!(commit.patch().is_empty());
+        assert!(commit.patch().is_noop());
         let after = package
             .clone()
             .into_plain_opc()
@@ -5566,7 +5711,7 @@ mod tests {
             .unwrap()
             .rels()
             .to_xml();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_description(Some("edited".to_owned()));
@@ -5574,7 +5719,10 @@ mod tests {
             })
             .unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
-        package.apply_surveys_patch(&patch.inverse()).unwrap();
+        package = package
+            .apply_surveys(&patch.inverse())
+            .unwrap()
+            .into_package();
         assert_eq!(
             package
                 .clone()
@@ -5695,7 +5843,7 @@ mod tests {
         );
 
         let mut package = crate::package::Package::from_opc(package_with_survey(xml)).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_description(Some("description".to_owned()));
@@ -5727,7 +5875,7 @@ mod tests {
     fn edits_retain_nested_namespaces_comments_and_unknown_attributes() {
         let xml = br#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="7" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><!-- between --><question xmlns:q="urn:question-future" q:unknown="question" binding="1"><questionPr xmlns:p="urn:properties-future" p:unknown="properties"><!-- property comment --></questionPr><!-- question comment --></question></questions></survey>"#;
         let mut package = crate::package::Package::from_opc(package_with_survey(xml)).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_description(Some("edited".to_owned()));
@@ -5759,7 +5907,7 @@ mod tests {
     #[test]
     fn failed_edit_does_not_mutate_the_transaction_draft() {
         let mut package = crate::package::Package::from_opc(package_with_survey(XML)).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         let result = transaction.edit(0, |survey| {
             survey.questions_mut().values_mut()[0].set_binding(Binding::new(999));
             Ok(())
@@ -5774,7 +5922,7 @@ mod tests {
     #[test]
     fn stale_patch_and_explicit_limits_are_rejected_atomically() {
         let mut package = crate::package::Package::from_opc(package_with_survey(XML)).unwrap();
-        let mut transaction = package.edit_surveys().unwrap();
+        let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
                 survey.set_title(Some("Changed".to_owned()));

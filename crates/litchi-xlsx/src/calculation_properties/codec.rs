@@ -528,13 +528,21 @@ fn parse_feature(
             return Err(invalid("duplicate feature name attribute"));
         }
         if attribute.value.len() > limits.max_feature_name_bytes() {
-            return Err(invalid("calculation feature name exceeds byte limit"));
+            return Err(Error::limit(
+                super::LimitKind::FeatureNameBytes,
+                attribute.value.len(),
+                limits.max_feature_name_bytes(),
+            ));
         }
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(xml_error)?;
         if value.len() > limits.max_feature_name_bytes() {
-            return Err(invalid("calculation feature name exceeds byte limit"));
+            return Err(Error::limit(
+                super::LimitKind::FeatureNameBytes,
+                value.len(),
+                limits.max_feature_name_bytes(),
+            ));
         }
         name = Some(Feature::new(value.into_owned())?);
     }
@@ -548,7 +556,11 @@ fn push_feature(
     limits: &Limits,
 ) -> Result<()> {
     if values.len() >= limits.max_features() {
-        return Err(invalid("calculation feature count exceeds limit"));
+        return Err(Error::limit(
+            super::LimitKind::Features,
+            values.len().saturating_add(1),
+            limits.max_features(),
+        ));
     }
     *total = total
         .checked_add(feature.as_str().len())

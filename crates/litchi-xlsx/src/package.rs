@@ -277,6 +277,22 @@ impl Package {
         })
     }
 
+    /// The semantic budgets this package keeps for its bounded reads and the
+    /// default limits of its record-family edits ([`crate::semantic_limits`]).
+    #[must_use]
+    pub fn semantic_limits(&self) -> &crate::SemanticLimits {
+        self.workbook.semantic_limits()
+    }
+
+    /// This package under other semantic budgets; the package state is
+    /// shared, not copied.
+    #[must_use]
+    pub fn with_semantic_limits(&self, limits: crate::SemanticLimits) -> Self {
+        Self {
+            workbook: self.workbook.with_semantic_limits(limits),
+        }
+    }
+
     /// The opt-in repair policy this package was opened with.
     #[must_use]
     pub fn leniency(&self) -> crate::Leniency {
@@ -423,30 +439,20 @@ impl Package {
         patch.apply(self)
     }
 
-    /// Read the workbook's source-bound calculation metadata.
+    /// Read the workbook's source-bound calculation metadata under the
+    /// package's semantic limits
+    /// ([`crate::SemanticLimits::calculation_properties`]).
     pub fn calculation_metadata(&self) -> Result<crate::calculation_properties::Snapshot> {
-        crate::calculation_properties::Snapshot::load(self.opc())
+        self.workbook.calculation_metadata()
     }
 
-    /// Read calculation metadata with a caller-supplied resource policy.
-    pub fn calculation_metadata_with_limits(
-        &self,
-        limits: &crate::calculation_properties::Limits,
-    ) -> Result<crate::calculation_properties::Snapshot> {
-        crate::calculation_properties::Snapshot::load_with_limits(self.opc(), limits)
-    }
-
-    /// Read table-associated survey metadata.
+    /// Read table-associated survey metadata under the package's semantic
+    /// limits ([`crate::SemanticLimits::survey`]).
     pub fn surveys(&self) -> Result<crate::survey::Snapshot> {
-        crate::survey::Snapshot::load(self.opc())
-    }
-
-    /// Read surveys with a caller-supplied resource policy.
-    pub fn surveys_with_limits(
-        &self,
-        limits: &crate::survey::Limits,
-    ) -> Result<crate::survey::Snapshot> {
-        crate::survey::Snapshot::load_with_limits(self.opc(), limits)
+        crate::survey::Snapshot::load_with_limits(
+            self.opc(),
+            &self.semantic_limits().survey_value(),
+        )
     }
 
     /// Read the source-bound workbook Data Model graph, if present.
@@ -454,238 +460,19 @@ impl Package {
         crate::workbook::data_model::Snapshot::load(self.opc())
     }
 
-    /// Start a source-bound Data Model transaction.
-    pub fn edit_data_model(&mut self) -> Result<crate::workbook::data_model::Transaction<'_>> {
-        self.ensure_mutation_allowed("edit_data_model")?;
-        crate::workbook::data_model::Transaction::for_package(self)
-    }
-
-    /// Atomically create/import or replace a Data Model with outer validation.
-    ///
-    /// Creation/import validates the typed descriptor, XLDM storage profile,
-    /// OPC ownership, and relationship closure while retaining the binary
-    /// payload as opaque bytes. A time-grouping write additionally requires a
-    /// complete neutral XLDM identity closure for its table, source column,
-    /// and calculated columns. For an existing source-bound model,
-    /// payload-only replacement with an unchanged typed descriptor is
-    /// supported; other structural replacement remains refused until its
-    /// complete inner proof exists.
-    pub fn put_data_model(&mut self, model: crate::workbook::data_model::Model) -> Result<()> {
-        self.ensure_mutation_allowed("put_data_model")?;
-        let mut transaction = crate::workbook::data_model::Transaction::for_package(self)?;
-        transaction.set(model)?;
-        transaction.commit().map(|_commit| ())
-    }
-
-    /// Atomically remove the workbook Data Model graph.
-    pub fn remove_data_model(&mut self) -> Result<()> {
-        self.ensure_mutation_allowed("remove_data_model")?;
-        let mut transaction = crate::workbook::data_model::Transaction::for_package(self)?;
-        transaction.remove()?;
-        transaction.commit().map(|_commit| ())
-    }
-
-    /// Apply an exact source-bound Data Model patch.
-    pub fn apply_data_model_patch(
-        &mut self,
-        patch: &crate::workbook::data_model::Patch,
-    ) -> Result<()> {
-        self.ensure_mutation_allowed("apply_data_model_patch")?;
-        self.stage(|package| patch.apply(package))
-    }
-
-    /// Read the source-bound Custom Data and Custom Data Properties catalog.
+    /// Read the source-bound Custom Data and Custom Data Properties catalog
+    /// under the package's semantic limits
+    /// ([`crate::SemanticLimits::custom_data`]).
     pub fn custom_data(&self) -> Result<crate::custom_data::Snapshot> {
-        crate::custom_data::Snapshot::load(self.opc())
-    }
-
-    /// Read Custom Data with explicit payload and storage limits.
-    pub fn custom_data_with_limits(
-        &self,
-        limits: &crate::custom_data::Limits,
-    ) -> Result<crate::custom_data::Snapshot> {
-        crate::custom_data::Snapshot::load_with_limits(self.opc(), limits)
+        crate::custom_data::Snapshot::load_with_limits(
+            self.opc(),
+            &self.semantic_limits().custom_data_value(),
+        )
     }
 
     /// Alias emphasizing that the catalog includes Custom Data Properties.
     pub fn custom_data_properties(&self) -> Result<crate::custom_data::Snapshot> {
         self.custom_data()
-    }
-
-    /// Read Custom Data and Custom Data Properties with explicit limits.
-    pub fn custom_data_properties_with_limits(
-        &self,
-        limits: &crate::custom_data::Limits,
-    ) -> Result<crate::custom_data::Snapshot> {
-        self.custom_data_with_limits(limits)
-    }
-
-    /// Start a source-bound Custom Data transaction.
-    pub fn edit_custom_data(&mut self) -> Result<crate::custom_data::Transaction<'_>> {
-        self.ensure_mutation_allowed("edit_custom_data")?;
-        crate::custom_data::Transaction::for_package(self, &crate::custom_data::Limits::default())
-    }
-
-    /// Start a Custom Data transaction with explicit limits.
-    pub fn edit_custom_data_with_limits(
-        &mut self,
-        limits: &crate::custom_data::Limits,
-    ) -> Result<crate::custom_data::Transaction<'_>> {
-        self.ensure_mutation_allowed("edit_custom_data_with_limits")?;
-        crate::custom_data::Transaction::for_package(self, limits)
-    }
-
-    /// Atomically insert or replace one inert Custom Data storage.
-    pub fn put_custom_data(&mut self, value: crate::custom_data::CustomData) -> Result<()> {
-        self.put_custom_data_with_limits(value, &crate::custom_data::Limits::default())
-    }
-
-    /// Atomically insert or replace one inert Custom Data storage with
-    /// explicit resource limits.
-    pub fn put_custom_data_with_limits(
-        &mut self,
-        value: crate::custom_data::CustomData,
-        limits: &crate::custom_data::Limits,
-    ) -> Result<()> {
-        self.ensure_mutation_allowed("put_custom_data")?;
-        let mut transaction = crate::custom_data::Transaction::for_package(self, limits)?;
-        transaction.upsert(value)?;
-        transaction.commit().map(|_commit| ())
-    }
-
-    /// Atomically remove a Custom Data storage by UID.  Missing UIDs are an
-    /// idempotent no-op. Referenced storages require an explicit disposition.
-    pub fn remove_custom_data(&mut self, id: &str) -> Result<()> {
-        self.remove_custom_data_with(id, crate::custom_data::RemovalDisposition::RejectReferenced)
-    }
-
-    /// Atomically remove one Custom Data storage with explicit limits.
-    /// Referenced storages require an explicit disposition through
-    /// [`Self::remove_custom_data_with_and_limits`].
-    pub fn remove_custom_data_with_limits(
-        &mut self,
-        id: &str,
-        limits: &crate::custom_data::Limits,
-    ) -> Result<()> {
-        self.remove_custom_data_with_and_limits(
-            id,
-            crate::custom_data::RemovalDisposition::RejectReferenced,
-            limits,
-        )
-    }
-
-    /// Rename a Custom Data storage and its recognized connection references.
-    pub fn rename_custom_data(&mut self, id: &str, new_id: impl Into<String>) -> Result<bool> {
-        self.rename_custom_data_with_limits(id, new_id, &crate::custom_data::Limits::default())
-    }
-
-    /// Rename a Custom Data storage and its recognized connection references
-    /// with explicit resource limits.
-    pub fn rename_custom_data_with_limits(
-        &mut self,
-        id: &str,
-        new_id: impl Into<String>,
-        limits: &crate::custom_data::Limits,
-    ) -> Result<bool> {
-        self.ensure_mutation_allowed("rename_custom_data")?;
-        let mut transaction = crate::custom_data::Transaction::for_package(self, limits)?;
-        let index = transaction
-            .entries()
-            .iter()
-            .position(|entry| entry.id() == id)
-            .ok_or_else(|| crate::Error::Invalid("Custom Data storage UID is absent".into()))?;
-        let changed = transaction.rename(index, new_id)?;
-        transaction.commit()?;
-        Ok(changed)
-    }
-
-    /// Remove a Custom Data storage with an explicit connection disposition.
-    pub fn remove_custom_data_with(
-        &mut self,
-        id: &str,
-        disposition: crate::custom_data::RemovalDisposition,
-    ) -> Result<()> {
-        self.remove_custom_data_with_and_limits(
-            id,
-            disposition,
-            &crate::custom_data::Limits::default(),
-        )
-    }
-
-    /// Remove a Custom Data storage with an explicit connection disposition
-    /// and resource limits.
-    pub fn remove_custom_data_with_and_limits(
-        &mut self,
-        id: &str,
-        disposition: crate::custom_data::RemovalDisposition,
-        limits: &crate::custom_data::Limits,
-    ) -> Result<()> {
-        self.ensure_mutation_allowed("remove_custom_data")?;
-        let mut transaction = crate::custom_data::Transaction::for_package(self, limits)?;
-        if let Some(index) = transaction
-            .entries()
-            .iter()
-            .position(|entry| entry.id() == id)
-        {
-            transaction.remove_with(index, disposition)?;
-        }
-        transaction.commit().map(|_commit| ())
-    }
-
-    /// Apply an exact source-bound Custom Data patch.
-    pub fn apply_custom_data_patch(&mut self, patch: &crate::custom_data::Patch) -> Result<()> {
-        self.ensure_mutation_allowed("apply_custom_data_patch")?;
-        self.stage(|package| patch.apply(package))
-    }
-
-    /// Start a source-bound Survey transaction.
-    pub fn edit_surveys(&mut self) -> Result<crate::survey::Transaction<'_>> {
-        self.ensure_mutation_allowed("edit_surveys")?;
-        crate::survey::Transaction::for_package(self, &crate::survey::Limits::default())
-    }
-
-    /// Start a Survey transaction with explicit resource limits.
-    pub fn edit_surveys_with_limits(
-        &mut self,
-        limits: &crate::survey::Limits,
-    ) -> Result<crate::survey::Transaction<'_>> {
-        self.ensure_mutation_allowed("edit_surveys_with_limits")?;
-        crate::survey::Transaction::for_package(self, limits)
-    }
-
-    /// Apply an exact source-bound Survey patch.
-    pub fn apply_surveys_patch(&mut self, patch: &crate::survey::Patch) -> Result<()> {
-        self.ensure_mutation_allowed("apply_surveys_patch")?;
-        self.stage(|package| patch.apply(package))
-    }
-
-    /// Start a source-bound calculation-metadata transaction.
-    pub fn edit_calculation_metadata(
-        &mut self,
-    ) -> Result<crate::calculation_properties::Transaction<'_>> {
-        self.ensure_mutation_allowed("edit_calculation_metadata")?;
-        crate::calculation_properties::Transaction::for_package(
-            self,
-            &crate::calculation_properties::Limits::default(),
-        )
-    }
-
-    /// Start a calculation-metadata transaction with explicit limits.
-    pub fn edit_calculation_metadata_with_limits(
-        &mut self,
-        limits: &crate::calculation_properties::Limits,
-    ) -> Result<crate::calculation_properties::Transaction<'_>> {
-        self.ensure_mutation_allowed("edit_calculation_metadata_with_limits")?;
-        crate::calculation_properties::Transaction::for_package(self, limits)
-    }
-
-    /// Atomically apply an exact source-bound calculation-metadata patch.
-    pub fn apply_calculation_metadata_patch(
-        &mut self,
-        patch: &crate::calculation_properties::Patch,
-    ) -> Result<()> {
-        self.ensure_mutation_allowed("apply_calculation_metadata_patch")?;
-        self.stage(|package| patch.apply(package))
     }
 
     /// Read one worksheet's source-bound row and column page breaks.
@@ -699,31 +486,6 @@ impl Package {
         selector: impl Into<crate::Selector<'a>>,
     ) -> Result<crate::page_breaks::Snapshot> {
         crate::page_breaks::Snapshot::load(self.opc(), selector)
-    }
-
-    /// Start a source-bound page-break transaction for one worksheet.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when mutation is prohibited or loading the selected
-    /// worksheet fails.
-    pub fn edit_page_breaks<'package, 'selector>(
-        &'package mut self,
-        selector: impl Into<crate::Selector<'selector>>,
-    ) -> Result<crate::page_breaks::Transaction<'package>> {
-        self.ensure_mutation_allowed("edit_page_breaks")?;
-        crate::page_breaks::Transaction::for_package(self, selector)
-    }
-
-    /// Atomically apply an exact source-bound worksheet page-break patch.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when mutation is prohibited, the patch source is
-    /// stale, or publication/readback fails.
-    pub fn apply_page_breaks_patch(&mut self, patch: &crate::page_breaks::Patch) -> Result<()> {
-        self.ensure_mutation_allowed("apply_page_breaks_patch")?;
-        self.stage(|package| patch.apply(package))
     }
 
     /// Read the inert typed package-level custom document properties.
@@ -902,7 +664,7 @@ impl Package {
     /// successful encrypted save. In-memory byte generation is side-effect-free.
     #[cfg(feature = "encryption")]
     #[must_use]
-    pub const fn encryption(&self) -> Option<crate::encryption::Mode> {
+    pub fn encryption(&self) -> Option<crate::encryption::Mode> {
         self.workbook.encryption_state().mode()
     }
 
@@ -977,13 +739,6 @@ impl Package {
     pub(crate) fn republish(&mut self, staged: OpcPackage) -> Result<()> {
         self.workbook = Workbook::from_package_with_styles(staged, Some(&self.workbook))?;
         Ok(())
-    }
-
-    fn stage<T>(&mut self, mutation: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
-        let mut staged = self.opc().clone();
-        let value = mutation(&mut staged)?;
-        self.republish(staged)?;
-        Ok(value)
     }
 
     fn ensure_mutation_allowed(&self, operation: &'static str) -> Result<()> {

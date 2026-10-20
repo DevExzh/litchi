@@ -26,6 +26,7 @@ use litchi_opc::SourceLimits;
 pub struct OpenOptions {
     pub(crate) source_limits: SourceLimits,
     pub(crate) leniency: Leniency,
+    pub(crate) semantic_limits: crate::SemanticLimits,
     #[cfg(feature = "encryption")]
     pub(crate) encryption_limits: crate::encryption::Limits,
 }
@@ -49,6 +50,20 @@ impl OpenOptions {
     pub const fn leniency(mut self, leniency: Leniency) -> Self {
         self.leniency = leniency;
         self
+    }
+
+    /// Select the semantic budgets the package keeps for its bounded reads
+    /// and edits ([`crate::semantic_limits`]).
+    #[must_use]
+    pub const fn semantic_limits(mut self, limits: crate::SemanticLimits) -> Self {
+        self.semantic_limits = limits;
+        self
+    }
+
+    /// The semantic budgets the package keeps.
+    #[must_use]
+    pub const fn semantic_limits_value(&self) -> &crate::SemanticLimits {
+        &self.semantic_limits
     }
 
     /// The physical limits of the clear OPC archive.

@@ -1,5 +1,11 @@
 //! MS-XLDM workbook Data Model owner.
 //!
+//! [`crate::Package::data_model`] reads the source-bound graph;
+//! [`crate::Package::edit_data_model`] starts an [`Edit`] whose
+//! [`Edit::commit`] returns a [`Commit`] holding the new package, the exact
+//! [`Patch`] and the [`Diagnostics`]; [`crate::Package::apply_data_model`]
+//! replays a patch. The source package never changes.
+//!
 //! The semantic descriptor is separated from its bounded XML codec and from
 //! the OPC singleton graph. The binary MS-XLDM payload stays inert and is
 //! validated only by the existing [`crate::package::xldm`] inspector.
@@ -15,7 +21,15 @@ pub use model::{
     CalculatedTimeColumn, Definition, Model, ModelTimeGrouping, ModelTimeGroupingContentType,
     ModelTimeGroupings, ModelView, OpaqueXml, Payload, Relationship, Table,
 };
-pub use package::{Commit, Patch, Snapshot, Transaction, load_data_model, store_data_model};
+pub use package::{Commit, Diagnostics, Edit, Error, Patch, Snapshot, load_data_model};
+
+/// The typed budgets of the Data Model family.
+///
+/// The family has none yet: its fixed XML, extension and payload bounds are
+/// still reported as [`Error::Invalid`] (record 0360 gap), so this
+/// enum has no variant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LimitKind {}
 
 /// OPC content type for an MS-XLDM payload.
 pub const DATA_MODEL_CONTENT_TYPE: &str =
@@ -53,14 +67,14 @@ pub(crate) const MAX_RELATIONSHIPS: usize = 65_536;
 pub(crate) const MAX_TIME_GROUPINGS: usize = 65_536;
 pub(crate) const MAX_CALCULATED_TIME_COLUMNS: usize = 65_536;
 
-pub(crate) fn invalid(message: impl Into<String>) -> crate::Error {
-    crate::Error::Invalid(message.into())
+pub(crate) fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
 
-pub(crate) fn limit(name: &str) -> crate::Error {
+pub(crate) fn limit(name: &str) -> Error {
     invalid(format!("Data Model {name} limit exceeded"))
 }
 
-pub(crate) fn xml_error(error: impl std::fmt::Display) -> crate::Error {
-    crate::Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
+pub(crate) fn xml_error(error: impl std::fmt::Display) -> Error {
+    Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
 }
