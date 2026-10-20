@@ -3,7 +3,8 @@
 use std::io::Cursor;
 
 use litchi_cfb::{DirectoryEntry, OleFile, OleWriter};
-use litchi_xls::{Builder, UserNamesLimits, UserNamesPackageSnapshot, raw::Reader};
+use litchi_xls::user_names::publication::Snapshot as UserNamesPackageSnapshot;
+use litchi_xls::{Builder, UserNamesLimits, raw::Reader};
 
 const USER_NAMES_STREAM_NAME: &str = "User Names";
 const REVISION_LOG_STREAM_NAME: &str = "Revision Log";
@@ -27,6 +28,11 @@ const WINDOW2: u16 = 0x023E;
 const WINDOW2_SELECTED: u16 = 0x0200;
 const CODE_PAGE: u16 = 0x0042;
 const FILE_PASS: u16 = 0x002F;
+
+/// The package a `User Names` package snapshot was read from.
+fn xls_package(snapshot: &UserNamesPackageSnapshot) -> litchi_xls::Package {
+    litchi_xls::Package::from_bytes(snapshot.bytes()).unwrap()
+}
 
 fn record(record_type: u16, payload: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(4 + payload.len());
@@ -526,20 +532,40 @@ fn package_owner_is_exact_for_noop_and_reversible_for_changed_stream() {
             .unwrap();
     assert_eq!(source.bytes(), source_bytes.as_slice());
 
-    let noop = source.edit().commit().unwrap();
-    assert!(!noop.changed());
+    let noop = xls_package(&source)
+        .edit_user_names()
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(!noop.diagnostics().changed());
     assert!(noop.patch().is_noop());
-    assert_eq!(noop.snapshot().bytes(), source_bytes.as_slice());
+    assert_eq!(noop.patch().after(), source_bytes.as_slice());
 
-    let mut edit = source.edit();
+    let mut edit = xls_package(&source).edit_user_names().unwrap();
     edit.set_user_name(0, "Bob").unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
-    assert_eq!(commit.snapshot().user_names().users()[0].user_name(), "Bob");
-    assert_eq!(commit.patch().apply(&source).unwrap(), *commit.snapshot());
-    assert_eq!(commit.patch().revert(commit.snapshot()).unwrap(), source);
+    assert!(commit.diagnostics().changed());
     assert_eq!(
-        commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+        commit.package().user_names().unwrap().user_names().users()[0].user_name(),
+        "Bob"
+    );
+    assert_eq!(
+        commit.patch().apply(&source).unwrap(),
+        commit.package().user_names().unwrap()
+    );
+    assert_eq!(
+        commit
+            .patch()
+            .revert(&commit.package().user_names().unwrap())
+            .unwrap(),
+        source
+    );
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(&commit.package().user_names().unwrap())
+            .unwrap(),
         source
     );
 }
@@ -554,9 +580,9 @@ fn package_owner_accepts_official_rrdhead_code_pages_and_keeps_unicode_user_name
         );
         let source =
             UserNamesPackageSnapshot::from_bytes(source_bytes, UserNamesLimits::default()).unwrap();
-        let mut edit = source.edit();
+        let mut edit = xls_package(&source).edit_user_names().unwrap();
         edit.set_user_name(0, "Élodie").unwrap();
-        let target = edit.commit().unwrap().into_snapshot();
+        let target = edit.commit().unwrap().into_package().user_names().unwrap();
         assert_eq!(target.user_names().users()[0].user_name(), "Élodie");
 
         let mut workbook = Reader::new(Cursor::new(target.finish())).unwrap();
@@ -659,9 +685,9 @@ fn package_owner_preserves_unrelated_streams_and_directory_metadata() {
     let source =
         UserNamesPackageSnapshot::from_bytes(source_bytes.clone(), UserNamesLimits::default())
             .unwrap();
-    let mut edit = source.edit();
+    let mut edit = xls_package(&source).edit_user_names().unwrap();
     edit.set_user_name(0, "Bob").unwrap();
-    let target = edit.commit().unwrap().into_snapshot();
+    let target = edit.commit().unwrap().into_package().user_names().unwrap();
 
     let mut source_ole = OleFile::open(Cursor::new(source_bytes)).unwrap();
     let mut target_ole = OleFile::open(Cursor::new(target.finish())).unwrap();

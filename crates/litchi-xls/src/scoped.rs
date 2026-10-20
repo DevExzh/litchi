@@ -99,3 +99,92 @@ pub(crate) fn package_error(error: crate::package::Error) -> Error {
         _ => Error::Internal("the edited workbook could not be republished"),
     }
 }
+
+/// Declare the whole-package `Patch`, `Commit` and `Diagnostics` of one
+/// byte-rendering family in the calling module, with `published` (a commit
+/// from the source and rendered bytes) and `replay` (`apply_x`) helpers.
+macro_rules! byte_family {
+    ($noun:literal, $operation:literal) => {
+        #[doc = concat!(
+                            "A published ", $noun, " edit: the new package, its exact whole-package ",
+                            "patch and diagnostics."
+                        )]
+        pub type Commit = litchi_core::edit::Commit<$crate::Package, Patch>;
+
+        #[doc = concat!("Content-free diagnostics of one ", $noun, " commit.")]
+        pub use litchi_core::edit::Diagnostics;
+
+        #[doc = concat!("An exact, reversible whole-package ", $noun, " patch.")]
+        #[derive(Clone, PartialEq, Eq)]
+        pub struct Patch {
+            before: ::std::sync::Arc<[u8]>,
+            after: ::std::sync::Arc<[u8]>,
+        }
+
+        impl ::std::fmt::Debug for Patch {
+            fn fmt(&self, formatter: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                formatter
+                    .debug_struct("Patch")
+                    .field("before_bytes", &self.before.len())
+                    .field("after_bytes", &self.after.len())
+                    .finish()
+            }
+        }
+
+        impl Patch {
+            /// Whether applying the patch changes nothing.
+            #[must_use]
+            pub fn is_noop(&self) -> bool {
+                self.before == self.after
+            }
+
+            /// The patch that undoes this one.
+            #[must_use]
+            pub fn inverse(&self) -> Self {
+                Self {
+                    before: ::std::sync::Arc::clone(&self.after),
+                    after: ::std::sync::Arc::clone(&self.before),
+                }
+            }
+
+            /// The exact package bytes the patch applies to.
+            #[must_use]
+            pub fn before(&self) -> &[u8] {
+                &self.before
+            }
+
+            /// The exact package bytes the patch produces.
+            #[must_use]
+            pub fn after(&self) -> &[u8] {
+                &self.after
+            }
+        }
+
+        fn published(
+            base: $crate::scoped::Base,
+            before: &[u8],
+            after: Vec<u8>,
+        ) -> $crate::Result<Commit> {
+            let package = $crate::scoped::publish(base, before, &after)?;
+            let patch = Patch {
+                before: ::std::sync::Arc::from(before),
+                after: ::std::sync::Arc::from(after),
+            };
+            let diagnostics = Diagnostics::new(!patch.is_noop());
+            Ok(Commit::new(package, patch, diagnostics))
+        }
+
+        fn replay(package: &$crate::Package, patch: &Patch) -> $crate::Result<Commit> {
+            $crate::scoped::replay_source(package, patch.before(), $operation)?;
+            let target =
+                $crate::scoped::publish(Some(package.clone()), patch.before(), patch.after())?;
+            Ok(Commit::new(
+                target,
+                patch.clone(),
+                Diagnostics::new(!patch.is_noop()),
+            ))
+        }
+    };
+}
+
+pub(crate) use byte_family;

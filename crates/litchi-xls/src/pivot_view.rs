@@ -1,11 +1,15 @@
-//! Transactional rewrite of existing BIFF8 worksheet `PivotTable` views.
+//! The XLS pivot-view edit family (record 0351 §2.3): rewrites of existing
+//! BIFF8 worksheet `PivotTable` views and their caches.
+//!
+//! [`crate::Package::edit_pivot_views`] starts an [`Edit`]; [`Edit::commit`]
+//! publishes a new package with an exact whole-package [`Patch`] and
+//! [`Diagnostics`]; [`crate::Package::apply_pivot_views`] replays the patch.
 
 use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
 
 use litchi_cfb::{OleFile, OleWriter};
 
-use super::error::{Error, Result};
 use super::pivot_table::{
     PivotAdditionalExtension, PivotAxisField, PivotCache, PivotCacheGrouping, PivotCacheItem,
     PivotLayoutLine, PivotQueryTag, PivotTable, PivotViewEx9, PivotViewExtension,
@@ -16,13 +20,48 @@ use super::pivot_table::{
 use super::raw::Reader;
 use super::writer::biff;
 
+crate::scoped::byte_family!("pivot-view", "edit pivot views");
+
+/// The pivot-view family has no caller-selected limit dimension: the
+/// republished package is admitted under the source package's limits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {}
+
+/// The family error and result: the crate's.
+pub use super::error::{Error, Result};
+
+impl crate::Package {
+    /// Start a pivot-view edit of this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an encrypted workbook or malformed pivot records.
+    pub fn edit_pivot_views(&self) -> Result<Edit> {
+        let (base, bytes) = crate::scoped::capture(self)?;
+        Edit::open(base, bytes)
+    }
+
+    /// Replay a pivot-view patch onto the exact package it was made from.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// source, or [`Error::Signed`] for a changed signed workbook.
+    pub fn apply_pivot_views(&self, patch: &Patch) -> Result<Commit> {
+        replay(self, patch)
+    }
+}
+
 const BOUNDSHEET: u16 = 0x0085;
 const BOF: u16 = 0x0809;
 const EOF: u16 = 0x000A;
 const MAX_RECORD: usize = 8_224;
 
 /// An owned, transactional editor for `PivotTable` worksheet views in an XLS file.
-pub struct PivotViewEditor {
+/// A staged pivot-view edit of one package. Dropping it discards it.
+pub struct Edit {
+    base: crate::scoped::Base,
     original: Vec<u8>,
     original_tables: Vec<Vec<PivotTable>>,
     tables: Vec<Vec<PivotTable>>,
@@ -31,12 +70,10 @@ pub struct PivotViewEditor {
     cache_stream_ids: Vec<u16>,
 }
 
-impl PivotViewEditor {
-    /// Parses an owned XLS file. Calling [`finish`](Self::finish) without edits returns these bytes unchanged.
-    /// # Errors
-    ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn new(bytes: Vec<u8>) -> Result<Self> {
+impl Edit {
+    /// Parses an owned XLS file; committing without edits publishes the
+    /// source unchanged.
+    fn open(base: crate::scoped::Base, bytes: Vec<u8>) -> Result<Self> {
         let workbook = Reader::new(Cursor::new(bytes.clone()))?;
         let worksheet_count = workbook
             .sheets()
@@ -53,6 +90,7 @@ impl PivotViewEditor {
         let caches = workbook.pivot_caches().to_vec();
         let cache_stream_ids = workbook.pivot_cache_stream_ids().to_vec();
         Ok(Self {
+            base,
             original: bytes,
             original_tables: tables.clone(),
             tables,
@@ -301,11 +339,22 @@ impl PivotViewEditor {
         })
     }
 
-    /// Serializes all staged edits. Validation and serialization complete before any output is returned.
+    /// Validate the staged pivot-view edits and publish them as a new
+    /// package. Validation and serialization complete before the package is
+    /// republished.
+    ///
     /// # Errors
     ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn finish(self) -> Result<Vec<u8>> {
+    /// Returns an error if validation or encoding fails, or
+    /// [`Error::Signed`] for a changed signed workbook.
+    pub fn commit(self) -> Result<Commit> {
+        let base = self.base.clone();
+        let before = self.original.clone();
+        let after = self.finish()?;
+        published(base, &before, after)
+    }
+
+    fn finish(self) -> Result<Vec<u8>> {
         if self.tables == self.original_tables && self.caches == self.original_caches {
             return Ok(self.original);
         }

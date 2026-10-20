@@ -1,10 +1,13 @@
-//! Source-bound publication of an XLS package containing `User Names`.
+//! The XLS `User Names` edit family (record 0351 §2.3).
 //!
-//! [`Snapshot`] owns the complete validated CFB artifact, while the common
-//! OLE package editor owns rendering and directory metadata preservation.  A
-//! transaction changes only the typed `User Names` stream; the resulting CFB
-//! is reopened through the normal XLS reader and the Revision Log dependency
-//! check before a commit is returned.
+//! [`crate::Package::user_names`] reads the shared-workbook user list as a
+//! [`Snapshot`] of the complete validated CFB artifact;
+//! [`crate::Package::edit_user_names`] stages typed `User Names` changes and
+//! [`Edit::commit`] publishes a new [`crate::Package`] with an exact
+//! [`Patch`] and [`Diagnostics`]. The common OLE package editor owns
+//! rendering and directory metadata preservation; the resulting CFB is
+//! reopened through the normal XLS reader and the Revision Log dependency
+//! check before the commit is returned.
 
 use litchi_core::edit::RefusalKind;
 use std::fmt;
@@ -15,7 +18,8 @@ use litchi_cfb::OleFile;
 use litchi_ole_common::object::{Edit as PackageEditor, Limits as PackageLimits, Targets};
 
 use super::{Edit as UserNamesEdit, Limits as UserNamesLimits, Snapshot as UserNamesSnapshot};
-use crate::{Error, Result};
+/// The User Names family error and result: the crate's.
+pub use crate::{Error, Result};
 
 /// An immutable, cheaply cloned source-bound XLS package snapshot.
 #[derive(Clone)]
@@ -84,22 +88,9 @@ impl Snapshot {
         &self.inner.user_names
     }
 
-    /// Alias emphasizing the typed stream owner.
-    #[must_use]
-    pub fn user_names_snapshot(&self) -> &UserNamesSnapshot {
-        self.user_names()
-    }
-
-    /// Start a detached source-bound User Names transaction.
-    #[must_use]
-    pub fn edit(&self) -> Edit {
-        self.edit_user_names()
-    }
-
-    /// Start a detached source-bound User Names transaction.
-    #[must_use]
-    pub fn edit_user_names(&self) -> Edit {
+    fn edit_based(&self, base: crate::scoped::Base) -> Edit {
         Edit {
+            base,
             source: self.clone(),
             user_names: self.inner.user_names.edit(),
         }
@@ -133,6 +124,7 @@ impl Eq for Snapshot {}
 /// A detached source-bound transaction over one complete XLS package.
 #[derive(Clone)]
 pub struct Edit {
+    base: crate::scoped::Base,
     source: Snapshot,
     user_names: UserNamesEdit,
 }
@@ -244,18 +236,6 @@ impl Edit {
         self.user_names.remove(index)
     }
 
-    /// Reparse the staged User Names stream as a complete package snapshot.
-    ///
-    /// This renders and reopens the candidate through the common CFB owner;
-    /// it is useful for callers that need a read view before final commit.
-    ///
-    /// # Errors
-    ///
-    /// Returns a CFB, workbook, stream, or dependency-closure error.
-    pub fn snapshot(&self) -> Result<Snapshot> {
-        self.clone().commit().map(|commit| commit.snapshot)
-    }
-
     /// Validate and publish the complete XLS package with a reversible patch.
     ///
     /// The common publication owner retains untouched stream payloads and CFB
@@ -268,13 +248,23 @@ impl Edit {
     /// Returns a CFB, workbook, stream, User Names, or dependency-closure
     /// error without publishing partial bytes.
     pub fn commit(self) -> Result<Commit> {
-        let Self { source, user_names } = self;
+        let base = self.base.clone();
+        let (_, patch) = self.commit_record()?;
+        let package = crate::scoped::publish(base, patch.before(), patch.after())?;
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(package, patch, diagnostics))
+    }
+
+    pub(crate) fn commit_record(self) -> Result<(Snapshot, Patch)> {
+        let Self {
+            source, user_names, ..
+        } = self;
         let user_names_commit = user_names.commit()?;
         if !user_names_commit.diagnostics().changed() {
-            return Ok(Commit {
-                patch: Patch::new(source.bytes_shared(), source.bytes_shared()),
-                snapshot: source,
-            });
+            return Ok((
+                source.clone(),
+                Patch::new(source.bytes_shared(), source.bytes_shared()),
+            ));
         }
 
         let replacement =
@@ -288,7 +278,7 @@ impl Edit {
             package.put_stream_shared_with_rendered(&source.inner.user_names_path, replacement)?;
         let snapshot = Snapshot::from_bytes(rendered, source.inner.user_names_limits)?;
         let patch = Patch::new(source.bytes_shared(), snapshot.bytes_shared());
-        Ok(Commit { snapshot, patch })
+        Ok((snapshot, patch))
     }
 }
 
@@ -301,54 +291,99 @@ impl fmt::Debug for Edit {
     }
 }
 
-/// A successful complete-CFB User Names publication.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
+/// A published User Names edit: the new package, its exact complete-CFB
+/// patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<crate::Package, Patch>;
+
+/// Content-free diagnostics of one User Names commit.
+pub use litchi_core::edit::Diagnostics;
+
+/// A User Names edit limit dimension: the bounds of [`super::Limits`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// The `User Names` and Revision Log stream bytes.
+    StreamBytes,
+    /// The users in the `User Names` stream.
+    Users,
+    /// The Revision Log GUIDs of the dependency closure.
+    RevisionGuids,
 }
 
-impl Commit {
-    /// Reopened target package snapshot.
+/// Per-edit configuration of a User Names edit.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: UserNamesLimits,
+}
+
+impl EditOptions {
+    /// Default options: the default `User Names` bounds.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    /// Exact-source reversible package patch.
+    /// Select the `User Names` stream bounds.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
+    pub const fn limits(mut self, limits: UserNamesLimits) -> Self {
+        self.limits = limits;
+        self
     }
 
-    /// Whether the complete CFB artifact changed.
+    /// The selected `User Names` stream bounds.
     #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
+    pub const fn limits_value(&self) -> UserNamesLimits {
+        self.limits
+    }
+}
+
+impl crate::Package {
+    /// The `User Names` read view of this shared workbook.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package has no valid `User Names` stream or
+    /// its Revision Log dependency closure is invalid.
+    pub fn user_names(&self) -> Result<Snapshot> {
+        let (_, bytes) = crate::scoped::capture(self)?;
+        Snapshot::from_bytes(bytes, UserNamesLimits::default())
     }
 
-    /// Consume the publication into its target snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
+    /// Start a `User Names` edit of this package with the default bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::user_names`], or a refusal for an
+    /// encrypted workbook.
+    pub fn edit_user_names(&self) -> Result<Edit> {
+        self.edit_user_names_with_options(EditOptions::default())
     }
 
-    /// Consume the publication into its reversible patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
+    /// Start a `User Names` edit of this package under explicit bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::edit_user_names`], or a limit error
+    /// when the package exceeds `options`.
+    pub fn edit_user_names_with_options(&self, options: EditOptions) -> Result<Edit> {
+        let (base, bytes) = crate::scoped::capture(self)?;
+        Ok(Snapshot::from_bytes(bytes, options.limits_value())?.edit_based(base))
     }
 
-    /// Consume the publication into exact complete-CFB bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.snapshot.finish()
-    }
-
-    /// Consume the publication into its target snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
+    /// Replay a `User Names` patch onto the exact package it was made from.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// source, or [`Error::Signed`] for a changed signed workbook.
+    pub fn apply_user_names(&self, patch: &Patch) -> Result<Commit> {
+        crate::scoped::replay_source(self, patch.before(), "edit user names")?;
+        let package = crate::scoped::publish(Some(self.clone()), patch.before(), patch.after())?;
+        Ok(Commit::new(
+            package,
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
     }
 }
 

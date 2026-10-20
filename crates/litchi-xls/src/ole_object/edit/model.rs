@@ -67,9 +67,12 @@ impl Snapshot {
     }
 
     /// Starts an independent failure-atomic edit.
+    /// A codec-level edit of this bare snapshot (tests only); package
+    /// callers use [`crate::Package::edit_ole_objects`].
+    #[cfg(test)]
     #[must_use]
-    pub fn edit(&self) -> super::Edit {
-        super::Edit::new(self.clone())
+    pub(crate) fn edit(&self) -> super::Edit {
+        super::Edit::new(None, self.clone())
     }
 
     /// Publishes this immutable snapshot without rebuilding the CFB.
@@ -176,9 +179,93 @@ impl Patch {
     }
 }
 
-/// A published edit: the new snapshot, its reversible patch and
-/// diagnostics.
-pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
+/// A published OLE-object edit: the new package, its exact artifact patch
+/// and diagnostics.
+pub type Commit = litchi_core::edit::Commit<crate::Package, Patch>;
 
 /// Content-free diagnostics of one commit.
 pub use litchi_core::edit::Diagnostics;
+
+/// The OLE-object family has no caller-selected limit dimension beyond the
+/// object capture bounds of [`Limits`], which [`EditOptions`] selects.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {}
+
+/// Per-edit configuration of an OLE-object edit.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: Limits,
+}
+
+impl EditOptions {
+    /// Default options: the default object capture bounds.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Select the object capture bounds.
+    #[must_use]
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
+        self
+    }
+
+    /// The selected object capture bounds.
+    #[must_use]
+    pub const fn limits_value(&self) -> Limits {
+        self.limits
+    }
+}
+
+impl crate::Package {
+    /// The OLE-object and form-control read view of this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package is not a supported BIFF8 workbook.
+    pub fn ole_objects(&self) -> Result<Snapshot> {
+        let (_, bytes) = crate::scoped::capture(self)?;
+        Snapshot::open(bytes, Limits::default())
+    }
+
+    /// Start an OLE-object edit of this package with the default bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an encrypted, protected or unsupported workbook.
+    pub fn edit_ole_objects(&self) -> Result<super::Edit> {
+        self.edit_ole_objects_with_options(EditOptions::default())
+    }
+
+    /// Start an OLE-object edit of this package under explicit bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::edit_ole_objects`], or a limit
+    /// error when the package exceeds `options`.
+    pub fn edit_ole_objects_with_options(&self, options: EditOptions) -> Result<super::Edit> {
+        let (base, bytes) = crate::scoped::capture(self)?;
+        Ok(super::Edit::new(
+            base,
+            Snapshot::open(bytes, options.limits_value())?,
+        ))
+    }
+
+    /// Replay an OLE-object patch onto the exact package it was made from.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// source, or [`Error::Signed`] for a changed signed workbook.
+    pub fn apply_ole_objects(&self, patch: &Patch) -> Result<Commit> {
+        crate::scoped::replay_source(self, patch.before(), "edit OLE objects")?;
+        let package = crate::scoped::publish(Some(self.clone()), patch.before(), patch.after())?;
+        Ok(Commit::new(
+            package,
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
+    }
+}

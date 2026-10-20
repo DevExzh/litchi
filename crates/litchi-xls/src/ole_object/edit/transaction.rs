@@ -15,13 +15,15 @@ use super::{Commit, Diagnostics, Patch, Snapshot};
 /// candidate, so failed edits leave all typed views unchanged.
 #[derive(Clone)]
 pub struct Edit {
+    base: crate::scoped::Base,
     source: Snapshot,
     editor: Editor,
 }
 
 impl Edit {
-    pub(super) fn new(source: Snapshot) -> Self {
+    pub(super) fn new(base: crate::scoped::Base, source: Snapshot) -> Self {
         Self {
+            base,
             editor: source.editor().clone(),
             source,
         }
@@ -178,22 +180,37 @@ impl Edit {
         self.with_candidate(|editor| editor.replace_embedded_payload(worksheet, object_id, payload))
     }
 
-    /// Validates and publishes the candidate as a snapshot plus reversible
-    /// source-checked patch.
+    /// Validates and publishes the candidate as a new package plus a
+    /// reversible source-checked patch.
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn commit(self) -> Result<Commit> {
+        let base = self.base.clone();
+        let record = self.commit_record()?;
+        let package = crate::scoped::publish(base, record.patch.before(), record.patch.after())?;
+        Ok(Commit::new(package, record.patch, record.diagnostics))
+    }
+
+    /// The record-level result: the reopened candidate snapshot, its patch
+    /// and diagnostics, before the package is republished.
+    pub(crate) fn commit_record(self) -> Result<RecordCommit> {
         let before = self.source;
         let after = self.editor.finish()?;
-        let patch = Patch::new(before.bytes().to_vec(), after.clone());
+        let patch = Patch::new(before.bytes().to_vec(), after);
+        // Reopen the candidate through the object owner: the commit proves
+        // the rendered artifact still validates under its bounds.
         let snapshot = if patch.is_noop() {
             before
         } else {
-            Snapshot::open(after, before.limits())?
+            Snapshot::open(patch.after().to_vec(), before.limits())?
         };
         let diagnostics = Diagnostics::new(!patch.is_noop());
-        Ok(Commit::new(snapshot, patch, diagnostics))
+        Ok(RecordCommit {
+            snapshot,
+            patch,
+            diagnostics,
+        })
     }
 
     fn with_candidate<F>(&mut self, edit: F) -> Result<()>
@@ -204,5 +221,34 @@ impl Edit {
         edit(&mut candidate)?;
         self.editor = candidate;
         Ok(())
+    }
+}
+
+/// The record-level result of an OLE-object edit, before publication.
+#[derive(Clone)]
+pub(crate) struct RecordCommit {
+    #[cfg_attr(not(test), allow(dead_code, reason = "the record-level tests read it"))]
+    snapshot: Snapshot,
+    patch: Patch,
+    diagnostics: Diagnostics,
+}
+
+#[cfg(test)]
+#[allow(dead_code, reason = "not every record-level test reads every part")]
+impl RecordCommit {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
+    }
+
+    pub(crate) fn into_snapshot(self) -> Snapshot {
+        self.snapshot
+    }
+
+    pub(crate) const fn patch(&self) -> &Patch {
+        &self.patch
+    }
+
+    pub(crate) const fn diagnostics(&self) -> &Diagnostics {
+        &self.diagnostics
     }
 }

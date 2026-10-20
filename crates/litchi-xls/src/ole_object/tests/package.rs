@@ -1,6 +1,6 @@
 //! Regression tests for the XLS OLE-object owner.
 
-use super::super::package::{read_workbook, targets_for_sheets};
+use super::super::package::{Editor, read_workbook, targets_for_sheets};
 use super::super::*;
 use crate::error::Error;
 use litchi_cfb::{OleFile, OleWriter};

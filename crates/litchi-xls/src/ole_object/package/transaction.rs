@@ -96,7 +96,7 @@ impl OpaqueObjectIdentity {
 }
 
 #[derive(Clone)]
-pub struct Editor {
+pub(crate) struct Editor {
     package: ObjectEditor,
     limits: Limits,
     workbook_path: Vec<String>,
@@ -114,7 +114,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn new(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+    pub(crate) fn new(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         // Workbook metadata is XLS-owned. Read and parse it before handing
         // the original CFB bytes to the neutral object editor so the target
         // catalog can be derived solely from Obj/FtPictFmla records.
@@ -138,7 +138,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn objects(&self, worksheet: usize) -> Result<&[OleObjectRecord]> {
+    pub(crate) fn objects(&self, worksheet: usize) -> Result<&[OleObjectRecord]> {
         self.sheets
             .get(worksheet)
             .map(Vec::as_slice)
@@ -150,7 +150,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn form_controls(&self, worksheet: usize) -> Result<&[FormControl]> {
+    pub(crate) fn form_controls(&self, worksheet: usize) -> Result<&[FormControl]> {
         self.form_controls
             .get(worksheet)
             .map(Vec::as_slice)
@@ -170,7 +170,11 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn add_form_control(&mut self, worksheet: usize, control: FormControl) -> Result<()> {
+    pub(crate) fn add_form_control(
+        &mut self,
+        worksheet: usize,
+        control: FormControl,
+    ) -> Result<()> {
         control.validate()?;
         let object_id = control.object_id();
         self.opaque_identity.require_topology_proof()?;
@@ -204,7 +208,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn add(
+    pub(crate) fn add(
         &mut self,
         worksheet: usize,
         object: OleObjectRecord,
@@ -261,7 +265,7 @@ impl Editor {
     /// Returns an error if the worksheet or object identity is invalid, the
     /// identity is already present, or the payload cannot be admitted by the
     /// bounded common CFB editor.
-    pub fn add_embedded_payload(
+    pub(crate) fn add_embedded_payload(
         &mut self,
         worksheet: usize,
         draft: EmbeddedObjectDraft,
@@ -283,7 +287,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn remove(&mut self, worksheet: usize, object_id: u16) -> Result<OleObjectRecord> {
+    pub(crate) fn remove(&mut self, worksheet: usize, object_id: u16) -> Result<OleObjectRecord> {
         self.opaque_identity.require_topology_proof()?;
         let mut candidate = self.clone();
         let sheet = candidate
@@ -329,7 +333,11 @@ impl Editor {
     ///
     /// Returns an error if the selected object is absent or is not a valid
     /// storage-backed embedded object.
-    pub fn remove_embedded_payload(&mut self, worksheet: usize, object_id: u16) -> Result<()> {
+    pub(crate) fn remove_embedded_payload(
+        &mut self,
+        worksheet: usize,
+        object_id: u16,
+    ) -> Result<()> {
         self.embedded_storage(worksheet, object_id)?;
         self.remove(worksheet, object_id).map(|_| ())
     }
@@ -337,7 +345,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn reorder(&mut self, worksheet: usize, ids: &[u16]) -> Result<()> {
+    pub(crate) fn reorder(&mut self, worksheet: usize, ids: &[u16]) -> Result<()> {
         let mut candidate = self.clone();
         let sheet = candidate
             .sheets
@@ -381,7 +389,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn update_object_metadata(
+    pub(crate) fn update_object_metadata(
         &mut self,
         worksheet: usize,
         object_id: u16,
@@ -426,7 +434,11 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn replace_storage(&mut self, storage_name: &str, compound_file: Vec<u8>) -> Result<()> {
+    pub(crate) fn replace_storage(
+        &mut self,
+        storage_name: &str,
+        compound_file: Vec<u8>,
+    ) -> Result<()> {
         let storage = self
             .sheets
             .iter()
@@ -470,7 +482,7 @@ impl Editor {
     /// Returns an error if the worksheet/object identity is absent or is not
     /// a storage-backed embedded object, or if the replacement CFB is invalid,
     /// protected, or exceeds the configured limits.
-    pub fn replace_embedded_payload(
+    pub(crate) fn replace_embedded_payload(
         &mut self,
         worksheet: usize,
         object_id: u16,
@@ -483,7 +495,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn finish(self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(self) -> Result<Vec<u8>> {
         self.package.finish().map_err(Into::into)
     }
 

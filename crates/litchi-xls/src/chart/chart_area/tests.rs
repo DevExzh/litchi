@@ -1,7 +1,8 @@
 use super::super::codec::serialize_chart;
+use super::super::model::Chart;
 use super::super::package::{build_workbook_fixture, ranges};
 use super::super::wire::{CHART, EOF, record};
-use super::super::{Chart, Limits, Selector};
+use super::super::{Limits, Selector};
 use super::*;
 use crate::Error;
 
@@ -164,7 +165,7 @@ fn patch_changes_only_the_chart_payload_and_preserves_unknown_offsets() {
 fn package_editor_exposes_contextual_area_edit_without_host_resize() {
     let limits = Limits::default();
     let bytes = build_workbook_fixture(Chart::default(), limits).expect("fixture workbook");
-    let mut editor = super::super::Editor::open(bytes, limits).expect("open workbook");
+    let mut editor = super::super::Edit::open(bytes, limits).expect("open workbook");
     let target = Rect {
         x: 0,
         y: 0,
