@@ -414,3 +414,16 @@ litchi-ops `error::` tests pass: 62.
   the 54 KiB probe deck, +10.7% over the whole-package patch); computing the
   target digest lazily, on the first `apply` of the inverse, would remove it
   from the commit path. The bench matrix lists the row as a follow-up.
+
+## Primary-route ABBA after the 0357a changes
+
+The primary edit gained verbs and an error variant (§7), so the record 0357
+§7 routes were measured again: trunk `5f6fb75164` against this branch at
+`cf2088fa00`, release, `taskset -c 29`, binary-level ABBA (single 61, batch
+15, elements 21 rounds), host load 7–10 from other agents. Every after/before
+ratio is 0.96–1.03 except the first 10k text batch (native 1.072, unified
+1.036); three more batch-only ABBA runs put it at native 1.025 and unified
+0.998, i.e. noise. Pair ratios are unchanged (single 1.02–1.04, batch
+1.09–1.10, the two microsecond reads 1.42 and 3.1 as in record 0323).
+Evidence: [`results/0357a/primary/`](results/0357a/primary/) (`summary.json`,
+the per-leg JSON, `rb-*.json` for the repeat batch runs, binary SHA-256).
