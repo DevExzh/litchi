@@ -10599,7 +10599,11 @@
           "replacement": "`Workbook::with_name` (record 0354)"
         }
       ],
-      "families": []
+      "families": [],
+      "immutable_owners": [
+        "litchi_sheet_text::Workbook",
+        "litchi_sheet_text::Worksheet"
+      ]
     },
     {
       "id": "pages",

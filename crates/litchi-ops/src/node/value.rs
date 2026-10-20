@@ -93,9 +93,7 @@ impl<'a> Value<'a> {
     /// empty list is an absent property, as the keyword list's `Vec` is.
     #[cfg_attr(
         not(any(
-            feature = "doc",
             feature = "docx",
-            feature = "ppt",
             feature = "pptx",
             feature = "xls",
             feature = "xlsx",
@@ -103,8 +101,7 @@ impl<'a> Value<'a> {
             feature = "odt",
             feature = "ods",
             feature = "odp",
-            feature = "odi",
-            feature = "pages"
+            feature = "odi"
         )),
         allow(dead_code, reason = "only the metadata adapters read keyword lists")
     )]

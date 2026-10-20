@@ -147,6 +147,14 @@ in `litchi_core::metadata::keywords`:
   type entries (`string` → `list`), re-blessed in both feature sets.
 - Field refresh: DOCX `KEYWORDS`/`DOCPROPERTY Keywords` and ODF
   `text:keywords` show the list joined with `, `.
+- Markdown front matter (`with_metadata`) writes `keywords:` as a YAML
+  sequence. The facade Markdown golden (`crates/litchi/tests/golden/
+  markdown_corpus.tsv`) re-records the metadata+html columns of 43
+  fixtures: 11 now list their keywords, and 32 whose keyword text was empty
+  (`keywords: ''`) omit the key, 13 bytes shorter; the regeneration checked
+  both conditions per fixture, and every other column is unchanged.
+- The OfficeCLI corpus outcomes are unchanged (the three keyword `set` lines
+  stay `ok`); the capability delta changed only in its golden hashes.
 
 ## 3. Evidence
 
@@ -187,4 +195,19 @@ in `litchi_core::metadata::keywords`:
 
 ## 6. Gates
 
-See the coordinator hand-off for the commands and exit codes.
+After merging trunk `e652864de8` (record 0351), each with exit code 0:
+`cargo fmt --all --check`; warning-denied clippy of the 15 changed leaf
+crates, `litchi-ops`, `litchi` and `litchi-py` (`--all-targets
+--all-features`); `tools/check_feature_matrix.py` (31 facade steps) and
+`--ops --clippy --all-targets --only ops` (22 steps); `cargo check
+--workspace --exclude litchi-ods --all-features --all-targets`; `cargo test`
+of the 15 changed crates, `-p litchi --all-features`, `-p litchi-ops
+--all-features --lib`, `--doc` and every `--test` in chunks; `litchi-ods`
+lib clippy only (its suite needs a purged fixture); rustdoc with
+`-Dwarnings`; `check_crate_boundaries.py`; `non_iwork_gate.py verify`;
+`check_api_glossary.py` (all profiles, with the new `sheet-text` and
+`facade-sheet-text`); `crates/pyo3-litchi/tests/run_tests.sh`;
+`tools/perf-baseline` `cargo check --locked --all-targets`; the tool unit
+tests; `officecli_capability_delta.py --check`; `officecli_corpus.py
+--check` after the corpus bless; `unified_bench_matrix.py --check` (0354 is
+listed under `evidence_without_rows`).

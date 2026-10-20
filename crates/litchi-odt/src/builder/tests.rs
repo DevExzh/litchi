@@ -273,7 +273,7 @@ fn test_set_metadata() {
         author: Some("Test Author".to_string()),
         subject: Some("Test Subject".to_string()),
         description: Some("Test Description".to_string()),
-        keywords: Some("test, keywords".to_string()),
+        keywords: vec!["test".to_string(), "keywords".to_string()],
         ..Metadata::default()
     };
     builder.set_metadata(metadata);
@@ -312,7 +312,7 @@ fn test_generate_meta_xml() {
     builder.metadata.author = Some("My Author".to_string());
     builder.metadata.subject = Some("My Subject".to_string());
     builder.metadata.description = Some("My Description".to_string());
-    builder.metadata.keywords = Some("my, keywords".to_string());
+    builder.metadata.keywords = vec!["my".to_string(), "keywords".to_string()];
     builder.metadata.identifier = Some("urn:litchi:document".to_string());
     builder.metadata.language = Some("en-US".to_string());
     builder.metadata.created = Some("2026-08-10T01:02:03Z".parse().unwrap());
@@ -331,7 +331,9 @@ fn test_generate_meta_xml() {
     assert!(meta_xml.contains("My Author"));
     assert!(meta_xml.contains("My Subject"));
     assert!(meta_xml.contains("My Description"));
-    assert!(meta_xml.contains("my, keywords"));
+    assert!(
+        meta_xml.contains("<meta:keyword>my</meta:keyword><meta:keyword>keywords</meta:keyword>")
+    );
     assert_eq!(meta_xml.matches("<dc:title>").count(), 1);
     assert!(meta_xml.contains("<dc:identifier>urn:litchi:document</dc:identifier>"));
     assert!(meta_xml.contains("<dc:language>en-US</dc:language>"));
