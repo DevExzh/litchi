@@ -526,8 +526,13 @@ fn web_facades_are_lazy_borrowed_and_snapshot_scoped() {
             AddIn::new("add-in-1", reference).expect("valid add-in"),
         ))
         .expect("valid pane");
-    litchi_ooxml_common::web::put(&mut package, panes, Conformance::Transitional)
-        .expect("install task panes");
+    litchi_ooxml_common::web::put(
+        &mut package,
+        panes,
+        Conformance::Transitional,
+        &litchi_ooxml_common::web::Limits::standard(),
+    )
+    .expect("install task panes");
 
     let with_panes = Package::from_opc(package).expect("reopen task-pane workbook");
     std::thread::scope(|scope| {

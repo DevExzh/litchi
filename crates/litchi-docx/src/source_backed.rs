@@ -1251,7 +1251,7 @@ impl Package {
     /// inventory call.
     pub fn embedded(&self) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
         self.trim_clean_paragraph_index_for_operation();
-        Ok(litchi_ooxml_common::embedded::scan_source_with(
+        Ok(litchi_ooxml_common::embedded::scan_source(
             self.physical_package()?,
             &self.semantic_limits.embedded_value(),
         )?)

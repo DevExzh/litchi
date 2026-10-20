@@ -1594,9 +1594,9 @@ fn decode_list(decoder: &mut Decoder<'_>, limits: &Limits) -> Result<Option<Cust
 fn replay_intent(package: &OpcPackage, intent: &WebIntent, limits: &Limits) -> Result<Patch> {
     match intent {
         WebIntent::Put { panes, conformance } => {
-            super::plan_put_with(package, panes.clone(), *conformance, limits)
+            super::plan_put(package, panes.clone(), *conformance, limits)
         },
-        WebIntent::Remove => super::plan_remove_with(package, limits),
+        WebIntent::Remove => super::plan_remove(package, limits),
         WebIntent::CustomFunctions(edit) => replay_custom_functions(package, edit, limits),
     }
 }
@@ -1609,7 +1609,7 @@ fn replay_custom_functions(
     if edit.mode == GraphMode::ReplaceManagedGraph {
         return invalid("ReplaceManagedGraph requires a complete WebIntent::Put graph".into());
     }
-    let existing = super::load_with(package, limits)?;
+    let existing = super::load(package, limits)?;
     let mut panes = match existing {
         Some(panes) => panes,
         None if edit.mode == GraphMode::ExistingOnly || edit.additions.is_empty() => {
@@ -1636,7 +1636,7 @@ fn replay_custom_functions(
             ));
         }
     }
-    super::plan_put_with(package, panes, infer_conformance(package, limits)?, limits)
+    super::plan_put(package, panes, infer_conformance(package, limits)?, limits)
 }
 
 fn infer_conformance(package: &OpcPackage, limits: &Limits) -> Result<Conformance> {

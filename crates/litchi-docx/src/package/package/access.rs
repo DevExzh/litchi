@@ -146,14 +146,14 @@ impl Package {
     /// Discover inert embedded-object and embedded-package relationships
     /// using the shared safe default resource limits.
     ///
-    /// Use [`embedded::scan_with`] with [`Self::opc_package`] when a lower
+    /// Use [`embedded::scan`] with [`Self::opc_package`] when a lower
     /// layer needs explicitly tuned limits.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn embedded(&self) -> Result<Vec<embedded::Entry<'_>>> {
-        Ok(embedded::scan(&self.opc)?)
+        Ok(embedded::scan(&self.opc, &embedded::Limits::default())?)
     }
 
     /// Load the bounded, inert classic-chart graph owned by the main document.

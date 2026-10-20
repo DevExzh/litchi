@@ -15,7 +15,7 @@ impl Package {
     /// This operation never starts an add-in or fetches an external target.
     pub(crate) fn task_panes_bounded(&self, limits: &Limits) -> Result<Option<Panes>> {
         self.ensure_story_opc_current("task_panes_bounded")?;
-        Ok(web::load_with(self.opc_package(), limits)?)
+        Ok(web::load(self.opc_package(), limits)?)
     }
 
     /// Plan a reversible task-pane graph replacement without changing this package.
@@ -40,7 +40,7 @@ impl Package {
         limits: &Limits,
     ) -> Result<Patch> {
         self.ensure_story_opc_current("plan_task_panes_bounded")?;
-        Ok(web::plan_put_with(
+        Ok(web::plan_put(
             self.opc_package(),
             panes,
             conformance,
@@ -56,7 +56,7 @@ impl Package {
     /// Plan task-pane removal with explicit resource limits.
     pub(crate) fn plan_remove_task_panes_bounded(&self, limits: &Limits) -> Result<Patch> {
         self.ensure_story_opc_current("plan_remove_task_panes_bounded")?;
-        Ok(web::plan_remove_with(self.opc_package(), limits)?)
+        Ok(web::plan_remove(self.opc_package(), limits)?)
     }
 
     /// Apply a task-pane patch after validating its source and package policy.

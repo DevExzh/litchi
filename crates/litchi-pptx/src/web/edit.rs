@@ -61,7 +61,12 @@ impl Edit<'_> {
     /// Returns an error for a candidate that violates bounded MS-OWEXML or OPC invariants, or a changed edit of a signed package.
     pub fn set(&mut self, panes: Panes, conformance: Conformance) -> Result<bool> {
         self.staged.update(move |opc| {
-            let patch = litchi_ooxml_common::web::plan_put(opc, panes, conformance)?;
+            let patch = litchi_ooxml_common::web::plan_put(
+                opc,
+                panes,
+                conformance,
+                &litchi_ooxml_common::web::Limits::standard(),
+            )?;
             Ok(patch.apply(opc)?)
         })
     }
@@ -75,7 +80,10 @@ impl Edit<'_> {
     /// Returns an error for a malformed task-pane graph, or a changed edit of a signed package.
     pub fn remove(&mut self) -> Result<bool> {
         self.staged.update(|opc| {
-            let patch = litchi_ooxml_common::web::plan_remove(opc)?;
+            let patch = litchi_ooxml_common::web::plan_remove(
+                opc,
+                &litchi_ooxml_common::web::Limits::standard(),
+            )?;
             Ok(patch.apply(opc)?)
         })
     }

@@ -95,7 +95,7 @@ impl Edit {
     ///
     /// Returns an error for panes the configured limits refuse.
     pub fn put(&mut self, panes: Panes, conformance: Conformance) -> Result<bool> {
-        let plan = web::plan_put_with(
+        let plan = web::plan_put(
             self.staged.working().opc_package(),
             panes,
             conformance,
@@ -111,7 +111,7 @@ impl Edit {
     ///
     /// Returns an error for a graph the configured limits refuse.
     pub fn remove(&mut self) -> Result<bool> {
-        let plan = web::plan_remove_with(self.staged.working().opc_package(), &self.limits)?;
+        let plan = web::plan_remove(self.staged.working().opc_package(), &self.limits)?;
         self.stage(&plan)
     }
 

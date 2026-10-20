@@ -1065,10 +1065,12 @@ impl Workbook {
     /// The complete package graph is validated on first access. Later calls
     /// borrow the model retained by this immutable workbook snapshot.
     pub fn task_panes(&self) -> Result<Option<&litchi_ooxml_common::web::Panes>> {
-        let panes = self
-            .inner
-            .task_panes
-            .get_or_try_init(|| litchi_ooxml_common::web::load(&self.inner.package))?;
+        let panes = self.inner.task_panes.get_or_try_init(|| {
+            litchi_ooxml_common::web::load(
+                &self.inner.package,
+                &litchi_ooxml_common::web::Limits::standard(),
+            )
+        })?;
         Ok(panes.as_ref())
     }
 

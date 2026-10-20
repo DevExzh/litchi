@@ -120,7 +120,10 @@ impl Package {
     /// Returns an error when managed authoring state is stale or the bounded
     /// package graph is malformed.
     pub fn task_panes(&self) -> Result<Option<crate::web::Panes>> {
-        Ok(litchi_ooxml_common::web::load(&self.opc)?)
+        Ok(litchi_ooxml_common::web::load(
+            &self.opc,
+            &litchi_ooxml_common::web::Limits::standard(),
+        )?)
     }
 
     /// Borrow the canonical presentation graph when no mutable state is stale.

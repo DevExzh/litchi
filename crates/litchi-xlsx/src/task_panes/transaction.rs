@@ -27,7 +27,7 @@ impl<'a> Transaction<'a> {
 
     fn start(target: crate::package::Target<'a>, conformance: Conformance) -> Result<Self> {
         let staged = (*target).clone();
-        common_web::load(&staged).map_err(crate::Error::from)?;
+        common_web::load(&staged, &common_web::Limits::standard()).map_err(crate::Error::from)?;
         Ok(Self {
             target,
             staged,
@@ -43,9 +43,11 @@ impl<'a> Transaction<'a> {
 
     /// Return a semantic snapshot of the current task panes.
     pub fn panes(&self) -> Result<Panes> {
-        Ok(common_web::load(&self.staged)
-            .map_err(crate::Error::from)?
-            .unwrap_or_default())
+        Ok(
+            common_web::load(&self.staged, &common_web::Limits::standard())
+                .map_err(crate::Error::from)?
+                .unwrap_or_default(),
+        )
     }
 
     /// Replace the complete graph. An empty collection removes the graph.
@@ -53,11 +55,17 @@ impl<'a> Transaction<'a> {
         let conformance = self.conformance;
         self.apply(move |candidate| {
             if panes.is_empty() {
-                common_web::remove(candidate)
+                common_web::remove(candidate, &common_web::Limits::standard())
                     .map(|_| ())
                     .map_err(crate::Error::from)
             } else {
-                common_web::put(candidate, panes, conformance).map_err(crate::Error::from)
+                common_web::put(
+                    candidate,
+                    panes,
+                    conformance,
+                    &common_web::Limits::standard(),
+                )
+                .map_err(crate::Error::from)
             }
         })
     }
@@ -100,12 +108,16 @@ impl<'a> Transaction<'a> {
 
     /// Remove the complete task-pane graph.
     pub fn clear(&mut self) -> Result<bool> {
-        self.apply(|candidate| common_web::remove(candidate).map_err(crate::Error::from))
+        self.apply(|candidate| {
+            common_web::remove(candidate, &common_web::Limits::standard())
+                .map_err(crate::Error::from)
+        })
     }
 
     /// Publish the staged package. Dropping without committing rolls back.
     pub fn commit(mut self) -> Result<()> {
-        common_web::load(&self.staged).map_err(crate::Error::from)?;
+        common_web::load(&self.staged, &common_web::Limits::standard())
+            .map_err(crate::Error::from)?;
         self.target.publish(self.staged)?;
         Ok(())
     }
@@ -113,7 +125,8 @@ impl<'a> Transaction<'a> {
     fn apply<T>(&mut self, operation: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
         let mut candidate = self.staged.clone();
         let value = operation(&mut candidate)?;
-        common_web::load(&candidate).map_err(crate::Error::from)?;
+        common_web::load(&candidate, &common_web::Limits::standard())
+            .map_err(crate::Error::from)?;
         self.staged = candidate;
         Ok(value)
     }

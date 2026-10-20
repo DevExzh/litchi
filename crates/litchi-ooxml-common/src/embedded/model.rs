@@ -21,7 +21,7 @@ pub enum Kind {
 ///
 /// [`Limits::default`] is the safe general-purpose policy. Callers that know
 /// their workload may explicitly tighten or loosen either independent budget
-/// with [`scan_with`](super::scan_with). Payload relationships are charged
+/// with [`scan`](super::scan). Payload relationships are charged
 /// once per unique internal target, even when several source relationships
 /// reference it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

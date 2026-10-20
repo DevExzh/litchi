@@ -534,7 +534,7 @@ impl Workbook {
 
     /// Load inert persisted Office Add-in task panes.
     pub fn task_panes(&self) -> Result<Option<web::Panes>> {
-        Ok(web::load(&self.package)?)
+        Ok(web::load(&self.package, &web::Limits::standard())?)
     }
 
     /// Store task panes after validating every binary worksheet `appRef`.
@@ -550,7 +550,7 @@ impl Workbook {
         conformance: web::Conformance,
     ) -> Result<&mut Self> {
         self.validate_task_pane_bindings(&panes)?;
-        let patch = web::plan_put(&self.package, panes, conformance)?;
+        let patch = web::plan_put(&self.package, panes, conformance, &web::Limits::standard())?;
         if !patch.is_empty() {
             crate::signature_policy::ensure_unsigned(&self.package)?;
         }
@@ -574,7 +574,7 @@ impl Workbook {
             return Ok(false);
         }
         self.validate_task_pane_bindings(&web::Panes::new())?;
-        let patch = web::plan_remove(&self.package)?;
+        let patch = web::plan_remove(&self.package, &web::Limits::standard())?;
         if !patch.is_empty() {
             crate::signature_policy::ensure_unsigned(&self.package)?;
         }
@@ -595,7 +595,7 @@ impl Workbook {
 
     /// Read the bounded, inert package-level Ribbon customizations.
     pub fn ribbon(&self) -> Result<ribbon::Set<'_>> {
-        Ok(ribbon::load(&self.package)?)
+        Ok(ribbon::load(&self.package, &ribbon::Limits::standard())?)
     }
 
     /// Create or replace one Ribbon customization family.
@@ -609,12 +609,15 @@ impl Workbook {
         // The shared Ribbon owner removes signatures itself, so a change to a
         // signed workbook is refused here, before it is reached.
         if self.package.is_signed() || self.package.requires_signature_edit_policy() {
-            let stored = ribbon_slot(ribbon::load(&self.package)?, version.family());
+            let stored = ribbon_slot(
+                ribbon::load(&self.package, &ribbon::Limits::standard())?,
+                version.family(),
+            );
             if !stored.is_some_and(|ui| ui.version() == version && ui.xml() == xml.as_slice()) {
                 crate::signature_policy::ensure_unsigned(&self.package)?;
             }
         }
-        ribbon::put(&mut self.package, version, xml)?;
+        ribbon::put(&mut self.package, version, xml, &ribbon::Limits::standard())?;
         Ok(self)
     }
 
@@ -626,7 +629,11 @@ impl Workbook {
     /// the signature explicitly first with [`Self::unsign`].
     pub fn remove_ribbon(&mut self, family: ribbon::Family) -> Result<bool> {
         if (self.package.is_signed() || self.package.requires_signature_edit_policy())
-            && ribbon_slot(ribbon::load(&self.package)?, family).is_some()
+            && ribbon_slot(
+                ribbon::load(&self.package, &ribbon::Limits::standard())?,
+                family,
+            )
+            .is_some()
         {
             crate::signature_policy::ensure_unsigned(&self.package)?;
         }
@@ -636,10 +643,10 @@ impl Workbook {
     /// Discover inert embedded-object and embedded-package relationships
     /// using the shared safe default resource limits.
     ///
-    /// Use [`embedded::scan_with`] with [`Self::opc_package`] when a lower
+    /// Use [`embedded::scan`] with [`Self::opc_package`] when a lower
     /// layer needs explicitly tuned limits.
     pub fn embedded(&self) -> Result<Vec<embedded::Entry<'_>>> {
-        Ok(embedded::scan(&self.package)?)
+        Ok(embedded::scan(&self.package, &embedded::Limits::default())?)
     }
 
     /// Get the underlying OPC package.

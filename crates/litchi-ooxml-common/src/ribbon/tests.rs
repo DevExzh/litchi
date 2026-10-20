@@ -1,7 +1,7 @@
 //! Focused regression coverage for the Ribbon model, codec, and package graph.
 
 use super::model::{Family, LEGACY_RELATIONSHIP, Limits, Version};
-use super::package::{CONTENT_TYPE, load, load_with, put, put_with, remove};
+use super::package::{CONTENT_TYPE, load, put, remove};
 use crate::Error;
 use litchi_opc::BlobPart;
 use litchi_opc::constants::relationship_type as rt;
@@ -18,10 +18,22 @@ const XML_UI2: &[u8] =
 #[test]
 fn fixed_slots_borrow_package_bytes_and_prefer_modern() {
     let mut package = OpcPackage::new();
-    put(&mut package, Version::V2007, XML_2007.to_vec()).unwrap();
-    put(&mut package, Version::V2010, XML_2010.to_vec()).unwrap();
+    put(
+        &mut package,
+        Version::V2007,
+        XML_2007.to_vec(),
+        &Limits::standard(),
+    )
+    .unwrap();
+    put(
+        &mut package,
+        Version::V2010,
+        XML_2010.to_vec(),
+        &Limits::standard(),
+    )
+    .unwrap();
 
-    let ribbons = load(&package).unwrap();
+    let ribbons = load(&package, &Limits::standard()).unwrap();
     let legacy = ribbons.legacy().unwrap();
     let modern = ribbons.modern().unwrap();
     assert_eq!(ribbons.iter().collect::<Vec<_>>(), [legacy, modern]);
@@ -37,11 +49,31 @@ fn fixed_slots_borrow_package_bytes_and_prefer_modern() {
 #[test]
 fn modern_vocabulary_updates_in_place() {
     let mut package = OpcPackage::new();
-    put(&mut package, Version::Ui2, XML_UI2.to_vec()).unwrap();
-    let part = load(&package).unwrap().modern().unwrap().part().clone();
+    put(
+        &mut package,
+        Version::Ui2,
+        XML_UI2.to_vec(),
+        &Limits::standard(),
+    )
+    .unwrap();
+    let part = load(&package, &Limits::standard())
+        .unwrap()
+        .modern()
+        .unwrap()
+        .part()
+        .clone();
 
-    put(&mut package, Version::V2010, XML_2010.to_vec()).unwrap();
-    let modern = load(&package).unwrap().modern().unwrap();
+    put(
+        &mut package,
+        Version::V2010,
+        XML_2010.to_vec(),
+        &Limits::standard(),
+    )
+    .unwrap();
+    let modern = load(&package, &Limits::standard())
+        .unwrap()
+        .modern()
+        .unwrap();
     assert_eq!(modern.part(), &part);
     assert_eq!(modern.version(), Version::V2010);
     assert_eq!(package.part_count(), 1);
@@ -62,15 +94,29 @@ fn shared_ribbon_is_forked_before_update() {
         .get_part_mut(&source)
         .unwrap()
         .relate_to("../addons/ui.xml", "urn:shared-ribbon");
-    let relationship_id = load(&package).unwrap().legacy().unwrap().id().to_owned();
+    let relationship_id = load(&package, &Limits::standard())
+        .unwrap()
+        .legacy()
+        .unwrap()
+        .id()
+        .to_owned();
     let replacement =
         br#"<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui"><ribbon/></customUI>"#
             .to_vec();
     let allocation = replacement.as_ptr();
 
-    put(&mut package, Version::V2007, replacement).unwrap();
+    put(
+        &mut package,
+        Version::V2007,
+        replacement,
+        &Limits::standard(),
+    )
+    .unwrap();
 
-    let updated = load(&package).unwrap().legacy().unwrap();
+    let updated = load(&package, &Limits::standard())
+        .unwrap()
+        .legacy()
+        .unwrap();
     assert_ne!(updated.part(), &original);
     assert_eq!(updated.part().as_str(), "/customUI/customUI.xml");
     assert_eq!(updated.id(), relationship_id);
@@ -90,12 +136,29 @@ fn shared_ribbon_is_forked_before_update() {
 #[test]
 fn identical_put_is_a_signature_and_allocation_preserving_noop() {
     let mut package = OpcPackage::new();
-    put(&mut package, Version::V2007, XML_2007.to_vec()).unwrap();
-    let part = load(&package).unwrap().legacy().unwrap().part().clone();
+    put(
+        &mut package,
+        Version::V2007,
+        XML_2007.to_vec(),
+        &Limits::standard(),
+    )
+    .unwrap();
+    let part = load(&package, &Limits::standard())
+        .unwrap()
+        .legacy()
+        .unwrap()
+        .part()
+        .clone();
     let before = package.get_part(&part).unwrap().blob_arc();
     sign_marker(&mut package);
 
-    put(&mut package, Version::V2007, XML_2007.to_vec()).unwrap();
+    put(
+        &mut package,
+        Version::V2007,
+        XML_2007.to_vec(),
+        &Limits::standard(),
+    )
+    .unwrap();
 
     assert!(package.is_signed());
     let after = package.get_part(&part).unwrap().blob_arc();
@@ -108,7 +171,7 @@ fn identical_put_is_a_signature_and_allocation_preserving_noop() {
             .to_vec()
     };
     assert!(matches!(
-        put(&mut package, Version::V2007, changed()),
+        put(&mut package, Version::V2007, changed(), &Limits::standard()),
         Err(Error::Opc(
             litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
         ))
@@ -119,7 +182,7 @@ fn identical_put_is_a_signature_and_allocation_preserving_noop() {
         &package.get_part(&part).unwrap().blob_arc()
     ));
     package.unsign();
-    put(&mut package, Version::V2007, changed()).unwrap();
+    put(&mut package, Version::V2007, changed(), &Limits::standard()).unwrap();
     assert!(!package.is_signed());
 }
 
@@ -139,9 +202,12 @@ fn name_collisions_do_not_copy_the_moved_payload() {
     let xml = XML_2007.to_vec();
     let allocation = xml.as_ptr();
 
-    put(&mut package, Version::V2007, xml).unwrap();
+    put(&mut package, Version::V2007, xml, &Limits::standard()).unwrap();
 
-    let ui = load(&package).unwrap().legacy().unwrap();
+    let ui = load(&package, &Limits::standard())
+        .unwrap()
+        .legacy()
+        .unwrap();
     assert_eq!(ui.part().as_str(), "/customUI/customUI2.xml");
     assert_eq!(ui.xml().as_ptr(), allocation);
 }
@@ -154,7 +220,7 @@ fn xml_bytes_depth_nodes_entities_and_namespaces_are_bounded() {
         ..Limits::standard()
     };
     assert!(matches!(
-        put_with(&mut package, Version::V2007, XML_2007.to_vec(), &tiny_bytes),
+        put(&mut package, Version::V2007, XML_2007.to_vec(), &tiny_bytes),
         Err(Error::RibbonLimit { .. })
     ));
     assert_eq!(package.part_count(), 0);
@@ -165,7 +231,7 @@ fn xml_bytes_depth_nodes_entities_and_namespaces_are_bounded() {
     };
     let nested = br#"<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui"><ribbon/></customUI>"#;
     assert!(matches!(
-        put_with(&mut package, Version::V2007, nested.to_vec(), &shallow),
+        put(&mut package, Version::V2007, nested.to_vec(), &shallow),
         Err(Error::RibbonLimit { .. })
     ));
 
@@ -174,29 +240,26 @@ fn xml_bytes_depth_nodes_entities_and_namespaces_are_bounded() {
         ..Limits::standard()
     };
     assert!(matches!(
-        put_with(&mut package, Version::V2007, XML_2007.to_vec(), &few_nodes),
+        put(&mut package, Version::V2007, XML_2007.to_vec(), &few_nodes),
         Err(Error::RibbonLimit { .. })
     ));
     assert!(put(
         &mut package,
         Version::V2007,
         br#"<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui">&madeUp;</customUI>"#
-            .to_vec()
-    )
+            .to_vec(), &Limits::standard())
     .is_err());
     assert!(put(
         &mut package,
         Version::V2007,
         br#"<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui"><bad:node/></customUI>"#
-            .to_vec()
-    )
+            .to_vec(), &Limits::standard())
     .is_err());
     assert!(put(
         &mut package,
         Version::V2007,
         br#"<!DOCTYPE customUI><customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui"/>"#
-            .to_vec()
-    )
+            .to_vec(), &Limits::standard())
     .is_err());
     assert_eq!(package.part_count(), 0);
 }
@@ -205,9 +268,19 @@ fn xml_bytes_depth_nodes_entities_and_namespaces_are_bounded() {
 fn xml_declarations_characters_namespaces_and_inert_instructions_are_strict() {
     let mut valid = OpcPackage::new();
     let normalized_namespace = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><?safe inert?><customUI xmlns="http://schemas.microsoft.com/office/2006/01/customu&#x69;"><?inside retained?></customUI>"#;
-    put(&mut valid, Version::V2007, normalized_namespace.to_vec()).unwrap();
+    put(
+        &mut valid,
+        Version::V2007,
+        normalized_namespace.to_vec(),
+        &Limits::standard(),
+    )
+    .unwrap();
     assert_eq!(
-        load(&valid).unwrap().legacy().unwrap().xml(),
+        load(&valid, &Limits::standard())
+            .unwrap()
+            .legacy()
+            .unwrap()
+            .xml(),
         normalized_namespace
     );
 
@@ -230,7 +303,7 @@ fn xml_declarations_characters_namespaces_and_inert_instructions_are_strict() {
             .as_slice(),
     ] {
         let mut package = OpcPackage::new();
-        assert!(put(&mut package, Version::V2007, invalid.to_vec()).is_err());
+        assert!(put(&mut package, Version::V2007, invalid.to_vec(), &Limits::standard()).is_err());
         assert_eq!(package.part_count(), 0);
     }
 
@@ -240,7 +313,7 @@ fn xml_declarations_characters_namespaces_and_inert_instructions_are_strict() {
             &mut duplicate_expanded,
             Version::V2007,
             br#"<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui" xmlns:a="urn:x" xmlns:b="urn:&#x78;" a:value="1" b:value="2"/>"#
-                .to_vec(),
+                .to_vec(), &Limits::standard(),
         )
         .is_err()
     );
@@ -250,14 +323,25 @@ fn xml_declarations_characters_namespaces_and_inert_instructions_are_strict() {
     raw_control.push(1);
     raw_control.extend_from_slice(b"</customUI>");
     let mut package = OpcPackage::new();
-    assert!(put(&mut package, Version::V2007, raw_control).is_err());
+    assert!(
+        put(
+            &mut package,
+            Version::V2007,
+            raw_control,
+            &Limits::standard()
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn relationship_location_cardinality_and_root_family_are_strict() {
     let mut external = OpcPackage::new();
     external.relate_to_external("https://example.invalid/ui.xml", LEGACY_RELATIONSHIP);
-    assert!(matches!(load(&external), Err(Error::Relationship(_))));
+    assert!(matches!(
+        load(&external, &Limits::standard()),
+        Err(Error::Relationship(_))
+    ));
 
     let mut duplicate = OpcPackage::new();
     raw_ribbon(
@@ -267,7 +351,10 @@ fn relationship_location_cardinality_and_root_family_are_strict() {
         XML_2010,
     );
     raw_ribbon(&mut duplicate, Version::Ui2, "/customUI/two.xml", XML_UI2);
-    assert!(matches!(load(&duplicate), Err(Error::Relationship(_))));
+    assert!(matches!(
+        load(&duplicate, &Limits::standard()),
+        Err(Error::Relationship(_))
+    ));
 
     let mut mismatched = OpcPackage::new();
     raw_ribbon(
@@ -276,7 +363,10 @@ fn relationship_location_cardinality_and_root_family_are_strict() {
         "/customUI/customUI.xml",
         XML_2010,
     );
-    assert!(matches!(load(&mismatched), Err(Error::Invalid(_))));
+    assert!(matches!(
+        load(&mismatched, &Limits::standard()),
+        Err(Error::Invalid(_))
+    ));
 
     let mut part_sourced = OpcPackage::new();
     let source = PackURI::new("/word/document.xml").unwrap();
@@ -289,7 +379,10 @@ fn relationship_location_cardinality_and_root_family_are_strict() {
         .get_part_mut(&source)
         .unwrap()
         .relate_to("../customUI/customUI.xml", LEGACY_RELATIONSHIP);
-    assert!(matches!(load(&part_sourced), Err(Error::Relationship(_))));
+    assert!(matches!(
+        load(&part_sourced, &Limits::standard()),
+        Err(Error::Relationship(_))
+    ));
 }
 
 #[test]
@@ -306,7 +399,10 @@ fn ribbon_outbound_relationships_are_internal_images_only() {
         .get_part_mut(&ribbon)
         .unwrap()
         .relate_to("data.bin", "urn:not-an-image");
-    assert!(matches!(load(&wrong_type), Err(Error::Relationship(_))));
+    assert!(matches!(
+        load(&wrong_type, &Limits::standard()),
+        Err(Error::Relationship(_))
+    ));
 
     let mut wrong_media = package_with_legacy();
     let ribbon = legacy_part(&wrong_media);
@@ -320,7 +416,10 @@ fn ribbon_outbound_relationships_are_internal_images_only() {
         .get_part_mut(&ribbon)
         .unwrap()
         .relate_to("image.bin", rt::IMAGE);
-    assert!(matches!(load(&wrong_media), Err(Error::ContentType { .. })));
+    assert!(matches!(
+        load(&wrong_media, &Limits::standard()),
+        Err(Error::ContentType { .. })
+    ));
 
     let mut external = package_with_legacy();
     let ribbon = legacy_part(&external);
@@ -334,7 +433,10 @@ fn ribbon_outbound_relationships_are_internal_images_only() {
             "rIdImage".into(),
             true,
         );
-    assert!(matches!(load(&external), Err(Error::Relationship(_))));
+    assert!(matches!(
+        load(&external, &Limits::standard()),
+        Err(Error::Relationship(_))
+    ));
 
     let mut queried = package_with_legacy();
     let ribbon = legacy_part(&queried);
@@ -343,7 +445,10 @@ fn ribbon_outbound_relationships_are_internal_images_only() {
         .get_part_mut(&ribbon)
         .unwrap()
         .relate_to("image.png?variant=2", rt::IMAGE);
-    assert!(matches!(load(&queried), Err(Error::Relationship(_))));
+    assert!(matches!(
+        load(&queried, &Limits::standard()),
+        Err(Error::Relationship(_))
+    ));
 
     for content_type in ["image/ png", "image/png;garbage"] {
         let mut malformed = package_with_legacy();
@@ -353,7 +458,10 @@ fn ribbon_outbound_relationships_are_internal_images_only() {
             .get_part_mut(&ribbon)
             .unwrap()
             .relate_to("image.png", rt::IMAGE);
-        assert!(matches!(load(&malformed), Err(Error::ContentType { .. })));
+        assert!(matches!(
+            load(&malformed, &Limits::standard()),
+            Err(Error::ContentType { .. })
+        ));
     }
 }
 
@@ -371,7 +479,7 @@ fn aggregate_image_relationships_are_bounded() {
         ..Limits::standard()
     };
     assert!(matches!(
-        load_with(&package, &limits),
+        load(&package, &limits),
         Err(Error::RibbonLimit { .. })
     ));
 }
@@ -463,7 +571,15 @@ fn failed_mutations_leave_graph_bytes_and_signatures_untouched() {
     let ribbon = legacy_part(&package);
     let before = package.get_part(&ribbon).unwrap().blob_arc();
     sign_marker(&mut package);
-    assert!(put(&mut package, Version::V2010, b"<broken".to_vec()).is_err());
+    assert!(
+        put(
+            &mut package,
+            Version::V2010,
+            b"<broken".to_vec(),
+            &Limits::standard()
+        )
+        .is_err()
+    );
     assert!(package.is_signed());
     assert!(Arc::ptr_eq(
         &before,
@@ -495,7 +611,13 @@ fn failed_mutations_leave_graph_bytes_and_signatures_untouched() {
 
 fn package_with_legacy() -> OpcPackage {
     let mut package = OpcPackage::new();
-    put(&mut package, Version::V2007, XML_2007.to_vec()).unwrap();
+    put(
+        &mut package,
+        Version::V2007,
+        XML_2007.to_vec(),
+        &Limits::standard(),
+    )
+    .unwrap();
     package
 }
 
@@ -535,7 +657,12 @@ fn raw_ribbon(package: &mut OpcPackage, version: Version, name: &str, xml: &[u8]
 }
 
 fn legacy_part(package: &OpcPackage) -> PackURI {
-    load(package).unwrap().legacy().unwrap().part().clone()
+    load(package, &Limits::standard())
+        .unwrap()
+        .legacy()
+        .unwrap()
+        .part()
+        .clone()
 }
 
 fn add_image(package: &mut OpcPackage, name: &str, content_type: &str) -> PackURI {

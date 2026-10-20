@@ -18,7 +18,8 @@ use super::{
     planned_deletions, preflight_planned_parts, validate_plan_counts,
 };
 use crate::web::LimitKind;
-/// Create or replace the package-level persisted task-pane graph.
+/// Create or replace the package-level persisted task-pane graph under
+/// `limits` ([`Limits::standard`] for the safe defaults).
 ///
 /// Add-in references, bindings, properties, and snapshot resources are stored
 /// as inert data. External snapshot links are never contacted.
@@ -26,27 +27,19 @@ use crate::web::LimitKind;
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn put(package: &mut OpcPackage, panes: Panes, conformance: Conformance) -> Result<()> {
-    put_with(package, panes, conformance, &Limits::standard())
-}
-
-/// Create or replace the task-pane graph with explicit resource limits.
-/// # Errors
-///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
-pub fn put_with(
+pub fn put(
     package: &mut OpcPackage,
     task_panes: Panes,
     conformance: Conformance,
     limits: &Limits,
 ) -> Result<()> {
-    plan_put_with(package, task_panes, conformance, limits)?
+    plan_put(package, task_panes, conformance, limits)?
         .apply(package)
         .map(|_| ())
 }
 
-/// Plan an exact, source-checked replacement of the persisted task-pane graph.
+/// Plan an exact, source-checked replacement of the persisted task-pane graph
+/// under `limits`.
 ///
 /// The returned patch is opaque: physical part names and relationship IDs stay
 /// private to the graph owner. Payload allocations are shared with the patch,
@@ -55,16 +48,7 @@ pub fn put_with(
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn plan_put(package: &OpcPackage, panes: Panes, conformance: Conformance) -> Result<Patch> {
-    plan_put_with(package, panes, conformance, &Limits::standard())
-}
-
-/// Plan a task-pane graph replacement with explicit resource limits.
-/// # Errors
-///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
-pub fn plan_put_with(
+pub fn plan_put(
     package: &OpcPackage,
     task_panes: Panes,
     conformance: Conformance,
@@ -629,27 +613,20 @@ fn inspect_relationship_attributes(node: &Node, expected: &str, opposite_seen: &
     }
 }
 
-/// Remove the package-level task-pane relationship and graph.
+/// Remove the package-level task-pane relationship and graph under the
+/// package graph and deletion ceilings of `limits`.
 ///
 /// Parts still referenced elsewhere remain in the package.
 /// # Errors
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn remove(package: &mut OpcPackage) -> Result<bool> {
-    remove_with(package, &Limits::standard())
+pub fn remove(package: &mut OpcPackage, limits: &Limits) -> Result<bool> {
+    plan_remove(package, limits)?.apply(package)
 }
 
-/// Remove the task-pane graph with explicit package graph and deletion ceilings.
-/// # Errors
-///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
-pub fn remove_with(package: &mut OpcPackage, limits: &Limits) -> Result<bool> {
-    plan_remove_with(package, limits)?.apply(package)
-}
-
-/// Plan removal of the package-level task-pane relationship and owned graph.
+/// Plan removal of the package-level task-pane relationship and owned graph
+/// under the graph and deletion ceilings of `limits`.
 ///
 /// An absent graph produces an empty patch, so applying it is a
 /// signature-preserving no-op.
@@ -657,16 +634,7 @@ pub fn remove_with(package: &mut OpcPackage, limits: &Limits) -> Result<bool> {
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn plan_remove(package: &OpcPackage) -> Result<Patch> {
-    plan_remove_with(package, &Limits::standard())
-}
-
-/// Plan task-pane graph removal with explicit graph and deletion ceilings.
-/// # Errors
-///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
-pub fn plan_remove_with(package: &OpcPackage, limits: &Limits) -> Result<Patch> {
+pub fn plan_remove(package: &OpcPackage, limits: &Limits) -> Result<Patch> {
     if !has_task_panes_relationship(package, limits)? {
         return Ok(bind_intent(
             empty_source_bound_noop_patch(package, limits)?,

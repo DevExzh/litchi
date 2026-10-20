@@ -12,17 +12,8 @@ pub(super) const XLSB_EXTERNAL_LINK: &str = "application/vnd.ms-excel.externalLi
 pub(super) const XLSB_MACRO_SHEET: &str = "application/vnd.ms-excel.macrosheet";
 pub(super) const XLSB_WORKSHEET: &str = "application/vnd.ms-excel.worksheet";
 
-/// Inventory embedded parts with the safe general-purpose resource policy.
-#[inline]
-/// # Errors
-///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
-pub fn scan(package: &OpcPackage) -> Result<Vec<Entry<'_>>> {
-    scan_with(package, &Limits::default())
-}
-
-/// Inventory embedded parts with explicit resource budgets.
+/// Inventory embedded parts under the resource budgets `limits`
+/// ([`Limits::default`] for the safe general-purpose policy).
 ///
 /// Results are ordered by source part name and then relationship identifier,
 /// independent of the package's internal hash-map order. Duplicate internal
@@ -32,7 +23,7 @@ pub fn scan(package: &OpcPackage) -> Result<Vec<Entry<'_>>> {
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn scan_with<'a>(package: &'a OpcPackage, limits: &Limits) -> Result<Vec<Entry<'a>>> {
+pub fn scan<'a>(package: &'a OpcPackage, limits: &Limits) -> Result<Vec<Entry<'a>>> {
     let limits = limits.validate()?;
     for relationship in package.rels().iter() {
         if kind(relationship.reltype()).is_some() {
@@ -131,21 +122,6 @@ pub fn scan_with<'a>(package: &'a OpcPackage, limits: &Limits) -> Result<Vec<Ent
     Ok(entries)
 }
 
-/// Inventory embedded parts from a source-backed OPC catalog without reading
-/// any ordinary part payload.
-///
-/// The returned entries retain deferred [`SourcePayload`] views. Their
-/// payload bytes are read only when an explicit `data` or `stream_to` call is
-/// made on such a view.
-/// # Errors
-///
-/// Returns an error when input violates OOXML constraints, exceeds a
-/// configured bound, the source becomes stale, execution is cancelled, or an
-/// underlying catalog operation fails.
-pub fn scan_source(package: &SourceBackedPackage) -> Result<Vec<SourceEntry<'_>>> {
-    scan_source_with(package, &Limits::default())
-}
-
 /// Inventory embedded parts from a source-backed OPC catalog with explicit
 /// resource budgets.
 ///
@@ -154,13 +130,13 @@ pub fn scan_source(package: &SourceBackedPackage) -> Result<Vec<SourceEntry<'_>>
 /// canonical source catalog entry and their relationship sets are validated
 /// once, while duplicate source relationships remain distinct entries.
 /// Results use the same source/name and relationship-ID ordering as
-/// [`scan_with`].
+/// [`scan`].
 /// # Errors
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a
 /// configured bound, the source becomes stale, execution is cancelled, or an
 /// underlying catalog operation fails.
-pub fn scan_source_with<'a>(
+pub fn scan_source<'a>(
     package: &'a SourceBackedPackage,
     limits: &Limits,
 ) -> Result<Vec<SourceEntry<'a>>> {

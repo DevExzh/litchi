@@ -3486,7 +3486,12 @@ impl Edit {
         let web_patch = match requested_panes {
             Some(PanesAction::Put { panes, conformance }) => {
                 let after = panes.clone();
-                let patch = common_web::plan_put(&base.inner.package, panes, conformance)?;
+                let patch = common_web::plan_put(
+                    &base.inner.package,
+                    panes,
+                    conformance,
+                    &common_web::Limits::standard(),
+                )?;
                 if patch.is_empty() {
                     None
                 } else {
@@ -3498,7 +3503,8 @@ impl Edit {
                 }
             },
             Some(PanesAction::Remove) => {
-                let patch = common_web::plan_remove(&base.inner.package)?;
+                let patch =
+                    common_web::plan_remove(&base.inner.package, &common_web::Limits::standard())?;
                 if patch.is_empty() {
                     None
                 } else {
