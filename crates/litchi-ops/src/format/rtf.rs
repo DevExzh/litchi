@@ -25,8 +25,9 @@ use std::sync::Arc;
 
 use litchi_core::Metadata;
 use litchi_core::metadata::Timestamp;
+use litchi_rtf::Package;
 use litchi_rtf::leniency::ToleranceReport;
-use litchi_rtf::{Package, RtfDocument};
+use litchi_rtf::raw::Tree;
 
 use crate::transaction::SemanticLimits;
 use crate::{IntoProps, OpenOptions, Result, TargetArg};
@@ -290,7 +291,7 @@ impl Rtf {
     }
 
     /// The retained leaf owner, for the crate's family views.
-    pub(crate) fn document(&self) -> &RtfDocument<'static> {
+    pub(crate) fn document(&self) -> &Tree<'static> {
         self.0.package.raw()
     }
 }
@@ -316,7 +317,7 @@ fn timestamp_to_naive(
 
 /// The facade's RTF metadata projection (`litchi::document::doc`), moved
 /// verbatim.
-fn metadata(document: &RtfDocument<'_>) -> Metadata {
+fn metadata(document: &Tree<'_>) -> Metadata {
     let info = document.info();
     let text = |value: Option<&str>| value.map(str::to_owned);
     Metadata {

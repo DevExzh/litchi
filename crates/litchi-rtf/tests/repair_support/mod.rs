@@ -12,11 +12,11 @@ pub(crate) trait Outcome {
     fn tolerance_report(&self) -> Option<&ToleranceReport>;
 }
 
-impl Outcome for litchi_rtf::Result<litchi_rtf::RtfDocument<'_>> {
+impl Outcome for litchi_rtf::Result<litchi_rtf::raw::Tree<'_>> {
     fn tolerance_report(&self) -> Option<&ToleranceReport> {
         self.as_ref()
             .ok()
-            .map(litchi_rtf::RtfDocument::tolerance_report)
+            .map(litchi_rtf::raw::Tree::tolerance_report)
     }
 }
 

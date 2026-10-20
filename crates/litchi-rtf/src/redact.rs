@@ -279,11 +279,7 @@ impl Plan {
             &self.source.unsupported,
         )?;
         let patch = build_patch(&self.source.source, &selected, self.mode, self.limits)?;
-        Ok(Commit {
-            document: candidate,
-            patch,
-            diagnostics,
-        })
+        Ok(Commit::new(candidate, patch, diagnostics))
     }
 
     /// Source inventory used by this plan.
@@ -293,42 +289,11 @@ impl Plan {
     }
 }
 
-/// Ordinary document plus an intentionally irreversible forward-only patch.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    document: Package,
-    patch: Patch<ForwardOnly>,
-    diagnostics: Diagnostics,
-}
-
-impl Commit {
-    /// Borrow the ordinary candidate document.  This is not a certification
-    /// type; callers must inspect [`Self::diagnostics`] before treating the
-    /// result as complete.
-    #[must_use]
-    pub const fn document(&self) -> &Package {
-        &self.document
-    }
-
-    /// Consume the commit and return its ordinary candidate document.
-    #[must_use]
-    pub fn into_document(self) -> Package {
-        self.document
-    }
-
-    /// Borrow the sealed forward-only durable patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch<ForwardOnly> {
-        &self.patch
-    }
-
-    /// Borrow explicit completeness/effect diagnostics.
-    #[must_use]
-    pub const fn diagnostics(&self) -> &Diagnostics {
-        &self.diagnostics
-    }
-}
-
+/// The ordinary candidate document plus an intentionally irreversible
+/// forward-only patch and explicit completeness/effect diagnostics. The
+/// document is not a certification type: callers must inspect
+/// `diagnostics()` before treating the result as complete.
+pub type Commit = litchi_core::edit::Commit<Package, Patch<ForwardOnly>, Diagnostics>;
 fn push_occurrence(
     entries: &mut Vec<ReferenceOccurrence>,
     kind: ReferenceKind,
@@ -356,7 +321,7 @@ fn push_occurrence(
 }
 
 fn collect_unsupported(
-    model: &crate::raw::Document<'_>,
+    model: &crate::raw::Tree<'_>,
     unsupported: &mut Vec<UnsupportedReference>,
 ) -> Result<(), Error> {
     if !model.opaque_nodes().is_empty() {
@@ -469,7 +434,7 @@ fn collect_unsupported(
 /// external-reference surface when it lives outside the body root: headers,
 /// footers, notes, annotations, separators, table cells, field results, and
 /// legacy text-box stories all retain independent drawing stores.
-fn model_has_hyperlink_shapes(model: &crate::raw::Document<'_>) -> bool {
+fn model_has_hyperlink_shapes(model: &crate::raw::Tree<'_>) -> bool {
     story_shapes_have_hyperlink(model.shapes(), model.shape_groups())
         || model.tables().iter().any(table_has_hyperlink)
         || model

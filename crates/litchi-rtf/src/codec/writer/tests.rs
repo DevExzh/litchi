@@ -9,6 +9,7 @@
 
 use super::super::*;
 use super::codec::{Charset, RtfWriter, WriterOptions};
+use crate::RtfDocument;
 use litchi_codepage::Mbcs;
 use std::io;
 

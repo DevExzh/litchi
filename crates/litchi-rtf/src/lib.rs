@@ -146,7 +146,7 @@ pub mod write {
 pub mod transport {
     pub use crate::codec::compressed::{
         DEFAULT_MAX_DECOMPRESSED_RTF_BYTES, DecompressionLimits, compress, decompress,
-        decompress_with_limits, is_compressed_rtf,
+        is_compressed_rtf,
     };
 }
 
@@ -155,7 +155,7 @@ pub mod transport {
 /// This interface exposes format-specific structure. Ordinary read-only code
 /// should prefer [`crate::Document`].
 pub mod raw {
-    pub use crate::model::document::RtfDocument as Document;
+    pub use crate::model::document::RtfDocument as Tree;
     pub use crate::native::*;
 }
 
@@ -208,7 +208,7 @@ pub use validation::{
 mod native {
     use super::{
         annotation, bookmark, border, character_positioning, compressed, custom_xml, data_store,
-        document, document_asian_grid_compatibility, document_booklet_printing,
+        document_asian_grid_compatibility, document_booklet_printing,
         document_compatibility_policy, document_default_formatting, document_drawing_grid,
         document_east_asian_compatibility, document_embedding_policies, document_file_settings,
         document_legacy_layout_compatibility, document_line_spacing_compatibility, document_origin,
@@ -241,11 +241,10 @@ mod native {
     };
     pub use compressed::{
         DEFAULT_MAX_DECOMPRESSED_RTF_BYTES, DecompressionLimits, compress, decompress,
-        decompress_with_limits, is_compressed_rtf,
+        is_compressed_rtf,
     };
     pub use custom_xml::{CustomXmlAttribute, CustomXmlTag};
     pub use data_store::DocumentDataStore;
-    pub use document::RtfDocument;
     pub use document_asian_grid_compatibility::DocumentAsianGridCompatibility;
     pub use document_booklet_printing::DocumentBookletPrinting;
     pub use document_compatibility_policy::{DocumentCompatibilityPolicy, DocumentFeatureThrottle};
@@ -484,6 +483,11 @@ mod native {
         DocumentXslTransform, DocumentXslTransformUsage, MAX_DOCUMENT_XSL_TRANSFORM_LOCATION_BYTES,
     };
 }
+
+/// The retained tree under its crate-internal name for the unit tests; the
+/// public path is [`raw::Tree`].
+#[cfg(test)]
+pub(crate) use model::document::RtfDocument;
 
 #[cfg(doc)]
 pub(crate) use native::*;

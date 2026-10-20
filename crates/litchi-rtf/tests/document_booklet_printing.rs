@@ -9,9 +9,10 @@
 
 mod repair_support;
 
-use litchi_rtf::{DocumentBookletPrinting, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DocumentBookletPrinting, RtfWriter};
 
-fn write(document: &RtfDocument<'_>) -> std::io::Result<Vec<u8>> {
+fn write(document: &Tree<'_>) -> std::io::Result<Vec<u8>> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output).write_document(document)?;
     Ok(output)
@@ -19,8 +20,7 @@ fn write(document: &RtfDocument<'_>) -> std::io::Result<Vec<u8>> {
 
 #[test]
 fn parses_complete_producer_style_booklet_metadata_passively() {
-    let document =
-        RtfDocument::parse(r"{\rtf1\bookfold\bookfoldrev\bookfoldsheets16 Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1\bookfold\bookfoldrev\bookfoldsheets16 Body}").unwrap();
     assert_eq!(
         *document.booklet_printing(),
         DocumentBookletPrinting {
@@ -34,11 +34,11 @@ fn parses_complete_producer_style_booklet_metadata_passively() {
 
 #[test]
 fn preserves_producer_observed_zero_separately_from_omission() {
-    let explicit = RtfDocument::parse(r"{\rtf1\bookfoldsheets0 Body}").unwrap();
+    let explicit = Tree::parse(r"{\rtf1\bookfoldsheets0 Body}").unwrap();
     assert_eq!(explicit.booklet_printing().sheets_per_booklet, Some(0));
     assert_eq!(explicit.text(), "Body");
 
-    let omitted = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let omitted = Tree::parse(r"{\rtf1 Body}").unwrap();
     assert!(omitted.booklet_printing().is_empty());
     let serialized = String::from_utf8(write(&omitted).unwrap()).unwrap();
     assert!(!serialized.contains("bookfold"));
@@ -50,7 +50,7 @@ fn accepts_independent_flags_without_synthesizing_layout_or_printing() {
         (r"{\rtf1\bookfold Body}", true, false),
         (r"{\rtf1\bookfoldrev Body}", false, true),
     ] {
-        let document = RtfDocument::parse(source).unwrap();
+        let document = Tree::parse(source).unwrap();
         assert_eq!(document.booklet_printing().book_fold, book_fold);
         assert_eq!(document.booklet_printing().reverse_book_fold, reverse);
         assert_eq!(document.text(), "Body");
@@ -63,7 +63,7 @@ fn accepts_independent_flags_without_synthesizing_layout_or_printing() {
 #[test]
 fn typed_api_round_trips_boundaries_in_canonical_order_and_clears() {
     for sheets in [0, 4, 16, 2_147_483_644] {
-        let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+        let mut document = Tree::parse(r"{\rtf1 Body}").unwrap();
         document.set_booklet_printing(DocumentBookletPrinting {
             book_fold: true,
             reverse_book_fold: true,
@@ -75,12 +75,12 @@ fn typed_api_round_trips_boundaries_in_canonical_order_and_clears() {
         for pair in controls.windows(2) {
             assert!(serialized.find(pair[0]).unwrap() < serialized.find(pair[1]).unwrap());
         }
-        let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+        let reparsed = Tree::parse_bytes(&output).unwrap();
         assert_eq!(reparsed.booklet_printing(), document.booklet_printing());
         assert_eq!(reparsed.text(), "Body");
     }
 
-    let mut document = RtfDocument::parse(r"{\rtf1\bookfold Body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1\bookfold Body}").unwrap();
     document.clear_booklet_printing();
     assert!(document.booklet_printing().is_empty());
     assert_eq!(document.text(), "Body");
@@ -89,10 +89,10 @@ fn typed_api_round_trips_boundaries_in_canonical_order_and_clears() {
 #[test]
 fn coexists_independently_with_adjacent_print_layout_metadata() {
     let document =
-        RtfDocument::parse(r"{\rtf1\gutterprl\twoonone\bookfold\bookfoldsheets8\bookfoldrev Body}")
+        Tree::parse(r"{\rtf1\gutterprl\twoonone\bookfold\bookfoldsheets8\bookfoldrev Body}")
             .unwrap();
     let output = write(&document).unwrap();
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.booklet_printing(), document.booklet_printing());
     assert_eq!(
         reparsed.print_layout_settings(),
@@ -113,7 +113,7 @@ fn rejects_invalid_values_parameters_duplicates_starred_grouped_and_late_forms()
         r"{\rtf1\bookfoldsheets99999999999 Body}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
             "accepted malformed {source}"
         );
     }
@@ -121,7 +121,7 @@ fn rejects_invalid_values_parameters_duplicates_starred_grouped_and_late_forms()
         for suffix in ["0", "1", "2147483647", "99999999999"] {
             let source = format!(r"{{\rtf1\{name}{suffix} Body}}");
             assert!(
-                repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
+                repair_support::rejected_or_parameter_repaired(&Tree::parse(&source)),
                 "accepted malformed {source}"
             );
         }
@@ -135,14 +135,14 @@ fn rejects_invalid_values_parameters_duplicates_starred_grouped_and_late_forms()
             format!(r"{{\rtf1 Body\{control}}}"),
         ] {
             assert!(
-                repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
+                repair_support::rejected_or_parameter_repaired(&Tree::parse(&source)),
                 "accepted malformed {name}: {source}"
             );
         }
     }
 
     for invalid in [2, i32::MAX as u32 + 1] {
-        let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+        let mut document = Tree::parse(r"{\rtf1 Body}").unwrap();
         document.set_booklet_printing(DocumentBookletPrinting {
             sheets_per_booklet: Some(invalid),
             ..DocumentBookletPrinting::default()

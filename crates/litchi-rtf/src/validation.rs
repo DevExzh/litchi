@@ -453,12 +453,7 @@ impl ValidationReport {
         reason = "the inherent constructor keeps the validation API parallel with Package::parse"
     )]
     pub fn from_str(input: &str) -> RtfResult<Self> {
-        Self::from_str_with_limits(input, SourceLimits::default())
-    }
-
-    /// Parse UTF-8 RTF once with an explicit finite profile.
-    pub fn from_str_with_limits(input: &str, limits: SourceLimits) -> RtfResult<Self> {
-        Self::from_str_with_options(input, OpenOptions::from(limits))
+        Self::from_str_with_options(input, OpenOptions::default())
     }
 
     /// Parse UTF-8 RTF once with an explicit opening profile.
@@ -470,12 +465,7 @@ impl ValidationReport {
     /// Parse original RTF bytes once, including bounded compressed-RTF
     /// decompression when the transport header is present.
     pub fn from_bytes(input: &[u8]) -> RtfResult<Self> {
-        Self::from_bytes_with_limits(input, SourceLimits::default())
-    }
-
-    /// Parse original RTF bytes once with an explicit finite profile.
-    pub fn from_bytes_with_limits(input: &[u8], limits: SourceLimits) -> RtfResult<Self> {
-        Self::from_bytes_with_options(input, OpenOptions::from(limits))
+        Self::from_bytes_with_options(input, OpenOptions::default())
     }
 
     /// Parse original RTF bytes once with an explicit opening profile.
@@ -493,7 +483,7 @@ impl ValidationReport {
 
     /// Build a report from the advanced retained model without mutating it.
     #[must_use]
-    pub fn from_raw(document: &crate::raw::Document<'_>) -> Self {
+    pub fn from_raw(document: &crate::raw::Tree<'_>) -> Self {
         build_report(document, document.parse_limits())
     }
 
@@ -605,11 +595,6 @@ pub fn validate(input: &[u8]) -> RtfResult<ValidationReport> {
     ValidationReport::from_bytes(input)
 }
 
-/// Validate original RTF bytes with an explicit finite profile.
-pub fn validate_with_limits(input: &[u8], limits: SourceLimits) -> RtfResult<ValidationReport> {
-    validate_with_options(input, OpenOptions::from(limits))
-}
-
 /// Validate original RTF bytes with an explicit opening profile.
 pub fn validate_with_options(input: &[u8], options: OpenOptions) -> RtfResult<ValidationReport> {
     ValidationReport::from_bytes_with_options(input, options)
@@ -618,11 +603,6 @@ pub fn validate_with_options(input: &[u8], options: OpenOptions) -> RtfResult<Va
 /// Validate UTF-8 RTF with the default finite profile.
 pub fn validate_str(input: &str) -> RtfResult<ValidationReport> {
     ValidationReport::from_str(input)
-}
-
-/// Validate UTF-8 RTF with an explicit finite profile.
-pub fn validate_str_with_limits(input: &str, limits: SourceLimits) -> RtfResult<ValidationReport> {
-    validate_str_with_options(input, OpenOptions::from(limits))
 }
 
 /// Validate UTF-8 RTF with an explicit opening profile.

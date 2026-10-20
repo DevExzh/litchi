@@ -10,9 +10,10 @@
 //! Round-trip tests for in-content RSID markers:
 //! `\insrsid`, `\delrsid`, `\charrsid`, `\pararsid`, `\sectrsid`, `\tblrsid`.
 
-use litchi_rtf::{RtfDocument, RtfWriter};
+use litchi_rtf::RtfWriter;
+use litchi_rtf::raw::Tree;
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -23,7 +24,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn content_rsid_markers_reach_the_model() {
     let source = r"{\rtf1\ansi\sectrsid46 A\insrsid42 B\delrsid43 C\charrsid44 D\pararsid45\par\trowd\tblrsid47\cellx2000\pard\intbl X\cell\row}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
 
     let blocks = document.blocks();
     let inserted = blocks
@@ -42,7 +43,7 @@ fn content_rsid_markers_reach_the_model() {
 #[test]
 fn content_rsid_markers_round_trip_through_the_writer() {
     let source = r"{\rtf1\ansi\sectrsid46 A\insrsid42 B\delrsid43 C\charrsid44 D\pararsid45\par\trowd\tblrsid47\cellx2000\pard\intbl X\cell\row}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
 
     let output = write(&document);
     let serialized = String::from_utf8(output).unwrap();
@@ -60,7 +61,7 @@ fn content_rsid_markers_round_trip_through_the_writer() {
         );
     }
 
-    let reparsed = RtfDocument::parse(&serialized).unwrap();
+    let reparsed = Tree::parse(&serialized).unwrap();
     let inserted = reparsed
         .blocks()
         .iter()

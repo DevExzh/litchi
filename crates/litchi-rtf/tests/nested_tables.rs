@@ -9,7 +9,8 @@
 
 mod repair_support;
 
-use litchi_rtf::{Cell, RtfDocument, RtfWriter, Table};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{Cell, RtfWriter, Table};
 
 fn nested_count(table: &Table<'_>) -> usize {
     table
@@ -52,7 +53,7 @@ fn sample() -> String {
 
 #[test]
 fn parses_ordered_nested_content_empty_cells_and_round_trips() {
-    let document = RtfDocument::parse(&sample()).unwrap();
+    let document = Tree::parse(&sample()).unwrap();
     let outer = &document.tables()[0];
     let cell = &outer.rows()[0].cells()[0];
     assert_eq!(cell.text(), "Before After");
@@ -69,7 +70,7 @@ fn parses_ordered_nested_content_empty_cells_and_round_trips() {
     assert!(first.contains("\\itap2 Inner\\nestcell"));
     assert!(first.contains("{\\*\\nesttableprops\\itap2\\trowd"));
     assert!(first.contains("\\nestrow}{\\nonesttables\\par}"));
-    let reparsed = RtfDocument::parse(&first).unwrap();
+    let reparsed = Tree::parse(&first).unwrap();
     assert_table_eq(outer, &reparsed.tables()[0]);
     let mut second = Vec::new();
     RtfWriter::new(&mut second)
@@ -81,7 +82,7 @@ fn parses_ordered_nested_content_empty_cells_and_round_trips() {
 #[test]
 fn grouped_table_text_keeps_cell_boundaries_and_round_trips() {
     let source = r"{\rtf1\trowd\cellx1000\cellx2000\intbl A{\b B}\cell\intbl C\cell\row}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     let row = &document.tables()[0].rows()[0];
     assert_eq!(row.cells().len(), 2);
     assert_eq!(row.cells()[0].text(), "AB");
@@ -91,7 +92,7 @@ fn grouped_table_text_keeps_cell_boundaries_and_round_trips() {
     RtfWriter::new(&mut bytes)
         .write_document(&document)
         .unwrap();
-    let reparsed = RtfDocument::parse(&String::from_utf8(bytes).unwrap()).unwrap();
+    let reparsed = Tree::parse(&String::from_utf8(bytes).unwrap()).unwrap();
     let reparsed_row = &reparsed.tables()[0].rows()[0];
     assert_eq!(
         reparsed_row
@@ -107,7 +108,7 @@ fn grouped_table_text_keeps_cell_boundaries_and_round_trips() {
 fn parses_real_libreoffice_end_defined_nested_table() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf117268.rtf");
-    let document = RtfDocument::parse(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let document = Tree::parse(&std::fs::read_to_string(path).unwrap()).unwrap();
     assert!(
         document
             .tables()
@@ -128,7 +129,7 @@ fn parses_real_libreoffice_end_defined_nested_table() {
 #[test]
 fn restores_groups_and_ignores_fallback_and_unknown_destinations() {
     let source = r"{\rtf1\trowd\cellx2000\intbl\itap1 Outer{\itap2}{\*\unknown\itap32\nestcell bad}{\nonesttables\itap32\nestcell fallback}\cell\row}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     assert_eq!(document.tables()[0].rows()[0].cells()[0].text(), "Outer");
     assert!(
         document.tables()[0].rows()[0].cells()[0]
@@ -150,7 +151,7 @@ fn rejects_malformed_levels_destinations_and_boundaries() {
         r"{\rtf1\trowd\cellx1\intbl\itap2 X\nestcell{\nesttableprops\trowd\cellx1\cellx2\nestrow}}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
             "accepted {source}"
         );
     }
@@ -159,7 +160,7 @@ fn rejects_malformed_levels_destinations_and_boundaries() {
 #[test]
 fn enforces_nested_floating_invariant_and_trowd_reset() {
     let source = r"{\rtf1\trowd\cellx5000\intbl\itap2 A\nestcell{\nesttableprops\trowd\tposx1\cellx1000\nestrow}\intbl\itap2 B\nestcell{\nesttableprops\trowd\cellx1000\nestrow}\itap1\cell\row}";
-    assert!(RtfDocument::parse(source).is_err());
+    assert!(Tree::parse(source).is_err());
 }
 
 #[test]
@@ -169,13 +170,13 @@ fn enforces_nested_cell_cap() {
         source.push_str("\\nestcell");
     }
     source.push_str("{\\nesttableprops\\trowd\\nestrow}}");
-    assert!(RtfDocument::parse(&source).is_err());
+    assert!(Tree::parse(&source).is_err());
 }
 
 #[test]
 fn retains_nested_table_in_implicit_outer_cell() {
     let source = r"{\rtf1\trowd\cellx5000\intbl\itap2 Inner\nestcell{\*\nesttableprops\itap2\trowd\cellx1000\nestrow}\intbl\itap1\row}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     let cells = document.tables()[0].rows()[0].cells();
     assert_eq!(cells.len(), 1);
     assert_eq!(cells[0].text(), "");

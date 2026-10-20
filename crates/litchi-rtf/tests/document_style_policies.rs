@@ -9,9 +9,10 @@
 
 mod repair_support;
 
-use litchi_rtf::{DocumentStylePolicies, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DocumentStylePolicies, RtfWriter};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -21,10 +22,9 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_all_four_passive_flags_without_applying_styles() {
-    let document = RtfDocument::parse(
-        r"{\rtf1\linkstyles\stylelocktheme\stylelockqfset\usenormstyforlist Body}",
-    )
-    .unwrap();
+    let document =
+        Tree::parse(r"{\rtf1\linkstyles\stylelocktheme\stylelockqfset\usenormstyforlist Body}")
+            .unwrap();
     assert_eq!(
         *document.style_policies(),
         DocumentStylePolicies {
@@ -39,7 +39,7 @@ fn parses_all_four_passive_flags_without_applying_styles() {
 
 #[test]
 fn parses_common_producer_flag_independently() {
-    let document = RtfDocument::parse(r"{\rtf1\usenormstyforlist Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1\usenormstyforlist Body}").unwrap();
     assert!(!document.style_policies().update_styles_from_template);
     assert!(!document.style_policies().lock_theme);
     assert!(!document.style_policies().lock_quick_format_set);
@@ -49,7 +49,7 @@ fn parses_common_producer_flag_independently() {
 
 #[test]
 fn omission_remains_empty_and_is_not_serialized() {
-    let document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1 Body}").unwrap();
     assert!(document.style_policies().is_empty());
     let serialized = String::from_utf8(write(&document)).unwrap();
     assert!(!serialized.contains("stylelocktheme"));
@@ -59,7 +59,7 @@ fn omission_remains_empty_and_is_not_serialized() {
 
 #[test]
 fn typed_api_round_trips_in_stable_order_and_clears_without_style_changes() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Body}").unwrap();
     document.set_style_policies(DocumentStylePolicies {
         update_styles_from_template: true,
         lock_theme: true,
@@ -77,7 +77,7 @@ fn typed_api_round_trips_in_stable_order_and_clears_without_style_changes() {
     for pair in controls.windows(2) {
         assert!(serialized.find(pair[0]).unwrap() < serialized.find(pair[1]).unwrap());
     }
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.style_policies(), document.style_policies());
     assert_eq!(reparsed.text(), "Body");
 
@@ -88,14 +88,14 @@ fn typed_api_round_trips_in_stable_order_and_clears_without_style_changes() {
 
 #[test]
 fn coexists_with_theme_data_filter_sort_and_language_metadata() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\stylelockqfset\themelang1033{\*\themedata 0102}"#,
         r#"{\*\wgrffmtfilter 0002}\stylesortmethod3"#,
         r#"\usenormstyforlist\stylelocktheme Body}"#,
     ))
     .unwrap();
     let output = write(&document);
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.style_policies(), document.style_policies());
     assert_eq!(reparsed.theme_languages(), document.theme_languages());
     assert_eq!(reparsed.style_list_filter(), document.style_list_filter());
@@ -108,7 +108,7 @@ fn parses_bundled_producer_after_stylesheet_without_loading_a_template() {
     let fixture = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf"
     );
-    let document = RtfDocument::parse_bytes(fixture).unwrap();
+    let document = Tree::parse_bytes(fixture).unwrap();
     assert!(document.style_policies().update_styles_from_template);
     assert!(document.text().contains("first"));
     assert!(document.text().contains("second"));
@@ -117,7 +117,7 @@ fn parses_bundled_producer_after_stylesheet_without_loading_a_template() {
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains("\\linkstyles"));
     assert!(!serialized.contains("\\template"));
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.style_policies(), document.style_policies());
     assert!(reparsed.text().contains("first"));
 }
@@ -133,7 +133,7 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
         for suffix in ["0", "1", "2147483647", "99999999999"] {
             let source = format!(r"{{\rtf1\{name}{suffix} Body}}");
             assert!(
-                repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
+                repair_support::rejected_or_parameter_repaired(&Tree::parse(&source)),
                 "accepted malformed {source}"
             );
         }
@@ -144,7 +144,7 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
             format!(r"{{\rtf1 Body\{name}}}"),
         ] {
             assert!(
-                repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(&source)),
+                repair_support::rejected_or_parameter_repaired(&Tree::parse(&source)),
                 "accepted malformed {source}"
             );
         }

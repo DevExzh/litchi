@@ -9,9 +9,10 @@
 
 use std::borrow::Cow;
 
-use litchi_rtf::{EmbeddedObject, ObjectKind, ObjectResultKind, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{EmbeddedObject, ObjectKind, ObjectResultKind, RtfWriter};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -24,7 +25,7 @@ fn round_trips_real_libreoffice_inline_ole_object() {
     let source = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/ole-inline.rtf"
     );
-    let document = RtfDocument::parse_bytes(source).unwrap();
+    let document = Tree::parse_bytes(source).unwrap();
     assert_eq!(document.objects().len(), 1);
     let object = &document.objects()[0];
     assert_eq!(object.kind, ObjectKind::Embedded);
@@ -38,7 +39,7 @@ fn round_trips_real_libreoffice_inline_ole_object() {
     assert!(serialized.contains("{\\*\\objclass "));
     assert!(serialized.contains("{\\*\\objdata "));
 
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.objects().len(), 1);
     let reparsed_object = &reparsed.objects()[0];
@@ -59,7 +60,7 @@ fn preserves_typed_object_metadata_and_shared_result_picture_indices() {
         {\*\oleclsid 00112233-4455-6677-8899-AABBCCDDEEFF}
         {\*\objdata 0102a0ff}
         {\result fallback{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}}B}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     let object = &document.objects()[0];
     assert_eq!(object.position, 1);
     assert_eq!(object.kind, ObjectKind::OleControl);
@@ -84,7 +85,7 @@ fn preserves_typed_object_metadata_and_shared_result_picture_indices() {
     ));
 
     let output = write(&document);
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     let reparsed_object = &reparsed.objects()[0];
     assert_eq!(reparsed_object.position, 1);
     assert_eq!(reparsed_object.kind, ObjectKind::OleControl);
@@ -98,7 +99,7 @@ fn preserves_typed_object_metadata_and_shared_result_picture_indices() {
 
 #[test]
 fn typed_mutation_validates_positions_and_clear_keeps_shared_pictures() {
-    let mut document = RtfDocument::parse(
+    let mut document = Tree::parse(
         r"{\rtf1 Body{\object\objemb{\*\objdata 00}{\result{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}}}",
     )
     .unwrap();
@@ -124,7 +125,7 @@ fn typed_mutation_validates_positions_and_clear_keeps_shared_pictures() {
     assert!(document.push_object(invalid).is_err());
 
     let output = write(&document);
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.objects()[0].position, 2);
     assert_eq!(reparsed.objects()[0].kind, ObjectKind::Publisher);
     assert_eq!(reparsed.objects()[0].result_picture_indices.len(), 1);
@@ -154,10 +155,7 @@ fn rejects_hostile_object_destination_grammar() {
         r"{\rtf1{\object\objemb{\*\objclass X{\object}}{\*\objdata 00}}}",
         r"{\rtf1\intbl{\object\objemb{\*\objdata 00}}}",
     ] {
-        assert!(
-            RtfDocument::parse(source).is_err(),
-            "accepted malformed {source}"
-        );
+        assert!(Tree::parse(source).is_err(), "accepted malformed {source}");
     }
 }
 
@@ -169,7 +167,7 @@ fn round_trips_object_alias_and_section_metadata() {
         {\*\oleclsid 00112233-4455-6677-8899-AABBCCDDEEFF}
         {\*\objdata 0102a0ff}
         {\result fallback}}B}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     let object = &document.objects()[0];
     assert_eq!(object.alias.as_deref(), Some("Alias Name"));
     assert_eq!(object.section.as_deref(), Some("Section1"));
@@ -179,7 +177,7 @@ fn round_trips_object_alias_and_section_metadata() {
     assert!(serialized.contains("{\\*\\objalias Alias Name}"));
     assert!(serialized.contains("{\\*\\objsect Section1}"));
 
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     let reparsed_object = &reparsed.objects()[0];
     assert_eq!(reparsed_object.alias, object.alias);
     assert_eq!(reparsed_object.section, object.section);
@@ -202,10 +200,7 @@ fn rejects_misplaced_object_alias_and_section_destinations() {
         // Metadata after the CLSID.
         r"{\rtf1{\object\objemb{\*\oleclsid X}{\*\objalias A}{\*\objdata 00}}}",
     ] {
-        assert!(
-            RtfDocument::parse(source).is_err(),
-            "accepted malformed {source}"
-        );
+        assert!(Tree::parse(source).is_err(), "accepted malformed {source}");
     }
 }
 
@@ -217,7 +212,7 @@ fn round_trips_object_time_metadata() {
         {\*\oleclsid 00112233-4455-6677-8899-AABBCCDDEEFF}
         {\*\objdata 0102a0ff}
         {\result fallback}}B}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     let object = &document.objects()[0];
     let time = object.time.unwrap();
     assert_eq!(time.year, Some(1994));
@@ -231,7 +226,7 @@ fn round_trips_object_time_metadata() {
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains("{\\*\\objtime \\yr1994\\mo6\\dy16\\hr12\\min30}"));
 
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.objects()[0].time, object.time);
     assert_eq!(reparsed.objects()[0].section, object.section);
 }
@@ -250,9 +245,6 @@ fn rejects_misplaced_object_time_destinations() {
         // Active non-time control in the destination.
         r"{\rtf1{\object\objemb{\*\objtime \b\yr1994}{\*\objdata 00}}}",
     ] {
-        assert!(
-            RtfDocument::parse(source).is_err(),
-            "accepted malformed {source}"
-        );
+        assert!(Tree::parse(source).is_err(), "accepted malformed {source}");
     }
 }

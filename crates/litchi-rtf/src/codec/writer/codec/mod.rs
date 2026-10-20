@@ -53,12 +53,12 @@ use super::super::{
     ParagraphGroupPropertyTable, ParagraphWrapping, Picture, PictureCompatibilityKind,
     PictureCompatibilityRecord, PictureShapeProperties, PresentNoteKinds, ProtectionRange,
     ProtectionUserTable, Revision, RevisionAuthor, RevisionMetadata, RevisionSaveMetadata,
-    RevisionType, Row, RtfDocument, RtfTimestamp, Section, SectionBreakType,
-    SectionFootnotePlacement, SectionLineNumberRestart, SectionNoteOptions, SectionRendering,
-    Shading, ShadingPattern, Shape, ShapeGroup, ShapeGroupChild, ShapeGroupInfo, ShapeProperty,
-    ShapeResult, ShapeThemeColor, ShapeType, SmartTag, SoftBreak, SoftBreakKind, StoryDrawing,
-    StoryEvent, StoryField, Style, StyleBlock, StyleSheet, StyleType, TabAlignment, TabLeader,
-    TabStop, Table, TableAutoformatFlag, TableCellBorders, TableCellMergeRole, TableCellTextFlow,
+    RevisionType, Row, RtfTimestamp, Section, SectionBreakType, SectionFootnotePlacement,
+    SectionLineNumberRestart, SectionNoteOptions, SectionRendering, Shading, ShadingPattern, Shape,
+    ShapeGroup, ShapeGroupChild, ShapeGroupInfo, ShapeProperty, ShapeResult, ShapeThemeColor,
+    ShapeType, SmartTag, SoftBreak, SoftBreakKind, StoryDrawing, StoryEvent, StoryField, Style,
+    StyleBlock, StyleSheet, StyleType, TabAlignment, TabLeader, TabStop, Table,
+    TableAutoformatFlag, TableCellBorders, TableCellMergeRole, TableCellTextFlow,
     TableCellVerticalAlignment, TableDistanceUnit, TableEdgeDistances, TableHorizontalPosition,
     TableHorizontalReference, TableIndentUnit, TablePreferredWidth, TablePreferredWidthUnit,
     TableRowAlignment, TableRowBandIndex, TableRowBorders, TableRowCellDefaults, TableRowGeometry,
@@ -66,6 +66,7 @@ use super::super::{
     UnderlineStyle, UserProperty, VerticalAlignment, XmlNamespace, annotation, document_variable,
     field, form_field, navigation_entry, section, user_property,
 };
+use crate::model::document::RtfDocument;
 use litchi_codepage::Mbcs;
 use std::collections::HashSet;
 use std::io::{self, Write};

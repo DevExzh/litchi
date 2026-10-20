@@ -9,7 +9,8 @@
 
 mod repair_support;
 
-use litchi_rtf::{DefaultFormattingDestination, ParagraphWrapping, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DefaultFormattingDestination, ParagraphWrapping, RtfWriter};
 
 const PRODUCER: &str = r"{\rtf1\ansi\adeff7\deff2\stshfdbch31505\stshfloch31506\stshfhich31507\stshfbi31508
 {\fonttbl{\f2 Arial;}}
@@ -19,7 +20,7 @@ Body}";
 
 #[test]
 fn parses_preserves_order_and_round_trips_defaults_inertly() {
-    let document = RtfDocument::parse(PRODUCER).unwrap();
+    let document = Tree::parse(PRODUCER).unwrap();
     let defaults = document.default_formatting();
     assert_eq!(defaults.fonts.primary, Some(2));
     assert_eq!(defaults.fonts.associated, Some(7));
@@ -57,7 +58,7 @@ fn parses_preserves_order_and_round_trips_defaults_inertly() {
         .unwrap();
     let text = String::from_utf8_lossy(&first);
     assert!(text.find("defpap").unwrap() < text.find("defchp").unwrap());
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first).unwrap();
     assert_eq!(defaults, reparsed.default_formatting());
     let mut second = Vec::new();
     RtfWriter::new(&mut second)
@@ -68,13 +69,13 @@ fn parses_preserves_order_and_round_trips_defaults_inertly() {
 
 #[test]
 fn parses_real_producer_default_destinations() {
-    let first = RtfDocument::parse_bytes(include_bytes!(
+    let first = Tree::parse_bytes(include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/core/text/data/A011-charheight.rtf"
     ))
     .unwrap();
     assert!(first.default_formatting().character().is_some());
     assert!(first.default_formatting().paragraph().is_some());
-    let cjk = RtfDocument::parse_bytes(include_bytes!(
+    let cjk = Tree::parse_bytes(include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/cjklist24.rtf"
     ))
     .unwrap();
@@ -110,7 +111,7 @@ fn rejects_malformed_default_formatting() {
     ];
     for source in malformed {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
             "accepted malformed RTF: {source}"
         );
     }

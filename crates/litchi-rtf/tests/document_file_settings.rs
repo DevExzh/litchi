@@ -9,9 +9,10 @@
 
 mod repair_support;
 
-use litchi_rtf::{DocumentFileSettings, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DocumentFileSettings, RtfWriter};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -21,7 +22,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_all_three_passive_parameterless_flags() {
-    let document = RtfDocument::parse(r"{\rtf1\makebackup\defformat\doctemp Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1\makebackup\defformat\doctemp Body}").unwrap();
     assert_eq!(
         *document.file_settings(),
         DocumentFileSettings {
@@ -35,13 +36,13 @@ fn parses_all_three_passive_parameterless_flags() {
 
 #[test]
 fn omission_is_preserved_as_no_requested_file_behavior() {
-    let document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1 Body}").unwrap();
     assert!(document.file_settings().is_empty());
 }
 
 #[test]
 fn typed_api_round_trips_in_stable_order_and_clears_without_side_effects() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Body}").unwrap();
     document.set_file_settings(DocumentFileSettings {
         automatic_backup: true,
         default_save_format_rtf: true,
@@ -51,7 +52,7 @@ fn typed_api_round_trips_in_stable_order_and_clears_without_side_effects() {
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.find("\\makebackup").unwrap() < serialized.find("\\defformat").unwrap());
     assert!(serialized.find("\\defformat").unwrap() < serialized.find("\\doctemp").unwrap());
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.file_settings(), document.file_settings());
     assert_eq!(reparsed.text(), "Body");
     document.clear_file_settings();
@@ -60,7 +61,7 @@ fn typed_api_round_trips_in_stable_order_and_clears_without_side_effects() {
 
 #[test]
 fn coexists_with_origin_external_reference_and_classification_metadata() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\fromhtml1\deff0{\*\nextfile next.rtf}"#,
         r#"\doctemp\defformat\makebackup\doctype2 Body}"#,
     ))
@@ -94,7 +95,7 @@ fn rejects_parameters_duplicates_starred_grouped_late_and_overlong_numeric_forms
         r"{\rtf1 Body\doctemp}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
             "accepted malformed {source}"
         );
     }

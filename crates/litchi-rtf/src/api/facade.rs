@@ -91,16 +91,7 @@ impl Package {
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn parse(input: &str) -> RtfResult<Self> {
-        Self::parse_with_limits(input, SourceLimits::default())
-    }
-
-    /// Parse UTF-8 RTF source with an explicit finite resource profile.
-    ///
-    /// # Errors
-    /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn parse_with_limits(input: &str, limits: SourceLimits) -> RtfResult<Self> {
-        RtfDocument::parse_with_limits(input, limits)
-            .map(|model| Self::from_model(model, limits.into()))
+        Self::parse_with_options(input, OpenOptions::default())
     }
 
     /// Parse UTF-8 RTF source with explicit resource limits and repair
@@ -128,17 +119,7 @@ impl Package {
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn from_bytes(input: &[u8]) -> RtfResult<Self> {
-        Self::from_bytes_with_limits(input, SourceLimits::default())
-    }
-
-    /// Parse original RTF transport bytes with an explicit finite resource
-    /// profile.
-    ///
-    /// # Errors
-    /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn from_bytes_with_limits(input: &[u8], limits: SourceLimits) -> RtfResult<Self> {
-        RtfDocument::parse_bytes_with_limits(input, limits)
-            .map(|model| Self::from_model(model, limits.into()))
+        Self::from_bytes_with_options(input, OpenOptions::default())
     }
 
     /// Parse original RTF transport bytes with explicit resource limits and
@@ -162,17 +143,7 @@ impl Package {
     /// Returns an error when the input is malformed or a configured limit is
     /// exceeded.
     pub fn from_owned_bytes(input: Vec<u8>) -> RtfResult<Self> {
-        Self::from_owned_bytes_with_limits(input, SourceLimits::default())
-    }
-
-    /// Parse an owned RTF transport allocation with an explicit finite profile.
-    ///
-    /// # Errors
-    /// Returns an error when the input is malformed or a configured limit is
-    /// exceeded.
-    pub fn from_owned_bytes_with_limits(input: Vec<u8>, limits: SourceLimits) -> RtfResult<Self> {
-        RtfDocument::from_owned_bytes_with_limits(input, limits)
-            .map(|model| Self::from_model(model, limits.into()))
+        Self::from_owned_bytes_with_options(input, OpenOptions::default())
     }
 
     /// Parse an owned RTF transport allocation with explicit resource limits
@@ -191,16 +162,7 @@ impl Package {
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn open(path: impl AsRef<Path>) -> RtfResult<Self> {
-        Self::open_with_limits(path, SourceLimits::default())
-    }
-
-    /// Open an RTF file with an explicit finite resource profile.
-    ///
-    /// # Errors
-    /// Returns an error when the input is malformed or a configured limit is exceeded.
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> RtfResult<Self> {
-        RtfDocument::open_with_limits(path, limits)
-            .map(|model| Self::from_model(model, limits.into()))
+        Self::open_with_options(path, OpenOptions::default())
     }
 
     /// Open an RTF file with explicit resource limits and repair posture.

@@ -3068,7 +3068,7 @@ fn run_rtf(
             },
             Leg::Leaf => {
                 let started = Instant::now();
-                let document = litchi_rtf::RtfDocument::from_owned_bytes(owned)?;
+                let document = litchi_rtf::raw::Tree::from_owned_bytes(owned)?;
                 let text = lifecycle.then(|| document.text());
                 let duration = started.elapsed();
                 let observed = TextProjection {
@@ -3094,9 +3094,9 @@ fn run_rtf(
     let timed_calls = match (entry.leg, lifecycle) {
         (Leg::Unified, false) => "litchi::open_bytes(Vec<u8>) -> File::Rtf",
         (Leg::Unified, true) => "litchi::open_bytes(Vec<u8>) + File::text()",
-        (Leg::Leaf, false) => "litchi_rtf::RtfDocument::from_owned_bytes(Vec<u8>)",
+        (Leg::Leaf, false) => "litchi_rtf::raw::Tree::from_owned_bytes(Vec<u8>)",
         (Leg::Leaf, true) => {
-            "litchi_rtf::RtfDocument::from_owned_bytes(Vec<u8>) + RtfDocument::text()"
+            "litchi_rtf::raw::Tree::from_owned_bytes(Vec<u8>) + RtfDocument::text()"
         },
     };
     let summary = RouteSummary::for_case(entry.case, timed_calls)?.verified(&expected, samples)?;

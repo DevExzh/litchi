@@ -9,9 +9,9 @@
 
 mod repair_support;
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    PageBorder, PageBorderAppliesTo, PageBorderDepth, PageBorderOffset, PageBorderStyle,
-    RtfDocument, RtfWriter,
+    PageBorder, PageBorderAppliesTo, PageBorderDepth, PageBorderOffset, PageBorderStyle, RtfWriter,
 };
 
 #[test]
@@ -20,7 +20,7 @@ fn parses_libreoffice_page_border_export_and_round_trips_deterministically() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/page-border.rtf"
     ));
-    let document = RtfDocument::parse(fixture).unwrap();
+    let document = Tree::parse(fixture).unwrap();
     let borders = document.sections()[0].properties.page_borders;
     assert_eq!(borders.top.unwrap().width, 10);
     assert_eq!(borders.left.unwrap().width, 20);
@@ -34,14 +34,14 @@ fn parses_libreoffice_page_border_export_and_round_trips_deterministically() {
     let text = String::from_utf8(output).unwrap();
     let expected = r"\pgbrdrt\brdrs\brdrw10\brdrcf0\brsp480\pgbrdrl\brdrs\brdrw20\brdrcf0\brsp480\pgbrdrb\brdrs\brdrw30\brdrcf0\brsp480\pgbrdrr\brdrs\brdrw40\brdrcf0\brsp480";
     assert!(text.contains(expected), "{text}");
-    let reparsed = RtfDocument::parse(&text).unwrap();
+    let reparsed = Tree::parse(&text).unwrap();
     assert_eq!(reparsed.sections()[0].properties.page_borders, borders);
 }
 
 #[test]
 fn parses_options_group_boundaries_destinations_and_sectd_reset() {
     let rtf = r"{\rtf1{\*\unknown\pgbrdrt\brdrs\brdrw75}\sectd\pgbrdropt43\pgbrdrhead\pgbrdrfoot\pgbrdrsnap{\pgbrdrt\brdrdb\brdrw25\brdrcf7\brsp30\brdrsh}\sectd\pgbrdrb\brdrdot\brdrw5 Body}";
-    let document = RtfDocument::parse(rtf).unwrap();
+    let document = Tree::parse(rtf).unwrap();
     let borders = document.sections()[0].properties.page_borders;
     assert!(borders.top.is_none());
     assert_eq!(borders.bottom.unwrap().style, PageBorderStyle::Dotted);
@@ -92,7 +92,7 @@ fn rejects_malformed_page_borders_and_negative_libreoffice_fixture() {
         r"{\rtf1\pgbrdrt\brdrs\brdrw10\pgbrdrt\brdrs Body}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(rtf)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(rtf)),
             "accepted {rtf}"
         );
     }
@@ -101,6 +101,6 @@ fn rejects_malformed_page_borders_and_negative_libreoffice_fixture() {
         "/../../test-data/libreoffice-core/sw/qa/writerfilter/rtftok/data/negative-page-border.rtf"
     ));
     assert!(repair_support::rejected_or_parameter_repaired(
-        &RtfDocument::parse(negative)
+        &Tree::parse(negative)
     ));
 }

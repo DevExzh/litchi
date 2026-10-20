@@ -9,12 +9,12 @@
 
 mod repair_support;
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    AbstractNumberingCleanupStatus, DocumentEventMask, DocumentProcessingSettings, RtfDocument,
-    RtfWriter,
+    AbstractNumberingCleanupStatus, DocumentEventMask, DocumentProcessingSettings, RtfWriter,
 };
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -24,8 +24,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_explicit_values_and_preserves_zero_separately_from_omission() {
-    let explicit =
-        RtfDocument::parse(r"{\rtf1\fracwidth\ilfomacatclnup0\grfdocevents0 Body}").unwrap();
+    let explicit = Tree::parse(r"{\rtf1\fracwidth\ilfomacatclnup0\grfdocevents0 Body}").unwrap();
     assert!(
         explicit
             .processing_settings()
@@ -43,7 +42,7 @@ fn parses_explicit_values_and_preserves_zero_separately_from_omission() {
     assert!(serialized.contains("\\ilfomacatclnup0"));
     assert!(serialized.contains("\\grfdocevents0"));
 
-    let omitted = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let omitted = Tree::parse(r"{\rtf1 Body}").unwrap();
     assert!(omitted.processing_settings().is_empty());
     assert_eq!(
         omitted
@@ -80,11 +79,11 @@ fn every_document_event_bit_including_reserved_bits_round_trips() {
         assert_eq!(flag.bits(), 1 << bit);
         assert!(DocumentEventMask::ALL.contains(flag));
         let source = format!(r"{{\rtf1\grfdocevents{} Body}}", flag.bits());
-        let document = RtfDocument::parse(&source).unwrap();
+        let document = Tree::parse(&source).unwrap();
         assert_eq!(document.processing_settings().event_mask, Some(flag));
         let output = write(&document);
         assert_eq!(
-            RtfDocument::parse_bytes(&output)
+            Tree::parse_bytes(&output)
                 .unwrap()
                 .processing_settings()
                 .event_mask,
@@ -96,7 +95,7 @@ fn every_document_event_bit_including_reserved_bits_round_trips() {
 
 #[test]
 fn typed_api_round_trips_all_bits_in_stable_order_without_side_effects() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Body}").unwrap();
     document.set_processing_settings(DocumentProcessingSettings {
         fractional_character_widths_for_printing: true,
         abstract_numbering_cleanup: Some(AbstractNumberingCleanupStatus::Incomplete),
@@ -111,7 +110,7 @@ fn typed_api_round_trips_all_bits_in_stable_order_without_side_effects() {
         serialized.find("\\ilfomacatclnup1").unwrap()
             < serialized.find("\\grfdocevents32767").unwrap()
     );
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(
         reparsed.processing_settings(),
         document.processing_settings()
@@ -125,7 +124,7 @@ fn typed_api_round_trips_all_bits_in_stable_order_without_side_effects() {
 
 #[test]
 fn coexists_with_adjacent_output_and_rendering_properties() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\grfdocevents16387\jexpand\fracwidth\psover"#,
         r#"\ilfomacatclnup1\horzdoc Body}"#,
     ))
@@ -135,7 +134,7 @@ fn coexists_with_adjacent_output_and_rendering_properties() {
         DocumentEventMask::from_bits(16387)
     );
     let output = write(&document);
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(
         reparsed.processing_settings(),
         document.processing_settings()
@@ -173,7 +172,7 @@ fn rejects_missing_invalid_overflow_duplicate_starred_grouped_and_late_forms() {
         r"{\rtf1 Body\grfdocevents0}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
             "accepted malformed {source}"
         );
     }

@@ -16666,7 +16666,10 @@ fn semantic_rtf_bytes(
             let plain = semantic_rtf_plain_bytes(shape)?;
             let compressed = litchi_rtf::transport::compress(&plain, true)?;
             if !litchi_rtf::transport::is_compressed_rtf(&compressed)
-                || litchi_rtf::transport::decompress(&compressed)? != plain
+                || litchi_rtf::transport::decompress(
+                    &compressed,
+                    litchi_rtf::transport::DecompressionLimits::default(),
+                )? != plain
             {
                 return Err("semantic RTF LZFu transport verification failed".into());
             }
@@ -33786,7 +33789,7 @@ fn stage_rtf_tail_prepared(
     edit.append_text_paragraphs(paragraphs)?;
     let prepared = if plan_based {
         let context = rtf_tail_publication_context(expected_output_bytes, inserted_bytes)?;
-        let plan = edit.publication_plan_with_limits_and_context(publication_limits, &context)?;
+        let plan = edit.publication_plan_with_context(publication_limits, &context)?;
         RtfTailPrepared::Plan { plan, context }
     } else {
         RtfTailPrepared::Commit(edit.commit()?)
@@ -33962,8 +33965,7 @@ fn verify_rtf_tail_publication_plan_gates(
         u64::try_from(plan.inserted_bytes())?,
     )?;
     if !matches!(
-        bounded_edit
-            .publication_plan_with_limits_and_context(publication_limits, &bounded_context,),
+        bounded_edit.publication_plan_with_context(publication_limits, &bounded_context,),
         Err(litchi_rtf::TailAppendPublicationError::Plan(
             litchi_rtf::tail_append::Error::Limit {
                 kind: litchi_rtf::tail_append::LimitKind::OutputBytes,
@@ -33985,7 +33987,7 @@ fn verify_rtf_tail_publication_plan_gates(
         u64::try_from(plan.inserted_bytes())?,
     )?;
     if !matches!(
-        invalid_edit.publication_plan_with_limits_and_context(
+        invalid_edit.publication_plan_with_context(
             litchi_rtf::TailAppendPublicationLimits::new(0, 0),
             &invalid_context,
         ),
@@ -34103,7 +34105,7 @@ fn run_rtf_logical_tail_publication(
             litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
         );
         edit.append_text_paragraphs(&paragraph_inputs)?;
-        edit.publication_plan_with_limits(publication_limits)?
+        edit.publication_plan(publication_limits)?
     };
     let lifecycle_duration = verify_rtf_tail_publication_lifecycle(
         &source,
