@@ -157,6 +157,7 @@ fn settings_edit_reopens_and_keeps_unknown_children() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );
@@ -889,6 +890,7 @@ fn normative_connection_targets_read_and_write_without_opening_drivers() {
         opaque_changed
             .apply(&opaque_commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         opaque_database.as_bytes()
     );

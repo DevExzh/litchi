@@ -772,7 +772,7 @@ impl Snapshot {
     }
 
     /// Start a non-consuming semantic metadata edit.
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit {
             before: self.clone(),
             consolidation: None,
@@ -1520,7 +1520,7 @@ impl Edit {
     }
 
     /// Commit this edit without consuming its staged ledger.
-    pub fn commit(&mut self, context: &ExecutionContext) -> Result<Commit> {
+    pub(crate) fn commit(&mut self, context: &ExecutionContext) -> Result<Commit> {
         context.check().map_err(map_execution)?;
         if self.before.enforce_context_lineage {
             if context.limits() != self.before.context.limits()
@@ -1535,10 +1535,6 @@ impl Edit {
         if self.is_no_op() {
             return Ok(Commit {
                 snapshot: self.before.clone(),
-                patch: Patch {
-                    source: self.before.clone(),
-                    target: self.before.clone(),
-                },
                 changed: false,
             });
         }
@@ -1552,15 +1548,12 @@ impl Edit {
         verify_readback(&target, self, context)?;
         Ok(Commit {
             snapshot: target.clone(),
-            patch: Patch {
-                source: self.before.clone(),
-                target,
-            },
             changed: true,
         })
     }
-    /// Clear every staged operation by restoring the immutable base ledger.
-    pub fn rollback(&mut self) {
+
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
         self.consolidation = None;
         self.consolidation_staged = false;
         self.labels = None;
@@ -1574,91 +1567,21 @@ impl Edit {
 
 /// Accepted source-checked metadata result.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
-    patch: Patch,
     changed: bool,
 }
 
 impl Commit {
     /// Whether content.xml changed.
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
     }
     /// Resulting immutable snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-    /// Reversible exact-source patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-}
-
-/// Exact content.xml patch authorized by one metadata snapshot.
-#[derive(Clone, Debug)]
-pub struct Patch {
-    source: Snapshot,
-    target: Snapshot,
-}
-
-impl Patch {
-    /// Whether source and target are byte-identical.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.source.source.as_ref() != self.target.source.as_ref()
-    }
-    /// Alias for [`Self::changed`] with the opposite polarity.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        !self.changed()
-    }
-    /// Exact source bytes required by this patch.
-    #[must_use]
-    pub fn source_xml(&self) -> &str {
-        self.source.source_xml()
-    }
-    /// Exact target bytes produced by this patch.
-    #[must_use]
-    pub fn target_xml(&self) -> &str {
-        self.target.source_xml()
-    }
-    /// Inverse exact-source patch.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            source: self.target.clone(),
-            target: self.source.clone(),
-        }
-    }
-    /// Apply to an exact source snapshot, reopening the retained target under
-    /// the destination snapshot's limits and execution context.
-    pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
-        if snapshot.source.as_ref() != self.source.source.as_ref() {
-            return Err(Error::InvalidFormat(
-                "ODS sheet metadata patch source snapshot does not match".to_string(),
-            ));
-        }
-        snapshot.context.check().map_err(map_execution)?;
-        if !self.changed() {
-            return Ok(Commit {
-                snapshot: snapshot.clone(),
-                patch: self.clone(),
-                changed: false,
-            });
-        }
-        let target = self.target.reopen_for_destination(snapshot)?;
-        Ok(Commit {
-            snapshot: target.clone(),
-            patch: Patch {
-                source: snapshot.clone(),
-                target,
-            },
-            changed: self.changed(),
-        })
     }
 }
 

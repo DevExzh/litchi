@@ -1,9 +1,27 @@
-//! Source-checked linked-section transactions.
+//! Source-checked linked-section edits: the `link` family.
+//!
+//! [`Package::edit_link`](crate::Package::edit_link) stages an [`Edit`] of
+//! one `text:section-source` target; [`Edit::commit`] publishes a new
+//! [`Package`] with its [`Patch`] (which records the
+//! [`Change`]) and [`Diagnostics`];
+//! [`Package::apply_link`](crate::Package::apply_link) replays a patch onto
+//! its exact source.
 
-use litchi_core::{Error, Position, Result};
+use litchi_core::{Error as CoreError, Position, Result};
 use std::{borrow::Cow, ops::Range, sync::Arc};
 
 use crate::Package;
+
+/// Whether a commit changed the package bytes.
+pub use litchi_core::edit::Diagnostics;
+/// The family error: typed limits, refusals and patch conflicts plus the
+/// common-core payload.
+pub use litchi_odf_common::Error;
+/// The dimension named by [`Error::Limit`] and [`Error::InvalidLimit`].
+pub use litchi_odf_common::LimitKind;
+
+/// A committed link edit: the published package, its patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
 const MAX_HREF_BYTES: usize = 16 * 1024;
 const MAX_CONTENT_BYTES: usize = 256 * 1024 * 1024;
@@ -99,10 +117,14 @@ impl<'source> Edit<'source> {
     ///
     /// Returns an error when the compact source cannot be patched losslessly,
     /// the package is signed, or semantic readback differs from the request.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(self) -> std::result::Result<Commit, Error> {
+        Ok(self.commit_core()?)
+    }
+
+    fn commit_core(self) -> Result<Commit> {
         if self.before == self.after {
             let snapshot = self.source.clone();
-            return Ok(Commit::new(
+            return Ok(commit(
                 self.source,
                 snapshot,
                 Change::new(self.reference, self.before, self.after),
@@ -119,7 +141,7 @@ impl<'source> Edit<'source> {
                 "ODM linked-section transaction readback differs from the staged target",
             ));
         }
-        Ok(Commit::new(
+        Ok(commit(
             self.source,
             snapshot,
             Change::new(self.reference, self.before, self.after),
@@ -163,47 +185,14 @@ impl Change {
     }
 }
 
-/// A validated publication result containing a new snapshot and patch.
-pub struct Commit {
-    snapshot: Package,
-    patch: Patch,
-}
-
-impl Commit {
-    fn new(source: &Package, snapshot: Package, change: Change) -> Self {
-        Self {
-            patch: Patch {
-                before: source.shared_bytes(),
-                after: snapshot.shared_bytes(),
-                change,
-            },
-            snapshot,
-        }
-    }
-
-    /// Returns the committed immutable master-document package.
-    #[must_use]
-    pub const fn package(&self) -> &Package {
-        &self.snapshot
-    }
-
-    /// Returns the exact-source-checked reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consumes the commit and returns the published package.
-    #[must_use]
-    pub fn into_package(self) -> Package {
-        self.snapshot
-    }
-
-    /// Consumes the commit into its published package and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Package, Patch) {
-        (self.snapshot, self.patch)
-    }
+fn commit(source: &Package, snapshot: Package, change: Change) -> Commit {
+    let patch = Patch {
+        before: source.shared_bytes(),
+        after: snapshot.shared_bytes(),
+        change,
+    };
+    let diagnostics = Diagnostics::new(!patch.is_noop());
+    Commit::new(snapshot, patch, diagnostics)
 }
 
 /// An exact-source-checked reversible linked-section patch.
@@ -232,13 +221,19 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error when the supplied source differs byte-for-byte.
-    pub(crate) fn apply(&self, source: &Package) -> Result<Package> {
+    pub(crate) fn apply(&self, source: &Package) -> std::result::Result<Commit, Error> {
         if !self.is_applicable_to(source) {
-            return Err(invalid(
-                "ODM linked-section patch source does not match its expected snapshot",
+            return Err(Error::patch_conflict(
+                "link.apply",
+                "the package is not the patch source",
             ));
         }
-        Package::from_shared_bytes(Arc::clone(&self.after))
+        let package = Package::from_shared_bytes(Arc::clone(&self.after))?;
+        Ok(Commit::new(
+            package,
+            self.clone(),
+            Diagnostics::new(!self.is_noop()),
+        ))
     }
 
     /// Returns the patch that restores the exact source package bytes.
@@ -282,7 +277,7 @@ pub(crate) fn replace_attribute_value(
     let mut output = String::new();
     output
         .try_reserve_exact(capacity)
-        .map_err(|allocation| Error::Allocation {
+        .map_err(|allocation| CoreError::Allocation {
             resource: "ODM edited content",
             source: allocation,
         })?;
@@ -325,6 +320,6 @@ pub(crate) fn validate_href(href: &str) -> Result<()> {
     Ok(())
 }
 
-fn invalid(message: &str) -> Error {
-    Error::InvalidFormat(message.to_owned())
+fn invalid(message: &str) -> CoreError {
+    CoreError::InvalidFormat(message.to_owned())
 }

@@ -16,11 +16,10 @@ pub mod edit {
         ActiveContentStatus, ActiveContentWritePolicy, Change, Commit, ControlReferenceChange,
         Diagnostics, DurablePatch, Edit, GeometryChange, History, HistoryLimits, JoinedEdits,
         LayerChange, Lineage, MergePlan, NameChange, PageNameChange, PageStyleChange,
-        PageTransitionChange, Patch, PathChange, PreparedEdit, ResourceChange,
-        SecurityCapabilities, SecurityLifecycleDisposition, SecurityLifecycleOperation,
-        SecurityLifecycleRefusal, SecurityStatus, SecurityWritePolicy, ShapeTransfer,
-        StructureChange, StyleChange, TextChange, TransferControl, TransferResource, TransferStyle,
-        TransferStyleResource,
+        PageTransitionChange, Patch, PathChange, ResourceChange, SecurityCapabilities,
+        SecurityLifecycleDisposition, SecurityLifecycleOperation, SecurityLifecycleRefusal,
+        SecurityStatus, SecurityWritePolicy, ShapeTransfer, StructureChange, StyleChange, SubEdit,
+        TextChange, TransferControl, TransferResource, TransferStyle, TransferStyleResource,
     };
     pub use litchi_odf_common::{Error, LimitKind};
 }

@@ -114,14 +114,17 @@ fn first_middle_last_copies_keep_exact_table_bytes_and_durable_lineage() -> Resu
         let durable = Patch::from_deterministic_json(&wire, snapshot.limits())?;
         assert_eq!(durable.operations()[0].op, "ods.sheet.copy");
         assert_eq!(
-            snapshot.apply(&durable)?.as_bytes(),
+            snapshot.apply(&durable)?.into_package().as_bytes(),
             commit.package().as_bytes()
         );
         let inverse = Patch::from_deterministic_json(
             &durable.inverse().to_deterministic_json()?,
             snapshot.limits(),
         )?;
-        assert_eq!(commit.package().apply(&inverse)?.as_bytes(), source);
+        assert_eq!(
+            commit.package().apply(&inverse)?.into_package().as_bytes(),
+            source
+        );
         let stale = Package::from_bytes(&package(&content(&table("Other", "x"), ""), &[]))?;
         assert!(stale.apply(&durable).is_err());
     }
@@ -206,7 +209,7 @@ fn attribute_whitespace_names_reopen_exactly_and_collisions_are_atomic() -> Resu
     let wire = commit.patch().to_deterministic_json()?;
     let durable = Patch::from_deterministic_json(&wire, snapshot.limits())?;
     assert_eq!(
-        snapshot.apply(&durable)?.as_bytes(),
+        snapshot.apply(&durable)?.into_package().as_bytes(),
         commit.package().as_bytes()
     );
 
@@ -284,7 +287,7 @@ fn long_source_name_keeps_the_durable_operation_target_bounded() -> Result<()> {
     let wire = commit.patch().to_deterministic_json()?;
     let durable = Patch::from_deterministic_json(&wire, snapshot.limits())?;
     assert_eq!(
-        snapshot.apply(&durable)?.as_bytes(),
+        snapshot.apply(&durable)?.into_package().as_bytes(),
         commit.package().as_bytes()
     );
     Ok(())

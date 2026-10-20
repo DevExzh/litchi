@@ -79,7 +79,11 @@ pub(crate) fn compact_source_xml(source: &str) -> Result<String> {
     let bytes = writer.into_inner();
     let compact = String::from_utf8(bytes)
         .map_err(|error| invalid(format!("ODM compact XML is not UTF-8: {error}")))?;
-    litchi_odf_common::compact_xml::validate(compact.as_bytes()).map_err(Error::from)?;
+    litchi_odf_common::compact_xml::validate(
+        compact.as_bytes(),
+        litchi_odf_common::compact_xml::Limits::default(),
+    )
+    .map_err(Error::from)?;
     Ok(compact)
 }
 

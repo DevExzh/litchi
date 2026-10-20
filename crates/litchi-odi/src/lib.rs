@@ -15,7 +15,7 @@ mod authoring;
 mod codec;
 mod editing;
 mod facade;
-mod flat;
+pub mod flat;
 mod history;
 pub mod metadata;
 mod model;
@@ -27,7 +27,7 @@ pub use facade::{
     Builder, Commit, Diagnostics, Edit, Image, MetadataChange, MetadataFields, Package, Patch,
     ResourceChange, StyleChange,
 };
-pub use flat::{FlatImage, FlatImageCommit, FlatImagePatch, FlatImageTransaction, FrameChange};
+pub use flat::FrameChange;
 pub use history::{CommittedTransition, History, HistoryArtifact};
 pub use litchi_odf_common::{
     Error, LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,

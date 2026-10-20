@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     use std::time::Instant;
 
     use litchi_core::Position;
-    use litchi_odp::scene::{Change, ObjectRef, StoryRef, TextPropertyEdit};
+    use litchi_odp::scene::{Change, ObjectRef, StoryRef, TextPropertyUpdate};
     use litchi_ops::{NewNode, OpenOptions, Placement, SourceMode, props};
     use litchi_xls::cell_values::Selector;
 
@@ -95,7 +95,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let native = litchi_odp::Package::from_bytes(&bytes)?;
         let unified = litchi_ops::open_bytes(bytes.clone())?;
         let path = "/slide[100]/shape[1]/paragraph[1]/run[1]";
-        let mut properties = TextPropertyEdit::new();
+        let mut properties = TextPropertyUpdate::new();
         properties.bold = Some(true);
         properties.size = Some("24pt".to_owned());
         let changes = [Change::SetTextProperties {

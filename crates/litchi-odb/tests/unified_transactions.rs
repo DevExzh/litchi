@@ -97,7 +97,7 @@ fn unified_transaction_composes_schema_relation_query_connection_component_and_e
     assert!(extensions[0].xml().contains("lo:keep=\"true\""));
 
     let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
-    assert_eq!(restored.as_bytes(), source.as_bytes());
+    assert_eq!(restored.into_package().as_bytes(), source.as_bytes());
     assert!(commit.package().apply(commit.patch()).is_err());
 }
 
@@ -166,6 +166,7 @@ fn real_pretty_libreoffice_package_changes_only_the_selected_query_xml() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         bytes
     );

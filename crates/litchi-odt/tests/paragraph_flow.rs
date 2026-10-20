@@ -31,7 +31,7 @@ fn parses_real_odfdo_and_libreoffice() {
     let lo = include_bytes!(
         "../../../test-data/libreoffice-core/xmloff/qa/unit/data/scale-width-redline.fodt"
     );
-    let flat = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(lo)).unwrap();
+    let flat = litchi_odt::generic::flat::Document::from_reader(Cursor::new(lo)).unwrap();
     assert!(!flat.paragraph_style_flows().unwrap().styles.is_empty());
 }
 #[test]

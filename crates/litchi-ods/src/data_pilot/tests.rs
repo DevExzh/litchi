@@ -1,5 +1,5 @@
 use super::{Field, Orientation, Table};
-use crate::{Builder, MutableSpreadsheet, Workbook};
+use crate::{Builder, Workbook, builder::Workbook as Draft};
 
 const XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:v="urn:example:vendor"><office:body><office:spreadsheet><t:table t:name="Input"/><t:data-pilot-tables><t:data-pilot-table t:name="Pivot" t:target-range-address="Output.A1:B4"><t:source-cell-range t:cell-range-address="Input.A1:B20"/><t:data-pilot-field t:source-field-name="Region" t:orientation="row"/><v:future v:flag="retain"><v:value>opaque</v:value></v:future></t:data-pilot-table></t:data-pilot-tables><t:shapes/></office:spreadsheet></office:body></office:document-content>"#;
 
@@ -57,7 +57,7 @@ fn clone_staged_crud_rewrites_only_the_owner_and_reopens() {
         )
         .replace(" xmlns:v=\"urn:example:vendor\"", "");
     let mut mutable = Workbook::from_bytes(package(&typed_xml))
-        .map(MutableSpreadsheet::from_workbook)
+        .map(Draft::from_workbook)
         .expect("test fixture or operation should succeed");
     mutable
         .edit_data_pilots(|editor| {
@@ -70,8 +70,14 @@ fn clone_staged_crud_rewrites_only_the_owner_and_reopens() {
     let content = mutable.workbook().content_xml().to_owned();
     assert!(content.contains("t:shapes"));
 
-    let spreadsheet =
-        Workbook::from_bytes(mutable.to_bytes()).expect("test fixture or operation should succeed");
+    let spreadsheet = Workbook::from_bytes(
+        mutable
+            .build()
+            .expect("the draft builds")
+            .as_bytes()
+            .to_vec(),
+    )
+    .expect("test fixture or operation should succeed");
     let catalog = spreadsheet
         .data_pilots()
         .expect("test fixture or operation should succeed");
@@ -88,7 +94,7 @@ fn clone_staged_crud_rewrites_only_the_owner_and_reopens() {
 #[test]
 fn insertion_honors_spreadsheet_order_and_supports_removal() {
     let mut mutable = Workbook::from_bytes(package(XML_WITHOUT_OWNER))
-        .map(MutableSpreadsheet::from_workbook)
+        .map(Draft::from_workbook)
         .expect("test fixture or operation should succeed");
     mutable
         .edit_data_pilots(|editor| editor.add(table("Pivot")))
@@ -120,7 +126,7 @@ fn insertion_honors_spreadsheet_order_and_supports_removal() {
 #[test]
 fn opaque_markup_blocks_lossy_edits_and_leaves_source_unchanged() {
     let mut mutable = Workbook::from_bytes(package(XML))
-        .map(MutableSpreadsheet::from_workbook)
+        .map(Draft::from_workbook)
         .expect("test fixture or operation should succeed");
     let before = mutable.workbook().content_xml().to_owned();
     let result = mutable.edit_data_pilots(|editor| {
@@ -150,19 +156,13 @@ fn failed_typed_update_does_not_change_the_staged_catalog() {
 }
 
 #[test]
-fn owned_snapshot_commit_patch_inverse_and_conflict_are_atomic() -> litchi_core::Result<()> {
+fn owned_snapshot_commit_adds_the_owner() -> litchi_core::Result<()> {
     let snapshot = crate::data_pilot::Snapshot::from_bytes(package(XML_WITHOUT_OWNER))?;
     let mut edit = snapshot.edit();
     edit.editor().add(table("Pivot"))?;
     let commit = edit.commit()?;
-    assert!(commit.changed());
+    assert_ne!(commit.snapshot().as_bytes(), snapshot.as_bytes());
     assert!(commit.snapshot().has_owner());
     assert_eq!(commit.snapshot().tables()[0].name, "Pivot");
-
-    let restored = commit.patch().inverse().apply(commit.snapshot())?;
-    assert_eq!(restored.snapshot().as_bytes(), snapshot.as_bytes());
-
-    let other = crate::data_pilot::Snapshot::from_bytes(package(XML))?;
-    assert!(commit.patch().apply(&other).is_err());
     Ok(())
 }

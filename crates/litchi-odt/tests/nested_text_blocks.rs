@@ -176,7 +176,7 @@ fn producer_written_frame_captions_round_trip_through_the_flat_reader() {
     // LibreOffice writes an anchored caption frame as a `text:p` that contains a
     // `draw:text-box` with its own `text:p`. Before frames were reachable this
     // shape made `text()` fail outright for the whole document.
-    let flat = litchi_odt::generic::FlatDocument::open(
+    let flat = litchi_odt::generic::flat::Document::open(
         "../../test-data/odf/odt/nested-frame-paragraphs.fodt",
     )
     .unwrap();

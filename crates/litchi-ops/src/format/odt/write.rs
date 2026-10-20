@@ -13,7 +13,7 @@ use litchi_core::selector::{Path, Predicate, Step};
 use litchi_core::{FileFormat, Position};
 use litchi_odt::body::{
     Attribute, Kind as LeafKind, Location, NewNode as LeafNew, Node as LeafNode, NodeId,
-    ParagraphPropertyEdit, Placement as LeafPlacement, TextPropertyEdit,
+    ParagraphPropertyUpdate, Placement as LeafPlacement, TextPropertyUpdate,
 };
 use litchi_odt::metadata::Field as MetadataField;
 use litchi_odt::transaction::Edit;
@@ -158,8 +158,8 @@ fn odf_color(color: Color, key: &'static str) -> Result<String> {
 #[derive(Default)]
 pub(crate) struct Staged {
     text: Option<String>,
-    text_properties: TextPropertyEdit,
-    paragraph_properties: ParagraphPropertyEdit,
+    text_properties: TextPropertyUpdate,
+    paragraph_properties: ParagraphPropertyUpdate,
     attributes: Vec<(Attribute, Option<String>)>,
 }
 
@@ -517,12 +517,12 @@ pub(crate) fn set_with_limits<'p, 'v>(
 
 /// One tab stop as the unified keys write it: the leaf edit and its
 /// position in twips (for ordering).
-type TabList = Vec<(Option<i64>, litchi_odt::body::TabStopEdit)>;
+type TabList = Vec<(Option<i64>, litchi_odt::body::TabStopSpec)>;
 
 /// Apply one tab stop's unified `pos`, `val` and `leader` to `stop`.
 fn tab_props(
     props: &Props<'_>,
-    stop: &mut (Option<i64>, litchi_odt::body::TabStopEdit),
+    stop: &mut (Option<i64>, litchi_odt::body::TabStopSpec),
     adding: bool,
 ) -> Result<usize> {
     let mut operations = 0;
@@ -603,7 +603,7 @@ fn stage_tabs(edit: &mut Edit, lists: Vec<(NodeId, TabList, TabList)>) -> Result
         if unchanged {
             continue;
         }
-        let mut properties = ParagraphPropertyEdit::new();
+        let mut properties = ParagraphPropertyUpdate::new();
         properties.tab_stops = Some(after.into_iter().map(|(_, stop)| stop).collect());
         edit.set_paragraph_properties(paragraph, &properties)
             .map_err(staging_error)?;
@@ -718,7 +718,7 @@ fn add_tab(
             "an ODT tab stop is added under a paragraph or heading",
         ));
     };
-    let mut stop = (None, litchi_odt::body::TabStopEdit::new("0pt"));
+    let mut stop = (None, litchi_odt::body::TabStopSpec::new("0pt"));
     let operations = tab_props(props, &mut stop, true)?;
     bound(LimitKind::Operations, operations, limits.max_operations())?;
     let mut lists = Vec::new();

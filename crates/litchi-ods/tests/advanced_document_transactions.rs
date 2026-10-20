@@ -167,6 +167,7 @@ fn automatic_style_replace_remove_and_package_resolution_are_durable() -> Result
         replaced
             .package()
             .apply(&replaced.patch().inverse())?
+            .into_package()
             .as_bytes(),
         created.package().as_bytes()
     );
@@ -444,6 +445,7 @@ fn rich_form_vocabulary_and_drawing_geometry_reopen_durably() -> Result<()> {
         commit
             .package()
             .apply(&commit.patch().inverse())?
+            .into_package()
             .as_bytes(),
         source
     );
@@ -527,13 +529,14 @@ fn deep_style_form_drawing_and_chart_dependencies_are_atomic_and_durable() -> Re
     let wire = commit.patch().to_deterministic_json()?;
     let decoded = litchi_ods::document::Patch::from_deterministic_json(&wire, snapshot.limits())?;
     assert_eq!(
-        snapshot.apply(&decoded)?.as_bytes(),
+        snapshot.apply(&decoded)?.into_package().as_bytes(),
         commit.package().as_bytes()
     );
     assert_eq!(
         commit
             .package()
             .apply(&commit.patch().inverse())?
+            .into_package()
             .as_bytes(),
         source
     );
@@ -753,13 +756,14 @@ fn unified_advanced_crud_reopens_and_is_durable() -> Result<()> {
         commit
             .package()
             .apply(&commit.patch().inverse())?
+            .into_package()
             .as_bytes(),
         source
     );
     let wire = commit.patch().to_deterministic_json()?;
     let decoded = litchi_ods::document::Patch::from_deterministic_json(&wire, snapshot.limits())?;
     assert_eq!(
-        snapshot.apply(&decoded)?.as_bytes(),
+        snapshot.apply(&decoded)?.into_package().as_bytes(),
         commit.package().as_bytes()
     );
     Ok(())
@@ -864,6 +868,7 @@ fn explicit_signature_policy_strips_stale_signatures_for_commit_and_apply() -> R
     assert_eq!(
         signed
             .apply_with_security(commit.patch(), policy)?
+            .into_package()
             .as_bytes(),
         commit.package().as_bytes()
     );
@@ -958,7 +963,7 @@ fn advanced_operations_use_join_three_way_and_history() -> Result<()> {
         .patch()
         .join(resource_commit.patch())
         .map_err(|error| litchi_core::Error::InvalidFormat(error.detail().to_string()))?;
-    let joined_commit = snapshot.apply(&joined)?;
+    let joined_commit = snapshot.apply(&joined)?.into_package();
     assert!(joined_commit.resource("Data/independent.bin")?.is_some());
     assert!(
         Package::from_bytes(joined_commit.as_bytes())?
@@ -980,7 +985,7 @@ fn advanced_operations_use_join_three_way_and_history() -> Result<()> {
     let mut plan = litchi_ods::document::Patch::three_way(rich_commit.patch(), competing.patch())?;
     let _plan = plan.resolve(MergeChoice::Left);
     assert!(
-        Package::from_bytes(snapshot.apply(&plan.finish()?)?.as_bytes())?
+        Package::from_bytes(snapshot.apply(&plan.finish()?)?.into_package().as_bytes())?
             .workbook()?
             .content_xml()
             .contains("left")

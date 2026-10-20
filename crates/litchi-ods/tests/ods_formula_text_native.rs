@@ -336,7 +336,8 @@ fn selected_libreoffice_text_caches_match_literal_resolved_sources() {
             };
             let resolver =
                 TextFunctionsResolver::new(sheet.clone(), formula_row, formula_column, cells);
-            let expression = Expression::parse(formula).expect("upstream formula parses");
+            let expression =
+                Expression::parse(formula, &Default::default()).expect("upstream formula parses");
             let context = Context::new(
                 &execution,
                 Position::new(&sheet, formula_row - 1, formula_column - 1),

@@ -66,7 +66,7 @@ fn main() -> Outcome<()> {
 #[cfg(all(feature = "odt", feature = "odp", feature = "rtf"))]
 fn odt_cases(cases: &mut Vec<serde_json::Value>) -> Outcome<()> {
     use litchi_odt::body::parts::{Parts, RegionKind, tab_stops};
-    use litchi_odt::body::{Kind, ParagraphPropertyEdit, TabStopEdit};
+    use litchi_odt::body::{Kind, ParagraphPropertyUpdate, TabStopSpec};
 
     let bytes = fixture("parts.odt")?;
     let package = litchi_odt::Package::from_bytes(&bytes)?;
@@ -106,10 +106,10 @@ fn odt_cases(cases: &mut Vec<serde_json::Value>) -> Outcome<()> {
         .path()
         .to_string();
     let id = paragraph.id();
-    let held: Vec<TabStopEdit> = tab_stops(paragraph)
+    let held: Vec<TabStopSpec> = tab_stops(paragraph)
         .iter()
         .map(|stop| {
-            let mut edit = TabStopEdit::new(stop.position());
+            let mut edit = TabStopSpec::new(stop.position());
             edit.kind = stop.kind_attribute().map(str::to_owned);
             edit.leader_style = stop.leader_style().map(str::to_owned);
             edit.leader_text = stop.leader_text().map(str::to_owned);
@@ -121,11 +121,11 @@ fn odt_cases(cases: &mut Vec<serde_json::Value>) -> Outcome<()> {
         "odt_tab_add",
         || {
             let mut stops = held.clone();
-            let mut stop = TabStopEdit::new("144pt");
+            let mut stop = TabStopSpec::new("144pt");
             stop.kind = Some("char".to_owned());
             stop.character = Some(".".to_owned());
             stops.insert(1, stop);
-            let mut properties = ParagraphPropertyEdit::new();
+            let mut properties = ParagraphPropertyUpdate::new();
             properties.tab_stops = Some(stops);
             let mut edit = package.edit();
             edit.set_paragraph_properties(id, &properties)?;

@@ -41,7 +41,11 @@ pub(super) fn open<T: ZipTail>(
         feature = "odp",
         feature = "odf-objects"
     ))]
-    if let Some(format) = litchi_odf_common::detect::flat(&bytes) {
+    if let Some(format) =
+        litchi_odf_common::detect::flat(&bytes, litchi_odf_common::detect::Limits::default())
+            .ok()
+            .flatten()
+    {
         #[cfg(feature = "ods")]
         if format == FileFormat::Ods {
             return Ok(File::Ods(crate::format::ods::Ods::from_flat(
@@ -115,14 +119,23 @@ fn zip<T: ZipTail>(bytes: Vec<u8>, options: &OpenOptions, tail: &T) -> Result<Fi
         feature = "odp",
         feature = "odf-objects"
     ))]
-    let odf = litchi_odf_common::detect::packaged_mime(&bytes);
+    let odf = litchi_odf_common::detect::packaged_mime(
+        &bytes,
+        litchi_odf_common::detect::Limits::default(),
+    )
+    .ok()
+    .flatten();
     #[cfg(any(
         feature = "odt",
         feature = "ods",
         feature = "odp",
         feature = "odf-objects"
     ))]
-    if odf.is_some() && litchi_odf_common::detect::packaged_has_ooxml_catalog(&bytes) == Some(false)
+    if odf.is_some()
+        && litchi_odf_common::detect::packaged_has_ooxml_catalog(
+            &bytes,
+            litchi_odf_common::detect::CatalogProbeLimits::default(),
+        ) == Some(false)
     {
         return zip_fallback(bytes, options, tail);
     }
@@ -237,7 +250,10 @@ pub(super) fn zip_fallback<T: ZipTail>(
         feature = "odp",
         feature = "odf-objects"
     ))]
-    let bytes = match litchi_odf_common::detect::prepared_or_original(bytes) {
+    let bytes = match litchi_odf_common::detect::prepared_or_original(
+        bytes,
+        litchi_odf_common::SourceLimits::default(),
+    ) {
         Ok(prepared) => return super::odf_from_prepared(prepared, options),
         Err(bytes) => bytes,
     };

@@ -606,7 +606,7 @@ fn measure(
         let expression = match phase {
             Phase::Evaluate => expression.expect("pre-parsed expression"),
             Phase::ParseEvaluate => {
-                parsed = Expression::parse(&case.source)
+                parsed = Expression::parse(&case.source, &Default::default())
                     .map_err(|error| format!("{} parse failed: {error}", case.name))?;
                 &parsed
             },
@@ -1427,7 +1427,7 @@ fn selected_cases<'a>(
 }
 
 fn preflight(case: &Case, allow_unsupported: bool) -> AnyResult<(bool, u64, JsonValue)> {
-    let expression = Expression::parse(&case.source)
+    let expression = Expression::parse(&case.source, &Default::default())
         .map_err(|error| format!("{} parse preflight failed: {error}", case.name))?;
     let (execution, cancellation) = execution();
     let resolver = FixtureResolver::new(
@@ -1509,7 +1509,7 @@ fn run_case(case: &Case, config: &Config) -> AnyResult<()> {
         return Ok(());
     }
     let repeat = config.repeat.unwrap_or(case.repeat);
-    let expression = Expression::parse(&case.source)?;
+    let expression = Expression::parse(&case.source, &Default::default())?;
     for _ in 0..config.warmups {
         let _ = measure(case, Some(&expression), config.phase, repeat)?;
     }

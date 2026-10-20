@@ -381,8 +381,10 @@ and title masters reference masters by that id, so every reference keeps its
 master. Refusals are typed: `ElementNotFound` (master, custom table styles),
 `InvalidElementValue` (a non-permutation, or bytes that are not exactly one
 such atom), `UnsupportedElement` (a second atom), and `Signed`. These edits
-have no durable vocabulary, so `to_durable` refuses them with
-`UnsupportedPatch`. They do not `join`. Three-way plans report
+had no durable vocabulary, so `to_durable` refused them with
+`UnsupportedPatch`, and they did not `join`. Record
+[0357b](0357b-ppt-block-roots-and-durable-structure-edits.md) §5–§6 adds
+both. Three-way plans report
 `document/master-list`, `document/custom-table-styles` and
 `slide-list/position:N/non-outline-data`.
 
@@ -413,7 +415,8 @@ litchi-ops `error::` tests pass: 62.
 - 0357a-F1: a changed scoped commit hashes its target once (about 21 µs on
   the 54 KiB probe deck, +10.7% over the whole-package patch); computing the
   target digest lazily, on the first `apply` of the inverse, would remove it
-  from the commit path. The bench matrix lists the row as a follow-up.
+  from the commit path. Closed by [0357b](0357b-ppt-block-roots-and-durable-structure-edits.md)
+  (incremental block roots; the commit is 0.970× the pre-0357a base).
 
 ## Primary-route ABBA after the 0357a changes
 

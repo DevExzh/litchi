@@ -18,8 +18,9 @@ use std::sync::Arc;
 
 use litchi_core::OwnedSource;
 use litchi_odf_common::{ContentDefect, Defect, DefectLocation, ToleranceReport};
+use litchi_ods::flat::Workbook as FlatSnapshot;
 use litchi_ods::worksheet::{CellValue, Sheet};
-use litchi_ods::{FlatSnapshot, Package, SourceBackedSpreadsheet, SourceBackedSpreadsheetCatalog};
+use litchi_ods::{Package, SourceBackedSpreadsheet, SourceBackedSpreadsheetCatalog};
 
 type Recorded = (Defect, u16, Option<DefectLocation>);
 
@@ -154,8 +155,11 @@ fn assert_every_open_path(bytes: &[u8], defects: &[Recorded], label: &str) {
         assert_degraded_cells(owned.sheets(), &format!("{label}: from_bytes"));
     }
 
-    let prepared = litchi_odf_common::detect::prepared(bytes.to_vec())
-        .unwrap_or_else(|| panic!("{label}: package must prepare"));
+    let prepared = litchi_odf_common::detect::prepared(
+        bytes.to_vec(),
+        litchi_odf_common::SourceLimits::default(),
+    )
+    .unwrap_or_else(|| panic!("{label}: package must prepare"));
     let adopted = Package::from_prepared_package(prepared)
         .unwrap()
         .workbook()

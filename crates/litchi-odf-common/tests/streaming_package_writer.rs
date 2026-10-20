@@ -651,7 +651,11 @@ fn canonical_paths_reopen_through_owned_indexed_and_family_packages() {
     );
     assert_eq!(owned.mimetype().unwrap(), MIME);
 
-    let prepared = litchi_odf_common::detect::prepared(output.clone()).unwrap();
+    let prepared = litchi_odf_common::detect::prepared(
+        output.clone(),
+        litchi_odf_common::SourceLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         prepared
             .package()
@@ -713,7 +717,11 @@ fn manifest_only_paths_use_strict_odf_validation_and_reopen() {
     let owned = OwnedPackage::from_bytes(output.clone()).unwrap();
     let indexed = owned.package().unwrap();
     assert_eq!(indexed.manifest().get_media_type("Object..1/"), Some(""));
-    let prepared = litchi_odf_common::detect::prepared(output.clone()).unwrap();
+    let prepared = litchi_odf_common::detect::prepared(
+        output.clone(),
+        litchi_odf_common::SourceLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         prepared
             .package()

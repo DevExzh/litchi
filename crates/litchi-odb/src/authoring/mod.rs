@@ -9,7 +9,7 @@ mod transaction;
 pub use builder::Builder;
 pub use composition::{
     CompositionLimits, JoinError, JoinedEdits, Lineage, MergeChoice, MergePlan, MergePlanError,
-    PreparedEdit,
+    SubEdit,
 };
 pub use durable::{DurablePatch, SealedPatch};
 pub use policy::{

@@ -179,16 +179,16 @@ fn definition_and_annotation_edits_accept_producer_prologs() {
 #[test]
 fn flat_documents_admit_xml_misc_around_the_root() {
     let flat = fixture("odf/ods/rich-text-hyperlinks.fods");
-    let spreadsheet = litchi_ods::FlatSpreadsheet::from_bytes(&flat).unwrap();
+    let spreadsheet = litchi_ods::flat::Workbook::from_bytes(&flat).unwrap();
     assert_eq!(spreadsheet.sheets().len(), 1);
     assert!(spreadsheet.text().unwrap().contains("AboldmixtailZ"));
     // Text before or after the root is still refused.
     let mut trailing = flat.clone();
     trailing.extend_from_slice(b"tail");
-    assert!(litchi_ods::FlatSpreadsheet::from_bytes(&trailing).is_err());
+    assert!(litchi_ods::flat::Workbook::from_bytes(&trailing).is_err());
     let mut leading = b"lead".to_vec();
     leading.extend_from_slice(&flat);
-    assert!(litchi_ods::FlatSpreadsheet::from_bytes(&leading).is_err());
+    assert!(litchi_ods::flat::Workbook::from_bytes(&leading).is_err());
 }
 
 #[cfg(any(unix, windows))]

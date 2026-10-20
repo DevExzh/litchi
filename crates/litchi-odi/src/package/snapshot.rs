@@ -1,7 +1,6 @@
 //! Immutable image package ownership and bounded content-part rebuilding.
 
 use crate::{
-    FlatImage,
     active::{ActiveContent, ActiveContentLocation},
     frame::Frame,
     resource::{Edge, Graph, Node, Resource},
@@ -18,7 +17,7 @@ use std::{collections::HashMap, path::Path, sync::Arc};
 
 pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.image";
 // The shared package owner only needs a coarse non-empty XML marker here;
-// `FlatImage::from_content_xml` performs the namespace-aware ODI grammar check.
+// `crate::flat::Image::from_content_xml` performs the namespace-aware ODI grammar check.
 const BODY_MARKER: &str = "<";
 const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
 
@@ -37,7 +36,7 @@ pub(crate) enum StylesReplacement<'a> {
 
 struct State {
     package: Package,
-    content: FlatImage,
+    content: crate::flat::Image,
     resources: Vec<Resource>,
     resource_graph: Graph,
     active_content: Vec<ActiveContent>,
@@ -149,7 +148,8 @@ impl Snapshot {
     }
 
     fn from_package(package: Package) -> Result<Self> {
-        let content = FlatImage::from_content_xml(package.content_xml().as_bytes().to_vec())?;
+        let content =
+            crate::flat::Image::from_content_xml(package.content_xml().as_bytes().to_vec())?;
         let resources = scan_resources(&package)?;
         let resource_graph = build_resource_graph(&package, &resources)?;
         let files = package.files()?;
@@ -255,7 +255,7 @@ impl Snapshot {
         self.0.content.frames()
     }
 
-    pub(crate) fn content_snapshot(&self) -> FlatImage {
+    pub(crate) fn content_snapshot(&self) -> crate::flat::Image {
         self.0.content.clone()
     }
 
@@ -340,7 +340,10 @@ impl Snapshot {
                 continue;
             }
             match inspected.get_file(path) {
-                Ok(bytes) => noncompact_xml |= compact_xml::validate(&bytes).is_err(),
+                Ok(bytes) => {
+                    noncompact_xml |=
+                        compact_xml::validate(&bytes, compact_xml::Limits::default()).is_err()
+                },
                 Err(_) => unreadable_xml = true,
             }
         }
@@ -377,7 +380,8 @@ impl Snapshot {
         writer.add_file("content.xml", content.as_bytes())?;
         match replacement_styles_xml {
             StylesReplacement::Set(styles_xml) => {
-                compact_xml::validate(styles_xml.as_bytes()).map_err(Error::from)?;
+                compact_xml::validate(styles_xml.as_bytes(), compact_xml::Limits::default())
+                    .map_err(Error::from)?;
                 writer.add_file("styles.xml", styles_xml.as_bytes())?;
             },
             StylesReplacement::Preserve => {
@@ -397,7 +401,8 @@ impl Snapshot {
             )?;
         }
         if let Some(meta_xml) = replacement_meta_xml {
-            compact_xml::validate(meta_xml.as_bytes()).map_err(Error::from)?;
+            compact_xml::validate(meta_xml.as_bytes(), compact_xml::Limits::default())
+                .map_err(Error::from)?;
             writer.add_file("meta.xml", meta_xml.as_bytes())?;
         } else if self.0.package.package().has_file("meta.xml")? {
             writer.add_file("meta.xml", &self.0.package.package().get_file("meta.xml")?)?;
@@ -497,7 +502,8 @@ fn ensure_compact_rewrite_source(source: &Snapshot, files: &[String]) -> Result<
             .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"))
             && path != "META-INF/manifest.xml"
         {
-            compact_xml::validate(&archive.get_file(path)?).map_err(Error::from)?;
+            compact_xml::validate(&archive.get_file(path)?, compact_xml::Limits::default())
+                .map_err(Error::from)?;
         }
     }
     Ok(())

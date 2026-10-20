@@ -189,10 +189,14 @@ fn atomic_batch_updates_first_middle_last_and_cross_slide_owners_deterministical
 
     let durable =
         edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
-    let applied = source.apply(&durable).unwrap();
+    let applied = source.apply(&durable).unwrap().into_package();
     assert_eq!(applied.as_bytes(), commit.package().as_bytes());
     assert_eq!(
-        applied.apply(&durable.inverse()).unwrap().as_bytes(),
+        applied
+            .apply(&durable.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
     let foreign = Package::from_bytes(&fixture(1, 1, FixtureOptions::default())).unwrap();

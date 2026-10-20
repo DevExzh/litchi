@@ -52,7 +52,9 @@ use litchi_core::Result;
 
 use change::Fragment;
 pub use change::{Attribute, Change, NewPage, NewTextBox, ObjectRef, Scope, ShapeAction, StoryRef};
-pub use styles::{AutomaticStyle, AutomaticStyles, CommonStyles, TextProperties, TextPropertyEdit};
+pub use styles::{
+    AutomaticStyle, AutomaticStyles, CommonStyles, TextProperties, TextPropertyUpdate,
+};
 
 /// Apply `changes` to the `content.xml` of `source` as checked splices.
 ///

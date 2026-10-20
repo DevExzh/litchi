@@ -16089,10 +16089,15 @@ fn verify_ppt_picture_limit_gates(
         parsed.open_stream(&["Pictures"])?
     };
     let pictures_range = ppt_picture_payload_range(archive, &pictures_payload)?;
-    let mut eager =
-        litchi_ppt::raw::Reader::from_reader_with_options(Cursor::new(archive.to_vec()), litchi_ppt::OpenOptions::new().source_limits(exact))?;
+    let mut eager = litchi_ppt::raw::Reader::from_reader_with_options(
+        Cursor::new(archive.to_vec()),
+        litchi_ppt::OpenOptions::new().source_limits(exact),
+    )?;
     eager.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(exact))?;
-    let source = litchi_ppt::SourceBackedPackage::from_read_at_with_options(Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())), litchi_ppt::OpenOptions::new().source_limits(exact))?;
+    let source = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+        Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())),
+        litchi_ppt::OpenOptions::new().source_limits(exact),
+    )?;
     source.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(exact))?;
 
     let package_under = ppt_source_limits_with(
@@ -16104,12 +16109,18 @@ fn verify_ppt_picture_limit_gates(
         exact.max_entry_bytes(),
         exact.max_aggregate_bytes(),
     )?;
-    if litchi_ppt::raw::Reader::from_reader_with_options(Cursor::new(archive.to_vec()), litchi_ppt::OpenOptions::new().source_limits(package_under))
+    if litchi_ppt::raw::Reader::from_reader_with_options(
+        Cursor::new(archive.to_vec()),
+        litchi_ppt::OpenOptions::new().source_limits(package_under),
+    )
     .is_ok()
     {
         return Err("PPT eager package limit accepted one byte under package size".into());
     }
-    if litchi_ppt::SourceBackedPackage::from_read_at_with_options(Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())), litchi_ppt::OpenOptions::new().source_limits(package_under))
+    if litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+        Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())),
+        litchi_ppt::OpenOptions::new().source_limits(package_under),
+    )
     .is_ok()
     {
         return Err("PPT source-backed package limit accepted one byte under package size".into());
@@ -16124,18 +16135,29 @@ fn verify_ppt_picture_limit_gates(
             .ok_or("PPT Pictures fixture is empty")?,
         exact.max_aggregate_bytes(),
     )?;
-    let mut eager =
-        litchi_ppt::raw::Reader::from_reader_with_options(Cursor::new(archive.to_vec()), litchi_ppt::OpenOptions::new().source_limits(exact))?;
-    if eager.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(pictures_under)).is_ok() {
+    let mut eager = litchi_ppt::raw::Reader::from_reader_with_options(
+        Cursor::new(archive.to_vec()),
+        litchi_ppt::OpenOptions::new().source_limits(exact),
+    )?;
+    if eager
+        .presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(pictures_under))
+        .is_ok()
+    {
         return Err("PPT eager Pictures limit accepted one byte under stream size".into());
     }
     let source = Arc::new(InstrumentedSource::new(
         archive.to_vec(),
         vec![pictures_range],
     ));
-    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(source.clone(), litchi_ppt::OpenOptions::new().source_limits(exact))?;
+    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+        source.clone(),
+        litchi_ppt::OpenOptions::new().source_limits(exact),
+    )?;
     source.reset();
-    if package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(pictures_under)).is_ok() {
+    if package
+        .presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(pictures_under))
+        .is_ok()
+    {
         return Err("PPT source-backed Pictures limit accepted one byte under stream size".into());
     }
     let snapshot = source.snapshot();
@@ -16209,8 +16231,13 @@ fn time_ppt_pictures_eager(
     let cursor = Cursor::new(archive);
     if phase == "presentation_open_no_image_query" {
         let started = Instant::now();
-        let mut package = litchi_ppt::raw::Reader::from_reader_with_options(cursor, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
-        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let mut package = litchi_ppt::raw::Reader::from_reader_with_options(
+            cursor,
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
+        let presentation = package.presentation_with_options(
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
         std::hint::black_box(&presentation);
         let duration = started.elapsed();
         if !presentation.has_pictures() {
@@ -16221,8 +16248,13 @@ fn time_ppt_pictures_eager(
 
     if phase == "fresh_open_plus_cold_all_images_query" {
         let started = Instant::now();
-        let mut package = litchi_ppt::raw::Reader::from_reader_with_options(cursor, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
-        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let mut package = litchi_ppt::raw::Reader::from_reader_with_options(
+            cursor,
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
+        let presentation = package.presentation_with_options(
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
         let images = presentation.images()?;
         std::hint::black_box(&images);
         let duration = started.elapsed();
@@ -16230,8 +16262,12 @@ fn time_ppt_pictures_eager(
         return Ok(duration);
     }
 
-    let mut package = litchi_ppt::raw::Reader::from_reader_with_options(cursor, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
-    let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+    let mut package = litchi_ppt::raw::Reader::from_reader_with_options(
+        cursor,
+        litchi_ppt::OpenOptions::new().source_limits(source_limits),
+    )?;
+    let presentation = package
+        .presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
     if cached_repeat {
         let first = presentation.images()?;
         verify_ppt_picture_images(&first)?;
@@ -16252,9 +16288,13 @@ fn time_ppt_pictures_source_backed(
 ) -> Result<Duration, Box<dyn Error>> {
     if phase == "presentation_open_no_image_query" {
         let started = Instant::now();
-        let package =
-            litchi_ppt::SourceBackedPackage::from_read_at_with_options(source, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
-        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+            source,
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
+        let presentation = package.presentation_with_options(
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
         std::hint::black_box(&presentation);
         let duration = started.elapsed();
         if !presentation.has_pictures() {
@@ -16265,9 +16305,13 @@ fn time_ppt_pictures_source_backed(
 
     if phase == "fresh_open_plus_cold_all_images_query" {
         let started = Instant::now();
-        let package =
-            litchi_ppt::SourceBackedPackage::from_read_at_with_options(source, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
-        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+            source,
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
+        let presentation = package.presentation_with_options(
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
         let images = presentation.images()?;
         std::hint::black_box(&images);
         let duration = started.elapsed();
@@ -16275,8 +16319,12 @@ fn time_ppt_pictures_source_backed(
         return Ok(duration);
     }
 
-    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(source, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
-    let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+        source,
+        litchi_ppt::OpenOptions::new().source_limits(source_limits),
+    )?;
+    let presentation = package
+        .presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
     if cached_repeat {
         let first = presentation.images()?;
         verify_ppt_picture_images(&first)?;
@@ -16302,17 +16350,25 @@ fn collect_ppt_pictures_source_evidence(
     ));
 
     if phase == "presentation_open_no_image_query" {
-        let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(source.clone(), litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
-        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+            source.clone(),
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
+        let presentation = package.presentation_with_options(
+            litchi_ppt::OpenOptions::new().source_limits(source_limits),
+        )?;
         if !presentation.has_pictures() {
             return Err("PPT source-backed evidence open lost Pictures descriptor".into());
         }
         return Ok(source.snapshot());
     }
 
-    let package =
-        litchi_ppt::SourceBackedPackage::from_read_at_with_options(source.clone(), litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
-    let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+        source.clone(),
+        litchi_ppt::OpenOptions::new().source_limits(source_limits),
+    )?;
+    let presentation = package
+        .presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
     if phase != "fresh_open_plus_cold_all_images_query" {
         source.reset();
     }
@@ -18549,9 +18605,10 @@ fn publish_pptx_source_backed_cross_copy(
     let source = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(
         source_archive.to_vec(),
     )))?;
-    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(Arc::new(
+    let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(
         OwnedSource::new(destination_archive.to_vec()),
     ))?;
+    let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
     let plan = editor.plan_cross_slide_copy(
         &source,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
@@ -18564,7 +18621,9 @@ fn publish_pptx_source_backed_cross_copy(
         );
     }
     let mut output = Vec::new();
-    let snapshot = editor.publish_cross_slide_copy_to_stream(&mut output, &plan)?;
+    let mut editor_copy = editor.edit_cross_slide_copy()?;
+    let snapshot = editor_copy.stage(&plan)?;
+    editor_copy.commit()?.package().write_to(&mut output)?;
     if snapshot.destination_slide_count() != PPTX_CROSS_COPY_DESTINATION_SLIDE_COUNT + 1
         || snapshot.insertion_position() != PPTX_CROSS_COPY_INSERTION_POSITION
     {
@@ -18848,7 +18907,8 @@ fn verify_pptx_source_backed_cross_copy_gates(
     let source_read: Arc<dyn ReadAt> = source_probe.clone();
     let destination_read: Arc<dyn ReadAt> = destination_probe.clone();
     let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-    let editor_probe = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+    let editor_probe_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+    let editor_probe = litchi_pptx::source::Package::from_presentation(&editor_probe_view)?;
     let probe_plan = editor_probe.plan_cross_slide_copy(
         &source_view,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
@@ -18866,7 +18926,12 @@ fn verify_pptx_source_backed_cross_copy_gates(
         .text_and_name()?;
     source_view.check_source()?;
     let mut probe_output = Vec::new();
-    editor_probe.publish_cross_slide_copy_to_stream(&mut probe_output, &probe_plan)?;
+    let mut editor_probe_copy = editor_probe.edit_cross_slide_copy()?;
+    editor_probe_copy.stage(&probe_plan)?;
+    editor_probe_copy
+        .commit()?
+        .package()
+        .write_to(&mut probe_output)?;
     let source_after = source_probe.bytes()?;
     let source_version_after = source_probe.version()?;
     let source_version_stability_verified =
@@ -19482,7 +19547,8 @@ fn verify_pptx_source_backed_cross_copy_lifecycle_gates(
     let source_read: Arc<dyn ReadAt> = source_probe.clone();
     let destination_read: Arc<dyn ReadAt> = destination_probe.clone();
     let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-    let editor_probe = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+    let editor_probe_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+    let editor_probe = litchi_pptx::source::Package::from_presentation(&editor_probe_view)?;
     let probe_plan = editor_probe.plan_cross_slide_copy(
         &source_view,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
@@ -19500,7 +19566,12 @@ fn verify_pptx_source_backed_cross_copy_lifecycle_gates(
         .text_and_name()?;
     source_view.check_source()?;
     let mut probe_output = Vec::new();
-    editor_probe.publish_cross_slide_copy_to_stream(&mut probe_output, &probe_plan)?;
+    let mut editor_probe_copy = editor_probe.edit_cross_slide_copy()?;
+    editor_probe_copy.stage(&probe_plan)?;
+    editor_probe_copy
+        .commit()?
+        .package()
+        .write_to(&mut probe_output)?;
     let source_after = source_probe.bytes()?;
     let source_version_after = source_probe.version()?;
     let source_version_stability_verified = before == after
@@ -19572,7 +19643,8 @@ fn source_backed_cross_copy_revision_refusal(
     let source_read: Arc<dyn ReadAt> = source.clone();
     let destination_read: Arc<dyn ReadAt> = destination.clone();
     let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-    let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+    let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+    let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
     let plan = editor.plan_cross_slide_copy(
         &source_view,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
@@ -19585,7 +19657,12 @@ fn source_backed_cross_copy_revision_refusal(
         destination.replace(destination_archive.to_vec())?;
     }
     let mut output = Vec::new();
-    let result = editor.publish_cross_slide_copy_to_stream(&mut output, &plan);
+    let result = (|| -> litchi_pptx::Result<_> {
+        let mut copy = editor.edit_cross_slide_copy()?;
+        let copied = copy.stage(&plan)?;
+        copy.commit()?.package().write_to(&mut output)?;
+        Ok(copied)
+    })();
     let typed_refusal = matches!(
         result,
         Err(litchi_pptx::Error::PatchConflict)
@@ -19603,20 +19680,27 @@ fn source_backed_cross_copy_foreign_destination_refusal(
     let source = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(
         source_archive.to_vec(),
     )))?;
-    let editor_a = litchi_pptx::SourceBackedPresentationEditor::from_read_at(Arc::new(
+    let editor_a_view = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(
         OwnedSource::new(destination_archive.to_vec()),
     ))?;
+    let editor_a = litchi_pptx::source::Package::from_presentation(&editor_a_view)?;
     let plan = editor_a.plan_cross_slide_copy(
         &source,
         PPTX_CROSS_COPY_SOURCE_SLIDE,
         PPTX_CROSS_COPY_DESTINATION_SLIDE,
         PPTX_CROSS_COPY_INSERTION_POSITION,
     )?;
-    let editor_b = litchi_pptx::SourceBackedPresentationEditor::from_read_at(Arc::new(
+    let editor_b_view = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(
         OwnedSource::new(destination_archive.to_vec()),
     ))?;
+    let editor_b = litchi_pptx::source::Package::from_presentation(&editor_b_view)?;
     let mut output = Vec::new();
-    let result = editor_b.publish_cross_slide_copy_to_stream(&mut output, &plan);
+    let result = (|| -> litchi_pptx::Result<_> {
+        let mut copy = editor_b.edit_cross_slide_copy()?;
+        let copied = copy.stage(&plan)?;
+        copy.commit()?.package().write_to(&mut output)?;
+        Ok(copied)
+    })();
     Ok(matches!(result, Err(litchi_pptx::Error::PatchConflict)) && output.is_empty())
 }
 
@@ -21002,11 +21086,11 @@ fn odt_resource_batch_image(
 }
 
 fn odt_media_archive_for_shape(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut document = litchi_odt::mutable::MutableDocument::new();
+    let mut document = litchi_odt::Builder::new();
     for index in 0..shape.docx_paragraphs() {
         document.add_paragraph(&semantic_odt_text(index, false))?;
     }
-    let base = document.to_bytes()?;
+    let base = document.build()?.to_bytes()?;
     let source = ArchiveReader::new(&base)?;
     let mut writer = litchi_odt::core::PackageWriter::new();
     writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
@@ -21596,7 +21680,11 @@ fn build_semantic_odt_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
 fn build_odf_repair_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
     let canonical = build_semantic_odt_corpus(shape)?;
     let archive = inject_mimetype_local_timestamp_extra(canonical.archive.clone())?;
-    let report = litchi_odf_common::validate_package(&archive)?;
+    let report = litchi_odf_common::validate_package(
+        &archive,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )?;
     if !report.is_complete()
         || report.issues().len() != 1
         || report.issues()[0].code() != litchi_odf_common::MIMETYPE_LOCAL_EXTRA_ISSUE
@@ -34384,7 +34472,13 @@ fn run_odf_validation_report(
         corpus,
         warmup_iterations,
         samples,
-        |bytes| Ok(litchi_odf_common::validate_package(bytes)?),
+        |bytes| {
+            Ok(litchi_odf_common::validate_package(
+                bytes,
+                litchi_odf_common::OdfValidationLimits::default(),
+                litchi_core::ValidationLimits::default(),
+            )?)
+        },
         |report, bytes| generic_validation_summary(report, bytes, None, None),
     )
 }
@@ -34394,7 +34488,11 @@ fn verify_odf_mimetype_repair(
 ) -> Result<(OdfRepairSummary, Vec<u8>), Box<dyn Error>> {
     let shape = semantic_shape(corpus)?;
     let canonical = semantic_odt_bytes(shape)?;
-    let report = litchi_odf_common::validate_package(&corpus.archive)?;
+    let report = litchi_odf_common::validate_package(
+        &corpus.archive,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )?;
     let plan = litchi_odf_common::plan_odf_repair(
         &corpus.archive,
         &report,
@@ -34443,7 +34541,11 @@ fn verify_odf_mimetype_repair(
         return Err("ODF repair patch did not refuse a stale source before output".into());
     }
 
-    let canonical_report = litchi_odf_common::validate_package(&canonical)?;
+    let canonical_report = litchi_odf_common::validate_package(
+        &canonical,
+        litchi_odf_common::OdfValidationLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )?;
     if !canonical_report.is_complete()
         || canonical_report.has_errors()
         || !matches!(
@@ -34527,7 +34629,11 @@ fn run_odf_mimetype_repair_plan(
         // publisher's 64 KiB write request ceiling as a total memory bound.
         let mut sink = HashingDiscardSink::without_authoring_window(u64::try_from(expected.len())?);
         let started = Instant::now();
-        let report = litchi_odf_common::validate_package(&corpus.archive)?;
+        let report = litchi_odf_common::validate_package(
+            &corpus.archive,
+            litchi_odf_common::OdfValidationLimits::default(),
+            litchi_core::ValidationLimits::default(),
+        )?;
         let plan = litchi_odf_common::plan_odf_repair(
             &corpus.archive,
             &report,
@@ -35629,7 +35735,7 @@ fn verify_odt_mixed_guardrails(
     verify_odt_mixed_raw_members(source.as_bytes(), scalar.as_bytes())?;
     verify_odt_mixed_raw_members(source.as_bytes(), batch.package().as_bytes())?;
 
-    let replayed = source.apply(batch.patch())?;
+    let replayed = source.apply(batch.patch())?.into_package();
     if replayed.as_bytes() != batch.package().as_bytes() {
         return Err("ODT mixed volatile patch replay differs from batch output".into());
     }
@@ -36506,11 +36612,11 @@ fn run_odt_media_paragraph_edit_save(
         }
 
         verify_odt_media_archive(&bytes, true)?;
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT paragraph patch replay differs from commit".into());
         }
-        let restored = replayed.apply(&commit.patch().inverse())?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODT paragraph inverse did not restore the source".into());
         }
@@ -36559,11 +36665,11 @@ fn run_odt_media_line_break_edit_save(
         }
 
         verify_odt_media_line_break_archive(&bytes)?;
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT line-break patch replay differs from commit".into());
         }
-        let restored = replayed.apply(&commit.patch().inverse())?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODT line-break inverse did not restore the source".into());
         }
@@ -36607,11 +36713,11 @@ fn run_odt_media_append_run_edit_save(
         }
 
         verify_odt_media_append_run_archive(&bytes)?;
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT append-run patch replay differs from commit".into());
         }
-        let restored = replayed.apply(&commit.patch().inverse())?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODT append-run inverse did not restore the source".into());
         }
@@ -36659,11 +36765,11 @@ fn run_odt_media_append_hyperlink_edit_save(
         }
 
         verify_odt_media_append_hyperlink_archive(&bytes)?;
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT append-hyperlink patch replay differs from commit".into());
         }
-        let restored = replayed.apply(&commit.patch().inverse())?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err(
                 "media-rich ODT append-hyperlink inverse did not restore the source".into(),
@@ -36724,14 +36830,14 @@ fn run_odt_media_structural_paragraph_edit_save(
         }
 
         verify_odt_media_structural_paragraph_archive(&bytes, inserted)?;
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err(format!(
                 "media-rich ODT paragraph {operation} patch replay differs from commit"
             )
             .into());
         }
-        let restored = replayed.apply(&commit.patch().inverse())?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err(format!(
                 "media-rich ODT paragraph {operation} inverse did not restore the source"
@@ -36815,11 +36921,16 @@ fn verify_odt_embedded_resource_commit(
     let projection = verify_odt_resource_batch_archive(expected, true)?;
     verify_odt_resource_batch_raw_members(source.as_bytes(), expected)?;
 
-    let replayed = source.apply(commit.patch())?;
+    let replayed = source.apply(commit.patch())?.into_package();
     if replayed.as_bytes() != expected {
         return Err("ODT embedded-resource volatile replay differs from publication".into());
     }
-    if replayed.apply(&commit.patch().inverse())?.as_bytes() != source.as_bytes() {
+    if replayed
+        .apply(&commit.patch().inverse())?
+        .into_package()
+        .as_bytes()
+        != source.as_bytes()
+    {
         return Err("ODT embedded-resource volatile inverse did not restore source".into());
     }
     if replayed.apply(commit.patch()).is_ok() {
@@ -36915,9 +37026,13 @@ fn run_odt_embedded_resource_publication(
         if sink.bytes != expected {
             return Err("measured ODT embedded-resource publication differs from oracle".into());
         }
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != expected
-            || replayed.apply(&commit.patch().inverse())?.as_bytes() != source.as_bytes()
+            || replayed
+                .apply(&commit.patch().inverse())?
+                .into_package()
+                .as_bytes()
+                != source.as_bytes()
             || replayed.apply(commit.patch()).is_ok()
         {
             return Err("measured ODT embedded-resource patch contract differs".into());
@@ -38460,11 +38575,11 @@ fn run_odp_media_textbox_edit_save(
         }
 
         verify_odp_media_archive(&bytes, true)?;
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODP text-box patch replay differs from commit".into());
         }
-        let restored = replayed.apply(&commit.patch().inverse())?;
+        let restored = replayed.apply(&commit.patch().inverse())?.into_package();
         if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODP text-box inverse did not restore the source".into());
         }
@@ -42121,11 +42236,11 @@ fn verify_odp_text_box_model_commit(
         case == Case::OdpMediaTextBoxBatchReplaceSave,
     )?;
 
-    let replayed = source.apply(commit.patch())?;
+    let replayed = source.apply(commit.patch())?.into_package();
     if replayed.as_bytes() != expected {
         return Err("ODP text-box model patch replay differs from publication".into());
     }
-    let restored = replayed.apply(&commit.patch().inverse())?;
+    let restored = replayed.apply(&commit.patch().inverse())?.into_package();
     if restored.as_bytes() != source.as_bytes() {
         return Err("ODP text-box model inverse did not restore exact source bytes".into());
     }
@@ -42136,11 +42251,11 @@ fn verify_odp_text_box_model_commit(
     let durable = litchi_odp::authoring::edit::Patch::from_durable_bytes(
         &commit.patch().to_durable_bytes()?,
     )?;
-    let durable_replayed = source.apply(&durable)?;
+    let durable_replayed = source.apply(&durable)?.into_package();
     if durable_replayed.as_bytes() != expected {
         return Err("durable ODP text-box model replay differs from publication".into());
     }
-    let durable_restored = durable_replayed.apply(&durable.inverse())?;
+    let durable_restored = durable_replayed.apply(&durable.inverse())?.into_package();
     if durable_restored.as_bytes() != source.as_bytes() {
         return Err("durable ODP text-box model inverse did not restore source".into());
     }
@@ -42231,9 +42346,13 @@ fn run_odp_text_box_model_publication(
         {
             return Err("measured ODP text-box model publication differs from oracle".into());
         }
-        let replayed = source.apply(commit.patch())?;
+        let replayed = source.apply(commit.patch())?.into_package();
         if replayed.as_bytes() != expected
-            || replayed.apply(&commit.patch().inverse())?.as_bytes() != source.as_bytes()
+            || replayed
+                .apply(&commit.patch().inverse())?
+                .into_package()
+                .as_bytes()
+                != source.as_bytes()
             || replayed.apply(commit.patch()).is_ok()
         {
             return Err("measured ODP text-box model patch contract differs".into());
@@ -51052,7 +51171,11 @@ fn publish_pptx_source_edit<W: Write>(
     let package = litchi_pptx::source::Package::from_presentation(&presentation)?;
     let target_slide = PPTX_SOURCE_SLIDE_COUNT / 2;
     let mut edit = package.edit()?;
-    if !edit.set_shape_text(target_slide, 0_usize, semantic_pptx_text(target_slide, 0, true))? {
+    if !edit.set_shape_text(
+        target_slide,
+        0_usize,
+        semantic_pptx_text(target_slide, 0, true),
+    )? {
         return Err("PPTX source edit unexpectedly reported no change".into());
     }
     let commit = edit.commit()?;
@@ -51193,8 +51316,7 @@ fn publish_pptx_batch_edit<W: Write>(
         if replayed.apply(&commit.patch().inverse()).is_err() {
             return Err("PPTX source-backed batch inverse rejected its candidate".into());
         }
-        let materializations =
-            usize::try_from(presentation.cache_diagnostics().successful_loads)?;
+        let materializations = usize::try_from(presentation.cache_diagnostics().successful_loads)?;
         commit.package().write_to(&mut *writer)?;
         if commit.package().apply(&commit.patch().inverse()).is_err()
             || commit.package().apply(commit.patch()).is_ok()
@@ -51364,8 +51486,7 @@ fn publish_pptx_multi_slide_batch_edit<W: Write>(
         if replayed.apply(&commit.patch().inverse()).is_err() {
             return Err("PPTX source-backed multi-slide inverse rejected its candidate".into());
         }
-        let materializations =
-            usize::try_from(presentation.cache_diagnostics().successful_loads)?;
+        let materializations = usize::try_from(presentation.cache_diagnostics().successful_loads)?;
         commit.package().write_to(&mut *writer)?;
         if commit.package().apply(&commit.patch().inverse()).is_err()
             || commit.package().apply(commit.patch()).is_ok()
@@ -52081,9 +52202,10 @@ fn run_pptx_source_backed_cross_copy(
         let source_read: Arc<dyn ReadAt> = source.clone();
         let destination_read: Arc<dyn ReadAt> = destination.clone();
         let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-        let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+        let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+        let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
         if source_view.slide_count() != PPTX_CROSS_COPY_SOURCE_SLIDE_COUNT
-            || editor.slide_count() != corpus.destination_slide_count
+            || editor_view.slide_count() != corpus.destination_slide_count
         {
             return Err("source-backed PPTX cross-copy setup changed slide counts".into());
         }
@@ -52112,7 +52234,9 @@ fn run_pptx_source_backed_cross_copy(
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
         let started = Instant::now();
-        let snapshot = editor.publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
+        let mut editor_copy = editor.edit_cross_slide_copy()?;
+        let snapshot = editor_copy.stage(&plan)?;
+        editor_copy.commit()?.package().write_to(&mut sink)?;
         let publication_duration = started.elapsed();
         if snapshot.destination_slide_count() != corpus.destination_slide_count + 1
             || snapshot.insertion_position() != corpus.insertion_position
@@ -52187,9 +52311,9 @@ fn run_pptx_source_backed_cross_copy(
         return Err("source-backed PPTX cross-copy measured output digests are not stable".into());
     }
     let cross_copy = PptxSourceBackedCrossCopySummary {
-        implementation: "presentation::SourceBackedPresentationEditor + SourceTopologyPlan + publish_cross_slide_copy_to_stream",
+        implementation: "source::Package::plan_cross_slide_copy + cross_slide_copy::Edit::stage + commit + write_to (record 0356b)",
         workload: "matched plain corpus / existing pptx_cross_copy_plain input",
-        timing_scope: "source-backed plan only + public publish_cross_slide_copy_to_stream; setup, reopen, verification, topology gates, and cache diagnostics excluded",
+        timing_scope: "source-backed plan only + stage + commit + write_to; setup, reopen, verification, topology gates, and cache diagnostics excluded",
         performance_claim: "none: opt-in correctness/counter evidence only; no eager/source speedup, ABBA, allocation, RSS, physical-I/O, or cold-cache claim",
         source_archive_sha256: sha256_hex(&corpus.source_archive),
         destination_archive_sha256: sha256_hex(&corpus.destination_archive),
@@ -52331,7 +52455,8 @@ fn run_pptx_source_backed_cross_copy_lifecycle(
         let started = Instant::now();
         let open_started = Instant::now();
         let source_view = litchi_pptx::SourceBackedPresentation::from_read_at(source_read)?;
-        let editor = litchi_pptx::SourceBackedPresentationEditor::from_read_at(destination_read)?;
+        let editor_view = litchi_pptx::SourceBackedPresentation::from_read_at(destination_read)?;
+        let editor = litchi_pptx::source::Package::from_presentation(&editor_view)?;
         let open_duration = open_started.elapsed();
         let plan_started = Instant::now();
         let plan = editor.plan_cross_slide_copy(
@@ -52342,7 +52467,9 @@ fn run_pptx_source_backed_cross_copy_lifecycle(
         )?;
         let plan_duration = plan_started.elapsed();
         let publication_started = Instant::now();
-        let snapshot = editor.publish_cross_slide_copy_to_stream(&mut sink, &plan)?;
+        let mut editor_copy = editor.edit_cross_slide_copy()?;
+        let snapshot = editor_copy.stage(&plan)?;
+        editor_copy.commit()?.package().write_to(&mut sink)?;
         let publication_duration = publication_started.elapsed();
         let duration = started.elapsed();
         let allocation_metrics = match allocation_region.finish() {
@@ -52474,7 +52601,7 @@ fn run_pptx_source_backed_cross_copy_lifecycle(
         .checked_mul(PPTX_CROSS_COPY_MEDIA_ENTRY_BYTES)
         .ok_or("source-backed PPTX lifecycle media byte count overflows usize")?;
     let cross_copy = PptxSourceBackedCrossCopyLifecycleSummary {
-        implementation: "SourceBackedPresentation::from_read_at + SourceBackedPresentationEditor::from_read_at + SourceTopologyPlan::publish_cross_slide_copy_to_stream",
+        implementation: "SourceBackedPresentation::from_read_at + source::Package::from_presentation + cross_slide_copy::Edit::stage + write_to (record 0356b)",
         workload: if corpus.media_rich {
             "matched media-rich owned cross-copy corpus"
         } else {

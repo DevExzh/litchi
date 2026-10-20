@@ -26,7 +26,7 @@
 //! sheet.push_row(row)?;
 //! let sheets = [sheet];
 //! let resolver = Resolver::new(&sheets, SheetExtent::new(100, 26), execution)?;
-//! let expression = Expression::parse("=[.A1]+1")?;
+//! let expression = Expression::parse("=[.A1]+1", &Default::default())?;
 //! let context = Context::new(execution, Position::new("Data", 0, 0)).with_mode(Mode::Scalar);
 //! let result = value::evaluate(&expression, &resolver, &context, &Limits::default())?;
 //! assert!(matches!(result.value(), Value::Number(42.0)));

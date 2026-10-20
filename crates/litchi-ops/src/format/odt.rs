@@ -163,27 +163,28 @@ impl Odt {
     /// recognized. Reads go through the leaf's packaged projection of the
     /// flat parts; publication writes the flat bytes (record 0292).
     pub(crate) fn from_flat(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
-        let mut limits = litchi_odt::flat::Limits::default();
+        let mut flat_options = litchi_odt::OpenOptions::new();
         if let Some(maximum) = options.max_input_bytes {
-            let maximum = usize::try_from(maximum).unwrap_or(usize::MAX);
-            if maximum < bytes.len() {
+            if usize::try_from(maximum).unwrap_or(usize::MAX) < bytes.len() {
                 return Err(core_error(litchi_core::Error::ResourceLimit(
                     litchi_core::ResourceLimit {
                         resource: litchi_core::Resource::InputBytes,
                         observed: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
-                        limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+                        limit: maximum,
                         scope: Arc::from("flat ODT input"),
                     },
                 )));
             }
-            limits = limits
-                .with_max_document_bytes(
-                    maximum.clamp(1, litchi_odt::flat::Limits::HARD_MAX_DOCUMENT_BYTES),
+            let limits = litchi_odt::SourceLimits::builder()
+                .max_input_bytes(
+                    maximum.clamp(1, litchi_odt::SourceLimits::MAXIMUM.max_input_bytes()),
                 )
-                .map_err(core_error)?;
+                .and_then(litchi_odt::SourceLimitsBuilder::build)
+                .map_err(odf_error)?;
+            flat_options = flat_options.source_limits(limits);
         }
-        let flat = litchi_odt::flat::Document::from_bytes_with_limits(bytes, limits)
-            .map_err(core_error)?;
+        let flat = litchi_odt::flat::Document::from_bytes_with_options(&bytes, flat_options)
+            .map_err(odf_error)?;
         Self::from_flat_document(flat, None)
     }
 

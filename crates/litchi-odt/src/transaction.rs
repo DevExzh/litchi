@@ -31,6 +31,8 @@ use std::{
     sync::Arc,
 };
 
+mod document_verbs;
+
 pub use crate::package::paragraph_transfer::ParagraphTransferPlan;
 /// Shared zero-based semantic collection position.
 pub use litchi_core::Position;
@@ -154,10 +156,10 @@ impl Package {
     ) -> std::result::Result<Self, PackageError> {
         let password = zeroize::Zeroizing::new(password.into());
         let file = std::fs::File::open(path)?;
-        let package = crate::core::OwnedPackage::from_reader_with_limits_and_password(
+        let package = crate::core::OwnedPackage::from_reader_with_password_and_options(
             file,
-            options.source_limits_value(),
             password.as_str(),
+            options,
         )?;
         Self::from_owned_package_with_options(package, options)
     }
@@ -211,10 +213,10 @@ impl Package {
         let password = zeroize::Zeroizing::new(password.into());
         let limits = options.source_limits_value();
         check_input_bytes(bytes.len(), limits)?;
-        let package = crate::core::OwnedPackage::from_bytes_with_limits_and_password(
+        let package = crate::core::OwnedPackage::from_bytes_with_password_and_options(
             copy_input(bytes)?,
-            limits,
             password.as_str(),
+            OpenOptions::new().source_limits(limits),
         )?;
         Self::from_owned_package_with_options(package, options)
     }
@@ -238,10 +240,7 @@ impl Package {
         reader: impl std::io::Read,
         options: OpenOptions,
     ) -> std::result::Result<Self, PackageError> {
-        let package = crate::core::OwnedPackage::from_reader_with_limits(
-            reader,
-            options.source_limits_value(),
-        )?;
+        let package = crate::core::OwnedPackage::from_reader_with_options(reader, options)?;
         Self::from_owned_package_with_options(package, options)
     }
 
@@ -290,10 +289,7 @@ impl Package {
         bytes: Vec<u8>,
         options: OpenOptions,
     ) -> std::result::Result<Self, PackageError> {
-        let package = crate::core::OwnedPackage::from_bytes_with_limits(
-            bytes,
-            options.source_limits_value(),
-        )?;
+        let package = crate::core::OwnedPackage::from_bytes_with_options(bytes, options)?;
         Self::from_owned_package_with_options(package, options)
     }
 
@@ -366,10 +362,16 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns an error when this package is not byte-identical to the patch
-    /// source.
-    pub fn apply(&self, patch: &Patch) -> std::result::Result<Self, PackageError> {
-        Ok(patch.apply(self)?)
+    /// Returns [`PackageError::PatchConflict`] when this package is not
+    /// byte-identical to the patch source.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, PackageError> {
+        if !patch.is_applicable_to(self) {
+            return Err(PackageError::patch_conflict(
+                "odt.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(Commit::replayed(patch.apply(self)?, patch.clone()))
     }
 
     /// Atomically replace `path` with this package (full durability).
@@ -459,14 +461,15 @@ impl Package {
     pub fn apply_metadata(
         &self,
         patch: &crate::metadata::Patch,
-    ) -> std::result::Result<Self, PackageError> {
-        self.apply(patch.primary())
+    ) -> std::result::Result<crate::metadata::Commit, PackageError> {
+        let (package, primary) = self.apply(patch.primary())?.into_parts();
+        Ok(crate::metadata::Commit::replayed(package, primary))
     }
 
     /// Starts a bounded deterministic collection of independently prepared edits.
     #[must_use]
-    pub fn joined_edit(&self) -> JoinedEdit {
-        JoinedEdit::new(self.clone(), DEFAULT_COMPOSITION_LIMITS)
+    pub fn joined_edits(&self) -> JoinedEdits {
+        JoinedEdits::new(self.clone(), DEFAULT_COMPOSITION_LIMITS)
     }
 
     /// Starts commit-coupled bounded undo/redo history at this snapshot.
@@ -1635,7 +1638,7 @@ impl Edit {
     pub fn set_text_properties(
         &mut self,
         node: crate::body::NodeId,
-        properties: &crate::body::TextPropertyEdit,
+        properties: &crate::body::TextPropertyUpdate,
     ) -> Result<&mut Self> {
         self.stage_body(|edits, body| edits.set_text_properties(body, node, properties))
     }
@@ -1649,7 +1652,7 @@ impl Edit {
     pub fn set_paragraph_properties(
         &mut self,
         node: crate::body::NodeId,
-        properties: &crate::body::ParagraphPropertyEdit,
+        properties: &crate::body::ParagraphPropertyUpdate,
     ) -> Result<&mut Self> {
         self.stage_body(|edits, body| edits.set_paragraph_properties(body, node, properties))
     }
@@ -1736,6 +1739,18 @@ impl Edit {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.operations.is_empty()
+    }
+
+    /// Stage one structural document verb.
+    fn document_operation(
+        &mut self,
+        name: &'static str,
+        apply: impl Fn(&mut MutableDocument) -> Result<OperationResult> + Send + Sync + 'static,
+    ) -> Result<&mut Self> {
+        self.push(Operation::Document {
+            name,
+            apply: Arc::new(apply),
+        })
     }
 
     fn push(&mut self, operation: Operation) -> Result<&mut Self> {
@@ -1829,8 +1844,21 @@ impl Edit {
                 audit_changed_xml_is_compact(&before_operation, document.transaction_package())?;
                 continue;
             }
+            if matches!(operation, Operation::Document { .. }) {
+                let mut mutable = MutableDocument::from_document(document)?;
+                while let Some(Operation::Document { apply, .. }) =
+                    self.operations.get(operation_index)
+                {
+                    results.push(apply(&mut mutable)?);
+                    operation_index += 1;
+                }
+                document = Document::from_bytes(mutable.to_bytes()?)?;
+                audit_changed_xml_is_compact(&before_operation, document.transaction_package())?;
+                continue;
+            }
             let result = match operation {
                 Operation::Noop => OperationResult::Unit,
+                Operation::Document { .. } => unreachable!("document operations run above"),
                 Operation::Body { count } => {
                     // One result per staged body edit; the edits were applied
                     // together before this loop.
@@ -2601,13 +2629,13 @@ impl JoinConflict {
 }
 
 /// Bounded collection of disjoint edits against one exact immutable snapshot.
-pub struct JoinedEdit {
+pub struct JoinedEdits {
     source: Package,
     limits: CompositionLimits,
     inner: JoinedSubEdits<Lineage, Vec<Operation>>,
 }
 
-impl JoinedEdit {
+impl JoinedEdits {
     /// Creates an empty composition under caller-selected finite bounds.
     #[must_use]
     pub fn new(source: Package, limits: CompositionLimits) -> Self {
@@ -2696,7 +2724,7 @@ pub struct MergePlan {
 
 impl MergePlan {
     /// Plans a merge without mutating or reopening the base snapshot.
-    pub fn new(left: JoinedEdit, right: JoinedEdit) -> Result<Self> {
+    pub fn new(left: JoinedEdits, right: JoinedEdits) -> Result<Self> {
         if left.source.as_bytes() != right.source.as_bytes() {
             return Err(CoreError::InvalidFormat(
                 "ODT merge branches do not share an exact base snapshot".to_string(),
@@ -2736,9 +2764,9 @@ impl MergePlan {
     }
 
     /// Finishes only after every conflict has an explicit resolution.
-    pub fn finish(self) -> std::result::Result<JoinedEdit, Box<Self>> {
+    pub fn finish(self) -> std::result::Result<JoinedEdits, Box<Self>> {
         match self.inner.finish() {
-            Ok(inner) => Ok(JoinedEdit {
+            Ok(inner) => Ok(JoinedEdits {
                 source: self.source,
                 limits: self.limits,
                 inner,
@@ -2833,10 +2861,20 @@ impl History {
     }
 }
 
+/// One staged structural document verb: the closure applies the verb to the
+/// working document of the commit (record 0358).
+type DocumentStep = Arc<dyn Fn(&mut MutableDocument) -> Result<OperationResult> + Send + Sync>;
+
 #[derive(Clone)]
 enum Operation {
     Noop,
     RestoreSnapshot,
+    /// A structural document verb; consecutive document operations share one
+    /// working document.
+    Document {
+        name: &'static str,
+        apply: DocumentStep,
+    },
     /// `count` staged structural body edits; the edits themselves live in
     /// [`Edit::body`] and are applied together, before every other
     /// operation.
@@ -3124,6 +3162,14 @@ impl Diagnostics {
 }
 
 impl Commit {
+    pub(crate) fn replayed(package: Package, patch: Patch) -> Self {
+        Self {
+            package,
+            patch,
+            results: Vec::new(),
+        }
+    }
+
     fn new(
         before: Package,
         package: Package,
@@ -3214,6 +3260,8 @@ pub enum OperationResult {
     Indices(Vec<usize>),
     /// Package path allocated by a resource insertion operation.
     Path(String),
+    /// Name allocated by a document operation (a frame or drawing name).
+    Name(String),
 }
 
 /// Exact-byte, source-checked package patch.
@@ -3230,6 +3278,13 @@ impl Patch {
     pub fn is_noop(&self) -> bool {
         Arc::ptr_eq(&self.before.bytes, &self.after.bytes)
             || self.before.as_bytes() == self.after.as_bytes()
+    }
+
+    /// Whether this patch was made from exactly `source`'s bytes.
+    #[must_use]
+    pub fn is_applicable_to(&self, source: &Package) -> bool {
+        Arc::ptr_eq(&self.before.bytes, &source.bytes)
+            || source.as_bytes() == self.before.as_bytes()
     }
 
     /// Applies this patch only to the exact snapshot from which it was made.
@@ -4545,6 +4600,11 @@ fn semantic_patch_operation(
             format!("/package/scripts/{path}"),
             Value::Null,
         ),
+        Operation::Document { name, .. } => {
+            return Err(CoreError::Unsupported(format!(
+                "the ODT document operation `{name}` has no semantic durable patch form"
+            )));
+        },
         Operation::RestoreSnapshot | Operation::Annotation(_) | Operation::Body { .. } => {
             return Err(CoreError::Unsupported(
                 "this ODT operation has not migrated to the semantic durable vocabulary"
@@ -6270,6 +6330,8 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
         }
         match operation {
             Operation::Noop => {},
+            // A structural document verb may rewrite any part.
+            Operation::Document { .. } => writes.push("/package".to_string()),
             Operation::Body { .. } => writes.push("/body".to_string()),
             Operation::Annotation(_) => writes.push("/body/annotations".to_string()),
             Operation::InsertParagraph { index, .. } | Operation::RemoveParagraph { index } => {
@@ -6610,7 +6672,7 @@ fn audit_changed_xml_is_compact(
             let limits = litchi_odf_common::compact_xml::Limits::new(MAX_PACKAGE_BYTES, 4_096)
                 .map_err(CoreError::from)?;
             let validation_xml = numeric_reference_projection(&xml)?;
-            litchi_odf_common::compact_xml::validate_with_limits(&validation_xml, limits).map_err(
+            litchi_odf_common::compact_xml::validate(&validation_xml, limits).map_err(
                 |source| {
                     CoreError::InvalidFormat(format!(
                         "XML publication rejected for '{path}': {source}"

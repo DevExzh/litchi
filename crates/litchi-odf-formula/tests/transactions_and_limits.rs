@@ -39,10 +39,10 @@ fn root_transaction_is_atomic_source_checked_and_reversible() {
     assert_eq!(source.as_bytes(), source_bytes);
     assert!(commit.patch().is_applicable_to(&source));
 
-    let published = source.apply(commit.patch()).expect("apply");
+    let published = source.apply(commit.patch()).expect("apply").into_package();
     assert_eq!(published.formula().root(), &replacement);
     let restored = published.apply(&commit.patch().inverse()).expect("inverse");
-    assert_eq!(restored.as_bytes(), source_bytes);
+    assert_eq!(restored.into_package().as_bytes(), source_bytes);
 
     let unrelated = create(r#"<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>z</mi></math>"#)
         .expect("unrelated");
@@ -129,6 +129,7 @@ fn changed_libreoffice_formula_reopens_with_non_content_members_exact() {
         published
             .apply(&commit.patch().inverse())
             .expect("inverse")
+            .into_package()
             .as_bytes(),
         source.as_bytes()
     );

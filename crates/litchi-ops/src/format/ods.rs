@@ -8,7 +8,7 @@
 //! - the filesystem-backed [`litchi_ods::SourceBackedSpreadsheet`] on the
 //!   path route, which materializes its editable `Package` once, on the
 //!   first edit;
-//! - the flat single-XML [`litchi_ods::FlatSpreadsheet`], read-only through
+//! - the flat single-XML [`litchi_ods::flat::Workbook`], read-only through
 //!   the unified layer.
 //!
 //! Reads borrow the owner's typed worksheets; nothing is copied at open.
@@ -91,7 +91,7 @@ enum OdsOwner {
         package: OnceLock<Package>,
     },
     /// A flat single-XML spreadsheet (`.fods`).
-    Flat(litchi_ods::FlatSpreadsheet),
+    Flat(litchi_ods::flat::Workbook),
 }
 
 const fn assert_handle<T: Send + Sync + Clone>() {}
@@ -146,7 +146,6 @@ impl Ods {
 
     /// Parses a flat single-XML spreadsheet detection recognized.
     pub(crate) fn from_flat(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
-        let mut limits = litchi_ods::FlatLimits::default();
         if let Some(maximum) = options.max_input_bytes {
             let maximum = usize::try_from(maximum).unwrap_or(usize::MAX);
             if maximum < bytes.len() {
@@ -160,10 +159,8 @@ impl Ods {
                 ))
                 .with_format(FileFormat::Ods));
             }
-            limits = limits.with_input_bytes(maximum.min(bytes.len().max(1)));
         }
-        let flat =
-            litchi_ods::FlatSpreadsheet::from_bytes_with(bytes, limits).map_err(core_error)?;
+        let flat = litchi_ods::flat::Workbook::from_bytes(&bytes).map_err(odf_error)?;
         Ok(Self::from_owner(OdsOwner::Flat(flat), None))
     }
 

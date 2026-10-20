@@ -521,17 +521,28 @@ impl<P: Owner> Patch<P> {
     }
 
     /// Replay the patch onto `package`; leaves expose it as
-    /// `Package::apply_metadata`.
+    /// `Package::apply_metadata`. The commit publishes the patch's target
+    /// package with the patch and its change flag.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Core`] when `package` is not the patch's exact
-    /// source snapshot.
-    pub fn apply(&self, package: &P) -> Result<P, Error> {
+    /// Returns [`Error::PatchConflict`] when `package` is not the patch's
+    /// exact source snapshot.
+    pub fn apply(&self, package: &P) -> Result<Commit<P>, Error> {
         if package.metadata_bytes() != self.source.metadata_bytes() {
-            return Err(invalid("stale ODF metadata patch source"));
+            return Err(Error::patch_conflict(
+                "metadata.apply",
+                "the package is not the patch source",
+            ));
         }
-        Ok(self.target.clone())
+        Ok(Commit {
+            package: self.target.clone(),
+            patch: self.clone(),
+            diagnostics: Diagnostics {
+                changed: self.changed,
+                fields: 0,
+            },
+        })
     }
 }
 
@@ -593,16 +604,16 @@ fn refuse_envelope(package: &OwnedPackage) -> Result<(), Error> {
         .any(|entry| entry.encryption.is_some())
         || package.has_zip_encrypted_entries()
     {
-        return Err(Error::Core(CoreError::Unsupported(
-            "ODF metadata edits refuse encrypted packages".to_owned(),
-        )));
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "metadata.commit",
+            "a changed metadata edit of an encrypted package is not supported",
+        ));
     }
     if archive.has_file("META-INF/documentsignatures.xml")
         || archive.has_file("META-INF/macrosignatures.xml")
     {
-        return Err(Error::Core(CoreError::Unsupported(
-            "ODF metadata edits refuse signed packages; unsign it first".to_owned(),
-        )));
+        return Err(Error::Signed);
     }
     Ok(())
 }

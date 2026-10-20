@@ -14,4 +14,4 @@ mod tests;
 
 pub use litchi_odf_common::calculation::{Iteration, IterationStatus, NullDate, Settings};
 pub use model::Snapshot;
-pub use transaction::{Commit, Editor, Transaction};
+pub use transaction::Editor;

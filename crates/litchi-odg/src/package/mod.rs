@@ -7,9 +7,9 @@ pub use snapshot::{
     ActiveContentStatus, ActiveContentWritePolicy, Change, Commit, ControlReferenceChange,
     Diagnostics, DurablePatch, Edit, GeometryChange, History, JoinedEdits, LayerChange, Lineage,
     MergePlan, NameChange, Package, PageNameChange, PageStyleChange, PageTransitionChange, Patch,
-    PathChange, PreparedEdit, ResourceChange, SecurityCapabilities, SecurityLifecycleDisposition,
+    PathChange, ResourceChange, SecurityCapabilities, SecurityLifecycleDisposition,
     SecurityLifecycleOperation, SecurityLifecycleRefusal, SecurityStatus, SecurityWritePolicy,
-    ShapeTransfer, StructureChange, StyleChange, TextChange, TransferControl, TransferResource,
-    TransferStyle, TransferStyleResource,
+    ShapeTransfer, StructureChange, StyleChange, SubEdit, TextChange, TransferControl,
+    TransferResource, TransferStyle, TransferStyleResource,
 };
 pub(crate) use snapshot::{MIMETYPE, TEMPLATE_MIMETYPE};

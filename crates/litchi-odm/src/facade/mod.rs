@@ -344,7 +344,10 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error when this package does not match the patch's source.
-    pub fn apply_title(&self, patch: &crate::title::Patch) -> Result<Self> {
+    pub fn apply_title(
+        &self,
+        patch: &crate::title::Patch,
+    ) -> std::result::Result<crate::title::Commit, PackageError> {
         patch.apply(self)
     }
 
@@ -370,7 +373,10 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error when this package does not match the patch's source.
-    pub fn apply_link(&self, patch: &crate::link::Patch) -> Result<Self> {
+    pub fn apply_link(
+        &self,
+        patch: &crate::link::Patch,
+    ) -> std::result::Result<crate::link::Commit, PackageError> {
         patch.apply(self)
     }
 
@@ -397,8 +403,17 @@ impl Package {
     pub fn apply(
         &self,
         patch: &crate::transaction::Patch,
-    ) -> std::result::Result<Self, PackageError> {
-        Ok(patch.apply(self)?)
+    ) -> std::result::Result<crate::transaction::Commit, PackageError> {
+        if !patch.is_applicable_to(self) {
+            return Err(PackageError::patch_conflict(
+                "odm.apply",
+                "the package is not the patch source",
+            ));
+        }
+        Ok(crate::transaction::Commit::replayed(
+            patch.apply(self)?,
+            patch.clone(),
+        ))
     }
 
     /// Creates explicit bounded undo/redo history at this package.

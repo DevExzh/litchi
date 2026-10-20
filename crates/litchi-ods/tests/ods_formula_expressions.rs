@@ -182,14 +182,14 @@ fn assert_current_cell_reference(
 }
 
 fn parse(source: &str) -> Expression {
-    match Expression::parse(source) {
+    match Expression::parse(source, &Default::default()) {
         Ok(expression) => expression,
         Err(error) => panic!("{source:?} should parse: {error}"),
     }
 }
 
 fn assert_invalid(source: &str) {
-    let error = Expression::parse(source)
+    let error = Expression::parse(source, &Default::default())
         .err()
         .unwrap_or_else(|| panic!("{source:?} should be rejected"));
     assert!(
@@ -199,7 +199,7 @@ fn assert_invalid(source: &str) {
 }
 
 fn assert_resource_limit(source: &str, limits: &Limits) {
-    let error = Expression::parse_with_limits(source, limits)
+    let error = Expression::parse(source, limits)
         .err()
         .unwrap_or_else(|| panic!("{source:?} should exceed its explicit limit"));
     assert!(
@@ -786,7 +786,7 @@ fn explicit_resource_limits_fail_atomically_at_the_boundary() {
 }
 
 fn parse_with_limits(source: &str, limits: &Limits) -> Expression {
-    match Expression::parse_with_limits(source, limits) {
+    match Expression::parse(source, limits) {
         Ok(expression) => expression,
         Err(error) => panic!("{source:?} should parse: {error}"),
     }
@@ -834,7 +834,7 @@ fn hard_depth_cap_is_checked_in_a_subprocess_before_stack_overflow() {
         ];
 
         for source in &sources {
-            let error = Expression::parse_with_limits(source, &limits)
+            let error = Expression::parse(source, &limits)
                 .err()
                 .unwrap_or_else(|| panic!("depth-hostile source unexpectedly parsed"));
             assert!(
@@ -918,7 +918,7 @@ fn malformed_short_inputs_are_bounded_and_panic_free() {
     for (index, left) in FRAGMENTS.iter().enumerate() {
         for right in FRAGMENTS.iter().skip(index % 7) {
             let source = format!("{left}{right}");
-            let _ = Expression::parse_with_limits(&source, &limits);
+            let _ = Expression::parse(&source, &limits);
         }
     }
 }
@@ -928,7 +928,7 @@ fn every_parser_reservation_propagates_a_single_injected_allocation_failure() {
     let source = "of:==SUM(1;[.A1];{2;3|4})";
 
     begin_allocation_count();
-    let baseline = Expression::parse(source);
+    let baseline = Expression::parse(source, &Default::default());
     let allocation_count = end_allocation_count();
     assert!(baseline.is_ok(), "valid mixed expression should parse");
     assert!(
@@ -938,7 +938,7 @@ fn every_parser_reservation_propagates_a_single_injected_allocation_failure() {
 
     for index in 0..allocation_count {
         arm_allocation_failure(index);
-        let result = Expression::parse(source);
+        let result = Expression::parse(source, &Default::default());
         let _ = end_allocation_count();
         FAIL_AT.with(|target| target.set(None));
         assert!(

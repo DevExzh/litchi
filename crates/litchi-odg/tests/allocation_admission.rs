@@ -3,7 +3,7 @@
     reason = "the integration test observes allocation admission"
 )]
 
-use litchi_odg::{FlatDrawing, Package};
+use litchi_odg::{Package, flat::Drawing};
 use soapberry_zip::office::StreamingArchiveWriter;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::{
@@ -211,14 +211,17 @@ fn flat_public_path_rejects_oversized_attribute_before_decode_ownership() {
 
     ALLOCATED.store(0, Ordering::Relaxed);
     OBSERVE.store(true, Ordering::Relaxed);
-    let result = FlatDrawing::from_bytes(&input);
+    let result = Drawing::from_bytes(&input);
     OBSERVE.store(false, Ordering::Relaxed);
 
     let error = match result {
         Ok(_) => panic!("oversized flat attribute was accepted"),
         Err(error) => error,
     };
-    assert!(matches!(error, litchi_core::Error::InvalidFormat(reason) if reason.contains("limit")));
+    assert!(
+        matches!(error, litchi_odg::flat::Error::Limit { .. }),
+        "{error}"
+    );
     let allocated = ALLOCATED.load(Ordering::Relaxed);
     assert!(
         allocated
@@ -240,7 +243,7 @@ fn flat_public_path_rejects_oversized_text_before_decode_ownership() {
 
     ALLOCATED.store(0, Ordering::Relaxed);
     OBSERVE.store(true, Ordering::Relaxed);
-    let result = FlatDrawing::from_bytes(&input);
+    let result = Drawing::from_bytes(&input);
     OBSERVE.store(false, Ordering::Relaxed);
 
     let error = match result {
@@ -248,7 +251,8 @@ fn flat_public_path_rejects_oversized_text_before_decode_ownership() {
         Err(error) => error,
     };
     assert!(
-        matches!(error, litchi_core::Error::InvalidFormat(reason) if reason.contains("event") && reason.contains("limit"))
+        matches!(error, litchi_odg::flat::Error::Limit { .. }),
+        "{error}"
     );
     let allocated = ALLOCATED.load(Ordering::Relaxed);
     assert!(
@@ -271,7 +275,7 @@ fn flat_public_path_rejects_oversized_unknown_prefix_before_resolution() {
 
     ALLOCATED.store(0, Ordering::Relaxed);
     OBSERVE.store(true, Ordering::Relaxed);
-    let result = FlatDrawing::from_bytes(&input);
+    let result = Drawing::from_bytes(&input);
     OBSERVE.store(false, Ordering::Relaxed);
 
     let error = match result {
@@ -279,7 +283,7 @@ fn flat_public_path_rejects_oversized_unknown_prefix_before_resolution() {
         Err(error) => error,
     };
     assert!(
-        matches!(error, litchi_core::Error::InvalidFormat(ref reason) if reason.contains("limit")),
+        matches!(error, litchi_odg::flat::Error::Limit { .. }),
         "unexpected flat unknown-prefix error: {error}"
     );
     let allocated = ALLOCATED.load(Ordering::Relaxed);
@@ -303,7 +307,7 @@ fn flat_public_path_rejects_oversized_namespace_declaration_before_registration(
 
     ALLOCATED.store(0, Ordering::Relaxed);
     OBSERVE.store(true, Ordering::Relaxed);
-    let result = FlatDrawing::from_bytes(&input);
+    let result = Drawing::from_bytes(&input);
     OBSERVE.store(false, Ordering::Relaxed);
 
     let error = match result {
@@ -311,7 +315,7 @@ fn flat_public_path_rejects_oversized_namespace_declaration_before_registration(
         Err(error) => error,
     };
     assert!(
-        matches!(error, litchi_core::Error::InvalidFormat(ref reason) if reason.contains("limit")),
+        matches!(error, litchi_odg::flat::Error::Limit { .. }),
         "unexpected flat namespace-declaration error: {error}"
     );
     let allocated = ALLOCATED.load(Ordering::Relaxed);
@@ -343,7 +347,7 @@ fn flat_public_path_rejects_deep_nesting_before_reader_stack_growth() {
 
     ALLOCATED.store(0, Ordering::Relaxed);
     OBSERVE.store(true, Ordering::Relaxed);
-    let result = FlatDrawing::from_bytes(&input);
+    let result = Drawing::from_bytes(&input);
     OBSERVE.store(false, Ordering::Relaxed);
 
     let error = match result {
@@ -351,7 +355,13 @@ fn flat_public_path_rejects_deep_nesting_before_reader_stack_growth() {
         Err(error) => error,
     };
     assert!(
-        matches!(error, litchi_core::Error::InvalidFormat(ref reason) if reason.contains("nesting") && reason.contains("limit")),
+        matches!(
+            error,
+            litchi_odg::flat::Error::Limit {
+                kind: litchi_odg::LimitKind::Semantic(litchi_odg::SemanticLimitKind::Depth),
+                ..
+            }
+        ),
         "unexpected deep-nesting error: {error}"
     );
     let allocated = ALLOCATED.load(Ordering::Relaxed);

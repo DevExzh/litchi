@@ -131,14 +131,18 @@ fn rich_text_table_form_and_fine_chart_data_share_one_durable_root() {
 
     let durable =
         edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
-    let applied = source.apply(&durable).unwrap();
+    let applied = source.apply(&durable).unwrap().into_package();
     let reopened = Package::from_bytes(applied.as_bytes())
         .unwrap()
         .presentation()
         .unwrap();
     assert!(reopened.content_xml().contains("Rich Box"));
     assert_eq!(
-        applied.apply(&durable.inverse()).unwrap().as_bytes(),
+        applied
+            .apply(&durable.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 
@@ -237,10 +241,14 @@ fn rich_content_objects_transfer_through_durable_history() {
 
     let durable =
         edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
-    let applied = destination_base.apply(&durable).unwrap();
+    let applied = destination_base.apply(&durable).unwrap().into_package();
     assert_eq!(applied.as_bytes(), commit.package().as_bytes());
     assert_eq!(
-        applied.apply(&durable.inverse()).unwrap().as_bytes(),
+        applied
+            .apply(&durable.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         destination_base.as_bytes()
     );
 
@@ -383,10 +391,14 @@ fn source_backed_story_table_and_form_models_edit_without_flattening() {
     let commit = transaction.commit().unwrap();
     let durable =
         edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
-    let replayed = source.apply(&durable).unwrap();
+    let replayed = source.apply(&durable).unwrap().into_package();
     assert_eq!(replayed.as_bytes(), commit.package().as_bytes());
     assert_eq!(
-        replayed.apply(&durable.inverse()).unwrap().as_bytes(),
+        replayed
+            .apply(&durable.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
     let inventory = commit.package().rich_content().unwrap();
@@ -552,9 +564,12 @@ fn real_producer_manifest_config_and_ole_are_exactly_preserved_during_text_box_e
             .content_xml()
             .contains("Litchi source sentinel text")
     );
-    let applied = source.apply(commit.patch()).unwrap();
+    let applied = source.apply(commit.patch()).unwrap().into_package();
     assert_eq!(applied.as_bytes(), commit.package().as_bytes());
-    let restored = applied.apply(&commit.patch().inverse()).unwrap();
+    let restored = applied
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.as_bytes(), source.as_bytes());
 }
 
@@ -658,7 +673,11 @@ fn content_only_text_box_edit_raw_preserves_unchanged_media_and_metadata() {
         Some("application/octet-stream")
     );
     assert_eq!(
-        source.apply(commit.patch()).unwrap().as_bytes(),
+        source
+            .apply(commit.patch())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         commit.package().as_bytes()
     );
     assert_eq!(
@@ -666,6 +685,7 @@ fn content_only_text_box_edit_raw_preserves_unchanged_media_and_metadata() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         source_bytes
     );

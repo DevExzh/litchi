@@ -48,7 +48,8 @@ fn from_bytes_round_trips_the_exact_bytes() {
 
 #[test]
 fn prepared_detection_is_adopted_and_foreign_formats_are_refused() {
-    let prepared = litchi_odf_common::detect::prepared(FIXTURE.to_vec()).unwrap();
+    let prepared =
+        litchi_odf_common::detect::prepared(FIXTURE.to_vec(), SourceLimits::default()).unwrap();
     let adopted = Package::from_prepared_package(prepared).unwrap();
     assert_eq!(adopted.as_bytes(), FIXTURE);
 
@@ -57,7 +58,7 @@ fn prepared_detection_is_adopted_and_foreign_formats_are_refused() {
             .join("../../test-data/odf/corpus/writer-header-footer.odt"),
     )
     .unwrap();
-    let foreign = litchi_odf_common::detect::prepared(odt).unwrap();
+    let foreign = litchi_odf_common::detect::prepared(odt, SourceLimits::default()).unwrap();
     assert!(Package::from_prepared_package(foreign).is_err());
 }
 
@@ -70,7 +71,10 @@ fn an_exact_no_op_commit_is_the_source_byte_for_byte() {
     assert_eq!(commit.package().as_bytes(), FIXTURE);
     let (published, patch) = commit.into_parts();
     assert_eq!(published.as_bytes(), FIXTURE);
-    assert_eq!(package.apply(&patch).unwrap().as_bytes(), FIXTURE);
+    assert_eq!(
+        package.apply(&patch).unwrap().into_package().as_bytes(),
+        FIXTURE
+    );
 }
 
 #[test]
@@ -95,12 +99,16 @@ fn a_real_edit_changes_bytes_and_replays_through_apply() {
             .is_some()
     );
     assert_eq!(
-        package.apply(&patch).unwrap().as_bytes(),
+        package.apply(&patch).unwrap().into_package().as_bytes(),
         published.as_bytes()
     );
     assert!(published.apply(&patch).is_err());
     assert_eq!(
-        published.apply(&patch.inverse()).unwrap().as_bytes(),
+        published
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         FIXTURE
     );
 }

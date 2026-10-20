@@ -58,7 +58,11 @@ fn raw_pretty_producer_package_is_ingested_exactly_then_compacted_on_change() {
     let mut edit = source.edit();
     edit.add_section(SectionSpec::new("B").unwrap()).unwrap();
     let changed = edit.commit().unwrap().into_package();
-    compact_xml::validate(changed.document().content_xml().as_bytes()).unwrap();
+    compact_xml::validate(
+        changed.document().content_xml().as_bytes(),
+        compact_xml::Limits::default(),
+    )
+    .unwrap();
     assert!(!changed.document().content_xml().contains('\n'));
     assert!(Package::from_bytes(changed.as_bytes()).is_ok());
 }

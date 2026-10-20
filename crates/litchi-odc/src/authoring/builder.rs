@@ -49,10 +49,11 @@ impl Builder {
         &mut self.definition
     }
 
-    /// Retain caller-selected limits for validation and package publication.
+    /// Retain caller-selected [`crate::OpenOptions`] for validation and
+    /// package publication; the built package keeps them.
     #[must_use]
-    pub fn with_limits(mut self, limits: crate::Limits) -> Self {
-        self.limits = limits;
+    pub fn with_options(mut self, options: crate::OpenOptions) -> Self {
+        self.limits = crate::Limits::from_options(options);
         self
     }
 
@@ -125,10 +126,10 @@ fn package_content(
 ) -> Result<crate::package::Snapshot> {
     let compact_limits = compact_xml::Limits::new(limits.max_content_bytes(), limits.max_depth())
         .map_err(Error::from)?;
-    compact_xml::validate_with_limits(content_xml.as_bytes(), compact_limits)?;
+    compact_xml::validate(content_xml.as_bytes(), compact_limits)?;
     crate::codec::validate(content_xml)?;
     if let Some(styles) = styles_xml {
-        compact_xml::validate_with_limits(styles.as_bytes(), compact_limits)?;
+        compact_xml::validate(styles.as_bytes(), compact_limits)?;
         crate::codec::validate_styles(styles, limits)?;
     }
     let mut writer = PackageWriter::new_bounded(limits.max_package_bytes());

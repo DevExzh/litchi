@@ -35,7 +35,7 @@ pub(crate) fn definition(chart: &crate::Chart) -> Result<Definition> {
         .map(cached_table)
         .transpose()?;
     crate::validation::validate_definition(&value, chart.limits())?;
-    let canonical = crate::serialize_content_with_limits(&value, chart.limits())?;
+    let canonical = crate::authoring::serialize_content_with_limits(&value, chart.limits())?;
     if canonical != chart.content_xml() {
         return Err(Error::Unsupported(
             "opened ODC contains lexical or semantic content outside the lossless typed edit surface"

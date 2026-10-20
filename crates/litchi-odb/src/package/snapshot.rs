@@ -287,7 +287,11 @@ impl Snapshot {
     ) -> crate::ComponentTransferSupport {
         let requires_provenance = additions.iter().any(|addition| {
             is_xml_member(&addition.path, &addition.media_type)
-                && litchi_odf_common::compact_xml::validate(&addition.bytes).is_err()
+                && litchi_odf_common::compact_xml::validate(
+                    &addition.bytes,
+                    litchi_odf_common::compact_xml::Limits::default(),
+                )
+                .is_err()
         });
         if requires_provenance {
             crate::ComponentTransferSupport::Refused(

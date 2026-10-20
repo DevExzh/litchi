@@ -1,4 +1,4 @@
-use super::{Snapshot, Transaction};
+use super::{Snapshot, transaction::Transaction};
 
 const META: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <office:document-meta
@@ -23,7 +23,6 @@ fn no_op_metadata_transaction_preserves_source_exactly() {
         .expect("test fixture or operation should succeed");
     assert!(!commit.changed());
     assert_eq!(commit.xml(), Some(META));
-    assert_eq!(commit.metadata().title.as_deref(), Some("Before"));
 }
 
 #[test]

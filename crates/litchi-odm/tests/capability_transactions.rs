@@ -136,11 +136,19 @@ fn unified_title_and_link_commit_is_atomic_compact_and_reversible() {
             .content_xml()
             .contains("revised &amp; exact.odt")
     );
-    compact_xml::validate(changed.document().content_xml().as_bytes()).unwrap();
+    compact_xml::validate(
+        changed.document().content_xml().as_bytes(),
+        compact_xml::Limits::default(),
+    )
+    .unwrap();
     assert_eq!(commit.patch().changes().links().len(), 1);
     assert!(commit.patch().changes().title().is_some());
     assert_eq!(
-        changed.apply(&commit.patch().inverse()).unwrap().as_bytes(),
+        changed
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
         source.as_bytes()
     );
 
@@ -162,7 +170,7 @@ fn durable_patch_merge_and_bounded_history_preserve_lineage() {
         .unwrap();
     let link_commit = link_edit.commit().unwrap();
     let merged = title_commit.patch().merge(link_commit.patch()).unwrap();
-    let merged_snapshot = source.apply(&merged).unwrap();
+    let merged_snapshot = source.apply(&merged).unwrap().into_package();
     assert_eq!(merged_snapshot.document().title(), Some("Merged title"));
     assert_eq!(
         merged_snapshot.document().subdocuments()[0].href(),
@@ -345,6 +353,7 @@ fn original_libreoffice_odm_ingests_edits_and_reopens_without_repacking() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .as_bytes(),
         original
     );

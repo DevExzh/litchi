@@ -39,6 +39,23 @@ pub enum Error {
         /// The selected maximum.
         maximum: u64,
     },
+    /// A well-formed request that this route refuses, classified by its
+    /// [`litchi_core::edit::RefusalKind`]. The refusal carries static
+    /// operation and reason strings only.
+    #[error("ODF edit refused: {0}")]
+    Refused(litchi_core::edit::Refusal),
+    /// A patch or staged plan was made against another package base.
+    #[error("ODF patch conflict in {operation}: {reason}")]
+    PatchConflict {
+        /// The staging or replay operation that detected the conflict.
+        operation: &'static str,
+        /// Why the base does not match.
+        reason: &'static str,
+    },
+    /// A changed write was requested on a digitally signed package; an exact
+    /// no-op commit keeps the signatures byte-identical instead.
+    #[error("ODF package is signed: a changed write would invalidate its signatures")]
+    Signed,
     /// Any other package, parse, I/O or publication failure.
     #[error(transparent)]
     Core(litchi_core::Error),
@@ -50,7 +67,7 @@ impl Error {
     pub const fn core(&self) -> Option<&litchi_core::Error> {
         match self {
             Self::Core(error) => Some(error),
-            Self::InvalidLimit { .. } | Self::Limit { .. } => None,
+            _ => None,
         }
     }
 
@@ -59,8 +76,33 @@ impl Error {
     pub const fn limit_kind(&self) -> Option<LimitKind> {
         match self {
             Self::InvalidLimit { kind, .. } | Self::Limit { kind, .. } => Some(*kind),
-            Self::Core(_) => None,
+            _ => None,
         }
+    }
+
+    /// Return the refusal of an [`Error::Refused`] failure.
+    #[must_use]
+    pub const fn refusal(&self) -> Option<&litchi_core::edit::Refusal> {
+        match self {
+            Self::Refused(refusal) => Some(refusal),
+            _ => None,
+        }
+    }
+
+    /// Build an [`Error::Refused`] failure.
+    #[must_use]
+    pub const fn refused(
+        kind: litchi_core::edit::RefusalKind,
+        operation: &'static str,
+        reason: &'static str,
+    ) -> Self {
+        Self::Refused(litchi_core::edit::Refusal::new(kind, operation, reason))
+    }
+
+    /// Build an [`Error::PatchConflict`] failure.
+    #[must_use]
+    pub const fn patch_conflict(operation: &'static str, reason: &'static str) -> Self {
+        Self::PatchConflict { operation, reason }
     }
 }
 
@@ -68,9 +110,15 @@ impl From<litchi_core::Error> for Error {
     fn from(error: litchi_core::Error) -> Self {
         match error {
             litchi_core::Error::ResourceLimit(limit) => {
-                match SourceLimitKind::from_scope(&limit.scope) {
+                let kind = SourceLimitKind::from_scope(&limit.scope)
+                    .map(LimitKind::Source)
+                    .or_else(|| {
+                        crate::limits::SemanticLimitKind::from_scope(&limit.scope)
+                            .map(LimitKind::Semantic)
+                    });
+                match kind {
                     Some(kind) => Self::Limit {
-                        kind: LimitKind::Source(kind),
+                        kind,
                         observed: limit.observed,
                         maximum: limit.limit,
                     },
@@ -111,19 +159,20 @@ impl From<Error> for litchi_core::Error {
             } => Self::ResourceLimit(ResourceLimit {
                 resource: match kind {
                     LimitKind::Source(SourceLimitKind::Members) => Resource::Objects,
-                    LimitKind::Semantic(crate::limits::SemanticLimitKind::Units) => {
-                        Resource::Objects
-                    },
+                    LimitKind::Semantic(kind) => kind.resource(),
                     _ => Resource::InputBytes,
                 },
                 observed,
                 limit: maximum,
                 scope: Arc::from(match kind {
                     LimitKind::Source(kind) => kind.scope(),
-                    LimitKind::Semantic(kind) => kind.as_str(),
+                    LimitKind::Semantic(kind) => kind.scope(),
                 }),
             }),
             invalid @ Error::InvalidLimit { .. } => Self::InvalidFormat(invalid.to_string()),
+            refused @ Error::Refused(_) => Self::Unsupported(refused.to_string()),
+            conflict @ Error::PatchConflict { .. } => Self::InvalidFormat(conflict.to_string()),
+            signed @ Error::Signed => Self::Unsupported(signed.to_string()),
         }
     }
 }
@@ -132,6 +181,58 @@ impl From<Error> for litchi_core::Error {
 mod tests {
     use super::Error;
     use crate::limits::{LimitKind, SourceLimitKind};
+
+    #[test]
+    fn semantic_resource_limits_become_typed_and_round_trip() {
+        use crate::limits::{SemanticLimitKind, SemanticLimits};
+
+        let limits = SemanticLimits::builder()
+            .max_depth(3)
+            .unwrap()
+            .build()
+            .unwrap();
+        let core = limits.check_core(SemanticLimitKind::Depth, 4).unwrap_err();
+        let typed = Error::from(core);
+        assert!(matches!(
+            typed,
+            Error::Limit {
+                kind: LimitKind::Semantic(SemanticLimitKind::Depth),
+                observed: 4,
+                maximum: 3,
+            }
+        ));
+        let back = litchi_core::Error::from(typed);
+        assert!(matches!(
+            Error::from(back),
+            Error::Limit {
+                kind: LimitKind::Semantic(SemanticLimitKind::Depth),
+                ..
+            }
+        ));
+        assert!(limits.check_core(SemanticLimitKind::Depth, 3).is_ok());
+    }
+
+    #[test]
+    fn refusals_conflicts_and_signatures_stay_content_free() {
+        let refused = Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedTarget,
+            "operation",
+            "reason",
+        );
+        assert_eq!(
+            refused.refusal().map(litchi_core::edit::Refusal::kind),
+            Some(litchi_core::edit::RefusalKind::UnsupportedTarget)
+        );
+        assert!(
+            Error::patch_conflict("operation", "reason")
+                .core()
+                .is_none()
+        );
+        assert!(matches!(
+            litchi_core::Error::from(Error::Signed),
+            litchi_core::Error::Unsupported(_)
+        ));
+    }
 
     #[test]
     fn source_resource_limits_become_typed_and_round_trip() {

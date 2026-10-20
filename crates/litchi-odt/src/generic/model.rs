@@ -2,6 +2,9 @@
 
 use crate::core::OwnedPackage;
 
+/// The crate-internal name of the flat owner ([`Document`]).
+pub(crate) use self::Document as FlatDocument;
+
 /// Standard packaged `OpenDocument` document family.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -33,6 +36,7 @@ pub enum Family {
 /// This provides lossless package access for every standard `OpenDocument`
 /// family, including document types that do not yet have a specialized object
 /// model. Saving an unmodified package returns the original bytes exactly.
+#[derive(Clone)]
 pub struct Package {
     pub(super) package: OwnedPackage,
     pub(super) family: Family,
@@ -48,7 +52,7 @@ pub struct Package {
 /// also accepted for compatibility with odfdo's non-standard
 /// `office:formula` convention; conforming packaged `.odf` formulas use a
 /// direct `MathML` root.
-pub struct FlatDocument {
+pub struct Document {
     pub(super) xml: String,
     pub(super) family: Family,
     pub(super) template: bool,

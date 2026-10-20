@@ -86,7 +86,10 @@ impl Presentation {
         // different ODF family still follows the historical package owner so
         // its MIME error is reported at the same boundary; rejected probes
         // recover the original allocation for the ordinary parser.
-        match litchi_odf_common::detect::prepared_or_original(bytes) {
+        match litchi_odf_common::detect::prepared_or_original(
+            bytes,
+            litchi_odf_common::SourceLimits::default(),
+        ) {
             Ok(prepared) if prepared.format() == litchi_core::detection::FileFormat::Odp => {
                 Self::from_prepared_package(prepared)
             },
@@ -606,7 +609,8 @@ mod tests {
         assert!(presentation.tolerance_report().is_clean());
         assert_eq!(presentation.tolerance_report().total(), 0);
         let prepared =
-            litchi_odf_common::detect::prepared(bytes).expect("fixture must be detected");
+            litchi_odf_common::detect::prepared(bytes, litchi_odf_common::SourceLimits::default())
+                .expect("fixture must be detected");
         let presentation =
             Presentation::from_prepared_package(prepared).expect("fixture must open");
         assert!(presentation.tolerance_report().is_clean());

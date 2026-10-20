@@ -19,7 +19,8 @@ fn byte_functions_match_independent_utf8_boundary_oracle() {
 fn check_rows(rows: &[serde_json::Value]) {
     for row in rows {
         let source = row["formula"].as_str().expect("formula");
-        let expression = Expression::parse(source).expect("valid fixture expression");
+        let expression =
+            Expression::parse(source, &Default::default()).expect("valid fixture expression");
         let budget = Budget::root("byte-text-oracle", Limits::for_profile(Profile::Server));
         let (_cancellation, token) = CancellationSource::pair();
         let execution = ExecutionContext::new(

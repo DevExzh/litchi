@@ -10,7 +10,7 @@
 use std::{fmt, io::Write, sync::Arc};
 
 use litchi_core::{
-    CancellationToken, Error, ExecutionError, ReadAt, Resource, Result, SourceVersion,
+    CancellationToken, Error as CoreError, ExecutionError, ReadAt, Resource, Result, SourceVersion,
 };
 use litchi_odf_common::{
     constants::{ODF_CONTENT, ODF_PRESENTATION},
@@ -51,7 +51,7 @@ const MAX_CONTENT_XML_BYTES: u64 = 256 * 1024 * 1024;
 
 /// Finite bounds for a source-backed one-slide append.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TailAppendLimits {
+pub struct Limits {
     /// Maximum combined UTF-8 bytes in the submitted title and body.
     pub max_text_bytes: usize,
     /// Maximum generated page bytes retained by the plan.
@@ -62,7 +62,7 @@ pub struct TailAppendLimits {
     pub max_content_xml_bytes: u64,
 }
 
-impl TailAppendLimits {
+impl Limits {
     /// Create explicit finite append bounds.
     #[must_use]
     pub const fn new(
@@ -80,7 +80,7 @@ impl TailAppendLimits {
     }
 }
 
-impl Default for TailAppendLimits {
+impl Default for Limits {
     fn default() -> Self {
         Self::new(
             MAX_TEXT_BYTES,
@@ -94,11 +94,11 @@ impl Default for TailAppendLimits {
 /// Failure from the format-owned source append proof or publication handoff.
 #[derive(Debug)]
 #[non_exhaustive]
-pub enum TailAppendError {
+pub enum Error {
     /// The source or authored request is not accepted by the ODP proof.
-    Invalid(Error),
+    Invalid(CoreError),
     /// A verified source member reader failed while scanning the source.
-    SourceMember(SourceMemberReaderError<Error>),
+    SourceMember(SourceMemberReaderError<CoreError>),
     /// The common insertion owner rejected the bounded plan before output.
     Plan(SourceContentPublicationError),
     /// The common insertion owner reported a typed sink/source failure after
@@ -106,7 +106,7 @@ pub enum TailAppendError {
     Publication(SourceContentInsertionError),
 }
 
-impl fmt::Display for TailAppendError {
+impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Invalid(error) => error.fmt(formatter),
@@ -117,7 +117,7 @@ impl fmt::Display for TailAppendError {
     }
 }
 
-impl std::error::Error for TailAppendError {
+impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Invalid(error) => Some(error),
@@ -128,7 +128,7 @@ impl std::error::Error for TailAppendError {
     }
 }
 
-impl TailAppendError {
+impl Error {
     /// Return sink progress when the common publication layer has observed it.
     #[must_use]
     pub const fn progress(&self) -> Option<SourceContentPublicationProgress> {
@@ -140,28 +140,24 @@ impl TailAppendError {
     }
 }
 
-fn invalid(message: impl Into<String>) -> TailAppendError {
-    TailAppendError::Invalid(Error::InvalidFormat(message.into()))
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(CoreError::InvalidFormat(message.into()))
 }
 
-fn check_plan_options(
-    options: &SourceContentPublicationOptions,
-) -> std::result::Result<(), TailAppendError> {
+fn check_plan_options(options: &SourceContentPublicationOptions) -> std::result::Result<(), Error> {
     if options
         .cancellation()
         .is_some_and(CancellationToken::is_cancelled)
     {
-        return Err(TailAppendError::Plan(
-            SourceContentPublicationError::Cancelled {
-                progress: SourceContentPublicationProgress::Untouched,
-            },
-        ));
+        return Err(Error::Plan(SourceContentPublicationError::Cancelled {
+            progress: SourceContentPublicationProgress::Untouched,
+        }));
     }
     if let Some(execution) = options.execution_context() {
         execution
             .check()
             .map_err(map_execution_error)
-            .map_err(TailAppendError::Plan)?;
+            .map_err(Error::Plan)?;
     }
     Ok(())
 }
@@ -181,7 +177,7 @@ fn map_execution_error(error: ExecutionError) -> SourceContentPublicationError {
 fn reserve_fragment_memory(
     options: &SourceContentPublicationOptions,
     maximum: usize,
-) -> std::result::Result<Option<litchi_core::Reservation>, TailAppendError> {
+) -> std::result::Result<Option<litchi_core::Reservation>, Error> {
     let Some(execution) = options.execution_context() else {
         return Ok(None);
     };
@@ -192,7 +188,7 @@ fn reserve_fragment_memory(
         .reserve(Resource::Memory, amount)
         .map(Some)
         .map_err(map_execution_error)
-        .map_err(TailAppendError::Plan)
+        .map_err(Error::Plan)
 }
 
 /// Bound the format-owned page generation and parser readback window.
@@ -219,44 +215,50 @@ fn generated_readback_memory_bound(
     let submitted_text_bytes = title
         .len()
         .checked_add(body.len())
-        .ok_or_else(|| Error::InvalidFormat("ODP submitted text size overflow".to_string()))?;
+        .ok_or_else(|| CoreError::InvalidFormat("ODP submitted text size overflow".to_string()))?;
     let parser_text_bytes = submitted_text_bytes
         .checked_mul(GENERATED_READBACK_TEXT_GEOMETRIC_MULTIPLIER)
         .and_then(|value| value.checked_mul(GENERATED_READBACK_TEXT_PARALLEL_STRINGS))
-        .ok_or_else(|| Error::InvalidFormat("ODP parser text bound overflow".to_string()))?;
+        .ok_or_else(|| CoreError::InvalidFormat("ODP parser text bound overflow".to_string()))?;
     let text_memory = retained_text_capacity
         .checked_add(parser_text_bytes)
-        .ok_or_else(|| Error::InvalidFormat("ODP text memory bound overflow".to_string()))?;
+        .ok_or_else(|| CoreError::InvalidFormat("ODP text memory bound overflow".to_string()))?;
     let wrapper_bytes = GENERATED_DOCUMENT_PREFIX
         .len()
         .checked_add(GENERATED_DOCUMENT_SUFFIX.len())
         .ok_or_else(|| {
-            Error::InvalidFormat("ODP generated document wrapper size overflow".to_string())
+            CoreError::InvalidFormat("ODP generated document wrapper size overflow".to_string())
         })?;
     let fragment_growth = max_fragment_bytes
         .checked_mul(GENERATED_FRAGMENT_GROWTH_MULTIPLIER)
-        .ok_or_else(|| Error::InvalidFormat("ODP fragment growth bound overflow".to_string()))?;
+        .ok_or_else(|| {
+            CoreError::InvalidFormat("ODP fragment growth bound overflow".to_string())
+        })?;
     let readback_document = max_fragment_bytes
         .checked_add(wrapper_bytes)
-        .ok_or_else(|| Error::InvalidFormat("ODP readback document bound overflow".to_string()))?;
+        .ok_or_else(|| {
+            CoreError::InvalidFormat("ODP readback document bound overflow".to_string())
+        })?;
     let parser_buffer = max_fragment_bytes
         .checked_mul(GENERATED_READBACK_PARSER_BUFFER_MULTIPLIER)
-        .ok_or_else(|| Error::InvalidFormat("ODP parser buffer bound overflow".to_string()))?;
+        .ok_or_else(|| CoreError::InvalidFormat("ODP parser buffer bound overflow".to_string()))?;
     let decoded_token = max_fragment_bytes
         .checked_mul(GENERATED_READBACK_DECODED_TOKEN_MULTIPLIER)
-        .ok_or_else(|| Error::InvalidFormat("ODP decoded token bound overflow".to_string()))?;
+        .ok_or_else(|| CoreError::InvalidFormat("ODP decoded token bound overflow".to_string()))?;
     text_memory
         .checked_add(fragment_growth)
         .and_then(|value| value.checked_add(readback_document))
         .and_then(|value| value.checked_add(parser_buffer))
         .and_then(|value| value.checked_add(decoded_token))
         .and_then(|value| value.checked_add(GENERATED_READBACK_FIXED_STATE_BYTES))
-        .ok_or_else(|| Error::InvalidFormat("ODP generated page memory bound overflow".to_string()))
+        .ok_or_else(|| {
+            CoreError::InvalidFormat("ODP generated page memory bound overflow".to_string())
+        })
 }
 
 /// Facts established by the bounded source scan before ZIP preparation.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TailAppendSourceProof {
+pub struct SourceProof {
     source_version: SourceVersion,
     content_bytes: u64,
     insert_at: u64,
@@ -264,7 +266,7 @@ pub struct TailAppendSourceProof {
     page_name: String,
 }
 
-impl TailAppendSourceProof {
+impl SourceProof {
     /// Source revision captured by the proof.
     #[must_use]
     pub const fn source_version(&self) -> SourceVersion {
@@ -298,17 +300,17 @@ impl TailAppendSourceProof {
 }
 
 /// A source-backed ODP append edit containing only bounded caller input.
-pub struct SourceBackedTailAppendEdit {
+pub struct Edit {
     package: Arc<SourceBackedPackage>,
     title: String,
     body: String,
-    limits: TailAppendLimits,
+    limits: Limits,
 }
 
-impl fmt::Debug for SourceBackedTailAppendEdit {
+impl fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SourceBackedTailAppendEdit")
+            .debug_struct("Edit")
             .field("package", &self.package)
             .field("title_bytes", &self.title.len())
             .field("body_bytes", &self.body.len())
@@ -317,7 +319,7 @@ impl fmt::Debug for SourceBackedTailAppendEdit {
     }
 }
 
-impl SourceBackedTailAppendEdit {
+impl Edit {
     /// Open an ODP positional source and stage one plain title/body slide.
     ///
     /// # Errors
@@ -343,23 +345,22 @@ impl SourceBackedTailAppendEdit {
         title: impl Into<String>,
         body: impl Into<String>,
     ) -> std::result::Result<Self, litchi_odf_common::Error> {
-        let package =
-            SourceBackedPackage::from_read_at_with_limits(source, options.source_limits_value())?;
+        let package = SourceBackedPackage::from_read_at_with_options(source, options)?;
         let package = Arc::new(package);
         if package.mimetype()? != ODF_PRESENTATION {
-            return Err(Error::InvalidFormat(format!(
+            return Err(CoreError::InvalidFormat(format!(
                 "expected {FAMILY_NAME} package MIME type '{ODF_PRESENTATION}'"
             ))
             .into());
         }
         let title = title.into();
         let body = body.into();
-        validate_text_core(&title, &body, TailAppendLimits::default().max_text_bytes)?;
+        validate_text_core(&title, &body, Limits::default().max_text_bytes)?;
         Ok(Self {
             package,
             title,
             body,
-            limits: TailAppendLimits::default(),
+            limits: Limits::default(),
         })
     }
 
@@ -368,8 +369,8 @@ impl SourceBackedTailAppendEdit {
         package: Arc<SourceBackedPackage>,
         title: impl Into<String>,
         body: impl Into<String>,
-    ) -> std::result::Result<Self, TailAppendError> {
-        Self::with_limits(package, title, body, TailAppendLimits::default())
+    ) -> std::result::Result<Self, Error> {
+        Self::with_limits(package, title, body, Limits::default())
     }
 
     /// Start from an already indexed package with explicit append bounds.
@@ -377,9 +378,9 @@ impl SourceBackedTailAppendEdit {
         package: Arc<SourceBackedPackage>,
         title: impl Into<String>,
         body: impl Into<String>,
-        limits: TailAppendLimits,
-    ) -> std::result::Result<Self, TailAppendError> {
-        let mimetype = package.mimetype().map_err(TailAppendError::Invalid)?;
+        limits: Limits,
+    ) -> std::result::Result<Self, Error> {
+        let mimetype = package.mimetype().map_err(Error::Invalid)?;
         if mimetype != ODF_PRESENTATION {
             return Err(invalid(format!(
                 "expected {FAMILY_NAME} package MIME type '{ODF_PRESENTATION}'"
@@ -404,7 +405,7 @@ impl SourceBackedTailAppendEdit {
 
     /// Return the configured append bounds.
     #[must_use]
-    pub const fn limits(&self) -> TailAppendLimits {
+    pub const fn limits(&self) -> Limits {
         self.limits
     }
 
@@ -412,7 +413,7 @@ impl SourceBackedTailAppendEdit {
     pub fn plan(
         self,
         options: &SourceContentPublicationOptions,
-    ) -> std::result::Result<SourceBackedTailAppendPublicationPlan, TailAppendError> {
+    ) -> std::result::Result<PublicationPlan, Error> {
         let Self {
             package,
             title,
@@ -420,10 +421,10 @@ impl SourceBackedTailAppendEdit {
             limits,
         } = self;
         check_plan_options(options)?;
-        let source_version = package.source_version().map_err(TailAppendError::Invalid)?;
+        let source_version = package.source_version().map_err(Error::Invalid)?;
         let content_bytes = package
             .member_materialized_size(ODF_CONTENT)
-            .map_err(TailAppendError::Invalid)?
+            .map_err(Error::Invalid)?
             .ok_or_else(|| invalid("ODP package has no content.xml"))?;
         if content_bytes > limits.max_content_xml_bytes {
             return Err(invalid("ODP content.xml exceeds the source append limit"));
@@ -448,17 +449,15 @@ impl SourceBackedTailAppendEdit {
                 retained_text_capacity,
                 limits.max_fragment_bytes,
             )
-            .map_err(TailAppendError::Invalid)?;
+            .map_err(Error::Invalid)?;
             let _memory = reserve_fragment_memory(options, readback_bound)?;
             let fragment = build_plain_page(&page_name, &title, &body, limits.max_fragment_bytes)?;
             // Keep the reservation alive while the exact authored fragment is
             // audited by the established ODP parser.  The parser sees only
             // this bounded page wrapped in a small, locally namespace-bound
             // document; the source content remains cold and opaque.
-            validate_generated_page_semantics(&fragment, &title, &body)
-                .map_err(TailAppendError::Invalid)?;
-            let authored =
-                AuthoredXmlFragment::markup(fragment).map_err(TailAppendError::Invalid)?;
+            validate_generated_page_semantics(&fragment, &title, &body).map_err(Error::Invalid)?;
+            let authored = AuthoredXmlFragment::markup(fragment).map_err(Error::Invalid)?;
             // Release submitted allocations while their reservation is still
             // held; only the authored fragment enters common planning.
             drop(title);
@@ -481,15 +480,15 @@ impl SourceBackedTailAppendEdit {
                 1_000_000,
                 candidate_token_bytes,
             )
-            .map_err(TailAppendError::Invalid)?,
+            .map_err(Error::Invalid)?,
             options,
             |event, tracker| validator.observe(event, tracker),
         )
-        .map_err(TailAppendError::Plan)?;
+        .map_err(Error::Plan)?;
 
-        Ok(SourceBackedTailAppendPublicationPlan {
+        Ok(PublicationPlan {
             common,
-            proof: TailAppendSourceProof {
+            proof: SourceProof {
                 source_version,
                 content_bytes,
                 insert_at: first.insert_at,
@@ -501,24 +500,24 @@ impl SourceBackedTailAppendEdit {
 }
 
 /// A fully source-proved ODP append publication plan.
-pub struct SourceBackedTailAppendPublicationPlan {
+pub struct PublicationPlan {
     common: SourceContentInsertionPlan,
-    proof: TailAppendSourceProof,
+    proof: SourceProof,
 }
 
-impl fmt::Debug for SourceBackedTailAppendPublicationPlan {
+impl fmt::Debug for PublicationPlan {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SourceBackedTailAppendPublicationPlan")
+            .debug_struct("PublicationPlan")
             .field("proof", &self.proof)
             .finish_non_exhaustive()
     }
 }
 
-impl SourceBackedTailAppendPublicationPlan {
+impl PublicationPlan {
     /// Return the ODP source proof.
     #[must_use]
-    pub const fn proof(&self) -> &TailAppendSourceProof {
+    pub const fn proof(&self) -> &SourceProof {
         &self.proof
     }
 
@@ -575,10 +574,10 @@ impl SourceBackedTailAppendPublicationPlan {
         &self,
         sink: W,
         options: SourceContentPublicationOptions,
-    ) -> std::result::Result<SourceContentPublicationReport, TailAppendError> {
+    ) -> std::result::Result<SourceContentPublicationReport, Error> {
         self.common
             .write_to(sink, options)
-            .map_err(TailAppendError::Publication)
+            .map_err(Error::Publication)
     }
 }
 
@@ -591,9 +590,9 @@ struct ScanFacts {
 
 fn scan_source(
     package: &SourceBackedPackage,
-    limits: TailAppendLimits,
+    limits: Limits,
     options: &SourceContentPublicationOptions,
-) -> std::result::Result<ScanFacts, TailAppendError> {
+) -> std::result::Result<ScanFacts, Error> {
     let mut facts = ScanFacts {
         content_bytes: 0,
         insert_at: 0,
@@ -606,7 +605,7 @@ fn scan_source(
         1_000_000,
         64 * 1024,
     )
-    .map_err(TailAppendError::Invalid)?;
+    .map_err(Error::Invalid)?;
     let mut state = OdpScanState::default();
     let report = scan_source_content(
         package,
@@ -617,15 +616,15 @@ fn scan_source(
         },
     )
     .map_err(|error| match error {
-        SourceContentScanError::Publication(error) => TailAppendError::Plan(error),
-        SourceContentScanError::SourceMember(error) => TailAppendError::SourceMember(error),
-        _ => TailAppendError::Invalid(Error::InvalidFormat(
+        SourceContentScanError::Publication(error) => Error::Plan(error),
+        SourceContentScanError::SourceMember(error) => Error::SourceMember(error),
+        _ => Error::Invalid(CoreError::InvalidFormat(
             "unknown source-content scan failure".to_string(),
         )),
     })?;
     facts.content_bytes = report.bytes();
     facts.slide_count = state.pages_seen;
-    state.finish(&facts).map_err(TailAppendError::Invalid)?;
+    state.finish(&facts).map_err(Error::Invalid)?;
     Ok(facts)
 }
 
@@ -658,7 +657,7 @@ impl OdpScanState {
         event: &XmlStreamEvent<'_>,
         tracker: &BindingTracker,
         facts: &mut ScanFacts,
-        limits: TailAppendLimits,
+        limits: Limits,
     ) -> Result<()> {
         self.content_bytes = self.content_bytes.max(event.end());
         if self.content_bytes > limits.max_content_xml_bytes {
@@ -1144,8 +1143,8 @@ impl CandidateValidator {
     }
 }
 
-fn candidate_invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn candidate_invalid(message: impl Into<String>) -> CoreError {
+    CoreError::InvalidFormat(message.into())
 }
 
 fn page_name_matches_core(
@@ -1156,7 +1155,7 @@ fn page_name_matches_core(
 ) -> Result<bool> {
     for attribute in element.attributes().with_checks(false) {
         let attribute = attribute.map_err(|error| {
-            Error::InvalidFormat(format!("invalid ODP draw:page attribute: {error}"))
+            CoreError::InvalidFormat(format!("invalid ODP draw:page attribute: {error}"))
         })?;
         let (namespace, local) = tracker.resolve_attribute(attribute.key).map_err(|error| {
             error.into_litchi_error_with_context(|| "invalid ODP attribute namespace".to_string())
@@ -1166,7 +1165,9 @@ fn page_name_matches_core(
         {
             let value = attribute
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
-                .map_err(|error| Error::InvalidFormat(format!("invalid ODP draw:name: {error}")))?;
+                .map_err(|error| {
+                    CoreError::InvalidFormat(format!("invalid ODP draw:name: {error}"))
+                })?;
             return Ok(value == expected);
         }
     }
@@ -1183,11 +1184,13 @@ fn validate_generated_page_semantics(fragment: &[u8], title: &str, body: &str) -
         .len()
         .checked_add(fragment.len())
         .and_then(|length| length.checked_add(GENERATED_DOCUMENT_SUFFIX.len()))
-        .ok_or_else(|| Error::InvalidFormat("ODP generated document size overflow".to_string()))?;
+        .ok_or_else(|| {
+            CoreError::InvalidFormat("ODP generated document size overflow".to_string())
+        })?;
     let mut document = Vec::new();
     document
         .try_reserve_exact(length)
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "ODP generated semantic readback document",
             source,
         })?;
@@ -1195,25 +1198,25 @@ fn validate_generated_page_semantics(fragment: &[u8], title: &str, body: &str) -
     document.extend_from_slice(fragment);
     document.extend_from_slice(GENERATED_DOCUMENT_SUFFIX);
     let document = std::str::from_utf8(&document).map_err(|error| {
-        Error::InvalidFormat(format!("generated ODP page is not UTF-8: {error}"))
+        CoreError::InvalidFormat(format!("generated ODP page is not UTF-8: {error}"))
     })?;
     let slides = crate::codec::Parser::parse_slides_with_styles(document, None)?;
     let slide = slides.first().ok_or_else(|| {
-        Error::InvalidFormat("ODP generated page semantic readback found no slide".to_string())
+        CoreError::InvalidFormat("ODP generated page semantic readback found no slide".to_string())
     })?;
     if slides.len() != 1 {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODP generated page semantic readback found more than one slide".to_string(),
         ));
     }
     if slide.title.as_deref().unwrap_or_default() != title {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODP generated title does not survive the established parser projection".to_string(),
         ));
     }
     if body.trim().is_empty() {
         if !slide.text.is_empty() {
-            return Err(Error::InvalidFormat(
+            return Err(CoreError::InvalidFormat(
                 "ODP generated whitespace-only body unexpectedly entered the slide text projection"
                     .to_string(),
             ));
@@ -1224,7 +1227,7 @@ fn validate_generated_page_semantics(fragment: &[u8], title: &str, body: &str) -
                 continue;
             }
             if object_shape.replace(shape).is_some() {
-                return Err(Error::InvalidFormat(
+                return Err(CoreError::InvalidFormat(
                     "ODP generated whitespace-only body produced multiple object shapes"
                         .to_string(),
                 ));
@@ -1232,47 +1235,43 @@ fn validate_generated_page_semantics(fragment: &[u8], title: &str, body: &str) -
         }
         if body.is_empty() {
             if object_shape.is_some() {
-                return Err(Error::InvalidFormat(
+                return Err(CoreError::InvalidFormat(
                     "ODP generated empty body produced an object shape".to_string(),
                 ));
             }
         } else {
             let shape = object_shape.ok_or_else(|| {
-                Error::InvalidFormat(
+                CoreError::InvalidFormat(
                     "ODP generated whitespace-only body was not retained as an object shape"
                         .to_string(),
                 )
             })?;
             if shape.text()? != body {
-                return Err(Error::InvalidFormat(
+                return Err(CoreError::InvalidFormat(
                     "ODP generated whitespace-only body does not survive object-shape readback"
                         .to_string(),
                 ));
             }
         }
     } else if slide.text != body {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODP generated body does not survive the established parser projection".to_string(),
         ));
     }
     Ok(())
 }
 
-fn validate_text(
-    title: &str,
-    body: &str,
-    maximum: usize,
-) -> std::result::Result<(), TailAppendError> {
-    validate_text_core(title, body, maximum).map_err(TailAppendError::Invalid)
+fn validate_text(title: &str, body: &str, maximum: usize) -> std::result::Result<(), Error> {
+    validate_text_core(title, body, maximum).map_err(Error::Invalid)
 }
 
 fn validate_text_core(title: &str, body: &str, maximum: usize) -> Result<()> {
     let bytes = title
         .len()
         .checked_add(body.len())
-        .ok_or_else(|| Error::InvalidFormat("ODP slide text size overflow".to_string()))?;
+        .ok_or_else(|| CoreError::InvalidFormat("ODP slide text size overflow".to_string()))?;
     if bytes > maximum {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODP slide text exceeds the append limit".to_string(),
         ));
     }
@@ -1281,7 +1280,7 @@ fn validate_text_core(title: &str, body: &str, maximum: usize) -> Result<()> {
         .chain(body.chars())
         .any(|character| character == '\r')
     {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODP slide text contains a carriage return; use '\\n' for paragraph breaks".to_string(),
         ));
     }
@@ -1292,14 +1291,14 @@ fn validate_text_core(title: &str, body: &str, maximum: usize) -> Result<()> {
                 | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..='\u{10FFFF}'
         )
     }) {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODP slide text contains a character forbidden by XML 1.0".to_string(),
         ));
     }
     if title.chars().chain(body.chars()).any(|character| {
         character.is_whitespace() && !matches!(character, ' ' | '\t' | '\n' | '\r')
     }) {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODP slide text contains Unicode whitespace that the established parser normalizes; use spaces, tabs, or newlines".to_string(),
         ));
     }
@@ -1311,7 +1310,7 @@ fn build_plain_page(
     title: &str,
     body: &str,
     maximum: usize,
-) -> std::result::Result<Vec<u8>, TailAppendError> {
+) -> std::result::Result<Vec<u8>, Error> {
     let mut output = Vec::new();
     append_limited(
         &mut output,
@@ -1349,7 +1348,7 @@ fn append_limited(
     output: &mut Vec<u8>,
     bytes: &[u8],
     maximum: usize,
-) -> std::result::Result<(), TailAppendError> {
+) -> std::result::Result<(), Error> {
     let required = output
         .len()
         .checked_add(bytes.len())
@@ -1368,7 +1367,7 @@ fn append_escaped_text(
     output: &mut Vec<u8>,
     text: &str,
     maximum: usize,
-) -> std::result::Result<(), TailAppendError> {
+) -> std::result::Result<(), Error> {
     for character in text.chars() {
         append_escaped_char(output, character, maximum)?;
     }
@@ -1379,7 +1378,7 @@ fn append_escaped_char(
     output: &mut Vec<u8>,
     character: char,
     maximum: usize,
-) -> std::result::Result<(), TailAppendError> {
+) -> std::result::Result<(), Error> {
     match character {
         '&' => append_limited(output, b"&amp;", maximum),
         '<' => append_limited(output, b"&lt;", maximum),
@@ -1398,7 +1397,7 @@ fn append_text_paragraphs(
     output: &mut Vec<u8>,
     text: &str,
     maximum: usize,
-) -> std::result::Result<(), TailAppendError> {
+) -> std::result::Result<(), Error> {
     for paragraph in text.split('\n') {
         append_limited(output, b"<text:p>", maximum)?;
         append_encoded_paragraph(output, paragraph, maximum)?;
@@ -1411,7 +1410,7 @@ fn append_encoded_paragraph(
     output: &mut Vec<u8>,
     paragraph: &str,
     maximum: usize,
-) -> std::result::Result<(), TailAppendError> {
+) -> std::result::Result<(), Error> {
     let mut characters = paragraph.chars().peekable();
     let mut encoded_any = false;
     while let Some(character) = characters.next() {
@@ -1487,13 +1486,11 @@ mod tests {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}"><office:body><office:presentation></office:presentation></office:body></office:document-content>"#,
         );
-        let edit =
-            SourceBackedTailAppendEdit::from_read_at(source_package(&content), "title", "body")
-                .unwrap();
+        let edit = Edit::from_read_at(source_package(&content), "title", "body").unwrap();
         let error = edit.plan(&plan_options()).unwrap_err();
         assert!(matches!(
             error,
-            TailAppendError::Invalid(Error::InvalidFormat(message))
+            Error::Invalid(CoreError::InvalidFormat(message))
                 if message.contains("non-empty")
         ));
     }
@@ -1503,13 +1500,11 @@ mod tests {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}"><office:body><office:presentation/></office:body></office:document-content>"#,
         );
-        let edit =
-            SourceBackedTailAppendEdit::from_read_at(source_package(&content), "title", "body")
-                .unwrap();
+        let edit = Edit::from_read_at(source_package(&content), "title", "body").unwrap();
         let error = edit.plan(&plan_options()).unwrap_err();
         assert!(matches!(
             error,
-            TailAppendError::Invalid(Error::InvalidFormat(message))
+            Error::Invalid(CoreError::InvalidFormat(message))
                 if message.contains("non-empty") || message.contains("self-closing")
         ));
     }
@@ -1519,14 +1514,12 @@ mod tests {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page draw:name="page2"/></office:presentation></office:body></office:document-content>"#,
         );
-        let edit =
-            SourceBackedTailAppendEdit::from_read_at(source_package(&content), "title", "body")
-                .unwrap();
+        let edit = Edit::from_read_at(source_package(&content), "title", "body").unwrap();
         let error = edit.plan(&plan_options()).unwrap_err();
         assert!(matches!(
             error,
-            TailAppendError::Plan(SourceContentPublicationError::Core(
-                Error::InvalidFormat(message)
+            Error::Plan(SourceContentPublicationError::Core(
+                CoreError::InvalidFormat(message)
             )) if message.contains("generated page")
         ));
     }
@@ -1536,9 +1529,7 @@ mod tests {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}" xmlns:presentation="{PRESENTATION_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page draw:name="page1"/><presentation:settings presentation:start-page="page1"/><!--tail-token--></office:presentation></office:body></office:document-content>"#,
         );
-        let edit =
-            SourceBackedTailAppendEdit::from_read_at(source_package(&content), "title", "body")
-                .unwrap();
+        let edit = Edit::from_read_at(source_package(&content), "title", "body").unwrap();
         let options = plan_options();
         let plan = edit.plan(&options).unwrap();
         let mut output = Vec::new();
@@ -1561,8 +1552,7 @@ mod tests {
         );
         let title = "A & < B > \"C\" ' 😀\t\nnext";
         let body = "  body  \n第二行";
-        let edit = SourceBackedTailAppendEdit::from_read_at(source_package(&content), title, body)
-            .unwrap();
+        let edit = Edit::from_read_at(source_package(&content), title, body).unwrap();
         let options = plan_options();
         let plan = edit.plan(&options).unwrap();
         let mut output = Vec::new();
@@ -1589,9 +1579,7 @@ mod tests {
             r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page draw:name="page1"/></office:presentation></office:body></office:document-content>"#,
         );
         let body = " \t\n  ";
-        let edit =
-            SourceBackedTailAppendEdit::from_read_at(source_package(&content), "title", body)
-                .unwrap();
+        let edit = Edit::from_read_at(source_package(&content), "title", body).unwrap();
         let options = plan_options();
         let plan = edit.plan(&options).unwrap();
         let mut output = Vec::new();
@@ -1629,15 +1617,11 @@ mod tests {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page draw:name="page1"/></office:presentation></office:body></office:document-content>"#,
         );
-        let error = SourceBackedTailAppendEdit::from_read_at(
-            source_package(&content),
-            "title\u{2003}",
-            "body",
-        )
-        .unwrap_err();
+        let error =
+            Edit::from_read_at(source_package(&content), "title\u{2003}", "body").unwrap_err();
         assert!(matches!(
             error,
-            litchi_odf_common::Error::Core(Error::InvalidFormat(message))
+            litchi_odf_common::Error::Core(CoreError::InvalidFormat(message))
                 if message.contains("Unicode whitespace")
         ));
     }
@@ -1657,7 +1641,7 @@ mod tests {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page draw:name="page1"/></office:presentation></office:body></office:document-content>"#,
         );
-        let error = SourceBackedTailAppendEdit::from_read_at(
+        let error = Edit::from_read_at(
             source_package(&content),
             "title\rwith carriage return",
             "body",
@@ -1665,7 +1649,7 @@ mod tests {
         .unwrap_err();
         assert!(matches!(
             error,
-            litchi_odf_common::Error::Core(Error::InvalidFormat(message))
+            litchi_odf_common::Error::Core(CoreError::InvalidFormat(message))
                 if message.contains("carriage return")
         ));
     }
@@ -1675,9 +1659,7 @@ mod tests {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}" xmlns:presentation="{PRESENTATION_NAMESPACE_UTF8}"><office:body><office:presentation><presentation:settings presentation:start-page="page1"/><draw:page draw:name="page1"/></office:presentation></office:body></office:document-content>"#,
         );
-        let edit =
-            SourceBackedTailAppendEdit::from_read_at(source_package(&content), "title", "body")
-                .unwrap();
+        let edit = Edit::from_read_at(source_package(&content), "title", "body").unwrap();
         let options = plan_options();
         let plan = edit.plan(&options).unwrap();
         let mut output = Vec::new();
