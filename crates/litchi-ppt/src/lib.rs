@@ -64,6 +64,7 @@ mod binary_tag_edit;
 mod consts;
 mod officeart_wire;
 mod record_wire;
+mod scoped;
 
 pub use consts::RecordType;
 // Core modules
@@ -255,10 +256,10 @@ pub use external_media::{
     Video,
 };
 pub use font::{
-    Commit as FontCommit, EmbeddedFont, EotMetadata, Facet as FontFacet, Font, FontCollection,
-    FontCollections, FontEmbeddingFlags, Limits as FontLimits, PackageLimits as FontPackageLimits,
-    PackageOptions as FontPackageOptions, Patch as FontPatch, Revision as FontRevision,
-    Scope as FontScope, Snapshot as FontSnapshot, Transaction as FontTransaction,
+    EmbeddedFont, EotMetadata, Facet as FontFacet, Font, FontCollection, FontCollections,
+    FontEmbeddingFlags, Limits as FontLimits, PackageLimits as FontPackageLimits,
+    PackageOptions as FontPackageOptions, Revision as FontRevision, Scope as FontScope,
+    Snapshot as FontSnapshot,
 };
 pub use header_footer::{
     DateTimeFormatId, HeaderFooter, HeaderFooterDisplayText, HeaderFooterOptions,

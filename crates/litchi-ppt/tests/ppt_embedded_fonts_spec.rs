@@ -14,8 +14,8 @@
 #[cfg(feature = "encryption")]
 use litchi_ppt::FontPackageOptions;
 use litchi_ppt::{
-    Error, Font, FontCollection, FontEmbeddingFlags, FontScope, FontSnapshot, Record, RecordType,
-    SourceLimitKind, SourceLimits,
+    Error, Font, FontCollection, FontEmbeddingFlags, FontScope, FontSnapshot, Package, Record,
+    RecordType, SourceLimitKind, SourceLimits, font,
 };
 use std::io::Cursor;
 
@@ -335,18 +335,17 @@ fn signed_source_allows_exact_no_op_but_refuses_changed_font_commit() {
         &["_xmlsignatures", "origin.sigs"],
         b"fixture",
     );
-    let snapshot =
-        FontSnapshot::from_bytes(source.clone()).expect("signed PPT remains inspectable");
+    let package = Package::from_bytes(&source).expect("signed PPT remains inspectable");
 
-    let commit = snapshot.edit().unwrap().commit().expect("exact no-op");
-    assert!(commit.patch().is_empty());
-    assert_eq!(commit.snapshot().bytes(), source);
+    let commit = package.edit_fonts().unwrap().commit().expect("exact no-op");
+    assert!(commit.patch().is_noop());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().to_bytes().unwrap(), source);
 
-    let mut transaction = snapshot.edit().unwrap();
-    transaction
-        .append_font(FontScope::Base, Font::new("Changed"))
+    let mut edit = package.edit_fonts().unwrap();
+    edit.append_font(FontScope::Base, Font::new("Changed"))
         .unwrap();
-    assert!(transaction.commit().is_err());
+    assert!(matches!(edit.commit(), Err(font::Error::Signed)));
 }
 
 #[test]
@@ -362,14 +361,15 @@ fn signed_inconsistent_save_with_fonts_flag_is_preserved_on_exact_no_op() {
             .all(|font| font.embedded_fonts.is_empty())
     }));
 
-    let commit = snapshot.edit().unwrap().commit().expect("exact no-op");
-    assert!(commit.patch().is_empty());
-    assert_eq!(commit.snapshot().bytes(), source);
+    let package = Package::from_bytes(&source).expect("signed PPT opens");
+    let commit = package.edit_fonts().unwrap().commit().expect("exact no-op");
+    assert!(commit.patch().is_noop());
+    assert_eq!(commit.package().to_bytes().unwrap(), source);
 }
 
 #[test]
 #[cfg(feature = "encryption")]
-fn encrypted_source_allows_exact_no_op_but_refuses_changed_font_commit() {
+fn encrypted_source_allows_font_inspection_but_refuses_font_edits() {
     let password = "font fixture password";
     let source = encrypted_ppt(password);
     let snapshot = FontSnapshot::from_bytes_with_options(
@@ -380,16 +380,17 @@ fn encrypted_source_allows_exact_no_op_but_refuses_changed_font_commit() {
         },
     )
     .expect("password-authorized font inspection");
+    assert!(snapshot.fonts().base.is_some());
 
-    let commit = snapshot.edit().unwrap().commit().expect("exact no-op");
-    assert!(commit.patch().is_empty());
-    assert_eq!(commit.snapshot().bytes(), source);
-
-    let mut transaction = snapshot.edit().unwrap();
-    transaction
-        .append_font(FontScope::Base, Font::new("Changed"))
-        .unwrap();
-    assert!(transaction.commit().is_err());
+    let package = Package::from_bytes_with_options(
+        &source,
+        litchi_ppt::OpenOptions::new().password(password),
+    )
+    .expect("password-authorized open");
+    assert!(matches!(
+        package.edit_fonts(),
+        Err(font::Error::Package(Error::EncryptionPolicy))
+    ));
 }
 
 #[test]
@@ -402,15 +403,15 @@ fn empty_root_and_nested_protection_storages_refuse_changed_publication() {
         &["Nested", "\u{9}drmvIEWERcONTENT"][..],
     ] {
         let source = with_storage(unsigned_ppt(), path);
-        let snapshot = FontSnapshot::from_bytes(source.clone()).expect("protected PPT inspection");
-        let no_op = snapshot
-            .edit()
+        let package = Package::from_bytes(&source).expect("protected PPT inspection");
+        let no_op = package
+            .edit_fonts()
             .unwrap()
             .commit()
             .expect("exact protected no-op");
-        assert_eq!(no_op.snapshot().bytes(), source);
+        assert_eq!(no_op.package().to_bytes().unwrap(), source);
 
-        let mut changed = snapshot.edit().unwrap();
+        let mut changed = package.edit_fonts().unwrap();
         changed
             .append_font(FontScope::Base, Font::new("Changed"))
             .unwrap();

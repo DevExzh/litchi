@@ -1256,19 +1256,9 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn broadcasts(&self) -> Result<crate::Broadcasts> {
-        let records = self.inner.parser.find_records_ref();
-        let mut documents = records
-            .into_iter()
-            .filter(|record| record.record_type == RecordType::Document);
-        let document = documents.next().ok_or_else(|| {
-            Error::Corrupted("PowerPoint document has no Document container".to_string())
-        })?;
-        if documents.next().is_some() {
-            return Err(Error::Corrupted(
-                "PowerPoint document has multiple Document containers".to_string(),
-            ));
-        }
-        crate::Broadcasts::parse_document(document)
+        // The live document: an incrementally saved presentation keeps its
+        // superseded `DocumentContainer` records in the stream (record 0357).
+        crate::Broadcasts::parse_document(&self.live_document_record()?)
     }
 
     /// Return the structurally decoded, inert `PowerPoint` 9 mail envelope.

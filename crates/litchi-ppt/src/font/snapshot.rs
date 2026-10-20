@@ -198,8 +198,9 @@ impl Snapshot {
     ///
     /// Returns an error if the transaction cannot be initialized from this
     /// snapshot.
-    pub fn edit(&self) -> Result<super::Transaction> {
-        Ok(super::Transaction::new(self.clone()))
+    #[cfg(test)]
+    pub(crate) fn edit(&self) -> Result<super::transaction::Transaction> {
+        Ok(super::transaction::Transaction::new(self.clone()))
     }
 }
 

@@ -5536,11 +5536,68 @@
           "name": "Transaction",
           "scope": "litchi_ppt::text_edit",
           "replacement": "use Package::edit / package::edit::Edit (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::font",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::font",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::font",
+          "replacement": "use the family's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::font::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::broadcast",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::broadcast",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::broadcast",
+          "replacement": "use the family's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::broadcast::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "FontTransaction",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::font::Edit via Package::edit_fonts"
+        },
+        {
+          "name": "FontCommit",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::font::Commit"
+        },
+        {
+          "name": "FontPatch",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::font::Patch"
         }
       ],
       "families": [
         "litchi_ppt::package::edit",
-        "litchi_ppt::package::metadata"
+        "litchi_ppt::package::metadata",
+        "litchi_ppt::font",
+        "litchi_ppt::broadcast"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
@@ -5845,11 +5902,68 @@
           "name": "Transaction",
           "scope": "litchi_ppt::text_edit",
           "replacement": "use Package::edit / package::edit::Edit (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::font",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::font",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::font",
+          "replacement": "use the family's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::font::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::broadcast",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::broadcast",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::broadcast",
+          "replacement": "use the family's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::broadcast::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "FontTransaction",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::font::Edit via Package::edit_fonts"
+        },
+        {
+          "name": "FontCommit",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::font::Commit"
+        },
+        {
+          "name": "FontPatch",
+          "scope": "litchi_ppt",
+          "replacement": "use litchi_ppt::font::Patch"
         }
       ],
       "families": [
         "litchi_ppt::package::edit",
-        "litchi_ppt::package::metadata"
+        "litchi_ppt::package::metadata",
+        "litchi_ppt::font",
+        "litchi_ppt::broadcast"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
