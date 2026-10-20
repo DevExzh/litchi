@@ -1,6 +1,7 @@
-//! Transactional persisted-record rewrite for `PowerPoint` OLE objects.
+//! Append-only persisted-record rewrite for `PowerPoint` packages.
 //!
-//! [`Editor`] is intentionally kept as the small ergonomic facade.  Its
+//! [`Editor`] is the crate-private record publisher behind
+//! [`super::Edit`] and the other scoped families.  Its
 //! implementation is divided by responsibility so that opening an OLE
 //! package, reading and mapping persisted records, staging mutations, and
 //! emitting an incremental edit remain independently auditable.
@@ -28,7 +29,7 @@ type Result<T> = std::result::Result<T, Error>;
 
 /// Appends a new PPT incremental edit; existing persisted bytes never move.
 #[derive(Clone)]
-pub struct Editor {
+pub(crate) struct Editor {
     pub(super) original: Arc<[u8]>,
     pub(super) max_output_bytes: usize,
     /// Every stream in source order. Entries whose path is `document_path` or
@@ -95,7 +96,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn open(bytes: Vec<u8>, collection: Collection) -> Result<Self> {
+    pub(crate) fn open(bytes: Vec<u8>, collection: Collection) -> Result<Self> {
         lifecycle::open(Arc::from(bytes), collection)
     }
 
@@ -105,7 +106,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn open_records(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn open_records(bytes: Vec<u8>) -> Result<Self> {
         lifecycle::open_records(Arc::from(bytes))
     }
 
@@ -125,19 +126,17 @@ impl Editor {
     /// re-lays out the whole container.
     ///
     /// Both policies publish the same logical package.
-    pub const fn set_sector_layout_policy(&mut self, policy: litchi_cfb::SectorLayoutPolicy) {
+    #[cfg(test)]
+    pub(crate) const fn set_sector_layout_policy(
+        &mut self,
+        policy: litchi_cfb::SectorLayoutPolicy,
+    ) {
         self.layout = policy;
-    }
-
-    /// The sector-layout policy a finished package will apply.
-    #[must_use]
-    pub const fn sector_layout_policy(&self) -> litchi_cfb::SectorLayoutPolicy {
-        self.layout
     }
 
     /// Live persisted identifiers in ascending order.
     #[must_use]
-    pub fn persist_ids(&self) -> Vec<u32> {
+    pub(crate) fn persist_ids(&self) -> Vec<u32> {
         lifecycle::persist_ids(self)
     }
 
@@ -146,7 +145,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if serialization fails or the underlying writer reports an error.
-    pub fn persisted_record(&self, persist_id: u32) -> Result<Vec<u8>> {
+    pub(crate) fn persisted_record(&self, persist_id: u32) -> Result<Vec<u8>> {
         lifecycle::persisted_record(self, persist_id)
     }
 
@@ -155,7 +154,11 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace_persisted_record(&mut self, persist_id: u32, record: Vec<u8>) -> Result<()> {
+    pub(crate) fn replace_persisted_record(
+        &mut self,
+        persist_id: u32,
+        record: Vec<u8>,
+    ) -> Result<()> {
         mutation::replace_persisted_record(self, persist_id, record)
     }
 
@@ -196,7 +199,7 @@ impl Editor {
 
     /// Returns the typed embedded-object collection represented by this edit.
     #[must_use]
-    pub fn objects(&self) -> &Collection {
+    pub(crate) fn objects(&self) -> &Collection {
         &self.collection
     }
 
@@ -205,7 +208,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn add(&mut self, object: ExternalObject, storage: Storage) -> Result<u32> {
+    pub(crate) fn add(&mut self, object: ExternalObject, storage: Storage) -> Result<u32> {
         mutation::add(self, object, storage)
     }
 
@@ -214,7 +217,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace_storage(&mut self, persist_id: u32, storage: Storage) -> Result<()> {
+    pub(crate) fn replace_storage(&mut self, persist_id: u32, storage: Storage) -> Result<()> {
         mutation::replace_storage(self, persist_id, storage)
     }
 
@@ -224,7 +227,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn remove(&mut self, id: u32) -> Result<ExternalObject> {
+    pub(crate) fn remove(&mut self, id: u32) -> Result<ExternalObject> {
         mutation::remove(self, id)
     }
 
@@ -233,8 +236,31 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn reorder(&mut self, ids: &[u32]) -> Result<()> {
+    pub(crate) fn reorder(&mut self, ids: &[u32]) -> Result<()> {
         mutation::reorder(self, ids)
+    }
+
+    /// Whether the staged state differs from `source` and the live records:
+    /// a reorder back to the source order or a storage replacement with the
+    /// exact live record is no net change.
+    pub(crate) fn has_net_change(&self, source: &Collection) -> Result<bool> {
+        if !self.changed {
+            return Ok(false);
+        }
+        if self.collection != *source || !self.removed_persist_ids.is_empty() {
+            return Ok(true);
+        }
+        for (persist_id, record) in &self.staged_storage {
+            let Some(offset) = self.mappings.get(persist_id) else {
+                return Ok(true);
+            };
+            let offset = usize::try_from(*offset)
+                .map_err(|_err| Error::Corrupted("persist offset exceeds usize".into()))?;
+            if rewrite::slice(&self.document, offset)? != record.as_slice() {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     /// Emits the staged changes as one PPT incremental edit.
@@ -242,7 +268,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn finish(self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(self) -> Result<Vec<u8>> {
         transaction::finish(self)
     }
 }

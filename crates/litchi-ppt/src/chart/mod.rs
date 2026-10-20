@@ -1,9 +1,9 @@
-//! Neutral, inert chart views and bounded Graph-package transactions for
+//! Neutral, inert chart views and bounded Graph-package drafts for
 //! legacy `PowerPoint` OLE objects.
 //!
 //! PPT owns only external-object discovery, frame attribution, storage
 //! decompression, and host metadata. `[MS-OGRAPH]` Workbook validation and
-//! chart traversal belong to [`litchi_ograph`]. [`PackageEditor`] only replaces
+//! chart traversal belong to [`litchi_ograph`]. [`GraphPackage`] only replaces
 //! an existing standalone Graph chart stream; linked objects are never opened.
 
 /// Host-neutral typed MS-OGRAPH semantic chart model and validation
@@ -23,13 +23,14 @@ pub mod semantic {
 }
 
 mod codec;
+mod draft;
 mod model;
 mod package;
-mod transaction;
 
 #[cfg(test)]
 mod tests;
 
+pub use draft::{GraphPackage, View};
 #[allow(
     clippy::module_name_repetitions,
     reason = "`SemanticChart`/`SemanticCharts` are the established public API names mirroring the `litchi-ograph` semantic model; renaming them would break downstream crates"
@@ -37,6 +38,5 @@ mod tests;
 pub use model::{
     Chart, Excel, Failure, Frame, Graph, Info, Inventory, Kind, SemanticChart, SemanticCharts,
 };
-pub use transaction::{PackageEditor, Snapshot};
 
 pub(crate) use package::enumerate;

@@ -196,7 +196,7 @@ impl Builder {
     ///
     /// Returns an error if the interaction fails validation, references an
     /// unknown hyperlink, the slide does not exist, or the slide has no shapes.
-    pub fn set_last_shape_interaction_with_limits(
+    pub(crate) fn set_last_shape_interaction_with_limits(
         &mut self,
         slide: usize,
         interaction: crate::Interaction,
@@ -320,7 +320,7 @@ impl Builder {
     /// Returns an error if the interaction references an unknown hyperlink, the
     /// slide does not exist, the slide has no shapes, the UTF-16 range is invalid
     /// for the shape text, or the configured interaction count limit is exceeded.
-    pub fn set_last_shape_text_interaction_with_limits(
+    pub(crate) fn set_last_shape_text_interaction_with_limits(
         &mut self,
         slide: usize,
         interaction: crate::TextInteraction,

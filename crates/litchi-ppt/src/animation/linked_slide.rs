@@ -81,7 +81,10 @@ impl LinkedSlide {
     /// Returns an error if the record type, header fields, or payload do not
     /// match the fixed `LinkedSlide10Atom` layout, or if the shape count is
     /// negative or exceeds the given limits.
-    pub fn parse_record_with_limits(record: &Record, limits: LinkedSlideLimits) -> Result<Self> {
+    pub(crate) fn parse_record_with_limits(
+        record: &Record,
+        limits: LinkedSlideLimits,
+    ) -> Result<Self> {
         let payload = validate_record(
             record,
             RecordType::LinkedSlide10Atom,
@@ -108,7 +111,7 @@ impl LinkedSlide {
     ///
     /// Returns an error if the bytes are not exactly one `LinkedSlide10Atom`
     /// record, or if the shape count is negative or exceeds the given limits.
-    pub fn parse_bytes_with_limits(bytes: &[u8], limits: LinkedSlideLimits) -> Result<Self> {
+    pub(crate) fn parse_bytes_with_limits(bytes: &[u8], limits: LinkedSlideLimits) -> Result<Self> {
         let payload = validate_bytes(
             bytes,
             RecordType::LinkedSlide10Atom,
@@ -203,7 +206,10 @@ impl LinkedShape {
     ///
     /// Returns an error if the record type, header fields, or payload do not
     /// match the fixed `LinkedShape10Atom` layout.
-    pub fn parse_record_with_limits(record: &Record, limits: LinkedSlideLimits) -> Result<Self> {
+    pub(crate) fn parse_record_with_limits(
+        record: &Record,
+        limits: LinkedSlideLimits,
+    ) -> Result<Self> {
         Self::parse_payload(validate_record(
             record,
             RecordType::LinkedShape10Atom,
@@ -228,7 +234,7 @@ impl LinkedShape {
     ///
     /// Returns an error if the bytes are not exactly one `LinkedShape10Atom`
     /// record.
-    pub fn parse_bytes_with_limits(bytes: &[u8], limits: LinkedSlideLimits) -> Result<Self> {
+    pub(crate) fn parse_bytes_with_limits(bytes: &[u8], limits: LinkedSlideLimits) -> Result<Self> {
         Self::parse_payload(validate_bytes(
             bytes,
             RecordType::LinkedShape10Atom,

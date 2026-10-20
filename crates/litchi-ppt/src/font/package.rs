@@ -36,17 +36,6 @@ impl<R: Read + Seek> Reader<R> {
     pub fn fonts(&mut self) -> Result<FontCollections> {
         self.presentation()?.fonts()
     }
-
-    /// Read font semantics under explicit limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the package cannot be opened, the limits are
-    /// invalid, or the font records are malformed or exceed the limits.
-    pub fn fonts_with_limits(&mut self, limits: Limits) -> Result<FontCollections> {
-        self.presentation_with_limits(limits.records)?
-            .fonts_with_limits(limits)
-    }
 }
 
 /// Require every unrelated stream path and payload to remain exact.

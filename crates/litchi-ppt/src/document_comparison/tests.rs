@@ -180,3 +180,173 @@ fn rejects_atom_children_and_oversized_builder() {
     let oversized = vec![SlideCreationEntry::new(0, 0); validation::MAX_SLIDE_LIST_ENTRIES + 1];
     assert!(SlideListTable10::new(oversized).is_err());
 }
+
+/// Rewrite the live document of a built one-slide package with `edit`.
+fn built_package_with(edit: impl FnOnce(&mut Record)) -> crate::Package {
+    let mut builder = crate::Builder::new();
+    builder.add_slide().unwrap();
+    let source = builder.build().unwrap().to_bytes().unwrap();
+    let (persist_id, document) =
+        crate::embedded::object::Editor::inspect_live_document(&source).unwrap();
+    let (mut document, _) = Record::parse_strict(&document, 0).unwrap();
+    edit(&mut document);
+    let replacement = codec::encode_document(&document).unwrap();
+    let mut editor = crate::embedded::object::Editor::open_records(source).unwrap();
+    editor
+        .replace_persisted_record(persist_id, replacement)
+        .unwrap();
+    crate::Package::from_bytes(&editor.finish().unwrap()).unwrap()
+}
+
+/// A built package whose `___PPT10` review payload also carries one
+/// reviewer tree.
+fn package_with_review() -> crate::Package {
+    built_package_with(|document| {
+        let limits = Limits::default();
+        let mut review = codec::read_review(document, limits).unwrap();
+        let tree = DiffTree10::new(
+            "Reviewer".to_string(),
+            node(DiffType::Document, false, vec![]),
+        )
+        .unwrap();
+        review.entries.push(Entry::Diff(tree));
+        codec::write_review(document, &review, limits).unwrap();
+    })
+}
+
+/// A built package whose live document has no `___PPT10` review payload.
+fn package_without_review() -> crate::Package {
+    built_package_with(|document| {
+        for doc_info in document
+            .children
+            .iter_mut()
+            .filter(|child| child.record_type == RecordType::DocInfoList)
+        {
+            for prog_tags in doc_info
+                .children
+                .iter_mut()
+                .filter(|child| child.record_type == RecordType::ProgTags)
+            {
+                prog_tags
+                    .children
+                    .retain(|tag| !codec::is_pp10_tag(tag).unwrap());
+                if prog_tags.children.is_empty() {
+                    // An empty container encodes from its raw data.
+                    prog_tags.data = Vec::new().into();
+                    prog_tags.data_length = 0;
+                }
+            }
+        }
+        assert!(
+            codec::read_review(document, Limits::default())
+                .unwrap()
+                .entries
+                .is_empty()
+        );
+    })
+}
+
+#[test]
+fn package_document_comparison_edits_publish_replay_and_invert_exactly() {
+    use litchi_core::edit::RefusalKind;
+
+    let source = package_with_review();
+    let source_bytes = source.to_bytes().unwrap();
+    let read = |package: &crate::Package| {
+        package
+            .presentation()
+            .unwrap()
+            .document_comparison()
+            .unwrap()
+            .review()
+            .unwrap()
+    };
+    assert_eq!(
+        read(&source).diff_tree(0).unwrap().reviewer_name(),
+        "Reviewer"
+    );
+
+    let no_op = source.edit_document_comparison().unwrap().commit().unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), source_bytes);
+
+    let mut edit = source.edit_document_comparison().unwrap();
+    edit.set_reviewer_name(0, "Editor").unwrap();
+    drop(edit);
+    assert_eq!(source.to_bytes().unwrap(), source_bytes);
+
+    let mut edit = source.edit_document_comparison().unwrap();
+    edit.set_reviewer_name(0, "Editor").unwrap();
+    edit.set_toolbar(ReviewingToolbarStates::new(true, false))
+        .unwrap();
+    assert_eq!(edit.changes().len(), 2);
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.patch().before_bytes(), source_bytes.as_slice());
+    let published = read(commit.package());
+    assert_eq!(published.diff_tree(0).unwrap().reviewer_name(), "Editor");
+    assert!(published.toolbar().unwrap().show_reviewing_toolbar());
+
+    let replayed = source.apply_document_comparison(commit.patch()).unwrap();
+    assert_eq!(
+        replayed.package().to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
+    let restored = commit
+        .package()
+        .apply_document_comparison(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(restored.package().to_bytes().unwrap(), source_bytes);
+    assert!(matches!(
+        commit.package().apply_document_comparison(commit.patch()),
+        Err(Error::PatchConflict)
+    ));
+
+    let mut edit = source.edit_document_comparison().unwrap();
+    let Err(Error::Refused(refusal)) = edit.set_reviewer_name(1, "Nobody") else {
+        panic!("an absent reviewer tree must be refused");
+    };
+    assert_eq!(refusal.kind(), RefusalKind::NotFound);
+    assert!(edit.changes().is_empty());
+
+    let plain = package_without_review();
+    let snapshot = plain.presentation().unwrap().document_comparison().unwrap();
+    assert_eq!(codec::find_pp10_blob(snapshot.record()).unwrap(), None);
+    let mut edit = plain.edit_document_comparison().unwrap();
+    let result = edit.set_toolbar(ReviewingToolbarStates::new(true, true));
+    let Err(Error::Refused(refusal)) = result else {
+        panic!("a document without a review payload must be refused: {result:?}");
+    };
+    assert_eq!(refusal.kind(), RefusalKind::UnsupportedTarget);
+}
+
+#[test]
+fn package_document_comparison_edits_refuse_changed_writes_to_signed_packages() {
+    use litchi_cfb::{OleFile, OleWriter};
+    use std::io::Cursor;
+
+    let source = package_with_review().to_bytes().unwrap();
+    let mut source_file = OleFile::open(Cursor::new(source)).unwrap();
+    let mut writer = OleWriter::new();
+    for stream_path in source_file.list_streams() {
+        let refs = stream_path.iter().map(String::as_str).collect::<Vec<_>>();
+        let data = source_file.open_stream(&refs).unwrap();
+        writer.create_stream(&refs, &data).unwrap();
+    }
+    writer
+        .create_stream(&["_xmlsignatures", "origin.sigs"], b"signature")
+        .unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    let signed = crate::Package::from_bytes(&output.into_inner()).unwrap();
+    let bytes = signed.to_bytes().unwrap();
+
+    let no_op = signed.edit_document_comparison().unwrap().commit().unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert_eq!(no_op.package().to_bytes().unwrap(), bytes);
+
+    let mut edit = signed.edit_document_comparison().unwrap();
+    edit.set_reviewer_name(0, "Editor").unwrap();
+    assert!(matches!(edit.commit(), Err(Error::Signed)));
+}

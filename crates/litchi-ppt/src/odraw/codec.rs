@@ -4,7 +4,7 @@ use litchi_odraw::{Container, Record, RecordKind};
 use crate::embedded::reference::Reference;
 use crate::package::Result;
 
-use super::model::{Anchor, Drawing, Frame, FrameKind, Placeholder, ShapeExt};
+use super::model::{Anchor, Drawing, Frame, FrameKind, Placeholder, ShapeExt, ShapeLimitsExt};
 use super::package::{
     CLIENT_DATA_RAW_KIND, CLIENT_TEXTBOX_RAW_KIND, RawRecords, advance, corrupted, host_record,
     validate_host_record, visit_host_record,
@@ -35,6 +35,50 @@ impl ShapeExt for Shape<'_> {
         self.interactions_with_limits(crate::InteractionLimits::default())
     }
 
+    fn text_interactions(&self) -> Result<Vec<crate::TextInteraction>> {
+        self.text_interactions_with_limits(crate::TextInteractionLimits::default())
+    }
+
+    fn placeholder_atom(
+        &self,
+        context: crate::PlaceholderContext,
+    ) -> Result<Option<crate::PlaceholderAtom>> {
+        self.placeholder_atom_with_limits(context, crate::PlaceholderLimits::default())
+    }
+
+    fn powerpoint12_shape_metadata(&self) -> Result<Option<crate::ShapeMetadata>> {
+        powerpoint12_shape_metadata(self, None)
+    }
+
+    fn programmable_tags(&self) -> Result<Option<crate::ShapeProgrammableTags>> {
+        self.programmable_tags_with_limits(crate::ShapeProgrammableTagLimits::default())
+    }
+
+    fn ppt_flags(&self) -> Result<Option<crate::ShapeFlagProjection>> {
+        self.ppt_flags_with(crate::ShapeFlagLimits::default())
+    }
+
+    fn animation(&self) -> Result<Option<crate::animation::AnimationInfo>> {
+        let Some(client_data) = host_record(self, RecordKind::ClientData)? else {
+            return Ok(None);
+        };
+        validate_host_record(&client_data, CLIENT_DATA_RAW_KIND, "ClientData")?;
+        let mut offset = 0usize;
+        let mut records = 0u32;
+        while offset < client_data.data().len() {
+            visit_host_record(&mut records)?;
+            let (record, consumed) =
+                crate::records::Record::parse_strict(client_data.data(), offset)?;
+            if record.record_type == crate::consts::RecordType::AnimationInfo {
+                return crate::animation::parse_animation_info(&record).map(Some);
+            }
+            offset = advance(offset, consumed, "OfficeArt client-data")?;
+        }
+        Ok(None)
+    }
+}
+
+impl ShapeLimitsExt for Shape<'_> {
     fn interactions_with_limits(
         &self,
         limits: crate::InteractionLimits,
@@ -46,10 +90,6 @@ impl ShapeExt for Shape<'_> {
         crate::Interaction::parse_client_data_payload(client_data.data(), limits)
     }
 
-    fn text_interactions(&self) -> Result<Vec<crate::TextInteraction>> {
-        self.text_interactions_with_limits(crate::TextInteractionLimits::default())
-    }
-
     fn text_interactions_with_limits(
         &self,
         limits: crate::TextInteractionLimits,
@@ -59,13 +99,6 @@ impl ShapeExt for Shape<'_> {
         };
         validate_host_record(&textbox, CLIENT_TEXTBOX_RAW_KIND, "ClientTextbox")?;
         crate::EscherTextboxWrapper::parse_text_interactions_with_limits(textbox.data(), limits)
-    }
-
-    fn placeholder_atom(
-        &self,
-        context: crate::PlaceholderContext,
-    ) -> Result<Option<crate::PlaceholderAtom>> {
-        self.placeholder_atom_with_limits(context, crate::PlaceholderLimits::default())
     }
 
     fn placeholder_atom_with_limits(
@@ -83,10 +116,6 @@ impl ShapeExt for Shape<'_> {
             limits,
         )?
         .placeholder)
-    }
-
-    fn powerpoint12_shape_metadata(&self) -> Result<Option<crate::ShapeMetadata>> {
-        powerpoint12_shape_metadata(self, None)
     }
 
     fn programmable_tags_with_limits(
@@ -118,14 +147,6 @@ impl ShapeExt for Shape<'_> {
         Ok(result)
     }
 
-    fn programmable_tags(&self) -> Result<Option<crate::ShapeProgrammableTags>> {
-        self.programmable_tags_with_limits(crate::ShapeProgrammableTagLimits::default())
-    }
-
-    fn ppt_flags(&self) -> Result<Option<crate::ShapeFlagProjection>> {
-        self.ppt_flags_with(crate::ShapeFlagLimits::default())
-    }
-
     fn ppt_flags_with(
         &self,
         limits: crate::ShapeFlagLimits,
@@ -137,25 +158,6 @@ impl ShapeExt for Shape<'_> {
         let projection =
             crate::ShapeFlagProjection::parse_client_data_payload(client_data.data(), limits)?;
         Ok(projection.has_flags().then_some(projection))
-    }
-
-    fn animation(&self) -> Result<Option<crate::animation::AnimationInfo>> {
-        let Some(client_data) = host_record(self, RecordKind::ClientData)? else {
-            return Ok(None);
-        };
-        validate_host_record(&client_data, CLIENT_DATA_RAW_KIND, "ClientData")?;
-        let mut offset = 0usize;
-        let mut records = 0u32;
-        while offset < client_data.data().len() {
-            visit_host_record(&mut records)?;
-            let (record, consumed) =
-                crate::records::Record::parse_strict(client_data.data(), offset)?;
-            if record.record_type == crate::consts::RecordType::AnimationInfo {
-                return crate::animation::parse_animation_info(&record).map(Some);
-            }
-            offset = advance(offset, consumed, "OfficeArt client-data")?;
-        }
-        Ok(None)
     }
 }
 

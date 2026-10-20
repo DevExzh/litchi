@@ -12,7 +12,9 @@
 
 use std::sync::Arc;
 
-use super::{Error, PackageError, Position, Result, Snapshot, persisted_record};
+use super::{
+    Error, PackageError, Position, Result, Snapshot, persisted_object_record, persisted_record,
+};
 
 /// The persisted owner one record rewrite replaces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,6 +23,8 @@ pub(crate) enum Owner {
     Document,
     /// The slide at this position of the artifact's own slide list.
     Slide(Position),
+    /// The persisted record with this persist identifier, such as a master.
+    Persist(u32),
 }
 
 /// One complete persisted-record replacement.
@@ -91,6 +95,7 @@ fn owner_persist_id(snapshot: &Snapshot, owner: Owner) -> Result<u32> {
             .get(position.get())
             .map(|slide| slide.persist_id())
             .ok_or(Error::Refused(super::Refusal::SlideNotFound { position })),
+        Owner::Persist(persist_id) => Ok(persist_id),
     }
 }
 
@@ -99,6 +104,7 @@ pub(crate) fn owner_record(snapshot: &Snapshot, owner: Owner) -> Result<Vec<u8>>
     match owner {
         Owner::Document => Ok(snapshot.document.bytes().to_vec()),
         Owner::Slide(_) => persisted_record(snapshot, owner_persist_id(snapshot, owner)?),
+        Owner::Persist(persist_id) => persisted_object_record(snapshot, persist_id),
     }
 }
 
@@ -171,12 +177,20 @@ fn owner_label(owner: Owner) -> String {
     match owner {
         Owner::Document => "document".to_owned(),
         Owner::Slide(position) => format!("slide:{}", position.get()),
+        Owner::Persist(persist_id) => format!("persist:{persist_id}"),
     }
 }
 
 fn parse_owner(label: &str) -> Result<Owner> {
     if label == "document" {
         return Ok(Owner::Document);
+    }
+    if let Some(persist_id) = label.strip_prefix("persist:") {
+        return persist_id
+            .parse::<u32>()
+            .ok()
+            .map(Owner::Persist)
+            .ok_or_else(|| super::invalid_durable_patch("element record owner is malformed"));
     }
     label
         .strip_prefix("slide:")

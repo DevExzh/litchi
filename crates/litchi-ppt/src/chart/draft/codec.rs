@@ -1,4 +1,4 @@
-//! OLE2 stream assembly for the chart transaction.
+//! OLE2 stream assembly for the chart-package draft.
 
 use std::io::Cursor;
 

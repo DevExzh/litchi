@@ -170,7 +170,7 @@ impl DiffTree10 {
     /// Returns an error if `max_records` is zero, or if the container header,
     /// reviewer-name atom, or any nested `Diff10` record is malformed or
     /// truncated.
-    pub fn parse_with_limits(
+    pub(crate) fn parse_with_limits(
         record: &Record,
         max_depth: usize,
         max_records: usize,
@@ -584,7 +584,7 @@ pub(crate) fn encode_document(root: &Record) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn find_pp10_blob(root: &Record) -> Result<Option<Vec<usize>>> {
+pub(super) fn find_pp10_blob(root: &Record) -> Result<Option<Vec<usize>>> {
     if root.record_type != RecordType::Document {
         return corrupted("document-comparison owner requires a DocumentContainer root");
     }
@@ -635,7 +635,7 @@ fn find_pp10_blob(root: &Record) -> Result<Option<Vec<usize>>> {
     Ok(match_path)
 }
 
-fn is_pp10_tag(record: &Record) -> Result<bool> {
+pub(super) fn is_pp10_tag(record: &Record) -> Result<bool> {
     let Some(name) = record
         .children
         .iter()

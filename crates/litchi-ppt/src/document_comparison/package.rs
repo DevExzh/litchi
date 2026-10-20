@@ -54,7 +54,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+    pub(crate) fn from_bytes_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         if bytes.len() > MAX_PACKAGE_BYTES {
             return Err(Error::InvalidFormat(
                 "PowerPoint package exceeds the bounded package byte limit".into(),
@@ -104,7 +104,7 @@ impl Snapshot {
 
     /// Begin an isolated package edit over the review-owned metadata.
     #[must_use]
-    pub fn edit(&self) -> Editor {
+    pub(crate) fn edit(&self) -> Editor {
         Editor {
             source: self.clone(),
             document: self.document.edit(),
@@ -114,59 +114,60 @@ impl Snapshot {
 
 /// An isolated package transaction over inert document-comparison metadata.
 #[derive(Debug, Clone)]
-pub struct Editor {
+pub(crate) struct Editor {
     source: Snapshot,
     document: DocumentEditor,
 }
 
+#[allow(
+    dead_code,
+    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+)]
 impl Editor {
     /// Read the transaction-local review records.
-    pub fn review(&self) -> Result<super::model::Review> {
+    pub(crate) fn review(&self) -> Result<super::model::Review> {
         self.document.review()
     }
 
     /// Read the transaction-local toolbar state.
-    pub fn toolbar(&self) -> Result<Option<super::model::ReviewingToolbarStates>> {
+    pub(crate) fn toolbar(&self) -> Result<Option<super::model::ReviewingToolbarStates>> {
         self.document.toolbar()
     }
 
     /// Read one transaction-local reviewer tree.
-    pub fn diff_tree(&self, index: usize) -> Result<Option<super::model::DiffTree10>> {
+    pub(crate) fn diff_tree(&self, index: usize) -> Result<Option<super::model::DiffTree10>> {
         self.document.diff_tree(index)
     }
 
-    /// Return the current transaction-local document snapshot.
-    pub fn document_snapshot(&self) -> Result<DocumentSnapshot> {
-        self.document.snapshot()
-    }
-
     /// Return semantic changes staged in this package transaction.
-    pub fn changes(&self) -> &[Change] {
+    pub(crate) fn changes(&self) -> &[Change] {
         self.document.changes()
     }
 
-    /// Whether any review metadata has been staged.
-    pub const fn is_changed(&self) -> bool {
-        self.document.is_changed()
-    }
-
     /// Set or replace the reviewing toolbar state.
-    pub fn set_toolbar(&mut self, value: super::model::ReviewingToolbarStates) -> Result<()> {
+    pub(crate) fn set_toolbar(
+        &mut self,
+        value: super::model::ReviewingToolbarStates,
+    ) -> Result<()> {
         self.document.set_toolbar(value)
     }
 
     /// Remove the reviewing toolbar state, preserving all other PP10 records.
-    pub fn clear_toolbar(&mut self) -> Result<bool> {
+    pub(crate) fn clear_toolbar(&mut self) -> Result<bool> {
         self.document.clear_toolbar()
     }
 
     /// Set one reviewer name in source order.
-    pub fn set_reviewer_name(&mut self, tree_index: usize, value: impl Into<String>) -> Result<()> {
+    pub(crate) fn set_reviewer_name(
+        &mut self,
+        tree_index: usize,
+        value: impl Into<String>,
+    ) -> Result<()> {
         self.document.set_reviewer_name(tree_index, value)
     }
 
     /// Set one reviewer tree's document-level display flags.
-    pub fn set_document_flags(
+    pub(crate) fn set_document_flags(
         &mut self,
         tree_index: usize,
         value: super::model::DiffFlags,
@@ -176,7 +177,7 @@ impl Editor {
 
     /// Publish the package edit as a fresh OLE artifact and source-checked
     /// reversible patch.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         let document_commit = self.document.commit()?;
         let source = self.source;
         let target_document = document_commit.snapshot().clone();
@@ -226,33 +227,32 @@ impl Editor {
         };
         Ok(Commit { snapshot, patch })
     }
-
-    /// Discard the package candidate and recover the source snapshot.
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
 }
 
 /// A committed package snapshot and reversible source-checked patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
 }
 
+#[allow(
+    dead_code,
+    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+)]
 impl Commit {
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     #[must_use]
-    pub fn document(&self) -> &DocumentSnapshot {
+    pub(crate) fn document(&self) -> &DocumentSnapshot {
         self.snapshot.document()
     }
 
@@ -262,7 +262,7 @@ impl Commit {
     ///
     /// Returns an error if `current` does not match this commit's target
     /// revision, or if the recovered source bytes fail to parse.
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.undo(current)
     }
 
@@ -272,19 +272,19 @@ impl Commit {
     ///
     /// Returns an error if `current` does not match this commit's base
     /// revision, or if the committed target bytes fail to parse.
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.redo(current)
     }
 
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 }
 
 /// A reversible whole-artifact package patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct Patch {
     base: Revision,
     target: Revision,
     before: Arc<[u8]>,
@@ -293,29 +293,33 @@ pub struct Patch {
     limits: Limits,
 }
 
+#[allow(
+    dead_code,
+    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+)]
 impl Patch {
     #[must_use]
-    pub const fn base(&self) -> Revision {
+    pub(crate) const fn base(&self) -> Revision {
         self.base
     }
 
     #[must_use]
-    pub const fn target(&self) -> Revision {
+    pub(crate) const fn target(&self) -> Revision {
         self.target
     }
 
     #[must_use]
-    pub fn before_bytes(&self) -> &[u8] {
+    pub(crate) fn before_bytes(&self) -> &[u8] {
         &self.before
     }
 
     #[must_use]
-    pub fn after_bytes(&self) -> &[u8] {
+    pub(crate) fn after_bytes(&self) -> &[u8] {
         &self.after
     }
 
     #[must_use]
-    pub const fn document(&self) -> &DocumentPatch {
+    pub(crate) const fn document(&self) -> &DocumentPatch {
         &self.document
     }
 
@@ -325,7 +329,7 @@ impl Patch {
     ///
     /// Returns an error if `current` does not match this patch's target
     /// revision, or if the recovered source bytes fail to parse.
-    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() != self.target || current.bytes() != self.after.as_ref() {
             return Err(Error::InvalidFormat(
                 "cannot undo review package edits against a different source".into(),
@@ -340,7 +344,7 @@ impl Patch {
     ///
     /// Returns an error if `current` does not match this patch's base
     /// revision, or if the committed target bytes fail to parse.
-    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() != self.base || current.bytes() != self.before.as_ref() {
             return Err(Error::InvalidFormat(
                 "cannot redo review package edits against a different source".into(),

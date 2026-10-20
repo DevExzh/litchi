@@ -31,7 +31,7 @@ pub fn parse<'data>(build_list: &Record, drawing: &'data [u8]) -> Result<Invento
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn parse_with_limits<'data>(
+pub(crate) fn parse_with_limits<'data>(
     build_list: &Record,
     drawing: &'data [u8],
     limits: Limits,
@@ -74,7 +74,7 @@ pub fn parse_bytes<'data>(build_list: &[u8], drawing: &'data [u8]) -> Result<Inv
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn parse_bytes_with_limits<'data>(
+pub(crate) fn parse_bytes_with_limits<'data>(
     build_list: &[u8],
     drawing: &'data [u8],
     limits: Limits,

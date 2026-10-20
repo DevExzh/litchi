@@ -261,21 +261,16 @@ fn current_edit_offset(bytes: &[u8]) -> u32 {
 }
 
 fn cyclic_signed_deck() -> Vec<u8> {
-    use litchi_ppt::text_edit::{
-        Position as TextPosition, Snapshot as TextSnapshot, Target as TextTarget,
-    };
-
-    let snapshot = TextSnapshot::from_bytes(generated_deck()).expect("open editable source deck");
-    let mut edit = snapshot
-        .edit_text(TextTarget::new(TextPosition::new(1), TextPosition::new(0)))
-        .expect("stage second-slide text edit");
-    edit.set_text("BETA").expect("stage same-length text edit");
+    let source = Package::from_bytes(&generated_deck()).expect("open editable source deck");
+    let mut edit = source.edit().expect("start editable source edit");
+    edit.set_shape_text(Target::new(Position::new(1), Position::new(0)), "BETA")
+        .expect("stage same-length text edit");
     let mut bytes = edit
         .commit()
         .expect("commit editable source deck")
-        .snapshot()
-        .bytes()
-        .to_vec();
+        .package()
+        .to_bytes()
+        .expect("committed bytes");
     let user_edits = record_headers(&bytes, RecordType::UserEditAtom.as_u16());
     assert_eq!(
         user_edits.len(),
@@ -322,11 +317,15 @@ fn assert_exact_noop(package: &Package, edit: litchi_ppt::Edit) {
 
     let inverse = commit.patch().inverse();
     assert!(inverse.is_noop());
-    let restored = package.apply(&inverse).expect("apply exact no-op inverse");
+    let restored = package
+        .apply(&inverse)
+        .expect("apply exact no-op inverse")
+        .into_package();
     assert_eq!(restored.to_bytes().expect("restored bytes"), before);
     let replayed = package
         .apply(commit.patch())
-        .expect("apply exact no-op patch");
+        .expect("apply exact no-op patch")
+        .into_package();
     assert_eq!(replayed.to_bytes().expect("replayed bytes"), before);
 }
 

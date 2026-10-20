@@ -26,7 +26,7 @@ impl Data {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
         let payload = bytes.as_ref();
         validation::payload_len(payload.len(), limits)?;
         match payload.len() {
@@ -103,7 +103,7 @@ impl Anchor {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
         let record = bytes.as_ref();
         if record.len() < HEADER_LEN {
             return Err(Error::Corrupted(

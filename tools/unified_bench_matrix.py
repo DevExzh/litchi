@@ -2592,6 +2592,36 @@ def p0355():
     return out
 
 
+@needs("0357")
+def p0357():
+    """Record 0357 (W3 PPT contract): ppt_paired_probe single/batch and
+    ppt_elements_probe, binary-level ABBA; the after legs are listed."""
+    out = []
+    paired = sorted((RES / "0357").glob("single-after-*.json")) + sorted(
+        (RES / "0357").glob("batch-after-*.json"))
+    groups: dict = {}
+    for path in paired:
+        for r in load_json(path):
+            groups.setdefault((r["scenario"], r["size"]), []).append(r)
+    for (scen, size), items in sorted(groups.items()):
+        out.append(ppt_paired_row("0357", scen, size,
+                                  med(i["native_median_us"] for i in items),
+                                  med(i["unified_median_us"] for i in items),
+                                  [i["pair_ratio_median"] for i in items],
+                                  src(paired), "after record 0357", 2))
+    paths = sorted((RES / "0357").glob("elements-after-*.json"))
+    for (scen, n), items in group_cases([load_json(p) for p in paths],
+                                        lambda r: (r["scenario"], r["slides"])).items():
+        op, label = PPT_ELEMENTS[scen]
+        out.append(row("0357", "ppt", op, label, f"{n} slides",
+                       med(i["native_median_us"] for i in items),
+                       med(i["unified_median_us"] for i in items),
+                       [i["pair_ratio_median"] for i in items],
+                       READ_POINT if op == "get" else SINGLE, f"ppt_elements:{scen}:{n}",
+                       src(paths), "after record 0357", 2, comparison="unified/native"))
+    return out
+
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
@@ -2600,7 +2630,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0306, p0307, p0308, p0309, p0310, p0311, p0312,
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
-           p0347, p0348, p0355]
+           p0347, p0348, p0355, p0357]
 
 
 # ---------------------------------------------------------------- merge

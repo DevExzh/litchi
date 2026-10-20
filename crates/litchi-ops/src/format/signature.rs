@@ -153,33 +153,6 @@ pub(crate) fn exact_source(package: &litchi_opc::SourceBackedPackage) -> Result<
     Ok(bytes)
 }
 
-/// The whole compound file `shared` reads, checked against the source
-/// revision captured at open before and after the read.
-#[cfg(feature = "ppt")]
-pub(crate) fn compound_file_bytes(shared: &litchi_cfb::SharedOleFile) -> Result<Vec<u8>> {
-    let source = shared.source_arc();
-    let expected = shared.captured_source_version();
-    let current = || -> Result<()> {
-        let observed = source.version()?;
-        if observed == expected {
-            Ok(())
-        } else {
-            Err(litchi_core::Error::SourceChanged { expected, observed }.into())
-        }
-    };
-    current()?;
-    let mut bytes = Vec::new();
-    let length = reserve(
-        &mut bytes,
-        source.len()?,
-        "the compound file of an unsigned copy",
-    )?;
-    bytes.resize(length, 0);
-    source.read_exact_at(0, &mut bytes)?;
-    current()?;
-    Ok(bytes)
-}
-
 /// `bytes` with every legacy (`_signatures`) and XML (`_xmlsignatures`)
 /// signature removed by the compound-file signature leaf.
 #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
@@ -194,7 +167,7 @@ pub(crate) fn unsign_compound_file(
 
 /// Reserve exactly `length` bytes and return the length, or fail with a
 /// typed limit or allocation error.
-#[cfg(any(feature = "ppt", feature = "xlsb"))]
+#[cfg(feature = "xlsb")]
 fn reserve(bytes: &mut Vec<u8>, length: u64, resource: &'static str) -> Result<usize> {
     let Ok(length) = usize::try_from(length) else {
         return Err(

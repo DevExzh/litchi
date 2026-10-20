@@ -1,15 +1,19 @@
-//! Strict, inert metadata for legacy `PowerPoint` OLE objects.
+//! Strict, inert metadata for legacy `PowerPoint` OLE objects and their
+//! package-level edits.
 //!
-//! This module never loads an embedded storage, invokes COM, starts an OLE
+//! [`crate::Package::edit_objects`] stages edits of the live document's
+//! embedded-object list and storages; see [`Edit`]. This module never loads an embedded storage, invokes COM, starts an OLE
 //! server, follows a link, or executes object content.
 
 mod codec;
+mod edit;
 mod model;
 mod validation;
 
-pub mod editor;
+pub(crate) mod editor;
 
-pub use editor::Editor;
+pub use edit::Edit;
+pub(crate) use editor::Editor;
 #[allow(
     clippy::module_name_repetitions,
     reason = "`ExternalObject`, `ObjectSubtype`, and `ObjectType` are established public API names from the OLE object model; renaming them would break downstream crates"
@@ -19,6 +23,8 @@ pub use model::{
     EmbedPreferences, ExternalObject, LinkInfo, Metadata, ObjectSubtype, ObjectType, UnknownRecord,
     UpdateMode,
 };
+
+crate::scoped::family!("embedded-object");
 
 #[cfg(test)]
 mod tests;

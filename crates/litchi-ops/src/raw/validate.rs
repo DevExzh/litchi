@@ -179,8 +179,11 @@ pub(super) fn validate(file: &File) -> Result<Validation> {
         #[cfg(feature = "ppt")]
         FileFormat::Ppt => {
             let bytes = file.to_bytes()?;
-            litchi_ppt::validate_source(Arc::new(litchi_core::OwnedSource::new(bytes)))
-                .map_err(Error::Ppt)?
+            litchi_ppt::validate_source(
+                Arc::new(litchi_core::OwnedSource::new(bytes)),
+                litchi_ppt::PptValidationLimits::default(),
+            )
+            .map_err(Error::Ppt)?
         },
         #[cfg(feature = "doc")]
         FileFormat::Doc => {

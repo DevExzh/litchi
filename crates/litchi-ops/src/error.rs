@@ -1776,20 +1776,13 @@ impl Classify for litchi_ppt::package::edit::Error {
                 litchi_ppt::slide_order::Error::Package(error) => error.classify(),
                 litchi_ppt::slide_order::Error::Text(error) => error.classify(),
                 litchi_ppt::slide_order::Error::Composition(error) => error.classify(),
-                litchi_ppt::slide_order::Error::Refused(refusal) => match refusal {
-                    litchi_ppt::slide_order::Refusal::Signed => {
+                // By kind alone (record 0351 §2.4); a protected refusal is a
+                // signed source, which keeps the signature suggestion.
+                litchi_ppt::slide_order::Error::Refused(refusal) => match refusal.kind() {
+                    litchi_core::edit::RefusalKind::Protected => {
                         Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION)
                     },
-                    litchi_ppt::slide_order::Refusal::SlideNotFound { .. } => {
-                        Class::of(Code::NotFound)
-                    },
-                    litchi_ppt::slide_order::Refusal::DuplicateShapeTextTarget { .. } => {
-                        Class::of(Code::InvalidArgument)
-                    },
-                    litchi_ppt::slide_order::Refusal::TransferTargetMismatch => {
-                        Class::of(Code::InvalidInput)
-                    },
-                    _ => Class::of(Code::UnsupportedCapability),
+                    kind => kind.classify(),
                 },
             },
             Self::Signed => Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION),
@@ -2042,18 +2035,14 @@ impl Classify for litchi_doc::body_text::source::Error {
 #[cfg(feature = "ppt")]
 impl Classify for litchi_ppt::text_edit::Error {
     fn classify(&self) -> Class {
-        use litchi_ppt::text_edit::Refusal;
-
         match self {
             Self::Package(error) => error.classify(),
             Self::Source(error) => error.classify(),
-            Self::Refused(Refusal::SlideNotFound { .. } | Refusal::ShapeNotFound) => {
-                Class::of(Code::NotFound)
-            },
-            // Includes `UnsupportedSource`, the leaf's one refusal for
-            // signed, encrypted and otherwise unsupported containers: a
-            // signed handle is refused before it reaches the leaf.
-            Self::Refused(_) => Class::of(Code::UnsupportedCapability),
+            // By kind alone (record 0351 §2.4). `UnsupportedSource`, the
+            // leaf's one refusal for signed, encrypted and otherwise
+            // unsupported containers, is unsupported content: a signed
+            // handle is refused before it reaches the leaf.
+            Self::Refused(refusal) => refusal.kind().classify(),
         }
     }
 }

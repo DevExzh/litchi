@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 /// An immutable PPT package source for property-set edits.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Snapshot {
+pub(crate) struct Snapshot {
     bytes: Arc<[u8]>,
 }
 
@@ -24,7 +24,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         validate_host(&bytes)?;
         Ok(Self {
             bytes: Arc::from(bytes.into_boxed_slice()),
@@ -36,13 +36,13 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
+    pub(crate) fn parse(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes(bytes.to_vec())
     }
 
     /// Returns the exact source artifact bytes.
     #[must_use]
-    pub fn bytes(&self) -> &[u8] {
+    pub(crate) fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
@@ -51,7 +51,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn summary_information(
+    pub(crate) fn summary_information(
         &self,
     ) -> Result<Option<property_set::summary_information::Snapshot>> {
         let Some(stream) = read_stream(&self.bytes, Binding::SummaryInformation)? else {
@@ -67,7 +67,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn document_summary_information(
+    pub(crate) fn document_summary_information(
         &self,
     ) -> Result<Option<property_set::document_summary::Snapshot>> {
         let Some(stream) = read_stream(&self.bytes, Binding::DocumentSummaryInformation)? else {
@@ -83,7 +83,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn user_defined_properties(&self) -> Result<Option<Section>> {
+    pub(crate) fn user_defined_properties(&self) -> Result<Option<Section>> {
         Ok(read_stream(&self.bytes, Binding::UserDefinedProperties)?
             .and_then(|stream| stream.section(USER_DEFINED_PROPERTIES_FMTID).cloned()))
     }
@@ -93,19 +93,19 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn transaction(&self) -> Result<Transaction> {
+    pub(crate) fn transaction(&self) -> Result<Transaction> {
         Transaction::new(self.clone())
     }
 
     /// Consumes the snapshot into owned source bytes.
     #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
+    pub(crate) fn into_bytes(self) -> Vec<u8> {
         self.bytes.to_vec()
     }
 }
 
 /// An isolated PPT property-set transaction over owned CFB bytes.
-pub struct Transaction {
+pub(crate) struct Transaction {
     source: Snapshot,
     editor: property_set::Editor,
     changed: bool,
@@ -134,7 +134,7 @@ impl Transaction {
 
     /// Whether a successful edit has changed the transaction state.
     #[must_use]
-    pub const fn is_changed(&self) -> bool {
+    pub(crate) const fn is_changed(&self) -> bool {
         self.changed
     }
 
@@ -143,7 +143,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn summary_information(
+    pub(crate) fn summary_information(
         &self,
     ) -> Result<Option<property_set::summary_information::Snapshot>> {
         let Some(section) = self.editor.property_set(Binding::SummaryInformation)? else {
@@ -159,7 +159,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn document_summary_information(
+    pub(crate) fn document_summary_information(
         &self,
     ) -> Result<Option<property_set::document_summary::Snapshot>> {
         let Some(section) = self
@@ -178,7 +178,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn user_defined_properties(&self) -> Result<Option<Section>> {
+    pub(crate) fn user_defined_properties(&self) -> Result<Option<Section>> {
         self.editor
             .property_set(Binding::UserDefinedProperties)
             .map_err(Into::into)
@@ -194,7 +194,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn edit_summary_information<F>(&mut self, edit: F) -> Result<bool>
+    pub(crate) fn edit_summary_information<F>(&mut self, edit: F) -> Result<bool>
     where
         F: for<'a> FnOnce(
             &mut property_set::summary_information::Edit<'a>,
@@ -234,7 +234,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn edit_document_summary_information<F>(&mut self, edit: F) -> Result<bool>
+    pub(crate) fn edit_document_summary_information<F>(&mut self, edit: F) -> Result<bool>
     where
         F: for<'a> FnOnce(
             &mut property_set::document_summary::Edit<'a>,
@@ -269,7 +269,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn edit_user_defined_properties<F>(&mut self, edit: F) -> Result<bool>
+    pub(crate) fn edit_user_defined_properties<F>(&mut self, edit: F) -> Result<bool>
     where
         F: FnOnce(&mut Section) -> std::result::Result<(), OleError>,
     {
@@ -296,7 +296,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn remove_user_defined_properties(&mut self) -> Result<bool> {
+    pub(crate) fn remove_user_defined_properties(&mut self) -> Result<bool> {
         if self
             .editor
             .property_set(Binding::UserDefinedProperties)?
@@ -314,7 +314,7 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         let before = self.source.bytes.clone();
         let bytes = self.editor.finish()?;
         let snapshot = Snapshot::from_bytes(bytes)?;
@@ -328,17 +328,11 @@ impl Transaction {
             changed,
         })
     }
-
-    /// Discards the transaction and recovers its exact source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
 }
 
 /// An owned result of a PPT property-set transaction.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     changed: bool,
@@ -347,38 +341,38 @@ pub struct Commit {
 impl Commit {
     /// Whether the complete output differs from the source artifact.
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
     }
 
     /// Borrows the validated output snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrows the source-checked reversible whole-package patch.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consumes the commit into its owned output bytes.
     #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
+    pub(crate) fn into_bytes(self) -> Vec<u8> {
         self.snapshot.into_bytes()
     }
 
     /// Consumes the commit into its output snapshot and patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 }
 
 /// A source-checked reversible whole-PPT package patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct Patch {
     source: Arc<[u8]>,
     replacement: Arc<[u8]>,
 }
@@ -386,13 +380,13 @@ pub struct Patch {
 impl Patch {
     /// Returns the exact source bytes bound to this patch.
     #[must_use]
-    pub fn source(&self) -> &[u8] {
+    pub(crate) fn source(&self) -> &[u8] {
         &self.source
     }
 
     /// Returns the exact replacement bytes produced by the commit.
     #[must_use]
-    pub fn replacement(&self) -> &[u8] {
+    pub(crate) fn replacement(&self) -> &[u8] {
         &self.replacement
     }
 
@@ -401,7 +395,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.bytes.as_ref() != self.source.as_ref() {
             return Err(Error::InvalidFormat(
                 "PPT property-set patch source does not match".to_string(),
@@ -415,7 +409,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn revert(&self, replacement: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn revert(&self, replacement: &Snapshot) -> Result<Snapshot> {
         if replacement.bytes.as_ref() != self.replacement.as_ref() {
             return Err(Error::InvalidFormat(
                 "PPT property-set patch replacement does not match".to_string(),

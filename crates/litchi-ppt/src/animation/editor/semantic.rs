@@ -13,7 +13,7 @@ pub enum Scope {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct EditorLimits {
+pub(crate) struct EditorLimits {
     pub max_persist_records: usize,
     pub max_record_bytes: usize,
     pub max_timeline_nodes: usize,
@@ -62,7 +62,7 @@ pub(super) struct PersistAnimation {
 }
 
 #[derive(Clone)]
-pub struct Editor {
+pub(crate) struct Editor {
     pub(super) package: ObjectEditor,
     pub(super) entries: Vec<PersistAnimation>,
     pub(super) limits: EditorLimits,

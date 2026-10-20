@@ -102,6 +102,7 @@ fn run_format_splits_runs_and_round_trips() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source_bytes

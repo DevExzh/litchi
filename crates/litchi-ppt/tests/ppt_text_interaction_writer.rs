@@ -8,7 +8,7 @@ use litchi_ppt::writer::text_format::{Paragraph, TextRun};
 use litchi_ppt::writer::{Builder, Hyperlink};
 use litchi_ppt::{
     Interaction, InteractionAction, InteractionJump, InteractionLinkTarget, InteractionTrigger,
-    TextInteraction, TextInteractionLimits, TextRange, raw::Reader,
+    TextInteraction, TextRange, raw::Reader,
 };
 use std::io::Cursor;
 
@@ -162,27 +162,6 @@ fn invalid_text_ranges_references_and_limits_are_atomic() {
             .is_err()
     );
 
-    let second = TextInteraction::new(
-        TextRange::new(3, 5).unwrap(),
-        Interaction::new(
-            InteractionTrigger::MouseOver,
-            InteractionAction::Ole,
-            InteractionLinkTarget::Nil,
-        ),
-    )
-    .unwrap();
-    assert!(
-        writer
-            .set_last_shape_text_interaction_with_limits(
-                slide,
-                second,
-                TextInteractionLimits {
-                    max_interactions: 1,
-                    ..Default::default()
-                }
-            )
-            .is_err()
-    );
     assert!(
         !writer
             .clear_last_shape_text_interaction(

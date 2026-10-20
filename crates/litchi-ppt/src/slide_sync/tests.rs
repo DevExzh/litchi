@@ -156,3 +156,110 @@ fn rejects_wrong_root_and_stale_revision_operations() {
     let changed_commit = changed.commit().unwrap();
     assert!(commit.undo(changed_commit.snapshot()).is_err());
 }
+
+fn built_package() -> crate::Package {
+    let mut builder = crate::Builder::new();
+    let slide = builder.add_slide().unwrap();
+    builder
+        .add_textbox(slide, 10, 10, 200, 40, "Synced")
+        .unwrap();
+    builder.add_slide().unwrap();
+    builder.build().unwrap()
+}
+
+#[test]
+fn package_slide_sync_edits_publish_replay_and_invert_exactly() {
+    use litchi_core::Position;
+    use litchi_core::edit::RefusalKind;
+
+    let source = built_package();
+    let source_bytes = source.to_bytes().unwrap();
+    let slide = Position::new(0);
+    assert!(
+        source
+            .edit_slide_sync(slide)
+            .unwrap()
+            .synchronization()
+            .unwrap()
+            .is_none()
+    );
+
+    let no_op = source.edit_slide_sync(slide).unwrap().commit().unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), source_bytes);
+
+    // Clearing absent metadata and setting-then-clearing are exact no-ops.
+    let mut edit = source.edit_slide_sync(slide).unwrap();
+    assert!(!edit.clear().unwrap());
+    edit.set(synchronization()).unwrap();
+    assert!(edit.clear().unwrap());
+    let net_no_op = edit.commit().unwrap();
+    assert!(!net_no_op.diagnostics().changed());
+    assert_eq!(net_no_op.package().to_bytes().unwrap(), source_bytes);
+
+    let mut edit = source.edit_slide_sync(slide).unwrap();
+    edit.set(synchronization()).unwrap();
+    drop(edit);
+    assert_eq!(source.to_bytes().unwrap(), source_bytes);
+
+    let mut edit = source.edit_slide_sync(slide).unwrap();
+    edit.set(synchronization()).unwrap();
+    assert_eq!(edit.changes().len(), 1);
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.patch().before_bytes(), source_bytes.as_slice());
+    assert_eq!(
+        commit
+            .package()
+            .edit_slide_sync(slide)
+            .unwrap()
+            .synchronization()
+            .unwrap(),
+        Some(synchronization())
+    );
+    assert!(
+        commit
+            .package()
+            .edit_slide_sync(Position::new(1))
+            .unwrap()
+            .synchronization()
+            .unwrap()
+            .is_none()
+    );
+
+    let replayed = source.apply_slide_sync(commit.patch()).unwrap();
+    assert_eq!(
+        replayed.package().to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
+    let restored = commit
+        .package()
+        .apply_slide_sync(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(restored.package().to_bytes().unwrap(), source_bytes);
+    assert!(matches!(
+        commit.package().apply_slide_sync(commit.patch()),
+        Err(Error::PatchConflict)
+    ));
+
+    // Clearing the published metadata republishes the slide without it.
+    let mut clear = commit.package().edit_slide_sync(slide).unwrap();
+    assert!(clear.clear().unwrap());
+    let cleared = clear.commit().unwrap();
+    assert!(cleared.diagnostics().changed());
+    assert!(
+        cleared
+            .package()
+            .edit_slide_sync(slide)
+            .unwrap()
+            .synchronization()
+            .unwrap()
+            .is_none()
+    );
+
+    let Err(Error::Refused(refusal)) = source.edit_slide_sync(Position::new(2)) else {
+        panic!("a missing slide must be refused");
+    };
+    assert_eq!(refusal.kind(), RefusalKind::NotFound);
+}

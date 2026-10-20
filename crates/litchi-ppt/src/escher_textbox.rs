@@ -203,7 +203,7 @@ impl EscherTextboxWrapper {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_text_interactions_with_limits(
+    pub(crate) fn parse_text_interactions_with_limits(
         data: &[u8],
         limits: TextInteractionLimits,
     ) -> Result<Vec<TextInteraction>> {

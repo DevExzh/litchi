@@ -25,7 +25,7 @@ impl Editor {
     /// Returns an error if `limits` is invalid, the package or one of its
     /// persisted records is malformed, or the animation data exceeds the
     /// configured limits.
-    pub fn open(bytes: Vec<u8>, limits: EditorLimits) -> Result<Self> {
+    pub(crate) fn open(bytes: Vec<u8>, limits: EditorLimits) -> Result<Self> {
         validate_limits(limits)?;
         let package = ObjectEditor::open_records(bytes)?;
         let ids = package.persist_ids();
@@ -77,13 +77,20 @@ impl Editor {
         })
     }
 
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    /// Whether any staging verb rewrote a persisted record.
+    pub(crate) fn has_net_change(&self) -> bool {
         self.changed
     }
 
+    /// Whether the slide or main master `persist_id` owns shape `shape_id`.
+    pub(crate) fn has_shape(&self, persist_id: u32, shape_id: u32) -> bool {
+        self.entries
+            .iter()
+            .any(|entry| entry.persist_id == persist_id && entry.shape_ids.contains(&shape_id))
+    }
+
     #[must_use]
-    pub fn timelines(&self) -> Vec<Timeline> {
+    pub(crate) fn timelines(&self) -> Vec<Timeline> {
         self.entries
             .iter()
             .map(|entry| Timeline {
@@ -95,7 +102,7 @@ impl Editor {
     }
 
     #[must_use]
-    pub fn find(&self, persist_id: u32) -> Option<Timeline> {
+    pub(crate) fn find(&self, persist_id: u32) -> Option<Timeline> {
         self.entries
             .iter()
             .find(|entry| entry.persist_id == persist_id)
@@ -107,7 +114,7 @@ impl Editor {
     }
 
     #[must_use]
-    pub fn legacy_shape_animations(&self) -> Vec<LegacyShapeAnimation> {
+    pub(crate) fn legacy_shape_animations(&self) -> Vec<LegacyShapeAnimation> {
         self.entries
             .iter()
             .flat_map(|entry| entry.legacy.clone())
@@ -115,7 +122,11 @@ impl Editor {
     }
 
     #[must_use]
-    pub fn find_shape(&self, persist_id: u32, shape_id: u32) -> Option<LegacyShapeAnimation> {
+    pub(crate) fn find_shape(
+        &self,
+        persist_id: u32,
+        shape_id: u32,
+    ) -> Option<LegacyShapeAnimation> {
         self.entries
             .iter()
             .find(|entry| entry.persist_id == persist_id)
@@ -128,7 +139,12 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn add(&mut self, persist_id: u32, index: usize, node: ExtendedTimeNode) -> Result<()> {
+    pub(crate) fn add(
+        &mut self,
+        persist_id: u32,
+        index: usize,
+        node: ExtendedTimeNode,
+    ) -> Result<()> {
         let mut candidate = self.clone();
         let entry = candidate.entry_mut(persist_id)?;
         let mut root = entry.extension.time_node.clone().unwrap_or_default();
@@ -147,7 +163,12 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn update(&mut self, persist_id: u32, index: usize, node: ExtendedTimeNode) -> Result<()> {
+    pub(crate) fn update(
+        &mut self,
+        persist_id: u32,
+        index: usize,
+        node: ExtendedTimeNode,
+    ) -> Result<()> {
         let mut candidate = self.clone();
         let entry = candidate.entry_mut(persist_id)?;
         let root = entry
@@ -170,7 +191,7 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace(
+    pub(crate) fn replace(
         &mut self,
         persist_id: u32,
         root: Option<ExtendedTimeNode>,
@@ -191,7 +212,7 @@ impl Editor {
     ///
     /// Returns an error if the persist ID is unknown, the timeline has no root
     /// node, `index` is out of range, or the rewritten record fails validation.
-    pub fn remove(&mut self, persist_id: u32, index: usize) -> Result<ExtendedTimeNode> {
+    pub(crate) fn remove(&mut self, persist_id: u32, index: usize) -> Result<ExtendedTimeNode> {
         let mut candidate = self.clone();
         let entry = candidate.entry_mut(persist_id)?;
         let root = entry
@@ -215,7 +236,7 @@ impl Editor {
     /// Returns an error if the persist ID is unknown, the timeline has no root
     /// node, `order` is not a permutation of every child index, or the
     /// rewritten record fails validation.
-    pub fn reorder(&mut self, persist_id: u32, order: &[usize]) -> Result<()> {
+    pub(crate) fn reorder(&mut self, persist_id: u32, order: &[usize]) -> Result<()> {
         let mut candidate = self.clone();
         let entry = candidate.entry_mut(persist_id)?;
         let root = entry
@@ -246,7 +267,7 @@ impl Editor {
     ///
     /// Returns an error if the persist ID is unknown, `index` is out of range,
     /// or the rewritten record fails validation.
-    pub fn add_build(
+    pub(crate) fn add_build(
         &mut self,
         persist_id: u32,
         index: usize,
@@ -274,7 +295,7 @@ impl Editor {
     /// Returns an error if the persist ID is unknown, the slide/master has no
     /// build list, `index` is out of range, or the rewritten record fails
     /// validation.
-    pub fn update_build(
+    pub(crate) fn update_build(
         &mut self,
         persist_id: u32,
         index: usize,
@@ -304,7 +325,7 @@ impl Editor {
     /// Returns an error if the persist ID is unknown, the slide/master has no
     /// build list, `index` is out of range, or the rewritten record fails
     /// validation.
-    pub fn remove_build(&mut self, persist_id: u32, index: usize) -> Result<BuildListEntry> {
+    pub(crate) fn remove_build(&mut self, persist_id: u32, index: usize) -> Result<BuildListEntry> {
         let mut candidate = self.clone();
         let entry = candidate.entry_mut(persist_id)?;
         let list = entry
@@ -328,7 +349,7 @@ impl Editor {
     /// Returns an error if the persist ID is unknown, the slide/master has no
     /// build list, `order` is not a permutation of every entry index, or the
     /// rewritten record fails validation.
-    pub fn reorder_builds(&mut self, persist_id: u32, order: &[usize]) -> Result<()> {
+    pub(crate) fn reorder_builds(&mut self, persist_id: u32, order: &[usize]) -> Result<()> {
         let mut candidate = self.clone();
         let entry = candidate.entry_mut(persist_id)?;
         let list = entry
@@ -360,7 +381,7 @@ impl Editor {
     /// Returns an error if the persist ID is unknown, the target shape does not
     /// exist, the animation fails serialization, or the shape's `OfficeArt`
     /// container is missing or malformed.
-    pub fn replace_shape_animation(
+    pub(crate) fn replace_shape_animation(
         &mut self,
         persist_id: u32,
         shape_id: u32,
@@ -409,12 +430,12 @@ impl Editor {
         Ok(())
     }
 
-    /// Finishes the transaction and returns the rewritten package bytes.
+    /// Serialize the rewritten package bytes.
     ///
     /// # Errors
     ///
     /// Returns an error if the rewritten package cannot be serialized.
-    pub fn finish(self) -> Result<Vec<u8>> {
+    pub(crate) fn into_bytes(self) -> Result<Vec<u8>> {
         self.package.finish()
     }
 
