@@ -213,3 +213,197 @@ Gates on `348bfe5e65`: `cargo fmt --all --check` 0; clippy
 `cargo check -p litchi-ops --all-features --all-targets` 0; the litchi-ops
 PPT tests (`crud_matrix`, `ppt_unified_read`, `ppt_unified_write`,
 `ppt_elements`, `--lib`) 0 (988 tests, no re-bless).
+
+## 7. Follow-up: restoring the routes record 0357 made crate-private
+
+Record 0357 kept four native capabilities crate-private with no public route
+([0357 §9](0357-ppt-api-contract.md#9-gaps-and-follow-ups)). The owner's
+direction is no capability loss. Three commits restore them in the contract
+shape. The scoped families' patch representation (§1) is unchanged.
+
+### 7.1 Durable patches, joins and three-way plans (`910d5de31d`)
+
+These live on the primary family `package::edit`, not on a parallel owner:
+
+- `package::edit::Patch::to_durable(&self, PatchLimits) -> Result<litchi_core::patch::Patch<Reversible>>`
+  and `Package::apply_durable<Mode>(&self, &litchi_core::patch::Patch<Mode>) -> Result<Commit>`.
+  Both delegate to the native `Patch::to_durable` / `Snapshot::apply_durable`.
+  The commit publishes a `Package` with `Diagnostics`, and
+  `operation_count()` is the number of durable operations. The replay's own
+  patch is exact, so `apply` and `inverse` work on it. It keeps no semantic
+  operations, so `to_durable` on it is `Refusal::UnsupportedPatch`. Convert
+  the durable patch itself instead. A bound the limits cannot hold is the new
+  `Error::Durable(PatchError)`, which litchi-ops classifies through its
+  `PatchError` rule.
+- Undo/redo is `patch.inverse()` plus `Package::apply`. The native
+  `History` alias and `Snapshot::history` are deleted.
+- `Package::plan_three_way(&self, &Patch, &Patch) -> Result<ThreeWayPlan>`,
+  with `package::edit::{ThreeWayPlan, Conflict}` (`is_clean`, `conflicts`,
+  `Conflict::target`). A patch from another package is `PatchConflict`. The
+  native plan has no apply or merge, so no apply or merge verb was added.
+- The native composition (`prepare_move`, `compose`, `PreparedMove`,
+  `Composition`, `JoinError`) joined independently prepared slide moves over
+  one source whose position ranges were disjoint. It is now
+  `package::edit::Patch::join(&self, &Patch) -> Result<Patch>`, using the
+  glossary's canonical `join`. It joins two move-only patches over the same
+  source whose permuted position sets are disjoint. Such moves commute. The
+  joined patch replays both patches' moves in one native commit, and its
+  operation count is the sum of the two. Another source is `PatchConflict`.
+  Other operations, or overlapping moves, are the new
+  `slide_order::Refusal::UnsupportedPatch` (kind `UnsupportedOperation`). This
+  is more general than the old composition, which took single moves only. The
+  native types are deleted.
+
+Tests: `slide_order::durable_tests` moved to `tests/durable_patches.rs` on
+the public route (11 tests). These cover insertion, notes, comment and
+outline-text durable replay and revert, the durable bound, the empty durable
+patch, undo/redo, joins (commuting, durable round trip, overlap, other
+operations, other source) and three-way plans. They include the
+native-handoff visual-transition scenario (exact replay and inverse, durable
+JSON round trip, undo/redo, three-way conflict). The in-crate history and
+composition unit tests use inverse/apply and the native join.
+
+### 7.2 The source-backed text splice family (`0f78d32842`)
+
+`litchi_ppt::text_edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`
+is registered in `ppt-minimal` and `ppt-full`, with `is_changed` banned in its
+scope:
+
+- `Package::edit_text(&self, text_edit::Target) -> text_edit::Result<text_edit::Edit>`;
+  `Edit::{text, target, set_text, commit}`;
+- `Package::apply_text(&self, &text_edit::Patch) -> text_edit::Result<text_edit::Commit>`;
+- `Commit::{package, into_package, patch, diagnostics, into_parts}`;
+  `Patch::{is_noop, inverse, target, source_fingerprint, target_fingerprint}`;
+  `Diagnostics::{changed, target, changed_spans, replacement_bytes,
+  source_bytes, source_fingerprint, target_fingerprint}`; `LimitKind` has no
+  caller-selected dimension.
+
+The edit opens `SourceSnapshot::from_shared` over the package's retained
+compound-file index and resolves the atom with bounded positional reads. The
+commit is the native owner, unchanged: one `ValidatedOverlayPlan` splice in
+`PowerPoint Document`, the composed target reopened, and the text read back.
+The commit then adopts the candidate `SharedOleFile`, which the native owner
+already opened and validated over the composed source, as the published
+`Package` (`SourceBackedPackage::from_validated_shared` plus
+`Package::from_source`). It does not index the container a third time, and it
+never materializes the package. The published package's `write_to` and `save`
+stream from the composed source. A partial sink receives exactly the accepted
+prefix.
+
+The patch is the record-sized `SourceBackedPatch`: the atom offset and its two
+byte images, bound to the exact source and target artifact fingerprints.
+`apply_text` accepts any package whose fingerprint is the patch source, so a
+reopened, byte-equal package also qualifies. It refuses every other package
+with the new `text_edit::Error::PatchConflict`. A signed package opens. Its
+text is read with the read-only resolver, and an exact no-op commit returns it
+unchanged. A changed commit is the new `text_edit::Error::Signed`. The two
+variants are classified by litchi-ops (`invalid_input`,
+`document_protected`), and the scoped and slide-level mappers handle them.
+`text_edit::SourceSnapshot` stays as the source-backed read view. The
+crate-private whole-artifact text owner's `Commit` and `Patch` are renamed
+`RecordCommit` and `RecordPatch`.
+
+Tests (`text_edit::family::tests`, 7): commit, replay and inverse on eager
+and positional packages, with the unrelated stream kept and the length
+unchanged. They also cover replay on a reopened equal package, conflicts,
+chained splices reading through the composed source, no-ops, length and
+absent-target refusals, the macro refusal, the signed rule, and a partial
+sink. The native `SourceSnapshot` and `SourceTransaction` unit tests stay.
+
+**Measurements.** Probe `crates/litchi-ppt/examples/text_splice_probe.rs` on a
+Builder-made 1,000-shape deck (10 slides of 100 text boxes, 168,448 bytes).
+Each iteration opens the deck from its file (`Package::open`), makes one
+same-length replacement of slide 5 / shape 50, commits, and streams the
+published package with `write_to` to a counting sink. There are 50 iterations
+per run. The `text` mode is `edit_text`. The `primary` mode is
+`Package::edit().set_shape_text`, the only public route at the parent commit.
+
+Method: release, no LTO, `taskset -c 29`, binary-level ABBA × 10 rounds.
+"Before" is `910d5de31d`, built from `git archive` with the same `Cargo.lock`
+and the probe with its `text` arm removed. "After" is `0f78d32842`. Every slot
+runs `primary`, and the after slots also run `text`. Load average was 5.4–11.4
+(other agents' builds). The scripts and evidence are in
+[`results/0357a/text/`](results/0357a/text/): `abba.sh`, `range_abba.sh`,
+`summarize.py`, `abba.tsv`, `range_abba.tsv`, `summary.json` and
+`binaries.sha256` (probe, perf-baseline and deck SHA-256; no binaries are
+committed). Times are pooled medians of per-run medians.
+
+| Route (1,000-shape deck) | open µs | edit+commit µs | commit µs | write_to µs | total µs | written bytes | peak RSS KiB |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| before, `primary` (20 runs) | 27.3 | 549.5 | 40.6 | 2.2 | 579.1 | 184,320 | 6,074 |
+| after, `primary` (20 runs) | 27.2 | 551.0 | 40.3 | 2.2 | 579.7 | 184,320 | 6,242 |
+| after, `text` (20 runs) | 22.8 | 827.8 | 520.4 | 5.2 | 856.1 | 168,448 | 5,010 |
+
+- The primary edit is unchanged: total 1.001×. Its peak RSS medians differ by
+  2.8%, and the two ranges overlap (5,856–6,316 against 6,076–6,432 KiB).
+- The restored splice costs 1.48× the primary edit's time on this small
+  in-memory-sized deck. It keeps the file length (168,448 bytes against
+  184,320; the append-only primary publisher adds a user edit), uses 20% less
+  peak RSS, and never holds the package bytes. Its commit is the native
+  owner's validated publication: an identity plan, a splice plan with the
+  complete source and target fingerprints, and a reopen plus readback of the
+  composed target. That owner was the route before record 0357 too. An
+  instrumented build split the 520 µs commit into about 500 µs in the native
+  splice and 24 µs in this family's package adoption. The adoption is the only
+  new cost.
+- The 0627 `tools/perf-baseline` `ole2_range_source` PPT cases still compile
+  and run unchanged. Run on the same deck, 5 ABBA rounds, 20 warmups and 50
+  samples per run, with the 0627 transport (1 ms per request, 100 MiB/s, 64 KiB
+  maximum physical read), after/before p50 is 1.001
+  (`ppt_range_source_open`, 18.27 ms), 1.001 (`…_open_one_shape_text`,
+  57.69 ms), 0.999 (`ppt_owned_source_control_open`, 179.6 µs) and 1.000
+  (`…_open_one_shape_text`, 304.5 µs). The read counts and bytes are
+  identical: 14 / 51 / 10 / 47 reads, and 344,064 / 360,875 bytes.
+
+### 7.3 Master order and custom table styles on the primary edit (`937ef82791`)
+
+These are `package::edit::Edit` verbs, staged on the native slide-order
+transaction's `document_structure::Transaction`:
+
+- `move_master(&mut self, from: Position, destination: Position) -> Result<()>`,
+  `move_master_id(&mut self, master_id: u32, destination: Position) -> Result<()>`,
+  `reorder_masters(&mut self, order: &[Position]) -> Result<()>`;
+- `insert_custom_table_styles(&mut self, atom: &[u8], CustomTableStylesPlacement) -> Result<()>`,
+  `remove_custom_table_styles(&mut self) -> Result<Vec<u8>>`,
+  `replace_custom_table_styles(&mut self, atom: &[u8]) -> Result<Vec<u8>>`,
+  `move_custom_table_styles(&mut self, CustomTableStylesPlacement) -> Result<()>`.
+  The atom is the complete `RoundTripCustomTableStyles12Atom` record, header
+  included;
+- `set_slide_non_outline_data(&mut self, position: Position, present: bool) -> Result<()>`.
+
+`package::edit` re-exports `CustomTableStylesPlacement`. Each verb records a
+`StructuralChange::Document`. The native commit therefore publishes the
+change with the live `DocumentContainer`, and its slide-list and
+persisted-slide round-trip checks still run unchanged. The structural rebase
+(used when media or live-document changes are staged too) replays the change,
+and `inverse` inverts it. Masters keep their `masterId`, and slides, notes
+and title masters reference masters by that id, so every reference keeps its
+master. Refusals are typed: `ElementNotFound` (master, custom table styles),
+`InvalidElementValue` (a non-permutation, or bytes that are not exactly one
+such atom), `UnsupportedElement` (a second atom), and `Signed`. These edits
+have no durable vocabulary, so `to_durable` refuses them with
+`UnsupportedPatch`. They do not `join`. Three-way plans report
+`document/master-list`, `document/custom-table-styles` and
+`slide-list/position:N/non-outline-data`.
+
+Tests (`tests/document_structure_edits.rs`, 8) use POI `slide_master.ppt`
+(two main masters and a title master) and `45543.ppt` (two masters and a
+custom table-style atom after the `EndDocumentAtom`). They cover reordering
+by position, id and permutation, with replay, inverse, `PatchConflict`,
+unchanged slide texts and master inventory. They also cover style replace
+(another length), move, remove, insert and remove-plus-reinsert (a net
+no-op), `fNonOutlineData`, composition with a slide move, the structural
+rebase with a media-path change (`unified-ops/0294/video.ppt`), no-op byte
+identity, refusals, and the signed rule.
+
+### 7.4 Gates
+
+Each of the three commits passed, with exit 0: `cargo fmt --all --check`;
+clippy `--all-features` and `--no-default-features` with `-D warnings`;
+`cargo test -p litchi-ppt --all-features` (1,546, 1,553 and 1,561 tests);
+`cargo doc` with `-Dwarnings`; `check_api_glossary.py` `ppt-minimal` and
+`ppt-full`; `cargo check -p litchi-ops --all-features --all-targets`; and the
+perf-baseline `cargo check --locked --all-targets`. After `937ef82791`, the
+litchi-ops PPT tests (`--lib`, `crud_matrix`, `ppt_unified_read`,
+`ppt_unified_write`, `ppt_elements`) pass: 988 tests, no re-bless. The
+litchi-ops `error::` tests pass: 62.
