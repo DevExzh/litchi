@@ -9,7 +9,7 @@ use crate::package_metadata::{
     next_object_identifier, set_package_last_object_identifier,
 };
 use crate::protobuf::tswp;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::super::line_end::{
     ShapeStyleOverrides, ShapeStyleVariationLocation, collapse_style_variation,
@@ -26,7 +26,7 @@ use litchi_iwa_common::text::layout::{AutoSize, Insets, Layout, VerticalAlignmen
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
 
 pub(crate) fn shape_text_layout(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     drawable_id: u64,
 ) -> Result<Layout> {
@@ -40,11 +40,11 @@ pub(crate) fn shape_text_layout(
 }
 
 pub(crate) fn set_shape_text_layout(
-    mut package: IWorkPackage,
+    mut package: HostPackage,
     archive_name: &str,
     drawable_id: u64,
     layout: Layout,
-) -> Result<IWorkPackage> {
+) -> Result<HostPackage> {
     if shape_text_layout(&package, archive_name, drawable_id)? == layout {
         return Ok(package);
     }
@@ -92,10 +92,10 @@ pub(crate) fn set_shape_text_layout(
 
 /// Remove direct frame-layout overrides and restore inherited values.
 pub(crate) fn reset_shape_text_layout(
-    mut package: IWorkPackage,
+    mut package: HostPackage,
     archive_name: &str,
     drawable_id: u64,
-) -> Result<(IWorkPackage, bool)> {
+) -> Result<(HostPackage, bool)> {
     let old_style_id = shape_payload(&package, archive_name, drawable_id)?
         .super_
         .style
@@ -192,11 +192,11 @@ struct LayoutVariationLocation<'a> {
 }
 
 fn insert_layout_variation(
-    mut package: IWorkPackage,
+    mut package: HostPackage,
     location: LayoutVariationLocation<'_>,
     overrides: ShapeStyleOverrides,
     expected: Layout,
-) -> Result<IWorkPackage> {
+) -> Result<HostPackage> {
     let LayoutVariationLocation {
         drawable_archive_name,
         drawable_id,
@@ -242,7 +242,7 @@ fn insert_layout_variation(
 }
 
 fn validate_layout(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     drawable_id: u64,
     expected: Layout,
@@ -256,7 +256,7 @@ fn validate_layout(
 }
 
 fn stylesheet_id(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style_archive_name: &str,
     style_id: u64,
     style: &tswp::ShapeStyleArchive,
@@ -292,7 +292,7 @@ fn parent_style_id(style_id: u64, style: &tswp::ShapeStyleArchive) -> Result<u64
         })
 }
 
-fn inherited_shape_text_layout(package: &IWorkPackage, first_style_id: u64) -> Result<Layout> {
+fn inherited_shape_text_layout(package: &HostPackage, first_style_id: u64) -> Result<Layout> {
     let mut visited = HashSet::new();
     let mut style_id = Some(first_style_id);
     let mut vertical_alignment = None;
@@ -414,7 +414,7 @@ mod tests {
         );
         let columns = Columns::equal(Count::new(2).unwrap(), None);
 
-        let mut pages = pages::Editor::create_with_text("Body").unwrap();
+        let mut pages = pages::Draft::create_with_text("Body").unwrap();
         let pages_box = pages
             .add_text_box(4, "Pages layout", POSITION, SIZE)
             .unwrap();
@@ -427,7 +427,7 @@ mod tests {
         pages
             .set_text_box_text_layout(pages_box.drawable_object_id, layout)
             .unwrap();
-        let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages
                 .text_box_text_layout(pages_box.drawable_object_id)
@@ -463,7 +463,7 @@ mod tests {
                 .unwrap()
         );
 
-        let mut numbers = numbers::Editor::create().unwrap();
+        let mut numbers = numbers::Draft::create().unwrap();
         let sheet_id = numbers.sheets().unwrap()[0].object_id;
         let numbers_box = numbers
             .add_sheet_text_box(sheet_id, "Numbers layout", POSITION, SIZE)
@@ -471,7 +471,7 @@ mod tests {
         numbers
             .set_sheet_text_box_text_layout(sheet_id, numbers_box.drawable_object_id, layout)
             .unwrap();
-        let mut numbers = numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        let mut numbers = numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
         assert_eq!(
             numbers
                 .sheet_text_box_text_layout(sheet_id, numbers_box.drawable_object_id)
@@ -484,14 +484,14 @@ mod tests {
                 .unwrap()
         );
 
-        let mut keynote = keynote::Editor::create().unwrap();
+        let mut keynote = keynote::Draft::create().unwrap();
         let keynote_box = keynote
             .add_slide_text_box(0, "Keynote layout", POSITION, SIZE)
             .unwrap();
         keynote
             .set_slide_text_box_text_layout(0, keynote_box.drawable_object_id, layout)
             .unwrap();
-        let mut keynote = keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let mut keynote = keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
             keynote
                 .slide_text_box_text_layout(0, keynote_box.drawable_object_id)

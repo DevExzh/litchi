@@ -7,7 +7,7 @@ use crate::charts::axis_label_position_3d::{
     set_chart_3d_value_axis_label_position as set_native_3d_value_axis_label_position,
 };
 
-impl Editor {
+impl Draft {
     /// Read one body chart's 3D primary value-axis label position.
     pub fn body_chart_3d_value_axis_label_position(
         &self,
@@ -49,7 +49,7 @@ impl Editor {
             graph.info.kind,
             position,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_3d_value_axis_label_position(drawable_object_id)? != position {
             return Err(Error::InvalidFormat(
                 "Pages chart 3D value-axis label-position update failed validation".to_owned(),
@@ -93,7 +93,7 @@ mod tests {
                 LabelPosition3d::Trailing,
             )
             .unwrap();
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_chart_3d_value_axis_label_position(chart.drawable_object_id)

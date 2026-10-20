@@ -8,7 +8,7 @@ use crate::package_metadata::{
     component_identifier_for_entry, next_object_identifier, release_package_identifier_suffix,
     set_package_last_object_identifier,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::annotation::{
     AnnotationKind, add_author_external_reference, annotation_by_id, remove_registered_object,
@@ -21,7 +21,7 @@ use super::highlight_object::{
 use super::highlight_storage::locate_storage;
 
 pub(super) fn annotation_replies(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     annotation_id: u64,
 ) -> Result<Vec<AnnotationReplyGraph>> {
@@ -33,7 +33,7 @@ pub(super) fn annotation_replies(
 }
 
 pub(super) fn add_annotation_reply(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     annotation_id: u64,
     body: String,
@@ -85,7 +85,7 @@ pub(super) fn add_annotation_reply(
 }
 
 pub(super) fn update_annotation_reply(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     annotation_id: u64,
     reply_id: u64,
@@ -131,7 +131,7 @@ pub(super) fn update_annotation_reply(
 }
 
 pub(super) fn remove_annotation_reply(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     annotation_id: u64,
     reply_id: u64,

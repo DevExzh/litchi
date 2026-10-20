@@ -11,7 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
     let sheet_index = arguments[2].parse::<usize>()?;
-    let mut editor = numbers::Editor::open(&arguments[0])?;
+    let mut editor = numbers::Draft::open(&arguments[0])?;
     let source = editor
         .sheets()?
         .into_iter()

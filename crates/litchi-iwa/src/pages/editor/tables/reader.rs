@@ -21,9 +21,9 @@ use litchi_pages::{
     table::merge::transaction::LimitKind as BodyTableMergesLimitKind,
 };
 
-use super::super::Editor;
+use super::super::Draft;
 use crate::archive::{ArchiveObject, RawMessage};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const BODY_STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const TABLE_ATTACHMENT_FIELD: u32 = 9;
@@ -36,7 +36,7 @@ const TABLE_INFO_MESSAGE_TYPES: &[u32] = &[6_000, 6_003];
 const MAX_BODY_TABLES: usize = 4_096;
 
 /// Read merged-cell regions through the cached focused Pages owner.
-pub(super) fn regions_in_editor(editor: &Editor, model_object_id: u64) -> Result<Vec<Region>> {
+pub(super) fn regions_in_editor(editor: &Draft, model_object_id: u64) -> Result<Vec<Region>> {
     if editor.package().exact_source_owner().is_none() {
         let (focused, table_position, _) =
             super::semantic::focused_body_table_source(editor, model_object_id)?;
@@ -71,10 +71,10 @@ pub(super) fn regions_in_editor(editor: &Editor, model_object_id: u64) -> Result
 ///
 /// This entry point is used by mutation adapters before constructing a
 /// focused writable package. It keeps the preadmission scan metadata-only and
-/// avoids the semantic `Editor::tables` projection, which would decode
+/// avoids the semantic `Draft::tables` projection, which would decode
 /// complete table models before the focused transaction is admitted.
 pub(super) fn focused_table_position_for_mutation(
-    editor: &Editor,
+    editor: &Draft,
     model_object_id: u64,
 ) -> Result<Option<usize>> {
     let (components, _) = editor
@@ -93,7 +93,7 @@ pub(super) fn focused_table_position_for_mutation(
 /// attachment references, and `TableInfoArchive` ownership; in particular it
 /// never decodes a `TableModelArchive` or materializes body text.
 fn focused_table_position(
-    package: &IWorkPackage,
+    package: &HostPackage,
     components: &ComponentCatalog,
     body_storage_id: u64,
     model_object_id: u64,
@@ -145,7 +145,7 @@ struct TableEntry {
 }
 
 fn decode_table_entries(
-    package: &IWorkPackage,
+    package: &HostPackage,
     source: &[u8],
     budget: &mut SelectorBudget,
 ) -> Result<Vec<TableEntry>> {
@@ -194,7 +194,7 @@ fn decode_table_entries(
     Ok(entries)
 }
 
-fn parse_drawable_id(package: &IWorkPackage, source: &[u8]) -> Result<NonZeroU64> {
+fn parse_drawable_id(package: &HostPackage, source: &[u8]) -> Result<NonZeroU64> {
     let limits = wire_limits(package, source)?;
     let view = WireView::parse_with_limits(source, limits)
         .map_err(|error| invalid_wire("Pages drawable attachment", error))?;
@@ -256,7 +256,7 @@ fn parse_local_reference(source: &[u8], limits: WireLimits) -> Result<NonZeroU64
 }
 
 fn decode_table_info(
-    package: &IWorkPackage,
+    package: &HostPackage,
     source: &[u8],
     body_storage_id: u64,
 ) -> Result<table_info_codec::TableInfoSnapshot> {
@@ -270,7 +270,7 @@ fn decode_table_info(
 }
 
 fn table_info_options(
-    package: &IWorkPackage,
+    package: &HostPackage,
     source: &[u8],
 ) -> Result<table_info_codec::DecodeOptions> {
     let limits = wire_limits(package, source)?;
@@ -284,7 +284,7 @@ fn table_info_options(
     ))
 }
 
-fn wire_limits(package: &IWorkPackage, source: &[u8]) -> Result<WireLimits> {
+fn wire_limits(package: &HostPackage, source: &[u8]) -> Result<WireLimits> {
     let archive_limits = package.limits().archive_limits();
     let input = source
         .len()
@@ -655,7 +655,7 @@ mod tests {
         let mut budget = SelectorBudget::new(&components).expect("empty catalog has a budget");
         budget.max_references = WireLimits::MAX_FIELDS;
         budget.max_work = WireLimits::MAX_REWRITE_WORK;
-        let error = decode_table_entries(&IWorkPackage::new(), &body, &mut budget)
+        let error = decode_table_entries(&HostPackage::new(), &body, &mut budget)
             .expect_err("the focused table ceiling must reject the 4097th attachment");
         assert!(matches!(
             error,

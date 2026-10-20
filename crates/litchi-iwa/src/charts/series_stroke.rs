@@ -21,7 +21,7 @@ use crate::shapes::{
     stroke_to_native,
 };
 use crate::wire::patch_length_delimited_field;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const AREA_STROKE_FIELD: u32 = 45;
 const BAR_STROKE_FIELD: u32 = 46;
@@ -342,7 +342,7 @@ impl ChartSeriesStrokeKind {
 
 /// Read effective strokes in native series order.
 pub(crate) fn chart_series_strokes(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -364,7 +364,7 @@ pub(crate) fn chart_series_strokes(
 
 /// Replace every effective series stroke in native series order.
 pub(crate) fn set_chart_series_strokes(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -417,7 +417,7 @@ pub(crate) fn set_chart_series_strokes(
 
 /// Remove one local stroke override and expose its inherited appearance.
 pub(crate) fn reset_chart_series_stroke(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -449,7 +449,7 @@ pub(crate) fn reset_chart_series_stroke(
 
 fn read_effective_stroke(
     slot: &ChartSeriesStyleSlot,
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage: ChartSeriesStrokeKind,
 ) -> Result<Option<ChartSeriesStroke>> {
     Ok(slot
@@ -461,7 +461,7 @@ fn read_effective_stroke(
 
 fn read_local_stroke(
     slot: &ChartSeriesStyleSlot,
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage: ChartSeriesStrokeKind,
 ) -> Result<Option<Option<ChartSeriesStroke>>> {
     slot.read(package, |data| {

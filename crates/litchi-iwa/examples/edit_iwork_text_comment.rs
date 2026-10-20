@@ -3,8 +3,8 @@
 use std::env;
 
 use litchi_iwa::text::{
-    IWorkTextEditor, TextCommentBody, TextCommentId, TextCommentReplyBody, TextCommentReplyId,
-    TextRange, TextStorageId,
+    TextCommentBody, TextCommentId, TextCommentReplyBody, TextCommentReplyId, TextRange,
+    TextStorageId,
 };
 use litchi_iwa_text::comment::raw::{comment_id, comment_id_value, reply_id, reply_id_value};
 
@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let input = arguments.next().ok_or(USAGE)?;
             let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             require_end(arguments)?;
-            let editor = IWorkTextEditor::open(input)?;
+            let editor = litchi_iwa::text::Draft::open(input)?;
             for comment in editor.text_comments(storage_id)? {
                 println!(
                     "id={} range={}..{} replies={} body={:?}",
@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let range = parse_range(&mut arguments)?;
             let body = TextCommentBody::try_from(arguments.next().ok_or(USAGE)?)?;
             require_end(arguments)?;
-            let mut editor = IWorkTextEditor::open(input)?;
+            let mut editor = litchi_iwa::text::Draft::open(input)?;
             let comment = editor.add_text_comment(storage_id, range, body)?;
             editor.save(output)?;
             println!("created comment {}", comment_id_value(comment.id()));
@@ -50,7 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let range = parse_range(&mut arguments)?;
             let body = TextCommentBody::try_from(arguments.next().ok_or(USAGE)?)?;
             require_end(arguments)?;
-            let mut editor = IWorkTextEditor::open(input)?;
+            let mut editor = litchi_iwa::text::Draft::open(input)?;
             editor.update_text_comment(storage_id, comment_id, range, body)?;
             editor.save(output)?;
             println!("updated comment {}", comment_id_value(comment_id));
@@ -61,7 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             let comment_id = comment_id(parse_u64(arguments.next(), "comment-id")?)?;
             require_end(arguments)?;
-            let mut editor = IWorkTextEditor::open(input)?;
+            let mut editor = litchi_iwa::text::Draft::open(input)?;
             editor.remove_text_comment(storage_id, comment_id)?;
             editor.save(output)?;
             println!("removed comment {}", comment_id_value(comment_id));
@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             let comment_id = parse_comment_id(arguments.next())?;
             require_end(arguments)?;
-            let editor = IWorkTextEditor::open(input)?;
+            let editor = litchi_iwa::text::Draft::open(input)?;
             for reply in editor.text_comment_replies(storage_id, comment_id)? {
                 println!(
                     "id={} comment={} body={:?}",
@@ -88,7 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let comment_id = parse_comment_id(arguments.next())?;
             let body = TextCommentReplyBody::try_from(arguments.next().ok_or(USAGE)?)?;
             require_end(arguments)?;
-            let mut editor = IWorkTextEditor::open(input)?;
+            let mut editor = litchi_iwa::text::Draft::open(input)?;
             let reply = editor.add_text_comment_reply(storage_id, comment_id, body)?;
             editor.save(output)?;
             println!("created reply {}", reply_id_value(reply.id()));
@@ -101,7 +101,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let reply_id = parse_reply_id(arguments.next())?;
             let body = TextCommentReplyBody::try_from(arguments.next().ok_or(USAGE)?)?;
             require_end(arguments)?;
-            let mut editor = IWorkTextEditor::open(input)?;
+            let mut editor = litchi_iwa::text::Draft::open(input)?;
             editor.update_text_comment_reply(storage_id, comment_id, reply_id, body)?;
             editor.save(output)?;
             println!("updated reply {}", reply_id_value(reply_id));
@@ -113,7 +113,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let comment_id = parse_comment_id(arguments.next())?;
             let reply_id = parse_reply_id(arguments.next())?;
             require_end(arguments)?;
-            let mut editor = IWorkTextEditor::open(input)?;
+            let mut editor = litchi_iwa::text::Draft::open(input)?;
             editor.remove_text_comment_reply(storage_id, comment_id, reply_id)?;
             editor.save(output)?;
             println!("removed reply {}", reply_id_value(reply_id));

@@ -9,7 +9,7 @@
 //! - Legend text
 //! - Grid data (row/column names and values)
 
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 mod archive;
 
@@ -182,7 +182,7 @@ impl From<litchi_iwa_common::chart::error_bar::Error> for crate::Error {
 
 /// Locate one chart-private object and reject ambiguous cross-component IDs.
 pub(crate) fn unique_chart_object_archive_name(
-    package: &IWorkPackage,
+    package: &HostPackage,
     identifier: u64,
     object_label: &str,
 ) -> Result<String> {

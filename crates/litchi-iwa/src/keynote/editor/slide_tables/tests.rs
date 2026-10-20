@@ -29,7 +29,7 @@ use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSet
 // Raw-ID header access remains only as compatibility coverage inside the
 // host's cfg(test) module. Production callers use litchi-keynote's checked
 // slide/table selectors and package transactions.
-impl Editor {
+impl Draft {
     fn slide_table_header_settings(
         &self,
         slide_index: usize,
@@ -52,12 +52,12 @@ impl Editor {
             model_object_id,
             settings,
         )?;
-        *self = Editor::from_package(staged)?;
+        *self = Draft::from_package(staged)?;
         Ok(())
     }
 }
 
-fn focused_table_index(editor: &Editor, slide_index: usize, model_object_id: u64) -> Result<usize> {
+fn focused_table_index(editor: &Draft, slide_index: usize, model_object_id: u64) -> Result<usize> {
     let tables = editor.slide_tables(slide_index)?;
     let mut table_index = None;
     for (index, table) in tables.iter().enumerate() {
@@ -77,14 +77,14 @@ fn focused_table_index(editor: &Editor, slide_index: usize, model_object_id: u64
     })
 }
 
-fn focused_table_package(editor: &Editor) -> Result<litchi_keynote::Package> {
+fn focused_table_package(editor: &Draft) -> Result<litchi_keynote::Package> {
     litchi_keynote::Package::from_bytes(&editor.to_bytes()?).map_err(|error| {
         Error::InvalidFormat(format!("focused Keynote table source failed: {error}"))
     })
 }
 
 fn set_focused_table_name(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     model_object_id: u64,
     before_name: &str,
@@ -126,7 +126,7 @@ fn set_focused_table_name(
     commit.package().write_to(&mut bytes).map_err(|error| {
         Error::InvalidFormat(format!("focused Keynote name write failed: {error}"))
     })?;
-    *editor = Editor::from_bytes(&bytes)?;
+    *editor = Draft::from_bytes(&bytes)?;
     let package = focused_table_package(editor)?;
     let focused_name = package
         .slide_table_name(
@@ -141,7 +141,7 @@ fn set_focused_table_name(
 }
 
 fn focused_table_title_settings(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     model_object_id: u64,
 ) -> Result<TableTitleSettings> {
@@ -157,7 +157,7 @@ fn focused_table_title_settings(
 }
 
 fn set_focused_table_title_settings(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     model_object_id: u64,
     settings: TableTitleSettings,
@@ -183,12 +183,12 @@ fn set_focused_table_title_settings(
     commit.package().write_to(&mut bytes).map_err(|error| {
         Error::InvalidFormat(format!("focused Keynote title write failed: {error}"))
     })?;
-    *editor = Editor::from_bytes(&bytes)?;
+    *editor = Draft::from_bytes(&bytes)?;
     Ok(())
 }
 
 fn assert_focused_table_dimension_rejected(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     model_object_id: u64,
     dimension: Dimension,
@@ -242,7 +242,7 @@ fn source_built_table_has_no_conditional_highlighting_and_clear_is_idempotent() 
         .clear_slide_table_cell_conditional_highlighting(0, table.model_object_id, 1, 1)
         .unwrap();
     assert!(
-        Editor::from_bytes(&editor.to_bytes().unwrap())
+        Draft::from_bytes(&editor.to_bytes().unwrap())
             .unwrap()
             .slide_table_cell_conditional_highlighting(0, table.model_object_id, 1, 1)
             .unwrap()
@@ -319,7 +319,7 @@ fn source_built_table_roundtrips_cell_border_crud() {
         .set_slide_table_cell_border(0, table.model_object_id, 2, 1, BorderSide::Top, stroke)
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_borders(0, table.model_object_id, 2, 1)
@@ -357,7 +357,7 @@ fn source_built_table_roundtrips_cell_fill_crud() {
         .set_slide_table_cell_fill(0, table.model_object_id, 1, 1, &fill)
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_fill(0, table.model_object_id, 1, 1)
@@ -397,7 +397,7 @@ fn source_built_table_roundtrips_cell_layout_crud() {
         .set_slide_table_cell_layout(0, table.model_object_id, 1, 1, layout)
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_layout(0, table.model_object_id, 1, 1)
@@ -443,7 +443,7 @@ fn source_built_table_roundtrips_number_data_format_crud() {
         .set_slide_table_cell_data_format(0, table.model_object_id, 1, 1, data_format.clone())
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
@@ -486,7 +486,7 @@ fn source_built_table_roundtrips_percentage_data_format() {
         .set_slide_table_cell_percentage_format(0, table.model_object_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
@@ -537,7 +537,7 @@ fn source_built_table_roundtrips_currency_format_crud() {
         .set_slide_table_cell_currency_format(0, table.model_object_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_currency_format(0, table.model_object_id, 1, 1)
@@ -578,7 +578,7 @@ fn source_built_table_roundtrips_scientific_format_crud() {
         .set_slide_table_cell_scientific_format(0, table.model_object_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_scientific_format(0, table.model_object_id, 1, 1)
@@ -619,7 +619,7 @@ fn source_built_table_roundtrips_fraction_format_crud() {
         .set_slide_table_cell_fraction_format(0, table.model_object_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_fraction_format(0, table.model_object_id, 1, 1)
@@ -665,7 +665,7 @@ fn source_built_table_roundtrips_numeral_system_format_crud() {
         .set_slide_table_cell_numeral_system_format(0, table.model_object_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_numeral_system_format(0, table.model_object_id, 1, 1)
@@ -706,7 +706,7 @@ fn source_built_table_roundtrips_date_time_format_crud() {
         .set_slide_table_cell_date_time_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_date_time_format(0, table.model_object_id, 1, 1)
@@ -748,7 +748,7 @@ fn source_built_table_roundtrips_duration_format_crud() {
         .set_slide_table_cell_duration_format(0, table.model_object_id, 1, 1, format)
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_duration_format(0, table.model_object_id, 1, 1)
@@ -779,7 +779,7 @@ fn source_built_table_roundtrips_checkbox_format_crud() {
         .set_slide_table_cell_checkbox_format(0, table.model_object_id, 1, 1, Checkbox)
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_checkbox_format(0, table.model_object_id, 1, 1)
@@ -817,7 +817,7 @@ fn source_built_table_roundtrips_star_rating_format_crud() {
         .set_slide_table_cell_star_rating_format(0, table.model_object_id, 1, 1, StarRating)
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_star_rating_format(0, table.model_object_id, 1, 1)
@@ -857,7 +857,7 @@ fn source_built_table_roundtrips_slider_format_crud() {
         .set_slide_table_cell_slider_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_slider_format(0, table.model_object_id, 1, 1)
@@ -897,7 +897,7 @@ fn source_built_table_roundtrips_stepper_format_crud() {
         .set_slide_table_cell_stepper_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_stepper_format(0, table.model_object_id, 1, 1)
@@ -944,7 +944,7 @@ fn source_built_table_roundtrips_text_format_crud() {
         .set_slide_table_cell_text_format(0, table.model_object_id, 1, 1)
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_text_format(0, table.model_object_id, 1, 1)
@@ -995,7 +995,7 @@ fn source_built_table_roundtrips_custom_format_crud() {
         .set_slide_table_cell_custom_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_custom_format(0, table.model_object_id, 1, 1)
@@ -1027,7 +1027,7 @@ fn source_built_table_roundtrips_pop_up_menu_format_crud() {
         .set_slide_table_cell_pop_up_menu_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_pop_up_menu_format(0, table.model_object_id, 1, 1)
@@ -1063,7 +1063,7 @@ fn source_built_table_roundtrips_full_crud() {
     package
         .insert_entry("Index/CalculationEngine-81.iwa", engine)
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Forecast", 3, 3, position, size)
@@ -1148,7 +1148,7 @@ fn source_built_table_roundtrips_full_crud() {
     let laid_out_geometry = replacement;
 
     let bytes = editor.to_bytes().unwrap();
-    let mut reopened = Editor::from_bytes(&bytes).unwrap();
+    let mut reopened = Draft::from_bytes(&bytes).unwrap();
     let materialized = reopened.slide_table(0, table.model_object_id).unwrap();
     assert_eq!(
         materialized.info.name,
@@ -1190,7 +1190,7 @@ fn source_built_table_roundtrips_full_crud() {
         .unwrap();
     assert_eq!(removed.table.model_object_id, table.model_object_id);
     assert!(reopened.slide_tables(0).unwrap().is_empty());
-    assert!(Editor::from_bytes(&reopened.to_bytes().unwrap()).is_ok());
+    assert!(Draft::from_bytes(&reopened.to_bytes().unwrap()).is_ok());
 }
 
 #[test]
@@ -1280,7 +1280,7 @@ fn source_built_table_duplication_clones_formula_storage_and_geometry() {
         "Budget copy 2"
     );
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.slide_tables(0).unwrap().len(), 3);
     reopened
         .remove_slide_table(copied.slide_index, copied.drawable_object_id)
@@ -1303,7 +1303,7 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
     package
         .insert_entry("Index/CalculationEngine-82.iwa", engine)
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Formula", 3, 2, position, size)
@@ -1325,7 +1325,7 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
         )
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_table_formula(0, table.model_object_id, 2, 1)
@@ -1440,7 +1440,7 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
     editor
         .insert_slide_table_column(0, model_id, ColumnInsertion::body(1))
         .unwrap();
-    let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let shifted = reopened.slide_table(0, model_id).unwrap();
     assert_eq!((shifted.info.rows, shifted.info.columns), (5, 5));
     assert_ne!(shifted.info.geometry.size, baseline_geometry.size);
@@ -1517,7 +1517,7 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
     package
         .insert_entry("Index/CalculationEngine-42-2.iwa", engine)
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let baseline = editor.to_bytes().unwrap();
 
     editor
@@ -1634,7 +1634,7 @@ fn source_built_table_roundtrips_title_settings_transactionally() {
     );
     set_focused_table_title_settings(&mut editor, 0, table.model_object_id, visible).unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         focused_table_title_settings(&reopened, 0, table.model_object_id).unwrap(),
         visible
@@ -1718,7 +1718,7 @@ fn source_built_tables_list_in_z_order_and_roundtrip_through_catalog() {
     // immutable package snapshot on reopen; no table identity or z-order is
     // inferred from the generated model's allocation order.
     let source = editor.to_bytes().unwrap();
-    let reopened = Editor::from_bytes(&source).unwrap();
+    let reopened = Draft::from_bytes(&source).unwrap();
     let reread = reopened.slide_tables(0).unwrap();
     assert_eq!(reread.len(), listed.len());
     for (before, after) in listed.iter().zip(reread) {

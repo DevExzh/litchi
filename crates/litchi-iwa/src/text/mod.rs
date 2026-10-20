@@ -14,7 +14,7 @@ mod date_time;
 mod date_time_field;
 mod date_time_object;
 mod drop_cap;
-pub mod editor;
+pub(crate) mod editor;
 pub(crate) mod extractor;
 mod font;
 mod highlight;
@@ -62,7 +62,7 @@ pub use bookmark_types::{
     TextBookmark, TextBookmarkId, TextBookmarkName, TextBookmarkSettings, TextBookmarkVisibility,
 };
 pub use date_time_field::{TextDateTimeField, TextDateTimeFieldId};
-pub use editor::{IWorkTextEditor, TextStorageInfo};
+pub use editor::{Draft, TextStorageInfo};
 pub use storage_id::{TextStorageId, TextStorageIdError};
 
 /// Validate a native storage reference at the IWA adapter boundary.

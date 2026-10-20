@@ -15,7 +15,7 @@ use crate::shapes::{
     Pattern, RgbaColor, Stroke, Width, empty_stroke_archive, stroke_from_native, stroke_to_native,
 };
 use crate::wire::patch_length_delimited_field;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// `tschchartinfodefaultborderstroke` in `TSCH.Generated.ChartStyleArchive`.
 const CHART_BORDER_STROKE_FIELD: u32 = 12;
@@ -27,7 +27,7 @@ pub(crate) fn native_default_chart_border_stroke() -> Stroke {
 
 /// Read the chart-area border stroke, or `None` when the native style is empty.
 pub(crate) fn chart_border_stroke(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -43,7 +43,7 @@ pub(crate) fn chart_border_stroke(
 
 /// Set the chart-area border stroke independently of border visibility.
 pub(crate) fn set_chart_border_stroke(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

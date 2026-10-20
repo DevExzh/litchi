@@ -14,14 +14,14 @@ use crate::charts::axis::{
 };
 use crate::protobuf::tsch;
 use crate::wire::{patch_length_delimited_field, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// `tschchartaxisvaluescale` in `TSCH.Generated.ChartAxisNonStyleArchive`.
 const VALUE_AXIS_SCALE_FIELD: u32 = 8;
 
 /// Read the scale mode of one native chart's primary value axis.
 pub(crate) fn chart_value_axis_scale(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -38,7 +38,7 @@ pub(crate) fn chart_value_axis_scale(
 
 /// Set the scale mode of one native chart's primary value axis.
 pub(crate) fn set_chart_value_axis_scale(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

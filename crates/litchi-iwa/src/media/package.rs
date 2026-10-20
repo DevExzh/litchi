@@ -9,8 +9,9 @@ use std::sync::Arc;
 use sha1::{Digest, Sha1};
 use tempfile::NamedTempFile;
 
+use crate::HostPackage;
 use crate::archive::RawMessage;
-use crate::package::{IWorkPackage, PackageLimits};
+use crate::package::PackageLimits;
 use crate::{Error, Result};
 
 use super::codec::{
@@ -28,7 +29,7 @@ const DEFAULT_MAX_REPLACEMENT_BYTES: usize = 1024 * 1024 * 1024;
 enum MediaSource {
     Directory(PathBuf),
     File(PathBuf),
-    Package(IWorkPackage),
+    Package(HostPackage),
 }
 
 /// Read-only media access for directory bundles, package files, and bytes.
@@ -95,6 +96,38 @@ impl MediaCatalog {
     }
 }
 
+/// Configuration for one media-manager ingress: the media resource ceilings.
+///
+/// The host package limits stay the defaults (or, for
+/// [`MediaManager::from_package_with_options`], those the package was opened
+/// with).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[must_use]
+pub struct OpenOptions {
+    media_limits: MediaLimits,
+}
+
+impl OpenOptions {
+    /// The default media ceilings.
+    pub fn new() -> Self {
+        Self {
+            media_limits: MediaLimits::default(),
+        }
+    }
+
+    /// Select the media resource ceilings.
+    pub const fn media_limits(mut self, limits: MediaLimits) -> Self {
+        self.media_limits = limits;
+        self
+    }
+
+    /// The selected media resource ceilings.
+    #[must_use]
+    pub const fn media_limits_value(&self) -> MediaLimits {
+        self.media_limits
+    }
+}
+
 impl MediaManager {
     fn from_parts(
         source: MediaSource,
@@ -118,13 +151,17 @@ impl MediaManager {
     }
 
     /// Open a directory bundle or a single-file `.pages`, `.numbers`, or `.key` package.
-    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::new_with_limits(path, MediaLimits::default())
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        Self::open_with_options(path, OpenOptions::new())
     }
 
-    /// Open a media source under caller-selected resource ceilings.
-    pub fn new_with_limits<P: AsRef<Path>>(path: P, limits: MediaLimits) -> Result<Self> {
-        Self::new_with_limits_and_package_limits(path, limits, PackageLimits::default())
+    /// Open a media source under the media ceilings of `options`.
+    pub fn open_with_options<P: AsRef<Path>>(path: P, options: OpenOptions) -> Result<Self> {
+        Self::open_with_limits_and_package_limits(
+            path,
+            options.media_limits_value(),
+            PackageLimits::default(),
+        )
     }
 
     /// Open a media source with separate media and package resource ceilings.
@@ -132,7 +169,7 @@ impl MediaManager {
     /// File-backed packages retain the package profile for later extraction;
     /// reopening an asset therefore cannot silently fall back to a broader
     /// default ZIP or Snappy budget.
-    pub fn new_with_limits_and_package_limits<P: AsRef<Path>>(
+    pub(crate) fn open_with_limits_and_package_limits<P: AsRef<Path>>(
         path: P,
         limits: MediaLimits,
         package_limits: PackageLimits,
@@ -161,7 +198,7 @@ impl MediaManager {
                 package_limits,
             ))
         } else if metadata.is_file() {
-            let package = IWorkPackage::open_with_limits(&path, package_limits)?;
+            let package = HostPackage::open_with_limits(&path, package_limits)?;
             let assets = Self::scan_package(&package, limits)?;
             Ok(Self::from_parts(
                 MediaSource::File(path),
@@ -179,33 +216,42 @@ impl MediaManager {
 
     /// Open read-only media access over an in-memory iWork package.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, MediaLimits::default())
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
     }
 
-    /// Open an in-memory iWork package under caller-selected resource ceilings.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: MediaLimits) -> Result<Self> {
-        Self::from_bytes_with_limits_and_package_limits(bytes, limits, PackageLimits::default())
+    /// Open an in-memory iWork package under the media ceilings of `options`.
+    pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> Result<Self> {
+        Self::from_bytes_with_limits_and_package_limits(
+            bytes,
+            options.media_limits_value(),
+            PackageLimits::default(),
+        )
     }
 
     /// Open an in-memory package with separate media and package ceilings.
-    pub fn from_bytes_with_limits_and_package_limits(
+    pub(crate) fn from_bytes_with_limits_and_package_limits(
         bytes: &[u8],
         limits: MediaLimits,
         package_limits: PackageLimits,
     ) -> Result<Self> {
         Self::from_package_with_limits(
-            IWorkPackage::from_bytes_with_limits(bytes, package_limits)?,
+            HostPackage::from_bytes_with_limits(bytes, package_limits)?,
             limits,
         )
     }
 
     /// Create read-only media access from an already parsed package.
-    pub fn from_package(package: IWorkPackage) -> Result<Self> {
-        Self::from_package_with_limits(package, MediaLimits::default())
+    pub fn from_package(package: HostPackage) -> Result<Self> {
+        Self::from_package_with_options(package, OpenOptions::new())
     }
 
-    /// Create read-only media access from a package under explicit limits.
-    pub fn from_package_with_limits(package: IWorkPackage, limits: MediaLimits) -> Result<Self> {
+    /// Create read-only media access from a package under the media ceilings
+    /// of `options`; the package keeps the limits it was opened with.
+    pub fn from_package_with_options(package: HostPackage, options: OpenOptions) -> Result<Self> {
+        Self::from_package_with_limits(package, options.media_limits_value())
+    }
+
+    fn from_package_with_limits(package: HostPackage, limits: MediaLimits) -> Result<Self> {
         let package_limits = package.limits();
         let assets = Self::scan_package(&package, limits)?;
         Ok(Self::from_parts(
@@ -283,7 +329,7 @@ impl MediaManager {
     }
 
     fn scan_package(
-        package: &IWorkPackage,
+        package: &HostPackage,
         limits: MediaLimits,
     ) -> Result<HashMap<String, MediaAsset>> {
         let mut assets = HashMap::new();
@@ -445,7 +491,7 @@ impl MediaManager {
                 Ok(())
             },
             MediaSource::File(path) => {
-                let package = IWorkPackage::open_with_limits(path, self.state.package_limits)?;
+                let package = HostPackage::open_with_limits(path, self.state.package_limits)?;
                 write_package_entry(&package, asset, self.state.limits, &mut sink)
             },
             MediaSource::Package(package) => {
@@ -517,22 +563,22 @@ impl MediaManager {
 /// Replacement retains the data identifier and all object/component references.
 /// The package member, SHA-1 digest, and materialized length are changed together.
 #[derive(Debug, Clone)]
-pub struct IWorkMediaEditor {
-    package: IWorkPackage,
+pub struct Draft {
+    package: HostPackage,
     assets: Vec<EmbeddedMediaAsset>,
     max_replacement_bytes: usize,
 }
 
-impl IWorkMediaEditor {
+impl Draft {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_package(IWorkPackage::open(path)?)
+        Self::from_package(HostPackage::open(path)?)
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_package(IWorkPackage::from_bytes(bytes)?)
+        Self::from_package(HostPackage::from_bytes(bytes)?)
     }
 
-    pub fn from_package(package: IWorkPackage) -> Result<Self> {
+    pub fn from_package(package: HostPackage) -> Result<Self> {
         let assets = embedded_assets(&package)?;
         Ok(Self {
             package,
@@ -751,11 +797,11 @@ impl IWorkMediaEditor {
         Ok(previous)
     }
 
-    pub fn package(&self) -> &IWorkPackage {
+    pub fn package(&self) -> &HostPackage {
         &self.package
     }
 
-    pub fn into_package(self) -> IWorkPackage {
+    pub fn into_package(self) -> HostPackage {
         self.package
     }
 
@@ -769,7 +815,7 @@ impl IWorkMediaEditor {
 }
 
 fn update_package_metadata(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     update: impl FnOnce(&[u8]) -> Result<Vec<u8>>,
 ) -> Result<()> {
     package.update_archive(PACKAGE_METADATA_ENTRY, |archive| {

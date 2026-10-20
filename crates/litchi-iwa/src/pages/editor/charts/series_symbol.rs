@@ -7,7 +7,7 @@ use crate::charts::series_symbol::{
 };
 use crate::charts::{ChartSeriesSymbol, Index};
 
-impl Editor {
+impl Draft {
     pub fn body_chart_series_symbols(
         &self,
         drawable_object_id: u64,
@@ -52,7 +52,7 @@ impl Editor {
 }
 
 fn body_chart_series_symbols(
-    editor: &Editor,
+    editor: &Draft,
     drawable_object_id: u64,
 ) -> Result<Vec<Option<ChartSeriesSymbol>>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
@@ -74,7 +74,7 @@ fn body_chart_series_symbols(
 }
 
 fn set_body_chart_series_symbols(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     symbols: &[Option<ChartSeriesSymbol>],
 ) -> Result<()> {
@@ -99,7 +99,7 @@ fn set_body_chart_series_symbols(
         series_count,
         symbols,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_series_symbols(drawable_object_id)? != symbols {
         return Err(Error::InvalidFormat(
             "Pages chart data-symbol update failed validation".to_owned(),

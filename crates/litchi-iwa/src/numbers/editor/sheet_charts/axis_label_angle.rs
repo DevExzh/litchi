@@ -7,7 +7,7 @@ use crate::charts::axis_label_angle::{
 };
 use crate::charts::{Axis, LabelAngle};
 
-impl Editor {
+impl Draft {
     /// Read one sheet-chart axis' normalized label angle.
     pub fn sheet_chart_axis_label_angle(
         &self,
@@ -31,7 +31,7 @@ impl Editor {
 }
 
 fn sheet_chart_axis_label_angle(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -47,7 +47,7 @@ fn sheet_chart_axis_label_angle(
 }
 
 fn set_sheet_chart_axis_label_angle(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -63,7 +63,7 @@ fn set_sheet_chart_axis_label_angle(
         axis,
         angle,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_axis_label_angle(sheet_id, drawable_object_id, axis)? != angle {
         return Err(Error::InvalidFormat(
             "Numbers chart axis label-angle update failed validation".to_owned(),
@@ -112,7 +112,7 @@ mod tests {
                 expected,
             )
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_axis_label_angle(sheet_id, chart.drawable_object_id, Axis::Value,)

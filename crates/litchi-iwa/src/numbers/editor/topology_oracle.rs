@@ -10,7 +10,7 @@
 use super::package::TableTopologyMutation;
 use super::*;
 
-/// One row or column edit, for [`Editor::__edit_table_topology_unverified`].
+/// One row or column edit, for [`Draft::__edit_table_topology_unverified`].
 #[doc(hidden)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnverifiedTopologyEdit {
@@ -24,7 +24,7 @@ pub enum UnverifiedTopologyEdit {
     RemoveColumn(ColumnDeletion),
 }
 
-impl Editor {
+impl Draft {
     /// Stage one row or column edit without the post-edit appearance
     /// verification of the public methods. Differential tests only.
     ///

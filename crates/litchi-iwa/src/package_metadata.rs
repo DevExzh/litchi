@@ -9,7 +9,7 @@ use crate::wire::{
     append_repeated_length_delimited_field, patch_varint_field,
     remove_repeated_length_delimited_field_where, transform_length_delimited_fields_at_path,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 use litchi_iwa_common::{LimitKind, WireLimits};
 use litchi_iwa_protos::package_metadata_codec::{
     Batch, ComponentDescriptor, ComponentSelector, DataReferenceOwnerDescriptor,
@@ -83,7 +83,7 @@ impl PackageMetadataVisitor for MetadataRootVisitor {
     }
 }
 
-pub(crate) fn next_object_identifier(package: &IWorkPackage) -> Result<u64> {
+pub(crate) fn next_object_identifier(package: &HostPackage) -> Result<u64> {
     let mut maximum = 0u64;
     for name in package.iwa_entry_names() {
         package.with_parsed_archive(name, |archive| {
@@ -107,24 +107,24 @@ pub(crate) fn next_object_identifier(package: &IWorkPackage) -> Result<u64> {
         .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))
 }
 
-pub(crate) fn package_last_object_identifier(package: &IWorkPackage) -> Result<Option<u64>> {
+pub(crate) fn package_last_object_identifier(package: &HostPackage) -> Result<Option<u64>> {
     inspect_package_metadata(package, &mut MetadataRootVisitor::default())
         .map(|inspection| inspection.map(PackageMetadataInspection::last_object_identifier))
 }
 
-pub(crate) fn package_save_token(package: &IWorkPackage) -> Result<Option<u64>> {
+pub(crate) fn package_save_token(package: &HostPackage) -> Result<Option<u64>> {
     inspect_package_metadata(package, &mut MetadataRootVisitor::default())
         .map(|inspection| inspection.and_then(PackageMetadataInspection::save_token))
 }
 
-pub(crate) fn package_has_data_metadata_map(package: &IWorkPackage) -> Result<bool> {
+pub(crate) fn package_has_data_metadata_map(package: &HostPackage) -> Result<bool> {
     let mut visitor = MetadataRootVisitor::default();
     let _inspection = inspect_package_metadata(package, &mut visitor)?;
     Ok(visitor.has_data_metadata_map)
 }
 
 pub(crate) fn set_package_last_object_identifier(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     identifier: u64,
 ) -> Result<()> {
     if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
@@ -186,7 +186,7 @@ pub(crate) fn set_package_last_object_identifier(
 }
 
 pub(crate) fn component_identifier_for_entry(
-    package: &IWorkPackage,
+    package: &HostPackage,
     entry_name: &str,
 ) -> Result<Option<u64>> {
     let locator = entry_name
@@ -219,7 +219,7 @@ pub(crate) fn component_identifier_for_entry(
 /// validates component cardinality, UUID uniqueness, and the inserted binding
 /// before replacing metadata.
 pub(crate) fn add_object_uuid_for_entry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     entry_name: &str,
     object_identifier: u64,
 ) -> Result<()> {
@@ -242,7 +242,7 @@ pub(crate) fn add_object_uuid_for_entry(
 /// missing binding is harmless because removal is idempotent for stale legacy
 /// registries.
 pub(crate) fn remove_object_uuid_for_entry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     entry_name: &str,
     object_identifier: u64,
 ) -> Result<()> {
@@ -265,7 +265,7 @@ pub(crate) fn remove_object_uuid_for_entry(
 }
 
 pub(crate) fn component_identifier_for_object_uuid(
-    package: &IWorkPackage,
+    package: &HostPackage,
     object_identifier: u64,
 ) -> Result<Option<u64>> {
     with_package_metadata_payload(package, |source| {
@@ -289,7 +289,7 @@ pub(crate) fn component_identifier_for_object_uuid(
 }
 
 pub(crate) fn clone_component_registration(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     source_component_identifier: u64,
     new_component_identifier: u64,
     preferred_locator: &str,
@@ -437,7 +437,7 @@ pub(crate) fn clone_component_registration(
 /// component identifiers, locators, and UUID values are rejected so malformed
 /// registries cannot be created accidentally.
 pub(crate) fn add_component_registration(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     component: &crate::protobuf::tsp::ComponentInfo,
 ) -> Result<()> {
     if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
@@ -521,7 +521,7 @@ pub(crate) fn add_component_registration(
 }
 
 pub(crate) fn remove_component_registration(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     component_identifier: u64,
 ) -> Result<()> {
     if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
@@ -579,7 +579,7 @@ pub(crate) fn remove_component_registration(
 }
 
 pub(crate) fn advance_package_save_token_for_components(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     component_identifiers: &[u64],
 ) -> Result<()> {
     if component_identifiers.is_empty() || !package.contains_entry(PACKAGE_METADATA_ENTRY) {
@@ -692,7 +692,7 @@ impl PackageMetadataVisitor for SaveTokenSelectorVisitor<'_> {
 }
 
 pub(crate) fn add_component_external_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     source_component_identifier: u64,
     target_component_identifier: u64,
     object_identifier: u64,
@@ -706,7 +706,7 @@ pub(crate) fn add_component_external_reference(
 }
 
 pub(crate) fn add_component_link(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     source_component_identifier: u64,
     target_component_identifier: u64,
 ) -> Result<()> {
@@ -725,7 +725,7 @@ pub(crate) fn add_component_link(
 /// to the same target component, versioned component records, and every
 /// unrelated or unknown field remain untouched.
 pub(crate) fn remove_component_link(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     source_component_identifier: u64,
     target_component_identifier: u64,
 ) -> Result<()> {
@@ -738,7 +738,7 @@ pub(crate) fn remove_component_link(
 }
 
 fn add_component_external_reference_value(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     source_component_identifier: u64,
     target_component_identifier: u64,
     object_identifier: Option<u64>,
@@ -812,7 +812,7 @@ fn add_component_external_reference_value(
 }
 
 pub(crate) fn remove_component_external_references_to_object(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     target_component_identifier: u64,
     object_identifier: u64,
 ) -> Result<()> {
@@ -881,7 +881,7 @@ pub(crate) fn remove_component_external_references_to_object(
 }
 
 pub(crate) fn remove_component_external_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     source_component_identifier: u64,
     target_component_identifier: u64,
     object_identifier: u64,
@@ -895,7 +895,7 @@ pub(crate) fn remove_component_external_reference(
 }
 
 fn remove_component_external_reference_value(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     source_component_identifier: u64,
     target_component_identifier: u64,
     object_identifier: Option<u64>,
@@ -992,7 +992,7 @@ fn remove_component_external_reference_value(
 }
 
 pub(crate) fn component_uuid_identifiers(
-    package: &IWorkPackage,
+    package: &HostPackage,
     component_identifier: u64,
 ) -> Result<Option<HashSet<u64>>> {
     with_package_metadata_payload(package, |source| {
@@ -1019,7 +1019,7 @@ pub(crate) fn component_uuid_identifiers(
 
 const PACKAGE_METADATA_RECURSION_LIMIT: u32 = 64;
 
-pub(crate) fn package_metadata_read_options(package: &IWorkPackage) -> RewriteOptions {
+pub(crate) fn package_metadata_read_options(package: &HostPackage) -> RewriteOptions {
     let package_limits = package.limits();
     let archive_limits = package_limits.archive_limits();
     let message_limit = package_limits
@@ -1042,7 +1042,7 @@ pub(crate) fn package_metadata_read_options(package: &IWorkPackage) -> RewriteOp
 }
 
 fn inspect_package_metadata_payload<V: PackageMetadataVisitor>(
-    package: &IWorkPackage,
+    package: &HostPackage,
     source: &[u8],
     visitor: &mut V,
 ) -> Result<()> {
@@ -1060,7 +1060,7 @@ pub(crate) fn inspect_package_metadata_source<V: PackageMetadataVisitor>(
 }
 
 pub(crate) fn inspect_package_metadata<V: PackageMetadataVisitor>(
-    package: &IWorkPackage,
+    package: &HostPackage,
     visitor: &mut V,
 ) -> Result<Option<PackageMetadataInspection>> {
     with_package_metadata_payload(package, |source| {
@@ -1121,7 +1121,7 @@ fn package_metadata_inspection_error(error: RewriteError) -> Error {
     }
 }
 
-fn with_package_metadata_payload<T, F>(package: &IWorkPackage, read: F) -> Result<Option<T>>
+fn with_package_metadata_payload<T, F>(package: &HostPackage, read: F) -> Result<Option<T>>
 where
     F: FnOnce(&[u8]) -> Result<T>,
 {
@@ -1301,7 +1301,7 @@ fn fresh_unique_uuid(existing: &mut HashSet<(u64, u64)>) -> crate::protobuf::tsp
 }
 
 pub(crate) fn add_component_object_uuids(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     component_identifier: u64,
     identifiers: &[u64],
 ) -> Result<()> {
@@ -1395,7 +1395,7 @@ pub(crate) fn add_component_object_uuids(
 }
 
 pub(crate) fn remove_component_object_uuids(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     component_identifier: u64,
     identifiers: &[u64],
 ) -> Result<()> {
@@ -1463,7 +1463,7 @@ pub(crate) fn remove_component_object_uuids(
 }
 
 pub(crate) fn release_package_identifier_suffix(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     removed: &[u64],
 ) -> Result<()> {
     let Some(mut last) = package_last_object_identifier(package)? else {
@@ -1528,19 +1528,19 @@ mod tests {
         PackageMetadata, Reference, Uuid, component_data_reference,
     };
 
-    fn package_with_metadata(metadata: PackageMetadata) -> IWorkPackage {
+    fn package_with_metadata(metadata: PackageMetadata) -> HostPackage {
         package_with_metadata_data(metadata.encode_to_vec())
     }
 
-    fn package_with_metadata_data(data: Vec<u8>) -> IWorkPackage {
+    fn package_with_metadata_data(data: Vec<u8>) -> HostPackage {
         package_with_metadata_messages(vec![RawMessage {
             type_: PACKAGE_METADATA_MESSAGE_TYPE,
             data,
         }])
     }
 
-    fn package_with_metadata_messages(messages: Vec<RawMessage>) -> IWorkPackage {
-        let mut package = IWorkPackage::new();
+    fn package_with_metadata_messages(messages: Vec<RawMessage>) -> HostPackage {
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 PACKAGE_METADATA_ENTRY,
@@ -1552,7 +1552,7 @@ mod tests {
         package
     }
 
-    fn metadata_payload(package: &IWorkPackage) -> Vec<u8> {
+    fn metadata_payload(package: &HostPackage) -> Vec<u8> {
         package
             .archive(PACKAGE_METADATA_ENTRY)
             .unwrap()
@@ -1626,7 +1626,7 @@ mod tests {
 
     #[test]
     fn set_package_last_identifier_without_metadata_is_a_noop() {
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         let revision = package.mutation_revision();
 
         set_package_last_object_identifier(&mut package, 11).unwrap();
@@ -1635,7 +1635,7 @@ mod tests {
         assert_eq!(package.mutation_revision(), revision);
     }
 
-    fn assert_component_queries_fail(package: &IWorkPackage) {
+    fn assert_component_queries_fail(package: &HostPackage) {
         assert!(component_identifier_for_entry(package, "Index/One.iwa").is_err());
         assert!(component_identifier_for_object_uuid(package, 1).is_err());
         assert!(component_uuid_identifiers(package, 1).is_err());
@@ -1700,7 +1700,7 @@ mod tests {
 
     #[test]
     fn metadata_scalar_reads_preserve_absence_and_reject_duplicate_tokens() {
-        let empty = IWorkPackage::new();
+        let empty = HostPackage::new();
         assert_eq!(package_last_object_identifier(&empty).unwrap(), None);
         assert_eq!(package_save_token(&empty).unwrap(), None);
         assert!(!package_has_data_metadata_map(&empty).unwrap());
@@ -2063,7 +2063,7 @@ mod tests {
 
     #[test]
     fn component_queries_preserve_missing_metadata_and_reject_malformed_wire() {
-        let package = IWorkPackage::new();
+        let package = HostPackage::new();
         assert_eq!(
             component_identifier_for_entry(&package, "Index/One.iwa").unwrap(),
             None
@@ -2184,7 +2184,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 PACKAGE_METADATA_ENTRY,
@@ -2222,7 +2222,7 @@ mod tests {
             ..Default::default()
         };
         let original = metadata.encode_to_vec();
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 PACKAGE_METADATA_ENTRY,
@@ -2460,7 +2460,7 @@ mod tests {
             ..Default::default()
         };
         let original = metadata.encode_to_vec();
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 PACKAGE_METADATA_ENTRY,

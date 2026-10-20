@@ -3,7 +3,7 @@
 use super::*;
 use litchi_iwa_common::comment::{TableCellComment, TableCellReply};
 
-impl Editor {
+impl Draft {
     /// Read the comment attached to a reachable body-table cell.
     pub fn table_cell_comment(
         &self,
@@ -180,7 +180,7 @@ impl Editor {
 }
 
 fn require_reply(
-    editor: &Editor,
+    editor: &Draft,
     model_object_id: u64,
     row: usize,
     column: usize,
@@ -268,7 +268,7 @@ mod tests {
         editor.clear_table_cell_comment(table_id, 1, 1).unwrap();
         assert!(editor.table_cell_comment(table_id, 1, 1).unwrap().is_none());
 
-        let reparsed = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reparsed = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(
             reparsed
                 .table_cell_comment(table_id, 1, 1)

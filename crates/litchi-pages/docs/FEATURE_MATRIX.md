@@ -119,7 +119,7 @@ edits preserve them.
 ## Legacy-host delta
 
 `litchi-iwa` remains the migration host governed by [ADR 0028](../../../docs/adr/0028-iwa-monolith-exit.md).
-Its source-free `litchi_iwa::pages::Editor` still owns broader Pages graphs, including sections, rich text,
+Its source-free `litchi_iwa::pages::Draft` still owns broader Pages graphs, including sections, rich text,
 text boxes, shapes, body media, charts, tables, cell/formula data, and comment threads. Most
 legacy operations still select native drawable/table/storage objects by raw IDs; the recent
 typed `MediaAssetId` boundary applies only to selected host media-asset references and does not
@@ -128,13 +128,13 @@ make the focused package a media owner. None of these host capabilities is count
 
 | Feature | Status | Read | Write | Notes |
 |-------------------|--------|------|-------|-------|
-| Fresh source-free Pages builder | 🟡 | ✅ | 🟡 | Present in [`litchi_iwa::pages::Editor`](../../litchi-iwa/src/pages/editor.rs) and documented in the [legacy host README](../../litchi-iwa/README.md); migration-only and not a focused package writer. |
+| Fresh source-free Pages builder | 🟡 | ✅ | 🟡 | Present in [`litchi_iwa::pages::Draft`](../../litchi-iwa/src/pages/editor.rs) and documented in the [legacy host README](../../litchi-iwa/README.md); migration-only and not a focused package writer. |
 | Sections and rich text/text-box content | 🟡 | ✅ | 🟡 | Broad section, text-storage, text-box, style, list, hyperlink, and inline-object operations remain under [`litchi-iwa/src/pages`](../../litchi-iwa/src/pages). They use migration-host graph identities and do not transfer rich-content ownership to the focused package. |
 | Body images, movies, and audio | 🟡 | ✅ | 🟡 | Host [`images`](../../litchi-iwa/src/pages/editor/images.rs), [`movies`](../../litchi-iwa/src/pages/editor/movies.rs), and [`audio`](../../litchi-iwa/src/pages/editor/audio.rs) retain discovery, creation, duplication, geometry/properties, replacement, playback settings, and removal. Drawable graph selection remains raw-ID based; focused `litchi-pages` has no package media reader or asset CRUD owner. |
 | Body charts and chart properties | 🟡 | ✅ | 🟡 | Host [`charts`](../../litchi-iwa/src/pages/editor/charts.rs) retains inline chart discovery/creation/duplication/removal, data/kind/direction/geometry, and many chart-property mutations. The focused `litchi-pages` owner now covers only existing body-chart Arrange flags through semantic selection; the broader chart graph and its lifecycle remain migration-host scope. |
 | Body shapes, drawings, and drawable order | 🟡 | ✅ | 🟡 | Host [`body shapes`](../../litchi-iwa/src/pages/editor/body_shapes.rs) retains creation, duplication, removal, geometry, and raw-ID shape operations. The focused `litchi-pages` package owns the bounded opaque body-order transaction; no legacy host drawable-order editor remains, and shape lifecycle or geometry are not part of that owner. |
 | Body tables, cells, formulas, and table comments | 🟡 | ✅ | 🟡 | Host [`tables`](../../litchi-iwa/src/pages/editor/tables/mod.rs) retains broad table topology/storage/value/formula operations and [`table comments`](../../litchi-iwa/src/pages/editor/tables/comments.rs) retains cell comment/reply CRUD. The Pages raw-ID hidden-axis convenience route remains compatibility debt until legacy source-built creation and comment-bearing package parity pass; focused Pages owns the bounded selector-first existing-owner metadata transaction, including the qualified native 6000/6001 profile. Attached Numbers/Keynote hidden-axis compatibility also remains migration-host-only. No focused cell/formula/comment owner exists. |
-| Drawable/text-box comments and replies | 🟡 | ✅ | 🟡 | Host [`litchi_iwa::pages::Editor` comment methods](../../litchi-iwa/src/pages/editor.rs) and the shared comment editor retain raw-ID comment/reply CRUD for drawable/text-box targets. This is explicitly a remaining host gap; focused `litchi-pages` has no comment-thread model or transaction. |
+| Drawable/text-box comments and replies | 🟡 | ✅ | 🟡 | Host [`litchi_iwa::pages::Draft` comment methods](../../litchi-iwa/src/pages/editor.rs) and the shared comment editor retain raw-ID comment/reply CRUD for drawable/text-box targets. This is explicitly a remaining host gap; focused `litchi-pages` has no comment-thread model or transaction. |
 | Legacy host as a replacement for the focused API | ❌ | N/A | ❌ | The host is not a substitute for the `litchi-pages` public contract; the deletion gate and remaining migration dependencies still apply. |
 
 ## Evidence and maintenance

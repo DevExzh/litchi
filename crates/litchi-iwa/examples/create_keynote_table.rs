@@ -113,9 +113,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn set_focused_keynote_table_headers(
-    editor: keynote::Editor,
+    editor: keynote::Draft,
     settings: KeynoteHeaderSettings,
-) -> Result<keynote::Editor, Box<dyn std::error::Error>> {
+) -> Result<keynote::Draft, Box<dyn std::error::Error>> {
     let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_slide_table_headers(
@@ -126,14 +126,14 @@ fn set_focused_keynote_table_headers(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(keynote::Editor::from_bytes(&bytes)?)
+    Ok(keynote::Draft::from_bytes(&bytes)?)
 }
 
 fn set_focused_keynote_table_dimension(
-    editor: keynote::Editor,
+    editor: keynote::Draft,
     dimension: Dimension,
     size: Size,
-) -> Result<keynote::Editor, Box<dyn std::error::Error>> {
+) -> Result<keynote::Draft, Box<dyn std::error::Error>> {
     let source = editor.to_bytes()?;
     let package = litchi_keynote::Package::from_bytes(&source)?;
     let result = package
@@ -160,7 +160,7 @@ fn set_focused_keynote_table_dimension(
     };
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    let reopened = keynote::Editor::from_bytes(&bytes)?;
+    let reopened = keynote::Draft::from_bytes(&bytes)?;
     let package = litchi_keynote::Package::from_bytes(&bytes)?;
     if package.slide_table_dimension_size(
         litchi_keynote::SlideSelector::index(0),
@@ -174,9 +174,9 @@ fn set_focused_keynote_table_dimension(
 }
 
 fn set_focused_keynote_table_title(
-    editor: keynote::Editor,
+    editor: keynote::Draft,
     settings: TableTitleSettings,
-) -> Result<keynote::Editor, Box<dyn std::error::Error>> {
+) -> Result<keynote::Draft, Box<dyn std::error::Error>> {
     let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_slide_table_title(
@@ -187,5 +187,5 @@ fn set_focused_keynote_table_title(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(keynote::Editor::from_bytes(&bytes)?)
+    Ok(keynote::Draft::from_bytes(&bytes)?)
 }

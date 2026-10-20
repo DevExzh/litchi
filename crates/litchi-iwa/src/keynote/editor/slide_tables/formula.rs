@@ -3,7 +3,7 @@
 use super::*;
 use litchi_keynote::slide::table::formula::{FormulaCachedValue, FormulaExpression};
 
-impl Editor {
+impl Draft {
     /// Read a cell's canonical formula source, including the leading equals sign.
     pub fn slide_table_formula(
         &self,

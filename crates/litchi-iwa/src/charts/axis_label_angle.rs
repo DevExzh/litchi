@@ -12,13 +12,13 @@ use crate::charts::axis_style::{
 };
 use crate::protobuf::tsch;
 use crate::wire::{parse_wire_fields, patch_fixed32_field, patch_length_delimited_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const CATEGORY_LABEL_ANGLE_FIELD: u32 = 9;
 const VALUE_LABEL_ANGLE_FIELD: u32 = 11;
 /// Read the label angle for one native chart axis.
 pub(crate) fn chart_axis_label_angle(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -36,7 +36,7 @@ pub(crate) fn chart_axis_label_angle(
 
 /// Set or reset the label angle for one native chart axis.
 pub(crate) fn set_chart_axis_label_angle(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

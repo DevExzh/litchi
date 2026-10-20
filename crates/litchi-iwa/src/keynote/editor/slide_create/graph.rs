@@ -229,7 +229,7 @@ pub(super) fn note_clone_object_ids(
 }
 
 pub(super) fn find_note_source(
-    editor: &Editor,
+    editor: &Draft,
     graph: &ObjectGraph,
     slides: &[SlideInfo],
 ) -> Result<NoteSource> {

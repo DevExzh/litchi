@@ -8,7 +8,7 @@ use crate::charts::axis::{
     set_chart_axis_title as set_native_chart_axis_title,
 };
 
-impl Editor {
+impl Draft {
     /// Read the title shown by Numbers for one native sheet-chart axis.
     pub fn sheet_chart_axis_title(
         &self,
@@ -44,7 +44,7 @@ impl Editor {
 }
 
 fn sheet_chart_axis_title(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -60,7 +60,7 @@ fn sheet_chart_axis_title(
 }
 
 fn set_sheet_chart_axis_title(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -76,7 +76,7 @@ fn set_sheet_chart_axis_title(
         axis,
         title,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified
         .sheet_chart_axis_title(sheet_id, drawable_object_id, axis)?
         .as_deref()
@@ -91,7 +91,7 @@ fn set_sheet_chart_axis_title(
 }
 
 fn remove_sheet_chart_axis_title(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -108,7 +108,7 @@ fn remove_sheet_chart_axis_title(
     if !removed {
         return Ok(false);
     }
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified
         .sheet_chart_axis_title(sheet_id, drawable_object_id, axis)?
         .is_some()

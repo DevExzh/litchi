@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.save(&output)?;
 
     assert_eq!(
-        numbers::Editor::open(output)?.table_hidden_axes(table)?,
+        numbers::Draft::open(output)?.table_hidden_axes(table)?,
         hidden
     );
     Ok(())

@@ -11,14 +11,14 @@ use super::*;
 /// Incoming cross-table dependencies are rejected so deletion cannot leave a
 /// surviving formula with a dangling internal owner ID.
 pub(in crate::numbers::editor) fn remove_table_formula_graph(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_info_id: u64,
 ) -> Result<Vec<u64>> {
     remove_table_formula_graph_for_contexts(package, &[table_info_id])
 }
 
 pub(in crate::numbers::editor) fn remove_table_formula_graph_for_contexts(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_context_ids: &[u64],
 ) -> Result<Vec<u64>> {
     let contexts = table_context_ids.iter().copied().collect::<HashSet<_>>();
@@ -145,7 +145,7 @@ pub(in crate::numbers::editor) fn remove_table_formula_graph_for_contexts(
 }
 
 fn prune_global_cell_dependencies(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     calculation_engine_entry: &str,
     archive: &Archive,
     removed_owner_ids: &HashSet<u64>,
@@ -255,7 +255,7 @@ fn prune_global_cell_dependencies(
 }
 
 pub(super) fn calculation_engine_entry_for_contexts(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_context_ids: &HashSet<u64>,
 ) -> Result<Option<String>> {
     let Some(entry) = package.calculation_engine_entry_name()? else {

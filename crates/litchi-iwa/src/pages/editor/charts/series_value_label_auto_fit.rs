@@ -8,7 +8,7 @@ use crate::charts::series_value_label_auto_fit::{
 };
 use crate::charts::{ChartSeriesValueLabelAutoFit, Index};
 
-impl Editor {
+impl Draft {
     /// Read every series' value-label Auto-Fit setting in native series order.
     pub fn body_chart_series_value_label_auto_fits(
         &self,
@@ -60,7 +60,7 @@ impl Editor {
 }
 
 fn body_chart_series_value_label_auto_fits(
-    editor: &Editor,
+    editor: &Draft,
     drawable_object_id: u64,
 ) -> Result<Vec<ChartSeriesValueLabelAutoFit>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
@@ -81,7 +81,7 @@ fn body_chart_series_value_label_auto_fits(
 }
 
 fn set_body_chart_series_value_label_auto_fits(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     values: &[ChartSeriesValueLabelAutoFit],
 ) -> Result<()> {
@@ -118,7 +118,7 @@ fn set_body_chart_series_value_label_auto_fits(
         "Pages",
         &expected,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_series_value_label_auto_fits(drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Pages chart series value-label Auto-Fit update failed validation".to_owned(),

@@ -32,7 +32,7 @@ struct MergeFormulaMutation {
     current: Option<tsce::FormulaArchive>,
 }
 
-pub(crate) fn regions_in_package(package: &IWorkPackage, table_id: u64) -> Result<Vec<Region>> {
+pub(crate) fn regions_in_package(package: &HostPackage, table_id: u64) -> Result<Vec<Region>> {
     with_attached_table_model_source(package, table_id, |source| {
         table_merges::read_table_merges(source, ReadLimits::default())
             .map(|read| read.regions)
@@ -47,7 +47,7 @@ pub(crate) fn regions_in_package(package: &IWorkPackage, table_id: u64) -> Resul
 /// then scans the borrowed model bytes, retains all unrelated fields, and
 /// returns a bounded replacement for just the merge-owner path.
 fn rewrite_merge_set_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     regions: &[Region],
     current_region_count: usize,
@@ -78,7 +78,7 @@ fn fresh_merge_owner_uuid() -> [u8; 16] {
 }
 
 fn merge_write_limits(
-    package: &IWorkPackage,
+    package: &HostPackage,
     source: &[u8],
     current_region_count: usize,
     region_count: usize,
@@ -178,7 +178,7 @@ fn clone_regions(regions: &[Region], additional: usize) -> Result<Vec<Region>> {
 /// candidate selection and table-info ownership checks on the bounded
 /// generated-free projections and never decode a `TableModelArchive` here.
 fn with_attached_table_model_source<T>(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     read: impl FnOnce(&[u8]) -> Result<T>,
 ) -> Result<T> {
@@ -244,7 +244,7 @@ fn with_attached_table_model_source<T>(
 /// Call this after the table's dimension has grown so a merge expanded at the
 /// former trailing boundary remains within the model bounds during validation.
 pub(super) fn shift_merges_for_axis_insertion(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     axis: MergeAxis,
     insertion: usize,
@@ -309,7 +309,7 @@ pub(super) fn shift_merges_for_axis_insertion(
 /// Call this before physically compacting tiles. The returned source cells
 /// must be relocated without releasing their value or comment references.
 pub(super) fn merge_anchor_relocations_for_axis_deletion(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     axis: MergeAxis,
     deletion: usize,
@@ -332,7 +332,7 @@ pub(super) fn merge_anchor_relocations_for_axis_deletion(
 /// Call this before decreasing the table dimensions: a merge touching the
 /// deleted trailing edge is temporarily out of bounds only after that change.
 pub(super) fn shift_merges_for_axis_deletion(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     axis: MergeAxis,
     deletion: usize,
@@ -403,7 +403,7 @@ pub(super) fn shift_merges_for_axis_deletion(
 }
 
 pub(crate) fn merge_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     region: Region,
 ) -> Result<()> {
@@ -443,7 +443,7 @@ pub(crate) fn merge_in_package(
 }
 
 pub(crate) fn unmerge_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     region: Region,
 ) -> Result<bool> {
@@ -465,7 +465,6 @@ pub(crate) fn unmerge_in_package(
 }
 
 #[cfg(test)]
-#[allow(deprecated)]
 mod tests {
     use super::*;
     use crate::archive::{ArchiveObject, RawMessage};
@@ -578,7 +577,7 @@ mod tests {
             vec![region, second]
         );
         let merged = editor.to_bytes().unwrap();
-        let mut reopened = Editor::from_bytes(&merged).unwrap();
+        let mut reopened = Draft::from_bytes(&merged).unwrap();
         assert_eq!(
             reopened.table_cell_merges(table_id).unwrap(),
             vec![region, second]
@@ -594,14 +593,14 @@ mod tests {
         assert!(reopened.unmerge_cells(table_id, region).unwrap());
         assert!(!reopened.unmerge_cells(table_id, region).unwrap());
         assert_eq!(reopened.table_cell_merges(table_id).unwrap(), vec![second]);
-        let mut reopened = Editor::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
         assert!(reopened.unmerge_cells(table_id, second).unwrap());
         assert_eq!(reopened.to_bytes().unwrap(), baseline);
     }
 
     #[test]
     fn native_table_merge_read_matches_compatibility_projection() {
-        let editor = Editor::from_bytes(include_bytes!(
+        let editor = Draft::from_bytes(include_bytes!(
             "../../../../../test-data/iwork/numbers/table-merges-native.numbers"
         ))
         .expect("native Numbers merge fixture");
@@ -656,7 +655,7 @@ mod tests {
             })
             .unwrap();
 
-        let editor = Editor::from_package(package).unwrap();
+        let editor = Draft::from_package(package).unwrap();
         assert!(!editor.package().source_is_exact());
         let before = editor.to_bytes().unwrap();
         assert_eq!(
@@ -710,7 +709,7 @@ mod tests {
         assert_eq!(editor.table_cell_merges(table_id).unwrap(), vec![expected]);
         assert_eq!(editor.tables().unwrap()[0].rows, 7);
         assert_eq!(editor.tables().unwrap()[0].columns, 8);
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.table_cell_merges(table_id).unwrap(),
             vec![expected]
@@ -804,7 +803,7 @@ mod tests {
                 .text(),
             "Merged anchor"
         );
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(reopened.table_cell_merges(table_id).unwrap().is_empty());
     }
 
@@ -869,7 +868,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(cached_formula_number(&editor, table_id, 1, 1), 11.0);
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(reopened.table_cell_merges(table_id).unwrap().is_empty());
     }
 
@@ -909,7 +908,7 @@ mod tests {
 
         let mut package = editor.into_package();
         install_uuid_host_references(&mut package, region.row(), region.column());
-        let mut editor = Editor::from_package(package).unwrap();
+        let mut editor = Draft::from_package(package).unwrap();
         let external_owner_id = formula_owner_at_host(&editor, 1, 1)
             .cell_dependencies
             .as_ref()
@@ -957,7 +956,7 @@ mod tests {
         );
         assert_eq!(cached_formula_number(&editor, source_table_id, 1, 1), 0.0);
         assert_formula_host_dependencies(&editor, external_owner_id, 2, 1);
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_formula_host_dependencies(&reopened, external_owner_id, 2, 1);
     }
 
@@ -1008,7 +1007,7 @@ mod tests {
         editor.merge_cells(source_table_id, region).unwrap();
         let mut package = editor.into_package();
         install_uuid_host_references(&mut package, region.row(), region.column());
-        let mut editor = Editor::from_package(package).unwrap();
+        let mut editor = Draft::from_package(package).unwrap();
         let external_owner_id = formula_owner_at_host(&editor, 1, 1)
             .cell_dependencies
             .as_ref()
@@ -1050,7 +1049,7 @@ mod tests {
         );
         assert_eq!(cached_formula_number(&editor, source_table_id, 1, 1), 0.0);
         assert_formula_host_range_edges(&editor, external_owner_id, &[2, 3], &[1, 1]);
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_formula_host_range_edges(&reopened, external_owner_id, &[2, 3], &[1, 1]);
     }
 
@@ -1113,7 +1112,7 @@ mod tests {
             dependency_ids.source_owner_id,
             TestRangeBounds::new(1, 1, 2, 2),
         );
-        let mut editor = Editor::from_package(package).unwrap();
+        let mut editor = Draft::from_package(package).unwrap();
 
         editor
             .remove_table_row(
@@ -1166,7 +1165,7 @@ mod tests {
             dependency_ids.source_owner_id,
             TestRangeBounds::new(1, 1, 1, 1),
         );
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_formula_host_native_range_dependencies(
             &reopened,
             dependency_ids.external_owner_id,
@@ -1228,7 +1227,7 @@ mod tests {
 
         let mut package = editor.into_package();
         install_uuid_host_references(&mut package, region.row(), region.column());
-        let mut editor = Editor::from_package(package).unwrap();
+        let mut editor = Draft::from_package(package).unwrap();
         let external_owner_id = formula_owner_at_host(&editor, 1, 1)
             .cell_dependencies
             .as_ref()
@@ -1269,7 +1268,7 @@ mod tests {
             &rebased_rows,
             &rebased_columns,
         );
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_formula_host_range_edges(
             &reopened,
             external_owner_id,
@@ -1337,7 +1336,7 @@ mod tests {
             dependency_ids.source_owner_id,
             TestRangeBounds::new(1, 1, 2, 2),
         );
-        let mut editor = Editor::from_package(package).unwrap();
+        let mut editor = Draft::from_package(package).unwrap();
 
         editor
             .remove_table_column(
@@ -1364,7 +1363,7 @@ mod tests {
             dependency_ids.source_owner_id,
             TestRangeBounds::new(1, 1, 2, 1),
         );
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_formula_host_native_range_dependencies(
             &reopened,
             dependency_ids.external_owner_id,
@@ -1399,7 +1398,7 @@ mod tests {
 
         let expected = Region::new(2, 1, 2, 2).unwrap();
         assert_eq!(editor.table_cell_merges(table_id).unwrap(), vec![expected]);
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.table_cell_merges(table_id).unwrap(),
             vec![expected]
@@ -1522,7 +1521,7 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        let mut editor = Editor::from_package(package).unwrap();
+        let mut editor = Draft::from_package(package).unwrap();
 
         editor
             .insert_table_row(
@@ -1589,7 +1588,7 @@ mod tests {
 
         editor.merge_table_cells(table_id, region).unwrap();
         assert_eq!(editor.table(table_id).unwrap().merges(), &[region]);
-        let mut reopened = pages::Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = pages::Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.table_cell_merges(table_id).unwrap(), vec![region]);
         assert!(reopened.unmerge_table_cells(table_id, region).unwrap());
         assert!(reopened.table_cell_merges(table_id).unwrap().is_empty());
@@ -1617,7 +1616,7 @@ mod tests {
             pages.table_cell_merges(pages_table_id).unwrap(),
             vec![pages_expected]
         );
-        let pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages.table_cell_merges(pages_table_id).unwrap(),
             vec![pages_expected]
@@ -1657,7 +1656,7 @@ mod tests {
                 .unwrap(),
             vec![keynote_expected]
         );
-        let keynote = keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let keynote = keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
             keynote
                 .slide_table_cell_merges(0, keynote_table.model_object_id)
@@ -1699,7 +1698,7 @@ mod tests {
             pages.table(pages_table_id).unwrap().get_cell(1, 1),
             Some(&CellValue::Text("Merged".to_owned()))
         );
-        let pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert!(pages.table_cell_merges(pages_table_id).unwrap().is_empty());
 
         let mut keynote = keynote::Builder::new().build().unwrap();
@@ -1753,7 +1752,7 @@ mod tests {
                 .get_cell(1, 1),
             Some(&CellValue::Text("Merged".to_owned()))
         );
-        let keynote = keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let keynote = keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert!(
             keynote
                 .slide_table_cell_merges(0, keynote_table.model_object_id)
@@ -1799,7 +1798,7 @@ mod tests {
             pages.table_formula(pages_table_id, 1, 1).unwrap(),
             Some("=D3".to_owned())
         );
-        let pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages.table_formula(pages_table_id, 1, 1).unwrap(),
             Some("=D3".to_owned())
@@ -1865,7 +1864,7 @@ mod tests {
                 .unwrap(),
             Some("=D3".to_owned())
         );
-        let keynote = keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let keynote = keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
             keynote
                 .slide_table_formula(0, keynote_table.model_object_id, 1, 1)
@@ -1902,7 +1901,7 @@ mod tests {
                 .merges(),
             &[region]
         );
-        let mut reopened = keynote::Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = keynote::Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(
             reopened
                 .unmerge_slide_table_cells(0, table.model_object_id, region)
@@ -1973,7 +1972,7 @@ mod tests {
             Err(litchi_keynote::slide::table::merge::transaction::Error::UnsupportedDependency)
         ));
 
-        let legacy = keynote::Editor::from_bytes(&source).unwrap();
+        let legacy = keynote::Draft::from_bytes(&source).unwrap();
         let before = legacy.to_bytes().unwrap();
         assert_eq!(
             legacy
@@ -1991,7 +1990,7 @@ mod tests {
         data.extend(litchi_iwa_common::varint::encode_varint(value));
     }
 
-    fn install_uuid_host_references(package: &mut IWorkPackage, row: u32, column: u32) {
+    fn install_uuid_host_references(package: &mut HostPackage, row: u32, column: u32) {
         let component = package
             .calculation_engine_entry_name()
             .unwrap()
@@ -2053,7 +2052,7 @@ mod tests {
     }
 
     fn install_native_cross_table_range_dependencies(
-        package: &mut IWorkPackage,
+        package: &mut HostPackage,
         row: u32,
         column: u32,
         bounds: TestRangeBounds,
@@ -2295,7 +2294,7 @@ mod tests {
     }
 
     fn install_native_merge_range_proxy(
-        package: &mut IWorkPackage,
+        package: &mut HostPackage,
         source_owner_id: u32,
         bounds: TestRangeBounds,
     ) -> NativeMergeRangeProxyIds {
@@ -2439,7 +2438,7 @@ mod tests {
     }
 
     fn formula_owner_at_host(
-        editor: &Editor,
+        editor: &Draft,
         row: u32,
         column: u32,
     ) -> tsce::FormulaOwnerDependenciesArchive {
@@ -2472,7 +2471,7 @@ mod tests {
     }
 
     fn assert_formula_host_dependencies(
-        editor: &Editor,
+        editor: &Draft,
         external_owner_id: u32,
         target_row: u32,
         target_column: u32,
@@ -2497,7 +2496,7 @@ mod tests {
     }
 
     fn assert_formula_host_range_edges(
-        editor: &Editor,
+        editor: &Draft,
         external_owner_id: u32,
         target_rows: &[u32],
         target_columns: &[u32],
@@ -2526,7 +2525,7 @@ mod tests {
     }
 
     fn assert_formula_host_native_range_dependencies(
-        editor: &Editor,
+        editor: &Draft,
         external_owner_id: u32,
         bounds: TestRangeBounds,
     ) {
@@ -2613,7 +2612,7 @@ mod tests {
     }
 
     fn assert_native_merge_range_proxy(
-        editor: &Editor,
+        editor: &Draft,
         proxy: NativeMergeRangeProxyIds,
         source_owner_id: u32,
         bounds: TestRangeBounds,
@@ -2684,7 +2683,7 @@ mod tests {
         assert_eq!(entry.row_set.entries[0].range_end, None);
     }
 
-    fn cached_formula_number(editor: &Editor, table_id: u64, row: usize, column: usize) -> f64 {
+    fn cached_formula_number(editor: &Draft, table_id: u64, row: usize, column: usize) -> f64 {
         let location = locate_attached_cell(editor.package(), table_id, row, column).unwrap();
         let data = read_tile_cell(
             editor.package(),

@@ -14,7 +14,7 @@ use crate::text::{
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextFont,
     TextLigatures, TextScript, TextStyle,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 #[derive(Debug, Clone, PartialEq)]
 pub(super) enum CellParagraphProperty {
@@ -82,7 +82,7 @@ impl CellParagraphProperty {
     }
 
     pub(super) fn inherited(
-        package: &IWorkPackage,
+        package: &HostPackage,
         style_id: u64,
         kind: CellParagraphPropertyKind,
     ) -> Result<Self> {

@@ -8,7 +8,7 @@ use crate::charts::series_stroke::{
 };
 use crate::charts::{ChartSeriesStroke, Index};
 
-impl Editor {
+impl Draft {
     /// Read effective strokes in native series order.
     pub fn sheet_chart_series_strokes(
         &self,
@@ -73,7 +73,7 @@ impl Editor {
 }
 
 fn sheet_chart_series_strokes(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Vec<Option<ChartSeriesStroke>>> {
@@ -96,7 +96,7 @@ fn sheet_chart_series_strokes(
 }
 
 fn set_sheet_chart_series_strokes(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     strokes: &[Option<ChartSeriesStroke>],
@@ -122,7 +122,7 @@ fn set_sheet_chart_series_strokes(
         series_count,
         strokes,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_series_strokes(sheet_id, drawable_object_id)? != strokes {
         return Err(Error::InvalidFormat(
             "Numbers chart series stroke update failed validation".to_owned(),
@@ -133,7 +133,7 @@ fn set_sheet_chart_series_strokes(
 }
 
 fn reset_sheet_chart_series_stroke(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     series: Index,
@@ -156,7 +156,7 @@ fn reset_sheet_chart_series_stroke(
         series_count,
         series.zero_based(),
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_series_stroke(sheet_id, drawable_object_id, series)? != inherited {
         return Err(Error::InvalidFormat(
             "Numbers chart series stroke reset failed validation".to_owned(),

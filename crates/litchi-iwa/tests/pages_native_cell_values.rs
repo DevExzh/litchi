@@ -56,7 +56,7 @@ fn assert_cell(
     );
 }
 
-fn assert_table_one(editor: &pages::Editor, model_object_id: u64) -> TestResult {
+fn assert_table_one(editor: &pages::Draft, model_object_id: u64) -> TestResult {
     let table = editor.table(model_object_id)?;
     assert_cell(
         &table,
@@ -145,7 +145,7 @@ fn assert_table_one(editor: &pages::Editor, model_object_id: u64) -> TestResult 
     Ok(())
 }
 
-fn assert_table_two(editor: &pages::Editor, model_object_id: u64) -> TestResult {
+fn assert_table_two(editor: &pages::Draft, model_object_id: u64) -> TestResult {
     let table = editor.table(model_object_id)?;
     assert_cell(
         &table,
@@ -176,7 +176,7 @@ fn assert_table_two(editor: &pages::Editor, model_object_id: u64) -> TestResult 
     Ok(())
 }
 
-fn assert_host_tables(editor: &pages::Editor) -> TestResult {
+fn assert_host_tables(editor: &pages::Draft) -> TestResult {
     let tables = editor.tables()?;
     assert_eq!(tables.len(), EXPECTED_TABLES.len());
     for (index, (info, expected)) in tables.iter().zip(EXPECTED_TABLES).enumerate() {
@@ -201,7 +201,7 @@ fn focused_bytes(package: &FocusedPagesPackage) -> TestResult<Vec<u8>> {
 
 #[test]
 fn native_pages_cell_values_and_catalog_roundtrip_exactly() -> TestResult {
-    let editor = pages::Editor::from_bytes(NATIVE_CELLS)?;
+    let editor = pages::Draft::from_bytes(NATIVE_CELLS)?;
     assert_eq!(
         editor.to_bytes()?,
         NATIVE_CELLS,
@@ -227,7 +227,7 @@ fn native_pages_cell_values_and_catalog_roundtrip_exactly() -> TestResult {
     );
 
     let source_bytes = editor.to_bytes()?;
-    let reopened_editor = pages::Editor::from_bytes(&source_bytes)?;
+    let reopened_editor = pages::Draft::from_bytes(&source_bytes)?;
     assert_eq!(reopened_editor.to_bytes()?, NATIVE_CELLS);
     assert_host_tables(&reopened_editor)?;
 

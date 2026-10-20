@@ -7,7 +7,7 @@ use crate::shapes::{insert_style_variation, remove_style_variation};
 use crate::text::style_registry::{
     object_archive_name, register_private_style, unregister_private_style,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::variation::{
     effective_style_id, paragraph_boundaries_with_style, style_isolated_to_paragraph,
@@ -17,7 +17,7 @@ use litchi_iwa_text::paragraph::list::{ParagraphList, ParagraphListNumberFormat}
 use litchi_iwa_text::position::TextPosition;
 
 pub(crate) fn paragraph_list_number_format(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
 ) -> Result<ParagraphListNumberFormat> {
@@ -35,7 +35,7 @@ pub(crate) fn paragraph_list_number_format(
 }
 
 pub(in crate::text) fn set_paragraph_list_number_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
     format: ParagraphListNumberFormat,
@@ -114,7 +114,7 @@ pub(in crate::text) fn set_paragraph_list_number_format(
 }
 
 pub(in crate::text) fn reset_paragraph_list_number_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
 ) -> Result<bool> {
@@ -134,7 +134,7 @@ pub(in crate::text) fn reset_paragraph_list_number_format(
 }
 
 fn collapse_or_clear_redundant_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
 ) -> Result<()> {

@@ -211,7 +211,7 @@ pub(super) fn focused_keynote_options(
     Ok(litchi_keynote::OpenOptions::new().source_limits(source))
 }
 
-fn focused_table_package(editor: &Editor) -> Result<litchi_keynote::Package> {
+fn focused_table_package(editor: &Draft) -> Result<litchi_keynote::Package> {
     let package_limits = editor.package().limits();
     let archive_limits = litchi_iwa_archive::Limits::new(
         package_limits.max_input_bytes(),
@@ -246,7 +246,7 @@ fn focused_table_package(editor: &Editor) -> Result<litchi_keynote::Package> {
 /// model identifiers subject to the same slide ownership proof as the
 /// historical editor path.
 pub(super) fn compatibility_slide_table_merge_regions(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     model_object_id: u64,
 ) -> Result<Vec<Region>> {
@@ -439,7 +439,7 @@ impl IntoKeynoteWireLimitKind for litchi_keynote::slide::table::merge::transacti
 /// Resolve the historical model identifier to the checked table position used
 /// by the focused Keynote package owner. A duplicate model identifier is
 /// malformed rather than an invitation to pick the first matching table.
-impl Editor {
+impl Draft {
     /// List native tables owned directly by one slide in z-order.
     pub fn slide_tables(&self, slide_index: usize) -> Result<Vec<SlideTableInfo>> {
         let mut catalog = KeynoteObjectCatalog::build(self.package()).map_err(map_catalog_error)?;
@@ -530,10 +530,8 @@ impl Editor {
                 .package()
                 .write_to(&mut bytes)
                 .map_err(|error| Error::Io(error.into_io_error()))?;
-            let verified = Self::from_package(IWorkPackage::from_bytes_with_limits(
-                &bytes,
-                package_limits,
-            )?)?;
+            let verified =
+                Self::from_package(HostPackage::from_bytes_with_limits(&bytes, package_limits)?)?;
             if !verified
                 .slide_table_cell_merges(slide_index, model_object_id)?
                 .contains(&region)
@@ -595,10 +593,8 @@ impl Editor {
                 .package()
                 .write_to(&mut bytes)
                 .map_err(|error| Error::Io(error.into_io_error()))?;
-            let verified = Self::from_package(IWorkPackage::from_bytes_with_limits(
-                &bytes,
-                package_limits,
-            )?)?;
+            let verified =
+                Self::from_package(HostPackage::from_bytes_with_limits(&bytes, package_limits)?)?;
             if verified
                 .slide_table_cell_merges(slide_index, model_object_id)?
                 .contains(&region)

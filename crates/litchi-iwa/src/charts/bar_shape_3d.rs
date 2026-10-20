@@ -13,14 +13,14 @@ use crate::charts::non_style::{
 };
 use crate::protobuf::tsch;
 use crate::wire::{patch_length_delimited_field, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// `tschchartinfodefault3dbarshape` in the generated chart non-style archive.
 const CHART_3D_BAR_SHAPE_FIELD: u32 = 1;
 
 /// Read one chart's effective native 3D bar shape.
 pub(crate) fn chart_3d_bar_shape(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -36,7 +36,7 @@ pub(crate) fn chart_3d_bar_shape(
 
 /// Set one chart's native 3D bar shape.
 pub(crate) fn set_chart_3d_bar_shape(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

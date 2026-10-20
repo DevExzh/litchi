@@ -146,6 +146,6 @@ pub struct TableCellConditionalHighlightInfo {
 /// Each semantic edit is applied to a cloned package and committed only after
 /// all affected IWA components serialize successfully.
 #[derive(Debug, Clone)]
-pub struct Editor {
-    pub(in crate::numbers::editor) package: IWorkPackage,
+pub struct Draft {
+    pub(in crate::numbers::editor) package: HostPackage,
 }

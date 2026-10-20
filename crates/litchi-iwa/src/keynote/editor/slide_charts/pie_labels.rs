@@ -7,7 +7,7 @@ use crate::charts::pie_labels::{
 };
 use crate::charts::{ChartPieWedgeIndex, LabelVisibility};
 
-impl Editor {
+impl Draft {
     /// Read label visibility for every pie or donut wedge in chart-series order.
     pub fn slide_chart_pie_label_visibilities(
         &self,
@@ -67,7 +67,7 @@ impl Editor {
 }
 
 fn slide_chart_pie_label_visibilities(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Vec<LabelVisibility>> {
@@ -89,7 +89,7 @@ fn slide_chart_pie_label_visibilities(
 }
 
 fn set_slide_chart_pie_label_visibilities(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     drawable_object_id: u64,
     visibilities: &[LabelVisibility],
@@ -127,7 +127,7 @@ fn set_slide_chart_pie_label_visibilities(
         "Keynote",
         &expected,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_pie_label_visibilities(slide_index, drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Keynote chart pie label-visibility update failed validation".to_owned(),

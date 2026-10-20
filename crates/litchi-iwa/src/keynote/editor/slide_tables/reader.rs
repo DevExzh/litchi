@@ -22,9 +22,9 @@ use litchi_keynote::{
 };
 use litchi_numbers::table::merge::Region;
 
-use super::super::Editor;
+use super::super::Draft;
 use crate::archive::{ArchiveObject, RawMessage};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const ROOT_OBJECT_ID: u64 = 1;
 const DOCUMENT_MESSAGE_TYPE: u32 = 1;
@@ -58,7 +58,7 @@ const ROLE_MESSAGE_TYPES: &[u32] = &[
 
 /// Read merged-cell regions through the cached focused Keynote owner.
 pub(super) fn regions_in_editor(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     model_object_id: u64,
 ) -> Result<Vec<Region>> {
@@ -111,7 +111,7 @@ pub(super) fn regions_in_editor(
 /// writer; only the canonical model message is admitted to the focused
 /// writable transaction.
 pub(super) fn focused_table_position_for_mutation(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     model_object_id: u64,
 ) -> Result<Option<usize>> {
@@ -148,7 +148,7 @@ pub(super) fn focused_table_position_for_mutation(
 /// references are projected; a `TableModelArchive` payload is never decoded
 /// by this admission scan.
 fn focused_table_position(
-    package: &IWorkPackage,
+    package: &HostPackage,
     components: &ComponentCatalog,
     slide_index: usize,
     model_object_id: u64,
@@ -277,7 +277,7 @@ fn validate_drawable_lists(
     Ok(())
 }
 
-fn decode_show_identifier(package: &IWorkPackage, source: &[u8]) -> Result<u64> {
+fn decode_show_identifier(package: &HostPackage, source: &[u8]) -> Result<u64> {
     let limits = wire_limits(package, source)?;
     let recursion_limit = u32::try_from(limits.max_nesting())
         .map_err(|_| invalid_source("Keynote document nesting limit overflows u32"))?;
@@ -291,7 +291,7 @@ fn decode_show_identifier(package: &IWorkPackage, source: &[u8]) -> Result<u64> 
 }
 
 fn decode_slide_identifier(
-    package: &IWorkPackage,
+    package: &HostPackage,
     source: &[u8],
     slide_index: usize,
 ) -> Result<u64> {
@@ -316,7 +316,7 @@ fn decode_slide_identifier(
 }
 
 fn decode_slide_node(
-    package: &IWorkPackage,
+    package: &HostPackage,
     source: &[u8],
     slide_index: usize,
 ) -> Result<(u64, bool)> {
@@ -326,7 +326,7 @@ fn decode_slide_node(
 }
 
 fn decode_slide_drawables(
-    package: &IWorkPackage,
+    package: &HostPackage,
     source: &[u8],
     slide_index: usize,
 ) -> Result<(Vec<u64>, Vec<u64>)> {
@@ -340,7 +340,7 @@ fn decode_slide_drawables(
 /// again; this first pass exists solely to charge the host aggregate budget
 /// before any collection growth.
 fn precharge_drawable_references(
-    package: &IWorkPackage,
+    package: &HostPackage,
     source: &[u8],
     budget: &mut SelectorBudget,
 ) -> Result<usize> {
@@ -409,7 +409,7 @@ fn map_common_wire_limit(
 }
 
 fn decode_table_info(
-    package: &IWorkPackage,
+    package: &HostPackage,
     source: &[u8],
     slide_id: u64,
 ) -> Result<table_info_codec::TableInfoSnapshot> {
@@ -434,7 +434,7 @@ fn decode_table_info(
     Ok(snapshot)
 }
 
-fn wire_limits(package: &IWorkPackage, source: &[u8]) -> Result<WireLimits> {
+fn wire_limits(package: &HostPackage, source: &[u8]) -> Result<WireLimits> {
     let archive_limits = package.limits().archive_limits();
     let source_bytes = source.len().max(1);
     let max_input_bytes = archive_limits
@@ -486,7 +486,7 @@ struct SelectorBudget {
 }
 
 impl SelectorBudget {
-    fn new(package: &IWorkPackage, catalog: &ComponentCatalog) -> Result<Self> {
+    fn new(package: &HostPackage, catalog: &ComponentCatalog) -> Result<Self> {
         let mut payload_bytes = 0usize;
         for component in catalog.iter() {
             for object in &component.archive().objects {

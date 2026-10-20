@@ -21,7 +21,7 @@ use crate::package_metadata::{
 };
 use crate::protobuf::{tsch, tsp, tss};
 use crate::wire::{patch_fixed64_field, patch_length_delimited_field, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 pub(crate) const REFERENCE_LINE_STYLE_MESSAGE_TYPE: u32 = 5_030;
 pub(crate) const REFERENCE_LINE_NON_STYLE_MESSAGE_TYPE: u32 = 5_031;
@@ -105,7 +105,7 @@ pub(crate) fn chart_reference_line_objects(
 
 /// Read the ordered reference lines on a chart's primary value axis.
 pub(crate) fn chart_reference_lines(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -124,7 +124,7 @@ pub(crate) fn chart_reference_lines(
 
 /// Replace the ordered reference lines on a chart's primary value axis.
 pub(crate) fn set_chart_reference_lines(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -151,7 +151,7 @@ pub(crate) fn set_chart_reference_lines(
 }
 
 fn set_chart_reference_lines_staged(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -267,7 +267,7 @@ fn set_chart_reference_lines_staged(
 }
 
 fn reference_line_graph(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -489,7 +489,7 @@ fn validate_reference_line_styles(
     Ok(())
 }
 
-fn read_slot_data(package: &IWorkPackage, slot: &ReferenceLineSlot) -> Result<Vec<u8>> {
+fn read_slot_data(package: &HostPackage, slot: &ReferenceLineSlot) -> Result<Vec<u8>> {
     let archive = package.archive(&slot.archive_name)?;
     let object = archive.object(slot.object_id).ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -513,7 +513,7 @@ fn read_slot_data(package: &IWorkPackage, slot: &ReferenceLineSlot) -> Result<Ve
 }
 
 fn replace_slot_data(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     slot: &ReferenceLineSlot,
     data: Vec<u8>,
 ) -> Result<()> {
@@ -536,7 +536,7 @@ fn replace_slot_data(
 }
 
 fn remove_reference_line_objects(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     drawable_label: &str,
     removed: &[ReferenceLineSlot],
 ) -> Result<()> {
@@ -563,7 +563,7 @@ fn remove_reference_line_objects(
 }
 
 fn patch_reference_line_graph(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -746,7 +746,7 @@ fn primary_value_axis_id() -> tsch::ChartAxisIdArchive {
 }
 
 fn ensure_reference_line_exclusive(
-    package: &IWorkPackage,
+    package: &HostPackage,
     reference_line_id: u64,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -783,7 +783,7 @@ fn ensure_reference_line_exclusive(
 }
 
 fn update_component_registrations(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     removed: &[ReferenceLineSlot],
     created_ids: &[u64],
@@ -826,7 +826,7 @@ fn update_component_registrations(
     Ok(())
 }
 
-fn reference_line_uuids(package: &IWorkPackage) -> Result<HashSet<(u64, u64)>> {
+fn reference_line_uuids(package: &HostPackage) -> Result<HashSet<(u64, u64)>> {
     let mut uuids = HashSet::new();
     for archive_name in package.iwa_entry_names() {
         for object in &package.archive(archive_name)?.objects {

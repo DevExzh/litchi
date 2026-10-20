@@ -9,7 +9,7 @@ use crate::wire::{
     repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields,
     transform_length_delimited_field,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::super::storage_wire::{
     LocatedStorage, StorageLocation, locate_storage as locate_native_storage,
@@ -42,7 +42,7 @@ const fn numbering_to_native(numbering: ParagraphListNumbering) -> u32 {
 }
 
 pub(crate) fn paragraph_list_numbering(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
 ) -> Result<ParagraphListNumbering> {
@@ -64,7 +64,7 @@ pub(crate) fn paragraph_list_numbering(
 }
 
 pub(in crate::text) fn set_paragraph_list_numbering(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
     numbering: ParagraphListNumbering,
@@ -88,7 +88,7 @@ pub(in crate::text) fn set_paragraph_list_numbering(
 }
 
 fn require_numbered_paragraph(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
 ) -> Result<()> {
@@ -113,7 +113,7 @@ fn require_numbered_paragraph(
 }
 
 fn patch_numbering(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedStorage,
     storage_id: u64,
     paragraph: TextPosition,
@@ -296,7 +296,7 @@ fn new_table(
     tswp::ParaDataAttributeTable { entries }
 }
 
-fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<StorageLocation> {
+fn locate_storage(package: &HostPackage, storage_id: u64) -> Result<StorageLocation> {
     locate_native_storage(
         package,
         storage_id,
@@ -305,7 +305,7 @@ fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<StorageLoca
     )
 }
 
-fn locate_storage_with_archive(package: &IWorkPackage, storage_id: u64) -> Result<LocatedStorage> {
+fn locate_storage_with_archive(package: &HostPackage, storage_id: u64) -> Result<LocatedStorage> {
     let located = locate_native_storage_with_archive(
         package,
         storage_id,
@@ -407,9 +407,9 @@ mod tests {
         assert_eq!(decoded.entries[1].second, 8);
     }
 
-    fn test_package(messages: Vec<RawMessage>) -> IWorkPackage {
+    fn test_package(messages: Vec<RawMessage>) -> HostPackage {
         let object = ArchiveObject::new(42, messages).unwrap();
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 "Index/Document.iwa",

@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = arguments.next().ok_or("missing output path")?;
     let slide_index = arguments.next().ok_or("missing slide index")?.parse()?;
 
-    let mut editor = keynote::Editor::open(input)?;
+    let mut editor = keynote::Draft::open(input)?;
     let slide = editor.duplicate_slide(slide_index)?;
     editor.save(output)?;
     println!("duplicated slide {} as slide {}", slide_index, slide.index);

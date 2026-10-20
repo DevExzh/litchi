@@ -6,7 +6,7 @@ use crate::package_metadata::{
 use crate::shapes::{insert_style_variation, remove_style_variation};
 use crate::text::style_registry::unregister_private_style;
 use crate::text::style_registry::{object_archive_name, register_private_style};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::variation::{
     effective_style_id, paragraph_boundaries_with_style, style_isolated_to_paragraph,
@@ -19,7 +19,7 @@ use litchi_iwa_text::paragraph::list::{
 use litchi_iwa_text::position::TextPosition;
 
 pub(crate) fn paragraph_list_bullet_geometry(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
 ) -> Result<ParagraphListBulletGeometry> {
@@ -49,7 +49,7 @@ pub(crate) fn paragraph_list_bullet_geometry(
 }
 
 pub(in crate::text) fn set_paragraph_list_bullet_geometry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
     geometry: ParagraphListBulletGeometry,
@@ -127,7 +127,7 @@ pub(in crate::text) fn set_paragraph_list_bullet_geometry(
 }
 
 pub(in crate::text) fn reset_paragraph_list_bullet_geometry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
 ) -> Result<bool> {
@@ -142,7 +142,7 @@ pub(in crate::text) fn reset_paragraph_list_bullet_geometry(
 }
 
 fn collapse_or_clear_redundant_geometry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
 ) -> Result<()> {

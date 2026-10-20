@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let body = "Pages shape created entirely by litchi-iwa";
-    let mut editor = pages::Editor::create_with_text(body)?;
+    let mut editor = pages::Draft::create_with_text(body)?;
     let created = editor.add_body_shape_with_fill(
         body.encode_utf16().count(),
         &text,

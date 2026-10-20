@@ -26,7 +26,7 @@ fn validate_dimension_index(model: &TableModelArchive, dimension: Dimension) -> 
 }
 
 pub(super) fn set_attached_table_dimension_size(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     dimension: Dimension,
     size: Size,
@@ -47,7 +47,7 @@ pub(super) fn set_attached_table_dimension_size(
 }
 
 pub(super) fn attached_table_size_points(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
 ) -> Result<(f32, f32)> {
     let descriptor = attached_table_descriptor(package, table_id)?;
@@ -81,7 +81,7 @@ pub(super) fn attached_table_size_points(
 }
 
 fn effective_dimension_points(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     dimension: Dimension,

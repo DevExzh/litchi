@@ -6,7 +6,7 @@ use crate::charts::border::{
     set_chart_border_visible as set_native_chart_border_visible,
 };
 
-impl Editor {
+impl Draft {
     /// Read whether Keynote shows the chart-area border for one native slide chart.
     pub fn slide_chart_border_visible(
         &self,
@@ -28,7 +28,7 @@ impl Editor {
 }
 
 fn slide_chart_border_visible(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<bool> {
@@ -42,7 +42,7 @@ fn slide_chart_border_visible(
 }
 
 fn set_slide_chart_border_visible(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     drawable_object_id: u64,
     visible: bool,
@@ -59,7 +59,7 @@ fn set_slide_chart_border_visible(
         "Keynote",
         visible,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_border_visible(slide_index, drawable_object_id)? != visible {
         return Err(Error::InvalidFormat(
             "Keynote chart border update failed validation".to_owned(),

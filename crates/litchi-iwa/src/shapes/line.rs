@@ -2,7 +2,7 @@
 
 use prost::Message;
 
-use crate::IWorkPackage;
+use crate::HostPackage;
 use crate::archive::RawMessage;
 use crate::protobuf::{tsd, tsp, tswp};
 use crate::wire::{
@@ -161,7 +161,7 @@ pub(crate) fn line_segments_match(left: LineSegment, right: LineSegment) -> bool
 }
 
 pub(crate) fn set_shape_line_segment(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_id: u64,
     replacement: LineSegment,

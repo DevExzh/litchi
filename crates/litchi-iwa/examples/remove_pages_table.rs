@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = args
         .next()
         .ok_or("usage: remove_pages_table INPUT OUTPUT")?;
-    let mut editor = pages::Editor::open(input)?;
+    let mut editor = pages::Draft::open(input)?;
     let table = editor
         .tables()?
         .into_iter()

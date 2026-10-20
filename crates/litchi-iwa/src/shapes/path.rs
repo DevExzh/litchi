@@ -8,7 +8,7 @@ use litchi_iwa_common::shape::path::{
 
 use super::geometry::DrawableSize;
 use super::line::is_straight_line_bezier;
-use crate::IWorkPackage;
+use crate::HostPackage;
 use crate::archive::RawMessage;
 use crate::protobuf::{tsd, tsp, tswp};
 use crate::wire::{
@@ -248,7 +248,7 @@ pub(crate) fn shape_path_source(
 }
 
 pub(crate) fn set_shape_preset(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_id: u64,
     preset: Preset,

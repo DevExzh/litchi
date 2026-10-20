@@ -6,7 +6,7 @@ use crate::charts::depth_3d::{
     chart_3d_depth as read_native_chart_3d_depth, set_chart_3d_depth as set_native_chart_3d_depth,
 };
 
-impl Editor {
+impl Draft {
     /// Read one slide chart's depth in Chart-inspector percent.
     pub fn slide_chart_3d_depth(
         &self,
@@ -52,7 +52,7 @@ impl Editor {
             graph.info.kind,
             depth,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_3d_depth(slide_index, drawable_object_id)? != depth {
             return Err(Error::InvalidFormat(
                 "Keynote chart 3D depth update failed validation".to_owned(),
@@ -100,7 +100,7 @@ mod tests {
         let duplicate = editor
             .duplicate_slide_chart(0, chart_selector(&editor, &chart))
             .unwrap();
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_chart_3d_depth(0, chart.drawable_object_id)

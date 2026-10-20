@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|extension| extension.to_str())
     {
         Some("key") => {
-            let editor = keynote::Editor::open(&input)?;
+            let editor = keynote::Draft::open(&input)?;
             print_assets("presentation", &editor.media_assets()?);
             for slide in editor.slides()? {
                 print_assets(
@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         },
         Some("numbers") => {
-            let editor = numbers::Editor::open(&input)?;
+            let editor = numbers::Draft::open(&input)?;
             print_assets("spreadsheet", &editor.media_assets()?);
             for sheet in editor.sheets()? {
                 print_assets(
@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         },
         Some("pages") => {
-            let editor = pages::Editor::open(&input)?;
+            let editor = pages::Draft::open(&input)?;
             print_assets("document", &editor.media_assets()?);
             for section in editor.sections() {
                 print_assets(

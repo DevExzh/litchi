@@ -3,7 +3,7 @@
 use super::*;
 use litchi_iwa_common::comment::{TableCellComment, TableCellReply};
 
-impl Editor {
+impl Draft {
     /// Read the comment attached to a reachable slide-table cell.
     pub fn slide_table_cell_comment(
         &self,
@@ -205,7 +205,7 @@ impl Editor {
 
 #[allow(clippy::too_many_arguments)]
 fn require_reply(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     model_object_id: u64,
     row: usize,
@@ -315,7 +315,7 @@ mod tests {
                 .is_none()
         );
 
-        let reparsed = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reparsed = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(
             reparsed
                 .slide_table_cell_comment(0, table_id, 1, 1)

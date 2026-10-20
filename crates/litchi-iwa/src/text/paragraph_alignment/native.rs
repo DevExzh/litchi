@@ -18,7 +18,7 @@ use crate::wire::{
     overlay_singular_wire_fields, parse_wire_fields, patch_length_delimited_field,
     patch_varint_field, repeated_length_delimited_payloads,
 };
-use crate::{Error, IWorkPackage, IWorkThemeArchive, Result};
+use crate::{Error, HostPackage, IWorkThemeArchive, Result};
 
 use super::super::font::{TextFont, TextFontName};
 use super::super::paragraph_direction::{
@@ -287,15 +287,12 @@ impl ParagraphStyleOverrides {
     }
 }
 
-pub(crate) fn locate_style(
-    package: &IWorkPackage,
-    style_id: u64,
-) -> Result<ParagraphStyleLocation> {
+pub(crate) fn locate_style(package: &HostPackage, style_id: u64) -> Result<ParagraphStyleLocation> {
     locate_style_with_archive(package, style_id).map(|located| located.location)
 }
 
 pub(crate) fn locate_style_with_archive(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style_id: u64,
 ) -> Result<LocatedParagraphStyle> {
     let (archive_name, archive) = object_archive(package, style_id)?;
@@ -341,10 +338,7 @@ pub(crate) fn locate_style_with_archive(
     })
 }
 
-pub(crate) fn inherited_alignment(
-    package: &IWorkPackage,
-    first_style_id: u64,
-) -> Result<Alignment> {
+pub(crate) fn inherited_alignment(package: &HostPackage, first_style_id: u64) -> Result<Alignment> {
     inheritance::alignment(package, first_style_id)
 }
 
@@ -382,156 +376,156 @@ fn border_override_count(_: Borders) -> u32 {
 }
 
 pub(crate) fn inherited_text_style(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<TextStyle> {
     inheritance::text_style(package, first_style_id)
 }
 
-pub(crate) fn inherited_text_font(package: &IWorkPackage, first_style_id: u64) -> Result<TextFont> {
+pub(crate) fn inherited_text_font(package: &HostPackage, first_style_id: u64) -> Result<TextFont> {
     inheritance::text_font(package, first_style_id)
 }
 
 pub(crate) fn inherited_text_decorations(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<TextDecorations> {
     inheritance::text_decorations(package, first_style_id)
 }
 
 pub(crate) fn inherited_text_color(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<RgbaColor> {
     inheritance::text_color(package, first_style_id)
 }
 
 pub(crate) fn inherited_text_capitalization(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<TextCapitalization> {
     inheritance::text_capitalization(package, first_style_id)
 }
 
 pub(crate) fn inherited_text_script(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<TextScript> {
     inheritance::text_script(package, first_style_id)
 }
 
 pub(crate) fn inherited_text_baseline_shift(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<TextBaselineShift> {
     inheritance::text_baseline_shift(package, first_style_id)
 }
 
 pub(crate) fn inherited_text_character_spacing(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<TextCharacterSpacing> {
     inheritance::text_character_spacing(package, first_style_id)
 }
 
 pub(crate) fn inherited_text_ligatures(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<TextLigatures> {
     inheritance::text_ligatures(package, first_style_id)
 }
 
 pub(crate) fn inherited_text_outline(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<Outline> {
     inheritance::text_outline(package, first_style_id)
 }
 
-pub(crate) fn inherited_text_shadow(package: &IWorkPackage, first_style_id: u64) -> Result<Shadow> {
+pub(crate) fn inherited_text_shadow(package: &HostPackage, first_style_id: u64) -> Result<Shadow> {
     inheritance::text_shadow(package, first_style_id)
 }
 
 pub(crate) fn inherited_text_background(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<Background> {
     inheritance::text_background(package, first_style_id)
 }
 
 pub(crate) fn inherited_paragraph_background(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<ParagraphBackground> {
     inheritance::paragraph_background(package, first_style_id)
 }
 
 pub(crate) fn inherited_paragraph_borders(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<Borders> {
     inheritance::paragraph_borders(package, first_style_id)
 }
 
 pub(crate) fn inherited_paragraph_flow(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<ParagraphFlow> {
     inheritance::paragraph_flow(package, first_style_id)
 }
 
 pub(crate) fn inherited_paragraph_writing_direction(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<ParagraphWritingDirection> {
     inheritance::paragraph_writing_direction(package, first_style_id)
 }
 
 pub(crate) fn inherited_line_spacing(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<LineSpacing> {
     inheritance::line_spacing(package, first_style_id)
 }
 
-pub(crate) fn inherited_spacing(package: &IWorkPackage, first_style_id: u64) -> Result<Spacing> {
+pub(crate) fn inherited_spacing(package: &HostPackage, first_style_id: u64) -> Result<Spacing> {
     inheritance::spacing(package, first_style_id)
 }
 
-pub(crate) fn inherited_indents(package: &IWorkPackage, first_style_id: u64) -> Result<Indents> {
+pub(crate) fn inherited_indents(package: &HostPackage, first_style_id: u64) -> Result<Indents> {
     inheritance::indents(package, first_style_id)
 }
 
 pub(crate) fn inherited_tab_stops(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<ParagraphTabStops> {
     inheritance::tab_stops(package, first_style_id)
 }
 
 pub(crate) fn inherited_decimal_tab_character(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<ParagraphDecimalTabCharacter> {
     inheritance::decimal_tab_character(package, first_style_id)
 }
 
 pub(crate) fn inherited_default_tab_interval(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<ParagraphDefaultTabInterval> {
     inheritance::default_tab_interval(package, first_style_id)
 }
 
 pub(crate) fn inherited_following_style(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<ParagraphFollowingStyle> {
     inheritance::following_style(package, first_style_id)
 }
 
 pub(crate) fn named_paragraph_styles(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<Vec<NamedParagraphStyle>> {
     let first = locate_style(package, first_style_id)?;
@@ -605,7 +599,7 @@ pub(crate) fn named_paragraph_styles(
     Ok(styles)
 }
 
-fn paragraph_style_preset_ids(package: &IWorkPackage, stylesheet_id: u64) -> Result<Vec<u64>> {
+fn paragraph_style_preset_ids(package: &HostPackage, stylesheet_id: u64) -> Result<Vec<u64>> {
     let mut identifiers = Vec::new();
     for archive_name in package.iwa_entry_names() {
         let archive = package.archive(archive_name)?;
@@ -649,7 +643,7 @@ fn paragraph_style_preset_ids(package: &IWorkPackage, stylesheet_id: u64) -> Res
 }
 
 pub(crate) fn validate_named_paragraph_style(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
     target: ParagraphStyleId,
 ) -> Result<()> {
@@ -1411,7 +1405,7 @@ fn prepare_variation_replacement(
 }
 
 pub(crate) fn replace_variation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &ParagraphStyleLocation,
     replacement: ArchiveObject,
 ) -> Result<()> {
@@ -1423,7 +1417,7 @@ pub(crate) fn replace_variation(
 }
 
 pub(crate) fn replace_variation_with_archive(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedParagraphStyle,
     replacement: ArchiveObject,
 ) -> Result<()> {
@@ -1536,7 +1530,7 @@ fn replace_variation_in_archive(
 }
 
 pub(crate) fn redefine_named_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     style_id: u64,
     variation_ids: &[u64],
 ) -> Result<()> {
@@ -2299,7 +2293,7 @@ fn sync_managed_field_info(
     }
 }
 
-pub(in crate::text) fn is_exclusive(package: &IWorkPackage, style_id: u64) -> Result<bool> {
+pub(in crate::text) fn is_exclusive(package: &HostPackage, style_id: u64) -> Result<bool> {
     let mut storage_references = 0usize;
     for archive_name in package.iwa_entry_names() {
         for object in package.archive(archive_name)?.objects {
@@ -2335,7 +2329,7 @@ pub(in crate::text) fn is_exclusive(package: &IWorkPackage, style_id: u64) -> Re
     Ok(storage_references == 1)
 }
 
-pub(in crate::text) fn is_unreferenced(package: &IWorkPackage, style_id: u64) -> Result<bool> {
+pub(in crate::text) fn is_unreferenced(package: &HostPackage, style_id: u64) -> Result<bool> {
     for archive_name in package.iwa_entry_names() {
         for object in package.archive(archive_name)?.objects {
             for message in &object.messages {

@@ -14,7 +14,7 @@ use crate::charts::source::{AXIS_NON_STYLE_MESSAGE_TYPE, CHART_MESSAGE_TYPE};
 use crate::charts::unique_chart_object_archive_name;
 use crate::protobuf::tsch;
 use crate::wire::{parse_wire_fields, patch_length_delimited_field, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// Proto2 extension holding the generated chart-axis non-style properties.
 pub(crate) const GENERATED_CHART_AXIS_NON_STYLE_EXTENSION_FIELD: u32 = 10_000;
@@ -92,7 +92,7 @@ pub(crate) struct AxisNonStyleSlot {
 
 /// Read one native chart-axis title.
 pub(crate) fn chart_axis_title(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -110,7 +110,7 @@ pub(crate) fn chart_axis_title(
 
 /// Set one native chart-axis title and enable its Axis Name switch.
 pub(crate) fn set_chart_axis_title(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -153,7 +153,7 @@ pub(crate) fn set_chart_axis_title(
 /// Returns whether the title was visible. An axis non-style shared by another
 /// chart axis is rejected rather than silently changing that axis.
 pub(crate) fn remove_chart_axis_title(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -188,7 +188,7 @@ pub(crate) fn remove_chart_axis_title(
 
 /// Read whether iWork shows labels for one native chart axis.
 pub(crate) fn chart_axis_labels_visible(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -206,7 +206,7 @@ pub(crate) fn chart_axis_labels_visible(
 
 /// Set whether iWork shows labels for one native chart axis.
 pub(crate) fn set_chart_axis_labels_visible(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -238,7 +238,7 @@ pub(crate) fn set_chart_axis_labels_visible(
 
 /// Read whether iWork shows series names on a native chart category axis.
 pub(crate) fn chart_category_axis_series_names_visible(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -255,7 +255,7 @@ pub(crate) fn chart_category_axis_series_names_visible(
 
 /// Set whether iWork shows series names on a native chart category axis.
 pub(crate) fn set_chart_category_axis_series_names_visible(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -332,7 +332,7 @@ fn read_category_axis_series_names_visible(data: &[u8]) -> Result<bool> {
 }
 
 pub(crate) fn axis_non_style_slot(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -406,7 +406,7 @@ pub(crate) fn axis_non_style_slot(
 impl AxisNonStyleSlot {
     pub(crate) fn read<T>(
         &self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         read: impl FnOnce(&[u8]) -> Result<T>,
     ) -> Result<T> {
         let archive = package.archive(&self.archive_name)?;
@@ -433,7 +433,7 @@ impl AxisNonStyleSlot {
 
     pub(crate) fn ensure_exclusive(
         &self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         drawable_object_id: u64,
         drawable_label: &str,
     ) -> Result<()> {
@@ -477,7 +477,7 @@ impl AxisNonStyleSlot {
 
     pub(crate) fn update(
         &self,
-        package: &mut IWorkPackage,
+        package: &mut HostPackage,
         patch: impl FnOnce(&[u8]) -> Result<Vec<u8>>,
     ) -> Result<()> {
         package.update_archive(&self.archive_name, |archive| {

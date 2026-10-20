@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use crate::{IWorkPackage, Result};
+use crate::{HostPackage, Result};
 
 use super::annotation::{
     AnnotationKind, add_annotation, annotations, remove_annotation,
@@ -16,7 +16,7 @@ use litchi_iwa_text::position::TextRange;
 
 /// Read every native plain highlight in a storage, ordered by text position.
 pub(crate) fn text_highlights(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<Vec<TextHighlight>> {
     annotations(package, storage_id)?
@@ -33,7 +33,7 @@ pub(crate) fn text_highlights(
 
 /// Create a plain highlight over a currently unoccupied annotation range.
 pub(crate) fn add_text_highlight(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     range: TextRange,
 ) -> Result<TextHighlight> {
@@ -52,7 +52,7 @@ pub(crate) fn add_text_highlight(
 
 /// Atomically move a plain highlight without changing its ID or owned metadata.
 pub(crate) fn update_text_highlight(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     id: TextHighlightId,
     range: TextRange,
@@ -70,7 +70,7 @@ pub(crate) fn update_text_highlight(
 
 /// Delete one plain highlight and its owned empty annotation graph.
 pub(crate) fn remove_text_highlight(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     id: TextHighlightId,
 ) -> Result<TextHighlight> {
@@ -85,7 +85,7 @@ pub(crate) fn remove_text_highlight(
 
 /// Reclaim annotation graphs whose table references disappeared during text replacement.
 pub(crate) fn remove_unreferenced_highlight_objects(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     candidates: &HashSet<u64>,
 ) -> Result<()> {

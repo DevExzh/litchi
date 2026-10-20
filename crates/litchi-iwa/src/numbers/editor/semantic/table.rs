@@ -55,7 +55,7 @@ struct FocusedCellLocation {
 }
 
 fn focused_cell_location(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
     row: usize,
     column: usize,
@@ -117,7 +117,7 @@ impl Write for FalliblePackageBytes {
     }
 }
 
-fn focused_package_to_editor(package: &FocusedNumbersPackage, source_len: usize) -> Result<Editor> {
+fn focused_package_to_editor(package: &FocusedNumbersPackage, source_len: usize) -> Result<Draft> {
     let mut output = FalliblePackageBytes::with_capacity(source_len)?;
     if let Err(error) = package.write_to(&mut output) {
         if let Some(amount) = output.allocation_failure {
@@ -125,10 +125,10 @@ fn focused_package_to_editor(package: &FocusedNumbersPackage, source_len: usize)
         }
         return Err(Error::Io(error.into_io_error()));
     }
-    Editor::from_bytes(&output.bytes)
+    Draft::from_bytes(&output.bytes)
 }
 
-fn parse_focused_merge_source(editor: &Editor) -> Result<FocusedNumbersPackage> {
+fn parse_focused_merge_source(editor: &Draft) -> Result<FocusedNumbersPackage> {
     let source = editor.package.exact_source_owner().ok_or_else(|| {
         Error::InvalidFormat("focused Numbers merge source is not exact".to_owned())
     })?;
@@ -153,7 +153,7 @@ fn focused_merge_package_to_editor(
     package: &FocusedNumbersPackage,
     source_len: usize,
     package_limits: crate::package::PackageLimits,
-) -> Result<Editor> {
+) -> Result<Draft> {
     let mut output = FalliblePackageBytes::with_capacity(source_len)?;
     if let Err(error) = package.write_to(&mut output) {
         if let Some(amount) = output.allocation_failure {
@@ -161,8 +161,8 @@ fn focused_merge_package_to_editor(
         }
         return Err(Error::Io(error.into_io_error()));
     }
-    let package = IWorkPackage::from_bytes_with_limits(&output.bytes, package_limits)?;
-    Editor::from_package(package)
+    let package = HostPackage::from_bytes_with_limits(&output.bytes, package_limits)?;
+    Draft::from_package(package)
 }
 
 struct FocusedMergeLocation {
@@ -178,7 +178,7 @@ struct FocusedMergeLocation {
 /// host's bounded compatibility writer.  Once this preadmission succeeds,
 /// focused transaction errors are terminal and are never reclassified as a
 /// compatibility request.
-fn focused_merge_location(editor: &Editor, table_id: u64) -> Result<Option<FocusedMergeLocation>> {
+fn focused_merge_location(editor: &Draft, table_id: u64) -> Result<Option<FocusedMergeLocation>> {
     // Source-built and normalized packages intentionally use the bounded
     // compatibility writer.  Check provenance before the metadata selector so
     // they never get misclassified as canonical focused sources.
@@ -200,7 +200,7 @@ fn focused_merge_location(editor: &Editor, table_id: u64) -> Result<Option<Focus
 }
 
 fn focused_control_format(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
     row: usize,
     column: usize,
@@ -225,7 +225,7 @@ fn focused_set_data_format(
     position: litchi_numbers::table::At,
     source_len: usize,
     format: &DataFormat,
-) -> Result<Option<Editor>> {
+) -> Result<Option<Draft>> {
     macro_rules! commit_set {
         ($edit:expr, $value:expr) => {{
             let commit = $edit
@@ -323,7 +323,7 @@ fn focused_clear_data_format(
     position: litchi_numbers::table::At,
     source_len: usize,
     format: &DataFormat,
-) -> Result<Option<Editor>> {
+) -> Result<Option<Draft>> {
     macro_rules! commit_clear {
         ($edit:expr) => {{
             let commit = $edit
@@ -435,7 +435,7 @@ fn focused_cell_value(
 }
 
 fn focused_cell_storage(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
     row: usize,
     column: usize,
@@ -584,7 +584,7 @@ fn uses_focused_data_format_owner(current: &DataFormat, requested: &DataFormat) 
 /// commit path; failures after owner selection remain terminal and never fall
 /// back to the compatibility writer.
 fn focused_data_format_owner_is_eligible(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
     row: usize,
     column: usize,
@@ -610,13 +610,13 @@ fn focused_data_format_owner_is_eligible(
 }
 
 fn commit_exact_focused_data_format(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
     row: usize,
     column: usize,
     current: &DataFormat,
     requested: &DataFormat,
-) -> Result<Editor> {
+) -> Result<Draft> {
     let location = focused_cell_location(editor, table_id, row, column)?;
     commit_exact_focused_data_format_with_location(
         editor, table_id, row, column, current, requested, location,
@@ -624,14 +624,14 @@ fn commit_exact_focused_data_format(
 }
 
 fn commit_exact_focused_data_format_with_location(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
     row: usize,
     column: usize,
     current: &DataFormat,
     requested: &DataFormat,
     location: FocusedCellLocation,
-) -> Result<Editor> {
+) -> Result<Draft> {
     let FocusedCellLocation {
         source,
         sheet,
@@ -728,7 +728,7 @@ fn commit_focused_data_format_transition(
     source_len: usize,
     current: &DataFormat,
     requested: &DataFormat,
-) -> Result<Editor> {
+) -> Result<Draft> {
     let before_value = focused_cell_value(source, sheet, table, position)?;
     let Some(cleared) =
         focused_clear_data_format(source, sheet, table, position, source_len, current)?
@@ -780,7 +780,7 @@ fn commit_focused_data_format_transition(
 }
 
 fn verify_focused_data_format(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
     row: usize,
     column: usize,
@@ -802,7 +802,7 @@ fn verify_focused_data_format(
 /// compatibility packages to acquire the same canonical control/list state
 /// through the existing transactional writer.
 fn commit_compatibility_control_format(
-    editor: &mut Editor,
+    editor: &mut Draft,
     table_id: u64,
     row: usize,
     column: usize,
@@ -811,7 +811,7 @@ fn commit_compatibility_control_format(
     let mut staged = editor.package.clone();
     cell_data_format::set_cell_data_format(&mut staged, table_id, row, column, format)?;
     staged.validate()?;
-    let verified = Editor::from_package(staged)?;
+    let verified = Draft::from_package(staged)?;
     if cell_data_format::cell_data_format(&verified.package, table_id, row, column)? != *format {
         return Err(Error::InvalidFormat(
             "Numbers compatibility cell-control write failed package validation".to_owned(),
@@ -822,7 +822,7 @@ fn commit_compatibility_control_format(
 }
 
 enum FocusedCommentReplacement {
-    Published(Editor),
+    Published(Draft),
     LegacyFallback,
 }
 
@@ -833,7 +833,7 @@ fn focused_comment_error(error: TableCellCommentError) -> Error {
 }
 
 fn replace_cell_comment_with_focused_owner(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
     row: usize,
     column: usize,
@@ -872,7 +872,7 @@ fn replace_cell_comment_with_focused_owner(
         .package()
         .write_to(&mut bytes)
         .map_err(|error| Error::Io(error.into_io_error()))?;
-    let verified = Editor::from_bytes(&bytes)?;
+    let verified = Draft::from_bytes(&bytes)?;
     let observed =
         cell_comment_in_package(verified.package(), table_id, row, column)?.ok_or_else(|| {
             Error::InvalidFormat(
@@ -897,14 +897,14 @@ struct FocusedCommentReplySource {
 
 enum FocusedCommentReplyPublication {
     Published {
-        editor: Editor,
+        editor: Draft,
         reply_id: Option<u64>,
     },
     LegacyFallback,
 }
 
 fn focused_comment_reply_source(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
     row: usize,
     column: usize,
@@ -955,7 +955,7 @@ fn focused_comment_reply_can_fallback(error: FocusedCommentReplyError) -> bool {
 fn publish_focused_comment_reply_package(
     source_bytes: &[u8],
     package: &FocusedNumbersPackage,
-) -> Result<Editor> {
+) -> Result<Draft> {
     let mut bytes = Vec::new();
     bytes.try_reserve_exact(source_bytes.len()).map_err(|_| {
         Error::InvalidFormat(
@@ -965,11 +965,11 @@ fn publish_focused_comment_reply_package(
     package
         .write_to(&mut bytes)
         .map_err(|error| Error::Io(error.into_io_error()))?;
-    Editor::from_bytes(&bytes)
+    Draft::from_bytes(&bytes)
 }
 
 fn focused_add_cell_comment_reply(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1015,7 +1015,7 @@ fn focused_add_cell_comment_reply(
 }
 
 fn focused_set_cell_comment_reply(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1071,7 +1071,7 @@ fn focused_set_cell_comment_reply(
 }
 
 fn focused_remove_cell_comment_reply(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1125,7 +1125,7 @@ fn focused_remove_cell_comment_reply(
     })
 }
 
-impl Editor {
+impl Draft {
     /// List absolute pivot categories backed by valid calculation-engine
     /// aggregate coordinates.
     pub fn pivot_categories(&self) -> Result<Vec<PivotCategoryInfo>> {
@@ -3005,10 +3005,12 @@ impl Editor {
     }
 
     /// Create or replace a cell comment without changing the cell value or style.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment API; use litchi_numbers::Package::edit_table_cell_comment or set_table_cell_comment with SheetSelector and TableSelector for supported strict-graph creation and replacement; unsupported graph creation and reply identity remain migration-host scope"
-    )]
+    ///
+    /// Native-ID host API (record 0361): the table is addressed by its native
+    /// object identifier. Supported strict graphs publish through the
+    /// selector-first `litchi_numbers::Package::edit_table_cell_comment`;
+    /// graphs that owner refuses (unsupported comment-storage creation) keep
+    /// the host's own rewrite, which no leaf owner provides yet.
     pub fn set_cell_comment(
         &mut self,
         table_id: u64,
@@ -3027,7 +3029,7 @@ impl Editor {
         let mut staged = self.package.clone();
         set_cell_comment_in_package(&mut staged, table_id, row, column, text)?;
         let bytes = staged.to_bytes()?;
-        IWorkPackage::from_bytes(&bytes)?;
+        HostPackage::from_bytes(&bytes)?;
         self.package = staged;
         Ok(())
     }
@@ -3112,14 +3114,11 @@ impl Editor {
 
     /// Read the direct replies attached to a cell comment in stored order.
     ///
-    /// This compatibility method retains native table, root-storage, and
-    /// reply-storage identifiers in its return value. Prefer the selector-first
+    /// Native-ID host API (record 0361): the result keeps the native table,
+    /// root-storage and reply-storage identifiers the other reply methods
+    /// take. Prefer the selector-first
     /// `litchi_numbers::Package::table_cell_comment_replies` projection for an
     /// ID-free semantic read.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment-reply read; use litchi_numbers::Package::table_cell_comment_replies with SheetSelector, TableSelector, and At for the selector-first semantic read; reply identity remains compatibility-host scope"
-    )]
     pub fn cell_comment_replies(
         &self,
         table_id: u64,
@@ -3132,11 +3131,9 @@ impl Editor {
     /// Append a direct reply to an existing cell comment.
     ///
     /// Supported exact graphs delegate to the selector-first package owner;
-    /// this deprecated raw-ID surface remains as a compatibility fallback.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment-reply creation API; use litchi_numbers::Package::add_table_cell_comment_reply with SheetSelector, TableSelector, and At for selector-first writes; this method delegates supported graphs and retains a compatibility fallback"
-    )]
+    /// other graphs keep the host rewrite, which no leaf owner provides yet.
+    /// Native-ID host API (record 0361): the table and reply storage are
+    /// addressed by native object identifiers.
     pub fn add_cell_comment_reply(
         &mut self,
         table_id: u64,
@@ -3159,7 +3156,7 @@ impl Editor {
         let mut staged = self.package.clone();
         let reply_id = add_cell_comment_reply_in_package(&mut staged, table_id, row, column, text)?;
         let bytes = staged.to_bytes()?;
-        IWorkPackage::from_bytes(&bytes)?;
+        HostPackage::from_bytes(&bytes)?;
         self.package = staged;
         Ok(reply_id)
     }
@@ -3167,11 +3164,9 @@ impl Editor {
     /// Replace one direct reply and return its new copy-on-write object ID.
     ///
     /// Supported exact graphs delegate to the selector-first package owner;
-    /// this deprecated raw-ID surface remains as a compatibility fallback.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment-reply replacement API; use litchi_numbers::Package::set_table_cell_comment_reply with SheetSelector, TableSelector, At, and CommentReplyIndex for selector-first writes; this method delegates supported graphs and retains a compatibility fallback"
-    )]
+    /// other graphs keep the host rewrite, which no leaf owner provides yet.
+    /// Native-ID host API (record 0361): the table and reply storage are
+    /// addressed by native object identifiers.
     pub fn set_cell_comment_reply(
         &mut self,
         table_id: u64,
@@ -3209,7 +3204,7 @@ impl Editor {
             text,
         )?;
         let bytes = staged.to_bytes()?;
-        IWorkPackage::from_bytes(&bytes)?;
+        HostPackage::from_bytes(&bytes)?;
         self.package = staged;
         Ok(reply_id)
     }
@@ -3217,11 +3212,9 @@ impl Editor {
     /// Remove one direct reply from an existing cell comment.
     ///
     /// Supported exact graphs delegate to the selector-first package owner;
-    /// this deprecated raw-ID surface remains as a compatibility fallback.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment-reply removal API; use litchi_numbers::Package::remove_table_cell_comment_reply with SheetSelector, TableSelector, At, and CommentReplyIndex for selector-first writes; this method delegates supported graphs and retains a compatibility fallback"
-    )]
+    /// other graphs keep the host rewrite, which no leaf owner provides yet.
+    /// Native-ID host API (record 0361): the table and reply storage are
+    /// addressed by native object identifiers.
     pub fn remove_cell_comment_reply(
         &mut self,
         table_id: u64,
@@ -3251,7 +3244,7 @@ impl Editor {
             reply_storage_object_id,
         )?;
         let bytes = staged.to_bytes()?;
-        IWorkPackage::from_bytes(&bytes)?;
+        HostPackage::from_bytes(&bytes)?;
         self.package = staged;
         Ok(())
     }
@@ -3262,7 +3255,7 @@ mod focused_custom_tests {
 
     use super::*;
     use crate::numbers::cell::CellValue;
-    use crate::numbers::{self, Editor};
+    use crate::numbers::{self, Draft};
     use litchi_iwa_archive::package::Catalog;
     use litchi_numbers::cell::data_format::custom::{
         Custom, DateTime as CustomDateTime, DateTimePattern, Name, Number as CustomNumber,
@@ -3289,7 +3282,7 @@ mod focused_custom_tests {
         )
     }
 
-    fn native_custom_table_id(editor: &Editor) -> u64 {
+    fn native_custom_table_id(editor: &Draft) -> u64 {
         editor
             .tables()
             .expect("native table catalog")
@@ -3349,7 +3342,7 @@ mod focused_custom_tests {
         source_bytes: &[u8],
         corruption: NativeCustomRouteCorruption,
     ) -> Vec<u8> {
-        let mut editor = Editor::from_bytes(source_bytes).expect("native source editor");
+        let mut editor = Draft::from_bytes(source_bytes).expect("native source editor");
         editor
             .package
             .update_archive("Index/Document.iwa", |archive| {
@@ -3443,7 +3436,7 @@ mod focused_custom_tests {
             .as_slice(),
         ];
         for source_bytes in fixtures {
-            let mut editor = Editor::from_bytes(source_bytes).expect("native number editor");
+            let mut editor = Draft::from_bytes(source_bytes).expect("native number editor");
             let table_id = native_custom_table_id(&editor);
             let current = editor
                 .table_cell_data_format(table_id, 1, 1)
@@ -3504,7 +3497,7 @@ mod focused_custom_tests {
     fn native_custom_data_format_compatibility_preserves_native_text_value() {
         let source_bytes =
             include_bytes!("../../../../../../test-data/iwork/numbers/custom-text-native.numbers");
-        let mut editor = Editor::from_bytes(source_bytes).expect("native Text editor");
+        let mut editor = Draft::from_bytes(source_bytes).expect("native Text editor");
         let table_id = native_custom_table_id(&editor);
         let original_value = FocusedNumbersPackage::from_bytes(source_bytes)
             .expect("focused native Text source")
@@ -3597,7 +3590,7 @@ mod focused_custom_tests {
             NativeCustomRouteCorruption::MalformedReference,
         ] {
             let hostile_bytes = corrupt_native_custom_route(source_bytes, corruption);
-            let Ok(mut editor) = Editor::from_bytes(&hostile_bytes) else {
+            let Ok(mut editor) = Draft::from_bytes(&hostile_bytes) else {
                 continue;
             };
             accepted += 1;
@@ -3676,9 +3669,9 @@ mod focused_custom_tests {
             before_value
         );
 
-        let mut actual = Editor::from_bytes(source_bytes).expect("exact editor");
+        let mut actual = Draft::from_bytes(source_bytes).expect("exact editor");
         // The focused fixture intentionally omits the appearance dependency
-        // required by `Editor::tables`; its table-model object is still
+        // required by `Draft::tables`; its table-model object is still
         // the stable native table id used by the cell APIs.
         let table_id = 4;
         assert!(matches!(
@@ -3728,7 +3721,7 @@ mod focused_custom_tests {
                 .expect("shared registry custom")
                 .is_some()
         );
-        let original_editor = Editor::from_bytes(source_bytes).expect("original editor");
+        let original_editor = Draft::from_bytes(source_bytes).expect("original editor");
         assert_eq!(
             actual.package().entry("Index/Unrelated.iwa"),
             original_editor.package().entry("Index/Unrelated.iwa")
@@ -3837,7 +3830,7 @@ mod focused_custom_tests {
             .storage()
             .value()
             .cloned();
-        let original = Editor::from_bytes(source_bytes).expect("exact editor");
+        let original = Draft::from_bytes(source_bytes).expect("exact editor");
 
         let mut editor = original.clone();
         editor
@@ -3927,7 +3920,7 @@ mod focused_custom_tests {
         );
 
         let source_bytes = editor.to_bytes().expect("builder bytes");
-        let mut reopened = Editor::from_bytes(&source_bytes).expect("reopened builder");
+        let mut reopened = Draft::from_bytes(&source_bytes).expect("reopened builder");
         assert_eq!(
             reopened
                 .table_cell_data_format(table_id, 0, 0)
@@ -4103,7 +4096,7 @@ mod focused_custom_tests {
 
                 if reopen {
                     let bytes = editor.to_bytes().expect("initial compatibility bytes");
-                    editor = Editor::from_bytes(&bytes)
+                    editor = Draft::from_bytes(&bytes)
                         .unwrap_or_else(|error| panic!("{label}: reopen failed: {error}"));
                 }
                 assert_eq!(
@@ -4144,7 +4137,7 @@ mod focused_custom_tests {
                 );
 
                 let bytes = editor.to_bytes().expect("mutated compatibility bytes");
-                let reopened_editor = Editor::from_bytes(&bytes)
+                let reopened_editor = Draft::from_bytes(&bytes)
                     .unwrap_or_else(|error| panic!("{label}: mutated reopen failed: {error}"));
                 assert_eq!(
                     reopened_editor
@@ -4184,7 +4177,7 @@ mod focused_custom_tests {
         let source_bytes = include_bytes!(
             "../../../../../../test-data/iwork/synthetic/numbers/custom-focused.numbers"
         );
-        let mut malformed = Editor::from_bytes(source_bytes).expect("focused source");
+        let mut malformed = Draft::from_bytes(source_bytes).expect("focused source");
         malformed
             .package
             .update_archive("Index/Tables.iwa", |archive| {
@@ -4242,7 +4235,7 @@ mod focused_custom_tests {
             })
             .expect("malformed source mutation");
         let malformed_bytes = malformed.to_bytes().expect("malformed bytes");
-        let mut actual = Editor::from_bytes(&malformed_bytes).expect("malformed editor");
+        let mut actual = Draft::from_bytes(&malformed_bytes).expect("malformed editor");
         let current = actual
             .table_cell_data_format(4, 0, 0)
             .expect("malformed custom read");
@@ -4295,7 +4288,7 @@ mod focused_custom_tests {
         let source_bytes = include_bytes!(
             "../../../../../../test-data/iwork/synthetic/numbers/custom-focused.numbers"
         );
-        let mut malformed = Editor::from_bytes(source_bytes).expect("focused source");
+        let mut malformed = Draft::from_bytes(source_bytes).expect("focused source");
         malformed
             .package
             .update_archive("Index/Document.iwa", |archive| {
@@ -4311,7 +4304,7 @@ mod focused_custom_tests {
             })
             .expect("duplicate registry edge");
         let bytes = malformed.to_bytes().expect("malformed source bytes");
-        let mut editor = Editor::from_bytes(&bytes).expect("discovery defers registry");
+        let mut editor = Draft::from_bytes(&bytes).expect("discovery defers registry");
         let current = editor
             .table_cell_data_format(4, 0, 0)
             .expect("legacy custom read");

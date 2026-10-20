@@ -22,11 +22,11 @@ const SIZE: DrawableSize = DrawableSize {
     height: 140.0,
 };
 
-fn fixture() -> (super::super::IWorkTextEditor, TextStorageId) {
-    let mut pages = pages::Editor::create_with_text("Body").unwrap();
+fn fixture() -> (crate::text::Draft, TextStorageId) {
+    let mut pages = pages::Draft::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, "Alpha Beta", POSITION, SIZE).unwrap();
     (
-        super::super::IWorkTextEditor::from_package(pages.into_package()),
+        crate::text::Draft::from_package(pages.into_package()),
         text_box.storage.id,
     )
 }
@@ -35,7 +35,7 @@ fn range(start: usize, end: usize) -> TextRange {
     TextRange::from_utf16_indexes(start, end).unwrap()
 }
 
-fn storage_message_index(package: &crate::IWorkPackage, storage_id: u64) -> usize {
+fn storage_message_index(package: &crate::HostPackage, storage_id: u64) -> usize {
     locate_storage(package, storage_id).unwrap().message_index
 }
 
@@ -84,7 +84,7 @@ fn unknown_table_entry_and_highlight_fields_survive_updates() {
         })
         .unwrap();
 
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     editor
         .update_text_highlight(storage_id, highlight.id, range(6, 10))
         .unwrap();
@@ -143,7 +143,7 @@ fn duplicate_highlight_tables_fail_without_mutation() {
             Ok(())
         })
         .unwrap();
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     let before = editor.to_bytes().unwrap();
     assert!(editor.text_highlights(storage_id).is_err());
     assert!(editor.add_text_highlight(storage_id, range(6, 10)).is_err());
@@ -173,7 +173,7 @@ fn highlight_updates_use_the_resolved_storage_with_a_2022_style_sibling() {
         })
         .unwrap();
 
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     let highlight = editor.add_text_highlight(storage_id, range(0, 5)).unwrap();
     editor
         .update_text_highlight(storage_id, highlight.id, range(6, 10))
@@ -221,7 +221,7 @@ fn highlight_with_an_additional_owner_cannot_be_updated_or_deleted() {
             Ok(())
         })
         .unwrap();
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
@@ -238,7 +238,7 @@ fn highlight_with_an_additional_owner_cannot_be_updated_or_deleted() {
 
 #[test]
 fn comment_backed_annotations_are_classified_without_mutation() {
-    let mut pages = pages::Editor::create_with_text("Body").unwrap();
+    let mut pages = pages::Draft::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, "Alpha Beta", POSITION, SIZE).unwrap();
     let storage_id = text_box.storage.id;
     let mut package = pages.into_package();
@@ -296,7 +296,7 @@ fn comment_backed_annotations_are_classified_without_mutation() {
 
 #[test]
 fn duplicate_comment_text_is_rejected_before_highlight_use() {
-    let mut pages = pages::Editor::create_with_text("Body").unwrap();
+    let mut pages = pages::Draft::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, "Alpha Beta", POSITION, SIZE).unwrap();
     let storage_id = text_box.storage.id;
     let mut package = pages.into_package();

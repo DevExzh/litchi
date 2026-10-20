@@ -15,5 +15,5 @@ fn numbers_builder_builds() {
 
 #[test]
 fn numbers_editor_creates() {
-    numbers::Editor::create().expect("create");
+    numbers::Draft::create().expect("create");
 }

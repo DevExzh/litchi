@@ -246,7 +246,7 @@ fn map_wire_limit_kind(kind: impl IntoWireLimitKind) -> Option<LimitKind> {
 }
 
 pub(super) fn focused_body_table_source(
-    editor: &Editor,
+    editor: &Draft,
     model_object_id: u64,
 ) -> Result<(FocusedPagesPackage, usize, TableInfo)> {
     let tables = editor.tables()?;
@@ -279,7 +279,7 @@ fn focused_options(limits: crate::package::PackageLimits) -> Result<litchi_pages
     Ok(litchi_pages::OpenOptions::new().source_limits(source))
 }
 
-fn focused_body_table_package(editor: &Editor) -> Result<FocusedPagesPackage> {
+fn focused_body_table_package(editor: &Draft) -> Result<FocusedPagesPackage> {
     let source = editor.package().exact_source_bytes().ok_or_else(|| {
         Error::InvalidFormat("focused Pages table source is not exact".to_owned())
     })?;
@@ -292,7 +292,7 @@ fn focused_body_table_package(editor: &Editor) -> Result<FocusedPagesPackage> {
 /// Admit one compatibility model identifier to the focused body-table
 /// deletion owner.
 ///
-/// A source-built or normalized legacy `IWorkPackage` has no exact ZIP
+/// A source-built or normalized legacy `HostPackage` has no exact ZIP
 /// baseline of its own. Its current package state is therefore serialized once
 /// and reparsed by the focused package, which gives the deletion transaction
 /// an exact source artifact without changing the editor's compatibility
@@ -301,7 +301,7 @@ fn focused_body_table_package(editor: &Editor) -> Result<FocusedPagesPackage> {
 /// that the host projection can see, the serialized package is admitted
 /// through the same focused source parser.
 fn focused_body_table_deletion_source(
-    editor: &Editor,
+    editor: &Draft,
     model_object_id: u64,
 ) -> Result<(FocusedPagesPackage, usize, TableInfo, bool)> {
     if editor.package().exact_source_owner().is_none() {
@@ -352,15 +352,15 @@ fn pages_editor_from_deletion_bytes(
     bytes: &[u8],
     package_limits: crate::pages::editor::PackageLimits,
     compatibility_source: bool,
-) -> Result<Editor> {
-    let mut package = IWorkPackage::from_bytes_with_limits(bytes, package_limits)?;
+) -> Result<Draft> {
+    let mut package = HostPackage::from_bytes_with_limits(bytes, package_limits)?;
     if compatibility_source {
         package.discard_exact_source_for_compatibility();
     }
-    Editor::from_package(package)
+    Draft::from_package(package)
 }
 
-impl Editor {
+impl Draft {
     /// List native tables anchored in the main body in document order.
     pub fn tables(&self) -> Result<Vec<TableInfo>> {
         Ok(body_table_graphs(self)?
@@ -3564,10 +3564,8 @@ impl Editor {
                 .write_to(&mut bytes)
                 .map_err(|error| Error::Io(error.into_io_error()))?;
             let package_limits = self.package().limits();
-            let verified = Self::from_package(IWorkPackage::from_bytes_with_limits(
-                &bytes,
-                package_limits,
-            )?)?;
+            let verified =
+                Self::from_package(HostPackage::from_bytes_with_limits(&bytes, package_limits)?)?;
             if !verified
                 .table_cell_merges(model_object_id)?
                 .contains(&region)
@@ -3621,10 +3619,8 @@ impl Editor {
                 .write_to(&mut bytes)
                 .map_err(|error| Error::Io(error.into_io_error()))?;
             let package_limits = self.package().limits();
-            let verified = Self::from_package(IWorkPackage::from_bytes_with_limits(
-                &bytes,
-                package_limits,
-            )?)?;
+            let verified =
+                Self::from_package(HostPackage::from_bytes_with_limits(&bytes, package_limits)?)?;
             if verified
                 .table_cell_merges(model_object_id)?
                 .contains(&region)
@@ -3693,7 +3689,7 @@ impl Editor {
     /// Insert an independent empty native table at a UTF-16 body position.
     ///
     /// An existing body table supplies native style and storage templates. A
-    /// table-less document created by [`Editor::create`] bootstraps that
+    /// table-less document created by [`Draft::create`] bootstraps that
     /// native scaffold automatically. No cells or formula state are shared,
     /// and the insertion transaction shifts later text attributes and
     /// attachments.
@@ -3749,7 +3745,7 @@ impl Editor {
             )
         };
 
-        let mut text_editor = IWorkTextEditor::from_package(staged);
+        let mut text_editor = crate::text::Draft::from_package(staged);
         text_editor.replace_text(
             self.body_storage_id,
             anchor_character_index..anchor_character_index,
@@ -3837,7 +3833,7 @@ impl Editor {
             source_info_id,
             cloned.info_object_id,
         )?;
-        let mut text_editor = IWorkTextEditor::from_package(staged);
+        let mut text_editor = crate::text::Draft::from_package(staged);
         text_editor.replace_text(
             self.body_storage_id,
             anchor_character_index..anchor_character_index,

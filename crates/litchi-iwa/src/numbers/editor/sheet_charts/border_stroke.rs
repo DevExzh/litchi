@@ -7,7 +7,7 @@ use crate::charts::border_stroke::{
 };
 use crate::shapes::Stroke;
 
-impl Editor {
+impl Draft {
     /// Read the chart-area border stroke independently of border visibility.
     ///
     /// `None` represents the native inspector's empty-stroke option.
@@ -31,7 +31,7 @@ impl Editor {
 }
 
 fn sheet_chart_border_stroke(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Option<Stroke>> {
@@ -45,7 +45,7 @@ fn sheet_chart_border_stroke(
 }
 
 fn set_sheet_chart_border_stroke(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     stroke: Option<Stroke>,
@@ -62,7 +62,7 @@ fn set_sheet_chart_border_stroke(
         "Numbers",
         stroke,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_border_stroke(sheet_id, drawable_object_id)? != stroke {
         return Err(Error::InvalidFormat(
             "Numbers chart border stroke update failed validation".to_owned(),

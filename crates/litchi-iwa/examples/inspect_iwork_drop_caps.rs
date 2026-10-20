@@ -2,8 +2,6 @@
 
 use std::env;
 
-use litchi_iwa::text::IWorkTextEditor;
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
     let input = arguments
@@ -13,7 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let editor = IWorkTextEditor::open(input)?;
+    let editor = litchi_iwa::text::Draft::open(input)?;
     for storage in editor.storages()? {
         for placement in editor.paragraph_drop_caps(storage.id)? {
             println!(

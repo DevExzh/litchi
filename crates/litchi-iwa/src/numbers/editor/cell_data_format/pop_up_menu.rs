@@ -7,7 +7,7 @@ use litchi_numbers::cell::data_format::pop_up_menu::{InitialSelection, PopUpMenu
 pub(super) const MODEL_MESSAGE_TYPE: u32 = 6_206;
 
 pub(super) fn read_model(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
     starts_with_first_item: bool,
@@ -86,7 +86,7 @@ pub(super) fn read_model(
 }
 
 pub(super) fn create_model(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     format: &PopUpMenu,
 ) -> Result<u64> {
@@ -126,7 +126,7 @@ pub(super) fn create_model(
 }
 
 pub(super) fn remove_model_if_unreferenced(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
 ) -> Result<()> {

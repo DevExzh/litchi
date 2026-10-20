@@ -236,7 +236,7 @@ fn last_native_media_id(source: &[u8], kind: MovieKind) -> Result<u64, Box<dyn E
 }
 
 fn add_audio(
-    editor: &mut keynote::Editor,
+    editor: &mut keynote::Draft,
     preferred_filename: &str,
     data: &[u8],
     options: SlideAudioOptions,
@@ -247,12 +247,12 @@ fn add_audio(
         .add(SlideSelector::index(0), preferred_filename, data, options)
         .and_then(|edit| edit.commit())?;
     let bytes = package_bytes(commit.package())?;
-    *editor = keynote::Editor::from_bytes(&bytes)?;
+    *editor = keynote::Draft::from_bytes(&bytes)?;
     last_native_media_id(&bytes, MovieKind::Audio)
 }
 
 fn add_movie(
-    editor: &mut keynote::Editor,
+    editor: &mut keynote::Draft,
     preferred_movie_filename: &str,
     movie_data: &[u8],
     preferred_poster_filename: &str,
@@ -272,7 +272,7 @@ fn add_movie(
         )
         .and_then(|edit| edit.commit())?;
     let bytes = package_bytes(commit.package())?;
-    *editor = keynote::Editor::from_bytes(&bytes)?;
+    *editor = keynote::Draft::from_bytes(&bytes)?;
     last_native_media_id(&bytes, MovieKind::File)
 }
 
@@ -317,7 +317,7 @@ fn focused_suffix_release_and_next_allocation_reopen_in_host() -> TestResult {
         let removed_bytes = package_bytes(removed.package())?;
         let released = package_watermark(&removed_bytes)?;
         assert!(released < old_watermark);
-        let removed_host = keynote::Editor::from_bytes(&removed_bytes)?;
+        let removed_host = keynote::Draft::from_bytes(&removed_bytes)?;
         assert_eq!(released, package_watermark(&removed_host.to_bytes()?)?);
         let removed_slide = removed
             .package()
@@ -341,7 +341,7 @@ fn focused_suffix_release_and_next_allocation_reopen_in_host() -> TestResult {
             .duplicate(SlideSelector::index(0), MovieSelector::index(source_index))
             .and_then(|edit| edit.commit())?;
         let repeated_bytes = package_bytes(repeated.package())?;
-        let _repeated_host = keynote::Editor::from_bytes(&repeated_bytes)?;
+        let _repeated_host = keynote::Draft::from_bytes(&repeated_bytes)?;
         let desired_kind = if is_movie {
             MovieKind::File
         } else {
@@ -409,7 +409,6 @@ fn set_movie_labels(
         .into_package())
 }
 
-#[allow(deprecated)]
 fn source_fixture() -> Result<SourceFixture, Box<dyn Error>> {
     let mut editor = keynote::Builder::new()
         .title("Focused media lifecycle")
@@ -485,7 +484,7 @@ fn source_fixture() -> Result<SourceFixture, Box<dyn Error>> {
 
     // Reopen once before returning so this fixture itself proves that labels,
     // comments, and the extra build are accepted by the host reader.
-    let reopened = keynote::Editor::from_bytes(&bytes)?;
+    let reopened = keynote::Draft::from_bytes(&bytes)?;
     let reopened_package = Package::from_bytes(&bytes)?;
     let reopened_slide = reopened_package
         .show()?
@@ -520,7 +519,7 @@ fn source_fixture() -> Result<SourceFixture, Box<dyn Error>> {
 
 fn semantic_snapshot(
     package: &Package,
-    editor: &keynote::Editor,
+    editor: &keynote::Draft,
 ) -> Result<MediaSnapshot, Box<dyn Error>> {
     let slide = package
         .show()?
@@ -604,8 +603,8 @@ fn semantic_snapshot(
     })
 }
 
-fn host_from_package(package: &Package) -> Result<keynote::Editor, Box<dyn Error>> {
-    Ok(keynote::Editor::from_bytes(&package_bytes(package)?)?)
+fn host_from_package(package: &Package) -> Result<keynote::Draft, Box<dyn Error>> {
+    Ok(keynote::Draft::from_bytes(&package_bytes(package)?)?)
 }
 
 fn offset_position(position: Option<(u32, u32)>) -> Option<(u32, u32)> {
@@ -1191,7 +1190,7 @@ fn source_built_selected_commented_audio_with_reply_duplicates_and_removal_is_at
         .add_reply("selected audio lifecycle reply")?
         .commit()?;
     let bytes = package_bytes(replied.package())?;
-    let reopened = keynote::Editor::from_bytes(&bytes)?;
+    let reopened = keynote::Draft::from_bytes(&bytes)?;
     let comment = drawable_comment_snapshot(&bytes, fixture.audio_a_id)?
         .ok_or_else(|| io::Error::other("selected audio comment was not persisted"))?;
     assert_eq!(comment.root.text, "selected audio lifecycle comment");
@@ -1326,7 +1325,7 @@ fn source_built_multiple_reply_threads_survive_focused_media_lifecycle() -> Test
     let unique_uuids = uuids.into_iter().flatten().collect::<HashSet<_>>();
     assert_eq!(unique_uuids.len(), 4);
 
-    let _reopened = keynote::Editor::from_bytes(&before_operations)?;
+    let _reopened = keynote::Draft::from_bytes(&before_operations)?;
     assert_eq!(
         drawable_comment_snapshot(&before_operations, fixture.movie_a_id)?,
         Some(movie.clone())

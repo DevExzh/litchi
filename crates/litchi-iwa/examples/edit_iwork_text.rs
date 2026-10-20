@@ -2,14 +2,12 @@
 
 use std::env;
 
-use litchi_iwa::text::IWorkTextEditor;
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
     let input = arguments
         .next()
         .ok_or("usage: edit_iwork_text <input> [<output> <object-id> <text>]")?;
-    let mut editor = IWorkTextEditor::open(&input)?;
+    let mut editor = litchi_iwa::text::Draft::open(&input)?;
     let Some(output) = arguments.next() else {
         for storage in editor.storages()? {
             if !storage.storage.is_empty() {

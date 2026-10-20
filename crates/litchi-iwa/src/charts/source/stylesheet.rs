@@ -20,7 +20,7 @@ use crate::wire::{
     append_repeated_length_delimited_field, repeated_length_delimited_payloads,
     rewrite_repeated_length_delimited_fields,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
 const STYLESHEET_STYLES_FIELD: u32 = 1;
@@ -37,7 +37,7 @@ const CHART_STYLE_MESSAGE_TYPES: [u32; 8] = [
 
 /// Return chart-style objects that are local to one private chart graph.
 pub(crate) fn local_chart_style_ids(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     object_ids: &[u64],
 ) -> Result<Vec<u64>> {
@@ -84,7 +84,7 @@ pub(crate) fn local_chart_style_ids(
 
 /// Register local chart styles in the document stylesheet and component graph.
 pub(crate) fn register_chart_styles(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     stylesheet_id: u64,
     owner_archive_name: &str,
     style_ids: &[u64],
@@ -97,7 +97,7 @@ pub(crate) fn register_chart_styles(
 }
 
 fn register_chart_styles_staged(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     stylesheet_id: u64,
     owner_archive_name: &str,
     style_ids: &[u64],
@@ -199,7 +199,7 @@ fn register_chart_styles_staged(
 
 /// Validate persisted stylesheet membership and reference metadata.
 pub(crate) fn validate_chart_styles_registered(
-    package: &IWorkPackage,
+    package: &HostPackage,
     stylesheet_id: u64,
     owner_archive_name: &str,
     style_ids: &[u64],
@@ -242,7 +242,7 @@ pub(crate) fn validate_chart_styles_registered(
 
 /// Remove local chart styles from the document stylesheet and component graph.
 pub(crate) fn unregister_chart_styles(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     stylesheet_id: u64,
     owner_archive_name: &str,
     style_ids: &[u64],
@@ -255,7 +255,7 @@ pub(crate) fn unregister_chart_styles(
 }
 
 fn unregister_chart_styles_staged(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     stylesheet_id: u64,
     owner_archive_name: &str,
     style_ids: &[u64],
@@ -359,7 +359,7 @@ fn unregister_chart_styles_staged(
 }
 
 fn validate_style_ids(
-    package: &IWorkPackage,
+    package: &HostPackage,
     owner_archive_name: &str,
     style_ids: &[u64],
 ) -> Result<()> {

@@ -8,13 +8,13 @@ use crate::package_metadata::{
 };
 use crate::protobuf::tsp;
 use crate::wire::append_repeated_length_delimited_field;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 use prost::Message;
 
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
 const STYLESHEET_STYLES_FIELD: u32 = 1;
 
-pub(super) fn object_archive_name(package: &IWorkPackage, identifier: u64) -> Result<String> {
+pub(super) fn object_archive_name(package: &HostPackage, identifier: u64) -> Result<String> {
     object_archive(package, identifier).map(|(name, _)| name)
 }
 
@@ -24,7 +24,7 @@ pub(super) fn object_archive_name(package: &IWorkPackage, identifier: u64) -> Re
 /// returned. This keeps malformed later archives observable and preserves the
 /// duplicate-identifier check while allowing callers that need the object to
 /// avoid parsing the matching archive a second time.
-pub(super) fn object_archive(package: &IWorkPackage, identifier: u64) -> Result<(String, Archive)> {
+pub(super) fn object_archive(package: &HostPackage, identifier: u64) -> Result<(String, Archive)> {
     let mut found = None;
     for name in package.iwa_entry_names() {
         let archive = package.archive(name)?;
@@ -42,7 +42,7 @@ pub(super) fn object_archive(package: &IWorkPackage, identifier: u64) -> Result<
 }
 
 pub(crate) fn unregister_owner_reference_if_unused(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     owner_archive_name: &str,
     style_archive_name: &str,
     style_id: u64,
@@ -73,7 +73,7 @@ pub(crate) fn unregister_owner_reference_if_unused(
 }
 
 pub(crate) fn register_private_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     owner_archive_name: &str,
     style_archive_name: &str,
     style_id: u64,
@@ -91,7 +91,7 @@ pub(crate) fn register_private_style(
 }
 
 pub(crate) fn register_style_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     owner_archive_name: &str,
     style_archive_name: &str,
     style_id: u64,
@@ -108,7 +108,7 @@ pub(crate) fn register_style_reference(
 }
 
 pub(crate) fn insert_private_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     stylesheet_id: u64,
     style_id: u64,
@@ -165,7 +165,7 @@ pub(crate) fn insert_private_style(
 }
 
 pub(crate) fn unregister_private_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     owner_archive_name: &str,
     style_archive_name: &str,
     style_id: u64,
@@ -189,8 +189,8 @@ pub(crate) fn unregister_private_style(
 mod tests {
     use super::*;
 
-    fn package_with_object(name: &str, identifier: u64) -> IWorkPackage {
-        let mut package = IWorkPackage::new();
+    fn package_with_object(name: &str, identifier: u64) -> HostPackage {
+        let mut package = HostPackage::new();
         let archive = Archive {
             objects: vec![
                 ArchiveObject::new(
@@ -220,7 +220,7 @@ mod tests {
 
     #[test]
     fn object_archive_rejects_missing_and_duplicate_identifiers() {
-        assert!(object_archive(&IWorkPackage::new(), 7).is_err());
+        assert!(object_archive(&HostPackage::new(), 7).is_err());
 
         let mut package = package_with_object("Index/One.iwa", 7);
         let second = package_with_object("Index/Two.iwa", 7)

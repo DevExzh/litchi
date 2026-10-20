@@ -46,7 +46,7 @@ struct TableObjectIds {
 impl TableObjectIds {
     const COUNT: usize = 12;
 
-    fn allocate(package: &IWorkPackage) -> Result<Self> {
+    fn allocate(package: &HostPackage) -> Result<Self> {
         let mut next = next_object_identifier(package)?;
         Ok(Self {
             info: take_identifier(&mut next)?,
@@ -127,7 +127,7 @@ impl TableStyleTemplate {
 /// component, and attaches an empty CalculationEngine formula owner when the
 /// workbook has a calculation component.
 pub(super) fn bootstrap_empty_table_graph(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     sheet_id: u64,
     name: &str,
     rows: usize,
@@ -179,7 +179,7 @@ pub(super) fn bootstrap_empty_table_graph(
     })
 }
 
-fn theme_table_style(package: &IWorkPackage) -> Result<TableStyleTemplate> {
+fn theme_table_style(package: &HostPackage) -> Result<TableStyleTemplate> {
     let document = numbers_document(package)?;
     let theme_id = document.theme.identifier;
     let locations = object_locations(package)?;
@@ -281,7 +281,7 @@ fn theme_table_style(package: &IWorkPackage) -> Result<TableStyleTemplate> {
     Ok(style)
 }
 
-fn package_table_uuids(package: &IWorkPackage) -> Result<HashSet<String>> {
+fn package_table_uuids(package: &HostPackage) -> Result<HashSet<String>> {
     let mut uuids = HashSet::new();
     for entry in package.iwa_entry_names() {
         for object in package.archive(entry)?.objects {
@@ -305,7 +305,7 @@ fn package_table_uuids(package: &IWorkPackage) -> Result<HashSet<String>> {
 }
 
 fn decode_object_message<M: Message + Default>(
-    package: &IWorkPackage,
+    package: &HostPackage,
     identifier: u64,
     message_type: u32,
     label: &str,
@@ -508,7 +508,7 @@ fn table_objects(
 }
 
 fn register_style_references(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     source_archive: &str,
     locations: &HashMap<u64, String>,
     style: TableStyleTemplate,

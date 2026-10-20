@@ -7,7 +7,7 @@ use crate::charts::axis_label_affixes::{
 };
 use crate::charts::{Axis, LabelAffixes};
 
-impl Editor {
+impl Draft {
     /// Read the prefix and suffix applied to one slide-chart axis' labels.
     pub fn slide_chart_axis_label_affixes(
         &self,
@@ -31,7 +31,7 @@ impl Editor {
 }
 
 fn slide_chart_axis_label_affixes(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
@@ -47,7 +47,7 @@ fn slide_chart_axis_label_affixes(
 }
 
 fn set_slide_chart_axis_label_affixes(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
@@ -63,7 +63,7 @@ fn set_slide_chart_axis_label_affixes(
         axis,
         &affixes,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_axis_label_affixes(slide_index, drawable_object_id, axis)? != affixes {
         return Err(Error::InvalidFormat(
             "Keynote chart axis label-affix update failed validation".to_owned(),
@@ -111,7 +111,7 @@ mod tests {
                 expected.clone(),
             )
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_chart_axis_label_affixes(0, chart.drawable_object_id, Axis::Value,)

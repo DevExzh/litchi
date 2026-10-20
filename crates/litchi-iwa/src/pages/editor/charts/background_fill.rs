@@ -8,7 +8,7 @@ use crate::charts::background_fill::{
 };
 use crate::shapes::{RgbaColor, ShapeFill, ShapeImageFill, ShapeImageFillTechnique};
 
-impl Editor {
+impl Draft {
     /// Read the effective color, gradient, or image background of one body chart.
     pub fn body_chart_background_fill(&self, drawable_object_id: u64) -> Result<ShapeFill> {
         body_chart_background_fill(self, drawable_object_id)
@@ -43,7 +43,7 @@ impl Editor {
     }
 }
 
-fn body_chart_background_fill(editor: &Editor, drawable_object_id: u64) -> Result<ShapeFill> {
+fn body_chart_background_fill(editor: &Draft, drawable_object_id: u64) -> Result<ShapeFill> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_background_fill(
         editor.package(),
@@ -54,7 +54,7 @@ fn body_chart_background_fill(editor: &Editor, drawable_object_id: u64) -> Resul
 }
 
 fn set_body_chart_background_fill(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     fill: &ShapeFill,
 ) -> Result<()> {
@@ -70,7 +70,7 @@ fn set_body_chart_background_fill(
         "Pages",
         fill,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if &verified.body_chart_background_fill(drawable_object_id)? != fill {
         return Err(Error::InvalidFormat(
             "Pages chart background fill update failed validation".to_owned(),
@@ -81,7 +81,7 @@ fn set_body_chart_background_fill(
 }
 
 fn set_body_chart_background_image_fill(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     preferred_filename: &str,
     data: &[u8],
@@ -106,7 +106,7 @@ fn set_body_chart_background_image_fill(
         fill_size,
         tint,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_background_fill(drawable_object_id)? != ShapeFill::Image(image.clone()) {
         return Err(Error::InvalidFormat(
             "Pages chart background image-fill update failed validation".to_owned(),

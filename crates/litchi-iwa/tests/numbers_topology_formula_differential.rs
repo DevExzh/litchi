@@ -7,8 +7,6 @@
 //! by identifier, in every component but the package metadata). A case the
 //! host editor refuses must be refused by the leaf too, with a typed reason.
 
-#![allow(deprecated)]
-
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -171,7 +169,7 @@ fn ops(body_rows: usize, body_columns: usize) -> Vec<Op> {
 }
 
 fn host(source: &[u8], table: &str, op: Op) -> Result<Vec<u8>, String> {
-    let mut editor = numbers::Editor::from_bytes(source).map_err(|error| error.to_string())?;
+    let mut editor = numbers::Draft::from_bytes(source).map_err(|error| error.to_string())?;
     let edit = match op {
         Op::InsertRow(insertion) => UnverifiedTopologyEdit::InsertRow(insertion),
         Op::InsertColumn(insertion) => UnverifiedTopologyEdit::InsertColumn(insertion),
@@ -909,7 +907,7 @@ fn leaf_topology_matches_the_host_editor_on_tables_with_formulas() -> TestResult
         let source = source.as_slice();
         let package = Package::from_bytes(source)?;
         let name = name.as_str();
-        if numbers::Editor::from_bytes(source).is_err() {
+        if numbers::Draft::from_bytes(source).is_err() {
             *summary
                 .entry(format!("skipped file: host cannot open {name}"))
                 .or_default() += 1;

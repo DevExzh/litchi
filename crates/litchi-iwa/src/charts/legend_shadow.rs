@@ -11,7 +11,7 @@ use crate::charts::style::{copy_wire_bytes, encode_wire_message};
 use crate::protobuf::tsd;
 use crate::shapes::{Drop, Shadow, shadow_from_native, shadow_to_native};
 use crate::wire::{WireField, parse_wire_fields, patch_length_delimited_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// `tschlegendmodeldefaultshadow` in `TSCH.Generated.LegendStyleArchive`.
 const LEGEND_SHADOW_FIELD: u32 = 4;
@@ -152,7 +152,7 @@ pub enum ChartLegendShadow {
 
 /// Read the exact direct legend-shadow state of one native chart.
 pub(crate) fn chart_legend_shadow(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -168,7 +168,7 @@ pub(crate) fn chart_legend_shadow(
 
 /// Set or remove the direct legend-shadow override of one native chart.
 pub(crate) fn set_chart_legend_shadow(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

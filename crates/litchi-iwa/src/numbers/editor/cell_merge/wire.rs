@@ -86,7 +86,7 @@ pub(super) fn mutate_formulas(
 }
 
 pub(super) fn patch_table_model(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     patch: impl FnOnce(&[u8]) -> Result<Vec<u8>>,
 ) -> Result<()> {
@@ -132,7 +132,7 @@ pub(super) fn patch_table_model(
 /// code continue to use its owned generated model while the merge writer
 /// preserves unrelated fields and unknown bytes in place.
 pub(super) fn patch_table_model_wire(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     patch: impl FnOnce(&[u8]) -> Result<Vec<u8>>,
 ) -> Result<()> {

@@ -9,7 +9,7 @@ use crate::package_metadata::{
     next_object_identifier, set_package_last_object_identifier,
 };
 use crate::protobuf::tswp;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::super::line_end::{
     ShapeStyleOverrides, ShapeStyleVariationLocation, collapse_style_variation,
@@ -23,7 +23,7 @@ use super::native::{empty_stroke_archive, stroke_from_native, stroke_to_native};
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
 
 pub(crate) fn shape_stroke(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     drawable_id: u64,
 ) -> Result<Option<Stroke>> {
@@ -38,7 +38,7 @@ pub(crate) fn shape_stroke(
 }
 
 pub(crate) fn set_shape_stroke(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_id: u64,
     stroke: Stroke,
@@ -95,7 +95,7 @@ pub(crate) fn set_shape_stroke(
 
 /// Remove a direct stroke override and restore the inherited appearance.
 pub(crate) fn reset_shape_stroke(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_id: u64,
 ) -> Result<bool> {
@@ -172,7 +172,7 @@ pub(crate) fn reset_shape_stroke(
 }
 
 fn insert_stroke_variation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     drawable_archive_name: &str,
     drawable_id: u64,
     style_archive_name: &str,
@@ -221,7 +221,7 @@ fn insert_stroke_variation(
 }
 
 fn validate_stroke(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     drawable_id: u64,
     expected: Option<Stroke>,
@@ -235,7 +235,7 @@ fn validate_stroke(
 }
 
 fn stylesheet_id(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style_archive_name: &str,
     style_id: u64,
     style: &tswp::ShapeStyleArchive,
@@ -271,7 +271,7 @@ fn parent_style_id(style_id: u64, style: &tswp::ShapeStyleArchive) -> Result<u64
         })
 }
 
-fn inherited_shape_stroke(package: &IWorkPackage, first_style_id: u64) -> Result<Option<Stroke>> {
+fn inherited_shape_stroke(package: &HostPackage, first_style_id: u64) -> Result<Option<Stroke>> {
     let mut visited = HashSet::new();
     let mut style_id = Some(first_style_id);
     for _ in 0..MAX_STYLE_INHERITANCE_DEPTH {

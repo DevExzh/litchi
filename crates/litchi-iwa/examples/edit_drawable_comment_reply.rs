@@ -1,8 +1,5 @@
-#![allow(deprecated)]
-
 use std::env;
 
-use litchi_iwa::IWorkDrawableCommentEditor;
 use litchi_iwa_common::comment::{DrawableId, StorageId};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let operation = arguments.next().ok_or("missing add, set, or remove")?;
 
-    let mut editor = IWorkDrawableCommentEditor::open(&input)?;
+    let mut editor = litchi_iwa::comments::Draft::open(&input)?;
     match operation.as_str() {
         "add" => {
             let text = arguments.next().ok_or("missing reply text")?;

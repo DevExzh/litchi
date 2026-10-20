@@ -32,7 +32,7 @@ use crate::charts::{
     ChartLegendStroke,
 };
 
-impl Editor {
+impl Draft {
     /// Read whether Pages shows the native legend for one body chart.
     pub fn body_chart_legend_visible(&self, drawable_object_id: u64) -> Result<bool> {
         body_chart_legend_visible(self, drawable_object_id)
@@ -76,7 +76,7 @@ impl Editor {
             "Pages",
             frame,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_legend_frame(drawable_object_id)? != frame {
             return Err(Error::InvalidFormat(
                 "Pages chart legend-frame update failed validation".to_owned(),
@@ -115,7 +115,7 @@ impl Editor {
             "Pages",
             fill,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_legend_fill(drawable_object_id)? != *fill {
             return Err(Error::InvalidFormat(
                 "Pages chart legend-fill update failed validation".to_owned(),
@@ -154,7 +154,7 @@ impl Editor {
             "Pages",
             font,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_legend_font(drawable_object_id)? != *font {
             return Err(Error::InvalidFormat(
                 "Pages chart legend font update failed validation".to_owned(),
@@ -196,7 +196,7 @@ impl Editor {
             "Pages",
             size,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_legend_font_size(drawable_object_id)? != size {
             return Err(Error::InvalidFormat(
                 "Pages chart legend font-size update failed validation".to_owned(),
@@ -235,7 +235,7 @@ impl Editor {
             "Pages",
             stroke,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_legend_stroke(drawable_object_id)? != stroke {
             return Err(Error::InvalidFormat(
                 "Pages chart legend-stroke update failed validation".to_owned(),
@@ -274,7 +274,7 @@ impl Editor {
             "Pages",
             shadow,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_legend_shadow(drawable_object_id)? != shadow {
             return Err(Error::InvalidFormat(
                 "Pages chart legend-shadow update failed validation".to_owned(),
@@ -285,7 +285,7 @@ impl Editor {
     }
 }
 
-fn body_chart_legend_visible(editor: &Editor, drawable_object_id: u64) -> Result<bool> {
+fn body_chart_legend_visible(editor: &Draft, drawable_object_id: u64) -> Result<bool> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_legend_visible(
         editor.package(),
@@ -296,7 +296,7 @@ fn body_chart_legend_visible(editor: &Editor, drawable_object_id: u64) -> Result
 }
 
 fn set_body_chart_legend_visible(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     visible: bool,
 ) -> Result<()> {
@@ -312,7 +312,7 @@ fn set_body_chart_legend_visible(
         "Pages",
         visible,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_legend_visible(drawable_object_id)? != visible {
         return Err(Error::InvalidFormat(
             "Pages chart legend update failed validation".to_owned(),

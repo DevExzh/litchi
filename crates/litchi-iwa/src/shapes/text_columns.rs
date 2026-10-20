@@ -10,7 +10,7 @@ use crate::package_metadata::{
 };
 use crate::protobuf::tswp;
 use crate::text::columns::{from_native, to_native};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 use litchi_iwa_text::columns::Columns;
 
 use super::line_end::{
@@ -23,7 +23,7 @@ use super::line_end::{
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
 
 pub(crate) fn shape_text_columns(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     drawable_id: u64,
 ) -> Result<Columns> {
@@ -37,11 +37,11 @@ pub(crate) fn shape_text_columns(
 }
 
 pub(crate) fn set_shape_text_columns(
-    mut package: IWorkPackage,
+    mut package: HostPackage,
     archive_name: &str,
     drawable_id: u64,
     columns: &Columns,
-) -> Result<IWorkPackage> {
+) -> Result<HostPackage> {
     if &shape_text_columns(&package, archive_name, drawable_id)? == columns {
         return Ok(package);
     }
@@ -84,10 +84,10 @@ pub(crate) fn set_shape_text_columns(
 }
 
 pub(crate) fn reset_shape_text_columns(
-    mut package: IWorkPackage,
+    mut package: HostPackage,
     archive_name: &str,
     drawable_id: u64,
-) -> Result<(IWorkPackage, bool)> {
+) -> Result<(HostPackage, bool)> {
     let old_style_id = shape_payload(&package, archive_name, drawable_id)?
         .super_
         .style
@@ -177,11 +177,11 @@ struct ColumnsVariationLocation<'a> {
 }
 
 fn insert_columns_variation(
-    mut package: IWorkPackage,
+    mut package: HostPackage,
     location: ColumnsVariationLocation<'_>,
     overrides: ShapeStyleOverrides,
     expected: &Columns,
-) -> Result<IWorkPackage> {
+) -> Result<HostPackage> {
     let new_style_id = next_object_identifier(&package)?;
     let new_style = shape_style_variation_object(
         new_style_id,
@@ -230,7 +230,7 @@ fn insert_columns_variation(
     Ok(package)
 }
 
-fn inherited_columns(package: &IWorkPackage, first_style_id: u64) -> Result<Columns> {
+fn inherited_columns(package: &HostPackage, first_style_id: u64) -> Result<Columns> {
     let mut visited = HashSet::new();
     let mut style_id = Some(first_style_id);
     for _ in 0..MAX_STYLE_INHERITANCE_DEPTH {
@@ -275,7 +275,7 @@ fn direct_columns(properties: &tswp::ShapeStylePropertiesArchive) -> Result<Opti
 }
 
 fn stylesheet_id(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     style_id: u64,
     style: &tswp::ShapeStyleArchive,
@@ -312,7 +312,7 @@ fn parent_style_id(style_id: u64, style: &tswp::ShapeStyleArchive) -> Result<u64
 }
 
 fn validate_columns(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     drawable_id: u64,
     expected: &Columns,
@@ -360,7 +360,7 @@ mod tests {
         );
         let three = Columns::equal(Count::new(3).unwrap(), None);
 
-        let mut pages = pages::Editor::create_with_text("Body").unwrap();
+        let mut pages = pages::Draft::create_with_text("Body").unwrap();
         let pages_box = pages
             .add_text_box(4, "Pages columns", POSITION, SIZE)
             .unwrap();
@@ -370,7 +370,7 @@ mod tests {
         pages
             .set_text_box_columns(pages_box.drawable_object_id, &three)
             .unwrap();
-        let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages
                 .text_box_columns(pages_box.drawable_object_id)
@@ -394,7 +394,7 @@ mod tests {
                 .unwrap()
         );
 
-        let mut numbers = numbers::Editor::create().unwrap();
+        let mut numbers = numbers::Draft::create().unwrap();
         let sheet_id = numbers.sheets().unwrap()[0].object_id;
         let numbers_box = numbers
             .add_sheet_text_box(sheet_id, "Numbers columns", POSITION, SIZE)
@@ -402,7 +402,7 @@ mod tests {
         numbers
             .set_sheet_text_box_columns(sheet_id, numbers_box.drawable_object_id, &two)
             .unwrap();
-        let mut numbers = numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        let mut numbers = numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
         assert_eq!(
             numbers
                 .sheet_text_box_columns(sheet_id, numbers_box.drawable_object_id)
@@ -415,14 +415,14 @@ mod tests {
                 .unwrap()
         );
 
-        let mut keynote = keynote::Editor::create().unwrap();
+        let mut keynote = keynote::Draft::create().unwrap();
         let keynote_box = keynote
             .add_slide_text_box(0, "Keynote columns", POSITION, SIZE)
             .unwrap();
         keynote
             .set_slide_text_box_columns(0, keynote_box.drawable_object_id, &three)
             .unwrap();
-        let mut keynote = keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let mut keynote = keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
             keynote
                 .slide_text_box_columns(0, keynote_box.drawable_object_id)

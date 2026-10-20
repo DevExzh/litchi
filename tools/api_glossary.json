@@ -11636,9 +11636,36 @@
           "name": "PagesTableCellVerticalAlignment",
           "scope": "litchi_iwa",
           "replacement": "use litchi_iwa::pages::TableCellVerticalAlignment; no redundant format prefix inside a per-format module (ADR 0034, record 0352)"
+        },
+        {
+          "name": "IWork",
+          "scope": "litchi_iwa",
+          "replacement": "the host's types live in focused modules with unprefixed names: litchi_iwa::Package (was IWorkPackage), comments::Draft (IWorkDrawableCommentEditor), media::Draft (IWorkMediaEditor), text::Draft (IWorkTextEditor) (record 0361)",
+          "match": "prefix"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_iwa",
+          "replacement": "the host's mutable working copies are drafts: pages::Draft, keynote::Draft, numbers::Draft, text::Draft, comments::Draft, media::Draft (record 0351 §2.1 rule 7, record 0361)",
+          "match": "suffix"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_iwa",
+          "replacement": "limits come from an OpenOptions (owners) or a required limits argument (record APIs); record 0351 §2.5 rule 3, record 0361",
+          "match": "suffix"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_iwa",
+          "replacement": "the host's per-format working copies are drafts: pages::Draft, keynote::Draft, numbers::Draft (record 0351 §2.1 rule 7, record 0361)"
         }
       ],
-      "families": []
+      "families": [],
+      "immutable_owners": [
+        "litchi_iwa::Package",
+        "litchi_iwa::Document"
+      ]
     },
     {
       "id": "numbers-minimal",

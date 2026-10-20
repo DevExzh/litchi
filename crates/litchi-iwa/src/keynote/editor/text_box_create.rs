@@ -77,7 +77,7 @@ impl TextBoxObjectIds {
     }
 }
 
-impl Editor {
+impl Draft {
     /// Add an independently editable text box to a slide.
     ///
     /// The shape, writable storage, title/caption stand-ins, drawable
@@ -509,7 +509,7 @@ mod tests {
             .unwrap();
         assert_ne!(duplicate.storage.id, created.storage.id);
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let text_boxes = reopened
             .slide_text_storages(0)
             .unwrap()
@@ -596,7 +596,7 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        let mut editor = Editor::from_package(package).unwrap();
+        let mut editor = Draft::from_package(package).unwrap();
 
         let created = editor
             .add_slide_text_box(0, "On a truly blank slide", FIRST_POSITION, FIRST_SIZE)

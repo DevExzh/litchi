@@ -14,7 +14,7 @@ use crate::charts::non_style::{
 };
 use crate::protobuf::tsch;
 use crate::wire::{patch_fixed32_field, patch_length_delimited_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// `tschchartinfodefaultradarstartangle` in the generated non-style archive.
 const CHART_RADAR_START_ANGLE_FIELD: u32 = 29;
@@ -80,7 +80,7 @@ impl TryFrom<f32> for ChartRadarStartAngle {
 
 /// Read the effective start angle of one native radar chart.
 pub(crate) fn chart_radar_start_angle(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -98,7 +98,7 @@ pub(crate) fn chart_radar_start_angle(
 
 /// Set the start angle of one native radar chart.
 pub(crate) fn set_chart_radar_start_angle(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

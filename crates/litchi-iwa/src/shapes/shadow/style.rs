@@ -9,7 +9,7 @@ use crate::package_metadata::{
     next_object_identifier, set_package_last_object_identifier,
 };
 use crate::protobuf::tswp;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::super::line_end::{
     ShapeStyleOverrides, ShapeStyleVariationLocation, collapse_style_variation,
@@ -23,7 +23,7 @@ use super::native::{shadow_from_native, shadow_to_native};
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
 
 pub(crate) fn shape_shadow(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     drawable_id: u64,
 ) -> Result<Shadow> {
@@ -37,11 +37,11 @@ pub(crate) fn shape_shadow(
 }
 
 pub(crate) fn set_shape_shadow(
-    mut package: IWorkPackage,
+    mut package: HostPackage,
     archive_name: &str,
     drawable_id: u64,
     shadow: Shadow,
-) -> Result<IWorkPackage> {
+) -> Result<HostPackage> {
     if shape_shadow(&package, archive_name, drawable_id)? == shadow {
         return Ok(package);
     }
@@ -89,10 +89,10 @@ pub(crate) fn set_shape_shadow(
 
 /// Remove the direct shadow override and restore inherited shadow state.
 pub(crate) fn reset_shape_shadow(
-    mut package: IWorkPackage,
+    mut package: HostPackage,
     archive_name: &str,
     drawable_id: u64,
-) -> Result<(IWorkPackage, bool)> {
+) -> Result<(HostPackage, bool)> {
     let old_style_id = shape_payload(&package, archive_name, drawable_id)?
         .super_
         .style
@@ -176,11 +176,11 @@ struct ShadowVariationLocation<'a> {
 }
 
 fn insert_shadow_variation(
-    mut package: IWorkPackage,
+    mut package: HostPackage,
     location: ShadowVariationLocation<'_>,
     overrides: ShapeStyleOverrides,
     expected: Shadow,
-) -> Result<IWorkPackage> {
+) -> Result<HostPackage> {
     let ShadowVariationLocation {
         drawable_archive_name,
         drawable_id,
@@ -226,7 +226,7 @@ fn insert_shadow_variation(
 }
 
 fn validate_shadow(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     drawable_id: u64,
     expected: Shadow,
@@ -240,7 +240,7 @@ fn validate_shadow(
 }
 
 fn stylesheet_id(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style_archive_name: &str,
     style_id: u64,
     style: &tswp::ShapeStyleArchive,
@@ -276,7 +276,7 @@ fn parent_style_id(style_id: u64, style: &tswp::ShapeStyleArchive) -> Result<u64
         })
 }
 
-fn inherited_shape_shadow(package: &IWorkPackage, first_style_id: u64) -> Result<Shadow> {
+fn inherited_shape_shadow(package: &HostPackage, first_style_id: u64) -> Result<Shadow> {
     let mut visited = HashSet::new();
     let mut style_id = Some(first_style_id);
     for _ in 0..MAX_STYLE_INHERITANCE_DEPTH {

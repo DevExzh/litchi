@@ -518,7 +518,7 @@ impl DependencyMutation {
 }
 
 pub(super) fn shift_formula_dependencies(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_info_id: u64,
     axis: DependencyAxis,
     insertion: u32,
@@ -537,7 +537,7 @@ pub(super) fn shift_formula_dependencies(
 }
 
 pub(super) fn delete_formula_dependencies(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_info_id: u64,
     axis: DependencyAxis,
     deletion: u32,
@@ -556,7 +556,7 @@ pub(super) fn delete_formula_dependencies(
 }
 
 fn mutate_formula_dependencies(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_info_id: u64,
     axis: DependencyAxis,
     position: u32,

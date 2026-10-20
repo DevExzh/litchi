@@ -16,8 +16,8 @@ use crate::text::storage_id::TextStorageId;
 use litchi_iwa_text::hyperlink::raw::object_id as native_object_id;
 use prost::Message;
 
-fn fixture() -> (super::super::IWorkTextEditor, TextStorageId) {
-    let mut pages = pages::Editor::create_with_text("Body").unwrap();
+fn fixture() -> (crate::text::Draft, TextStorageId) {
+    let mut pages = pages::Draft::create_with_text("Body").unwrap();
     let text_box = pages
         .add_text_box(
             4,
@@ -30,7 +30,7 @@ fn fixture() -> (super::super::IWorkTextEditor, TextStorageId) {
         )
         .unwrap();
     (
-        super::super::IWorkTextEditor::from_package(pages.into_package()),
+        crate::text::Draft::from_package(pages.into_package()),
         text_box.storage.id,
     )
 }
@@ -44,7 +44,7 @@ fn target(value: &str) -> TextHyperlinkTarget {
 }
 
 fn storage_message_index(
-    package: &crate::IWorkPackage,
+    package: &crate::HostPackage,
     storage_id: u64,
     kind: RangedObjectTable,
 ) -> usize {
@@ -103,7 +103,7 @@ fn unknown_table_entry_and_hyperlink_fields_survive_updates() {
         })
         .unwrap();
 
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     editor
         .update_text_hyperlink(
             storage_id,
@@ -171,7 +171,7 @@ fn duplicate_smart_field_tables_fail_without_mutation() {
             Ok(())
         })
         .unwrap();
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     let before = editor.to_bytes().unwrap();
     assert!(editor.text_hyperlinks(storage_id).is_err());
     assert!(
@@ -206,7 +206,7 @@ fn hyperlink_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
         })
         .unwrap();
 
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     let hyperlink = editor
         .add_text_hyperlink(storage_id, range(0, 5), target("https://example.com"))
         .unwrap();
@@ -265,7 +265,7 @@ fn hyperlink_with_an_additional_owner_cannot_be_updated_or_deleted() {
             Ok(())
         })
         .unwrap();
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     let before = editor.to_bytes().unwrap();
     assert!(
         editor

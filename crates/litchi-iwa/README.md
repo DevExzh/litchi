@@ -20,7 +20,7 @@ In particular, ordinary Keynote slide title, body, and speaker-notes reads or
 edits must use `litchi-keynote::Package` and `SlideSelector`. Presentation-wide
 dimensions and show playback flags use `litchi_keynote::show`; playback mode
 and volume for an existing soundtrack use `litchi_keynote::soundtrack`, not
-`litchi_iwa::Document` or `keynote::Editor`. The concrete package keeps native
+`litchi_iwa::Document` or `keynote::Draft`. The concrete package keeps native
 identifiers and raw records private, validates semantic ownership, and creates
 exact-source checked commits.
 
@@ -390,7 +390,7 @@ for media that has no original dimensions; see
 ```rust
 use litchi_iwa::pages::{self, PagesImageOptions};
 
-let mut pages = pages::Editor::builder()
+let mut pages = pages::Draft::builder()
     .body_text("Created entirely by litchi-iwa")
     .language("en")
     .locale("en_US")
@@ -421,7 +421,7 @@ use litchi_iwa::numbers::CellValue;
 use litchi_iwa::pages;
 use litchi_pages::{BodyTableSelector, Package as PagesPackage};
 
-let mut pages = pages::Editor::create_with_text("Quarterly revenue\n")?;
+let mut pages = pages::Draft::create_with_text("Quarterly revenue\n")?;
 let first_anchor = pages.body_text()?.encode_utf16().count();
 let table = pages.add_table(first_anchor, "Revenue", 4, 3)?;
 pages.set_table_cell(
@@ -438,7 +438,7 @@ let renamed = focused
     .commit()?;
 let mut renamed_bytes = Vec::new();
 renamed.package().write_to(&mut renamed_bytes)?;
-pages = pages::Editor::from_bytes(&renamed_bytes)?;
+pages = pages::Draft::from_bytes(&renamed_bytes)?;
 pages.resize_table(table.model_object_id, 5, 4)?;
 let second_anchor = pages.body_text()?.encode_utf16().count();
 let notes = pages.add_table(second_anchor, "Notes", 2, 2)?;
@@ -452,12 +452,12 @@ pages.save("created-with-table.pages")?;
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-`pages::Editor::add_table` bootstraps the first native table in a scratch-created
+`pages::Draft::add_table` bootstraps the first native table in a scratch-created
 document and reuses an existing native style template for later tables. Every
 table receives independent cell stores, row and column identities, and formula
 ownership. The same table operations work on app-created files; see
 `add_pages_table` and `edit_pages_table`.
-`pages::Editor::remove_table` transactionally removes the body anchor and the
+`pages::Draft::remove_table` transactionally removes the body anchor and the
 table's private storage and formula graph while preserving shared objects and
 other tables. See `remove_pages_table` for a complete file-to-file example and
 `inspect_pages_tables` for model identifiers and dimensions.
@@ -469,7 +469,7 @@ no existing drawable or template package is required:
 use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
-let mut pages = pages::Editor::create_with_text("Quarterly report")?;
+let mut pages = pages::Draft::create_with_text("Quarterly report")?;
 pages.add_text_box(
     "Quarterly report".encode_utf16().count(),
     "Prepared from typed IWA objects",
@@ -491,7 +491,7 @@ use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Preset};
 
 let body = "Quarterly report";
-let mut pages = pages::Editor::create_with_text(body)?;
+let mut pages = pages::Draft::create_with_text(body)?;
 let shape = pages.add_body_shape(
     body.encode_utf16().count(),
     "A fully editable shape",
@@ -518,7 +518,7 @@ style inheritance, and UUID graph are all source-built:
 use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, Endpoint, Endpoints};
 
-let mut pages = pages::Editor::create_with_text("Built without a template")?;
+let mut pages = pages::Draft::create_with_text("Built without a template")?;
 let line = pages.add_body_line_with_endpoints(
     pages.body_text()?.encode_utf16().count(),
     DrawablePoint { x: 180.0, y: 240.0 },
@@ -550,7 +550,7 @@ use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
 let body = "Quarterly report";
 let image = fs::read("chart.png")?;
-let mut pages = pages::Editor::create_with_text(body)?;
+let mut pages = pages::Draft::create_with_text(body)?;
 let source = pages.add_body_image(
     body.encode_utf16().count(),
     "chart.png",
@@ -588,7 +588,7 @@ use litchi_pages::movie::Options as PagesMovieOptions;
 let body = "Quarterly report";
 let movie = fs::read("demo.mov")?;
 let poster = fs::read("demo-poster.png")?;
-let mut pages = pages::Editor::create_with_text(body)?;
+let mut pages = pages::Draft::create_with_text(body)?;
 let source = pages.add_body_movie(
     body.encode_utf16().count(),
     "demo.mov",
@@ -630,7 +630,7 @@ use litchi_pages::audio::Options as PagesAudioOptions;
 
 let body = "Interview notes";
 let audio = fs::read("interview.aiff")?;
-let mut pages = pages::Editor::create_with_text(body)?;
+let mut pages = pages::Draft::create_with_text(body)?;
 let source = pages.add_body_audio(
     body.encode_utf16().count(),
     "interview.aiff",
@@ -841,7 +841,7 @@ keeping the duplicate's audio bytes shared with the source.
 The source-building and graph-editor APIs below remain in the migration host.
 For ordinary text in an existing presentation—its slide title, body, or
 speaker notes—use the `litchi-keynote::Package` workflow shown above instead
-of a `keynote::Editor` raw-ID operation.
+of a `keynote::Draft` raw-ID operation.
 
 Builder-only work stays in the host, then hands the completed artifact to the
 focused package API for a transition edit. The handoff has no native IDs:
@@ -1218,7 +1218,7 @@ body, or speaker-notes editing: those semantic operations are owned by
 
 #### Keynote slide-table discovery boundary
 
-Legacy `keynote::Editor::slide_tables` now uses a private bounded catalog for
+Legacy `keynote::Draft::slide_tables` now uses a private bounded catalog for
 its package-wide discovery pass, and `add_slide_table` reuses the same bounded
 template-discovery route. The catalog keeps only compact object/member slots
 and message type/length facts; decompressed archives and payloads are borrowed
@@ -1238,7 +1238,7 @@ or native compatibility paths. The private catalog does not claim a fully
 generated-free Keynote implementation, a zero-copy package, or retirement of
 the migration host, its dependency edges, or migration debts.
 
-An external public `keynote::Editor` read-only driver checked the Wave99 source
+An external public `keynote::Draft` read-only driver checked the Wave99 source
 `/private/tmp/wave99-native-table-source.key` (499,854 bytes, SHA-256
 `e5ddda5583d4312f67501312f2681859e0969bc8c49cdcd8160f9b93fe4c21ef`) and the
 Wave100 source (500,128 bytes, SHA-256
@@ -1274,7 +1274,7 @@ audit; protos/IWA checks, strict scoped Clippy (with existing Pages warnings
 allowed for IWA), isolated appearance fuzz checking, Rust 2024 formatting,
 and diff checks passed.
 
-An external read-only `keynote::Editor` driver replayed the Wave99 and Wave100
+An external read-only `keynote::Draft` driver replayed the Wave99 and Wave100
 sources and found one 5-by-4 `Table 1` in each. Both reported row banding
 disabled, fixed row sizing, and all five gridline classes visible; fresh
 replay was exact across all 86/86 ZIP members, with no changed, added, or
@@ -1338,7 +1338,7 @@ The canonical source, candidate, and inverse remained untouched. No native
 mutation, save, reopen acceptance, or byte-exact native UI-save claim follows.
 
 Focused Numbers scalar-cell operations are selector-first `litchi-numbers`
-package transactions, not `numbers::Editor` raw-ID convenience calls. Generic
+package transactions, not `numbers::Draft` raw-ID convenience calls. Generic
 source-built or cross-format `DataFormat` compatibility remains a
 migration-host surface. Focused transactions stage a complete batch before
 publication, so any rejected coordinate, dependency, or cache update leaves
@@ -1346,9 +1346,9 @@ the package unchanged:
 
 Existing-cell Number, Percentage, Currency, Scientific, Fraction, Text, Date
 & Time, and Duration format transactions follow the same focused-package rule.
-The former `numbers::Editor` raw-ID convenience methods are retired for Number,
+The former `numbers::Draft` raw-ID convenience methods are retired for Number,
 Percentage, Currency, Scientific, Fraction, Date & Time, and Duration; their
-dedicated `numbers::Editor` Number/Percentage/Currency/Scientific/Fraction bridge and fallback
+dedicated `numbers::Draft` Number/Percentage/Currency/Scientific/Fraction bridge and fallback
 entry points are retired as well; private attached Pages/Keynote adapters remain. There is no
 dedicated host raw-ID Text
 route; the focused Text owner handles that existing-cell operation. Generic
@@ -1356,10 +1356,10 @@ source-built or cross-format `DataFormat` compatibility helpers, including
 `DataFormat::Duration`, source-built `DataFormat::Text` and
 `DataFormat::DateTime`, the broad `TextDateTimeField` smart-field lifecycle,
 and attached Pages/Keynote table callers remain
-migration-host-only compatibility surfaces. The dedicated `numbers::Editor`
+migration-host-only compatibility surfaces. The dedicated `numbers::Draft`
 semantic/table Date & Time and Duration get/set/reset methods are retired;
 private Date & Time and Duration bridge helpers remain only behind attached
-pages::Editor and keynote::Editor table compatibility wrappers.
+pages::Draft and keynote::Draft table compatibility wrappers.
 
 The focused `litchi-numbers` Text-format owner handles existing-cell Text
 through its selector-first package API. For source-built Numbers compatibility,
@@ -1404,7 +1404,7 @@ keys, archive members, and wire payloads remain private. Deterministic
 source-built exact-source fixtures and strict codec/package tests are joined by
 operation-specific Numbers 14.4 replacement/clear evidence; focused validation
 passes 37 integration tests and boundary verification passes 927 policy tests.
-The three dedicated raw-ID `numbers::Editor` Custom conveniences are retired.
+The three dedicated raw-ID `numbers::Draft` Custom conveniences are retired.
 Generic source-built/cross-format `DataFormat::Custom` compatibility and
 private attached Pages/Keynote table adapters remain host-owned, and a
 focused-owner refusal is terminal rather than a fallback trigger. The native
@@ -1443,9 +1443,9 @@ comments and ordered direct replies with optional checked timestamps and
 author display metadata. Native object identifiers stay inside the adapter.
 Focused reads support shared replies, cross-component storage, segmented lists,
 and native empty threads while retaining strict mutation ownership checks.
-The legacy `numbers::Editor::cell_comment` reader has been retired; root-comment
+The legacy `numbers::Draft::cell_comment` reader has been retired; root-comment
 reads use the selector-first package owner. Deprecated
-`numbers::Editor::cell_comment_replies` remains pending native direct-reply
+`numbers::Draft::cell_comment_replies` remains pending native direct-reply
 save/reopen evidence; focused compatibility reads preserve the historical
 source-built reply graphs without rewriting their source.
 
@@ -1499,7 +1499,7 @@ let package = package
     .into_package();
 let _cleared = package.clear_table_cell_comment_a1(sheet, table, cell)?;
 
-let mut numbers = numbers::Editor::open("input.numbers")?;
+let mut numbers = numbers::Draft::open("input.numbers")?;
 let table = numbers.tables()?.remove(0);
 numbers.set_formula(
     table.id(),
@@ -1595,7 +1595,7 @@ header_edit.set("Quarterly report")?;
 let header_commit = header_edit.commit()?;
 let mut updated_pages = Vec::new();
 header_commit.package().write_to(&mut updated_pages)?;
-let mut pages = pages::Editor::from_bytes(&updated_pages)?;
+let mut pages = pages::Draft::from_bytes(&updated_pages)?;
 let section_id = pages.sections()[0].object_id;
 // Section-name editing now lives in litchi-pages and uses SectionSelector;
 // see litchi-pages/examples/edit_section_name.rs.
@@ -1625,7 +1625,7 @@ if let Some(drawable) = pages.drawables()?.first() {
 }
 pages.save("updated.pages")?;
 
-let mut keynote = keynote::Editor::open("input.key")?;
+let mut keynote = keynote::Draft::open("input.key")?;
 if let Some(text_box) = keynote
     .slide_text_storages(0)?
     .into_iter()
@@ -1661,7 +1661,7 @@ if let Some(drawable) = keynote.slide_drawables(0)?.first() {
     )?;
     let mut focused_bytes = Vec::new();
     focused.write_to(&mut focused_bytes)?;
-    keynote = keynote::Editor::from_bytes(&focused_bytes)?;
+    keynote = keynote::Draft::from_bytes(&focused_bytes)?;
 
     let build = keynote.add_slide_build(
         0,
@@ -1804,7 +1804,7 @@ file-to-file publication workflow.
 ### Pages page layout uses the focused package transaction
 
 Page dimensions, margins, scale, orientation, and vertical body layout are no
-longer `pages::Editor` operations. `litchi_pages::Package` exposes only the
+longer `pages::Draft` operations. `litchi_pages::Package` exposes only the
 validated semantic `Layout`; it does not expose native IDs, components, or raw
 records. The package and every commit are immutable, so begin each later edit
 from `commit.package()`.
@@ -1851,7 +1851,7 @@ publication.
 
 Section names, header/footer inheritance, first-page and even/odd template
 flags, section-start behavior, and page numbering are no longer aggregate
-`pages::Editor` raw-ID operations. Select a section by exact semantic name or
+`pages::Draft` raw-ID operations. Select a section by exact semantic name or
 checked position and exchange the complete aggregate
 `litchi_pages::section::Settings` value. The direct transaction types live under
 `litchi_pages::section::settings`; their public paths contain only the resolved
@@ -1933,7 +1933,7 @@ temporary files without clobbering existing paths.
 
 ### Numbers table locks use the focused package API
 
-Table-lock reads and edits are no longer `numbers::Editor` raw-ID operations.
+Table-lock reads and edits are no longer `numbers::Draft` raw-ID operations.
 Use a sheet selector and a table selector scoped to that sheet. The package and
 every commit are immutable; start a later edit from `commit.package()`. A patch
 is authorized against the exact source package, and applying its inverse to the
@@ -1972,7 +1972,7 @@ assert_eq!(restored_bytes, original);
 ### Numbers table headers and footers use the focused package transaction
 
 Header rows and columns, footer rows, frozen headers, and print-time repeated
-headers are no longer `numbers::Editor` raw-ID operations. Use the immutable
+headers are no longer `numbers::Draft` raw-ID operations. Use the immutable
 `Package` with a sheet selector and a table selector scoped to that sheet. The
 transaction vocabulary is
 `litchi_numbers::table::headers::transaction::{Edit, Patch, Commit, Diagnostics, Error, InvalidReason, LimitKind, Path}`.
@@ -2045,7 +2045,7 @@ file and publishes without clobbering an existing target.
 ### Numbers table titles use a focused package transaction
 
 Numbers table-title visibility and outline settings are no longer
-`numbers::Editor` raw-ID operations. Use
+`numbers::Draft` raw-ID operations. Use
 `litchi_numbers::table::title::{Settings, Edit, Patch, Commit, Diagnostics,
 Error, LimitKind, Path}` with a sheet selector and a table selector scoped to
 that sheet. `Settings` preserves optional Boolean presence: `None` is absent
@@ -2113,7 +2113,7 @@ sibling-temporary, distinct-output, no-clobber publication through
 Pages body-table titles use the same focused transaction shape through
 `litchi_pages::Package::{body_table_title_settings, edit_body_table_title,
 apply_body_table_title}` and `BodyTableSelector`; the former raw-object-ID
-`pages::Editor` title helpers were removed. Keynote's slide-table title methods
+`pages::Draft` title helpers were removed. Keynote's slide-table title methods
 remain migration-host helpers with their format-specific table CRUD.
 
 ### Pages body-table appearance uses the focused package transaction
@@ -2132,7 +2132,7 @@ The focused `litchi_pages::Package` owner is strict for all of its reads and
 changed writes. Separately, `litchi-iwa` legacy table listing retains one
 private read-only appearance helper for compatibility; it does not attempt a
 focused Package read, perform mutation, or bypass a focused Package write
-failure. Raw `pages::Editor` mutation APIs remain retired, and the appearance
+failure. Raw `pages::Draft` mutation APIs remain retired, and the appearance
 example uses the focused Package owner.
 
 The focused Pages integration passed 21/21, the appearance codec 18/18, the
@@ -2147,7 +2147,7 @@ monolith-exit or a full-workspace-green claim.
 
 ### Numbers sheet and table names use the focused package transaction
 
-Sheet and table names are no longer `numbers::Editor` raw-ID operations. Use
+Sheet and table names are no longer `numbers::Draft` raw-ID operations. Use
 `litchi_numbers::names::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`
 through an immutable `Package`. Both selectors resolve against the original
 snapshot, so a sheet and one of its tables can be renamed atomically without
@@ -2188,7 +2188,7 @@ synchronized sibling temporary file and no-clobber publication.
 
 ### Numbers sheet order uses a focused package transaction
 
-Moving a sheet is no longer a `numbers::Editor` operation. Use
+Moving a sheet is no longer a `numbers::Draft` operation. Use
 `litchi_numbers::sheet::order::{Edit, Patch, Commit, Diagnostics, Error,
 LimitKind}` with `Package::{edit_sheet_order, apply_sheet_order}`. The selected
 sheet is an exact-name or zero-based-position `SheetSelector`, and the
@@ -2274,7 +2274,7 @@ write to replace an existing Keynote package.
 
 ### Keynote title and body placeholder visibility is a focused transaction
 
-Per-slide title/body visibility is no longer a `keynote::Editor` mutation. Use
+Per-slide title/body visibility is no longer a `keynote::Draft` mutation. Use
 `litchi_keynote::slide::placeholder::{Kind, State, Edit, Patch, Commit,
 Diagnostics, Error, LimitKind}` with a semantic `SlideSelector`; native object
 IDs are never exposed. `slide_placeholder_visibility` returns `None` when the
@@ -2332,7 +2332,7 @@ output, sibling-temporary, no-clobber publication through `Package::write_to`.
 ### Keynote per-slide slide-number visibility is a focused transaction
 
 For an existing presentation, per-slide slide-number visibility is no longer a
-`keynote::Editor` mutation. Select the slide semantically and use the same
+`keynote::Draft` mutation. Select the slide semantically and use the same
 immutable placeholder transaction with `Kind::SlideNumber`. A read returns
 `None` when that slide's layout has no slide-number placeholder,
 `Some(State::Visible)` when it draws, and `Some(State::Hidden)` when the
@@ -2388,7 +2388,7 @@ no-clobber publication.
 ### Keynote soundtrack playback is a focused transaction
 
 Playback mode and volume for an existing soundtrack are no longer
-`keynote::Editor` settings mutations. Use
+`keynote::Draft` settings mutations. Use
 `litchi_keynote::soundtrack::{Mode, Settings, Edit, Patch, Commit,
 Diagnostics, Error, LimitKind}` with the immutable
 `Package::{soundtrack_settings, edit_soundtrack_settings,
@@ -2446,7 +2446,7 @@ that collection itself must change.
 
 ### Keynote existing-slide deletion is a focused transaction
 
-Deleting one existing slide is no longer a `keynote::Editor` mutation. Use the
+Deleting one existing slide is no longer a `keynote::Draft` mutation. Use the
 immutable `litchi_keynote::slide::delete::{Edit, Patch, Commit, Diagnostics,
 Error, LimitKind, Path}` transaction with an exact navigator name or checked
 semantic position. The final slide cannot be deleted, native IDs do not enter
@@ -2629,7 +2629,7 @@ their physical identifiers. The migration host retains sheet creation,
 duplication, and removal. Public relocation of an existing table belongs to
 the focused `litchi_numbers::Package`; the host retains only a crate-private
 adapter used while duplicating populated legacy sheets.
-`numbers::Editor::add_empty_table` can also recreate the first native table after
+`numbers::Draft::add_empty_table` can also recreate the first native table after
 the workbook's last table was removed. It derives the style graph from the
 workbook theme, builds independent storage and row/column identities, and
 registers a fresh formula owner without relying on a hidden template table.
@@ -2677,7 +2677,7 @@ ranges. Unknown fields remain in place, malformed duplicate identifiers fail
 transactionally, and a real text-cell create/clear cycle restores every
 decompressed Numbers member exactly.
 
-The compatibility `numbers::Editor` comment surface decodes root or segmented
+The compatibility `numbers::Draft` comment surface decodes root or segmented
 `COMMENT_STORAGE` lists and exposes their text, creation date, author, replies,
 and storage UUID. Selector-first `litchi_numbers::Package` projections cover
 ID-free root-comment and admitted direct-reply reads; direct-reply creation,
@@ -2698,7 +2698,7 @@ model, so unknown table-model and data-store extensions remain intact. Direct
 reply editing is available through the semantic `litchi_numbers::Package`
 comment-reply transactions; the obsolete host wrapper example was removed.
 
-Direct drawable comments use the shared `IWorkDrawableCommentEditor` across
+Direct drawable comments use the shared `litchi_iwa::comments::Draft` across
 Pages, Numbers, and Keynote protobufs. It resolves every supported nesting of
 `TSD.DrawableArchive.comment`, preserves creation date, author, replies, and
 message metadata during updates, isolates shared comments with copy-on-write,
@@ -2706,10 +2706,10 @@ and removes orphaned reply graphs on delete. Direct replies support ordered
 read, create, update, and delete; native-style root and reply copy-on-write
 keeps shared threads isolated, preserves stable storage UUIDs for logical
 updates, and reclaims obsolete roots, replies, and generated authors.
-`pages::Editor` restricts these
+`pages::Draft` restricts these
 operations to drawables reachable through the document, floating-drawable,
-z-order, template, and metadata graphs; `numbers::Editor` restricts them to a
-sheet's unique `drawable_infos` ownership; `keynote::Editor` restricts them to a
+z-order, template, and metadata graphs; `numbers::Draft` restricts them to a
+sheet's unique `drawable_infos` ownership; `keynote::Draft` restricts them to a
 slide's `owned_drawables` list. The `inspect_drawable_comments`,
 `edit_drawable_comment`, `edit_drawable_comment_reply`, and
 `edit_numbers_drawable_comment` examples expose the application-independent
@@ -2743,7 +2743,7 @@ after a retained-limit reopen and semantic readback. Global whole-body editing
 is a single-section convenience so it cannot silently orphan section graphs.
 Private Buffa lazy views validate known body-graph fields while raw records
 remain the unknown-content preservation authority.
-The legacy `pages::Editor` raw-ID section-text methods have been retired; use the
+The legacy `pages::Draft` raw-ID section-text methods have been retired; use the
 focused package transaction above. Changed nested-`Index.zip` packages still
 require the migration host because their physical section-text ownership has
 not yet crossed this boundary.
@@ -3056,8 +3056,8 @@ public `table::name::Name` and transaction values are archive-free. The strict
 unknown canonical fields and groups while rejecting malformed, duplicate,
 noncanonical, and wrong-wire input.
 
-Raw `pages::Editor` rename mutation is retired and the example uses the focused
-package owner. `pages::Editor::tables()` retains a legacy generated read-only
+Raw `pages::Draft` rename mutation is retired and the example uses the focused
+package owner. `pages::Draft::tables()` retains a legacy generated read-only
 name-listing compatibility path outside focused owner admission; it has no
 mutation fallback. Physical Pages table/content, storage, formula, and other
 compatibility duties remain in `litchi-iwa`.
@@ -3159,9 +3159,8 @@ for image, video, audio, PDF, and unknown assets; package discovery, metadata,
 limits, and replacement validation remain owned by this crate.
 
 ```rust
-use litchi_iwa::IWorkMediaEditor;
 
-let mut media = IWorkMediaEditor::open("input.key")?;
+let mut media = litchi_iwa::media::Draft::open("input.key")?;
 let asset = media
     .assets()
     .iter()
@@ -3174,8 +3173,8 @@ media.save("updated.key")?;
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-`pages::Editor::section_media_assets`, `numbers::Editor::sheet_media_assets`, and
-`keynote::Editor::slide_media_assets` scope discovery through the authoritative
+`pages::Draft::section_media_assets`, `numbers::Draft::sheet_media_assets`, and
+`keynote::Draft::slide_media_assets` scope discovery through the authoritative
 object-reference graph. Their `replace_media` methods reject identifiers that
 are not reachable from the application document root. `remove_unreferenced`
 removes only records absent from component records, message data references,
@@ -3338,7 +3337,7 @@ checks. Its private
 by a lazy Buffa projection and prepared source-preserving rewrite of the chart
 non-style field 20. Unknown fields, groups, and ordering remain untouched.
 
-The raw-ID `keynote::Editor::{slide_chart_legend_visible,
+The raw-ID `keynote::Draft::{slide_chart_legend_visible,
 set_slide_chart_legend_visible}` methods are retired with no fallback. The
 legacy host still owns Keynote legend fill/frame/font/shadow/stroke, chart
 creation and duplication/removal, and broader graph work; Pages and Numbers
@@ -3441,7 +3440,7 @@ selector-first (`SheetSelector` source and destination plus a source-sheet
 moves are exact no-ops; changed moves provide exact-source, conflict-checked
 patches and inverses with locality checks while preserving table content.
 
-The public legacy `numbers::Editor::move_table` entry point and its host example
+The public legacy `numbers::Draft::move_table` entry point and its host example
 are retired. Exact snapshots use the focused semantic `litchi-numbers`
 transaction, and any focused refusal is terminal. A crate-private physical
 bridge remains only for populated-sheet duplication of historical source-built

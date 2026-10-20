@@ -85,7 +85,7 @@ enum MovieClonePlacement {
     Preserve,
 }
 
-impl Editor {
+impl Draft {
     /// List ordinary file-backed movies owned directly by one reachable sheet.
     pub fn sheet_movies(&self, sheet_id: u64) -> Result<Vec<SheetMovieInfo>> {
         movie_infos(self, sheet_id)
@@ -109,7 +109,7 @@ impl Editor {
         let context = movie_creation_context(self, sheet_id)?;
         let ids = MovieObjectIds::allocate(next_object_identifier(&self.package)?)?;
 
-        let mut media = IWorkMediaEditor::from_package(self.package.clone())?;
+        let mut media = crate::media::Draft::from_package(self.package.clone())?;
         let movie_asset = media.insert_unreferenced(preferred_movie_filename, movie_data)?;
         if movie_asset.media_type != MediaType::Video {
             return Err(Error::ParseError(format!(
@@ -566,14 +566,13 @@ impl Editor {
     }
 
     /// Remove an ordinary movie, its private graph, and unshared assets.
-    #[allow(deprecated)]
     pub fn remove_sheet_movie(
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
     ) -> Result<RemovedNumbersSheetMovie> {
         let source = movie_graph(self, sheet_id, drawable_object_id)?;
-        let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
+        let mut comments = crate::comments::Draft::from_package(self.package.clone())?;
         comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
             drawable_object_id,
         )?)?;
@@ -619,7 +618,7 @@ impl Editor {
         remove_component_object_uuids(&mut staged, source.component_id, &source.uuid_object_ids)?;
         release_package_identifier_suffix(&mut staged, &source.object_ids)?;
 
-        let mut media = IWorkMediaEditor::from_package(staged)?;
+        let mut media = crate::media::Draft::from_package(staged)?;
         let mut removed_data_identifiers = Vec::new();
         let data_identifiers = source
             .data_references
@@ -697,7 +696,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn scratch_spreadsheet_supports_movie_crud_without_a_source_package() {
         let mut editor = numbers::Builder::new()
             .sheet_name("Movies")
@@ -734,7 +732,7 @@ mod tests {
             POSTER
         );
 
-        let roundtripped = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let roundtripped = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             roundtripped.sheet_movies(sheet_id).unwrap(),
             std::slice::from_ref(&created)
@@ -891,7 +889,7 @@ mod tests {
         );
         assert!(editor.sheet_movies(sheet_id).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
@@ -970,7 +968,7 @@ mod tests {
             crate::DrawableTitleCaption::default()
         );
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_movie_title_caption(sheet_id, duplicate.drawable_object_id)
@@ -1115,7 +1113,7 @@ mod tests {
             REPLACEMENT_POSTER
         );
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.sheet_movies(sheet_id).unwrap().len(), 2);
         assert_eq!(
             reopened
@@ -1145,7 +1143,7 @@ mod tests {
         );
         assert!(editor.sheet_movies(sheet_id).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]

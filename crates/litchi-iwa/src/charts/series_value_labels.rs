@@ -14,7 +14,7 @@ use crate::charts::series_non_style::{
 };
 use crate::protobuf::tsch;
 use crate::wire::{parse_wire_fields, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 use litchi_iwa_common::chart::series_labels::Visibility;
 
 const AREA_VALUE_LABELS_FIELD: u32 = 38;
@@ -28,7 +28,7 @@ const RADAR_VALUE_LABELS_FIELD: u32 = 162;
 
 /// Read value-label visibility for every series in native series order.
 pub(crate) fn chart_series_value_label_visibilities(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -49,7 +49,7 @@ pub(crate) fn chart_series_value_label_visibilities(
 
 /// Set value-label visibility for every series in native series order.
 pub(crate) fn set_chart_series_value_label_visibilities(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

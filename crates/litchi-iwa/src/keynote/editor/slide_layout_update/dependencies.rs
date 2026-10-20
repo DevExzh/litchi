@@ -8,7 +8,7 @@ pub(super) struct SlideLayoutDependencies {
 }
 
 pub(super) fn capture_slide_layout_dependencies(
-    package: &IWorkPackage,
+    package: &HostPackage,
     graph: &ObjectGraph,
     slide_id: u64,
     current: &kn::SlideArchive,
@@ -30,7 +30,7 @@ pub(super) fn capture_slide_layout_dependencies(
 }
 
 pub(super) fn reconcile_slide_layout_dependencies(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     slide_archive_name: &str,
     target_archive_name: &str,
     target_slide_id: u64,

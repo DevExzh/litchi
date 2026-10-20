@@ -7,7 +7,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = env::args().skip(1);
     let input = args.next().ok_or("usage: edit_pages_table INPUT OUTPUT")?;
     let output = args.next().ok_or("usage: edit_pages_table INPUT OUTPUT")?;
-    let mut editor = pages::Editor::open(input)?;
+    let mut editor = pages::Draft::open(input)?;
     let table = editor
         .tables()?
         .into_iter()
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if verified.body_table_name(selector)?.as_str() != "Edited Table" {
         return Err("Pages table rename failed focused-package verification".into());
     }
-    editor = pages::Editor::from_bytes(&bytes)?;
+    editor = pages::Draft::from_bytes(&bytes)?;
     editor.resize_table(
         table.model_object_id,
         table.rows.max(5),

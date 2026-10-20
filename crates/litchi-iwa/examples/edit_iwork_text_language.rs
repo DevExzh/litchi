@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::text::{IWorkTextEditor, TextLanguage, TextPosition};
+use litchi_iwa::text::{TextLanguage, TextPosition};
 
 enum LanguageEdit {
     ResetAll,
@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = IWorkTextEditor::open(input)?;
+    let mut editor = litchi_iwa::text::Draft::open(input)?;
     match edit {
         LanguageEdit::ResetAll => {
             editor.reset_text_languages(storage_id)?;

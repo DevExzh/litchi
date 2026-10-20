@@ -6,7 +6,7 @@ use crate::charts::shadow::{
     chart_shadow as read_native_chart_shadow, set_chart_shadow as set_native_chart_shadow,
 };
 
-impl Editor {
+impl Draft {
     /// Read the native shadow scope and drop-shadow appearance of one body chart.
     pub fn body_chart_shadow(&self, drawable_object_id: u64) -> Result<ChartShadow> {
         body_chart_shadow(self, drawable_object_id)
@@ -22,7 +22,7 @@ impl Editor {
     }
 }
 
-fn body_chart_shadow(editor: &Editor, drawable_object_id: u64) -> Result<ChartShadow> {
+fn body_chart_shadow(editor: &Draft, drawable_object_id: u64) -> Result<ChartShadow> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_shadow(
         editor.package(),
@@ -33,7 +33,7 @@ fn body_chart_shadow(editor: &Editor, drawable_object_id: u64) -> Result<ChartSh
 }
 
 fn set_body_chart_shadow(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     shadow: ChartShadow,
 ) -> Result<()> {
@@ -49,7 +49,7 @@ fn set_body_chart_shadow(
         "Pages",
         shadow,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_shadow(drawable_object_id)? != shadow {
         return Err(Error::InvalidFormat(
             "Pages chart shadow update failed validation".to_owned(),

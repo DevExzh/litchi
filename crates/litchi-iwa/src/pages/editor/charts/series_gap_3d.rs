@@ -7,7 +7,7 @@ use crate::charts::series_gap_3d::{
     set_chart_3d_series_gap as set_native_chart_3d_series_gap,
 };
 
-impl Editor {
+impl Draft {
     /// Read one 3D line/area chart's `Between Series` gap.
     pub fn body_chart_3d_series_gap(&self, drawable_object_id: u64) -> Result<Chart3dSeriesGap> {
         let graph = body_chart_graph(self, drawable_object_id)?;
@@ -46,7 +46,7 @@ impl Editor {
             graph.info.kind,
             gap,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_3d_series_gap(drawable_object_id)? != gap {
             return Err(Error::InvalidFormat(
                 "Pages chart 3D series-gap update failed validation".to_owned(),
@@ -88,7 +88,7 @@ mod tests {
         editor
             .set_body_chart_3d_series_gap(chart.drawable_object_id, gap)
             .unwrap();
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_chart_3d_series_gap(chart.drawable_object_id)

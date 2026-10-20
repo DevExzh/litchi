@@ -8,7 +8,7 @@ use crate::charts::series_error_bar_auto_fit::{
 };
 use crate::charts::{ChartSeriesErrorBarAutoFit, Index};
 
-impl Editor {
+impl Draft {
     /// Read every series' error-bar Auto-Fit setting.
     pub fn slide_chart_series_error_bar_auto_fits(
         &self,
@@ -64,7 +64,7 @@ impl Editor {
 }
 
 fn slide_chart_series_error_bar_auto_fits(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Vec<ChartSeriesErrorBarAutoFit>> {
@@ -86,7 +86,7 @@ fn slide_chart_series_error_bar_auto_fits(
 }
 
 fn set_slide_chart_series_error_bar_auto_fits(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     drawable_object_id: u64,
     values: &[ChartSeriesErrorBarAutoFit],
@@ -123,7 +123,7 @@ fn set_slide_chart_series_error_bar_auto_fits(
         "Keynote",
         values,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_series_error_bar_auto_fits(slide_index, drawable_object_id)? != values {
         return Err(Error::InvalidFormat(
             "Keynote chart series error-bar Auto-Fit update failed validation".to_owned(),

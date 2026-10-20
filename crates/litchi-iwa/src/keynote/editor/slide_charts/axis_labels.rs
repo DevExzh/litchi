@@ -7,7 +7,7 @@ use crate::charts::axis::{
     set_chart_axis_labels_visible as set_native_chart_axis_labels_visible,
 };
 
-impl Editor {
+impl Draft {
     /// Read whether Keynote shows labels for one native slide-chart axis.
     pub fn slide_chart_axis_labels_visible(
         &self,
@@ -31,7 +31,7 @@ impl Editor {
 }
 
 fn slide_chart_axis_labels_visible(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
@@ -47,7 +47,7 @@ fn slide_chart_axis_labels_visible(
 }
 
 fn set_slide_chart_axis_labels_visible(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
@@ -76,7 +76,7 @@ fn set_slide_chart_axis_labels_visible(
         axis,
         visible,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_axis_labels_visible(slide_index, drawable_object_id, axis)? != visible {
         return Err(Error::InvalidFormat(
             "Keynote chart axis-label update failed validation".to_owned(),

@@ -1,6 +1,6 @@
 //! Shared identity and ownership invariants for TSWP smart-field objects.
 
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 pub(super) fn generated_text_attribute_uuid() -> Result<String> {
     let braced = litchi_core::id::generate_guid_braced();
@@ -26,7 +26,7 @@ pub(super) fn validate_text_attribute_uuid(identifier: u64, label: &str, uuid: &
 }
 
 pub(super) fn require_exclusive_storage_reference(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     identifier: u64,
     label: &str,
@@ -56,7 +56,7 @@ pub(super) fn require_exclusive_storage_reference(
 }
 
 pub(super) fn ensure_no_metadata_reference(
-    package: &IWorkPackage,
+    package: &HostPackage,
     identifier: u64,
     label: &str,
 ) -> Result<()> {

@@ -40,7 +40,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     set_numbers_cells(&mut editor, table_cells())?;
     editor.set_table_hidden_axes(TableSelector::index(0), &hidden)?;
     editor.save(output)?;
-    if numbers::Editor::open(output)?.table_hidden_axes(TableSelector::index(0))? != hidden {
+    if numbers::Draft::open(output)?.table_hidden_axes(TableSelector::index(0))? != hidden {
         return Err("Numbers hidden axes failed reopen validation".into());
     }
     Ok(())
@@ -61,7 +61,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    editor = pages::Editor::from_bytes(&bytes)?;
+    editor = pages::Draft::from_bytes(&bytes)?;
     editor.save(output)?;
     let reopened = PagesPackage::from_bytes(&std::fs::read(output)?)?;
     if reopened.body_table_hidden_axes(BodyTableSelector::index(0))? != hidden {
@@ -87,7 +87,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_table_cells(0, table.model_object_id, table_cells())?;
     editor.set_slide_table_hidden_axes(0, table.model_object_id, &hidden)?;
     editor.save(output)?;
-    if keynote::Editor::open(output)?.slide_table_hidden_axes(0, table.model_object_id)? != hidden {
+    if keynote::Draft::open(output)?.slide_table_hidden_axes(0, table.model_object_id)? != hidden {
         return Err("Keynote hidden axes failed reopen validation".into());
     }
     Ok(())
@@ -111,7 +111,7 @@ fn table_cells() -> [TableCellUpdate; 12] {
 }
 
 fn set_numbers_cells(
-    editor: &mut numbers::Editor,
+    editor: &mut numbers::Draft,
     updates: impl IntoIterator<Item = litchi_numbers::cell::Update>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let changes = updates
@@ -128,7 +128,7 @@ fn set_numbers_cells(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    *editor = numbers::Editor::from_bytes(&bytes)?;
+    *editor = numbers::Draft::from_bytes(&bytes)?;
     Ok(())
 }
 

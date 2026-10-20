@@ -6,7 +6,7 @@ use super::*;
 use crate::numbers::{NumbersTableDimension, NumbersTableDimensionSize};
 
 pub(super) fn set_table_geometry_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     drawable_object_id: u64,
     geometry: DrawableGeometry,
 ) -> Result<()> {
@@ -48,7 +48,7 @@ pub(super) fn set_table_geometry_in_package(
 }
 
 pub(super) fn set_uniform_table_dimensions(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     model_object_id: u64,
     rows: usize,
     columns: usize,
@@ -75,7 +75,7 @@ pub(super) fn set_uniform_table_dimensions(
     Ok(())
 }
 
-pub(super) fn remove_objects(package: &mut IWorkPackage, identifiers: &[u64]) -> Result<()> {
+pub(super) fn remove_objects(package: &mut HostPackage, identifiers: &[u64]) -> Result<()> {
     let catalog = KeynoteObjectCatalog::build(package).map_err(map_catalog_error)?;
     let mut by_archive = HashMap::<String, Vec<u64>>::new();
     for &identifier in identifiers {

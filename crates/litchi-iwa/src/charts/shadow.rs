@@ -20,7 +20,7 @@ use crate::shapes::{
     Appearance, BlurRadius, Drop, Offset, RgbaColor, Shadow, shadow_from_native, shadow_to_native,
 };
 use crate::wire::{patch_length_delimited_field, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 use litchi_iwa_common::shape::shadow::{Angle, Opacity};
 
 /// `tschchartinfodefaultcombinelayers` in `TSCH.Generated.ChartStyleArchive`.
@@ -80,7 +80,7 @@ impl Default for ChartShadow {
 
 /// Read the effective shadow of one native chart.
 pub(crate) fn chart_shadow(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -117,7 +117,7 @@ pub(crate) fn chart_shadow(
 
 /// Set the shadow of one native chart.
 pub(crate) fn set_chart_shadow(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

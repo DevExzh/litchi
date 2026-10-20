@@ -8,7 +8,7 @@ use crate::wire::{
     parse_wire_fields, patch_varint_field, repeated_length_delimited_payloads,
     rewrite_repeated_length_delimited_fields, transform_length_delimited_field,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use crate::text::storage_wire::{
     LocatedStorage, StorageLocation,
@@ -31,14 +31,14 @@ pub(in crate::text) struct LocatedParagraphStorage {
 }
 
 pub(in crate::text) fn locate(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<ParagraphStorageLocation> {
     locate_with_archive(package, storage_id).map(|located| located.location)
 }
 
 pub(in crate::text) fn locate_with_archive(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<LocatedParagraphStorage> {
     let LocatedStorage {
@@ -88,7 +88,7 @@ pub(in crate::text) fn locate_with_archive(
 }
 
 pub(in crate::text) fn patch_style_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &ParagraphStorageLocation,
     old_style_id: u64,
     new_style_id: u64,
@@ -100,7 +100,7 @@ pub(in crate::text) fn patch_style_reference(
 }
 
 pub(in crate::text) fn patch_style_reference_with_archive(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedParagraphStorage,
     old_style_id: u64,
     new_style_id: u64,

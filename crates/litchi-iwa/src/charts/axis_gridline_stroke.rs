@@ -9,7 +9,7 @@ use crate::charts::axis_style::{
 use crate::protobuf::{tsch, tsd};
 use crate::shapes::{Stroke, empty_stroke_archive, stroke_from_native, stroke_to_native};
 use crate::wire::patch_length_delimited_field;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const CATEGORY_MAJOR_GRIDLINE_STROKE_FIELD: u32 = 16;
 const VALUE_MAJOR_GRIDLINE_STROKE_FIELD: u32 = 17;
@@ -91,7 +91,7 @@ pub enum ChartAxisGridlineStroke {
 
 /// Read the exact native gridline stroke state for one chart axis.
 pub(crate) fn chart_axis_gridline_stroke(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -112,7 +112,7 @@ pub(crate) fn chart_axis_gridline_stroke(
 
 /// Set one chart axis' gridline stroke without changing its visibility.
 pub(crate) fn set_chart_axis_gridline_stroke(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

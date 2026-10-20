@@ -21,7 +21,7 @@ use crate::shapes::{
 use crate::wire::{
     parse_wire_fields, patch_fixed32_field, patch_length_delimited_field, patch_varint_field,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const RADAR_FILL_FIELD: u32 = 165;
 const RADAR_STROKE_FIELD: u32 = 172;
@@ -45,7 +45,7 @@ pub enum ChartRadarSeriesStyle {
 
 /// Read the uniform native Radar style applied to every data series.
 pub(crate) fn chart_radar_series_style(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -81,7 +81,7 @@ pub(crate) fn chart_radar_series_style(
 
 /// Apply one native Radar style to every data series.
 pub(crate) fn set_chart_radar_series_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -140,7 +140,7 @@ fn require_radar_chart(kind: Kind) -> Result<()> {
 
 fn effective_radar_style(
     slot: &ChartSeriesStyleSlot,
-    package: &IWorkPackage,
+    package: &HostPackage,
 ) -> Result<ChartRadarSeriesStyle> {
     let fill = slot
         .read_inherited(package, read_local_radar_fill)?
@@ -176,7 +176,7 @@ fn classify_radar_style(
 
 fn validate_effective_alpha_multiplier(
     slot: &ChartSeriesStyleSlot,
-    package: &IWorkPackage,
+    package: &HostPackage,
 ) -> Result<()> {
     let multiplier = slot
         .read_inherited(package, read_local_alpha_multiplier)?
@@ -189,7 +189,7 @@ fn validate_effective_alpha_multiplier(
     Ok(())
 }
 
-fn effective_radar_color(slot: &ChartSeriesStyleSlot, package: &IWorkPackage) -> Result<RgbaColor> {
+fn effective_radar_color(slot: &ChartSeriesStyleSlot, package: &HostPackage) -> Result<RgbaColor> {
     if let Some(stroke) = slot
         .read_inherited(package, read_local_radar_stroke)?
         .flatten()

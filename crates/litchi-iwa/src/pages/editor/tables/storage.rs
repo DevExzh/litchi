@@ -18,17 +18,17 @@ struct PagesAppearanceObjectLocation {
 ///
 /// The catalog owns only archive names, object slots, and counts of the small
 /// set of appearance roles. Each selected payload is borrowed through
-/// `IWorkPackage::with_parsed_archive` for the duration of one Buffa decode,
+/// `HostPackage::with_parsed_archive` for the duration of one Buffa decode,
 /// so appearance discovery never clones a full archive or reparses one
 /// component per style hop.
 struct PagesAppearanceCatalog<'package> {
-    package: &'package IWorkPackage,
+    package: &'package HostPackage,
     archive_names: Vec<String>,
     objects: HashMap<u64, PagesAppearanceObjectLocation>,
 }
 
 impl<'package> PagesAppearanceCatalog<'package> {
-    fn build(package: &'package IWorkPackage) -> Result<Self> {
+    fn build(package: &'package HostPackage) -> Result<Self> {
         let archive_count = package.iwa_entry_names().count();
         let mut archive_names = Vec::new();
         archive_names
@@ -264,7 +264,7 @@ fn appearance_role_index(message_type: u32) -> Option<usize> {
         .position(|candidate| *candidate == message_type)
 }
 
-fn appearance_wire_limits(package: &IWorkPackage) -> Result<litchi_iwa_common::WireLimits> {
+fn appearance_wire_limits(package: &HostPackage) -> Result<litchi_iwa_common::WireLimits> {
     let archive_limits = package.limits().archive_limits();
     let source_bytes = archive_limits
         .max_message_bytes()
@@ -297,7 +297,7 @@ pub(crate) struct PagesTableGraph {
     pub(super) formula_context_ids: Vec<u64>,
 }
 
-pub(crate) fn body_table_graphs(editor: &Editor) -> Result<Vec<PagesTableGraph>> {
+pub(crate) fn body_table_graphs(editor: &Draft) -> Result<Vec<PagesTableGraph>> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
         editor.body_storage_id.get(),
@@ -498,8 +498,8 @@ fn retain_object_replacement_offsets(text: &str, offsets: &mut Vec<u32>) {
 }
 
 pub(crate) fn clone_body_table_attachment(
-    source: &IWorkPackage,
-    staged: &mut IWorkPackage,
+    source: &HostPackage,
+    staged: &mut HostPackage,
     source_attachment_id: u64,
     source_drawable_id: u64,
     new_drawable_id: u64,
@@ -543,7 +543,7 @@ pub(crate) fn clone_body_table_attachment(
 }
 
 pub(crate) fn expand_formula_contexts(
-    package: &IWorkPackage,
+    package: &HostPackage,
     contexts: &mut Vec<u64>,
     excluded: &HashSet<u64>,
 ) -> Result<()> {

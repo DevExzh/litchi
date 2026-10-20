@@ -7,7 +7,7 @@ use crate::charts::axis_steps::{
     set_chart_value_axis_steps as set_native_chart_value_axis_steps,
 };
 
-impl Editor {
+impl Draft {
     /// Read the major and minor scale steps of a native body chart's value axis.
     ///
     /// Missing step counts use Pages' automatic scale calculation.
@@ -28,7 +28,7 @@ impl Editor {
     }
 }
 
-fn body_chart_value_axis_steps(editor: &Editor, drawable_object_id: u64) -> Result<Steps> {
+fn body_chart_value_axis_steps(editor: &Draft, drawable_object_id: u64) -> Result<Steps> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_value_axis_steps(
         editor.package(),
@@ -39,7 +39,7 @@ fn body_chart_value_axis_steps(editor: &Editor, drawable_object_id: u64) -> Resu
 }
 
 fn set_body_chart_value_axis_steps(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     steps: Steps,
 ) -> Result<()> {
@@ -52,7 +52,7 @@ fn set_body_chart_value_axis_steps(
         "Pages",
         steps,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_value_axis_steps(drawable_object_id)? != steps {
         return Err(Error::InvalidFormat(
             "Pages chart value-axis steps update failed validation".to_owned(),

@@ -21,7 +21,7 @@ pub(super) use graph::layout_media_roots as template_media_roots;
 pub(super) use materialize::materialize_cloned_media;
 
 pub(super) fn materialize(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     graph: &ObjectGraph,
     slide_id: u64,
     current: &kn::SlideArchive,

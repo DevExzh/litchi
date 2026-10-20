@@ -5,7 +5,7 @@ use super::*;
 const FORMULA_OWNER_DEPENDENCIES_MESSAGE_TYPE: u32 = 4_008;
 
 pub(super) fn filter_has_row_state(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     reference: Option<&tsp::Reference>,
 ) -> Result<bool> {
@@ -42,7 +42,7 @@ pub(super) fn filter_has_row_state(
 }
 
 pub(super) fn category_grouping_is_enabled(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     reference: Option<&tsp::Reference>,
 ) -> Result<bool> {
@@ -98,7 +98,7 @@ pub(super) fn deprecated_category_grouping_is_enabled(
     owner.is_some_and(|owner| owner.group_by.iter().any(|group| group.is_enabled))
 }
 
-pub(super) fn table_has_spill_state(package: &IWorkPackage, table_info_id: u64) -> Result<bool> {
+pub(super) fn table_has_spill_state(package: &HostPackage, table_info_id: u64) -> Result<bool> {
     let Some(component) = package.calculation_engine_entry_name()? else {
         return Ok(false);
     };

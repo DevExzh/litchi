@@ -3,7 +3,7 @@
 use std::env;
 
 use litchi_iwa::shapes::{RgbColorSpace, RgbaColor};
-use litchi_iwa::text::{Background, IWorkTextEditor};
+use litchi_iwa::text::Background;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = IWorkTextEditor::open(input)?;
+    let mut editor = litchi_iwa::text::Draft::open(input)?;
     editor.set_text_background(storage_id, background)?;
     editor.save(output)?;
     Ok(())

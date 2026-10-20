@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let initial = HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)])?;
     let shifted = HiddenAxes::new([AxisIndex::row(3), AxisIndex::column(2)])?;
 
-    let mut editor = numbers::Editor::open(source)?;
+    let mut editor = numbers::Draft::open(source)?;
     let table = TableSelector::index(0);
     assert_eq!(editor.table_hidden_axes(table)?, initial);
     editor.insert_table_row(table, RowInsertion::body(0))?;

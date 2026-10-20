@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra argument".into());
     }
 
-    let mut editor = pages::Editor::open(input)?;
+    let mut editor = pages::Draft::open(input)?;
     editor.insert_table_row(table_id, RowInsertion::body(row))?;
     editor.save(output)?;
     Ok(())

@@ -108,7 +108,7 @@ pub struct RemovedPagesBodyChart {
     pub chart: BodyChartInfo,
 }
 
-impl Editor {
+impl Draft {
     /// List native charts anchored to the body in text-flow order.
     pub fn body_charts(&self) -> Result<Vec<BodyChartInfo>> {
         body_chart_infos(self)
@@ -199,7 +199,7 @@ impl Editor {
             &archive_name,
             &ids.style_ids(),
         )?;
-        let mut text_editor = IWorkTextEditor::from_package(staged);
+        let mut text_editor = crate::text::Draft::from_package(staged);
         text_editor.replace_text(
             self.body_storage_id,
             anchor_character_index..anchor_character_index,
@@ -522,7 +522,7 @@ impl Editor {
             position,
             left_margin,
         )?;
-        let mut text_editor = IWorkTextEditor::from_package(staged);
+        let mut text_editor = crate::text::Draft::from_package(staged);
         text_editor.replace_text(
             self.body_storage_id,
             anchor_character_index..anchor_character_index,
@@ -607,7 +607,6 @@ impl Editor {
     }
 
     /// Remove a body chart, its attachment, and any crate-owned private styles.
-    #[allow(deprecated)]
     pub fn remove_body_chart(&mut self, drawable_object_id: u64) -> Result<RemovedPagesBodyChart> {
         let mut source = body_chart_graph(self, drawable_object_id)?;
         source.info.arrangement = arrangement::focused_chart_arrangement_at(
@@ -615,11 +614,11 @@ impl Editor {
             source.chart_count,
             source.chart_position,
         )?;
-        let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
+        let mut comments = crate::comments::Draft::from_package(self.package().clone())?;
         comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
             drawable_object_id,
         )?)?;
-        let mut text_editor = IWorkTextEditor::from_package(comments.into_package());
+        let mut text_editor = crate::text::Draft::from_package(comments.into_package());
         let anchor = source.info.anchor_character_index as usize;
         text_editor.replace_text(self.body_storage_id, anchor..anchor + 1, "")?;
         let mut staged = text_editor.into_package();
@@ -735,7 +734,7 @@ fn chart_data_shape_and_labels_match(before: &ChartData, after: &ChartData) -> b
 }
 
 fn set_focused_body_chart_data(
-    editor: &mut Editor,
+    editor: &mut Draft,
     chart_position: usize,
     data: ChartData,
 ) -> Result<()> {
@@ -762,7 +761,7 @@ fn set_focused_body_chart_data(
                 "focused Pages chart data package write failed: {error}"
             ))
         })?;
-    let verified = Editor::from_bytes(&target_bytes)?;
+    let verified = Draft::from_bytes(&target_bytes)?;
     *editor = verified;
     Ok(())
 }
@@ -785,7 +784,7 @@ fn remapped_identifiers(
 }
 
 fn update_chart_payload(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_object_id: u64,
     update: impl FnOnce(&mut IWorkChartArchive) -> Result<()>,
@@ -813,7 +812,7 @@ fn update_chart_payload(
 }
 
 fn update_chart_payload_with_grid(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_object_id: u64,
     encoded_grid: &litchi_iwa_protos::chart_grid_creation_codec::EncodeOutput,
