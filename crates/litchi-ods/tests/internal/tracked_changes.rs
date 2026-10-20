@@ -1,10 +1,8 @@
-mod support;
+use super::support;
 
+use crate::tracked_changes::{Acceptance, CellValue, Change, Dimension, Integer, Limits, Snapshot};
+use crate::{Package, builder::Workbook as Draft};
 use litchi_odf_common::core::{OwnedPackage, PackageWriter, Profile};
-use litchi_ods::tracked_changes::{
-    Acceptance, CellValue, Change, Dimension, Integer, Limits, Patch, Snapshot,
-};
-use litchi_ods::{MutableSpreadsheet, Package};
 use std::sync::Arc;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -200,7 +198,7 @@ fn reads_all_four_families_and_authors_odf_14_order_with_schema_prefixes() {
     };
     assert!(deletion.cut_offs.iter().any(|cut_off| matches!(
         cut_off,
-        litchi_ods::tracked_changes::CutOff::MovementPoint { position }
+        crate::tracked_changes::CutOff::MovementPoint { position }
             if position.as_str() == "2"
     )));
 
@@ -310,7 +308,7 @@ fn transaction_crud_reorder_acceptance_reopen_and_rollback_are_atomic() {
         unreachable!()
     };
     movement.target =
-        litchi_ods::tracked_changes::RangeAddress::Cell(litchi_ods::tracked_changes::CellAddress {
+        crate::tracked_changes::RangeAddress::Cell(crate::tracked_changes::CellAddress {
             table: 0.into(),
             column: 9.into(),
             row: 9.into(),
@@ -372,7 +370,7 @@ fn transaction_crud_reorder_acceptance_reopen_and_rollback_are_atomic() {
         .set_tracking(Some(true))
         .expect("test fixture or operation should succeed");
     rollback
-        .rollback()
+        .reset()
         .expect("test fixture or operation should succeed");
     let rolled_back = rollback
         .commit()
@@ -479,42 +477,6 @@ fn direct_insert_succeeds_in_bounds_and_is_atomic_out_of_bounds() {
         .expect("test fixture or operation should succeed");
     assert!(!noop.changed());
     assert_eq!(noop.content_xml(), source);
-}
-
-#[test]
-fn patches_are_exact_source_bound_reversible_and_reject_stale_sources() {
-    let before = Snapshot::parse(content(&independent_owner(None)))
-        .expect("test fixture or operation should succeed");
-    let mut transaction = before
-        .transaction()
-        .expect("test fixture or operation should succeed");
-    transaction
-        .set_tracking(Some(true))
-        .expect("test fixture or operation should succeed");
-    let commit = transaction
-        .commit()
-        .expect("test fixture or operation should succeed");
-    let patch = commit.patch().clone();
-    assert!(!patch.is_empty());
-
-    let replay = patch
-        .apply(&before)
-        .expect("test fixture or operation should succeed");
-    assert_eq!(replay.content_xml(), commit.content_xml());
-    let inverse = patch.inverse();
-    let restored = inverse
-        .apply(commit.snapshot())
-        .expect("test fixture or operation should succeed");
-    assert_eq!(restored.content_xml(), before.source_xml());
-
-    let stale = Snapshot::parse(
-        before
-            .source_xml()
-            .replace("  <office:body>", "<office:body>"),
-    )
-    .expect("test fixture or operation should succeed");
-    assert!(patch.apply(&stale).is_err());
-    assert!(inverse.apply(&before).is_err());
 }
 
 #[test]
@@ -825,7 +787,7 @@ fn rich_neighbor_bytes_are_preserved_while_unknown_records_and_regeneration_are_
 fn package_facade_reopens_preserves_auxiliary_and_keeps_formulas_links_inert() {
     let source_xml = content(&independent_owner(None));
     let bytes = package(&source_xml, false);
-    let mut mutable = MutableSpreadsheet::from_workbook(
+    let mut mutable = Draft::from_workbook(
         Package::from_bytes(&bytes)
             .expect("test fixture or operation should succeed")
             .workbook()
@@ -838,7 +800,11 @@ fn package_facade_reopens_preserves_auxiliary_and_keeps_formulas_links_inert() {
             Ok(())
         })
         .expect("test fixture or operation should succeed");
-    let output = mutable.to_bytes();
+    let output = mutable
+        .build()
+        .expect("the draft builds")
+        .as_bytes()
+        .to_vec();
     let archive =
         OwnedPackage::from_bytes(output.clone()).expect("test fixture or operation should succeed");
     assert_eq!(
@@ -888,7 +854,7 @@ fn package_facade_reopens_preserves_auxiliary_and_keeps_formulas_links_inert() {
 fn signed_exact_noop_is_byte_exact_but_changed_publication_drops_signatures() {
     let bytes = package(&content(&independent_owner(None)), true);
 
-    let mut noop = MutableSpreadsheet::from_workbook(
+    let mut noop = Draft::from_workbook(
         Package::from_bytes(&bytes)
             .expect("test fixture or operation should succeed")
             .workbook()
@@ -896,9 +862,12 @@ fn signed_exact_noop_is_byte_exact_but_changed_publication_drops_signatures() {
     );
     noop.update_tracked_changes(|_| Ok(()))
         .expect("test fixture or operation should succeed");
-    assert_eq!(noop.to_bytes(), bytes);
+    assert_eq!(
+        noop.build().expect("the draft builds").as_bytes().to_vec(),
+        bytes
+    );
 
-    let mut changed = MutableSpreadsheet::from_workbook(
+    let mut changed = Draft::from_workbook(
         Package::from_bytes(&bytes)
             .expect("test fixture or operation should succeed")
             .workbook()
@@ -910,8 +879,14 @@ fn signed_exact_noop_is_byte_exact_but_changed_publication_drops_signatures() {
             Ok(())
         })
         .expect("test fixture or operation should succeed");
-    let archive = OwnedPackage::from_bytes(changed.to_bytes())
-        .expect("test fixture or operation should succeed");
+    let archive = OwnedPackage::from_bytes(
+        changed
+            .build()
+            .expect("the draft builds")
+            .as_bytes()
+            .to_vec(),
+    )
+    .expect("test fixture or operation should succeed");
     assert!(
         !archive
             .has_file("META-INF/documentsignatures.xml")
@@ -1340,86 +1315,6 @@ fn invalid_cross_record_operations_fail_immediately_without_draft_mutation() {
 }
 
 #[test]
-fn asymmetric_input_output_limits_keep_commits_and_patch_results_reeditable() {
-    let source = content("<table:tracked-changes/>");
-    let limits = Limits::new()
-        .with_max_input_bytes(source.len())
-        .with_max_output_bytes(source.len() + 16_384);
-    let initial = Snapshot::parse_with_limits(source.clone(), limits)
-        .expect("test fixture or operation should succeed");
-    let donor = Snapshot::parse(content(&format!(
-        "<table:tracked-changes>{}</table:tracked-changes>",
-        insertion("i")
-    )))
-    .expect("test fixture or operation should succeed")
-    .changes()
-    .expect("test fixture or operation should succeed")
-    .changes[0]
-        .clone();
-
-    let mut transaction = initial
-        .transaction()
-        .expect("test fixture or operation should succeed");
-    transaction
-        .insert(0, donor.clone())
-        .expect("test fixture or operation should succeed");
-    let committed = transaction
-        .commit()
-        .expect("test fixture or operation should succeed");
-    assert!(committed.content_xml().len() > limits.max_input_bytes());
-    let patch = committed.patch().clone();
-
-    let mut second = committed
-        .snapshot()
-        .transaction()
-        .expect("test fixture or operation should succeed");
-    second
-        .set_acceptance("i", Some(Acceptance::Accepted))
-        .expect("test fixture or operation should succeed");
-    assert!(
-        second
-            .commit()
-            .expect("test fixture or operation should succeed")
-            .changed()
-    );
-
-    let replayed = patch
-        .apply(&initial)
-        .expect("test fixture or operation should succeed");
-    let mut replay_edit = replayed
-        .snapshot()
-        .transaction()
-        .expect("test fixture or operation should succeed");
-    replay_edit
-        .set_acceptance("i", Some(Acceptance::Rejected))
-        .expect("test fixture or operation should succeed");
-    assert!(
-        replay_edit
-            .commit()
-            .expect("test fixture or operation should succeed")
-            .changed()
-    );
-
-    let restored = patch
-        .inverse()
-        .apply(committed.snapshot())
-        .expect("test fixture or operation should succeed");
-    let mut inverse_edit = restored
-        .snapshot()
-        .transaction()
-        .expect("test fixture or operation should succeed");
-    inverse_edit
-        .insert(0, donor)
-        .expect("test fixture or operation should succeed");
-    assert!(
-        inverse_edit
-            .commit()
-            .expect("test fixture or operation should succeed")
-            .changed()
-    );
-}
-
-#[test]
 fn bulk_acceptance_and_replace_keep_many_inbound_rejecting_edges_consistent() {
     let mut records = String::new();
     for index in 0..16 {
@@ -1552,60 +1447,5 @@ fn multi_deletion_run_breaking_mutations_fail_immediately_and_atomically() {
             .commit()
             .expect("test fixture or operation should succeed")
             .changed()
-    );
-}
-
-#[test]
-fn package_patch_application_is_source_checked_and_inverse_restores_exact_content() {
-    let bytes = package(&content(&independent_owner(None)), false);
-    let before = Package::from_bytes(&bytes)
-        .expect("test fixture or operation should succeed")
-        .workbook()
-        .expect("test fixture or operation should succeed")
-        .tracked_changes()
-        .expect("test fixture or operation should succeed");
-    let mut transaction = before
-        .transaction()
-        .expect("test fixture or operation should succeed");
-    transaction
-        .set_tracking(Some(true))
-        .expect("test fixture or operation should succeed");
-    let patch: Patch = transaction
-        .commit()
-        .expect("test fixture or operation should succeed")
-        .into_patch();
-
-    let mut mutable = MutableSpreadsheet::from_workbook(
-        Package::from_bytes(&bytes)
-            .expect("test fixture or operation should succeed")
-            .workbook()
-            .expect("test fixture or operation should succeed"),
-    );
-    mutable
-        .apply_tracked_changes_patch(&patch)
-        .expect("test fixture or operation should succeed");
-    assert_eq!(
-        mutable
-            .workbook()
-            .tracked_changes()
-            .expect("test fixture or operation should succeed")
-            .tracking(),
-        Some(true)
-    );
-    mutable
-        .apply_tracked_changes_patch(&patch.inverse())
-        .expect("test fixture or operation should succeed");
-    assert_eq!(
-        mutable
-            .workbook()
-            .tracked_changes()
-            .expect("test fixture or operation should succeed")
-            .source_xml(),
-        before.source_xml()
-    );
-    assert!(
-        mutable
-            .apply_tracked_changes_patch(&patch.inverse())
-            .is_err()
     );
 }

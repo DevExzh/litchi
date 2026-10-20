@@ -300,14 +300,13 @@ pub enum Reference {
 }
 
 impl Reference {
-    /// Parse one complete bracketed reference.
-    pub fn parse(value: &str) -> Result<Self> {
-        parse(value)
-    }
-
-    /// Parse one reference with explicit finite limits.
-    pub fn parse_with_limits(value: &str, limits: &Limits) -> Result<Self> {
-        parse_with_limits(value, limits)
+    /// Parse one complete bracketed reference within explicit finite limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns a syntax or resource-limit error.
+    pub fn parse(value: &str, limits: &Limits) -> Result<Self> {
+        parse(value, limits)
     }
 
     /// Return the source IRI, if this is source-qualified.
@@ -447,13 +446,12 @@ fn legacy_projection_cell(endpoint: &Endpoint) -> Option<super::CellRef> {
     })
 }
 
-/// Parse one OpenFormula reference with default limits.
-pub fn parse(value: &str) -> Result<Reference> {
-    parse_with_limits(value, &Limits::default())
-}
-
-/// Parse one OpenFormula reference with explicit finite limits.
-pub fn parse_with_limits(value: &str, limits: &Limits) -> Result<Reference> {
+/// Parse one OpenFormula reference within explicit finite limits.
+///
+/// # Errors
+///
+/// Returns a syntax or resource-limit error.
+pub fn parse(value: &str, limits: &Limits) -> Result<Reference> {
     let value = trim_reference_whitespace(value);
     if !value.starts_with('[') || !value.ends_with(']') || value.len() < 2 {
         return Err(invalid("a reference must be enclosed in brackets"));
@@ -1070,9 +1068,10 @@ mod tests {
 
     #[test]
     fn parses_local_cell_and_preserves_absolute_metadata() {
-        let spaced = parse("[. $A$1]").expect("whitespace after the current-sheet dot");
+        let spaced =
+            parse("[. $A$1]", &Default::default()).expect("whitespace after the current-sheet dot");
 
-        let reference = parse("[.$A$1]").expect("relative cell reference");
+        let reference = parse("[.$A$1]", &Default::default()).expect("relative cell reference");
         assert_eq!(spaced, reference);
         let endpoint = cell_endpoint(&reference);
         assert!(matches!(endpoint.sheet, SheetSelector::Current));
@@ -1088,7 +1087,8 @@ mod tests {
 
     #[test]
     fn parses_colon_rich_unquoted_sheet_name_without_range_split() {
-        let reference = parse("[Sheet:Two.A1]").expect("colon is legal in unquoted sheet names");
+        let reference = parse("[Sheet:Two.A1]", &Default::default())
+            .expect("colon is legal in unquoted sheet names");
         let endpoint = cell_endpoint(&reference);
         assert!(matches!(
             &endpoint.sheet,
@@ -1099,7 +1099,8 @@ mod tests {
 
     #[test]
     fn parses_inherited_and_cross_sheet_endpoints() {
-        let inherited = parse("[$Inputs.$A$1:.$B$2]").expect("inherited endpoint");
+        let inherited =
+            parse("[$Inputs.$A$1:.$B$2]", &Default::default()).expect("inherited endpoint");
         let Address::Cells(start, end) = inherited.address().expect("address") else {
             panic!("expected cell range");
         };
@@ -1110,7 +1111,8 @@ mod tests {
         ));
         assert!(matches!(end.sheet, SheetSelector::Inherited));
 
-        let cross_sheet = parse("[First.A1:Second.B2]").expect("cross-sheet range");
+        let cross_sheet =
+            parse("[First.A1:Second.B2]", &Default::default()).expect("cross-sheet range");
         let Address::Cells(start, end) = cross_sheet.address().expect("address") else {
             panic!("expected cell range");
         };
@@ -1126,7 +1128,7 @@ mod tests {
 
     #[test]
     fn parses_whole_axis_ranges() {
-        let columns = parse("[Sheet.A:.C]").expect("whole-column range");
+        let columns = parse("[Sheet.A:.C]", &Default::default()).expect("whole-column range");
         assert!(matches!(
             columns.address(),
             Some(Address::Columns(start, end))
@@ -1135,7 +1137,7 @@ mod tests {
                     && matches!(end.value, EndpointValue::Column(ref column) if column.label == "C")
         ));
 
-        let rows = parse("[Sheet.1:.4]").expect("whole-row range");
+        let rows = parse("[Sheet.1:.4]", &Default::default()).expect("whole-row range");
         assert!(matches!(
             rows.address(),
             Some(Address::Rows(start, end))
@@ -1147,7 +1149,8 @@ mod tests {
 
     #[test]
     fn parses_subtable_chain_and_quoted_names() {
-        let reference = parse("['Bob''s'.A1.'Sub.Table'.B2]").expect("subtable locator");
+        let reference =
+            parse("['Bob''s'.A1.'Sub.Table'.B2]", &Default::default()).expect("subtable locator");
         let endpoint = cell_endpoint(&reference);
         let SheetSelector::Explicit(locator) = &endpoint.sheet else {
             panic!("expected explicit locator");
@@ -1170,26 +1173,27 @@ mod tests {
 
     #[test]
     fn parses_source_and_keeps_reference_error_source_free() {
-        let reference = parse("['file:///tmp/a''b.ods'#Sheet.A1]").expect("source reference");
+        let reference = parse("['file:///tmp/a''b.ods'#Sheet.A1]", &Default::default())
+            .expect("source reference");
         assert_eq!(
             reference.source().map(Source::as_str),
             Some("file:///tmp/a'b.ods")
         );
         assert!(matches!(reference.address(), Some(Address::Cell(_))));
 
-        let error = parse("[#REF!]").expect("reference error");
+        let error = parse("[#REF!]", &Default::default()).expect("reference error");
         assert!(error.is_error());
         assert!(error.address().is_none());
         assert!(error.source().is_none());
-        assert!(parse("['file:///tmp/a.ods'# #REF!]").is_err());
+        assert!(parse("['file:///tmp/a.ods'# #REF!]", &Default::default()).is_err());
     }
 
     #[test]
     fn rejects_non_normative_columns_and_second_endpoint_without_dot() {
-        assert!(parse("[.a1]").is_err());
-        assert!(parse("[Sheet.A1:B2]").is_err());
-        assert!(parse("[.A1:Sheet.B2]").is_err());
-        assert!(parse("[Sheet.A1:.B]").is_err());
+        assert!(parse("[.a1]", &Default::default()).is_err());
+        assert!(parse("[Sheet.A1:B2]", &Default::default()).is_err());
+        assert!(parse("[.A1:Sheet.B2]", &Default::default()).is_err());
+        assert!(parse("[Sheet.A1:.B]", &Default::default()).is_err());
     }
 
     #[test]
@@ -1203,24 +1207,28 @@ mod tests {
             "[ $ 'Sheet' . A1 ]",
             "['file:///tmp/a.ods' # . A1 ]",
         ] {
-            parse(value).unwrap_or_else(|error| panic!("{value:?} should parse: {error}"));
+            parse(value, &Default::default())
+                .unwrap_or_else(|error| panic!("{value:?} should parse: {error}"));
         }
 
         for value in ["[.$ A1]", "[.A$ 1]", "[$ Sheet.A1]"] {
-            assert!(parse(value).is_err(), "{value:?} splits a lexical terminal");
+            assert!(
+                parse(value, &Default::default()).is_err(),
+                "{value:?} splits a lexical terminal"
+            );
         }
     }
 
     #[test]
     fn applies_byte_and_component_limits_before_component_allocation() {
         let limits = Limits::default().with_max_bytes(4);
-        let error = parse_with_limits("[.A123]", &limits).expect_err("byte limit");
+        let error = parse("[.A123]", &limits).expect_err("byte limit");
         assert!(
             matches!(error, Error::ResourceLimit(limit) if limit.resource == Resource::InputBytes)
         );
 
         let limits = Limits::default().with_max_components(1);
-        let error = parse_with_limits("[.A1]", &limits).expect_err("component limit");
+        let error = parse("[.A1]", &limits).expect_err("component limit");
         assert!(
             matches!(error, Error::ResourceLimit(limit) if limit.resource == Resource::Objects)
         );

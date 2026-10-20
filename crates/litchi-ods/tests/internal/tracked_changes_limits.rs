@@ -1,4 +1,4 @@
-use litchi_ods::tracked_changes::{
+use crate::tracked_changes::{
     Acceptance, Change, Changes, Dimension, Info, Insertion, Limits, Metadata, PositiveInteger,
     Snapshot,
 };
@@ -160,7 +160,7 @@ fn repeated_inserts_reject_before_node_or_aggregate_draft_growth() {
     assert!(transaction.is_changed());
 
     transaction
-        .rollback()
+        .reset()
         .expect("test fixture or operation should succeed");
     assert!(!transaction.is_changed());
     assert!(

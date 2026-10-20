@@ -127,7 +127,7 @@ impl Snapshot {
 
     /// Start a clone-staged, failure-atomic edit.
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit {
             before: self.clone(),
             draft: self.definitions.to_vec(),
@@ -247,8 +247,8 @@ impl Edit {
         self.draft.clear();
     }
 
-    /// Restore the exact semantic source candidate.
-    pub fn rollback(&mut self) {
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
         self.draft = self.before.definitions.to_vec();
     }
 
@@ -258,7 +258,7 @@ impl Edit {
     ///
     /// Returns an error when validation, compact XML enforcement, package rebuilding, or typed
     /// readback fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         crate::model::names::validate_collection(&self.draft)?;
         if self.draft.as_slice() == self.before.definitions() {
             return Ok(Commit::unchanged(self.before));
@@ -291,7 +291,7 @@ impl Edit {
 
 /// An exact-source, reversible named-definition patch.
 #[derive(Clone)]
-pub struct Patch {
+pub(crate) struct Patch {
     source: Arc<[u8]>,
     target: Arc<[u8]>,
 }
@@ -309,47 +309,14 @@ impl fmt::Debug for Patch {
 impl Patch {
     /// Return whether this patch changes package bytes.
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         self.source != self.target
-    }
-
-    /// Check exact applicability without mutating a snapshot.
-    #[must_use]
-    pub fn is_applicable_to(&self, snapshot: &Snapshot) -> bool {
-        self.source.as_ref() == snapshot.as_bytes()
-    }
-
-    /// Apply this patch only to the exact package snapshot that produced it.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for a stale source or invalid target package.
-    pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
-        if !self.is_applicable_to(snapshot) {
-            return Err(Error::InvalidFormat(
-                "ODS named-definition patch source snapshot does not match".to_string(),
-            ));
-        }
-        let target = Snapshot::from_arc(self.target.clone())?;
-        Ok(Commit {
-            snapshot: target,
-            patch: self.clone(),
-        })
-    }
-
-    /// Return the exact-source patch that restores the accepted source.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            source: self.target.clone(),
-            target: self.source.clone(),
-        }
     }
 }
 
 /// A validated named-definition publication.
 #[derive(Debug)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
 }
@@ -368,32 +335,14 @@ impl Commit {
 
     /// Return whether package bytes changed.
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         self.patch.changed()
     }
 
     /// Borrow the resulting immutable snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-
-    /// Borrow the reversible exact-source patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume this publication into its immutable snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Consume this publication into exact ODS package bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Arc<[u8]> {
-        self.snapshot.source
     }
 }
 

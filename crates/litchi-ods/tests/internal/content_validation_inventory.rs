@@ -1,4 +1,4 @@
-use litchi_ods::{Builder, Package, content_validation};
+use crate::{Builder, Package, content_validation};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";

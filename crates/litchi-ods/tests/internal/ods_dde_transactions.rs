@@ -11,13 +11,13 @@ use std::{
     num::{NonZeroU64, NonZeroUsize},
 };
 
+use crate::dde::{
+    self, AutomaticUpdate, CachedCell, CachedRow, CachedTable, CachedValue, ConversionMode,
+    LinkSpec,
+};
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as BudgetLimits, Profile,
     Resource,
-};
-use litchi_ods::dde::{
-    self, AutomaticUpdate, CachedCell, CachedRow, CachedTable, CachedValue, ConversionMode,
-    LinkSpec,
 };
 
 /// A compact synthetic ODF 1.4 content owner used by the transaction cases.

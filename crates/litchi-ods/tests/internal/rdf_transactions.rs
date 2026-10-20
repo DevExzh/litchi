@@ -1,6 +1,6 @@
-use litchi_core::Position;
-use litchi_ods::{
-    Builder, MutableSpreadsheet, Package,
+use crate::{
+    Builder, Package,
+    builder::Workbook as Draft,
     metadata_graphs::Snapshot,
     rdf::{Object, Subject, Triple},
 };
@@ -17,35 +17,6 @@ fn triple(predicate: &str, value: &str) -> Triple {
             language: None,
         },
     }
-}
-
-#[test]
-fn rdf_transaction_batches_graph_and_triple_crud_with_inverse() -> litchi_core::Result<()> {
-    let source = Builder::new().content_xml(CONTENT).build()?.to_bytes()?;
-    let snapshot = Snapshot::from_bytes(source.clone())?;
-    let mut edit = snapshot.edit();
-    let first = triple("https://example.invalid/schema#label", "Sheet");
-    let second = triple("https://example.invalid/schema#kind", "Input");
-    let path = edit.add_graph(None, std::slice::from_ref(&first))?;
-    assert_eq!(path, "Metadata/metadata_1.rdf");
-    assert_eq!(edit.add_triple(&path, &second)?, Position::new(1));
-    edit.move_triple(&path, Position::new(1), Position::new(0))?;
-    let commit = edit.commit();
-
-    assert!(commit.changed());
-    assert_eq!(commit.snapshot().graphs()[0].triples, [second, first]);
-    let restored = commit.patch().inverse().apply(commit.snapshot())?;
-    assert_eq!(restored.snapshot().as_bytes(), source);
-    assert!(commit.patch().apply(&snapshot).is_ok());
-
-    let unrelated = Snapshot::from_bytes(
-        Builder::new()
-            .content_xml(CONTENT.replace("Sheet1", "Other"))
-            .build()?
-            .to_bytes()?,
-    )?;
-    assert!(commit.patch().apply(&unrelated).is_err());
-    Ok(())
 }
 
 #[test]
@@ -66,7 +37,7 @@ fn rdf_no_ops_preserve_exact_bytes_and_failed_staging_is_atomic() -> litchi_core
 #[test]
 fn mutable_facade_publishes_a_batched_rdf_transaction() -> litchi_core::Result<()> {
     let source = Builder::new().content_xml(CONTENT).build()?.to_bytes()?;
-    let mut mutable = MutableSpreadsheet::from_workbook(Package::from_bytes(&source)?.workbook()?);
+    let mut mutable = Draft::from_workbook(Package::from_bytes(&source)?.workbook()?);
     let value = triple("https://example.invalid/schema#label", "Sheet");
     mutable.edit_rdf(|edit| {
         edit.add_graph(Some("Metadata/sheet.rdf"), std::slice::from_ref(&value))?;

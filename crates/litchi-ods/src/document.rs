@@ -37,7 +37,7 @@ pub use crate::advanced::{
     BoundFormControl, CellProperties, CellStyle, CellStyleNode, ChartObject, DataStyleNode,
     Drawing, DrawingFrame, DrawingGeometry, DrawingGeometryKind, DrawingGroup, DrawingPoint,
     DrawingPolygon, DrawingTextBox, EffectiveCellStyle, FormControl, FormControlKind, FormEvent,
-    LogicalRowEdit, NumberStyleNode, RichFormControl, RichRun, RichText, StyleGraph,
+    LogicalRowOperation, NumberStyleNode, RichFormControl, RichRun, RichText, StyleGraph,
     TextProperties, TextStyleNode,
 };
 
@@ -1056,6 +1056,20 @@ pub enum EncryptionWriteRefusal {
     SignedSourceRequiresStripPolicy,
 }
 
+impl EncryptionWriteRefusal {
+    /// The refusal class litchi-ops reports for this reason (record 0351
+    /// §2.4): the route cannot encrypt this source under the given policy.
+    #[must_use]
+    pub const fn kind(self) -> litchi_core::edit::RefusalKind {
+        match self {
+            Self::EncryptedSourceRequiresCredentialSnapshot => {
+                litchi_core::edit::RefusalKind::UnsupportedOperation
+            },
+            Self::SignedSourceRequiresStripPolicy => litchi_core::edit::RefusalKind::Protected,
+        }
+    }
+}
+
 /// Availability of terminal password encryption for one exact snapshot and signature policy.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -1191,7 +1205,7 @@ impl Edit {
     /// Returns an error when the closure, annotation publication, or package rebuild fails.
     pub fn annotations<F>(&mut self, update: F) -> Result<()>
     where
-        F: FnOnce(&mut crate::annotations::Transaction) -> Result<()>,
+        F: FnOnce(&mut crate::annotations::Edit) -> Result<()>,
     {
         let package = Arc::clone(&self.package);
         let snapshot = crate::annotations::Snapshot::parse(package.content_xml())?;
@@ -1223,7 +1237,7 @@ impl Edit {
     pub fn content_validations<F>(&mut self, update: F) -> Result<()>
     where
         F: FnOnce(
-            &mut crate::content_validation::Transaction<'_, '_>,
+            &mut crate::content_validation::Edit<'_, '_>,
         ) -> crate::content_validation::Result<()>,
     {
         let source = std::mem::replace(&mut self.candidate, Arc::new(Vec::new()));
@@ -1247,43 +1261,6 @@ impl Edit {
         };
         self.stage_package(
             "content-validation.edit",
-            "content-validations",
-            package,
-            candidate,
-            true,
-        )
-        .map(|_| ())
-    }
-
-    /// Stage a reversible content-validation patch against its exact XML source.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for stale/foreign lineage, invalid closure, splice publication, or
-    /// complete package readback failure.
-    pub fn apply_content_validation_patch(
-        &mut self,
-        patch: &crate::content_validation::Patch,
-    ) -> Result<()> {
-        let source = std::mem::replace(&mut self.candidate, Arc::new(Vec::new()));
-        let outcome: Result<Option<(Arc<Archive>, Arc<Vec<u8>>)>> = (|| {
-            let package = Arc::clone(&self.package);
-            let snapshot = crate::content_validation::Snapshot::parse(package.content_xml())
-                .map_err(content_validation_error)?;
-            let commit = patch.apply(&snapshot).map_err(content_validation_error)?;
-            if !commit.changed() {
-                return Ok(None);
-            }
-            let target = crate::content_validation::publish_package_commit(&package, &commit)?;
-            let bytes = target.shared_bytes_owner();
-            Ok(Some((Arc::new(target), bytes)))
-        })();
-        self.candidate = source;
-        let Some((package, candidate)) = outcome? else {
-            return Ok(());
-        };
-        self.stage_package(
-            "content-validation.patch",
             "content-validations",
             package,
             candidate,
@@ -1351,7 +1328,7 @@ impl Edit {
     /// Returns an error when the closure, protection publication, or package rebuild fails.
     pub fn protection<F>(&mut self, update: F) -> Result<()>
     where
-        F: FnOnce(&mut crate::protection::Transaction) -> Result<()>,
+        F: FnOnce(&mut crate::protection::Edit) -> Result<()>,
     {
         let package = Arc::clone(&self.package);
         let snapshot =
@@ -1391,6 +1368,165 @@ impl Edit {
         .map(|_| ())
     }
 
+    /// Stage inert database-range CRUD (`table:database-ranges`).
+    ///
+    /// No database, query, refresh or filter executes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the closure or database-range package
+    /// publication fails.
+    pub fn database_ranges<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::database_range::Edit) -> Result<()>,
+    {
+        let snapshot =
+            crate::database_range::Snapshot::from_bytes(self.candidate.as_ref().clone())?;
+        let mut edit = snapshot.edit();
+        update(&mut edit)?;
+        let commit = edit.commit()?;
+        self.stage(
+            "database-range.edit",
+            "database-ranges",
+            commit.snapshot().as_bytes().to_vec(),
+        )
+        .map(|_| ())
+    }
+
+    /// Stage scenario declaration CRUD (`table:scenario`). Scenario values
+    /// are never applied.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the closure, scenario validation or the
+    /// `content.xml` publication fails.
+    pub fn scenarios<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::scenario::Edit) -> Result<()>,
+    {
+        let package = Arc::clone(&self.package);
+        let snapshot =
+            crate::scenario::Snapshot::parse(package.content_xml()).map_err(|error| {
+                CoreError::InvalidFormat(format!(
+                    "ODS scenario metadata inspection failed: {error}"
+                ))
+            })?;
+        let mut edit = snapshot.edit();
+        update(&mut edit)?;
+        let commit = edit.commit()?;
+        if !commit.changed() {
+            return Ok(());
+        }
+        let bytes = package
+            .replace_content_xml(commit.snapshot().source_xml())?
+            .into_bytes();
+        self.stage("scenario.edit", "scenarios", bytes).map(|_| ())
+    }
+
+    /// Stage table-template CRUD in `styles.xml`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the closure, template validation or the
+    /// `styles.xml` publication fails.
+    pub fn table_templates<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::styles::table_template::Edit) -> Result<()>,
+    {
+        let package = Arc::clone(&self.package);
+        let snapshot = crate::styles::table_template::Snapshot::from_source(package.styles_xml())?;
+        let mut edit = snapshot.edit();
+        update(&mut edit)?;
+        let commit = edit.commit()?;
+        if !commit.changed() {
+            return Ok(());
+        }
+        let bytes = package
+            .replace_styles_xml(commit.snapshot().source_xml())?
+            .into_bytes();
+        self.stage("table-template.edit", "table-templates", bytes)
+            .map(|_| ())
+    }
+
+    /// Stage inert DDE link and sheet-source CRUD. Sources are never
+    /// refreshed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the closure, DDE validation or the
+    /// `content.xml` publication fails.
+    pub fn dde<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::dde::Edit) -> Result<()>,
+    {
+        let context = crate::dde::default_context();
+        let package = Arc::clone(&self.package);
+        let snapshot = crate::dde::Snapshot::parse_with_context(
+            package.content_xml(),
+            crate::dde::Limits::default(),
+            &context,
+        )?;
+        let mut edit = snapshot.edit();
+        update(&mut edit)?;
+        let commit = edit.commit(&context)?;
+        if !commit.changed() {
+            return Ok(());
+        }
+        let bytes = package
+            .replace_content_xml(commit.snapshot().source_xml())?
+            .into_bytes();
+        self.stage("dde.edit", "dde", bytes).map(|_| ())
+    }
+
+    /// Stage consolidation, label-range, cell range-source and detective
+    /// metadata CRUD.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the closure, metadata validation or the
+    /// `content.xml` publication fails.
+    pub fn sheet_metadata<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::sheet_metadata::Edit) -> Result<()>,
+    {
+        let context = crate::sheet_metadata::default_context();
+        let package = Arc::clone(&self.package);
+        let snapshot = crate::sheet_metadata::Snapshot::parse_with_context(
+            package.content_xml(),
+            crate::sheet_metadata::Limits::default(),
+            &context,
+        )?;
+        let mut edit = snapshot.edit();
+        update(&mut edit)?;
+        let commit = edit.commit(&context)?;
+        if !commit.changed() {
+            return Ok(());
+        }
+        let bytes = package
+            .replace_content_xml(commit.snapshot().source_xml())?
+            .into_bytes();
+        self.stage("sheet-metadata.edit", "sheet-metadata", bytes)
+            .map(|_| ())
+    }
+
+    /// Replace (`Some`) or remove (`None`) the calculation settings
+    /// (`table:calculation-settings`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the settings are invalid or the `content.xml`
+    /// publication fails.
+    pub fn set_settings(&mut self, settings: Option<&crate::settings::Settings>) -> Result<()> {
+        if let Some(settings) = settings {
+            settings.validate()?;
+        }
+        let bytes = self
+            .package
+            .replace_calculation_settings(settings)?
+            .into_bytes();
+        self.stage("settings.set", "settings", bytes).map(|_| ())
+    }
+
     /// Stage tracked-change graph CRUD and acceptance metadata.
     ///
     /// # Errors
@@ -1398,11 +1534,11 @@ impl Edit {
     /// Returns an error when the closure, tracked-change publication, or package rebuild fails.
     pub fn tracked_changes<F>(&mut self, update: F) -> Result<()>
     where
-        F: FnOnce(&mut crate::tracked_changes::Transaction) -> Result<()>,
+        F: FnOnce(&mut crate::tracked_changes::Edit) -> Result<()>,
     {
         let package = Arc::clone(&self.package);
         let snapshot = crate::tracked_changes::Snapshot::parse(package.content_xml())?;
-        let mut edit = crate::tracked_changes::Transaction::new(snapshot)?;
+        let mut edit = crate::tracked_changes::Edit::new(snapshot)?;
         update(&mut edit)?;
         let commit = edit.commit()?;
         let bytes = if commit.changed() {
@@ -1570,7 +1706,7 @@ impl Edit {
     /// coordinates, an unsafe dependency owner, unsupported source structure,
     /// logical/physical/output bounds, or provenance publication failure. The
     /// edit remains unchanged after every refusal.
-    pub fn edit_logical_rows(&mut self, sheet: &str, edits: &[LogicalRowEdit]) -> Result<()> {
+    pub fn edit_logical_rows(&mut self, sheet: &str, edits: &[LogicalRowOperation]) -> Result<()> {
         if edits.is_empty() {
             return Ok(());
         }

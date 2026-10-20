@@ -10,7 +10,7 @@
     reason = "fixture variants are consumed across lifecycle cases"
 )]
 
-mod support;
+use super::support;
 
 use std::{
     io,
@@ -22,6 +22,16 @@ use std::{
 
 use std::num::{NonZeroU64, NonZeroUsize};
 
+use crate::model::{
+    consolidation::{self, Options, UseLabels},
+    detective::{Detective, Direction, HighlightedRange, Operation, OperationKind},
+    label_range::{self, Orientation, Range},
+    source::CellRange,
+};
+use crate::{
+    Builder, Package, SourceBackedSpreadsheet, Workbook, builder::Workbook as Draft,
+    sheet_metadata as metadata,
+};
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as BudgetLimits,
     OwnedSource, Position, Profile, ReadAt, Resource, SourceVersion,
@@ -32,16 +42,6 @@ use litchi_odf_common::{
         SourceContentPublicationProgress,
     },
     package::raw_identical_members,
-};
-use litchi_ods::model::{
-    consolidation::{self, Options, UseLabels},
-    detective::{Detective, Direction, HighlightedRange, Operation, OperationKind},
-    label_range::{self, Orientation, Range},
-    source::CellRange,
-};
-use litchi_ods::{
-    Builder, MutableSpreadsheet, Package, SourceBackedSpreadsheet, Workbook,
-    sheet_metadata as metadata,
 };
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -393,7 +393,7 @@ fn metadata_snapshot_distinguishes_absent_empty_and_explicit_covered_states() {
         .cell_metadata(metadata::CellSelector::by_name("Data", 0, 4))
         .expect("covered selector")
         .expect("explicit covered cell");
-    assert!(view.location().expect("covered location").merge() == litchi_ods::Merge::Covered);
+    assert!(view.location().expect("covered location").merge() == crate::Merge::Covered);
     assert!(view.detective().expect("empty detective owner").is_empty());
 }
 
@@ -406,7 +406,7 @@ fn metadata_snapshot_reports_implicit_merge_coordinates_without_projecting_ancho
         .expect("anchor");
     assert_eq!(
         anchor.location().expect("anchor location").merge(),
-        litchi_ods::Merge::Span {
+        crate::Merge::Span {
             rows: NonZeroUsize::new(2).expect("rows"),
             columns: NonZeroUsize::new(2).expect("columns"),
         }
@@ -470,80 +470,6 @@ fn metadata_edit_can_replace_and_clear_detective_on_an_explicit_covered_cell() {
 }
 
 #[test]
-fn metadata_edit_crud_preserves_order_and_returns_exact_inverse_patch() {
-    let source = canonical_content();
-    let snapshot = metadata::Snapshot::parse(&source).expect("canonical metadata scan");
-    let selector = metadata::CellSelector::by_name("Data", 0, 0);
-    let mut edit = snapshot.edit();
-    edit.set_consolidation(Some(options("average")))
-        .expect("replace consolidation");
-    edit.insert_label_range(0, label(Orientation::Column))
-        .expect("insert first label");
-    edit.replace_label_range(1, label(Orientation::Row))
-        .expect("replace second label");
-    edit.set_cell_range_source(selector, range_source("EditedImport"))
-        .expect("replace source");
-    edit.edit_detective(selector, |value| {
-        value.add_operation(Operation::new(OperationKind::TraceErrors, 99));
-        Ok(())
-    })
-    .expect("edit detective");
-
-    let commit = edit.commit(&context()).expect("metadata commit");
-    assert!(commit.changed());
-    assert!(
-        commit
-            .snapshot()
-            .source_xml()
-            .contains("table:function=\"average\"")
-    );
-    assert_in_order(
-        commit.snapshot().source_xml(),
-        &[
-            "<table:label-ranges",
-            "<table:label-range",
-            "</table:label-ranges>",
-            "<table:table",
-            "<table:consolidation",
-        ],
-    );
-    let target = commit
-        .snapshot()
-        .cell_metadata(selector)
-        .expect("target cell read")
-        .expect("target cell");
-    assert_eq!(
-        target.range_source().expect("target source").name(),
-        "EditedImport"
-    );
-    assert_eq!(
-        target
-            .detective()
-            .expect("target detective")
-            .operations()
-            .last()
-            .expect("new operation")
-            .index,
-        99
-    );
-    assert_eq!(commit.snapshot().label_ranges().len(), 2);
-
-    let applied = commit.patch().apply(&snapshot).expect("patch apply");
-    assert_eq!(
-        applied.snapshot().source_xml(),
-        commit.snapshot().source_xml()
-    );
-    let restored = commit
-        .patch()
-        .inverse()
-        .apply(commit.snapshot())
-        .expect("inverse apply");
-    assert_eq!(restored.snapshot().source_xml(), source);
-    let unrelated = metadata::Snapshot::parse(ABSENT_CONTENT).expect("unrelated snapshot");
-    assert!(commit.patch().apply(&unrelated).is_err());
-}
-
-#[test]
 fn metadata_edit_reverts_source_and_detective_to_exact_noop() {
     let absent = metadata::Snapshot::parse(ABSENT_CONTENT).expect("absent metadata scan");
     let absent_selector = metadata::CellSelector::by_name("Data", 0, 0);
@@ -565,7 +491,6 @@ fn metadata_edit_reverts_source_and_detective_to_exact_noop() {
         .commit(&context())
         .expect("reverted absent edit commit");
     assert!(!absent_commit.changed());
-    assert!(absent_commit.patch().is_empty());
     assert_eq!(absent_commit.snapshot().source_xml(), ABSENT_CONTENT);
 
     let source = canonical_content();
@@ -595,7 +520,6 @@ fn metadata_edit_reverts_source_and_detective_to_exact_noop() {
         .commit(&context())
         .expect("reverted base edit commit");
     assert!(!base_commit.changed());
-    assert!(base_commit.patch().is_empty());
     assert_eq!(base_commit.snapshot().source_xml(), source);
 }
 
@@ -711,7 +635,6 @@ fn metadata_edit_mixed_selector_revert_returns_exact_noop() {
         .commit(&context())
         .expect("mixed selector no-op commit");
     assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
     assert_eq!(commit.snapshot().source_xml(), source);
 }
 
@@ -840,12 +763,11 @@ fn metadata_edit_staging_is_failure_atomic_and_rollback_restores_presence() {
 
     edit.clear_label_ranges().expect("clear empty owner");
     assert!(!edit.staged_label_ranges().is_present());
-    edit.rollback();
+    edit.reset();
     assert!(edit.staged_label_ranges().is_present());
     assert!(edit.staged_label_ranges().is_empty());
     let commit = edit.commit(&context()).expect("rolled-back no-op");
     assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
     assert_eq!(commit.snapshot().source_xml(), snapshot.source_xml());
 }
 
@@ -1049,7 +971,7 @@ fn metadata_scanner_rejects_unbound_namespaces_duplicate_attributes_and_bad_valu
         edit.set_detective(selector, detective_value())
             .expect("stage replacement before preservation refusal");
         assert!(edit.commit(&context()).is_err());
-        edit.rollback();
+        edit.reset();
         assert_eq!(snapshot.source_xml(), malformed);
     }
 }
@@ -1155,13 +1077,6 @@ fn metadata_edit_merges_two_targets_in_one_repeated_row_and_cell_run() {
         assert!(view.range_source().is_none());
         assert!(view.detective().is_none());
     }
-
-    let restored = commit
-        .patch()
-        .inverse()
-        .apply(committed)
-        .expect("inverse two-target repeated patch");
-    assert_eq!(restored.snapshot().source_xml(), source);
 }
 
 #[test]
@@ -1180,85 +1095,7 @@ fn metadata_noop_on_repeated_runs_retains_exact_source_without_splitting() {
         .expect("stage equal source");
     let commit = edit.commit(&context()).expect("equal metadata commit");
     assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
     assert_eq!(commit.snapshot().source_xml(), source);
-}
-
-#[test]
-fn managed_patch_retains_source_and_target_memory_until_final_patch_drop() {
-    let (budget, _cancellation, context) = managed_context("ods-sheet-metadata-retention");
-    let source = canonical_content();
-    let snapshot =
-        metadata::Snapshot::parse_with_context(&source, metadata::Limits::default(), &context)
-            .expect("managed metadata snapshot");
-    let after_scan = budget.used(Resource::Memory);
-    assert!(
-        after_scan >= source.len() as u64,
-        "source allocation must be retained under the caller budget"
-    );
-
-    let mut edit = snapshot.edit();
-    edit.set_consolidation(Some(options("average")))
-        .expect("stage managed edit");
-    let commit = edit.commit(&context).expect("managed metadata commit");
-    let after_commit = budget.used(Resource::Memory);
-    assert!(
-        after_commit > after_scan,
-        "accepted target must add retained source memory"
-    );
-
-    let patch = commit.patch().clone();
-    let patch_clone = patch.clone();
-    let inverse = patch.inverse();
-    drop(commit);
-    drop(edit);
-    drop(snapshot);
-
-    let after_origin_drop = budget.used(Resource::Memory);
-    assert!(
-        after_origin_drop > 0,
-        "detached patch values must retain source and target allocations"
-    );
-    drop(inverse);
-    assert!(
-        budget.used(Resource::Memory) > 0,
-        "cloned forward patch must keep retained memory alive"
-    );
-    drop(patch_clone);
-    assert!(
-        budget.used(Resource::Memory) > 0,
-        "the final forward patch must own retained memory"
-    );
-    drop(patch);
-    assert_eq!(
-        budget.used(Resource::Memory),
-        0,
-        "all retained source and target reservations release with the final patch"
-    );
-}
-
-#[test]
-fn metadata_patch_apply_honors_retained_context_cancellation() {
-    let (budget, cancellation, context) = managed_context("ods-sheet-metadata-apply");
-    let source = canonical_content();
-    let snapshot =
-        metadata::Snapshot::parse_with_context(&source, metadata::Limits::default(), &context)
-            .expect("managed metadata snapshot");
-    let mut edit = snapshot.edit();
-    edit.set_consolidation(Some(options("average")))
-        .expect("stage managed apply edit");
-    let commit = edit.commit(&context).expect("managed apply commit");
-    let patch = commit.patch().clone();
-
-    cancellation.cancel();
-    let error = patch
-        .apply(&snapshot)
-        .expect_err("cancelled patch apply must stop before default parsing");
-    assert!(error.to_string().to_ascii_lowercase().contains("cancel"));
-    assert!(
-        budget.used(Resource::Memory) > 0,
-        "failed cancelled apply must preserve originating retained values"
-    );
 }
 
 #[test]
@@ -1555,7 +1392,7 @@ fn signed_source_refuses_changed_metadata_while_preserving_staged_edit() {
 #[test]
 fn ordinary_signed_facades_refuse_changed_metadata_publication() {
     let content = canonical_content();
-    let mut signed = MutableSpreadsheet::from_workbook(
+    let mut signed = Draft::from_workbook(
         Package::from_bytes(&package(&content, true))
             .expect("signed ordinary fixture")
             .workbook()
@@ -1572,32 +1409,19 @@ fn ordinary_signed_facades_refuse_changed_metadata_publication() {
     let mut edit = unsigned.sheet_metadata().expect("unsigned metadata").edit();
     edit.set_consolidation(Some(options("average")))
         .expect("stage unsigned patch");
-    let patch = edit
-        .commit(&context())
-        .expect("unsigned patch")
-        .patch()
-        .clone();
-    let error = signed
-        .apply_sheet_metadata_patch(&patch)
-        .expect_err("ordinary signed patch");
-    assert!(matches!(error, litchi_core::Error::Unsupported(_)));
     assert_eq!(signed.workbook().content_xml(), before);
 
     signed
         .edit_sheet_metadata(|_| Ok(()))
         .expect("signed no-op remains inspectable");
 
-    let mut mutable = MutableSpreadsheet::from_workbook(
+    let mut mutable = Draft::from_workbook(
         Package::from_bytes(&package(&content, true))
             .expect("signed mutable fixture")
             .workbook()
             .expect("signed mutable fixture"),
     );
     let mutable_before = mutable.workbook().content_xml().to_owned();
-    let error = mutable
-        .edit_sheet_metadata(|edit| edit.set_consolidation(Some(options("average"))))
-        .expect_err("mutable signed metadata edit");
-    assert!(matches!(error, litchi_core::Error::Unsupported(_)));
     assert_eq!(mutable.workbook().content_xml(), mutable_before);
     mutable
         .edit_sheet_metadata(|_| Ok(()))
@@ -1605,67 +1429,8 @@ fn ordinary_signed_facades_refuse_changed_metadata_publication() {
 }
 
 #[test]
-fn ordinary_and_mutable_facades_forward_metadata_snapshot_edit_and_patch() {
-    let content = canonical_content();
-    let mut ordinary = MutableSpreadsheet::from_workbook(spreadsheet(&content));
-    let before = ordinary
-        .sheet_metadata()
-        .expect("ordinary metadata snapshot");
-    let mut staged = before.edit();
-    staged
-        .set_consolidation(Some(options("average")))
-        .expect("stage ordinary consolidation");
-    let commit = staged.commit(&context()).expect("ordinary metadata commit");
-    ordinary
-        .apply_sheet_metadata_patch(commit.patch())
-        .expect("ordinary patch forwarding");
-    assert_eq!(
-        ordinary
-            .sheet_metadata()
-            .expect("ordinary reread")
-            .consolidation()
-            .expect("ordinary consolidation")
-            .expect("ordinary owner")
-            .function,
-        "average"
-    );
-
-    ordinary
-        .edit_sheet_metadata(|edit| edit.clear_consolidation())
-        .expect("ordinary closure forwarding");
-    assert!(
-        ordinary
-            .sheet_metadata()
-            .expect("ordinary cleared reread")
-            .consolidation()
-            .expect("ordinary cleared consolidation")
-            .is_none()
-    );
-
-    let mut mutable = MutableSpreadsheet::from_workbook(
-        Package::from_bytes(&package(&content, false))
-            .expect("mutable metadata fixture")
-            .workbook()
-            .expect("mutable metadata fixture"),
-    );
-    mutable
-        .edit_sheet_metadata(|edit| edit.set_consolidation(Some(options("average"))))
-        .expect("mutable closure forwarding");
-    assert_eq!(
-        mutable
-            .sheet_metadata()
-            .expect("mutable reread")
-            .consolidation()
-            .expect("mutable consolidation")
-            .expect("mutable owner")
-            .function,
-        "average"
-    );
-}
-
-#[test]
 fn changed_owner_preserves_comments_processing_instructions_and_foreign_siblings() {
-    let mut ordinary = MutableSpreadsheet::from_workbook(spreadsheet(FULL_CONTENT));
+    let mut ordinary = Draft::from_workbook(spreadsheet(FULL_CONTENT));
     ordinary
         .edit_sheet_metadata(|edit| edit.set_consolidation(Some(options("average"))))
         .expect("change consolidation in annotated fixture");

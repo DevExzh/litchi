@@ -20,8 +20,8 @@ mod tests;
 
 pub use content::{ContentCommit, ContentEdit, ContentEditor};
 pub use model::{Catalog, Selector};
-pub use snapshot::{Commit, Edit, OwnedEditor, Patch, Snapshot};
-pub use transaction::{Commit as CatalogCommit, Editor, Transaction};
+pub use snapshot::{Edit, OwnedEditor, Snapshot};
+pub use transaction::Editor;
 
 pub use crate::model::database_range::{
     Condition, ConditionSource, DataType, EmbeddedNumberBehavior, Expression, Field, Filter, Key,

@@ -11,14 +11,14 @@
     reason = "hand-built fixtures keep tolerance assertions focused"
 )]
 
-#[path = "../../litchi-odf-common/tests/support/odf_rezip.rs"]
+#[path = "../../../litchi-odf-common/tests/support/odf_rezip.rs"]
 mod odf_rezip;
 
 use std::sync::Arc;
 
+use crate::{Package, SourceBackedSpreadsheet};
 use litchi_core::OwnedSource;
 use litchi_odf_common::{ContentDefect, Defect, ToleranceReport};
-use litchi_ods::{Package, SourceBackedSpreadsheet};
 
 const SETTINGS: &str = r#"<table:calculation-settings table:automatic-find-labels="false" table:use-regular-expressions="false" table:use-wildcards="true"/>"#;
 
@@ -196,7 +196,7 @@ fn the_standalone_parser_reports_the_same_repairs() {
 fn a_skipped_child_is_never_silently_dropped_by_an_edit() {
     let bytes = with_settings_children(r#"<loext:vendor-setting loext:mode="fast"/>"#);
     let owned = Package::from_bytes(&bytes).unwrap().workbook().unwrap();
-    let snapshot = litchi_ods::settings::Snapshot::from_content_xml(owned.content_xml()).unwrap();
+    let snapshot = crate::settings::Snapshot::from_content_xml(owned.content_xml()).unwrap();
 
     // An unchanged commit borrows the source and keeps the vendor child.
     let unchanged = snapshot.transaction().commit().unwrap();

@@ -73,7 +73,8 @@ fn seeded_binary64_aggregates_match_exact_rational_observations() {
     let context = Context::new(&execution, Position::new("Main", 0, 0));
     for row in rows {
         let formula = row["formula"].as_str().expect("formula");
-        let expression = Expression::parse(formula).expect("closed expression parses");
+        let expression =
+            Expression::parse(formula, &Default::default()).expect("closed expression parses");
         let result = evaluate(&expression, &NoCells, &context, &Limits::default())
             .unwrap_or_else(|error| panic!("{formula}: {error}"));
         let Some(expected_hex) = row["expected_bits"].as_str() else {
@@ -129,7 +130,8 @@ fn targeted_aggregate_cancellation_matches_retained_exact_rational_goldens() {
     let context = Context::new(&execution, Position::new("Main", 0, 0));
     for row in rows {
         let formula = row["formula"].as_str().expect("formula");
-        let expression = Expression::parse(formula).expect("closed expression parses");
+        let expression =
+            Expression::parse(formula, &Default::default()).expect("closed expression parses");
         let result = evaluate(&expression, &NoCells, &context, &Limits::default())
             .unwrap_or_else(|error| panic!("{formula}: {error}"));
         let bits = u64::from_str_radix(

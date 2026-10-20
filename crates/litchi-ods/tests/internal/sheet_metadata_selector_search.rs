@@ -10,11 +10,11 @@ use std::{
     num::{NonZeroU64, NonZeroUsize},
 };
 
+use crate::{Merge, model::detective::Detective, sheet_metadata as metadata};
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits, Position,
     Resource,
 };
-use litchi_ods::{Merge, model::detective::Detective, sheet_metadata as metadata};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";

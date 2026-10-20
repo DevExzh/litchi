@@ -43,7 +43,7 @@ pub use litchi_odf_common::core::metadata::{
     UserDefinedMetadata, UserDefinedValueType,
 };
 pub use model::Snapshot;
-pub use transaction::{Editor, Transaction, XmlCommit};
+pub use transaction::Editor;
 
 /// The family error: typed limits plus the common-core payload.
 pub use litchi_odf_common::Error;

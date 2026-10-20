@@ -62,7 +62,8 @@ fn execution_with_core_limits(
 }
 
 fn parse(source: &str) -> Expression {
-    Expression::parse(source).unwrap_or_else(|error| panic!("{source:?} should parse: {error}"))
+    Expression::parse(source, &Default::default())
+        .unwrap_or_else(|error| panic!("{source:?} should parse: {error}"))
 }
 
 fn evaluate<'a>(

@@ -5,12 +5,12 @@ use std::{
     sync::Arc,
 };
 
+use crate::sheet_metadata::{self, Options, Snapshot};
+use crate::{Builder, SourceBackedSpreadsheet};
 use litchi_core::{
     Budget, CancellationSource, Error, ExecutionContext, ExecutionLimits, Limits, OwnedSource,
     Profile, Resource,
 };
-use litchi_ods::sheet_metadata::{self, Options, Snapshot};
-use litchi_ods::{Builder, SourceBackedSpreadsheet};
 
 const SOURCE: &str = concat!(
     "<office:document-content ",
@@ -86,7 +86,6 @@ fn cloned_context_retains_authority() {
         .commit(&original.clone())
         .expect("shared context clone");
     assert!(commit.changed());
-    assert_eq!(commit.patch().source_xml(), SOURCE);
 }
 
 #[test]
@@ -111,43 +110,6 @@ fn fresh_token_cannot_bypass_retained_source_cancellation() {
         assert_eq!(edit.is_no_op(), !changed);
         assert_eq!(source.source_xml(), SOURCE);
     }
-}
-
-#[test]
-fn patch_application_respects_destination_output_limit() {
-    let (_source_cancel, source_context) = context(budget());
-    let source =
-        Snapshot::parse_with_context(SOURCE, sheet_metadata::Limits::default(), &source_context)
-            .expect("source snapshot");
-    let mut edit = source.edit();
-    let mut value = options();
-    // Application-defined function strings are permitted metadata. This one
-    // makes the accepted target larger than the destination's output policy.
-    value.function = "f".repeat(2048);
-    edit.set_consolidation(Some(value))
-        .expect("stage larger owner");
-    let commit = edit.commit(&source_context).expect("originating commit");
-
-    let (_destination_cancel, destination_context) = context(budget());
-    let destination = Snapshot::parse_with_context(
-        SOURCE,
-        sheet_metadata::Limits::new(4096, 1024, 32, 1024, 1_000_000)
-            .expect("smaller destination policy"),
-        &destination_context,
-    )
-    .expect("exact source fits the destination policy");
-    assert!(commit.patch().target_xml().len() > destination.limits().max_output_bytes());
-    let error = commit
-        .patch()
-        .apply(&destination)
-        .expect_err("destination output ceiling");
-    let Error::ResourceLimit(limit) = error else {
-        panic!("typed resource limit expected: {error:?}")
-    };
-    assert_eq!(limit.resource, Resource::OutputBytes);
-    assert_eq!(limit.limit, 1024);
-    assert!(limit.observed > limit.limit);
-    assert_eq!(destination.source_xml(), SOURCE);
 }
 
 #[test]

@@ -2,12 +2,12 @@
 
 use std::num::{NonZeroU64, NonZeroUsize};
 
+use crate::model::label_range::Orientation;
+use crate::sheet_metadata::{
+    CellRange, Detective, LabelRange, Operation, OperationKind, Options, Snapshot,
+};
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as BudgetLimits, Profile,
-};
-use litchi_ods::model::label_range::Orientation;
-use litchi_ods::sheet_metadata::{
-    CellRange, Detective, LabelRange, Operation, OperationKind, Options, Snapshot,
 };
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -62,7 +62,7 @@ fn paired_empty_owners_are_read_and_noop_exact() {
     let content = paired_empty_content();
     let snapshot = Snapshot::parse_with_context(
         &content,
-        litchi_ods::sheet_metadata::Limits::default(),
+        crate::sheet_metadata::Limits::default(),
         &execution,
     )
     .expect("paired empty owners are valid XML empty productions");
@@ -76,9 +76,7 @@ fn paired_empty_owners_are_read_and_noop_exact() {
     assert_eq!(snapshot.label_ranges().len(), 1);
     assert!(
         snapshot
-            .cell_metadata(litchi_ods::sheet_metadata::CellSelector::by_name(
-                "Data", 0, 0
-            ))
+            .cell_metadata(crate::sheet_metadata::CellSelector::by_name("Data", 0, 0))
             .expect("cell read")
             .expect("cell")
             .range_source()
@@ -91,7 +89,7 @@ fn paired_empty_owners_are_read_and_noop_exact() {
     assert_eq!(commit.snapshot().source_xml(), content);
 
     let mut source_rewrite = snapshot.edit();
-    let selector = litchi_ods::sheet_metadata::CellSelector::by_name("Data", 0, 0);
+    let selector = crate::sheet_metadata::CellSelector::by_name("Data", 0, 0);
     let mut changed_source = source();
     changed_source.set_name("ChangedImport");
     source_rewrite
@@ -114,7 +112,7 @@ fn paired_empty_comments_are_retained_for_noop_and_refused_for_rewrite() {
     );
     let snapshot = Snapshot::parse_with_context(
         &content,
-        litchi_ods::sheet_metadata::Limits::default(),
+        crate::sheet_metadata::Limits::default(),
         &execution,
     )
     .expect("comments and PIs are ignored by empty productions");
@@ -143,12 +141,8 @@ fn root_office_children_follow_schema_order_and_unique_body() {
     let valid = format!(
         r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}"><office:scripts/><office:font-face-decls/><office:automatic-styles/><office:body><office:spreadsheet/></office:body></office:document-content>"#
     );
-    Snapshot::parse_with_context(
-        &valid,
-        litchi_ods::sheet_metadata::Limits::default(),
-        &execution,
-    )
-    .expect("legal office siblings");
+    Snapshot::parse_with_context(&valid, crate::sheet_metadata::Limits::default(), &execution)
+        .expect("legal office siblings");
 
     let duplicate = valid.replace(
         "<office:body><office:spreadsheet/></office:body>",
@@ -157,7 +151,7 @@ fn root_office_children_follow_schema_order_and_unique_body() {
     assert!(
         Snapshot::parse_with_context(
             &duplicate,
-            litchi_ods::sheet_metadata::Limits::default(),
+            crate::sheet_metadata::Limits::default(),
             &execution,
         )
         .is_err()
@@ -170,7 +164,7 @@ fn root_office_children_follow_schema_order_and_unique_body() {
     assert!(
         Snapshot::parse_with_context(
             &out_of_order,
-            litchi_ods::sheet_metadata::Limits::default(),
+            crate::sheet_metadata::Limits::default(),
             &execution,
         )
         .is_err()
@@ -185,7 +179,7 @@ fn labels_precede_epilogue_owners_without_a_table() {
     );
     let snapshot = Snapshot::parse_with_context(
         &content,
-        litchi_ods::sheet_metadata::Limits::default(),
+        crate::sheet_metadata::Limits::default(),
         &execution,
     )
     .expect("epilogue-only spreadsheet");
@@ -219,7 +213,7 @@ fn inserted_owners_remain_namespace_valid_at_an_aliased_spreadsheet_context() {
     );
     let snapshot = Snapshot::parse_with_context(
         &content,
-        litchi_ods::sheet_metadata::Limits::default(),
+        crate::sheet_metadata::Limits::default(),
         &execution,
     )
     .expect("aliased document");
@@ -229,12 +223,8 @@ fn inserted_owners_remain_namespace_valid_at_an_aliased_spreadsheet_context() {
     let commit = edit.commit(&execution).expect("insert aliased owner");
     let output = commit.snapshot().source_xml();
     assert!(output.contains("consolidation"));
-    Snapshot::parse_with_context(
-        output,
-        litchi_ods::sheet_metadata::Limits::default(),
-        &execution,
-    )
-    .expect("aliased output reopens");
+    Snapshot::parse_with_context(output, crate::sheet_metadata::Limits::default(), &execution)
+        .expect("aliased output reopens");
 }
 
 #[test]
@@ -245,7 +235,7 @@ fn default_table_elements_get_named_attribute_binding() {
     );
     let snapshot = Snapshot::parse_with_context(
         &content,
-        litchi_ods::sheet_metadata::Limits::default(),
+        crate::sheet_metadata::Limits::default(),
         &execution,
     )
     .expect("default table namespace document");
@@ -256,12 +246,8 @@ fn default_table_elements_get_named_attribute_binding() {
         .expect("insert default element owner");
     let output = commit.snapshot().source_xml();
     assert!(output.contains("label-ranges"));
-    Snapshot::parse_with_context(
-        output,
-        litchi_ods::sheet_metadata::Limits::default(),
-        &execution,
-    )
-    .expect("default namespace output reopens");
+    Snapshot::parse_with_context(output, crate::sheet_metadata::Limits::default(), &execution)
+        .expect("default namespace output reopens");
 }
 
 #[test]
@@ -272,11 +258,11 @@ fn local_xlink_alias_is_used_and_nested_declarations_do_not_satisfy_root() {
     );
     let snapshot = Snapshot::parse_with_context(
         &aliased,
-        litchi_ods::sheet_metadata::Limits::default(),
+        crate::sheet_metadata::Limits::default(),
         &execution,
     )
     .expect("local alias document");
-    let selector = litchi_ods::sheet_metadata::CellSelector::by_name("Data", 0, 0);
+    let selector = crate::sheet_metadata::CellSelector::by_name("Data", 0, 0);
     let mut edit = snapshot.edit();
     edit.set_cell_range_source(selector, source())
         .expect("stage aliased source");
@@ -290,7 +276,7 @@ fn local_xlink_alias_is_used_and_nested_declarations_do_not_satisfy_root() {
     );
     let nested_snapshot = Snapshot::parse_with_context(
         &nested,
-        litchi_ods::sheet_metadata::Limits::default(),
+        crate::sheet_metadata::Limits::default(),
         &execution,
     )
     .expect("nested alias document");
@@ -322,7 +308,7 @@ fn child_local_table_alias_is_preserved_or_rebound_on_rewrite() {
     );
     let snapshot = Snapshot::parse_with_context(
         &content,
-        litchi_ods::sheet_metadata::Limits::default(),
+        crate::sheet_metadata::Limits::default(),
         &execution,
     )
     .expect("child-local table alias document");
@@ -354,7 +340,7 @@ fn shadowed_table_alias_does_not_make_inserted_metadata_unbound() {
     );
     let snapshot = Snapshot::parse_with_context(
         &content,
-        litchi_ods::sheet_metadata::Limits::default(),
+        crate::sheet_metadata::Limits::default(),
         &execution,
     )
     .expect("shadowed alias document");
@@ -363,7 +349,7 @@ fn shadowed_table_alias_does_not_make_inserted_metadata_unbound() {
     let commit = edit.commit(&execution).expect("insert labels");
     Snapshot::parse_with_context(
         commit.snapshot().source_xml(),
-        litchi_ods::sheet_metadata::Limits::default(),
+        crate::sheet_metadata::Limits::default(),
         &execution,
     )
     .expect("shadowed alias output remains namespace-valid");
@@ -376,10 +362,9 @@ fn long_table_prefix_does_not_overrun_small_scratch_profile() {
     let content = format!(
         r#"<o:document-content xmlns:o="{OFFICE}" xmlns:{prefix}="{TABLE}"><o:body><o:spreadsheet><{prefix}:table {prefix}:name="Data"><{prefix}:table-row><{prefix}:table-cell/></{prefix}:table-row></{prefix}:table></o:spreadsheet></o:body></o:document-content>"#
     );
-    let limits =
-        litchi_ods::sheet_metadata::Limits::new(128 * 1024, 128 * 1024, 32, 1024, 1_000_000)
-            .and_then(|limits| limits.with_output_limits(128 * 1024, 1024))
-            .expect("finite small scratch profile");
+    let limits = crate::sheet_metadata::Limits::new(128 * 1024, 128 * 1024, 32, 1024, 1_000_000)
+        .and_then(|limits| limits.with_output_limits(128 * 1024, 1024))
+        .expect("finite small scratch profile");
     let snapshot = Snapshot::parse_with_context(&content, limits, &execution)
         .expect("long-prefix input fits profile");
     let mut edit = snapshot.edit();
@@ -401,11 +386,11 @@ fn locally_declared_known_owners_remain_editable_after_reopen() {
     );
     let snapshot = Snapshot::parse_with_context(
         &content,
-        litchi_ods::sheet_metadata::Limits::default(),
+        crate::sheet_metadata::Limits::default(),
         &execution,
     )
     .expect("base document");
-    let selector = litchi_ods::sheet_metadata::CellSelector::by_name("Data", 0, 0);
+    let selector = crate::sheet_metadata::CellSelector::by_name("Data", 0, 0);
     let mut first = snapshot.edit();
     first
         .set_consolidation(Some(options()))
@@ -441,10 +426,6 @@ fn locally_declared_known_owners_remain_editable_after_reopen() {
     let output = second_commit.snapshot().source_xml();
     assert!(output.contains("average"));
     assert!(output.contains("ImportAgain"));
-    Snapshot::parse_with_context(
-        output,
-        litchi_ods::sheet_metadata::Limits::default(),
-        &execution,
-    )
-    .expect("second output reopens");
+    Snapshot::parse_with_context(output, crate::sheet_metadata::Limits::default(), &execution)
+        .expect("second output reopens");
 }

@@ -4,23 +4,23 @@
 //! reference token and its decoded metadata: no workbook lookup, URI
 //! resolution, network access, or formula evaluation is involved.
 
-use litchi_core::{Error, Resource};
-use litchi_ods::codec::formula::reference::{
+use crate::codec::formula::reference::{
     Address, Endpoint, EndpointValue, Limits, Reference, SheetSelector, Subtable,
 };
-use litchi_ods::codec::formula::{
+use crate::codec::formula::{
     FormulaLimits, FormulaParser, ReferenceView, Token, extract_cell_refs, extract_references,
     is_valid_function,
 };
+use litchi_core::{Error, Resource};
 
 fn parse_reference(value: &str) -> Reference {
-    Reference::parse(value)
+    Reference::parse(value, &Default::default())
         .unwrap_or_else(|error| panic!("expected valid OpenFormula reference {value:?}: {error}"))
 }
 
 fn parse_formula_reference(value: &str) -> Reference {
     let formula = FormulaParser::new(value)
-        .parse()
+        .parse(&Default::default())
         .unwrap_or_else(|error| panic!("expected valid formula {value:?}: {error}"));
     assert_eq!(
         formula.text, value,
@@ -100,7 +100,7 @@ fn reference_body_with_length(length: usize) -> String {
 #[test]
 fn bracketed_references_are_tokens_and_original_formula_text_is_retained() {
     let formula = FormulaParser::new("of:=[.A1]")
-        .parse()
+        .parse(&Default::default())
         .expect("legacy-compatible bracketed cell remains parseable");
     assert_eq!(formula.text, "of:=[.A1]");
     assert!(matches!(formula.tokens.first(), Some(Token::CellRef(_))));
@@ -117,14 +117,14 @@ fn bracketed_references_are_tokens_and_original_formula_text_is_retained() {
     }
 
     let formula = FormulaParser::new("=A1+Sheet1.$B$2")
-        .parse()
+        .parse(&Default::default())
         .expect("legacy bare cell references remain parseable");
     assert_eq!(formula.text, "=A1+Sheet1.$B$2");
     assert!(matches!(formula.tokens[0], Token::CellRef(_)));
     assert!(matches!(formula.tokens[2], Token::CellRef(_)));
 
     let nested = FormulaParser::new("of:=SUM([.A1:.B2])")
-        .parse()
+        .parse(&Default::default())
         .expect("a bracketed reference is inert inside a function call");
     assert_eq!(nested.text, "of:=SUM([.A1:.B2])");
     assert!(
@@ -371,7 +371,7 @@ fn source_iris_are_decoded_and_remain_external_inert_metadata() {
     assert!(matches!(formula_reference, Reference::Source { .. }));
 
     let nested_formula = FormulaParser::new("of:=SUM(['file:///book.ods'#.A1])")
-        .parse()
+        .parse(&Default::default())
         .expect("external references remain inert inside a formula");
     let rich_references = extract_references(&nested_formula);
     assert!(matches!(
@@ -402,19 +402,19 @@ fn reference_error_is_distinct_and_cannot_be_made_source_qualified() {
     assert_eq!(reference.address(), None);
     assert!(matches!(reference, Reference::Error));
 
-    assert!(Reference::parse("[''#REF!]").is_err());
-    assert!(Reference::parse("['file:///book.ods'# #REF!]").is_err());
+    assert!(Reference::parse("[''#REF!]", &Default::default()).is_err());
+    assert!(Reference::parse("['file:///book.ods'# #REF!]", &Default::default()).is_err());
 }
 
 #[test]
 fn public_reference_parser_requires_the_normative_bracket_wrapper() {
     for input in [".A1", "Sheet1.A1", "#REF!"] {
         assert!(
-            Reference::parse(input).is_err(),
+            Reference::parse(input, &Default::default()).is_err(),
             "unbracketed reference was accepted by the public parser: {input:?}"
         );
     }
-    assert!(Reference::parse("[.A1]").is_ok());
+    assert!(Reference::parse("[.A1]", &Default::default()).is_ok());
 }
 
 #[test]
@@ -437,7 +437,7 @@ fn representative_functions_and_bare_cell_controls_remain_unchanged() {
 
     for input in ["=A1", "=AA10", "=Sheet1.A1", "=$A$1", "=.A1"] {
         let formula = FormulaParser::new(input)
-            .parse()
+            .parse(&Default::default())
             .unwrap_or_else(|error| panic!("legacy cell reference rejected {input:?}: {error}"));
         assert_eq!(formula.text, input);
         assert!(
@@ -459,14 +459,14 @@ fn formula_limits_are_exact_and_forward_into_nested_references() {
     let input = "=A1";
     let exact = FormulaLimits::default().with_max_bytes(input.len());
     let formula = FormulaParser::new(input)
-        .parse_with_limits(&exact)
+        .parse(&exact)
         .expect("formula at the byte limit must be admitted");
     assert_eq!(formula.text, input);
     assert_eq!(formula.tokens.len(), 1);
 
     let short = FormulaLimits::default().with_max_bytes(input.len() - 1);
     let byte_error = FormulaParser::new(input)
-        .parse_with_limits(&short)
+        .parse(&short)
         .expect_err("formula one byte over the limit must fail");
     let Error::ResourceLimit(byte_limit) = byte_error else {
         panic!("formula byte overflow lost its typed limit error: {byte_error}");
@@ -477,12 +477,12 @@ fn formula_limits_are_exact_and_forward_into_nested_references() {
 
     let one_token = FormulaLimits::default().with_max_tokens(1);
     let one = FormulaParser::new("=1")
-        .parse_with_limits(&one_token)
+        .parse(&one_token)
         .expect("one token at the token limit must be admitted");
     assert_eq!(one.tokens.len(), 1);
 
     let token_error = FormulaParser::new("=1+2")
-        .parse_with_limits(&one_token)
+        .parse(&one_token)
         .expect_err("a second token over the limit must fail");
     let Error::ResourceLimit(token_limit) = token_error else {
         panic!("formula token overflow lost its typed limit error: {token_error}");
@@ -495,7 +495,7 @@ fn formula_limits_are_exact_and_forward_into_nested_references() {
     // reports the configured token budget instead of a syntax fallback.
     let no_tokens = FormulaLimits::default().with_max_tokens(0);
     let malformed_error = FormulaParser::new("=~")
-        .parse_with_limits(&no_tokens)
+        .parse(&no_tokens)
         .expect_err("zero token budget must reject before parsing malformed input");
     let Error::ResourceLimit(malformed_limit) = malformed_error else {
         panic!(
@@ -509,13 +509,13 @@ fn formula_limits_are_exact_and_forward_into_nested_references() {
     let nested_exact =
         FormulaLimits::default().with_reference_limits(Limits::default().with_max_bytes(3));
     FormulaParser::new("of:=[.A1]")
-        .parse_with_limits(&nested_exact)
+        .parse(&nested_exact)
         .expect("nested reference at its body byte limit must be admitted");
 
     let nested_short =
         FormulaLimits::default().with_reference_limits(Limits::default().with_max_bytes(2));
     let nested_error = FormulaParser::new("of:=[.A1]")
-        .parse_with_limits(&nested_short)
+        .parse(&nested_short)
         .expect_err("nested reference byte overflow must be forwarded");
     let Error::ResourceLimit(nested_limit) = nested_error else {
         panic!("nested reference limit was converted to syntax error: {nested_error}");
@@ -527,7 +527,7 @@ fn formula_limits_are_exact_and_forward_into_nested_references() {
     let nested_name =
         FormulaLimits::default().with_reference_limits(Limits::default().with_max_name_bytes(3));
     let name_error = FormulaParser::new("of:=[Sheet.A1]")
-        .parse_with_limits(&nested_name)
+        .parse(&nested_name)
         .expect_err("nested reference name overflow must be forwarded");
     assert!(matches!(name_error, Error::ResourceLimit(_)));
 }
@@ -563,7 +563,7 @@ fn malformed_mixed_and_overflow_references_are_refused() {
         "[#ref!]",
     ] {
         assert!(
-            Reference::parse(input).is_err(),
+            Reference::parse(input, &Default::default()).is_err(),
             "malformed reference was accepted: {input:?}"
         );
     }
@@ -574,9 +574,9 @@ fn source_and_locator_boundaries_are_bounded_without_losing_atomicity() {
     // `max_bytes` is the body budget: the two outer brackets do not consume
     // it.  Check both sides of the boundary through the public parser.
     let exact_body = Limits::default().with_max_bytes(".A1".len());
-    assert!(Reference::parse_with_limits("[.A1]", &exact_body).is_ok());
+    assert!(Reference::parse("[.A1]", &exact_body).is_ok());
     let one_byte_short = Limits::default().with_max_bytes(".A1".len() - 1);
-    assert!(Reference::parse_with_limits("[.A1]", &one_byte_short).is_err());
+    assert!(Reference::parse("[.A1]", &one_byte_short).is_err());
 
     // FormulaParser uses the same body budget after it has removed the
     // bracket wrapper.  Keep the constructed names within the independent
@@ -585,7 +585,7 @@ fn source_and_locator_boundaries_are_bounded_without_losing_atomicity() {
     let default_body_limit = Limits::default().max_bytes();
     let exact_formula = format!("of:=[{}]", reference_body_with_length(default_body_limit));
     let exact = FormulaParser::new(&exact_formula)
-        .parse()
+        .parse(&Default::default())
         .expect("formula reference at the body limit must be admitted");
     assert_eq!(exact.text, exact_formula);
     assert!(exact.tokens.iter().any(|token| matches!(
@@ -598,7 +598,7 @@ fn source_and_locator_boundaries_are_bounded_without_losing_atomicity() {
         reference_body_with_length(default_body_limit + 1)
     );
     let over_error = FormulaParser::new(&over_formula)
-        .parse()
+        .parse(&Default::default())
         .expect_err("formula reference one byte over the body limit must fail");
     assert!(
         matches!(&over_error, Error::ResourceLimit(_)),
@@ -608,30 +608,30 @@ fn source_and_locator_boundaries_are_bounded_without_losing_atomicity() {
     // Name limits are measured after UTF-8 decoding and doubled-apostrophe
     // unescaping, rather than by their lexical spelling.
     let exact_unicode = Limits::default().with_max_name_bytes("界".len());
-    assert!(Reference::parse_with_limits("['界'.A1]", &exact_unicode).is_ok());
+    assert!(Reference::parse("['界'.A1]", &exact_unicode).is_ok());
     let unicode_short = Limits::default().with_max_name_bytes("界".len() - 1);
-    assert!(Reference::parse_with_limits("['界'.A1]", &unicode_short).is_err());
+    assert!(Reference::parse("['界'.A1]", &unicode_short).is_err());
 
     let exact_decoded = Limits::default().with_max_name_bytes(3);
-    assert!(Reference::parse_with_limits("['a''b'.A1]", &exact_decoded).is_ok());
+    assert!(Reference::parse("['a''b'.A1]", &exact_decoded).is_ok());
     let decoded_short = Limits::default().with_max_name_bytes(2);
-    assert!(Reference::parse_with_limits("['a''b'.A1]", &decoded_short).is_err());
-    assert!(Reference::parse_with_limits("['a''b'#.A1]", &exact_decoded).is_ok());
-    assert!(Reference::parse_with_limits("['a''b'#.A1]", &decoded_short).is_err());
+    assert!(Reference::parse("['a''b'.A1]", &decoded_short).is_err());
+    assert!(Reference::parse("['a''b'#.A1]", &exact_decoded).is_ok());
+    assert!(Reference::parse("['a''b'#.A1]", &decoded_short).is_err());
 
     let body_limit = Limits::default().with_max_bytes(2);
-    assert!(Reference::parse_with_limits("[.A1]", &body_limit).is_err());
+    assert!(Reference::parse("[.A1]", &body_limit).is_err());
 
     let name_limit = Limits::default().with_max_name_bytes(3);
-    assert!(Reference::parse_with_limits("[Sheet.A1]", &name_limit).is_err());
-    assert!(Reference::parse_with_limits("['../book.ods'#.A1]", &name_limit).is_err());
+    assert!(Reference::parse("[Sheet.A1]", &name_limit).is_err());
+    assert!(Reference::parse("['../book.ods'#.A1]", &name_limit).is_err());
 
     let component_limit = Limits::default().with_max_components(1);
-    assert!(Reference::parse_with_limits("[.A1]", &component_limit).is_err());
+    assert!(Reference::parse("[.A1]", &component_limit).is_err());
 
     let oversized_source = "a".repeat(Limits::default().max_name_bytes() + 1);
     let oversized_reference = format!("['{oversized_source}'#.A1]");
-    let source_error = Reference::parse(&oversized_reference)
+    let source_error = Reference::parse(&oversized_reference, &Default::default())
         .expect_err("an oversized source must fail before it can be retained");
     assert!(
         matches!(&source_error, Error::ResourceLimit(_)),
@@ -646,7 +646,7 @@ fn source_and_locator_boundaries_are_bounded_without_losing_atomicity() {
     );
     let formula = format!("of:={oversized_reference}");
     let formula_error = FormulaParser::new(&formula)
-        .parse()
+        .parse(&Default::default())
         .expect_err("the formula path must propagate source admission refusal");
     assert!(
         matches!(&formula_error, Error::ResourceLimit(_)),
@@ -660,7 +660,7 @@ fn source_and_locator_boundaries_are_bounded_without_losing_atomicity() {
         "formula path converted source limit refusal into a generic fallback: {formula_error}"
     );
 
-    let valid = Reference::parse_with_limits(
+    let valid = Reference::parse(
         "[''#.A1:.B2]",
         &Limits::default()
             .with_max_bytes(64)

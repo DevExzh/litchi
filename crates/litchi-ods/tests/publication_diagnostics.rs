@@ -1,5 +1,5 @@
 use litchi_core::Result;
-use litchi_ods::document::{LogicalRowEdit, PublicationRoute};
+use litchi_ods::document::{LogicalRowOperation, PublicationRoute};
 use litchi_ods::names::{Expression, Scope};
 use litchi_ods::{Builder, Cell, CellValue, Package, Sheet};
 
@@ -73,7 +73,7 @@ fn logical_rebuild_is_not_reclassified_by_a_later_noop_splice() -> Result<()> {
     // helper therefore returns the current candidate bytes unchanged.
     edit.edit_logical_rows(
         "Data",
-        &[LogicalRowEdit::Move {
+        &[LogicalRowOperation::Move {
             at: 0,
             count: 1,
             to: 0,

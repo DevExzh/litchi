@@ -1,10 +1,10 @@
-mod support;
+use super::support;
 
-use litchi_odf_common::package::raw_identical_members;
-use litchi_ods::{
+use crate::{
     Package,
     content_validation::{self, Definition, DisplayList, Error},
 };
+use litchi_odf_common::package::raw_identical_members;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
@@ -78,25 +78,6 @@ fn absent_owner_crud_is_clone_staged_reversible_and_exact_source_checked() {
         target.definition("decimal").unwrap().display_list(),
         Some(DisplayList::SortAscending)
     );
-
-    let applied = commit.patch().apply(&snapshot).unwrap();
-    assert_eq!(applied.content_xml(), commit.content_xml());
-    let foreign_xml = source.replace("Sheet", "Foreign");
-    let foreign = content_validation::Snapshot::parse(&foreign_xml).unwrap();
-    assert_eq!(
-        commit.patch().apply(&foreign).unwrap_err(),
-        Error::SourceMismatch
-    );
-
-    let inverse = commit.patch().inverse().unwrap();
-    let restored = inverse.apply(&target).unwrap();
-    assert_eq!(restored.content_xml(), source);
-    assert_eq!(
-        inverse
-            .apply(&content_validation::Snapshot::parse(&source).unwrap())
-            .unwrap_err(),
-        Error::SourceMismatch
-    );
 }
 
 #[test]
@@ -110,10 +91,9 @@ fn rollback_and_semantic_noops_retain_the_exact_source() {
     assert_eq!(edit.set(same).unwrap().unwrap().name(), "v");
     edit.update("v", |_definition| Ok(())).unwrap();
     edit.add(Definition::new("temporary").unwrap()).unwrap();
-    edit.rollback().unwrap();
+    edit.reset().unwrap();
     let commit = edit.commit().unwrap();
     assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
     assert_eq!(commit.content_xml(), source);
 }
 
@@ -264,62 +244,6 @@ fn unified_publication_preserves_members_and_enforces_security_only_at_commit() 
 }
 
 #[test]
-fn unified_patch_apply_is_stale_safe_reversible_and_failure_atomic() {
-    let content = format!(
-        r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}"><office:body><office:spreadsheet><table:table table:name="Sheet"/></office:spreadsheet></office:body></office:document-content>"#
-    );
-    let source = package(&content);
-    let semantic_source = content_validation::Snapshot::parse(&content).unwrap();
-    let mut semantic_edit = semantic_source.edit().unwrap();
-    semantic_edit.add(Definition::new("v").unwrap()).unwrap();
-    let semantic_commit = semantic_edit.commit().unwrap();
-    let patch = semantic_commit.patch().clone();
-
-    let document_source = Package::from_bytes(&source).unwrap();
-    let mut document_edit = document_source.edit().unwrap();
-    document_edit
-        .apply_content_validation_patch(&patch)
-        .unwrap();
-    let target = document_edit.commit().unwrap();
-    let target_content = Package::from_bytes(target.package().as_bytes())
-        .unwrap()
-        .workbook()
-        .unwrap()
-        .content_xml()
-        .to_string();
-    let semantic_target = content_validation::Snapshot::parse(&target_content).unwrap();
-    let inverse = patch.inverse().unwrap();
-    assert_eq!(
-        inverse.apply(&semantic_target).unwrap().content_xml(),
-        content
-    );
-
-    let mut restore = target.package().edit().unwrap();
-    restore.apply_content_validation_patch(&inverse).unwrap();
-    let restored = restore.commit().unwrap();
-    assert_eq!(
-        Package::from_bytes(restored.package().as_bytes())
-            .unwrap()
-            .workbook()
-            .unwrap()
-            .content_xml(),
-        content
-    );
-    assert!(
-        raw_identical_members(&source, restored.package().as_bytes())
-            .unwrap()
-            .contains("Pictures/opaque.bin")
-    );
-
-    let foreign_content = content.replace("Sheet", "Foreign");
-    let foreign = package(&foreign_content);
-    let foreign_snapshot = Package::from_bytes(&foreign).unwrap();
-    let mut stale = foreign_snapshot.edit().unwrap();
-    assert!(stale.apply_content_validation_patch(&patch).is_err());
-    assert_eq!(stale.as_bytes(), foreign);
-}
-
-#[test]
 fn typed_operation_and_output_limits_are_failure_atomic() {
     let source = document(r#"<t:table t:name="Sheet"/>"#);
     let operation_snapshot = content_validation::Snapshot::parse_with_limits(
@@ -356,20 +280,6 @@ fn typed_operation_and_output_limits_are_failure_atomic() {
 }
 
 #[test]
-fn tight_source_input_and_larger_output_support_add_and_patch_readback() {
-    let source = document(r#"<t:table t:name="Sheet"/>"#);
-    let limits = content_validation::Limits::default()
-        .with_input_bytes(source.len())
-        .with_output_bytes(source.len() + 1024);
-    let snapshot = content_validation::Snapshot::parse_with_limits(&source, limits).unwrap();
-    let mut edit = snapshot.edit().unwrap();
-    edit.add(Definition::new("v").unwrap()).unwrap();
-    let commit = edit.commit().unwrap();
-    assert!(commit.content_xml().len() > source.len());
-    assert!(commit.patch().apply(&snapshot).unwrap().changed());
-}
-
-#[test]
 fn tiny_output_budget_refuses_before_rendering_large_escaped_values() {
     let source = document(r#"<t:table t:name="Sheet"/>"#);
     let limits = content_validation::Limits::default()
@@ -392,27 +302,6 @@ fn tiny_output_budget_refuses_before_rendering_large_escaped_values() {
 }
 
 #[test]
-fn inverse_handles_mixed_replacement_deletion_and_addition_offsets() {
-    let source = document(
-        r#"<t:content-validations><t:content-validation t:name="change" t:allow-empty-cell="false"/><t:content-validation t:name="remove"/><t:content-validation t:name="keep"/></t:content-validations>"#,
-    );
-    let snapshot = content_validation::Snapshot::parse(&source).unwrap();
-    let mut edit = snapshot.edit().unwrap();
-    edit.update("change", |definition| {
-        definition.set_allow_empty_cell(Some(true));
-        Ok(())
-    })
-    .unwrap();
-    edit.remove("remove").unwrap();
-    edit.add(Definition::new("addition-with-a-longer-name").unwrap())
-        .unwrap();
-    let commit = edit.commit().unwrap();
-    let target = content_validation::Snapshot::parse(commit.content_xml()).unwrap();
-    let restored = commit.patch().inverse().unwrap().apply(&target).unwrap();
-    assert_eq!(restored.content_xml(), source);
-}
-
-#[test]
 fn clear_removes_an_unbound_catalog_and_reparses_as_absent() {
     let source = document(
         r#"<t:content-validations><t:content-validation t:name="one"/><t:content-validation t:name="two"/></t:content-validations><t:table t:name="Sheet"/>"#,
@@ -424,16 +313,6 @@ fn clear_removes_an_unbound_catalog_and_reparses_as_absent() {
     let target = content_validation::Snapshot::parse(commit.content_xml()).unwrap();
     assert!(target.definitions().is_empty());
     assert!(!commit.content_xml().contains("content-validations"));
-    assert_eq!(
-        commit
-            .patch()
-            .inverse()
-            .unwrap()
-            .apply(&target)
-            .unwrap()
-            .content_xml(),
-        source
-    );
 }
 
 #[test]

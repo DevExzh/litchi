@@ -1,6 +1,6 @@
 //! Publication and execution-policy regressions for inert DDE facades.
 
-mod support;
+use super::support;
 
 use std::{
     io,
@@ -11,6 +11,7 @@ use std::{
     },
 };
 
+use crate::{Package, SourceBackedSpreadsheet, builder::Workbook as Draft, dde};
 use litchi_core::{
     Budget, CancellationSource, Error, ExecutionContext, ExecutionLimits, Limits, OwnedSource,
     Profile, ReadAt, Resource, SourceVersion,
@@ -22,7 +23,6 @@ use litchi_odf_common::{
     },
     package::raw_identical_members,
 };
-use litchi_ods::{MutableSpreadsheet, Package, SourceBackedSpreadsheet, dde};
 
 const CONTENT: &str = concat!(
     "<office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" ",
@@ -95,7 +95,7 @@ fn bom_prefixed_content_keeps_exact_transaction_coordinates() {
 
 #[test]
 fn ordinary_and_mutable_noops_preserve_exact_content() {
-    let mut ordinary = MutableSpreadsheet::from_workbook(
+    let mut ordinary = Draft::from_workbook(
         Package::from_bytes(&package())
             .expect("ordinary fixture")
             .workbook()
@@ -106,7 +106,7 @@ fn ordinary_and_mutable_noops_preserve_exact_content() {
     ordinary.edit_dde(|_| Ok(())).expect("ordinary no-op");
     assert_eq!(ordinary.workbook().content_xml(), CONTENT);
 
-    let mut mutable = MutableSpreadsheet::from_workbook(
+    let mut mutable = Draft::from_workbook(
         Package::from_bytes(&package())
             .expect("mutable fixture")
             .workbook()
@@ -122,7 +122,7 @@ fn ordinary_and_mutable_noops_preserve_exact_content() {
 
 #[test]
 fn closure_failure_leaves_both_facades_unchanged() {
-    let mut ordinary = MutableSpreadsheet::from_workbook(
+    let mut ordinary = Draft::from_workbook(
         Package::from_bytes(&package())
             .expect("ordinary fixture")
             .workbook()
@@ -132,7 +132,7 @@ fn closure_failure_leaves_both_facades_unchanged() {
     assert!(matches!(error, Err(Error::Unsupported(message)) if message == "caller abort"));
     assert_eq!(ordinary.workbook().content_xml(), CONTENT);
 
-    let mut mutable = MutableSpreadsheet::from_workbook(
+    let mut mutable = Draft::from_workbook(
         Package::from_bytes(&package())
             .expect("mutable fixture")
             .workbook()
@@ -148,7 +148,7 @@ fn closure_failure_leaves_both_facades_unchanged() {
 
 #[test]
 fn cancellation_during_closure_refuses_even_noop_publication() {
-    let mut ordinary = MutableSpreadsheet::from_workbook(
+    let mut ordinary = Draft::from_workbook(
         Package::from_bytes(&package())
             .expect("ordinary fixture")
             .workbook()
@@ -213,62 +213,8 @@ fn execution_limit_errors_retain_the_callers_resource_and_scope() {
 }
 
 #[test]
-fn ordinary_patch_and_inverse_rehydrate_the_complete_facade() {
-    let mut ordinary = MutableSpreadsheet::from_workbook(
-        Package::from_bytes(&package())
-            .expect("ordinary fixture")
-            .workbook()
-            .expect("ordinary fixture"),
-    );
-    let (_cancel, execution) = context();
-    let before = ordinary
-        .dde_with(dde::Limits::default(), &execution)
-        .expect("snapshot");
-    let mut edit = before.edit();
-    edit.set_sheet_source("Data", replacement_source())
-        .expect("stage source");
-    let commit = edit.commit(&execution).expect("commit source");
-    assert!(commit.changed());
-    ordinary
-        .apply_dde_patch(commit.patch())
-        .expect("apply patch");
-    assert_eq!(
-        ordinary.dde().expect("readback").sheet_sources()[0]
-            .source()
-            .item(),
-        "replacement-values"
-    );
-    assert!(
-        ordinary
-            .workbook()
-            .content_xml()
-            .contains("office:value=\"42\"")
-    );
-    ordinary
-        .apply_dde_patch(&commit.patch().inverse())
-        .expect("apply inverse");
-    assert_eq!(ordinary.workbook().content_xml(), CONTENT);
-
-    let mut mutable = MutableSpreadsheet::from_workbook(
-        Package::from_bytes(&package())
-            .expect("mutable fixture")
-            .workbook()
-            .expect("mutable fixture"),
-    );
-    mutable
-        .edit_dde(|edit| edit.set_sheet_source("Data", replacement_source()))
-        .expect("mutable edit");
-    assert_eq!(
-        mutable.dde().expect("mutable readback").sheet_sources()[0]
-            .source()
-            .item(),
-        "replacement-values"
-    );
-}
-
-#[test]
 fn failed_closure_after_staging_does_not_publish() {
-    let mut ordinary = MutableSpreadsheet::from_workbook(
+    let mut ordinary = Draft::from_workbook(
         Package::from_bytes(&package())
             .expect("ordinary fixture")
             .workbook()
@@ -292,7 +238,7 @@ fn signature_owner_refuses_changed_dde_but_retains_exact_noops() {
             "application/vnd.oasis.opendocument.digital-signature",
         ),
     ]);
-    let mut ordinary = MutableSpreadsheet::from_workbook(
+    let mut ordinary = Draft::from_workbook(
         Package::from_bytes(&signed)
             .expect("signed fixture")
             .workbook()
@@ -303,7 +249,7 @@ fn signature_owner_refuses_changed_dde_but_retains_exact_noops() {
     assert_eq!(ordinary.workbook().content_xml(), CONTENT);
     ordinary.edit_dde(|_| Ok(())).expect("signed no-op");
 
-    let mut mutable = MutableSpreadsheet::from_workbook(
+    let mut mutable = Draft::from_workbook(
         Package::from_bytes(&signed)
             .expect("signed mutable fixture")
             .workbook()

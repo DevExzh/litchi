@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
-use litchi_core::OwnedSource;
-use litchi_ods::{
-    Builder, CellView, MutableSpreadsheet, Package, SourceBackedSpreadsheet,
+use crate::{
+    Builder, CellView, Package, SourceBackedSpreadsheet,
+    builder::Workbook as Draft,
     model::source::CellRange,
     model::structure::StyleUsage,
     styles::table_template::{Region, Style, Template},
 };
+use litchi_core::OwnedSource;
 
 const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4"><office:body><office:spreadsheet><table:table table:name="Data"><table:title>Revenue &amp; Plan</table:title><table:desc>Imported source</table:desc><table:table-row><table:table-cell office:value-type="string"><table:cell-range-source table:name="DataRange" table:last-column-spanned="2" table:last-row-spanned="3" xlink:type="simple" xlink:href="source.ods#Data.A1:B3" xlink:actuate="onRequest" table:filter-name="csv"/><text:p>cached</text:p></table:table-cell></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#;
 
@@ -66,7 +67,7 @@ fn worksheet_metadata_edit_is_failure_atomic_and_reopenable() {
         .expect("build")
         .to_bytes()
         .expect("build");
-    let mut mutable = MutableSpreadsheet::from_workbook(
+    let mut mutable = Draft::from_workbook(
         Package::from_bytes(&bytes)
             .expect("open")
             .workbook()
@@ -106,7 +107,7 @@ fn table_template_builder_and_package_lifecycle_reopen() {
         .expect("build with styles")
         .to_bytes()
         .expect("build with styles");
-    let mut spreadsheet = MutableSpreadsheet::from_workbook(
+    let mut spreadsheet = Draft::from_workbook(
         Package::from_bytes(&bytes)
             .expect("open styles")
             .workbook()
@@ -146,7 +147,7 @@ fn table_template_edit_creates_missing_styles_owner() {
         .expect("minimal package")
         .to_bytes()
         .expect("minimal package");
-    let mut spreadsheet = MutableSpreadsheet::from_workbook(
+    let mut spreadsheet = Draft::from_workbook(
         Package::from_bytes(&bytes)
             .expect("open")
             .workbook()
@@ -163,14 +164,9 @@ fn table_template_edit_creates_missing_styles_owner() {
             .templates(),
         &[template]
     );
-    let snapshot = spreadsheet.table_templates().expect("snapshot");
-    let mut edit = snapshot.edit();
-    edit.clear().expect("clear");
-    let commit = edit.commit().expect("remove template");
-    assert!(commit.changed());
     spreadsheet
-        .apply_table_template_patch(commit.patch())
-        .expect("apply clear");
+        .edit_table_templates(|edit| edit.clear())
+        .expect("remove template");
     assert!(
         spreadsheet
             .table_templates()
@@ -218,7 +214,7 @@ fn metadata_rewrite_refuses_comment_or_pi_loss() {
         .expect("build source")
         .to_bytes()
         .expect("build source");
-    let mut mutable = MutableSpreadsheet::from_workbook(
+    let mut mutable = Draft::from_workbook(
         Package::from_bytes(&bytes)
             .expect("open")
             .workbook()
@@ -239,7 +235,7 @@ fn row_and_table_metadata_changes_use_the_full_table_fallback() {
         .expect("build")
         .to_bytes()
         .expect("build");
-    let mut mutable = MutableSpreadsheet::from_workbook(
+    let mut mutable = Draft::from_workbook(
         Package::from_bytes(&bytes)
             .expect("open")
             .workbook()
@@ -251,14 +247,11 @@ fn row_and_table_metadata_changes_use_the_full_table_fallback() {
         .set_cell(
             0,
             0,
-            litchi_ods::Cell::new(
-                litchi_ods::CellValue::Text("changed".to_string()),
-                "changed",
-            ),
+            crate::Cell::new(crate::CellValue::Text("changed".to_string()), "changed"),
         )
         .expect("cell");
     mutable.set_sheets(vec![sheet]).expect("combined edit");
-    let reopened = Package::from_bytes(&mutable.to_bytes())
+    let reopened = Package::from_bytes(mutable.build().expect("the draft builds").as_bytes())
         .expect("reopen")
         .workbook()
         .expect("reopen");
@@ -321,7 +314,7 @@ fn normative_table_template_usage_round_trips_through_sheet_edit() {
         }
     );
 
-    let mut metadata_only = MutableSpreadsheet::from_workbook(
+    let mut metadata_only = Draft::from_workbook(
         Package::from_bytes(&bytes)
             .expect("metadata open")
             .workbook()
@@ -345,7 +338,7 @@ fn normative_table_template_usage_round_trips_through_sheet_edit() {
         .set_template_name(Some("Other Bands".to_string()))
         .expect("template name");
     edited.style_usage.use_last_column_styles = Some(true);
-    let mut mutable = MutableSpreadsheet::from_workbook(
+    let mut mutable = Draft::from_workbook(
         Package::from_bytes(&bytes)
             .expect("mutable open")
             .workbook()
@@ -356,7 +349,7 @@ fn normative_table_template_usage_round_trips_through_sheet_edit() {
     assert!(xml.contains(r#"table:template-name="Other Bands""#));
     assert!(xml.contains(r#"table:use-last-column-styles="true""#));
 
-    let reopened = Package::from_bytes(&mutable.to_bytes())
+    let reopened = Package::from_bytes(mutable.build().expect("the draft builds").as_bytes())
         .expect("reopen")
         .workbook()
         .expect("reopen");

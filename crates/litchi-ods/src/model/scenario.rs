@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 mod transaction;
 
-pub use transaction::{Commit, Edit, Patch};
+pub use transaction::Edit;
 
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
@@ -753,7 +753,7 @@ impl Snapshot {
 
     /// Begin a source-checked, failure-atomic edit of scenario declarations.
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit::new(self.clone())
     }
 

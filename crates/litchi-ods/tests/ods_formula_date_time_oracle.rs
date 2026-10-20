@@ -270,7 +270,7 @@ fn date_time_oracle_replays_all_contract_vectors() {
             let formula = row["formula"]
                 .as_str()
                 .unwrap_or_else(|| panic!("{case}: missing formula"));
-            let expression = Expression::parse(formula)
+            let expression = Expression::parse(formula, &Default::default())
                 .unwrap_or_else(|error| panic!("{case}: {formula} should parse: {error}"));
             let resolver = EmptyResolver::new();
             let context = Context::new(&execution, Position::new("Main", 0, 0))

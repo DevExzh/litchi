@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use litchi_core::OwnedSource;
-use litchi_ods::{
-    Builder, MutableSpreadsheet, Package, SourceBackedSpreadsheet, Workbook, scenario,
+use crate::{
+    Builder, Package, SourceBackedSpreadsheet, Workbook, builder::Workbook as Draft, scenario,
 };
+use litchi_core::OwnedSource;
 
 const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4"><office:body><office:spreadsheet><table:table table:name="One"><table:title>Keep title</table:title><table:scenario table:scenario-ranges=".A1:.B2" table:is-active="true" table:comment="Original"/><table:table-row/></table:table><table:table table:name="Two"><table:desc>Keep description</table:desc><table:table-row/></table:table></office:spreadsheet></office:body></office:document-content>"#;
 
@@ -26,39 +26,8 @@ fn spreadsheet() -> Workbook {
 }
 
 #[test]
-fn scenario_noop_inverse_and_stale_source_are_exact() {
-    let before = scenario::Snapshot::parse(CONTENT).expect("parse scenario source");
-    let noop = before.edit().commit().expect("no-op commit");
-    assert!(!noop.changed());
-    assert!(noop.patch().is_empty());
-    assert_eq!(noop.snapshot().source_xml(), CONTENT);
-
-    let mut edit = before.edit();
-    edit.replace_sheet(
-        "One",
-        scenario::Scenario::new("One", vec![range(".C1:.D2")], scenario::State::Inactive)
-            .expect("scenario")
-            .with_comment("Edited"),
-    )
-    .expect("replace");
-    let commit = edit.commit().expect("commit");
-    assert!(commit.changed());
-    assert!(commit.snapshot().source_xml().contains(".C1:.D2"));
-    let restored = commit
-        .patch()
-        .inverse()
-        .apply(commit.snapshot())
-        .expect("inverse");
-    assert_eq!(restored.snapshot().source_xml(), CONTENT);
-
-    let other =
-        scenario::Snapshot::parse(&CONTENT.replace("Keep title", "Other")).expect("other source");
-    assert!(commit.patch().apply(&other).is_err());
-}
-
-#[test]
 fn owned_facade_scenario_edit_is_atomic_and_reopenable() {
-    let mut spreadsheet = MutableSpreadsheet::from_workbook(spreadsheet());
+    let mut spreadsheet = Draft::from_workbook(spreadsheet());
     let original = spreadsheet.workbook().content_xml().to_owned();
     spreadsheet
         .edit_scenarios(|edit| {
@@ -86,7 +55,11 @@ fn owned_facade_scenario_edit_is_atomic_and_reopenable() {
         2
     );
 
-    let bytes = spreadsheet.to_bytes();
+    let bytes = spreadsheet
+        .build()
+        .expect("the draft builds")
+        .as_bytes()
+        .to_vec();
     let reopened = Package::from_bytes(&bytes)
         .expect("reopen")
         .workbook()
@@ -96,7 +69,7 @@ fn owned_facade_scenario_edit_is_atomic_and_reopenable() {
         2
     );
 
-    let mut failed = MutableSpreadsheet::from_workbook(reopened);
+    let mut failed = Draft::from_workbook(reopened);
     assert!(
         failed
             .edit_scenarios(|edit| {

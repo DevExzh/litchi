@@ -1,8 +1,8 @@
+use crate::{
+    Builder, Cell, CellValue, Package, Sheet, builder::Workbook as Draft, worksheet::Snapshot,
+};
 use litchi_core::Position;
 use litchi_odf_common::{constants, core::PackageWriter, package::raw_identical_members};
-use litchi_ods::{
-    Builder, Cell, CellValue, MutableSpreadsheet, Package, Sheet, worksheet::Snapshot,
-};
 
 const OPAQUE_ROW: &str = concat!(
     r#"<table:table-row><table:table-cell office:value-type="string">"#,
@@ -84,40 +84,6 @@ fn row_splice_package() -> litchi_core::Result<Vec<u8>> {
 }
 
 #[test]
-fn worksheet_patch_round_trips_cells_order_and_inverse() -> litchi_core::Result<()> {
-    let source = Builder::new().build()?.to_bytes()?;
-    let snapshot = Snapshot::from_bytes(source.clone())?;
-    let mut edit = snapshot.edit();
-    edit.add(Sheet::new("First")?)?;
-    edit.add(Sheet::new("Second")?)?;
-    edit.set_cell(
-        "Second",
-        0,
-        0,
-        Cell::new(CellValue::Text("value".to_string()), "value"),
-    )?;
-    edit.move_to("Second", Position::new(0))?;
-    let commit = edit.commit()?;
-
-    assert!(commit.changed());
-    assert_eq!(commit.snapshot().sheets()[0].name, "Second");
-    let stored = commit.snapshot().sheets()[0].cell(0, 0).ok_or_else(|| {
-        litchi_core::Error::InvalidFormat("the stored cell is missing".to_string())
-    })?;
-    assert_eq!(stored.text, "value");
-    let spreadsheet = Package::from_bytes(commit.snapshot().as_bytes())?.workbook()?;
-    litchi_odf_common::compact_xml::validate(
-        spreadsheet.content_xml().as_bytes(),
-        litchi_odf_common::compact_xml::Limits::default(),
-    )?;
-
-    let restored = commit.patch().inverse().apply(commit.snapshot())?;
-    assert_eq!(restored.snapshot().as_bytes(), source);
-    assert!(commit.patch().apply(&snapshot).is_ok());
-    Ok(())
-}
-
-#[test]
 fn failed_worksheet_staging_does_not_mutate_the_draft() -> litchi_core::Result<()> {
     let mut builder = Builder::new();
     builder.add_sheet(Sheet::new("Data")?)?;
@@ -137,7 +103,7 @@ fn failed_worksheet_staging_does_not_mutate_the_draft() -> litchi_core::Result<(
 #[test]
 fn mutable_facade_publishes_batched_worksheet_edits() -> litchi_core::Result<()> {
     let source = Builder::new().build()?.to_bytes()?;
-    let mut mutable = MutableSpreadsheet::from_workbook(Package::from_bytes(&source)?.workbook()?);
+    let mut mutable = Draft::from_workbook(Package::from_bytes(&source)?.workbook()?);
     mutable.edit_worksheets(|edit| {
         edit.add(Sheet::new("Data")?)?;
         edit.set_formula("Data", 0, 0, "of:=1")?;
@@ -274,7 +240,7 @@ fn row_local_commit_preserves_untouched_opaque_rows_and_refuses_touched_ones()
     assert!(reopened.content_xml().contains(OPAQUE_ROW));
     assert!(matches!(
         reopened.cell("Data", 1, 0),
-        Some(litchi_ods::CellView::Stored(cell)) if cell.text == "changed"
+        Some(crate::CellView::Stored(cell)) if cell.text == "changed"
     ));
     let identical =
         raw_identical_members(&source, commit.snapshot().as_bytes()).ok_or_else(|| {
@@ -284,15 +250,6 @@ fn row_local_commit_preserves_untouched_opaque_rows_and_refuses_touched_ones()
     assert!(identical.contains("META-INF/manifest.xml"));
     assert!(identical.contains("Pictures/opaque.bin"));
     assert!(!identical.contains("content.xml"));
-    assert_eq!(
-        commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())?
-            .snapshot()
-            .as_bytes(),
-        source
-    );
 
     let untouched = Snapshot::from_bytes(source.clone())?;
     let mut refused = untouched.edit();
@@ -344,7 +301,7 @@ fn unified_row_local_commit_retains_raw_package_members() -> litchi_core::Result
     let reopened = Package::from_bytes(commit.package().as_bytes())?.workbook()?;
     assert!(matches!(
         reopened.cell("Data", 1, 0),
-        Some(litchi_ods::CellView::Stored(cell)) if cell.text == "unified"
+        Some(crate::CellView::Stored(cell)) if cell.text == "unified"
     ));
     Ok(())
 }
