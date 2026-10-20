@@ -29,10 +29,10 @@ pub use properties::{FieldPart, HyperlinkInsert, SectionValue};
 
 use crate::DateTime;
 use crate::package::{Error as PackageError, OpenOptions as PackageOpenOptions};
-use crate::parts::dofr::{DofrArray, DofrPatch};
+use crate::parts::dofr::{DofrArray, Patch as DofrPatch};
 use crate::parts::protection::ProtectionPolicy;
 use crate::parts::saved_selection::{
-    FIB_INDEX_WSS, SavedSelection, SavedSelectionEdit, SavedSelectionPatch,
+    Edit as SavedSelectionEdit, FIB_INDEX_WSS, Patch as SavedSelectionPatch, SavedSelection,
     SavedSelectionSpliceError,
 };
 use crate::tracked_revision::{

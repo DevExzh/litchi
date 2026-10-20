@@ -711,8 +711,8 @@ impl DofrArray {
 
     /// Start a source-bound, same-length record replacement edit.
     #[must_use]
-    pub fn edit(&self) -> DofrEdit {
-        DofrEdit {
+    pub fn edit(&self) -> Edit {
+        Edit {
             source: self.clone(),
             draft: self.source.clone(),
         }
@@ -741,12 +741,12 @@ impl DofrArray {
 /// A checked, staged edit over complete `Dofrh` records. Dropping it
 /// discards it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DofrEdit {
+pub struct Edit {
     source: DofrArray,
     draft: Vec<u8>,
 }
 
-impl DofrEdit {
+impl Edit {
     /// Original parsed array that this edit is based on.
     #[must_use]
     pub fn source(&self) -> &DofrArray {
@@ -779,34 +779,34 @@ impl DofrEdit {
     }
 
     /// Commit the validated draft and return its reversible source patch.
-    pub fn commit(self) -> Result<DofrCommit> {
+    pub fn commit(self) -> Result<Commit> {
         let owner = self.source.owner.clone();
         let snapshot = DofrArray::parse_bytes(&self.draft)?.with_optional_owner(owner.clone());
-        let patch = DofrPatch {
+        let patch = Patch {
             source: self.source.source,
             replacement: snapshot.source.clone(),
             owner,
         };
         let diagnostics = Diagnostics::new(!patch.is_noop());
-        Ok(DofrCommit::new(snapshot, patch, diagnostics))
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 }
 
-/// The result of committing a [`DofrEdit`]: the validated post-edit array,
+/// The result of committing a [`Edit`]: the validated post-edit array,
 /// its source-checked reversible patch and diagnostics.
-pub type DofrCommit = litchi_core::edit::Commit<DofrArray, DofrPatch>;
+pub type Commit = litchi_core::edit::Commit<DofrArray, Patch>;
 
 /// Content-free diagnostics of one DOFR commit.
 pub use litchi_core::edit::Diagnostics;
 /// A reversible, source-checked same-length byte patch for `RgDofr`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DofrPatch {
+pub struct Patch {
     source: Vec<u8>,
     replacement: Vec<u8>,
     owner: Option<Arc<[u8]>>,
 }
 
-impl DofrPatch {
+impl Patch {
     /// Exact source bytes required before applying this patch.
     #[must_use]
     pub fn source_bytes(&self) -> &[u8] {

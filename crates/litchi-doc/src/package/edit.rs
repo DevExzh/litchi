@@ -15,9 +15,9 @@
 
 use super::{Error as PackageError, OpenOptions, Package, model::EditProfile};
 use crate::body_text;
-use crate::parts::dofr::DofrPatch;
+use crate::parts::dofr::Patch as DofrPatch;
 use crate::parts::protection::ProtectionPolicy;
-use crate::parts::saved_selection::{SavedSelectionEdit, SavedSelectionPatch};
+use crate::parts::saved_selection::{Edit as SavedSelectionEdit, Patch as SavedSelectionPatch};
 use crate::tracked_revision::Limits;
 use litchi_core::Position;
 use std::fmt;

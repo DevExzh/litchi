@@ -255,9 +255,9 @@ pub use parts::document_properties_2007::{
 pub use parts::document_properties_2010::{DocumentId, Dop2010};
 pub use parts::document_properties_2013::Dop2013;
 pub use parts::dofr::{
-    DofrArray, DofrChildMarker, DofrCommit, DofrDivider, DofrDividerUnits, DofrEdit, DofrFrame,
-    DofrFrameKind, DofrListStyle, DofrListStyles, DofrPatch, DofrPayload, DofrRecord,
-    DofrScrollType, DofrSplitter, DofrType, DofrXstz,
+    DofrArray, DofrChildMarker, DofrDivider, DofrDividerUnits, DofrFrame, DofrFrameKind,
+    DofrListStyle, DofrListStyles, DofrPayload, DofrRecord, DofrScrollType, DofrSplitter, DofrType,
+    DofrXstz,
 };
 pub use parts::embedded_fonts::{DocumentEmbeddedFonts, EmbeddedFont};
 pub use parts::envelope::{
@@ -356,10 +356,7 @@ pub use parts::repair_bookmarks::{DocumentRepairBookmarks, RepairBookmark};
 pub use parts::rmd_threading::{DocumentRmdThreading, MessageDisplayProperties, ThreadingMessage};
 pub use parts::rsids::DocumentRsids;
 pub use parts::saved_by::{SavedByEntry, SavedByTable};
-pub use parts::saved_selection::{
-    SavedSelection, SavedSelectionCommit, SavedSelectionEdit, SavedSelectionPatch,
-    SelectionGeometry, SelectionStyle,
-};
+pub use parts::saved_selection::{SavedSelection, SelectionGeometry, SelectionStyle};
 pub use parts::smart_tags::{
     DocumentSmartTag, DocumentSmartTags, SmartTagBookmarkInfo, SmartTagOrigin,
     SmartTagRecognizerRange, SmartTagRecognizerState,

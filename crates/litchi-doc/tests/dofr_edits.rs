@@ -231,7 +231,10 @@ fn doc_with_dofr_and_stw_user(
     package.finish().expect("DOC package finish")
 }
 
-fn changed_frame_patch(source: &Snapshot, replacement_value: u32) -> litchi_doc::DofrPatch {
+fn changed_frame_patch(
+    source: &Snapshot,
+    replacement_value: u32,
+) -> litchi_doc::parts::dofr::Patch {
     let records = source
         .dofr_records()
         .expect("Dofr read")

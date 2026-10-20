@@ -14,11 +14,11 @@ use super::codec::{
 };
 use super::model::{CpTable, FcRun, PapxRun, RawPiece, Revision, RevisionKind, RevisionMetadata};
 use crate::package::{Error as PackageError, Result};
-use crate::parts::dofr::{DofrArray, DofrPatch};
+use crate::parts::dofr::{DofrArray, Patch as DofrPatch};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{EditProtection, ProtectionPolicy};
 use crate::parts::saved_selection::{
-    SavedSelection, SavedSelectionPatch, SavedSelectionSpliceError, table_range,
+    Patch as SavedSelectionPatch, SavedSelection, SavedSelectionSpliceError, table_range,
 };
 use crate::sprm_operations::{
     SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_BOLD, SPRM_C_F_ITALIC, SPRM_C_F_OBJ,
