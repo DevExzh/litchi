@@ -1,0 +1,212 @@
+# 0352 — iWork grid coordinates and `litchi-iwa` builders renamed (0343 D10, D11)
+
+- Status: implemented on `uo2/iwork-names` (cut from trunk `5ff605692e`).
+- Date: 2026-10-20.
+- Resolves: owner decision [0350](0350-owner-api-debt-decision.md) items 23
+  and 24, the deferrals D10 and D11 of record
+  [0343](0343-glossary-closure.md) §4.
+
+## 1. Item 23 (D10): `CellPosition`/`CellRange` → `At`/`Area`
+
+ADR 0034 names grid coordinates `At`/`Area`. The iWork crates were the last
+owners still exporting `CellPosition`/`CellRange`. Commit `581c8fb15f`
+renames them across the workspace. The old names are deleted, with no
+aliases left behind:
+
+| Old | New | Owner |
+|---|---|---|
+| `litchi_iwa_common::table::coordinate::CellPosition` | `At` | neutral coordinate owner; re-exported unchanged by `litchi_numbers::{At, table::At, table::coordinate::At}`, `litchi_keynote::slide::table::cells::At` and the facade `litchi::numbers` |
+| `litchi_iwa_common::table::coordinate::CellRange` | `Area` | same re-export chain |
+| `litchi_iwa_common::table::model::{Position, Range}` (coordinate aliases) | deleted; the model uses `At`/`Area` | ADR 0034 bans `Position`/`Range` as coordinate words (as numbers did in 0300) |
+| `litchi_keynote::slide::table::number_format::CellPosition` (root `litchi_keynote::CellPosition`, `slide::table::CellPosition`) | `At` | the Keynote-local Number-format coordinate |
+| `litchi_keynote::CellPositionError` | `AtError` | sibling of `NumberError` in the same module |
+| `number_format::transaction::Error::CellPositionNotFound { position }` | `CellNotFound { position }` | the variant reports a missing cell |
+| private `litchi-iwa` `formula_cache::CellRange` | `Area` | private helper, renamed for consistency |
+
+Callers migrated (about 1,450 identifier occurrences in 159 files): every
+iWork crate (`litchi-iwa*`, `litchi-numbers*`, `litchi-pages`,
+`litchi-keynote`), `litchi-ops` (`format/iwork/{numbers,keynote}.rs`,
+`tests/numbers_unified.rs`, `examples/{iwork_bench,numbers_unified_bench}.rs`),
+the facade (`src/lib.rs`, `README.md`, `tests/numbers_*`, 14 fuzz targets
+in `crates/litchi/fuzz`), `tools/perf-baseline/unified-batch-closure`, the
+boundary tooling (`tools/check_crate_boundaries.py`, its tests and
+`tools/check_iwork_leaf_public_api.py`) and the current-state docs (crate
+READMEs and feature matrices, `docs/IWORK_*_AUDIT.md`). `litchi-cli` and
+`pyo3-litchi` had no occurrence. Dated records and ADRs are history and
+are not rewritten.
+
+There were no name clashes to resolve:
+- `litchi-ops`' private `format::iwork::tree::At` and the Numbers coordinate
+  never share a module. `format/iwork/numbers.rs` imports
+  `litchi_numbers::table::{Area, At}` and does not import `tree::At`, and
+  `keynote.rs` names the coordinate by its full path
+  (`litchi_keynote::slide::table::cells::At`).
+- The `litchi_core::selector::CellRange` that the ops path, xlsx, xls, xlsb
+  and ods navigators use is a different type (a syntactic A1 range in
+  `litchi-core`). It is out of scope and unchanged, along with the
+  ODF/XLS/XLSB `CellRange` types.
+
+In `check_crate_boundaries.py`, the marker regexes that ran with
+`IGNORECASE` match the new short name case-sensitively (`(?-i:\bAt\b)`),
+so the English word "at" cannot satisfy them.
+
+No method name embedded the old words in public API: the remaining
+`cell_range`/`cell_ranges`/`cell_position_for_path` identifiers are private
+helpers or protobuf field names. The `.proto` message `TST.CellRange` is a
+native schema name and stays.
+
+Layout (`#[repr(C)]`, 8 and 16 bytes), A1 parsing, `Display` and every
+value are unchanged. The only observable difference is the type name in
+`Debug` output.
+
+## 2. Item 24 (D11): `litchi-iwa` builders
+
+### 2.1 Rename, not deletion
+
+Deleting `litchi-iwa` is not loss-free. ADR 0028's deletion gate is
+unmet. No workspace manifest depends on the crate (gate 1 holds), but the
+other gates do not. The host still holds capabilities the leaf crates
+lack:
+
+- **Native mutation editors.** `PagesEditor`, `KeynoteEditor` and
+  `NumbersEditor` expose about 1,900 public functions (667 in `pages`, 639
+  in `keynote`, 594 in `numbers`), plus 405 in the shared host modules
+  (`charts`, `comments`, `media`, `shapes`, `text`, `drawable_order`,
+  `application`). Among them:
+  - Numbers sheet delete and duplicate, table sorting
+    (`NumbersTableSortColumnIndex`), conditional highlights and formula
+    cache maintenance;
+  - chart 3D depth, lighting and value-label families;
+  - drawable comments (`IWorkDrawableCommentEditor`), media replacement and
+    captions.
+
+  ADR 0028 §2026-08-08 and `tools/crate_boundaries.json` record these as
+  "native mutation remains in the legacy host" for all three formats.
+- **Aggregate structured extraction.**
+  `litchi_iwa::Document::extract_structured_data` still routes through the
+  host adapter.
+- **Fixture provenance.** These fixtures were generated by the host's
+  builders and examples (206 examples, 18 integration test files):
+  - the embedded Pages builder template (`litchi-pages/src/builder.rs`,
+    record 0299);
+  - the Keynote assets (`litchi-keynote/assets/README.md`);
+  - the synthetic Numbers bench workbook
+    (`test-data/iwork/synthetic/numbers/README.md`).
+- **Debt edges.** The boundary policy still lists 11 ordered debt edges
+  from `litchi-iwa` (deletion gate 6).
+
+### 2.2 The rename
+
+Commit `a0bd75df39` renames the builders to the canonical per-format names:
+
+| Old | New |
+|---|---|
+| `litchi_iwa::pages::PagesDocumentBuilder` | `litchi_iwa::pages::Builder` (defined in `pages::creation`) |
+| `litchi_iwa::keynote::KeynoteDocumentBuilder` | `litchi_iwa::keynote::Builder` |
+| `litchi_iwa::numbers::NumbersDocumentBuilder` | `litchi_iwa::numbers::Builder` |
+
+Callers use module-qualified paths (`use litchi_iwa::pages;` …
+`pages::Builder::new()`, or `{self, …}` in use lists), never aliases. About
+960 occurrences in 190 files were migrated: the crate's sources, tests,
+examples and README, the boundary tooling, the litchi-pages and
+litchi-numbers doc comments, and the provenance notes. One evidence
+receipt (`test-data/iwork/numbers/chart-data-edited-native-receipt.json`)
+and the dated provenance line of the Keynote assets keep the historical
+name; the assets line now adds the new one.
+
+The other `litchi-iwa` names (`PagesEditor`, `NumbersSheetImageOptions`, …)
+keep their format prefixes. They are outside this item, and the crate
+remains the migration host that ADR 0028 retires piece by piece.
+
+## 3. Gate coverage
+
+`tools/api_glossary.json`:
+
+- **New profile `iwa-common`** (`litchi-iwa-common`). It bans
+  `CellPosition` and `CellRange` crate-wide, and the coordinate aliases
+  `Position`/`Range` directly under `table::model`.
+- **New profile `iwa`** (`litchi-iwa`, D11). It bans
+  `PagesDocumentBuilder`, `KeynoteDocumentBuilder`, `NumbersDocumentBuilder`,
+  `CellPosition` and `CellRange` crate-wide. A probe policy that bans
+  `Builder` shows the gate reaches `litchi_iwa::{pages, keynote,
+  numbers}::Builder`.
+- **Existing profiles.** `numbers-minimal`/`numbers-full` ban
+  `CellPosition`/`CellRange`, and their 0300 `Position`/`Range`
+  replacement texts now name `At`/`Area`. `keynote-minimal`/`keynote-full`
+  ban `CellPosition`, `CellPositionError`, `CellPositionNotFound` and
+  `CellRange`. `pages` and `facade-iwork` ban `CellPosition`/`CellRange`.
+
+`docs/API_GLOSSARY.md`: the *Grid coordinates* and *Option-bearing fresh
+authoring* cells are flipped from ⏸ to ✅.
+
+## 4. Verification
+
+The verification ran on the final tree (both commits). Every command exited
+0 unless noted.
+
+| Gate | Result |
+|---|---|
+| `cargo fmt --all --check` | 0 |
+| `cargo clippy -p litchi-iwa-common -p litchi-numbers -p litchi-numbers-wire -p litchi-pages -p litchi-keynote -p litchi-iwa-structured -p litchi-iwa -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
+| `cargo clippy -p litchi-ops --no-default-features [--features pages\|keynote\|numbers] --all-targets -- -D warnings` | 0 (all four) |
+| `cargo test --all-features -p litchi-iwa-common -p litchi-numbers-wire -p litchi-pages -p litchi-keynote -p litchi-numbers -p litchi-iwa-structured` | 0; 3,353 passed, 0 failed |
+| `cargo test -p litchi-iwa --all-features` | 0; 1,783 passed, 0 failed |
+| `cargo test -p litchi-ops --all-features`, chunked (`--lib`, `--doc`, then 9 groups of ≤20 `--test` targets, executables deleted between chunks) | 0 every chunk; 2,627 passed, 0 failed, 7 ignored |
+| `cargo test -p litchi --all-features` | 0; 235 passed |
+| `cargo test -p litchi-cli --all-features` | 0; 34 passed |
+| `crates/pyo3-litchi/tests/run_tests.sh` | 0; 298 tests |
+| `python3 tools/check_feature_matrix.py` | 0; 31 ok |
+| `python3 tools/non_iwork_gate.py verify` | 0 |
+| `cargo check --bins` in `crates/litchi/fuzz` | 0 (3 unrelated dead-code warnings, as before) |
+| `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features` on the nine changed crates | 0 |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile <p>` for `iwa-common`, `iwa`, `numbers-minimal`, `numbers-full`, `pages`, `keynote-minimal`, `keynote-full`, `facade-iwork` | 0 each |
+| `python3 tools/check_crate_boundaries.py` | 0 (67 packages, 11 debt items) |
+| `python3 -m unittest tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate` | 0; 1,269 tests |
+| `tools/officecli_capability_delta.py --check`, `tools/officecli_corpus.py --check` | 0 |
+| `tools/unified_bench_matrix.py --check` | 1 before this record, because trunk's record 0350 was not in the committed matrix; the matrix was regenerated with this record |
+
+The whole-corpus no-op guarantee, that open, empty edit and save is
+byte-identical (`corpus_fidelity::open_empty_edit_save_is_byte_identical`,
+iWork bundles and packages included), and the iWork exact-no-op tests
+(`iwork_unified`, `keynote_unified`) run inside the chunked litchi-ops
+suite.
+
+## 5. Performance
+
+No re-measure. The change renames types and paths only; no function body,
+layout or hot path changes shape, so the generated code is identical up
+to symbol names.
+
+## 6. Trunk merge
+
+Trunk moved to `e652864de8` (record 0351, api-contract) during the work and
+was merged (`6782bd1b3d`). The only conflict was `tools/api_glossary.json`,
+where 0351 added `match` bans; it was resolved by taking trunk's file and
+re-applying this record's profile edits. The post-merge re-run covered:
+
+- fmt, plus clippy on all changed crates and litchi-core/ops/facade/py/cli,
+  and the four litchi-ops feature sets;
+- the glossary profiles `core-minimal`, `iwa-common`, `iwa`, `numbers-*`,
+  `pages`, `keynote-*`, `facade-iwork` and `ops-iwork`;
+- the iWork leaf tests, plus the litchi-ops lib and the iWork, corpus,
+  capabilities and registry targets;
+- the litchi, cli and py tests, docs, and perf-baseline;
+- the boundary, non-iWork, tool-unittest, OfficeCLI, bench-matrix and
+  feature-matrix gates.
+
+The results are in the final report.
+
+## 7. Gaps and follow-ups
+
+- `tools/test_check_iwork_leaf_public_api.py` fails at the base commit
+  (`check_iwork_leaf_public_api.semantic_module` no longer exists). It is
+  not in the coordinator's unittest set and this change does not touch the
+  failure. Follow-up: restore or retire that test module.
+- `litchi-iwa` keeps prefixed names outside D11 (`PagesEditor`,
+  `KeynoteEditor`, `NumbersEditor`, `*Options`, …). They live in the
+  migration host and leave it with each ADR 0028 migration. The 0351
+  inventory already lists the host's `*_with_limits` and
+  `UnverifiedTopologyEdit` rows.
+- `Area::area()` (cell count) keeps its 0300-era name. Renaming it is a
+  separate API change.
