@@ -1675,15 +1675,34 @@ fn docx_refusals_classify_by_kind_and_patch_conflicts_are_invalid_input() {
         litchi_docx::metadata::Error::PatchConflict,
         Code::InvalidInput,
     );
-    // Record 0355 §3: the document refusal reasons keep their established
-    // codes; only an invalid property value is a value error.
-    assert_code(
-        litchi_docx::document::Error::Refused {
-            position: 0,
-            reason: litchi_docx::document::Refusal::RunNotFound,
-        },
-        Code::UnsupportedCapability,
-    );
+    // Record 0355a: document refusal reasons classify by their kind.
+    for (reason, code) in [
+        (litchi_docx::document::Refusal::RunNotFound, Code::NotFound),
+        (
+            litchi_docx::document::Refusal::SectionBreak,
+            Code::UnsupportedType,
+        ),
+        (
+            litchi_docx::document::Refusal::ComplexRun,
+            Code::UnsupportedCapability,
+        ),
+        (
+            litchi_docx::document::Refusal::UnmodelledProperty,
+            Code::UnsupportedProperty,
+        ),
+        (
+            litchi_docx::document::Refusal::StructuralText,
+            Code::UnsupportedCapability,
+        ),
+    ] {
+        assert_code(
+            litchi_docx::document::Error::Refused {
+                position: 0,
+                reason,
+            },
+            code,
+        );
+    }
     assert_code(
         litchi_docx::document::Error::Refused {
             position: 0,

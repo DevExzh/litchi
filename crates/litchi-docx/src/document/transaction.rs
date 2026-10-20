@@ -186,21 +186,11 @@ pub enum Refusal {
 
 impl Refusal {
     /// The shared refusal kind litchi-ops classifies this reason by (record
-    /// 0351).
-    ///
-    /// Only an invalid property value is a value error. Every other reason
-    /// is a request this route cannot perform on the selected content: a
-    /// selector that does not resolve to a direct child the route edits, a
-    /// target without editable text, or content it would lose. Those keep
-    /// the single `unsupported_capability` code the unified layer reported
-    /// before record 0355; finer kinds (`NotFound`, `UnsupportedTarget`,
-    /// `UnsupportedProperty`) would change OfficeCLI-visible codes and are
-    /// follow-up 0355-F3.
+    /// 0351 §2.4, one taxonomy across formats; record 0355a).
     #[must_use]
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
         match self {
-            Self::InvalidPropertyValue => RefusalKind::InvalidValue,
             Self::HyperlinkNotFound
             | Self::RunNotFound
             | Self::FieldNotFound
@@ -208,14 +198,16 @@ impl Refusal {
             | Self::RevisionNotFound
             | Self::ContentControlNotFound
             | Self::CellNotFound
-            | Self::BlockNotFound
-            | Self::AmbiguousCompositeSelector
-            | Self::TransitionalValue
-            | Self::ComplexRun
-            | Self::SectionBreak
-            | Self::FieldInterior
-            | Self::UnmodelledProperty => RefusalKind::UnsupportedOperation,
-            Self::ComplexContent
+            | Self::BlockNotFound => RefusalKind::NotFound,
+            Self::AmbiguousCompositeSelector
+            | Self::InvalidPropertyValue
+            | Self::TransitionalValue => RefusalKind::InvalidValue,
+            // The selected element is not an editable target of this route.
+            Self::SectionBreak | Self::FieldInterior => RefusalKind::UnsupportedTarget,
+            Self::UnmodelledProperty => RefusalKind::UnsupportedProperty,
+            // Content the route cannot rewrite without losing it.
+            Self::ComplexRun
+            | Self::ComplexContent
             | Self::RevisionDependency
             | Self::StructuralText
             | Self::DuplicateProperty
