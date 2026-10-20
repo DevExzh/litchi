@@ -465,6 +465,253 @@ fn master_layout_edits_publish_replay_and_invert_exactly() {
     }
 }
 
+fn corpus_decks() -> Vec<PathBuf> {
+    fn walk(dir: &std::path::Path, out: &mut Vec<PathBuf>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                walk(&path, out);
+            } else if path
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("ppt"))
+            {
+                out.push(path);
+            }
+        }
+    }
+    let mut decks = Vec::new();
+    walk(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data"),
+        &mut decks,
+    );
+    decks.sort();
+    decks
+}
+
+/// Every `test-data/**/*.ppt` deck that opens lists its masters, and every
+/// listed master (notes masters included: most real decks carry a
+/// `MasterId`-domain `NotesAtom.slideIdRef` there) opens both master
+/// families, whose untouched commit is the source package byte for byte. A
+/// renamed notes master publishes and the result lists its masters again.
+#[test]
+fn every_corpus_deck_lists_its_masters_and_opens_their_edits() {
+    let mut notes_masters = 0;
+    let mut decks = 0;
+    for path in corpus_decks() {
+        let bytes = std::fs::read(&path).unwrap();
+        let Ok(package) = Package::from_bytes(&bytes) else {
+            continue;
+        };
+        let name = path.display().to_string();
+        decks += 1;
+        let source_bytes = package.to_bytes().unwrap();
+        let presentation = package.presentation().unwrap();
+        let masters = presentation
+            .masters()
+            .unwrap_or_else(|error| panic!("{name}: masters() failed: {error:?}"));
+        let mut listed = Vec::new();
+        listed.extend((0..masters.main().len()).map(|index| (Kind::Main, index)));
+        listed.extend((0..masters.title().len()).map(|index| (Kind::Title, index)));
+        listed.extend(masters.notes().map(|_| (Kind::Notes, 0)));
+        listed.extend(masters.handout().map(|_| (Kind::Handout, 0)));
+        let has_notes = masters.notes().is_some();
+        drop(masters);
+        for (kind, index) in listed {
+            let position = Position::new(index);
+            let metadata = package
+                .edit_master_metadata(kind, position)
+                .unwrap_or_else(|error| panic!("{name}: {kind:?} metadata: {error:?}"))
+                .commit()
+                .unwrap();
+            assert!(!metadata.diagnostics().changed(), "{name}");
+            assert_eq!(
+                metadata.package().to_bytes().unwrap(),
+                source_bytes,
+                "{name}"
+            );
+            let layout = package
+                .edit_master_layout(kind, position)
+                .unwrap_or_else(|error| panic!("{name}: {kind:?} layout: {error:?}"))
+                .commit()
+                .unwrap();
+            assert!(!layout.diagnostics().changed(), "{name}");
+            assert_eq!(layout.package().to_bytes().unwrap(), source_bytes, "{name}");
+        }
+        if has_notes {
+            notes_masters += 1;
+            let mut edit = package
+                .edit_master_metadata(Kind::Notes, Position::new(0))
+                .unwrap();
+            edit.set_name("Scoped notes master").unwrap();
+            let commit = edit.commit().unwrap();
+            assert!(commit.diagnostics().changed(), "{name}");
+            let renamed = commit
+                .package()
+                .edit_master_metadata(Kind::Notes, Position::new(0))
+                .unwrap();
+            assert_eq!(
+                renamed.name().unwrap().unwrap().as_str(),
+                "Scoped notes master",
+                "{name}"
+            );
+            let reopened = Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
+            assert!(
+                reopened
+                    .presentation()
+                    .unwrap()
+                    .masters()
+                    .unwrap()
+                    .notes()
+                    .is_some(),
+                "{name}"
+            );
+        }
+    }
+    assert!(decks >= 25, "the corpus shrank to {decks} decks");
+    assert!(
+        notes_masters >= 13,
+        "only {notes_masters} decks have a notes master"
+    );
+}
+
+/// Apache POI `slide_master.ppt`: two main masters and one title master.
+fn titled() -> Package {
+    Package::from_bytes(&fixture("poi/test-data/slideshow/slide_master.ppt")).unwrap()
+}
+
+#[test]
+fn title_master_metadata_edits_publish_replay_and_invert_exactly() {
+    let source = titled();
+    let source_bytes = source.to_bytes().unwrap();
+    let title = Position::new(0);
+    let masters = source.presentation().unwrap();
+    let masters = masters.masters().unwrap();
+    assert_eq!((masters.main().len(), masters.title().len()), (2, 1));
+    drop(masters);
+
+    let no_op = source
+        .edit_master_metadata(Kind::Title, title)
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), source_bytes);
+
+    let main_before = layout_record(&source, Kind::Main);
+    let mut edit = source.edit_master_metadata(Kind::Title, title).unwrap();
+    let before = edit.name().unwrap().map(|name| name.as_str().to_owned());
+    edit.set_name("Scoped title master").unwrap();
+    // A design name belongs to a main master only.
+    assert!(matches!(
+        edit.set_template_name("x"),
+        Err(master_metadata::Error::Refused(_))
+    ));
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    let published = commit
+        .package()
+        .edit_master_metadata(Kind::Title, title)
+        .unwrap();
+    assert_eq!(
+        published.name().unwrap().unwrap().as_str(),
+        "Scoped title master"
+    );
+    assert_ne!(before.as_deref(), Some("Scoped title master"));
+    assert_eq!(layout_record(commit.package(), Kind::Main), main_before);
+    let reopened = Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .presentation()
+            .unwrap()
+            .masters()
+            .unwrap()
+            .title()
+            .len(),
+        1
+    );
+
+    let replayed = source.apply_master_metadata(commit.patch()).unwrap();
+    assert_eq!(
+        replayed.package().to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
+    let restored = commit
+        .package()
+        .apply_master_metadata(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(restored.package().to_bytes().unwrap(), source_bytes);
+    assert!(matches!(
+        commit.package().apply_master_metadata(commit.patch()),
+        Err(master_metadata::Error::PatchConflict)
+    ));
+    let Err(master_metadata::Error::Refused(refusal)) =
+        source.edit_master_metadata(Kind::Title, Position::new(1))
+    else {
+        panic!("a missing title master must be refused");
+    };
+    assert_eq!(refusal.kind(), RefusalKind::NotFound);
+}
+
+#[test]
+fn title_master_layout_edits_publish_replay_and_invert_exactly() {
+    let source = titled();
+    let source_bytes = source.to_bytes().unwrap();
+    let title = Position::new(0);
+
+    let no_op = source
+        .edit_master_layout(Kind::Title, title)
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), source_bytes);
+
+    let main_before = layout_record(&source, Kind::Main);
+    let mut edit = source.edit_master_layout(Kind::Title, title).unwrap();
+    let original = edit.record().clone();
+    let count = original.children.len();
+    let last = original.children[count - 1].clone();
+    edit.append(master_layout::Path::root(), last.clone())
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    let published = layout_record(commit.package(), Kind::Title);
+    assert_eq!(published.children.len(), count + 1);
+    assert_eq!(published.children[count], last);
+    assert_eq!(layout_record(commit.package(), Kind::Main), main_before);
+
+    let replayed = source.apply_master_layout(commit.patch()).unwrap();
+    assert_eq!(
+        replayed.package().to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
+    let restored = commit
+        .package()
+        .apply_master_layout(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(restored.package().to_bytes().unwrap(), source_bytes);
+    assert!(matches!(
+        commit.package().apply_master_layout(commit.patch()),
+        Err(master_layout::Error::PatchConflict)
+    ));
+
+    // Removing the appended record restores the title master's tree.
+    let mut remove = commit
+        .package()
+        .edit_master_layout(Kind::Title, title)
+        .unwrap();
+    assert_eq!(
+        remove
+            .remove(master_layout::Path::root().child(count))
+            .unwrap(),
+        last
+    );
+    let removed = remove.commit().unwrap();
+    assert_eq!(layout_record(removed.package(), Kind::Title), original);
+}
+
 fn object_ids(package: &Package) -> Vec<u32> {
     package
         .presentation()
