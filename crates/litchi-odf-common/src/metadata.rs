@@ -90,7 +90,9 @@ pub enum Field {
     LastModifiedBy,
     /// `dc:language`.
     Language,
-    /// The `meta:keyword` elements, written from a comma-separated list.
+    /// The `meta:keyword` elements, one per keyword: [`Edit::set_keywords`]
+    /// takes the list; [`Edit::set`] splits its text at `;` and `,`
+    /// (`litchi_core::metadata::keywords::split`).
     Keywords,
 }
 
@@ -136,7 +138,9 @@ pub trait Owner: Clone {
 /// publish metadata beside their own splices (ODT body edits).
 #[derive(Clone, Debug, Default)]
 pub struct Assignments {
-    fields: BTreeMap<Field, Option<String>>,
+    /// Each staged field's element texts (one per `meta:keyword`, else
+    /// one), or `None` for a removal.
+    fields: BTreeMap<Field, Option<Vec<String>>>,
 }
 
 impl Assignments {
@@ -151,7 +155,32 @@ impl Assignments {
         if let Some(value) = value {
             check_text(value)?;
         }
-        self.fields.insert(field, value.map(str::to_owned));
+        let values = value.map(|value| {
+            if field == Field::Keywords {
+                litchi_core::metadata::keywords::split(value)
+            } else {
+                vec![value.to_owned()]
+            }
+        });
+        self.fields.insert(field, values);
+        Ok(())
+    }
+
+    /// Stage the keyword list, one `meta:keyword` element per keyword; an
+    /// empty list removes every keyword. Empty keywords are dropped.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Core`] for text XML cannot carry or a keyword over
+    /// 1 MiB.
+    pub fn set_keywords(&mut self, keywords: &[String]) -> Result<(), Error> {
+        let mut list = Vec::with_capacity(keywords.len());
+        for keyword in keywords.iter().filter(|keyword| !keyword.is_empty()) {
+            check_text(keyword)?;
+            list.push(keyword.clone());
+        }
+        self.fields
+            .insert(Field::Keywords, (!list.is_empty()).then_some(list));
         Ok(())
     }
 
@@ -228,18 +257,9 @@ impl Assignments {
     pub fn created_package(&self, package: &OwnedPackage) -> Result<Option<Vec<u8>>, Error> {
         let mut children = String::new();
         for (field, value) in &self.fields {
-            let Some(value) = value else { continue };
+            let Some(values) = value else { continue };
             let (uri, local) = field.qualified();
             let prefix = if uri == META { "meta" } else { "dc" };
-            let values: Vec<&str> = if *field == Field::Keywords {
-                value
-                    .split(',')
-                    .map(str::trim)
-                    .filter(|value| !value.is_empty())
-                    .collect()
-            } else {
-                vec![value.as_str()]
-            };
             for value in values {
                 render(&mut children, prefix, local, None, value);
             }
@@ -347,6 +367,19 @@ impl<P: Owner> Edit<P> {
     /// 1 MiB.
     pub fn set(&mut self, field: Field, value: Option<&str>) -> Result<&mut Self, Error> {
         self.assignments.set(field, value)?;
+        self.count += 1;
+        Ok(self)
+    }
+
+    /// Stage the keyword list, one `meta:keyword` element per keyword; an
+    /// empty list removes every keyword.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Core`] for text XML cannot carry or a keyword over
+    /// 1 MiB.
+    pub fn set_keywords(&mut self, keywords: &[String]) -> Result<&mut Self, Error> {
+        self.assignments.set_keywords(keywords)?;
         self.count += 1;
         Ok(self)
     }
@@ -585,7 +618,7 @@ struct Child {
 /// to over `source`; unchanged ranges are dropped.
 fn plan(
     source: &[u8],
-    fields: &BTreeMap<Field, Option<String>>,
+    fields: &BTreeMap<Field, Option<Vec<String>>>,
 ) -> Result<Vec<(Range<usize>, String)>, Error> {
     let full = std::str::from_utf8(source).map_err(|_| invalid("ODF meta.xml is not UTF-8"))?;
     // The reader skips a byte-order mark: plan in the text after it, then
@@ -680,16 +713,7 @@ fn plan(
             None => (if uri == META { "meta" } else { "dc" }, true),
         };
         let mut rendered = String::new();
-        if let Some(value) = value {
-            let values: Vec<&str> = if *field == Field::Keywords {
-                value
-                    .split(',')
-                    .map(str::trim)
-                    .filter(|value| !value.is_empty())
-                    .collect()
-            } else {
-                vec![value.as_str()]
-            };
+        if let Some(values) = value {
             for value in values {
                 render(&mut rendered, prefix, local, declare.then_some(uri), value);
             }
@@ -766,11 +790,12 @@ fn render(out: &mut String, prefix: &str, local: &str, declare: Option<&[u8]>, v
 mod tests {
     use super::*;
 
-    fn fields(pairs: &[(Field, Option<&str>)]) -> BTreeMap<Field, Option<String>> {
-        pairs
-            .iter()
-            .map(|(field, value)| (*field, value.map(str::to_owned)))
-            .collect()
+    fn fields(pairs: &[(Field, Option<&str>)]) -> BTreeMap<Field, Option<Vec<String>>> {
+        let mut assignments = Assignments::default();
+        for (field, value) in pairs {
+            assignments.set(*field, *value).unwrap();
+        }
+        assignments.fields
     }
 
     const META_XML: &str = concat!(
@@ -801,7 +826,7 @@ mod tests {
             META_XML.as_bytes(),
             &fields(&[
                 (Field::Title, Some("New & <x>")),
-                (Field::Keywords, Some("c, d")),
+                (Field::Keywords, Some("c; d,")),
                 (Field::Subject, Some("S")),
             ]),
         )

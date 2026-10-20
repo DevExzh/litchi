@@ -248,6 +248,7 @@ jobs:
           -p litchi-ppt
           -p litchi-pptx
           -p litchi-sheet
+          -p litchi-sheet-text
           -p litchi-sign
           -p litchi-slide
           -p litchi-vba

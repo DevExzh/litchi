@@ -4982,3 +4982,27 @@ and `numbers`; it no longer turns on the leaves' `internal-iwork-source`
 features (the `pages`, `keynote` and `numbers` features of `litchi-ops` do).
 `tools/check_crate_boundaries.py` still reports 67 workspace packages and 282
 internal dependency declarations, with the same 11 migration debts.
+
+## 2026-10-20 amendment: `litchi-sheet-text` text-workbook leaf (record 0354)
+
+Unified-ops record [0354](../unified-ops/0354-sheet-text-and-structured-keywords.md)
+moves the facade's `litchi::sheet::text` module (CSV, TSV, PRN, SYLK, DIF and
+fixed-width readers and writers; owner memo item 26, decision 0350) into the
+new leaf package `litchi-sheet-text`. The existing `litchi-sheet` package
+stays the format-neutral vocabulary crate that XLSX and XLSB build on; the
+text readers are concrete formats, so they get their own leaf. Four edges
+are added, all downward:
+
+- `litchi-sheet-text -> litchi-core` (cell values, the sheet traits and the
+  byte-order-mark vocabulary) and `litchi-sheet-text -> litchi-sheet` (the
+  grid bounds that refuse out-of-grid SYLK coordinates);
+- `litchi -> litchi-sheet-text`, optional, behind the facade's new
+  `sheet-text` feature, which re-exports the crate as `litchi::sheet::text`;
+- `litchi-ops -> litchi-sheet-text`, normal: `File::import` tokenizes and
+  decodes its CSV/TSV source with the crate's `delimited::Tokenizer` and
+  `Encoding`, so the workspace has one delimited-text parser.
+
+The package is runtime-neutral and iWork-free, so the non-iWork release gate
+counts it among its bulk packages (46 to 47). `tools/check_crate_boundaries.py`
+reports 68 workspace packages and 286 internal dependency declarations, with
+the same 11 migration debts.

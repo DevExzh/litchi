@@ -530,9 +530,9 @@ impl FlatImageTransaction {
         Ok(())
     }
 
-    /// Replaces the flat document keyword value.
-    pub fn set_keywords(&mut self, value: Option<String>) -> Result<()> {
-        self.metadata_mut()?.1.set_keywords(value);
+    /// Replaces the flat document keyword list; an empty list removes it.
+    pub fn set_keywords(&mut self, keywords: Vec<String>) -> Result<()> {
+        self.metadata_mut()?.1.set_keywords(keywords);
         self.remove_metadata_noop();
         Ok(())
     }
@@ -1094,7 +1094,7 @@ fn patch_flat_metadata(bytes: &[u8], values: &crate::MetadataFields) -> Result<V
     target.author = values.author().map(str::to_owned);
     target.subject = values.subject().map(str::to_owned);
     target.description = values.description().map(str::to_owned);
-    target.keywords = values.keywords().map(str::to_owned);
+    target.keywords = values.keywords().to_vec();
     let patch = MetaXmlPatch::preserve_all().diff_simple_fields(&parsed, &target);
     patch_meta_xml(source, &patch)?
         .map(String::into_bytes)

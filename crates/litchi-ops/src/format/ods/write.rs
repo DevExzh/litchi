@@ -657,7 +657,7 @@ fn cell_value(scalar: Scalar<'_>) -> Result<(CellValue, String)> {
         Scalar::Text(text) | Scalar::Token(text) => {
             (CellValue::Text(text.to_owned()), text.to_owned())
         },
-        Scalar::Length(_) | Scalar::Color(_) => {
+        Scalar::Length(_) | Scalar::Color(_) | Scalar::List(_) => {
             return Err(refusal(
                 Code::InvalidValue,
                 "an ODS cell value is text, a number or a boolean",

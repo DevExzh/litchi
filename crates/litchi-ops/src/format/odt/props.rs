@@ -321,7 +321,7 @@ fn metadata_value(metadata: &Metadata, index: usize) -> Option<Value<'static>> {
         3 => owned(&metadata.author),
         4 => owned(&metadata.last_modified_by),
         5 => owned(&metadata.language),
-        6 => owned(&metadata.keywords),
+        6 => Value::owned_list(&metadata.keywords),
         7 => metadata
             .created
             .map(|at| Value::Text(Cow::Owned(at.to_string()))),

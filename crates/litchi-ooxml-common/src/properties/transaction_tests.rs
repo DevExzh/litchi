@@ -59,13 +59,55 @@ fn snapshot_projects_core_and_app_fields_into_one_metadata() {
     let metadata = snapshot.metadata().unwrap();
     assert_eq!(metadata.title.as_deref(), Some("Before"));
     assert_eq!(metadata.author.as_deref(), Some("Ada"));
-    assert_eq!(metadata.keywords.as_deref(), Some("alpha beta"));
+    assert_eq!(metadata.keywords, ["alpha", "beta"]);
     assert_eq!(metadata.company.as_deref(), Some("Old"));
     assert_eq!(metadata.application.as_deref(), Some("Producer"));
     assert_eq!(
         snapshot.custom_props().get("Project"),
         Some(&Value::Text("Litchi".into()))
     );
+}
+
+#[test]
+fn keyword_lists_round_trip_the_source_bytes_until_they_change() {
+    let mut package = OpcPackage::new();
+    let core = Core {
+        keywords: Some(Keywords::new().text("a; b,c ").value("d")),
+        ..Core::new().title("Keywords")
+    };
+    write_core(&mut package, core).unwrap();
+    let before = bytes(&package, "/docProps/core.xml").unwrap();
+    let snapshot = Snapshot::read(&package, Host::Word).unwrap();
+    assert_eq!(snapshot.metadata().unwrap().keywords, ["a", "b", "c", "d"]);
+
+    // Setting the list it already holds writes nothing.
+    let mut edit = snapshot.edit();
+    edit.update_metadata(|metadata| {
+        metadata.keywords = ["a", "b", "c", "d"].map(str::to_owned).to_vec();
+    })
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
+    assert_eq!(bytes(&package, "/docProps/core.xml").unwrap(), before);
+
+    // A changed list is joined with `, `; a keyword holding a separator
+    // becomes a `cp:value`, so it reads back whole.
+    let mut edit = Snapshot::read(&package, Host::Word).unwrap().edit();
+    edit.update_metadata(|metadata| {
+        metadata.keywords = ["a", "b", "x, y"].map(str::to_owned).to_vec();
+    })
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.diagnostics().fields(), [Field::Keywords]);
+    assert!(commit.patch().apply(&mut package).unwrap());
+    let core_xml = String::from_utf8(bytes(&package, "/docProps/core.xml").unwrap()).unwrap();
+    assert!(
+        core_xml.contains("<cp:keywords>a, b, <cp:value>x, y</cp:value></cp:keywords>"),
+        "{core_xml}"
+    );
+    let read = Snapshot::read(&package, Host::Word).unwrap();
+    assert_eq!(read.metadata().unwrap().keywords, ["a", "b", "x, y"]);
 }
 
 #[test]

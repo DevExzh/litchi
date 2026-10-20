@@ -595,7 +595,7 @@ crate::registry::registry! {
     crate::registry::Entry::read(PropSpec::new("title", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("author", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("subject", ValueType::Text)),
-    crate::registry::Entry::read(PropSpec::new("keywords", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("keywords", ValueType::List)),
     crate::registry::Entry::read(PropSpec::new("description", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("category", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("lastModifiedBy", ValueType::Text)),

@@ -281,7 +281,12 @@ impl MutableDocument {
         estimated += self.metadata.author.as_ref().map_or(0, String::len);
         estimated += self.metadata.subject.as_ref().map_or(0, String::len);
         estimated += self.metadata.description.as_ref().map_or(0, String::len);
-        estimated += self.metadata.keywords.as_ref().map_or(0, String::len);
+        estimated += self
+            .metadata
+            .keywords
+            .iter()
+            .map(|keyword| keyword.len() + 27)
+            .sum::<usize>();
         let mut meta_fields = String::with_capacity(estimated);
 
         // Add optional metadata fields
@@ -317,11 +322,11 @@ impl MutableDocument {
             ));
         }
 
-        if let Some(ref keywords) = self.metadata.keywords {
-            let escaped_keywords = escape_xml(keywords);
+        for keyword in &self.metadata.keywords {
+            let escaped_keyword = escape_xml(keyword);
             meta_fields.push_str(&xml_minifier::minified_xml_format!(
                 r#"<meta:keyword>{}</meta:keyword>"#,
-                escaped_keywords
+                escaped_keyword
             ));
         }
 

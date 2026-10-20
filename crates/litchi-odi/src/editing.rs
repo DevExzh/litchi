@@ -190,8 +190,8 @@ pub trait MetadataEditor {
     fn set_subject(&mut self, value: Option<String>) -> Result<()>;
     /// Replaces the document description.
     fn set_description(&mut self, value: Option<String>) -> Result<()>;
-    /// Replaces the comma-separated keyword value.
-    fn set_keywords(&mut self, value: Option<String>) -> Result<()>;
+    /// Replaces the keyword list; an empty list removes it.
+    fn set_keywords(&mut self, keywords: Vec<String>) -> Result<()>;
 }
 
 macro_rules! impl_metadata_editor {
@@ -209,8 +209,8 @@ macro_rules! impl_metadata_editor {
             fn set_description(&mut self, value: Option<String>) -> Result<()> {
                 <$type>::set_description(self, value)
             }
-            fn set_keywords(&mut self, value: Option<String>) -> Result<()> {
-                <$type>::set_keywords(self, value)
+            fn set_keywords(&mut self, keywords: Vec<String>) -> Result<()> {
+                <$type>::set_keywords(self, keywords)
             }
         }
     };

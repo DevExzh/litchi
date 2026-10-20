@@ -1591,7 +1591,7 @@ fn workbook_value(file: &Xlsx, key: WorkbookKey) -> Option<Value<'_>> {
         WorkbookKey::Title => optional(metadata.title.as_ref()),
         WorkbookKey::Author => optional(metadata.author.as_ref()),
         WorkbookKey::Subject => optional(metadata.subject.as_ref()),
-        WorkbookKey::Keywords => optional(metadata.keywords.as_ref()),
+        WorkbookKey::Keywords => Value::owned_list(&metadata.keywords),
         WorkbookKey::Description => optional(metadata.description.as_ref()),
         WorkbookKey::Category => optional(metadata.category.as_ref()),
         WorkbookKey::LastModifiedBy => optional(metadata.last_modified_by.as_ref()),
@@ -2024,5 +2024,6 @@ fn owned(value: Value<'_>) -> Value<'static> {
         Value::Token(value) => Value::Token(value),
         Value::Length(value) => Value::Length(value),
         Value::Color(value) => Value::Color(value),
+        Value::List(items) => Value::List(Cow::Owned(items.into_owned())),
     }
 }

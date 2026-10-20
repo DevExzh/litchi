@@ -372,6 +372,9 @@ impl<'py> Out<'py> {
             },
             Value::Text(text) => PyString::new(py, text).into_any(),
             Value::Token(token) => self.shared(token).into_any(),
+            // A list (the metadata keywords, record 0354): a list of str,
+            // as the JSON form writes an array.
+            Value::List(items) => PyList::new(py, items.iter())?.into_any(),
             // Lengths, colours and any later variant: the text the JSON form
             // writes, the value printed in its key's style.
             _ => self.display(prop).into_any(),
