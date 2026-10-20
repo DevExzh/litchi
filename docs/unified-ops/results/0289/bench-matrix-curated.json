@@ -2776,6 +2776,10 @@
   {
    "record": "0339",
    "reason": "a property-visibility probe of the corpus harness (record 0339 §1, `newly-visible-skipped-properties`), not a measurement; record 0339 claims no performance"
+  },
+  {
+   "record": "0351",
+   "reason": "a rustdoc inventory of the API debt (record 0351 §1, `inventory.tsv`), not a measurement; record 0351 changes no hot path (§8)"
   }
  ]
 }
