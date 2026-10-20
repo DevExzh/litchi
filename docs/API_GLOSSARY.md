@@ -143,7 +143,7 @@ line. A line is ✅ when the wave's gate registrations pass.
 | F0 foundation | `litchi-core`, gate | ➖ | ✅ shared types | ✅ bans on clean crates | ✅ shared types, ops classification | ➖ | ✅ 0351 |
 | W1 | DOCX | 🔴 | 🔴 | 🔴 | 🔴 | 🔴 | 🔴 |
 | W2 | PPTX | 🔴 | 🔴 | ✅ (0252) | 🔴 | 🔴 | 🔴 |
-| W3 | PPT | ✅ | 🔴 | 🔴 | ➖ | 🔴 (`raw::Reader`, record parsers) | 🔴 |
+| W3 | PPT | ✅ | ✅ 12 scoped families publish a `Package` (0357) | ✅ banned crate-wide (0357) | ➖ (typed `slide_order`/`text_edit` refusals gain `kind()`) | ✅ `raw::Reader`/`SourceBackedPackage` `*_with_options`, `_with_limits` banned (0357) | ✅ 0357 |
 | W4 | XLSX, XLSB, `litchi-ooxml-common` | 🔴 | 🔴 | 🔴 | ➖ | 🔴 | 🔴 |
 | W5 | DOC, XLS, RTF, `litchi-ograph`, `litchi-ole-common`, `litchi-crypto` | 🔴 (DOC `raw::Package`, RTF `raw::Document`) | 🔴 | 🔴 | 🔴 (XLS, ograph) | 🔴 | 🔴 |
 | W6 | ODF (`litchi-odf-common`, ODT, ODS, ODP, ODG, ODC, ODI, ODM, OTH, ODB, ODF-formula) | 🔴 (ODT `generic::Package`, `odc::Document`, `MutableDocument`) | 🔴 | 🔴 | ➖ | 🔴 (flat owners, ODC `Limits`) | 🔴 |

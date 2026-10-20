@@ -2586,10 +2586,10 @@ ppt	smartart	edit	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	-
 ppt	smartart	batch	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	-
 ppt	smartart	create	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	ok format
 ppt	smartart	save	gap	0339-F3 (deferred-P1): PPT SmartArt and diagram groups	ok format
-ppt	ole	get	supported		ok 3 instances, first `unified-ops/0294/elements.ppt` /slide[1]/ole[1]
-ppt	ole	find	supported		ok 3 instances, first `unified-ops/0294/elements.ppt` /slide[1]/ole[1]
+ppt	ole	get	supported		ok 4 instances, first `unified-ops/0294/elements.ppt` /slide[1]/ole[1]
+ppt	ole	find	supported		ok 4 instances, first `unified-ops/0294/elements.ppt` /slide[1]/ole[1]
 ppt	ole	query	supported		ok matches in unified-ops/0294/elements.ppt
-ppt	ole	view	supported		ok 3 instances, first `unified-ops/0294/elements.ppt` /slide[1]/ole[1]
+ppt	ole	view	supported		ok 4 instances, first `unified-ops/0294/elements.ppt` /slide[1]/ole[1]
 ppt	ole	set	n/a	set not offered for this element	-
 ppt	ole	add	n/a	add not offered for this element	-
 ppt	ole	remove	n/a	remove not offered for this element	-
