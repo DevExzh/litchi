@@ -1600,3 +1600,29 @@ fn ppt_primary_edit_errors_preserve_policy_codes_and_typed_sources() {
         Code::LimitExceeded,
     );
 }
+
+#[test]
+fn edit_refusals_classify_by_kind_alone() {
+    use litchi_core::edit::{Refusal, RefusalKind};
+
+    use super::Classify as _;
+
+    let expected = [
+        (
+            RefusalKind::UnsupportedOperation,
+            Code::UnsupportedCapability,
+        ),
+        (RefusalKind::UnsupportedContent, Code::UnsupportedCapability),
+        (RefusalKind::UnsupportedTarget, Code::UnsupportedType),
+        (RefusalKind::UnsupportedProperty, Code::UnsupportedProperty),
+        (RefusalKind::InvalidValue, Code::InvalidValue),
+        (RefusalKind::NotFound, Code::NotFound),
+        (RefusalKind::Protected, Code::DocumentProtected),
+    ];
+    assert_eq!(expected.len(), RefusalKind::ALL.len());
+    for (kind, code) in expected {
+        assert_eq!(kind.classify().code, code, "{kind}");
+        let refusal = Refusal::new(kind, "operation", "reason");
+        assert_eq!(refusal.classify().code, code, "{kind}");
+    }
+}
