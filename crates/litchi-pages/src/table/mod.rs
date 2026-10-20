@@ -18,12 +18,14 @@ pub mod values {
 /// body table (record 0329).
 pub mod creation {
     pub use crate::package::body_table_creation::{
-        Commit, Diagnostics, Error, LimitKind, NewTable, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, NewTable, Patch,
     };
 }
 /// Exact-source deletion of one rooted body table.
 pub mod deletion {
-    pub use crate::package::body_table_deletion::{Commit, Diagnostics, Error, LimitKind, Patch};
+    pub use crate::package::body_table_deletion::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+    };
 }
 /// Effective style, gridline, banding, and row-sizing settings for a body table.
 pub mod appearance;

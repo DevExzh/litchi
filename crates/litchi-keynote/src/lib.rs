@@ -538,7 +538,7 @@ pub use selector::{
 };
 pub use slide::comment::{Comment, CommentAuthor, CommentTimestamp, DrawableKind, Reply};
 pub use slide::image::ImageSelector;
-pub use slide::media::{MediaInfo, MediaProperties, MovieInfo, MovieKind};
+pub use slide::media::{MediaProperties, MovieInfo, MovieKind};
 pub use slide::movie::MovieSelector;
 pub use slide::table::TableSelector;
 pub use slide::table::merge::Region;

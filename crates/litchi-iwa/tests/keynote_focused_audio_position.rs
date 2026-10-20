@@ -234,8 +234,10 @@ fn add_audio(
     options: SlideAudioOptions,
 ) -> TestResult {
     let package = Package::from_bytes(&editor.to_bytes()?)?;
-    let commit =
-        package.add_slide_audio(SlideSelector::index(0), preferred_filename, data, options)?;
+    let commit = package
+        .edit_slide_audio_creation()
+        .add(SlideSelector::index(0), preferred_filename, data, options)
+        .and_then(|edit| edit.commit())?;
     let bytes = package_bytes(commit.package())?;
     *editor = keynote::Editor::from_bytes(&bytes)?;
     Ok(())
@@ -250,14 +252,17 @@ fn add_movie(
     options: SlideMovieOptions,
 ) -> TestResult<u64> {
     let package = Package::from_bytes(&editor.to_bytes()?)?;
-    let commit = package.add_slide_movie(
-        SlideSelector::index(0),
-        preferred_movie_filename,
-        movie_data,
-        preferred_poster_filename,
-        poster_data,
-        options,
-    )?;
+    let commit = package
+        .edit_slide_movie_creation()
+        .add(
+            SlideSelector::index(0),
+            preferred_movie_filename,
+            movie_data,
+            preferred_poster_filename,
+            poster_data,
+            options,
+        )
+        .and_then(|edit| edit.commit())?;
     let bytes = package_bytes(commit.package())?;
     *editor = keynote::Editor::from_bytes(&bytes)?;
     last_native_media_id(&bytes, MovieKind::File)

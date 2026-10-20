@@ -352,7 +352,9 @@ fn native_body_table_deletion_delegates_to_focused_package() {
 
     let focused = PagesPackage::from_bytes(&source).expect("focused Pages package");
     let focused_commit = focused
-        .remove_body_table(BodyTableSelector::index(0))
+        .edit_body_table_deletion()
+        .remove(BodyTableSelector::index(0))
+        .and_then(|edit| edit.commit())
         .expect("focused table deletion");
     let mut expected = Vec::new();
     focused_commit

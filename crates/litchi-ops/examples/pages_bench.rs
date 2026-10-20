@@ -24,7 +24,7 @@
 //!   compared byte for byte before timing.
 //! - record 0329: `table_add`, a 3 x 3 table at the end of
 //!   `body-table-catalog-native.pages` (leaf: `edit_section_paragraphs`
-//!   inserting an empty last paragraph, then `insert_body_table` at its
+//!   inserting an empty last paragraph, then `edit_body_table_creation().insert(..)` at its
 //!   start; unified `File::add("/body", tbl)` with `rows` and `cols`);
 //!   outputs compared byte for byte before timing.
 //!
@@ -353,10 +353,12 @@ fn main() {
         edit.insert(Position::new(line), "").unwrap();
         let with_paragraph = edit.commit().unwrap().into_package();
         with_paragraph
-            .insert_body_table(
+            .edit_body_table_creation()
+            .insert(
                 Position::new(anchor),
                 litchi_pages::table::creation::NewTable::new(3, 3),
             )
+            .and_then(|edit| edit.commit())
             .unwrap()
             .into_package()
     };

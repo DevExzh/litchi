@@ -550,10 +550,6 @@ impl Diagnostics {
 /// Result type for a physical Keynote slide-table sort transaction.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Compatibility spelling used by callers that distinguish value errors from
-/// package transaction errors in generic code.
-pub type TransactionError = Error;
-
 /// Exact-source physical row-sort transaction types.
 ///
 /// The package adapter owns the package-bearing `Edit`, `Patch`, and `Commit`
@@ -561,6 +557,6 @@ pub type TransactionError = Error;
 /// semantic `slide::table::physical_sort` namespace while the implementation
 /// remains below the archive boundary.
 pub mod transaction {
-    pub use super::{Diagnostics, Error, LimitKind, Path, TransactionError, UnsupportedFeature};
+    pub use super::{Diagnostics, Error, LimitKind, Path, UnsupportedFeature};
     pub use crate::package::slide_table_physical_sort::{Commit, Edit, Patch};
 }

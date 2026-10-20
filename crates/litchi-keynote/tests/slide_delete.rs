@@ -947,6 +947,8 @@ fn selector_first_deletion_is_exact_applicable_and_reversible() -> TestResult<()
     let commit = edit.commit()?;
     assert_eq!(names(commit.package())?, ["Plan", "Evidence"]);
     assert_eq!(commit.patch().position(), Position::new(0));
+    assert!(!commit.patch().is_noop());
+    assert!(!commit.patch().inverse().is_noop());
     assert_ne!(
         commit.patch().source_fingerprint(),
         commit.patch().target_fingerprint()

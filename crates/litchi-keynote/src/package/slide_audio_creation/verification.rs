@@ -193,7 +193,7 @@ enum BuildEffect {
 /// Verify the complete graph produced by one fresh slide-audio publication.
 ///
 /// This witness is intentionally used for the initial candidate assembled by
-/// [`Package::add_slide_audio`].  A replay of an already-authorized exact
+/// [`crate::slide::audio::creation::Edit`].  A replay of an already-authorized exact
 /// artifact does not need to retain these private native identifiers: the
 /// artifact fingerprint and the package-level semantic checks are its source
 /// of truth.

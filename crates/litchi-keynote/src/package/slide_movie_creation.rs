@@ -35,12 +35,38 @@ use crate::slide::movie::creation::{
 use crate::{MovieKind, SlideSelector};
 
 impl Package {
-    /// Create one independently positioned, file-backed movie on a slide.
+    /// Start an immutable single-creation slide movie edit.
+    ///
+    /// ```no_run
+    /// use std::fs;
+    /// use litchi_keynote::{Package, SlideSelector, slide::movie::Options};
+    ///
+    /// # fn create(options: Options) -> Result<(), Box<dyn std::error::Error>> {
+    /// let source = Package::open("presentation.key")?;
+    /// let (movie, poster) = (fs::read("clip.mov")?, fs::read("poster.png")?);
+    /// let commit = source
+    ///     .edit_slide_movie_creation()
+    ///     .add(SlideSelector::index(0), "clip.mov", &movie, "poster.png", &poster, options)?
+    ///     .commit()?;
+    /// let restored = commit
+    ///     .package()
+    ///     .apply_slide_movie_creation(&commit.patch().inverse())?;
+    /// # Ok(())
+    /// # }
+    /// # fn main() {}
+    /// ```
+    #[must_use]
+    pub const fn edit_slide_movie_creation(&self) -> crate::slide::movie::creation::Edit<'_> {
+        crate::slide::movie::creation::Edit::new(self)
+    }
+
+    /// Create one independently positioned, file-backed movie on a slide: the
+    /// commit of [`crate::slide::movie::creation::Edit`].
     ///
     /// Both movie and poster bytes are borrowed until the exact candidate has
     /// been assembled and reopened. The source package remains unchanged and
     /// the returned patch authorizes replay only for that exact source.
-    pub fn add_slide_movie<'slide>(
+    pub(crate) fn create_slide_movie<'slide>(
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         preferred_movie_filename: &str,
@@ -474,6 +500,10 @@ fn map_error(error: SlideAudioCreationError) -> SlideMovieCreationError {
         },
         SlideAudioCreationError::Verification => SlideMovieCreationError::Verification,
         SlideAudioCreationError::PatchConflict => SlideMovieCreationError::PatchConflict,
+        SlideAudioCreationError::OperationAlreadyStaged => {
+            SlideMovieCreationError::OperationAlreadyStaged
+        },
+        SlideAudioCreationError::NoStagedOperation => SlideMovieCreationError::NoStagedOperation,
     }
 }
 

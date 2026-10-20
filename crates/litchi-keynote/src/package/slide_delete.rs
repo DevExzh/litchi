@@ -790,6 +790,13 @@ impl Patch {
     pub const fn target_fingerprint(&self) -> u64 {
         self.artifacts.target_fingerprint()
     }
+    /// Return whether this patch leaves the deck unchanged. A deletion (or its
+    /// inverse, a restoration) always changes the slide count, so a patch of
+    /// this family is never a no-op.
+    #[must_use]
+    pub const fn is_noop(&self) -> bool {
+        self.source_slide_count == self.target_slide_count
+    }
     #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
@@ -854,6 +861,12 @@ impl Commit {
     #[must_use]
     pub fn into_package(self) -> Package {
         self.package
+    }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
     #[must_use]
     pub const fn patch(&self) -> &Patch {

@@ -45,7 +45,7 @@ const ATTACHMENT_TABLE_FIELD: u32 = 9;
 /// The object-replacement character a drawable attachment anchors at.
 const ANCHOR: &str = "\u{fffc}";
 
-/// A new body table for [`Package::insert_body_table`]: its size, an
+/// A new body table for [`Edit::insert`]: its size, an
 /// optional name and seeded cell values.
 ///
 /// ```
@@ -204,6 +204,12 @@ pub enum Error {
     /// The patch does not match the exact source package.
     #[error("the Pages body-table creation patch does not match the exact source package")]
     PatchConflict,
+    /// The edit already stages its one insertion.
+    #[error("the Pages body-table creation edit already stages an insertion")]
+    OperationAlreadyStaged,
+    /// The edit was committed without a staged insertion.
+    #[error("the Pages body-table creation edit stages no insertion")]
+    NoStagedOperation,
 }
 
 impl From<Fault> for Error {
@@ -265,12 +271,20 @@ impl Patch {
 /// Compact evidence for one verified body-table creation.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Diagnostics {
+    changed: bool,
     created_objects: usize,
     touched_components: usize,
     seeded_cells: usize,
 }
 
 impl Diagnostics {
+    /// Whether the commit changed the package (false only for a no-op patch
+    /// replay).
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed
+    }
+
     /// How many native objects the creation inserted.
     #[must_use]
     pub const fn created_objects(self) -> usize {
@@ -338,37 +352,46 @@ impl Commit {
     }
 }
 
-impl Package {
-    /// Insert a new, empty body table anchored at UTF-16 code unit `anchor`
+/// One immutable edit that stages exactly one body-table insertion.
+///
+/// Start it with [`Package::edit_body_table_creation`]; the source package is
+/// never changed, and dropping the edit discards the staged insertion.
+pub struct Edit<'a> {
+    source: &'a Package,
+    insertion: Option<(Position, NewTable)>,
+}
+
+impl fmt::Debug for Edit<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field(
+                "insertion",
+                &self
+                    .insertion
+                    .as_ref()
+                    .map(|(anchor, table)| (anchor, table.rows, table.columns)),
+            )
+            .finish_non_exhaustive()
+    }
+}
+
+impl Edit<'_> {
+    /// Stage a new, empty body table anchored at UTF-16 code unit `anchor`
     /// of the body story, cloned from the structure of the document's first
-    /// body table, as one exact-source transaction (record 0329). The
-    /// anchor character joins the paragraph holding `anchor`; seeded cells
-    /// are written with the body-table value writer.
-    ///
-    /// ```no_run
-    /// use litchi_core::Position;
-    /// use litchi_pages::Package;
-    /// use litchi_pages::table::creation::NewTable;
-    ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let package = Package::open("report.pages")?;
-    /// let commit = package.insert_body_table(Position::new(0), NewTable::new(3, 2))?;
-    /// assert_eq!(
-    ///     commit.package().body_tables()?.len(),
-    ///     package.body_tables()?.len() + 1
-    /// );
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// body table (record 0329). The anchor character joins the paragraph
+    /// holding `anchor`; seeded cells are written with the body-table value
+    /// writer.
     ///
     /// # Errors
     ///
-    /// [`Error::NoTemplate`] for a document without a body table,
-    /// [`Error::InvalidSize`], [`Error::InvalidCell`],
-    /// [`Error::PositionOutOfBounds`], [`Error::Unsupported`] for a
-    /// template or body shape outside the transaction, and typed source,
-    /// limit, allocation and verification errors.
-    pub fn insert_body_table(&self, anchor: Position, table: NewTable) -> Result<Commit, Error> {
+    /// [`Error::OperationAlreadyStaged`] after one insertion,
+    /// [`Error::InvalidSize`] and [`Error::InvalidCell`] for a table this
+    /// transaction cannot create.
+    pub fn insert(mut self, anchor: Position, table: NewTable) -> Result<Self, Error> {
+        if self.insertion.is_some() {
+            return Err(Error::OperationAlreadyStaged);
+        }
         if !table_create::admits_size(table.rows, table.columns) {
             return Err(Error::InvalidSize {
                 rows: table.rows,
@@ -382,10 +405,57 @@ impl Package {
         }) {
             return Err(Error::InvalidCell);
         }
-        if !self.state.source.source_is_exact() {
+        self.insertion = Some((anchor, table));
+        Ok(self)
+    }
+
+    /// Validate, publish and reopen the staged insertion.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NoStagedOperation`] for an empty edit,
+    /// [`Error::UnsupportedSource`] for a source that is not exact,
+    /// [`Error::NoTemplate`] for a document without a body table,
+    /// [`Error::PositionOutOfBounds`], [`Error::Unsupported`] for a
+    /// template or body shape outside the transaction, and typed source,
+    /// limit, allocation and verification errors. Failure never publishes a
+    /// partial package.
+    pub fn commit(self) -> Result<Commit, Error> {
+        let (anchor, table) = self.insertion.ok_or(Error::NoStagedOperation)?;
+        if !self.source.state.source.source_is_exact() {
             return Err(Error::UnsupportedSource);
         }
-        create(self, anchor.get(), &table)
+        create(self.source, anchor.get(), &table)
+    }
+}
+
+impl Package {
+    /// Start an immutable single-insertion body-table creation edit.
+    ///
+    /// ```no_run
+    /// use litchi_core::Position;
+    /// use litchi_pages::Package;
+    /// use litchi_pages::table::creation::NewTable;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::open("report.pages")?;
+    /// let commit = package
+    ///     .edit_body_table_creation()
+    ///     .insert(Position::new(0), NewTable::new(3, 2))?
+    ///     .commit()?;
+    /// assert_eq!(
+    ///     commit.package().body_tables()?.len(),
+    ///     package.body_tables()?.len() + 1
+    /// );
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub const fn edit_body_table_creation(&self) -> Edit<'_> {
+        Edit {
+            source: self,
+            insertion: None,
+        }
     }
 
     /// Apply a body-table creation patch (or its inverse) only to its exact
@@ -400,7 +470,10 @@ impl Package {
         Ok(Commit {
             package,
             patch: patch.clone(),
-            diagnostics: Diagnostics::default(),
+            diagnostics: Diagnostics {
+                changed: !patch.is_noop(),
+                ..Diagnostics::default()
+            },
         })
     }
 }
@@ -979,6 +1052,7 @@ fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, E
         },
         package,
         diagnostics: Diagnostics {
+            changed: true,
             created_objects,
             touched_components,
             seeded_cells: table.cells.len(),

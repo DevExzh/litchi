@@ -15,7 +15,7 @@ use litchi_iwa_common::table::merge::Region;
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::tswp;
 use litchi_pages::{
-    BodyTableSelector, MergeReader, Package,
+    BodyTableSelector, MergeReader, OpenOptions, Package, SourceLimits,
     table::merge::transaction::Error as BodyTableMergesError,
 };
 use prost::Message as _;
@@ -127,27 +127,18 @@ fn reader_keeps_a_bounded_snapshot_after_path_removal() -> TestResult {
 #[test]
 fn reader_accepts_an_inclusive_input_limit_and_rejects_one_below() -> TestResult {
     let input_bytes = u64::try_from(NATIVE.len())?;
-    let exact = Limits::new(
-        input_bytes,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        Limits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let options = |maximum| -> Result<OpenOptions, litchi_pages::PackageError> {
+        Ok(OpenOptions::new()
+            .source_limits(SourceLimits::builder().max_input_bytes(maximum)?.build()?))
+    };
     assert_eq!(
-        MergeReader::from_bytes_with_limits(NATIVE, exact)?.body_table_merges(0usize)?,
+        MergeReader::from_bytes_with_options(NATIVE, options(input_bytes)?)?
+            .body_table_merges(0usize)?,
         expected()
     );
 
-    let below = Limits::new(
-        input_bytes - 1,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        Limits::MAX_IWA_STREAM_BYTES,
-    )?;
     assert!(matches!(
-        MergeReader::from_bytes_with_limits(NATIVE, below),
+        MergeReader::from_bytes_with_options(NATIVE, options(input_bytes - 1)?),
         Err(BodyTableMergesError::LimitExceeded {
             kind: litchi_pages::table::merge::transaction::LimitKind::InputBytes,
             observed,

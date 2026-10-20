@@ -147,6 +147,12 @@ pub enum Error {
     /// The supplied patch was created from a different exact source artifact.
     #[error("the Pages body-table deletion patch does not match the exact source package")]
     PatchConflict,
+    /// The edit already stages its one removal.
+    #[error("the Pages body-table deletion edit already stages a removal")]
+    OperationAlreadyStaged,
+    /// The edit was committed without a staged removal.
+    #[error("the Pages body-table deletion edit stages no removal")]
+    NoStagedOperation,
 }
 
 /// One object location retained by the deletion-wide object index.
@@ -474,6 +480,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the exact reversible patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -496,20 +508,58 @@ impl Commit {
     }
 }
 
-impl Package {
-    /// Remove one rooted body table as one exact-source transaction.
-    pub fn remove_body_table<'table>(
-        &self,
-        selector: impl Into<BodyTableSelector<'table>>,
-    ) -> Result<Commit, Error> {
-        let source = &self.state.source;
+/// One immutable edit that stages exactly one rooted body-table removal.
+///
+/// Start it with [`Package::edit_body_table_deletion`]; the source package is
+/// never changed, and dropping the edit discards the staged removal.
+pub struct Edit<'a> {
+    source: &'a Package,
+    selector: Option<BodyTableSelector<'a>>,
+}
+
+impl fmt::Debug for Edit<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field("staged", &self.selector.is_some())
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a> Edit<'a> {
+    /// Stage the removal of the selected body table.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::OperationAlreadyStaged`] after one removal.
+    pub fn remove(mut self, selector: impl Into<BodyTableSelector<'a>>) -> Result<Self, Error> {
+        if self.selector.is_some() {
+            return Err(Error::OperationAlreadyStaged);
+        }
+        self.selector = Some(selector.into());
+        Ok(self)
+    }
+
+    /// Resolve, publish and reopen the staged removal as one exact-source
+    /// transaction.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NoStagedOperation`] for an empty edit,
+    /// [`Error::TableNotFound`], [`Error::AmbiguousTableName`] and
+    /// [`Error::AmbiguousSelector`] for the selector,
+    /// [`Error::UnsupportedSource`] for a source that is not exact, and typed
+    /// source, dependency, limit and verification errors. Failure never
+    /// publishes a partial package.
+    pub fn commit(self) -> Result<Commit, Error> {
+        let selector = self.selector.ok_or(Error::NoStagedOperation)?;
+        let source = &self.source.state.source;
         let mut budget = table_lock::WireBudget::new(source.limits()).map_err(map_lock_error)?;
         budget
             .charge_source_catalog(source)
             .map_err(map_lock_error)?;
-        let targets = table_lock::native_body_table_targets_with_budget(self, &mut budget)
+        let targets = table_lock::native_body_table_targets_with_budget(self.source, &mut budget)
             .map_err(map_lock_error)?;
-        let selector = selector.into();
         let target = select_target(targets, selector, &mut budget)?;
         if !source.source_is_exact() {
             return Err(Error::UnsupportedSource);
@@ -520,7 +570,32 @@ impl Package {
             target,
             removed_table,
         };
-        publish_deletion(self, request, &mut budget)
+        publish_deletion(self.source, request, &mut budget)
+    }
+}
+
+impl Package {
+    /// Start an immutable single-removal body-table deletion edit.
+    ///
+    /// ```no_run
+    /// use litchi_pages::Package;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::open("report.pages")?;
+    /// let commit = package.edit_body_table_deletion().remove(0usize)?.commit()?;
+    /// let restored = commit
+    ///     .package()
+    ///     .apply_body_table_deletion(&commit.patch().inverse())?;
+    /// assert_eq!(restored.package().body_tables()?.len(), package.body_tables()?.len());
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub const fn edit_body_table_deletion(&self) -> Edit<'_> {
+        Edit {
+            source: self,
+            selector: None,
+        }
     }
 
     /// Apply a deletion patch only to its exact immutable source package.

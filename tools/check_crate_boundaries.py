@@ -3686,27 +3686,28 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SHARED_CHILD_MODULES = frozenset(
     {"budget", "comment_graph"}
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SHARED_CHILD_VISIBILITY = "pub(in crate::package)"
+# Record 0361 (W7): the lifecycle is a scoped family. ``Package`` starts the
+# edit and replays its patch; the selector-first verbs stage on ``Edit``.
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS = frozenset(
     {
-        "duplicate_slide_media",
-        "remove_slide_media",
+        "edit_slide_media_lifecycle",
         "apply_slide_media_lifecycle",
-        "apply_slide_media_lifecycle_patch",
     }
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_TYPED_PACKAGE_METHODS = frozenset(
     {
-        "duplicate_slide_media",
-        "remove_slide_media",
-        "duplicate_slide_movie",
-        "duplicate_slide_audio",
-        "remove_slide_movie",
-        "remove_slide_audio",
+        "duplicate",
+        "remove",
+        "duplicate_movie",
+        "duplicate_audio",
+        "remove_movie",
+        "remove_audio",
     }
 )
-KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PATCH_METHODS = frozenset(
-    {"apply_slide_media_lifecycle", "apply_slide_media_lifecycle_patch"}
-)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PATCH_METHODS = frozenset({"apply_slide_media_lifecycle"})
+# The functions that run a lifecycle transaction (one aggregate budget each):
+# the staged edit's commit and the exact-source patch replay.
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OPERATIONS = frozenset({"commit", "apply_slide_media_lifecycle"})
 # These names are intentionally accepted in both the short and prefixed
 # forms.  Existing Keynote owners use the prefixed form, while the lifecycle
 # module may keep a concise internal semantic spelling before re-exporting it.
@@ -15646,7 +15647,7 @@ PAGES_TRANSACTION_FAMILIES: tuple[
         ("Catalog", "Error", "LimitKind", "Snapshot"),
         {"Catalog": "BodyTableCatalog", "Snapshot": "BodyTableSnapshot"},
     ),
-    ("body_table_deletion", "BodyTableDeletion", ("table", "deletion"), ("Commit", "Diagnostics", "Error", "LimitKind", "Patch"), {}),
+    ("body_table_deletion", "BodyTableDeletion", ("table", "deletion"), PAGES_TRANSACTION_SIX, {}),
     ("body_table_dimension", "BodyTableDimension", ("table", "dimension", "transaction"), PAGES_TRANSACTION_SIX, {}),
     ("body_table_headers", "BodyTableHeaderSettings", ("table", "headers", "transaction"), PAGES_TRANSACTION_SIX + ("InvalidReason",), {}),
     ("body_table_hidden_axes", "BodyTableHiddenAxes", ("table", "hidden_axes", "transaction"), PAGES_TRANSACTION_SIX + ("Path",), {}),
@@ -16292,7 +16293,7 @@ KEYNOTE_SLIDE_MOVIE_CREATION_FORBIDDEN_SOURCE_PATTERNS = (
 KEYNOTE_SLIDE_MOVIE_CREATION_ROUTE = re.compile(
     r"(?<![A-Za-z0-9_#])(?:CreationOptions|MediaCreationOptions)"
     r"[ \t\r\n]*::[ \t\r\n]*Movie\b|"
-    r"(?<![A-Za-z0-9_#])(?:pub[ \t]+)?fn[ \t\r\n]+add_slide_movie\b|"
+    r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t]+)?fn[ \t\r\n]+(?:add|create)_slide_movie\b|"
     r"(?<![A-Za-z0-9_#])make_movie_objects\b|"
     r"(?<![A-Za-z0-9_#])SlideMovieCreation(?:Commit|Patch|Error|Diagnostics)\b"
 )
@@ -52775,11 +52776,11 @@ def audit_keynote_slide_movie_creation_source_topology(
 
         # Keep raw-ID rejection local to a semantic entry point.  The shared
         # owner necessarily uses u64 references while staging the archive.
-        function = _rust_named_function_body(production_source, "add_slide_movie")
+        function = _rust_named_function_body(production_source, "create_slide_movie")
         if function is not None:
             body, body_offset = function
             signature = production_code[:body_offset]
-            signature_start = signature.rfind("fn add_slide_movie")
+            signature_start = signature.rfind("fn create_slide_movie")
             if signature_start >= 0:
                 signature = signature[max(0, signature_start - 240) :]
                 for match in KEYNOTE_SLIDE_MOVIE_CREATION_RAW_API_PARAMETER.finditer(
@@ -60049,6 +60050,10 @@ def audit_keynote_slide_media_lifecycle_facade_source_topology(
         (name, declaration)
         for name, declaration, _line in _rust_public_methods_in_impl(owner, "Package")
     )
+    edit_declarations = dict(
+        (name, declaration)
+        for name, declaration, _line in _rust_public_methods_in_impl(owner, "Edit")
+    )
     for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS):
         declaration = declarations.get(name)
         if declaration is None:
@@ -60057,20 +60062,17 @@ def audit_keynote_slide_media_lifecycle_facade_source_topology(
                 f"{name}: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
             )
             continue
-    for name in sorted(
-        KEYNOTE_SLIDE_MEDIA_LIFECYCLE_TYPED_PACKAGE_METHODS
-        - KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS
-    ):
-        declaration = declarations.get(name)
+    for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_TYPED_PACKAGE_METHODS):
+        declaration = edit_declarations.get(name)
         if declaration is None:
             violations.append(
-                "focused litchi-keynote slide-media lifecycle Package method is missing "
+                "focused litchi-keynote slide-media lifecycle Edit method is missing "
                 f"{name}: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
             )
             continue
 
     for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_TYPED_PACKAGE_METHODS):
-        declaration = declarations.get(name)
+        declaration = edit_declarations.get(name)
         if declaration is None:
             continue
         for selector in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SELECTOR_TYPES):
@@ -60083,18 +60085,19 @@ def audit_keynote_slide_media_lifecycle_facade_source_topology(
     for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PATCH_METHODS):
         declaration = declarations.get(name)
         if declaration is None:
-            if name == "apply_slide_media_lifecycle_patch":
-                # This compatibility spelling may be omitted by a minimal
-                # owner, but if it exists it is still part of the typed facade.
-                continue
             continue
         if not re.search(r"\b(?:LifecyclePatch|Patch)\b", declaration):
             violations.append(
                 "focused litchi-keynote slide-media lifecycle apply method must accept "
                 f"its typed patch ({name}): {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
             )
-    for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS):
-        declaration = declarations.get(name)
+    staged_declarations = [
+        declarations.get(name) for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS)
+    ] + [
+        edit_declarations.get(name)
+        for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_TYPED_PACKAGE_METHODS)
+    ]
+    for declaration in staged_declarations:
         if declaration is None:
             continue
         if re.search(r"\b(?:u64|u32|usize)\b|&\s*\[\s*u8\s*\]|Vec\s*<\s*u8\s*>", declaration):
@@ -61599,7 +61602,7 @@ def audit_keynote_slide_media_lifecycle_transaction_source_topology(
             )
         return reachable
 
-    for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS):
+    for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OPERATIONS):
         signature_body = functions.get(name)
         if signature_body is None:
             continue
@@ -70617,13 +70620,17 @@ IWA_PAGES_BODY_TABLE_DELETION_CANONICAL_TYPES = frozenset(
     {
         "Commit",
         "Diagnostics",
+        "Edit",
         "Error",
         "LimitKind",
         "Patch",
     }
 )
+# Record 0361 (W7): ``Package::edit_body_table_deletion`` starts the scoped
+# edit, ``Edit::remove`` stages the selector and ``Edit::commit`` resolves it
+# before any staging or publication helper runs.
 IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_METHODS = (
-    "remove_body_table",
+    "edit_body_table_deletion",
     "apply_body_table_deletion",
 )
 IWA_PAGES_BODY_TABLE_DELETION_CHILD_MARKER_GROUPS = {
@@ -74438,6 +74445,8 @@ def audit_pages_body_table_deletion_source_topology(
     package_method_records: dict[str, list[tuple[str, str, int, Path]]] = {
         name: [] for name in IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_METHODS
     }
+    commit_records: list[tuple[str, str, int, Path]] = []
+    stage_records: list[tuple[str, str, int, Path]] = []
     for path, source in sources:
         for method_name in package_method_records:
             for declaration, body, line in _rust_public_method_bodies(
@@ -74446,30 +74455,46 @@ def audit_pages_body_table_deletion_source_topology(
                 package_method_records[method_name].append(
                     (declaration, body, line, path)
                 )
+        for declaration, body, line in _rust_public_method_bodies(
+            source, "commit", type_name="Edit"
+        ):
+            commit_records.append((declaration, body, line, path))
+        for declaration, body, line in _rust_public_method_bodies(
+            source, "remove", type_name="Edit"
+        ):
+            stage_records.append((declaration, body, line, path))
 
-    remove_records = package_method_records["remove_body_table"]
-    if not remove_records:
+    if not package_method_records["edit_body_table_deletion"]:
         violations.append(
-            "Pages body-table deletion Package method is missing remove_body_table: "
-            f"{owner_path}"
+            "Pages body-table deletion Package method is missing "
+            f"edit_body_table_deletion: {owner_path}"
         )
-    for declaration, body, line, path in remove_records:
+    if not stage_records:
+        violations.append(
+            f"Pages body-table deletion Edit method is missing remove: {owner_path}"
+        )
+    for declaration, _body, line, path in stage_records:
         if re.search(r"\bBodyTableSelector\b", declaration) is None:
             violations.append(
-                "Pages remove_body_table must accept BodyTableSelector: "
+                "Pages body-table deletion Edit::remove must accept BodyTableSelector: "
                 f"{path}:{line}"
             )
+    if not commit_records:
+        violations.append(
+            f"Pages body-table deletion Edit method is missing commit: {owner_path}"
+        )
+    for declaration, body, line, path in commit_records:
         if re.search(r"\bResult\s*<\s*Commit\s*,\s*Error\s*>", declaration) is None:
             violations.append(
-                "Pages remove_body_table must return the typed deletion result: "
-                f"{path}:{line}"
+                "Pages body-table deletion Edit::commit must return the typed deletion "
+                f"result: {path}:{line}"
             )
         body_code = _mask_rust_non_code(body)
         body_opening = body_code.find("{")
         if body_opening >= 0:
             body_code = body_code[body_opening + 1 :]
         admission = re.search(
-            r"\b(?:BodyTableSelector|resolve_body_table|select_body_table|"
+            r"\b(?:select_target|resolve_body_table|select_body_table|"
             r"body_table_catalog)\b",
             body_code,
         )
@@ -74480,23 +74505,23 @@ def audit_pages_body_table_deletion_source_topology(
         )
         if admission is None:
             violations.append(
-                "Pages remove_body_table must resolve its typed selector before staging: "
-                f"{path}:{line}"
+                "Pages body-table deletion Edit::commit must resolve its typed selector "
+                f"before staging: {path}:{line}"
             )
         elif staging is not None and staging.start() < admission.start():
             violations.append(
-                "Pages remove_body_table stages deletion before selector admission: "
-                f"{path}:{line}"
+                "Pages body-table deletion Edit::commit stages deletion before selector "
+                f"admission: {path}:{line}"
             )
         if IWA_PAGES_BODY_TABLE_DELETION_LEGACY_FALLBACK.search(body_code):
             violations.append(
-                "Pages remove_body_table retains a legacy/catchall deletion fallback: "
-                f"{path}:{line}"
+                "Pages body-table deletion Edit::commit retains a legacy/catchall "
+                f"deletion fallback: {path}:{line}"
             )
         if re.search(r"\bErr\s*\(\s*_\s*\)\s*=>", body_code):
             violations.append(
-                "Pages remove_body_table uses a post-admission catchall error arm: "
-                f"{path}:{line}"
+                "Pages body-table deletion Edit::commit uses a post-admission catchall "
+                f"error arm: {path}:{line}"
             )
 
     apply_records = package_method_records["apply_body_table_deletion"]

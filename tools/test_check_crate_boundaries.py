@@ -4693,15 +4693,19 @@ def add_keynote_slide_media_lifecycle_canonical_scaffold(root: Path) -> None:
         "    }\n"
         "}\n"
         "fn exact_source_fingerprint_inverse() { ExactArtifacts; source_fingerprint; inverse; PatchConflict; }\n"
+        "pub struct Edit<'a> { source: &'a Package, staged: Option<LifecycleAction> }\n"
+        "impl<'a> Edit<'a> {\n"
+        "    pub fn duplicate(self, slide: SlideSelector, movie: MovieSelector) -> Result<Self, LifecycleError> { let _ = (slide, movie); Ok(self) }\n"
+        "    pub fn remove(self, slide: SlideSelector, movie: MovieSelector) -> Result<Self, LifecycleError> { let _ = (slide, movie); Ok(self) }\n"
+        "    pub fn duplicate_movie(self, slide: SlideSelector, movie: MovieSelector) -> Result<Self, LifecycleError> { self.duplicate(slide, movie) }\n"
+        "    pub fn duplicate_audio(self, slide: SlideSelector, movie: MovieSelector) -> Result<Self, LifecycleError> { self.duplicate(slide, movie) }\n"
+        "    pub fn remove_movie(self, slide: SlideSelector, movie: MovieSelector) -> Result<Self, LifecycleError> { self.remove(slide, movie) }\n"
+        "    pub fn remove_audio(self, slide: SlideSelector, movie: MovieSelector) -> Result<Self, LifecycleError> { self.remove(slide, movie) }\n"
+        "    pub fn commit(self) -> Result<LifecycleCommit, LifecycleError> { let mut budget = MediaLifecycleBudget::for_package(self.source); select_media(&mut budget); clone_object(&mut budget); replace_slide_message_with_lifecycle_refs(&mut budget); metadata_transition(); candidate_reopen_verify(); let _ = budget; todo!() }\n"
+        "}\n"
         "impl Package {\n"
-        "    pub fn duplicate_slide_media(&self, slide: SlideSelector, movie: MovieSelector) -> Result<LifecycleCommit, LifecycleError> { let mut budget = MediaLifecycleBudget::for_package(self); select_media(&mut budget); clone_object(&mut budget); replace_slide_message_with_lifecycle_refs(&mut budget); metadata_transition(); candidate_reopen_verify(); let _ = (slide, movie, budget); todo!() }\n"
-        "    pub fn remove_slide_media(&self, slide: SlideSelector, movie: MovieSelector) -> Result<LifecycleCommit, LifecycleError> { let mut budget = MediaLifecycleBudget::for_package(self); select_media(&mut budget); replace_slide_message_with_lifecycle_refs(&mut budget); metadata_transition(); candidate_reopen_verify(); let _ = (slide, movie, budget); todo!() }\n"
-        "    pub fn duplicate_slide_movie(&self, slide: SlideSelector, movie: MovieSelector) -> Result<LifecycleCommit, LifecycleError> { self.duplicate_slide_media(slide, movie) }\n"
-        "    pub fn duplicate_slide_audio(&self, slide: SlideSelector, movie: MovieSelector) -> Result<LifecycleCommit, LifecycleError> { self.duplicate_slide_media(slide, movie) }\n"
-        "    pub fn remove_slide_movie(&self, slide: SlideSelector, movie: MovieSelector) -> Result<LifecycleCommit, LifecycleError> { self.remove_slide_media(slide, movie) }\n"
-        "    pub fn remove_slide_audio(&self, slide: SlideSelector, movie: MovieSelector) -> Result<LifecycleCommit, LifecycleError> { self.remove_slide_media(slide, movie) }\n"
+        "    pub fn edit_slide_media_lifecycle(&self) -> Edit<'_> { Edit { source: self, staged: None } }\n"
         "    pub fn apply_slide_media_lifecycle(&self, patch: &LifecyclePatch) -> Result<LifecycleCommit, LifecycleError> { let mut budget = MediaLifecycleBudget::for_package(self); replace_slide_message_with_lifecycle_refs(&mut budget); metadata_transition(); candidate_reopen_verify(); let _ = (patch, budget); todo!() }\n"
-        "    pub fn apply_slide_media_lifecycle_patch(&self, patch: &LifecyclePatch) -> Result<LifecycleCommit, LifecycleError> { self.apply_slide_media_lifecycle(patch) }\n"
         "}\n"
         "impl LifecyclePatch { pub fn inverse(&self) -> Self { Self } }\n"
         "fn bounded_allocations() { try_reserve(); checked_add(); checked_mul(); allocation(); }\n",
@@ -50484,16 +50488,21 @@ fn rewrite_movie_title_operation(
             "    pub fn diagnostics(&self) -> &Diagnostics { todo!() }\n"
             "    pub fn removed_table(&self) -> &Snapshot { todo!() }\n"
             "}\n"
-            "impl Package {\n"
-            "    pub fn remove_body_table(\n"
-            "        &self, selector: impl Into<BodyTableSelector<'_>>\n"
-            "    ) -> Result<Commit, Error> {\n"
+            "pub struct Edit<'a> { source: &'a Package }\n"
+            "impl<'a> Edit<'a> {\n"
+            "    pub fn remove(\n"
+            "        self, selector: impl Into<BodyTableSelector<'a>>\n"
+            "    ) -> Result<Self, Error> { let _ = selector; Ok(self) }\n"
+            "    pub fn commit(self) -> Result<Commit, Error> {\n"
             "        let selected = resolve_body_table(selector);\n"
             "        let staged = Patch { removed: Snapshot };\n"
             "        let candidate = reassemble(staged);\n"
             "        let reopened = reopen(candidate);\n"
             "        verify(reopened)\n"
             "    }\n"
+            "}\n"
+            "impl Package {\n"
+            "    pub fn edit_body_table_deletion(&self) -> Edit<'_> { Edit { source: self } }\n"
             "    pub fn apply_body_table_deletion(\n"
             "        &self, patch: &Patch\n"
             "    ) -> Result<Commit, Error> {\n"
@@ -50548,13 +50557,13 @@ fn rewrite_movie_title_operation(
         package.parent.mkdir(parents=True, exist_ok=True)
         package.write_text(
             "mod body_table_deletion;\n"
-            "pub use body_table_deletion::{Commit, Diagnostics, Error, LimitKind, Patch};\n",
+            "pub use body_table_deletion::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};\n",
             encoding="utf-8",
         )
         library = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_LIBRARY_SOURCE
         library.parent.mkdir(parents=True, exist_ok=True)
         library.write_text(
-            "pub use package::{Commit, Diagnostics, Error, LimitKind, Patch};\n",
+            "pub use package::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};\n",
             encoding="utf-8",
         )
         add_pages_transaction_family_scaffold(root, "body_table_deletion")

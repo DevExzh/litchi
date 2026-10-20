@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use litchi_core::Position;
-use litchi_pages::table::creation::{Error, NewTable};
+use litchi_pages::table::creation::{Commit, Error, NewTable};
 use litchi_pages::table::read::Value as ReadValue;
 use litchi_pages::table::values::Value;
 use litchi_pages::{BodyTableSelector, Package};
@@ -43,12 +43,41 @@ fn first_section_end(package: &Package) -> usize {
         .map_or(0, |text| text.encode_utf16().count())
 }
 
+/// Stage and commit one insertion.
+fn insert(package: &Package, anchor: Position, table: NewTable) -> Result<Commit, Error> {
+    package
+        .edit_body_table_creation()
+        .insert(anchor, table)?
+        .commit()
+}
+
+#[test]
+fn the_edit_stages_exactly_one_insertion() -> TestResult {
+    let package = Package::open(pages_dir().join("body-table-visible.pages"))?;
+    assert!(matches!(
+        package.edit_body_table_creation().commit(),
+        Err(Error::NoStagedOperation)
+    ));
+    assert!(matches!(
+        package
+            .edit_body_table_creation()
+            .insert(Position::new(0), NewTable::new(2, 2))?
+            .insert(Position::new(0), NewTable::new(2, 2)),
+        Err(Error::OperationAlreadyStaged)
+    ));
+    let commit = insert(&package, Position::new(0), NewTable::new(2, 2))?;
+    assert!(commit.diagnostics().changed());
+    assert!(!commit.patch().is_noop());
+    Ok(())
+}
+
 #[test]
 fn tables_are_inserted_read_back_reopened_and_inverted() -> TestResult {
     let package = Package::open(pages_dir().join("body-table-visible.pages"))?;
     let source = bytes(&package)?;
     let before = package.body_tables()?.len();
-    let commit = package.insert_body_table(
+    let commit = insert(
+        &package,
         Position::new(0),
         NewTable::new(3, 4)
             .with_name("Budget")
@@ -92,7 +121,7 @@ fn every_corpus_document_inserts_a_table_or_refuses_typed() -> TestResult {
                 // creation, typed.
                 assert!(
                     matches!(
-                        package.insert_body_table(Position::new(0), NewTable::new(2, 2)),
+                        insert(&package, Position::new(0), NewTable::new(2, 2)),
                         Err(Error::Unsupported)
                     ),
                     "{}",
@@ -103,7 +132,8 @@ fn every_corpus_document_inserts_a_table_or_refuses_typed() -> TestResult {
             },
         };
         for anchor in [0, first_section_end(&package)] {
-            let result = package.insert_body_table(
+            let result = insert(
+                &package,
                 Position::new(anchor),
                 NewTable::new(2, 2).with_cell(1, 0, Value::Text("x".into())),
             );
@@ -141,26 +171,27 @@ fn every_corpus_document_inserts_a_table_or_refuses_typed() -> TestResult {
 fn invalid_requests_refuse_typed() -> TestResult {
     let package = Package::open(pages_dir().join("body-table-visible.pages"))?;
     assert!(matches!(
-        package.insert_body_table(Position::new(0), NewTable::new(0, 2)),
+        insert(&package, Position::new(0), NewTable::new(0, 2)),
         Err(Error::InvalidSize {
             rows: 0,
             columns: 2
         })
     ));
     assert!(matches!(
-        package.insert_body_table(
+        insert(
+            &package,
             Position::new(0),
             NewTable::new(2, 2).with_cell(2, 0, Value::Boolean(true))
         ),
         Err(Error::InvalidCell)
     ));
     assert!(matches!(
-        package.insert_body_table(Position::new(1_000_000), NewTable::new(2, 2)),
+        insert(&package, Position::new(1_000_000), NewTable::new(2, 2)),
         Err(Error::PositionOutOfBounds)
     ));
     let plain = Package::open(pages_dir().join("basic.pages"))?;
     assert!(matches!(
-        plain.insert_body_table(Position::new(0), NewTable::new(2, 2)),
+        insert(&plain, Position::new(0), NewTable::new(2, 2)),
         Err(Error::NoTemplate)
     ));
     Ok(())

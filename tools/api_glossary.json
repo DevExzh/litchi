@@ -12256,6 +12256,12 @@
           "name": "CellRange",
           "scope": "litchi_numbers",
           "replacement": "use litchi_numbers::Area; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_numbers",
+          "replacement": "limits come from OpenOptions (owners) or a required limits argument (record APIs); record 0351 §2.5 rule 3, record 0361",
+          "match": "suffix"
         }
       ],
       "families": [
@@ -12295,7 +12301,8 @@
       "immutable_owners": [
         "litchi_numbers::Package",
         "litchi_numbers::Workbook"
-      ]
+      ],
+      "family_methods": true
     },
     {
       "id": "numbers-full",
@@ -12915,6 +12922,12 @@
           "name": "CellRange",
           "scope": "litchi_numbers",
           "replacement": "use litchi_numbers::Area; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_numbers",
+          "replacement": "limits come from OpenOptions (owners) or a required limits argument (record APIs); record 0351 §2.5 rule 3, record 0361",
+          "match": "suffix"
         }
       ],
       "families": [
@@ -12954,7 +12967,8 @@
       "immutable_owners": [
         "litchi_numbers::Package",
         "litchi_numbers::Workbook"
-      ]
+      ],
+      "family_methods": true
     },
     {
       "id": "ops-iwork",
@@ -14173,6 +14187,12 @@
           "name": "CellRange",
           "scope": "litchi_pages",
           "replacement": "use litchi_iwa_common::table::coordinate::Area; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_pages",
+          "replacement": "limits come from OpenOptions (owners) or a required limits argument (record APIs); record 0351 §2.5 rule 3, record 0361",
+          "match": "suffix"
         }
       ],
       "families": [
@@ -14202,12 +14222,16 @@
         "litchi_pages::table::name::transaction",
         "litchi_pages::table::sort::transaction",
         "litchi_pages::table::title",
-        "litchi_pages::table::lock"
+        "litchi_pages::table::lock",
+        "litchi_pages::section::paragraphs",
+        "litchi_pages::table::creation",
+        "litchi_pages::table::deletion"
       ],
       "immutable_owners": [
         "litchi_pages::Package",
         "litchi_pages::Document"
-      ]
+      ],
+      "family_methods": true
     },
     {
       "id": "keynote-minimal",
@@ -15603,12 +15627,16 @@
         "litchi_keynote::soundtrack",
         "litchi_keynote::soundtrack::order",
         "litchi_keynote::soundtrack::items",
-        "litchi_keynote::slide::placeholder"
+        "litchi_keynote::slide::placeholder",
+        "litchi_keynote::slide::audio::creation",
+        "litchi_keynote::slide::movie::creation",
+        "litchi_keynote::slide::media::lifecycle"
       ],
       "immutable_owners": [
         "litchi_keynote::Package",
         "litchi_keynote::Presentation"
-      ]
+      ],
+      "family_methods": true
     },
     {
       "id": "keynote-full",
@@ -17000,12 +17028,16 @@
         "litchi_keynote::soundtrack",
         "litchi_keynote::soundtrack::order",
         "litchi_keynote::soundtrack::items",
-        "litchi_keynote::slide::placeholder"
+        "litchi_keynote::slide::placeholder",
+        "litchi_keynote::slide::audio::creation",
+        "litchi_keynote::slide::movie::creation",
+        "litchi_keynote::slide::media::lifecycle"
       ],
       "immutable_owners": [
         "litchi_keynote::Package",
         "litchi_keynote::Presentation"
-      ]
+      ],
+      "family_methods": true
     }
   ]
 }

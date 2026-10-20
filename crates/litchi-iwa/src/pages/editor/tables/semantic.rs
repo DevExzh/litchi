@@ -3879,7 +3879,9 @@ impl Editor {
         let (focused, table_position, info, compatibility_source) =
             focused_body_table_deletion_source(self, model_object_id)?;
         let commit = focused
-            .remove_body_table(BodyTableSelector::index(table_position))
+            .edit_body_table_deletion()
+            .remove(BodyTableSelector::index(table_position))
+            .and_then(|edit| edit.commit())
             .map_err(map_focused_deletion_error)?;
         let removed = commit.removed_table();
         if removed.index() != table_position

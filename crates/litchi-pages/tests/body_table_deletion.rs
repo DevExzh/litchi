@@ -89,7 +89,10 @@ fn lowered_transaction_budget_fails_atomically() -> TestResult {
     let package = smallest_success.ok_or("no successful ingress limit boundary found")?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.remove_body_table(BodyTableSelector::index(0)),
+        package
+            .edit_body_table_deletion()
+            .remove(BodyTableSelector::index(0))
+            .and_then(|edit| edit.commit()),
         Err(BodyTableDeletionError::LimitExceeded { .. })
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -99,7 +102,10 @@ fn lowered_transaction_budget_fails_atomically() -> TestResult {
 #[test]
 fn deletion_preserves_unrelated_zip_members_byte_for_byte() -> TestResult {
     let source = Package::from_bytes(SOURCE)?;
-    let commit = source.remove_body_table(BodyTableSelector::index(0))?;
+    let commit = source
+        .edit_body_table_deletion()
+        .remove(BodyTableSelector::index(0))
+        .and_then(|edit| edit.commit())?;
     let before = Catalog::from_bytes(SOURCE)?;
     let after_bytes = exact_bytes(commit.package())?;
     let after = Catalog::from_bytes(&after_bytes)?;
@@ -141,7 +147,10 @@ fn deletion_removes_empty_iwa_members_without_package_metadata_registration() ->
         );
 
         let package = Package::from_bytes(source)?;
-        let commit = package.remove_body_table(BodyTableSelector::index(0))?;
+        let commit = package
+            .edit_body_table_deletion()
+            .remove(BodyTableSelector::index(0))
+            .and_then(|edit| edit.commit())?;
         let target = exact_bytes(commit.package())?;
         let after_names = member_names(&target)?;
         assert_eq!(
@@ -200,7 +209,10 @@ fn deletion_removes_empty_iwa_members_without_package_metadata_registration() ->
 #[test]
 fn deleted_previews_are_restored_by_the_inverse_patch() -> TestResult {
     let source = Package::from_bytes(SOURCE)?;
-    let commit = source.remove_body_table(BodyTableSelector::index(0))?;
+    let commit = source
+        .edit_body_table_deletion()
+        .remove(BodyTableSelector::index(0))
+        .and_then(|edit| edit.commit())?;
     assert_eq!(commit.diagnostics().deleted_previews(), PREVIEWS.len());
     let changed = exact_bytes(commit.package())?;
     let changed_catalog = Catalog::from_bytes(&changed)?;
@@ -227,7 +239,10 @@ fn deleted_previews_are_restored_by_the_inverse_patch() -> TestResult {
 #[test]
 fn patch_rejects_an_independently_reallocated_source_with_different_bytes() -> TestResult {
     let source = Package::from_bytes(SOURCE)?;
-    let commit = source.remove_body_table(BodyTableSelector::index(0))?;
+    let commit = source
+        .edit_body_table_deletion()
+        .remove(BodyTableSelector::index(0))
+        .and_then(|edit| edit.commit())?;
 
     let source_catalog = Catalog::from_bytes(SOURCE)?;
     let altered_bytes = source_catalog.reassemble_to_bytes(

@@ -236,12 +236,15 @@ fn fresh_audio_preserves_unknown_and_noncanonical_slide_header_bytes() -> TestRe
     let source = Package::from_bytes(&source_bytes)?;
     assert_eq!(exact_bytes(&source)?, source_bytes);
 
-    let commit = source.add_slide_audio(
-        SlideSelector::index(0),
-        "fresh-pcm.wav",
-        &audio(),
-        options()?,
-    )?;
+    let commit = source
+        .edit_slide_audio_creation()
+        .add(
+            SlideSelector::index(0),
+            "fresh-pcm.wav",
+            &audio(),
+            options()?,
+        )
+        .and_then(|edit| edit.commit())?;
     let candidate_bytes = exact_bytes(commit.package())?;
     let candidate_header = slide_header(&candidate_bytes, &component_name)?;
     let candidate_view = WireView::parse(&candidate_header)?;

@@ -1026,7 +1026,8 @@ let movie = fs::read("demo.mov")?;
 let poster = fs::read("demo-poster.png")?;
 let source = keynote::Builder::new().build()?;
 let package = Package::from_bytes(&source.to_bytes()?)?;
-let commit = package.add_slide_movie(
+let commit = package.edit_slide_movie_creation()
+.add(
     SlideSelector::index(0),
     "demo.mov",
     &movie,
@@ -1037,14 +1038,17 @@ let commit = package.add_slide_movie(
         Size { width: 640.0, height: 360.0 },
         Duration::from_secs(8),
     )?,
-)?;
+)
+.and_then(|edit| edit.commit())?;
 commit.package().save("created-with-movie-source.key")?;
 
 let package = Package::open("created-with-movie-source.key")?;
-let duplicate = package.duplicate_slide_movie(
+let duplicate = package.edit_slide_media_lifecycle()
+.duplicate_movie(
     SlideSelector::index(0),
     MovieSelector::index(0),
-)?;
+)
+.and_then(|edit| edit.commit())?;
 duplicate.package().save("created-with-movie.key")?;
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
@@ -1053,9 +1057,9 @@ The builder supplies an empty source package. Creation and the lifecycle handoff
 run through `litchi_keynote::Package`, where the typed
 `SlideSelector` and `MovieSelector` address the source-order movie without
 exposing drawable IDs, native object IDs, or data keys. The verified commit
-returned by `Package::duplicate_slide_movie` creates the new movie graph and
+returned by `slide::media::lifecycle::Edit::duplicate_movie` creates the new movie graph and
 playback build while sharing video and poster data; use
-`Package::remove_slide_movie` for the corresponding typed removal.
+`slide::media::lifecycle::Edit::remove_movie` for the corresponding typed removal.
 
 Independently positioned audio uses a distinct typed API even though Keynote
 stores it in the movie-archive family. Its zero-size control, media style,
@@ -1073,26 +1077,30 @@ use litchi_keynote::{MovieSelector, Package, SlideSelector};
 let audio = fs::read("narration.aiff")?;
 let keynote = keynote::Builder::new().build()?;
 let source = Package::from_bytes(&keynote.to_bytes()?)?;
-let created = source.add_slide_audio(
+let created = source.edit_slide_audio_creation()
+.add(
     SlideSelector::index(0),
     "narration.aiff",
     &audio,
     SlideAudioOptions::new(Point { x: 960.0, y: 540.0 }, Duration::from_secs(12))?,
-)?;
+)
+.and_then(|edit| edit.commit())?;
 let package = created.package();
-let duplicate = package.duplicate_slide_audio(
+let duplicate = package.edit_slide_media_lifecycle()
+.duplicate_audio(
     SlideSelector::index(0),
     MovieSelector::index(0),
-)?;
+)
+.and_then(|edit| edit.commit())?;
 duplicate.package().save("created-with-audio.key")?;
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 The initial presentation builder remains in the host; audio creation and
-lifecycle mutation belong to the focused package API. `Package::duplicate_slide_audio` uses the same typed
+lifecycle mutation belong to the focused package API. `slide::media::lifecycle::Edit::duplicate_audio` uses the same typed
 source-order selectors and returns a verified commit with a separate audio
 graph and Start Audio build that shares the embedded asset. Use
-`Package::remove_slide_audio` for typed removal; callers that already hold
+`slide::media::lifecycle::Edit::remove_audio` for typed removal; callers that already hold
 source bytes can use `Package::from_bytes`, as shown above, instead of opening
 the filename directly.
 
@@ -3423,7 +3431,7 @@ migration debt is retired and no host exits.
 ## 2026-09-01 Numbers table relocation focused owner
 
 Physical relocation of an existing Numbers table now belongs to
-`litchi_numbers::table::relocation::transaction::{Commit, Diagnostics, Edit,
+`litchi_numbers::table::relocation::{Commit, Diagnostics, Edit,
 Error, LimitKind, Patch, Path}` through
 `litchi_numbers::Package::{edit_table_relocation, move_table,
 apply_table_relocation}` (`apply_table_move` remains a compatibility spelling).

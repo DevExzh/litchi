@@ -2,7 +2,7 @@
 
 //! Bounded selector-first fuzzing for fresh Keynote slide audio.
 //!
-//! The target exercises [`Package::add_slide_audio`] against arbitrary
+//! The target exercises [`Package::edit_slide_audio_creation`] against arbitrary
 //! bounded package bytes and a mandatory checked-in native package seed. A
 //! successful transaction must preserve the source, reopen and validate its
 //! candidate, replay exactly, restore through its inverse, and produce the
@@ -99,7 +99,9 @@ fn exercise_package(package: &Package, data: &[u8]) {
     let filename = requested_filename(data);
     let options = requested_options(data);
     let slide = requested_slide(data);
-    let commit = match package.add_slide_audio(slide, &filename, &audio, options) {
+    let commit = match package.edit_slide_audio_creation()
+.add(slide, &filename, &audio, options)
+.and_then(|edit| edit.commit()) {
         Ok(commit) => commit,
         Err(error) => {
             observe_error(error);
@@ -178,7 +180,9 @@ fn verify_seed_success_contract(package: &Package) {
     let data = seed_audio();
     let options = seed_options();
     let commit = package
-        .add_slide_audio(SlideSelector::index(0), "fuzz-seed.wav", &data, options)
+        .edit_slide_audio_creation()
+.add(SlideSelector::index(0), "fuzz-seed.wav", &data, options)
+.and_then(|edit| edit.commit())
         .unwrap_or_else(|error| panic!("native audio-creation seed must commit: {error}"));
     assert!(!commit.patch().is_noop());
     assert_eq!(commit.patch().options(), options);
@@ -233,12 +237,14 @@ fn exercise_limit_budget() {
     let source_bytes = package_bytes(&package);
     assert!(
         package
-            .add_slide_audio(
+            .edit_slide_audio_creation()
+.add(
                 SlideSelector::index(0),
                 "limit.wav",
                 &seed_audio(),
                 seed_options(),
             )
+.and_then(|edit| edit.commit())
             .is_err(),
         "the tight reference budget must reject creation"
     );

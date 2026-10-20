@@ -68,8 +68,10 @@ fn creates_audio_on_native_source_and_restores_exact_source() -> TestResult {
     let before = source.slides()?[0].movies().to_vec();
     let requested = options()?;
     let data = audio();
-    let commit =
-        source.add_slide_audio(SlideSelector::index(0), "fresh-pcm.wav", &data, requested)?;
+    let commit = source
+        .edit_slide_audio_creation()
+        .add(SlideSelector::index(0), "fresh-pcm.wav", &data, requested)
+        .and_then(|edit| edit.commit())?;
     let patch = commit.patch();
     assert!(commit.diagnostics().changed());
     assert_eq!(patch.source_media_count(), before.len());
@@ -125,14 +127,20 @@ fn creates_audio_on_native_source_and_restores_exact_source() -> TestResult {
 fn repeated_audio_content_reuses_one_data_record() -> TestResult {
     let source = Package::from_bytes(NATIVE_SOURCE)?;
     let data = audio();
-    let first =
-        source.add_slide_audio(SlideSelector::index(0), "fresh-pcm.wav", &data, options()?)?;
-    let second = first.package().add_slide_audio(
-        SlideSelector::index(0),
-        "same-content.wav",
-        &data,
-        Options::new(Point { x: 321.0, y: 42.0 }, Duration::from_millis(100))?,
-    )?;
+    let first = source
+        .edit_slide_audio_creation()
+        .add(SlideSelector::index(0), "fresh-pcm.wav", &data, options()?)
+        .and_then(|edit| edit.commit())?;
+    let second = first
+        .package()
+        .edit_slide_audio_creation()
+        .add(
+            SlideSelector::index(0),
+            "same-content.wav",
+            &data,
+            Options::new(Point { x: 321.0, y: 42.0 }, Duration::from_millis(100))?,
+        )
+        .and_then(|edit| edit.commit())?;
     assert_eq!(first.patch().created_data(), 1);
     assert_eq!(second.patch().created_data(), 0);
     assert_eq!(second.patch().created_objects(), 5);
@@ -168,13 +176,19 @@ fn rejects_unsafe_names_or_non_audio_without_mutating_source() -> TestResult {
         "audio\0.wav",
     ] {
         assert!(matches!(
-            source.add_slide_audio(SlideSelector::index(0), name, &data, options()?),
+            source
+                .edit_slide_audio_creation()
+                .add(SlideSelector::index(0), name, &data, options()?)
+                .and_then(|edit| edit.commit()),
             Err(SlideAudioCreationError::InvalidFilename),
         ));
     }
     for invalid in [b"".as_slice(), b"not an audio payload".as_slice()] {
         assert!(matches!(
-            source.add_slide_audio(SlideSelector::index(0), "audio.wav", invalid, options()?),
+            source
+                .edit_slide_audio_creation()
+                .add(SlideSelector::index(0), "audio.wav", invalid, options()?)
+                .and_then(|edit| edit.commit()),
             Err(SlideAudioCreationError::UnsupportedAudio),
         ));
     }
@@ -185,8 +199,10 @@ fn rejects_unsafe_names_or_non_audio_without_mutating_source() -> TestResult {
 #[test]
 fn patch_requires_the_exact_source_snapshot() -> TestResult {
     let source = Package::from_bytes(NATIVE_SOURCE)?;
-    let first =
-        source.add_slide_audio(SlideSelector::index(0), "fresh.wav", &audio(), options()?)?;
+    let first = source
+        .edit_slide_audio_creation()
+        .add(SlideSelector::index(0), "fresh.wav", &audio(), options()?)
+        .and_then(|edit| edit.commit())?;
     assert!(matches!(
         first.package().apply_slide_audio_creation(first.patch()),
         Err(SlideAudioCreationError::PatchConflict),
@@ -202,16 +218,22 @@ fn patch_requires_the_exact_source_snapshot() -> TestResult {
 fn source_selector_is_semantic_and_out_of_range_is_atomic() -> TestResult {
     let source = Package::from_bytes(NATIVE_SOURCE)?;
     assert!(matches!(
-        source.add_slide_audio(
-            SlideSelector::index(usize::MAX),
-            "audio.wav",
-            &audio(),
-            options()?
-        ),
+        source
+            .edit_slide_audio_creation()
+            .add(
+                SlideSelector::index(usize::MAX),
+                "audio.wav",
+                &audio(),
+                options()?
+            )
+            .and_then(|edit| edit.commit()),
         Err(SlideAudioCreationError::SlidePositionNotFound { .. }),
     ));
     assert!(matches!(
-        source.add_slide_audio(SlideSelector::name(""), "audio.wav", &audio(), options()?),
+        source
+            .edit_slide_audio_creation()
+            .add(SlideSelector::name(""), "audio.wav", &audio(), options()?)
+            .and_then(|edit| edit.commit()),
         Err(SlideAudioCreationError::EmptySlideName),
     ));
     assert_eq!(exact_bytes(&source)?, NATIVE_SOURCE);
@@ -237,7 +259,11 @@ fn oversized_audio_reports_entry_limit_without_changing_source() -> TestResult {
         Package::from_bytes_with_options(NATIVE_SOURCE, OpenOptions::new().source_limits(limits))?;
     let mut data = audio();
     data.resize(largest + 1, 0);
-    match source.add_slide_audio(SlideSelector::index(0), "oversized.wav", &data, options()?) {
+    match source
+        .edit_slide_audio_creation()
+        .add(SlideSelector::index(0), "oversized.wav", &data, options()?)
+        .and_then(|edit| edit.commit())
+    {
         Err(SlideAudioCreationError::LimitExceeded {
             kind: SlideAudioCreationLimitKind::EntryBytes,
             observed,
@@ -255,12 +281,15 @@ fn oversized_audio_reports_entry_limit_without_changing_source() -> TestResult {
 #[test]
 fn created_audio_composes_with_existing_semantic_editors() -> TestResult {
     let source = Package::from_bytes(NATIVE_SOURCE)?;
-    let creation = source.add_slide_audio(
-        SlideSelector::index(0),
-        "editable.wav",
-        &audio(),
-        options()?,
-    )?;
+    let creation = source
+        .edit_slide_audio_creation()
+        .add(
+            SlideSelector::index(0),
+            "editable.wav",
+            &audio(),
+            options()?,
+        )
+        .and_then(|edit| edit.commit())?;
     let selector = MovieSelector::position(creation.patch().movie_position());
     let moved = creation
         .package()
@@ -284,11 +313,39 @@ fn created_audio_composes_with_existing_semantic_editors() -> TestResult {
     );
     let removed = described
         .package()
-        .remove_slide_media(SlideSelector::index(0), selector)?;
+        .edit_slide_media_lifecycle()
+        .remove(SlideSelector::index(0), selector)
+        .and_then(|edit| edit.commit())?;
     assert_eq!(
         removed.package().slides()?[0].movies(),
         source.slides()?[0].movies(),
     );
+    assert_eq!(exact_bytes(&source)?, NATIVE_SOURCE);
+    Ok(())
+}
+
+#[test]
+fn the_edit_stages_exactly_one_audio_creation() -> TestResult {
+    let source = Package::from_bytes(NATIVE_SOURCE)?;
+    let data = audio();
+    assert!(matches!(
+        source.edit_slide_audio_creation().commit(),
+        Err(SlideAudioCreationError::NoStagedOperation)
+    ));
+    assert!(matches!(
+        source
+            .edit_slide_audio_creation()
+            .add(SlideSelector::index(0), "fresh-pcm.wav", &data, options()?)?
+            .add(SlideSelector::index(0), "fresh-pcm.wav", &data, options()?),
+        Err(SlideAudioCreationError::OperationAlreadyStaged)
+    ));
+    // Discarding a staged edit leaves the source untouched.
+    let _discarded = source.edit_slide_audio_creation().add(
+        SlideSelector::index(0),
+        "fresh-pcm.wav",
+        &data,
+        options()?,
+    )?;
     assert_eq!(exact_bytes(&source)?, NATIVE_SOURCE);
     Ok(())
 }

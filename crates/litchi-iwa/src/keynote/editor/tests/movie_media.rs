@@ -207,8 +207,10 @@ mod cases {
         options: SlideAudioOptions,
     ) -> TestResult<()> {
         let package = focused_package(editor)?;
-        let commit =
-            package.add_slide_audio(SlideSelector::index(0), preferred_filename, data, options)?;
+        let commit = package
+            .edit_slide_audio_creation()
+            .add(SlideSelector::index(0), preferred_filename, data, options)
+            .and_then(|edit| edit.commit())?;
         reopen_focused_package(editor, commit.package())
     }
 
@@ -242,7 +244,8 @@ mod cases {
     ) -> TestResult<MovieSnapshot> {
         let package = focused_package(editor)?;
         let commit = package
-            .add_slide_movie(
+            .edit_slide_movie_creation()
+            .add(
                 SlideSelector::index(slide_index),
                 preferred_movie_filename,
                 movie_data,
@@ -250,6 +253,7 @@ mod cases {
                 poster_data,
                 options,
             )
+            .and_then(|edit| edit.commit())
             .map_err(|error| format!("focused movie creation failed: {error}"))?;
         reopen_focused_package(editor, commit.package())?;
         let package = focused_package(editor)?;
@@ -336,7 +340,10 @@ mod cases {
 
     fn duplicate_movie(editor: &mut Editor, movie: MovieSelector) -> TestResult<MovieSnapshot> {
         let package = focused_package(editor)?;
-        let commit = package.duplicate_slide_movie(SlideSelector::index(0), movie)?;
+        let commit = package
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), movie)
+            .and_then(|edit| edit.commit())?;
         reopen_focused_package(editor, commit.package())?;
         let package = focused_package(editor)?;
         let index = package
@@ -348,7 +355,10 @@ mod cases {
 
     fn remove_movie(editor: &mut Editor, movie: MovieSelector) -> TestResult<()> {
         let package = focused_package(editor)?;
-        let commit = package.remove_slide_movie(SlideSelector::index(0), movie)?;
+        let commit = package
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), movie)
+            .and_then(|edit| edit.commit())?;
         reopen_focused_package(editor, commit.package())
     }
 

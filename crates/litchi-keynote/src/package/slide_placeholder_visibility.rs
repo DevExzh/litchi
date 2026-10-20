@@ -489,6 +489,12 @@ impl Commit {
     pub fn into_package(self) -> Package {
         self.package
     }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
     #[must_use]
     /// Borrow the process-local exact-source patch.
     pub const fn patch(&self) -> &Patch {

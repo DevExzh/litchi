@@ -350,8 +350,10 @@ fn audio_creation_from_saved_keynote_fixture_round_trips_exactly() -> TestResult
     let source = Package::from_bytes(NATIVE_FOCUSED)?;
     let data = audio();
     let requested = Options::new(Point { x: 321.0, y: 42.0 }, Duration::from_millis(250))?;
-    let commit =
-        source.add_slide_audio(SlideSelector::index(0), "second-pcm.wav", &data, requested)?;
+    let commit = source
+        .edit_slide_audio_creation()
+        .add(SlideSelector::index(0), "second-pcm.wav", &data, requested)
+        .and_then(|edit| edit.commit())?;
     let candidate_bytes = exact_bytes(commit.package())?;
     assert_ne!(candidate_bytes, exact_bytes(&source)?);
     assert_eq!(commit.patch().created_objects(), 5);

@@ -506,11 +506,7 @@ impl CreationBudget {
 }
 
 impl Package {
-    /// Create one independently positioned, slide-owned audio control.
-    ///
-    /// The source remains unchanged. The returned commit contains the candidate
-    /// package and an exact patch whose inverse restores the original bytes.
-    /// Identical materialized audio is reused when its metadata is unambiguous.
+    /// Start an immutable single-creation slide audio edit.
     ///
     /// ```no_run
     /// use std::{fs, time::Duration};
@@ -520,11 +516,21 @@ impl Package {
     /// let source = Package::from_bytes(&fs::read("presentation.key")?)?;
     /// let audio = fs::read("narration.wav")?;
     /// let options = Options::new(Point { x: 120.0, y: 240.0 }, Duration::from_secs(8))?;
-    /// let commit = source.add_slide_audio(SlideSelector::index(0), "narration.wav", &audio, options)?;
+    /// let commit = source
+    ///     .edit_slide_audio_creation()
+    ///     .add(SlideSelector::index(0), "narration.wav", &audio, options)?
+    ///     .commit()?;
     /// commit.package().write_to(&mut fs::File::create("narrated.key")?)?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn add_slide_audio<'slide>(
+    #[must_use]
+    pub const fn edit_slide_audio_creation(&self) -> crate::slide::audio::creation::Edit<'_> {
+        crate::slide::audio::creation::Edit::new(self)
+    }
+
+    /// Create one independently positioned, slide-owned audio control: the
+    /// commit of [`crate::slide::audio::creation::Edit`].
+    pub(crate) fn create_slide_audio<'slide>(
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         preferred_filename: &str,

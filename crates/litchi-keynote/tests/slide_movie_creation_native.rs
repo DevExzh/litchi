@@ -828,14 +828,17 @@ fn assert_replay_and_inverse(
     let source = Package::from_bytes(source_bytes)?;
     let source_snapshot = exact_bytes(&source)?;
     let commit = with_context(
-        source.add_slide_movie(
-            SlideSelector::index(0),
-            "native-replay-movie.mov",
-            movie_data,
-            "native-replay-poster.png",
-            poster_data,
-            options,
-        ),
+        source
+            .edit_slide_movie_creation()
+            .add(
+                SlideSelector::index(0),
+                "native-replay-movie.mov",
+                movie_data,
+                "native-replay-poster.png",
+                poster_data,
+                options,
+            )
+            .and_then(|edit| edit.commit()),
         "create another movie from native saved fixture",
     )?;
     let candidate = exact_bytes(commit.package())?;

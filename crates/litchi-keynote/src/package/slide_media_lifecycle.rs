@@ -146,6 +146,12 @@ pub enum Error {
     PatchConflict,
     #[error("the package could not be read")]
     Read,
+    /// The edit already stages its one duplication or removal.
+    #[error("the media lifecycle edit already stages an operation")]
+    OperationAlreadyStaged,
+    /// The edit was committed without a staged operation.
+    #[error("the media lifecycle edit stages no operation")]
+    NoStagedOperation,
 }
 
 /// The 128-bit identity used by native build chunks, kept private to the
@@ -379,6 +385,11 @@ impl Commit {
     pub fn into_package(self) -> Package {
         self.package
     }
+
+    /// Consume the commit and return its package and patch.
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
     pub const fn patch(&self) -> &Patch {
         &self.patch
     }
@@ -388,103 +399,206 @@ impl Commit {
     }
 }
 
-impl Package {
-    /// Duplicate one source-order movie or audio drawable on a slide.
+/// One staged movie or audio duplication or removal.
+#[derive(Debug, Clone, Copy)]
+struct Staged<'a> {
+    slide: SlideSelector<'a>,
+    media: MovieSelector,
+    action: LifecycleAction,
+    expected_kind: Option<MovieKind>,
+}
+
+/// One immutable edit that stages exactly one duplication or removal of a
+/// source-order movie or audio drawable on a slide.
+///
+/// Start it with [`Package::edit_slide_media_lifecycle`]; the source package
+/// is never changed, and dropping the edit discards the staged operation.
+#[derive(Debug)]
+pub struct Edit<'a> {
+    source: &'a Package,
+    staged: Option<Staged<'a>>,
+}
+
+impl<'a> Edit<'a> {
+    fn stage(
+        mut self,
+        slide: SlideSelector<'a>,
+        media: MovieSelector,
+        action: LifecycleAction,
+        expected_kind: Option<MovieKind>,
+    ) -> Result<Self, Error> {
+        if self.staged.is_some() {
+            return Err(Error::OperationAlreadyStaged);
+        }
+        self.staged = Some(Staged {
+            slide,
+            media,
+            action,
+            expected_kind,
+        });
+        Ok(self)
+    }
+
+    /// Stage the duplication of one source-order movie or audio drawable on
+    /// a slide.
     ///
     /// Direct comments and their replies receive independent storage while
     /// preserving their text, storage UUIDs, and shared authors.
-    pub fn duplicate_slide_media<'slide>(
-        &self,
-        slide_selector: impl Into<SlideSelector<'slide>>,
-        movie_selector: impl Into<MovieSelector>,
-    ) -> Result<Commit, Error> {
-        run_lifecycle(
-            self,
-            slide_selector.into(),
-            movie_selector.into(),
-            LifecycleAction::Duplicate,
-            None,
-        )
-    }
-
-    /// Remove one source-order movie or audio drawable from a slide.
     ///
-    /// Shared comment storage survives until its last drawable owner is removed.
-    /// Shared authors remain available after their component dependency is released.
-    pub fn remove_slide_media<'slide>(
-        &self,
-        slide_selector: impl Into<SlideSelector<'slide>>,
-        movie_selector: impl Into<MovieSelector>,
-    ) -> Result<Commit, Error> {
-        run_lifecycle(
-            self,
-            slide_selector.into(),
-            movie_selector.into(),
-            LifecycleAction::Remove,
-            None,
-        )
+    /// # Errors
+    ///
+    /// [`Error::OperationAlreadyStaged`] after one operation.
+    pub fn duplicate(
+        self,
+        slide: impl Into<SlideSelector<'a>>,
+        media: impl Into<MovieSelector>,
+    ) -> Result<Self, Error> {
+        self.stage(slide.into(), media.into(), LifecycleAction::Duplicate, None)
     }
 
-    /// Duplicate a file-backed movie.  The selector remains source-order and
-    /// therefore stays stable when native object identifiers change.
-    /// Direct comments follow the cloning policy of [`Self::duplicate_slide_media`].
-    pub fn duplicate_slide_movie<'slide>(
-        &self,
-        slide_selector: impl Into<SlideSelector<'slide>>,
-        movie_selector: impl Into<MovieSelector>,
-    ) -> Result<Commit, Error> {
-        run_lifecycle(
-            self,
-            slide_selector.into(),
-            movie_selector.into(),
+    /// Stage the removal of one source-order movie or audio drawable from a
+    /// slide.
+    ///
+    /// Shared comment storage survives until its last drawable owner is
+    /// removed. Shared authors remain available after their component
+    /// dependency is released.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::OperationAlreadyStaged`] after one operation.
+    pub fn remove(
+        self,
+        slide: impl Into<SlideSelector<'a>>,
+        media: impl Into<MovieSelector>,
+    ) -> Result<Self, Error> {
+        self.stage(slide.into(), media.into(), LifecycleAction::Remove, None)
+    }
+
+    /// Stage the duplication of a file-backed movie; the commit refuses any
+    /// other media kind with [`Error::KindMismatch`]. The selector remains
+    /// source-order and therefore stays stable when native object identifiers
+    /// change. Direct comments follow the cloning policy of
+    /// [`Self::duplicate`].
+    ///
+    /// # Errors
+    ///
+    /// [`Error::OperationAlreadyStaged`] after one operation.
+    pub fn duplicate_movie(
+        self,
+        slide: impl Into<SlideSelector<'a>>,
+        movie: impl Into<MovieSelector>,
+    ) -> Result<Self, Error> {
+        self.stage(
+            slide.into(),
+            movie.into(),
             LifecycleAction::Duplicate,
             Some(MovieKind::File),
         )
     }
 
-    /// Duplicate an audio drawable, including supported direct comment threads.
-    pub fn duplicate_slide_audio<'slide>(
-        &self,
-        slide_selector: impl Into<SlideSelector<'slide>>,
-        movie_selector: impl Into<MovieSelector>,
-    ) -> Result<Commit, Error> {
-        run_lifecycle(
-            self,
-            slide_selector.into(),
-            movie_selector.into(),
+    /// Stage the duplication of an audio drawable, including supported
+    /// direct comment threads; the commit refuses any other media kind with
+    /// [`Error::KindMismatch`].
+    ///
+    /// # Errors
+    ///
+    /// [`Error::OperationAlreadyStaged`] after one operation.
+    pub fn duplicate_audio(
+        self,
+        slide: impl Into<SlideSelector<'a>>,
+        audio: impl Into<MovieSelector>,
+    ) -> Result<Self, Error> {
+        self.stage(
+            slide.into(),
+            audio.into(),
             LifecycleAction::Duplicate,
             Some(MovieKind::Audio),
         )
     }
 
-    /// Remove a file-backed movie.
-    pub fn remove_slide_movie<'slide>(
-        &self,
-        slide_selector: impl Into<SlideSelector<'slide>>,
-        movie_selector: impl Into<MovieSelector>,
-    ) -> Result<Commit, Error> {
-        run_lifecycle(
-            self,
-            slide_selector.into(),
-            movie_selector.into(),
+    /// Stage the removal of a file-backed movie; the commit refuses any other
+    /// media kind with [`Error::KindMismatch`].
+    ///
+    /// # Errors
+    ///
+    /// [`Error::OperationAlreadyStaged`] after one operation.
+    pub fn remove_movie(
+        self,
+        slide: impl Into<SlideSelector<'a>>,
+        movie: impl Into<MovieSelector>,
+    ) -> Result<Self, Error> {
+        self.stage(
+            slide.into(),
+            movie.into(),
             LifecycleAction::Remove,
             Some(MovieKind::File),
         )
     }
 
-    /// Remove an audio drawable.
-    pub fn remove_slide_audio<'slide>(
-        &self,
-        slide_selector: impl Into<SlideSelector<'slide>>,
-        movie_selector: impl Into<MovieSelector>,
-    ) -> Result<Commit, Error> {
-        run_lifecycle(
-            self,
-            slide_selector.into(),
-            movie_selector.into(),
+    /// Stage the removal of an audio drawable; the commit refuses any other
+    /// media kind with [`Error::KindMismatch`].
+    ///
+    /// # Errors
+    ///
+    /// [`Error::OperationAlreadyStaged`] after one operation.
+    pub fn remove_audio(
+        self,
+        slide: impl Into<SlideSelector<'a>>,
+        audio: impl Into<MovieSelector>,
+    ) -> Result<Self, Error> {
+        self.stage(
+            slide.into(),
+            audio.into(),
             LifecycleAction::Remove,
             Some(MovieKind::Audio),
         )
+    }
+
+    /// Select, publish and reopen the staged operation as one exact-source
+    /// transaction.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NoStagedOperation`] for an empty edit; selector, kind,
+    /// comment, source, resource and verification errors. Failure never
+    /// publishes a partial package.
+    pub fn commit(self) -> Result<Commit, Error> {
+        let staged = self.staged.ok_or(Error::NoStagedOperation)?;
+        run_lifecycle(
+            self.source,
+            staged.slide,
+            staged.media,
+            staged.action,
+            staged.expected_kind,
+        )
+    }
+}
+
+impl Package {
+    /// Start an immutable single-operation movie or audio lifecycle edit.
+    ///
+    /// ```no_run
+    /// use litchi_keynote::{MovieSelector, Package, SlideSelector};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::open("talk.key")?;
+    /// let commit = package
+    ///     .edit_slide_media_lifecycle()
+    ///     .duplicate(SlideSelector::index(0), MovieSelector::index(0))?
+    ///     .commit()?;
+    /// let restored = commit
+    ///     .package()
+    ///     .apply_slide_media_lifecycle(&commit.patch().inverse())?;
+    /// assert!(restored.diagnostics().changed());
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub const fn edit_slide_media_lifecycle(&self) -> Edit<'_> {
+        Edit {
+            source: self,
+            staged: None,
+        }
     }
 
     /// Apply a patch only when this package is the exact retained source.
@@ -510,11 +624,6 @@ impl Package {
             patch: patch.clone(),
             diagnostics: diagnostics_for_patch(patch),
         })
-    }
-
-    /// Compatibility spelling for callers that use the patch terminology.
-    pub fn apply_slide_media_lifecycle_patch(&self, patch: &Patch) -> Result<Commit, Error> {
-        self.apply_slide_media_lifecycle(patch)
     }
 }
 

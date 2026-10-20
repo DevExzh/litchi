@@ -11,7 +11,7 @@ use litchi_iwa_archive::package::ExactArtifacts;
 use thiserror::Error as ThisError;
 
 use super::Options;
-use crate::Package;
+use crate::{Package, SlideSelector};
 
 /// Finite resources consumed by one movie-creation transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -115,6 +115,12 @@ pub enum Error {
     /// The patch is not authorized for this exact source snapshot.
     #[error("the slide movie creation patch does not match this exact source")]
     PatchConflict,
+    /// The edit already stages its one creation.
+    #[error("the slide movie creation edit already stages a movie")]
+    OperationAlreadyStaged,
+    /// The edit was committed without a staged creation.
+    #[error("the slide movie creation edit stages no movie")]
+    NoStagedOperation,
 }
 
 /// Exact source and target artifacts for creating one slide-owned movie.
@@ -411,6 +417,11 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the exact-source patch.
     pub const fn patch(&self) -> &Patch {
         &self.patch
@@ -420,5 +431,101 @@ impl Commit {
     #[must_use]
     pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
+    }
+}
+
+/// One staged slide movie creation.
+#[derive(Debug, Clone, Copy)]
+struct Staged<'a> {
+    slide: SlideSelector<'a>,
+    preferred_movie_filename: &'a str,
+    movie_data: &'a [u8],
+    preferred_poster_filename: &'a str,
+    poster_data: &'a [u8],
+    options: Options,
+}
+
+/// One immutable edit that stages exactly one independently positioned,
+/// file-backed movie on a slide.
+///
+/// Start it with [`Package::edit_slide_movie_creation`]; the source package is
+/// never changed, and dropping the edit discards the staged movie. Both movie
+/// and poster bytes stay borrowed until the commit has assembled and reopened
+/// the candidate.
+pub struct Edit<'a> {
+    source: &'a Package,
+    staged: Option<Staged<'a>>,
+}
+
+impl fmt::Debug for Edit<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field("slide", &self.staged.as_ref().map(|staged| staged.slide))
+            .field(
+                "movie_data_len",
+                &self.staged.as_ref().map(|staged| staged.movie_data.len()),
+            )
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a> Edit<'a> {
+    pub(crate) const fn new(source: &'a Package) -> Self {
+        Self {
+            source,
+            staged: None,
+        }
+    }
+
+    /// Stage one movie on the selected slide: `movie_data` (named after
+    /// `preferred_movie_filename`) with the poster frame `poster_data` (named
+    /// after `preferred_poster_filename`), placed by `options`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::OperationAlreadyStaged`] after one creation.
+    pub fn add(
+        mut self,
+        slide: impl Into<SlideSelector<'a>>,
+        preferred_movie_filename: &'a str,
+        movie_data: &'a [u8],
+        preferred_poster_filename: &'a str,
+        poster_data: &'a [u8],
+        options: Options,
+    ) -> Result<Self, Error> {
+        if self.staged.is_some() {
+            return Err(Error::OperationAlreadyStaged);
+        }
+        self.staged = Some(Staged {
+            slide: slide.into(),
+            preferred_movie_filename,
+            movie_data,
+            preferred_poster_filename,
+            poster_data,
+            options,
+        });
+        Ok(self)
+    }
+
+    /// Validate, publish and reopen the staged movie as one exact-source
+    /// transaction; the returned patch authorizes replay only for that exact
+    /// source.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NoStagedOperation`] for an empty edit; selector, input,
+    /// source, resource and verification errors. Failure never publishes a
+    /// partial package.
+    pub fn commit(self) -> Result<Commit, Error> {
+        let staged = self.staged.ok_or(Error::NoStagedOperation)?;
+        self.source.create_slide_movie(
+            staged.slide,
+            staged.preferred_movie_filename,
+            staged.movie_data,
+            staged.preferred_poster_filename,
+            staged.poster_data,
+            staged.options,
+        )
     }
 }

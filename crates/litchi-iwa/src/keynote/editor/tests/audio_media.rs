@@ -384,8 +384,10 @@ mod cases {
         options: SlideAudioOptions,
     ) -> TestResult<AudioSnapshot> {
         let package = focused_audio_package(editor)?;
-        let commit =
-            package.add_slide_audio(SlideSelector::index(0), preferred_filename, data, options)?;
+        let commit = package
+            .edit_slide_audio_creation()
+            .add(SlideSelector::index(0), preferred_filename, data, options)
+            .and_then(|edit| edit.commit())?;
         replace_with_focused_package(editor, commit.package())?;
         let position = audio_positions(editor)?
             .last()
@@ -460,10 +462,13 @@ mod cases {
 
     fn duplicate_audio(editor: &mut Editor, movie_position: usize) -> TestResult<AudioSnapshot> {
         let package = focused_audio_package(editor)?;
-        let commit = package.duplicate_slide_audio(
-            SlideSelector::index(0),
-            MovieSelector::index(movie_position),
-        )?;
+        let commit = package
+            .edit_slide_media_lifecycle()
+            .duplicate_audio(
+                SlideSelector::index(0),
+                MovieSelector::index(movie_position),
+            )
+            .and_then(|edit| edit.commit())?;
         replace_with_focused_package(editor, commit.package())?;
         let position = audio_positions(editor)?
             .last()
@@ -482,10 +487,13 @@ mod cases {
             .map(|audio| audio.content)
             .collect::<Vec<_>>();
         let package = focused_audio_package(editor)?;
-        let commit = package.remove_slide_audio(
-            SlideSelector::index(0),
-            MovieSelector::index(movie_position),
-        )?;
+        let commit = package
+            .edit_slide_media_lifecycle()
+            .remove_audio(
+                SlideSelector::index(0),
+                MovieSelector::index(movie_position),
+            )
+            .and_then(|edit| edit.commit())?;
         replace_with_focused_package(editor, commit.package())?;
         let after = audio_snapshots(editor)?
             .into_iter()
@@ -790,23 +798,31 @@ mod cases {
         let baseline = editor.to_bytes()?;
         assert!(
             focused_audio_package(&editor)?
-                .duplicate_slide_audio(SlideSelector::index(0), MovieSelector::index(0))
+                .edit_slide_media_lifecycle()
+                .duplicate_audio(SlideSelector::index(0), MovieSelector::index(0))
+                .and_then(|edit| edit.commit())
                 .is_err()
         );
         assert_eq!(editor.to_bytes()?, baseline);
         for result in [
-            focused_audio_package(&editor)?.add_slide_audio(
-                SlideSelector::index(0),
-                "payload.bin",
-                b"not audio",
-                SlideAudioOptions::new(POSITION, Duration::from_secs(1))?,
-            ),
-            focused_audio_package(&editor)?.add_slide_audio(
-                SlideSelector::index(1),
-                "audio.aiff",
-                AUDIO,
-                SlideAudioOptions::new(POSITION, Duration::from_secs(1))?,
-            ),
+            focused_audio_package(&editor)?
+                .edit_slide_audio_creation()
+                .add(
+                    SlideSelector::index(0),
+                    "payload.bin",
+                    b"not audio",
+                    SlideAudioOptions::new(POSITION, Duration::from_secs(1))?,
+                )
+                .and_then(|edit| edit.commit()),
+            focused_audio_package(&editor)?
+                .edit_slide_audio_creation()
+                .add(
+                    SlideSelector::index(1),
+                    "audio.aiff",
+                    AUDIO,
+                    SlideAudioOptions::new(POSITION, Duration::from_secs(1))?,
+                )
+                .and_then(|edit| edit.commit()),
         ] {
             assert!(result.is_err());
             assert_eq!(editor.to_bytes()?, baseline);

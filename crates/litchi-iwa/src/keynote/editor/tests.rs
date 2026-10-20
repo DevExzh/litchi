@@ -3172,12 +3172,16 @@ fn hand_built_slide_movie_admission_rejection_is_transactional() {
     );
     assert!(
         package
-            .duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert!(
         package
-            .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -3188,7 +3192,8 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
     let mut editor = keynote::Builder::new().build().unwrap();
     let package = FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let commit = package
-        .add_slide_movie(
+        .edit_slide_movie_creation()
+        .add(
             SlideSelector::index(0),
             "movie.mov",
             TEST_MOVIE_VIDEO,
@@ -3209,6 +3214,7 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
             })
             .unwrap(),
         )
+        .and_then(|edit| edit.commit())
         .unwrap();
     reopen_focused_package(&mut editor, commit.package());
     let created = generated_movie_identities(&editor, 0)
@@ -3264,7 +3270,9 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
     let baseline = editor.to_bytes().unwrap();
     let package = FocusedKeynotePackage::from_bytes(&baseline).unwrap();
     let duplicate_commit = package
-        .duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
+        .edit_slide_media_lifecycle()
+        .duplicate_movie(SlideSelector::index(0), MovieSelector::index(0))
+        .and_then(|edit| edit.commit())
         .unwrap();
     let inverse = duplicate_commit.patch().inverse();
     let restored = duplicate_commit
@@ -3355,7 +3363,9 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
 
     let package = FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let removed_duplicate = package
-        .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(1))
+        .edit_slide_media_lifecycle()
+        .remove_movie(SlideSelector::index(0), MovieSelector::index(1))
+        .and_then(|edit| edit.commit())
         .unwrap();
     assert_eq!(removed_duplicate.diagnostics().removed_data(), 0);
     reopen_focused_package(&mut editor, removed_duplicate.package());
@@ -3369,7 +3379,9 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
 
     let package = FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let removed_original = package
-        .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
+        .edit_slide_media_lifecycle()
+        .remove_movie(SlideSelector::index(0), MovieSelector::index(0))
+        .and_then(|edit| edit.commit())
         .unwrap();
     assert_eq!(removed_original.patch().kind(), MovieKind::File);
     assert_eq!(removed_original.patch().movie_position().get(), 0);
@@ -3402,12 +3414,16 @@ fn slide_movie_mutations_reject_wrong_targets_transactionally() {
     let package = FocusedKeynotePackage::from_bytes(&before).unwrap();
     assert!(
         package
-            .duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(9))
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(9))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert!(
         package
-            .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(9))
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), MovieSelector::index(9))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert!(
@@ -3446,12 +3462,16 @@ fn slide_movie_mutations_reject_wrong_targets_transactionally() {
     let package = FocusedKeynotePackage::from_bytes(&before).unwrap();
     assert!(
         package
-            .duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert!(
         package
-            .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(placeholder.to_bytes().unwrap(), before);

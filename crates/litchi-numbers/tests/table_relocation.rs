@@ -17,7 +17,7 @@ use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, 
 use litchi_iwa_protos::{tn, tsd, tsp, tst};
 use litchi_numbers::{
     Package, SheetSelector, TableSelector,
-    table::relocation::transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path},
+    table::relocation::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path},
 };
 use prost::Message as _;
 
