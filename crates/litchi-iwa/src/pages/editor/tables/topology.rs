@@ -3,7 +3,7 @@
 use super::*;
 use crate::numbers::editor::TableTopologyMutation;
 
-impl PagesEditor {
+impl Editor {
     /// Insert one blank row at a section-relative position.
     ///
     /// Cell storage, formulas, dimension overrides, and stable row identities

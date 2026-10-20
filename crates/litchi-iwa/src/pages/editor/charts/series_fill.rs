@@ -10,7 +10,7 @@ use crate::charts::series_fill::{
 };
 use crate::shapes::{RgbaColor, ShapeFill, ShapeImageFill, ShapeImageFillTechnique};
 
-impl PagesEditor {
+impl Editor {
     /// Read effective fills in native series order.
     pub fn body_chart_series_fills(&self, drawable_object_id: u64) -> Result<Vec<ShapeFill>> {
         body_chart_series_fills(self, drawable_object_id)
@@ -88,10 +88,7 @@ impl PagesEditor {
     }
 }
 
-fn body_chart_series_fills(
-    editor: &PagesEditor,
-    drawable_object_id: u64,
-) -> Result<Vec<ShapeFill>> {
+fn body_chart_series_fills(editor: &Editor, drawable_object_id: u64) -> Result<Vec<ShapeFill>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
         graph.info.kind,
@@ -111,7 +108,7 @@ fn body_chart_series_fills(
 }
 
 fn set_body_chart_series_fills(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     fills: &[ShapeFill],
 ) -> Result<()> {
@@ -136,7 +133,7 @@ fn set_body_chart_series_fills(
         series_count,
         fills,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_series_fills(drawable_object_id)? != fills {
         return Err(Error::InvalidFormat(
             "Pages chart series fill update failed validation".to_owned(),
@@ -147,7 +144,7 @@ fn set_body_chart_series_fills(
 }
 
 fn reset_body_chart_series_fill(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     series: Index,
 ) -> Result<ShapeFill> {
@@ -169,7 +166,7 @@ fn reset_body_chart_series_fill(
         series_count,
         series.zero_based(),
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_series_fill(drawable_object_id, series)? != inherited {
         return Err(Error::InvalidFormat(
             "Pages chart series fill reset failed validation".to_owned(),
@@ -181,7 +178,7 @@ fn reset_body_chart_series_fill(
 
 #[allow(clippy::too_many_arguments)]
 fn set_body_chart_series_image_fill(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     series: Index,
     preferred_filename: &str,
@@ -217,7 +214,7 @@ fn set_body_chart_series_image_fill(
         fill_size,
         tint,
     )?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_series_fill(drawable_object_id, series)?
         != ShapeFill::Image(image.clone())
     {

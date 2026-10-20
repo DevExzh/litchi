@@ -17,7 +17,7 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    CellPosition, Package, SheetSelector,
+    At, Package, SheetSelector,
     TableSelector,
     cell::comment::{CommentReply, CommentReplyIndex, transaction::Error},
 };
@@ -72,7 +72,7 @@ fuzz_target!(|data: &[u8]| {
 // even when strict native document projection rejects the source, because
 // legacy builder snapshots intentionally omit unrelated native envelopes.
 fn exercise_compatibility_reads(bytes: &[u8], command: u8) {
-    let position = CellPosition::new(u32::from(command % 4), u32::from((command / 4) % 4));
+    let position = At::new(u32::from(command % 4), u32::from((command / 4) % 4));
     match Package::__table_cell_comment_from_bytes_for_compatibility_with_options(
         bytes,
         options(),
@@ -169,7 +169,7 @@ fn native_metadata_package() -> &'static Package {
 fn verify_native_metadata(package: &Package) {
     let sheet = SheetSelector::name(NATIVE_SHEET);
     let table = TableSelector::name(NATIVE_TABLE);
-    let position = CellPosition::from_a1(NATIVE_COMMENT_ADDRESS)
+    let position = At::from_a1(NATIVE_COMMENT_ADDRESS)
         .unwrap_or_else(|error| unreachable!("native metadata address is valid: {error}"));
     let source_bytes = package_bytes(package);
     let root = package
@@ -320,7 +320,7 @@ fn exercise_native_refusal(
     package: &Package,
     sheet: SheetSelector<'_>,
     table: TableSelector<'_>,
-    position: CellPosition,
+    position: At,
     source_bytes: &[u8],
 ) {
     let oversized = "x".repeat(MAX_TEXT_BYTES.saturating_add(1));
@@ -369,16 +369,16 @@ fn find_reply_thread(
     package: &Package,
     data: &[u8],
     command: u8,
-) -> Option<(CellPosition, Box<[CommentReply]>)> {
+) -> Option<(At, Box<[CommentReply]>)> {
     let mut candidates = Vec::new();
     candidates.push(position_from_bytes(data, command));
     for row in 0..MAX_SCAN_ROWS {
         for column in 0..MAX_SCAN_COLUMNS {
-            candidates.push(CellPosition::new(row, column));
+            candidates.push(At::new(row, column));
         }
     }
     candidates.push(
-        CellPosition::from_a1("A1")
+        At::from_a1("A1")
             .unwrap_or_else(|error| unreachable!("A1 is a valid reply probe address: {error}")),
     );
 
@@ -399,7 +399,7 @@ fn find_reply_thread(
 
 fn exercise_missing_thread(
     package: &Package,
-    position: CellPosition,
+    position: At,
     stale: CommentReplyIndex,
     source_bytes: &[u8],
 ) {
@@ -445,7 +445,7 @@ fn exercise_missing_thread(
 
 fn exercise_thread(
     package: &Package,
-    position: CellPosition,
+    position: At,
     replies: &[CommentReply],
     data: &[u8],
 ) {
@@ -615,7 +615,7 @@ fn observe_atomic_failure(
     }
 }
 
-fn exercise_selector_errors(package: &Package, position: CellPosition, index: CommentReplyIndex) {
+fn exercise_selector_errors(package: &Package, position: At, index: CommentReplyIndex) {
     if let Err(error) = package.table_cell_comment_reply(
         SheetSelector::name(PRIVATE_SHEET),
         TableSelector::index(0),
@@ -685,8 +685,8 @@ fn exercise_input_limit() {
     black_box(result.err().map(|error| error.to_string()));
 }
 
-fn position_from_bytes(data: &[u8], command: u8) -> CellPosition {
-    CellPosition::new(
+fn position_from_bytes(data: &[u8], command: u8) -> At {
+    At::new(
         u32::from(command) % MAX_SCAN_ROWS,
         u32::from(data.get(1).copied().unwrap_or_default()) % MAX_SCAN_COLUMNS,
     )

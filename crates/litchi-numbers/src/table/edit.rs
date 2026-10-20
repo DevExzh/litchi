@@ -5,7 +5,7 @@
 //! leaving package identifiers, formula graphs, and wire mutation in the
 //! concrete format crate.
 
-use super::CellPosition;
+use super::At;
 use crate::cell::{Type, Update, Value};
 use std::collections::HashSet;
 use std::fmt;
@@ -34,7 +34,7 @@ impl Budget {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Batch {
     updates: Box<[Update]>,
-    positions: Box<[CellPosition]>,
+    positions: Box<[At]>,
 }
 
 impl Batch {
@@ -81,13 +81,12 @@ impl Batch {
                 });
             }
 
-            let position =
-                CellPosition::try_from_usize(update.row, update.column).map_err(|_error| {
-                    Error::CoordinateOverflow {
-                        row: update.row,
-                        column: update.column,
-                    }
-                })?;
+            let position = At::try_from_usize(update.row, update.column).map_err(|_error| {
+                Error::CoordinateOverflow {
+                    row: update.row,
+                    column: update.column,
+                }
+            })?;
             seen.try_reserve(1).map_err(|_error| Error::Allocation {
                 resource: "table edit coordinate set",
                 amount: 1,
@@ -124,7 +123,7 @@ impl Batch {
     /// Splits the validated updates from their compact cache-refresh
     /// coordinates without cloning either collection.
     #[must_use]
-    pub fn into_parts(self) -> (Box<[Update]>, Box<[CellPosition]>) {
+    pub fn into_parts(self) -> (Box<[Update]>, Box<[At]>) {
         (self.updates, self.positions)
     }
 }
@@ -136,7 +135,7 @@ pub enum Error {
     /// A coordinate cannot be represented by the compact table position.
     CoordinateOverflow { row: usize, column: usize },
     /// A coordinate occurs more than once in the batch.
-    DuplicatePosition { position: CellPosition },
+    DuplicatePosition { position: At },
     /// The batch exceeds its caller-supplied bound.
     LimitExceeded { requested: usize, maximum: usize },
     /// A collection reservation failed before the batch was completed.
@@ -228,10 +227,7 @@ mod tests {
         assert_eq!(batch.len(), 2);
         let (updates, positions) = batch.into_parts();
         assert_eq!(updates.len(), 2);
-        assert_eq!(
-            positions.as_ref(),
-            &[CellPosition::new(2, 3), CellPosition::new(0, 1)]
-        );
+        assert_eq!(positions.as_ref(), &[At::new(2, 3), At::new(0, 1)]);
     }
 
     #[test]

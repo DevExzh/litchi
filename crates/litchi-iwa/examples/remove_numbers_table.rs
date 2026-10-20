@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::numbers::NumbersEditor;
+use litchi_iwa::numbers;
 use litchi_numbers::TableSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = arguments.next().ok_or("missing output path")?;
     let table_index: usize = arguments.next().ok_or("missing table index")?.parse()?;
 
-    let mut editor = NumbersEditor::open(input)?;
+    let mut editor = numbers::Editor::open(input)?;
     editor
         .tables()?
         .get(table_index)

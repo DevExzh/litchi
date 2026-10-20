@@ -1263,10 +1263,7 @@ mod tests {
         let mut table = crate::table::Builder::new("Data", crate::Dimensions::new(1, 1));
         assert!(
             table
-                .set(
-                    crate::CellPosition::new(0, 0),
-                    Value::Text("value".to_owned())
-                )
+                .set(crate::At::new(0, 0), Value::Text("value".to_owned()))
                 .is_ok()
         );
         let table = table
@@ -1279,7 +1276,7 @@ mod tests {
         let mut second = crate::table::Builder::new("More", crate::Dimensions::new(1, 1));
         assert!(
             second
-                .set(crate::CellPosition::new(0, 0), Value::Text("v".to_owned()))
+                .set(crate::At::new(0, 0), Value::Text("v".to_owned()))
                 .is_ok()
         );
         let second = second

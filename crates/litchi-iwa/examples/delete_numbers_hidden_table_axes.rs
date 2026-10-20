@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use litchi_iwa::numbers::NumbersEditor;
+use litchi_iwa::numbers;
 use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 use litchi_numbers::TableSelector;
 use litchi_numbers::table::topology::{ColumnDeletion, RowDeletion};
@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     let initial = HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)])?;
 
-    let mut editor = NumbersEditor::open(source)?;
+    let mut editor = numbers::Editor::open(source)?;
     let table = TableSelector::index(0);
     assert_eq!(editor.table_hidden_axes(table)?, initial);
     editor.remove_table_row(table, RowDeletion::body(1))?;

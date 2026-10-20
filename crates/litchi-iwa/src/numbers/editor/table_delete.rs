@@ -40,7 +40,7 @@ impl TableAxis {
     }
 }
 
-impl NumbersEditor {
+impl Editor {
     /// Delete one row from a semantic table section and compact following rows.
     ///
     /// Stored values, comments, formula records, headers, stable UIDs, and
@@ -622,7 +622,7 @@ fn verify_numbers_dimensions(
     columns: usize,
     source_built: bool,
 ) -> Result<()> {
-    let verified = NumbersEditor::from_validation_bytes(&package.to_bytes()?, source_built)?;
+    let verified = Editor::from_validation_bytes(&package.to_bytes()?, source_built)?;
     let table = verified
         .tables()?
         .into_iter()

@@ -12,7 +12,7 @@ fn semantic_error(error: impl std::fmt::Display) -> Error {
 /// before falling back to `Unknown`; substring matching here would silently
 /// turn a future producer effect into a different typed action.
 pub(super) fn semantic_settings(
-    settings: &KeynoteBuildSettings,
+    settings: &BuildSettings,
 ) -> Result<litchi_keynote::build::Settings> {
     let duration = litchi_keynote::Seconds::new(settings.duration).map_err(semantic_error)?;
     let mut semantic = litchi_keynote::build::Settings::new(semantic_effect(settings)?, duration);
@@ -24,7 +24,7 @@ pub(super) fn semantic_settings(
     Ok(semantic)
 }
 
-fn semantic_effect(settings: &KeynoteBuildSettings) -> Result<litchi_keynote::build::Effect> {
+fn semantic_effect(settings: &BuildSettings) -> Result<litchi_keynote::build::Effect> {
     use litchi_keynote::build::{
         Action, Effect, Emphasis, FlipDirection, HorizontalDirection, Keyboard, KeyboardDirection,
         Motion, ObjectEffect, Opacity, Rotation, RotationDirection, Scale, SwooshDirection,
@@ -40,8 +40,8 @@ fn semantic_effect(settings: &KeynoteBuildSettings) -> Result<litchi_keynote::bu
                 Rotation::new(
                     action.total_degrees,
                     match action.direction {
-                        KeynoteRotationDirection::Clockwise => RotationDirection::Clockwise,
-                        KeynoteRotationDirection::Counterclockwise => {
+                        super::RotationDirection::Clockwise => RotationDirection::Clockwise,
+                        super::RotationDirection::Counterclockwise => {
                             RotationDirection::Counterclockwise
                         },
                     },
@@ -83,38 +83,30 @@ fn semantic_effect(settings: &KeynoteBuildSettings) -> Result<litchi_keynote::bu
                 Error::ParseError("Keynote emphasis is missing its typed parameters".to_owned())
             })?;
             let emphasis = match action {
-                KeynoteEmphasisAction::Blink { repeat_count, fade } => {
-                    Emphasis::blink(repeat_count, fade)
-                },
-                KeynoteEmphasisAction::Bounce {
+                EmphasisAction::Blink { repeat_count, fade } => Emphasis::blink(repeat_count, fade),
+                EmphasisAction::Bounce {
                     repeat_count,
                     decay,
                 } => Emphasis::bounce(repeat_count, decay),
-                KeynoteEmphasisAction::Flip {
+                EmphasisAction::Flip {
                     repeat_count,
                     direction,
                 } => Emphasis::flip(
                     repeat_count,
                     match direction {
-                        KeynoteFlipDirection::LeftToRight => FlipDirection::LeftToRight,
-                        KeynoteFlipDirection::RightToLeft => FlipDirection::RightToLeft,
+                        super::FlipDirection::LeftToRight => FlipDirection::LeftToRight,
+                        super::FlipDirection::RightToLeft => FlipDirection::RightToLeft,
                     },
                 ),
-                KeynoteEmphasisAction::Jiggle { intensity } => {
-                    Ok(Emphasis::jiggle(match intensity {
-                        KeynoteJiggleIntensity::Small => {
-                            litchi_keynote::build::JiggleIntensity::Small
-                        },
-                        KeynoteJiggleIntensity::Medium => {
-                            litchi_keynote::build::JiggleIntensity::Medium
-                        },
-                        KeynoteJiggleIntensity::Large => {
-                            litchi_keynote::build::JiggleIntensity::Large
-                        },
-                    }))
-                },
-                KeynoteEmphasisAction::Pop { scale_percent } => Emphasis::pop(scale_percent),
-                KeynoteEmphasisAction::Pulse {
+                EmphasisAction::Jiggle { intensity } => Ok(Emphasis::jiggle(match intensity {
+                    super::JiggleIntensity::Small => litchi_keynote::build::JiggleIntensity::Small,
+                    super::JiggleIntensity::Medium => {
+                        litchi_keynote::build::JiggleIntensity::Medium
+                    },
+                    super::JiggleIntensity::Large => litchi_keynote::build::JiggleIntensity::Large,
+                })),
+                EmphasisAction::Pop { scale_percent } => Emphasis::pop(scale_percent),
+                EmphasisAction::Pulse {
                     repeat_count,
                     scale_percent,
                 } => Emphasis::pulse(repeat_count, scale_percent),
@@ -128,8 +120,8 @@ fn semantic_effect(settings: &KeynoteBuildSettings) -> Result<litchi_keynote::bu
             })?;
             Effect::keyboard(Keyboard::new(
                 match keyboard.direction {
-                    KeynoteKeyboardDirection::Forward => KeyboardDirection::Forward,
-                    KeynoteKeyboardDirection::Backward => KeyboardDirection::Backward,
+                    super::KeyboardDirection::Forward => KeyboardDirection::Forward,
+                    super::KeyboardDirection::Backward => KeyboardDirection::Backward,
                 },
                 keyboard.show_cursor,
             ))
@@ -143,35 +135,21 @@ fn semantic_effect(settings: &KeynoteBuildSettings) -> Result<litchi_keynote::bu
                 Error::ParseError("Keynote object build is missing its typed parameters".to_owned())
             })?;
             Effect::object(match object {
-                KeynoteObjectBuildEffect::Dissolve => ObjectEffect::Dissolve,
-                KeynoteObjectBuildEffect::Shimmer => ObjectEffect::Shimmer,
-                KeynoteObjectBuildEffect::Skid { direction } => {
-                    ObjectEffect::Skid(match direction {
-                        KeynoteHorizontalBuildDirection::LeftToRight => {
-                            HorizontalDirection::LeftToRight
-                        },
-                        KeynoteHorizontalBuildDirection::RightToLeft => {
-                            HorizontalDirection::RightToLeft
-                        },
-                    })
-                },
-                KeynoteObjectBuildEffect::Swoosh { direction } => {
-                    ObjectEffect::Swoosh(match direction {
-                        KeynoteSwooshDirection::Center => SwooshDirection::Center,
-                        KeynoteSwooshDirection::FromLeft => SwooshDirection::FromLeft,
-                        KeynoteSwooshDirection::FromRight => SwooshDirection::FromRight,
-                    })
-                },
-                KeynoteObjectBuildEffect::Trace { direction } => {
-                    ObjectEffect::Trace(match direction {
-                        KeynoteHorizontalBuildDirection::LeftToRight => {
-                            HorizontalDirection::LeftToRight
-                        },
-                        KeynoteHorizontalBuildDirection::RightToLeft => {
-                            HorizontalDirection::RightToLeft
-                        },
-                    })
-                },
+                ObjectBuildEffect::Dissolve => ObjectEffect::Dissolve,
+                ObjectBuildEffect::Shimmer => ObjectEffect::Shimmer,
+                ObjectBuildEffect::Skid { direction } => ObjectEffect::Skid(match direction {
+                    HorizontalBuildDirection::LeftToRight => HorizontalDirection::LeftToRight,
+                    HorizontalBuildDirection::RightToLeft => HorizontalDirection::RightToLeft,
+                }),
+                ObjectBuildEffect::Swoosh { direction } => ObjectEffect::Swoosh(match direction {
+                    super::SwooshDirection::Center => SwooshDirection::Center,
+                    super::SwooshDirection::FromLeft => SwooshDirection::FromLeft,
+                    super::SwooshDirection::FromRight => SwooshDirection::FromRight,
+                }),
+                ObjectBuildEffect::Trace { direction } => ObjectEffect::Trace(match direction {
+                    HorizontalBuildDirection::LeftToRight => HorizontalDirection::LeftToRight,
+                    HorizontalBuildDirection::RightToLeft => HorizontalDirection::RightToLeft,
+                }),
             })
         },
         "apple:bc-appear" | "appear" => Effect::Appear,
@@ -184,7 +162,7 @@ fn semantic_effect(settings: &KeynoteBuildSettings) -> Result<litchi_keynote::bu
     Ok(typed)
 }
 
-fn semantic_path(path: &KeynoteMotionPath) -> Result<litchi_keynote::build::Path> {
+fn semantic_path(path: &MotionPath) -> Result<litchi_keynote::build::Path> {
     use litchi_keynote::build::{Node, NodeKind, Point, Subpath};
 
     let subpaths = path
@@ -195,7 +173,7 @@ fn semantic_path(path: &KeynoteMotionPath) -> Result<litchi_keynote::build::Path
                 .nodes
                 .iter()
                 .map(|node| {
-                    let point = |point: KeynoteMotionPathPoint| {
+                    let point = |point: MotionPathPoint| {
                         Point::new(f64::from(point.x), f64::from(point.y)).map_err(semantic_error)
                     };
                     Ok(Node::new(
@@ -203,9 +181,9 @@ fn semantic_path(path: &KeynoteMotionPath) -> Result<litchi_keynote::build::Path
                         point(node.point)?,
                         point(node.out_control_point)?,
                         match node.node_type {
-                            KeynoteMotionPathNodeType::Sharp => NodeKind::Sharp,
-                            KeynoteMotionPathNodeType::Bezier => NodeKind::Bezier,
-                            KeynoteMotionPathNodeType::Smooth => NodeKind::Smooth,
+                            MotionPathNodeType::Sharp => NodeKind::Sharp,
+                            MotionPathNodeType::Bezier => NodeKind::Bezier,
+                            MotionPathNodeType::Smooth => NodeKind::Smooth,
                         },
                     ))
                 })
@@ -223,7 +201,7 @@ fn semantic_path(path: &KeynoteMotionPath) -> Result<litchi_keynote::build::Path
     .map_err(semantic_error)
 }
 
-pub(super) fn validate_build_settings(settings: &KeynoteBuildSettings) -> Result<()> {
+pub(super) fn validate_build_settings(settings: &BuildSettings) -> Result<()> {
     semantic_settings(settings)?;
     for (label, value) in [
         ("delivery", settings.delivery.as_str()),
@@ -371,18 +349,18 @@ pub(super) fn validate_build_settings(settings: &KeynoteBuildSettings) -> Result
                 ));
             }
             match emphasis {
-                KeynoteEmphasisAction::Blink { repeat_count, .. }
-                | KeynoteEmphasisAction::Bounce { repeat_count, .. }
-                | KeynoteEmphasisAction::Flip { repeat_count, .. }
-                | KeynoteEmphasisAction::Pulse { repeat_count, .. }
+                EmphasisAction::Blink { repeat_count, .. }
+                | EmphasisAction::Bounce { repeat_count, .. }
+                | EmphasisAction::Flip { repeat_count, .. }
+                | EmphasisAction::Pulse { repeat_count, .. }
                     if repeat_count == 0 =>
                 {
                     return Err(Error::ParseError(
                         "Keynote emphasis repeat count must be greater than zero".to_owned(),
                     ));
                 },
-                KeynoteEmphasisAction::Pop { scale_percent }
-                | KeynoteEmphasisAction::Pulse { scale_percent, .. }
+                EmphasisAction::Pop { scale_percent }
+                | EmphasisAction::Pulse { scale_percent, .. }
                     if !scale_percent.is_finite() || scale_percent <= 0.0 =>
                 {
                     return Err(Error::ParseError(
@@ -393,9 +371,7 @@ pub(super) fn validate_build_settings(settings: &KeynoteBuildSettings) -> Result
                 _ => {},
             }
             let expected_direction = match emphasis {
-                KeynoteEmphasisAction::Flip { direction, .. } => {
-                    Some(native_flip_direction(direction))
-                },
+                EmphasisAction::Flip { direction, .. } => Some(native_flip_direction(direction)),
                 _ => None,
             };
             if settings.direction != expected_direction {
@@ -444,10 +420,10 @@ pub(super) fn validate_build_settings(settings: &KeynoteBuildSettings) -> Result
             let omitted_native_default = settings.direction.is_none()
                 && matches!(
                     object_effect,
-                    KeynoteObjectBuildEffect::Skid {
-                        direction: KeynoteHorizontalBuildDirection::LeftToRight,
-                    } | KeynoteObjectBuildEffect::Trace {
-                        direction: KeynoteHorizontalBuildDirection::LeftToRight,
+                    ObjectBuildEffect::Skid {
+                        direction: HorizontalBuildDirection::LeftToRight,
+                    } | ObjectBuildEffect::Trace {
+                        direction: HorizontalBuildDirection::LeftToRight,
                     }
                 );
             if settings.direction != expected_direction && !omitted_native_default {
@@ -502,53 +478,52 @@ pub(super) fn is_emphasis_action_effect(effect: &str) -> bool {
     )
 }
 
-pub(super) fn emphasis_effect(action: KeynoteEmphasisAction) -> &'static str {
+pub(super) fn emphasis_effect(action: EmphasisAction) -> &'static str {
     match action {
-        KeynoteEmphasisAction::Blink { .. } => BLINK_ACTION_EFFECT,
-        KeynoteEmphasisAction::Bounce { .. } => BOUNCE_ACTION_EFFECT,
-        KeynoteEmphasisAction::Flip { .. } => FLIP_ACTION_EFFECT,
-        KeynoteEmphasisAction::Jiggle { .. } => JIGGLE_ACTION_EFFECT,
-        KeynoteEmphasisAction::Pop { .. } => POP_ACTION_EFFECT,
-        KeynoteEmphasisAction::Pulse { .. } => PULSE_ACTION_EFFECT,
+        EmphasisAction::Blink { .. } => BLINK_ACTION_EFFECT,
+        EmphasisAction::Bounce { .. } => BOUNCE_ACTION_EFFECT,
+        EmphasisAction::Flip { .. } => FLIP_ACTION_EFFECT,
+        EmphasisAction::Jiggle { .. } => JIGGLE_ACTION_EFFECT,
+        EmphasisAction::Pop { .. } => POP_ACTION_EFFECT,
+        EmphasisAction::Pulse { .. } => PULSE_ACTION_EFFECT,
     }
 }
 
-pub(super) fn emphasis_decay(action: Option<KeynoteEmphasisAction>) -> Option<bool> {
+pub(super) fn emphasis_decay(action: Option<EmphasisAction>) -> Option<bool> {
     match action? {
-        KeynoteEmphasisAction::Blink { fade, .. } => Some(fade),
-        KeynoteEmphasisAction::Bounce { decay, .. } => Some(decay),
+        EmphasisAction::Blink { fade, .. } => Some(fade),
+        EmphasisAction::Bounce { decay, .. } => Some(decay),
         _ => None,
     }
 }
 
-pub(super) fn emphasis_repeat_count(action: Option<KeynoteEmphasisAction>) -> Option<u32> {
+pub(super) fn emphasis_repeat_count(action: Option<EmphasisAction>) -> Option<u32> {
     match action? {
-        KeynoteEmphasisAction::Blink { repeat_count, .. }
-        | KeynoteEmphasisAction::Bounce { repeat_count, .. }
-        | KeynoteEmphasisAction::Flip { repeat_count, .. }
-        | KeynoteEmphasisAction::Pulse { repeat_count, .. } => Some(repeat_count),
+        EmphasisAction::Blink { repeat_count, .. }
+        | EmphasisAction::Bounce { repeat_count, .. }
+        | EmphasisAction::Flip { repeat_count, .. }
+        | EmphasisAction::Pulse { repeat_count, .. } => Some(repeat_count),
         _ => None,
     }
 }
 
-pub(super) fn emphasis_scale(action: Option<KeynoteEmphasisAction>) -> Option<f64> {
+pub(super) fn emphasis_scale(action: Option<EmphasisAction>) -> Option<f64> {
     match action? {
-        KeynoteEmphasisAction::Pop { scale_percent }
-        | KeynoteEmphasisAction::Pulse { scale_percent, .. } => Some(scale_percent),
+        EmphasisAction::Pop { scale_percent } | EmphasisAction::Pulse { scale_percent, .. } => {
+            Some(scale_percent)
+        },
         _ => None,
     }
 }
 
-pub(super) fn emphasis_jiggle_intensity(action: Option<KeynoteEmphasisAction>) -> Option<i32> {
+pub(super) fn emphasis_jiggle_intensity(action: Option<EmphasisAction>) -> Option<i32> {
     match action? {
-        KeynoteEmphasisAction::Jiggle { intensity } => Some(native_jiggle_intensity(intensity)),
+        EmphasisAction::Jiggle { intensity } => Some(native_jiggle_intensity(intensity)),
         _ => None,
     }
 }
 
-pub(super) fn typed_action_acceleration(
-    settings: &KeynoteBuildSettings,
-) -> Option<BuildAcceleration> {
+pub(super) fn typed_action_acceleration(settings: &BuildSettings) -> Option<BuildAcceleration> {
     settings
         .rotation
         .as_ref()
@@ -563,7 +538,7 @@ pub(super) fn typed_action_acceleration(
         })
 }
 
-pub(super) fn validate_motion_path(path: &KeynoteMotionPath) -> Result<()> {
+pub(super) fn validate_motion_path(path: &MotionPath) -> Result<()> {
     if !path.natural_width.is_finite()
         || !path.natural_height.is_finite()
         || path.natural_width < 0.0
@@ -608,7 +583,7 @@ pub(super) fn validate_motion_path(path: &KeynoteMotionPath) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn validate_timing_curve(curve: &KeynoteBuildTimingCurve) -> Result<()> {
+pub(super) fn validate_timing_curve(curve: &BuildTimingCurve) -> Result<()> {
     let path = &curve.path;
     validate_motion_path(path).map_err(|error| match error {
         Error::ParseError(message) => {
@@ -643,38 +618,36 @@ pub(super) fn validate_timing_curve(curve: &KeynoteBuildTimingCurve) -> Result<(
     Ok(())
 }
 
-pub(super) fn native_motion_node_type(node_type: KeynoteMotionPathNodeType) -> i32 {
+pub(super) fn native_motion_node_type(node_type: MotionPathNodeType) -> i32 {
     use tsd::editable_bezier_path_source_archive::NodeType;
     match node_type {
-        KeynoteMotionPathNodeType::Sharp => NodeType::Sharp as i32,
-        KeynoteMotionPathNodeType::Bezier => NodeType::Bezier as i32,
-        KeynoteMotionPathNodeType::Smooth => NodeType::Smooth as i32,
+        MotionPathNodeType::Sharp => NodeType::Sharp as i32,
+        MotionPathNodeType::Bezier => NodeType::Bezier as i32,
+        MotionPathNodeType::Smooth => NodeType::Smooth as i32,
     }
 }
 
-pub(super) fn motion_node_type_from_native(value: i32) -> Option<KeynoteMotionPathNodeType> {
+pub(super) fn motion_node_type_from_native(value: i32) -> Option<MotionPathNodeType> {
     use tsd::editable_bezier_path_source_archive::NodeType;
     match NodeType::try_from(value).ok()? {
-        NodeType::Sharp => Some(KeynoteMotionPathNodeType::Sharp),
-        NodeType::Bezier => Some(KeynoteMotionPathNodeType::Bezier),
-        NodeType::Smooth => Some(KeynoteMotionPathNodeType::Smooth),
+        NodeType::Sharp => Some(MotionPathNodeType::Sharp),
+        NodeType::Bezier => Some(MotionPathNodeType::Bezier),
+        NodeType::Smooth => Some(MotionPathNodeType::Smooth),
     }
 }
 
-pub(super) fn motion_point_from_native(point: &tsp::Point) -> KeynoteMotionPathPoint {
-    KeynoteMotionPathPoint::new(point.x, point.y)
+pub(super) fn motion_point_from_native(point: &tsp::Point) -> MotionPathPoint {
+    MotionPathPoint::new(point.x, point.y)
 }
 
-pub(super) fn native_motion_point(point: KeynoteMotionPathPoint) -> tsp::Point {
+pub(super) fn native_motion_point(point: MotionPathPoint) -> tsp::Point {
     tsp::Point {
         x: point.x,
         y: point.y,
     }
 }
 
-pub(super) fn motion_path_from_native(
-    source: &tsd::PathSourceArchive,
-) -> Option<KeynoteMotionPath> {
+pub(super) fn motion_path_from_native(source: &tsd::PathSourceArchive) -> Option<MotionPath> {
     if source.point_path_source.is_some()
         || source.scalar_path_source.is_some()
         || source.bezier_path_source.is_some()
@@ -693,7 +666,7 @@ pub(super) fn motion_path_from_native(
                 .nodes
                 .iter()
                 .map(|node| {
-                    Some(KeynoteMotionPathNode {
+                    Some(MotionPathNode {
                         in_control_point: motion_point_from_native(&node.in_control_point),
                         point: motion_point_from_native(&node.node_point),
                         out_control_point: motion_point_from_native(&node.out_control_point),
@@ -701,13 +674,13 @@ pub(super) fn motion_path_from_native(
                     })
                 })
                 .collect::<Option<Vec<_>>>()?;
-            Some(KeynoteMotionSubpath {
+            Some(MotionSubpath {
                 nodes,
                 closed: subpath.closed,
             })
         })
         .collect::<Option<Vec<_>>>()?;
-    Some(KeynoteMotionPath {
+    Some(MotionPath {
         subpaths,
         natural_width: natural_size.width,
         natural_height: natural_size.height,
@@ -716,7 +689,7 @@ pub(super) fn motion_path_from_native(
     })
 }
 
-pub(super) fn native_motion_path(path: &KeynoteMotionPath) -> tsd::PathSourceArchive {
+pub(super) fn native_motion_path(path: &MotionPath) -> tsd::PathSourceArchive {
     use tsd::editable_bezier_path_source_archive::{Node, Subpath};
     tsd::PathSourceArchive {
         horizontal_flip: Some(path.horizontal_flip),
@@ -750,86 +723,86 @@ pub(super) fn native_motion_path(path: &KeynoteMotionPath) -> tsd::PathSourceArc
 
 pub(super) fn timing_curve_from_native(
     source: &tsd::PathSourceArchive,
-) -> Option<KeynoteBuildTimingCurve> {
-    let curve = KeynoteBuildTimingCurve::from_path(motion_path_from_native(source)?);
+) -> Option<BuildTimingCurve> {
+    let curve = BuildTimingCurve::from_path(motion_path_from_native(source)?);
     validate_timing_curve(&curve).ok()?;
     Some(curve)
 }
 
-pub(super) fn native_rotation_direction(direction: KeynoteRotationDirection) -> i32 {
+pub(super) fn native_rotation_direction(direction: RotationDirection) -> i32 {
     use kn::build_attributes_archive::BuildAttributesRotationDirection;
     match direction {
-        KeynoteRotationDirection::Clockwise => BuildAttributesRotationDirection::KClockwise as i32,
-        KeynoteRotationDirection::Counterclockwise => {
+        super::RotationDirection::Clockwise => BuildAttributesRotationDirection::KClockwise as i32,
+        super::RotationDirection::Counterclockwise => {
             BuildAttributesRotationDirection::KCounterclockwise as i32
         },
     }
 }
 
-pub(super) fn native_flip_direction(direction: KeynoteFlipDirection) -> u32 {
+pub(super) fn native_flip_direction(direction: FlipDirection) -> u32 {
     match direction {
-        KeynoteFlipDirection::LeftToRight => 11,
-        KeynoteFlipDirection::RightToLeft => 12,
+        super::FlipDirection::LeftToRight => 11,
+        super::FlipDirection::RightToLeft => 12,
     }
 }
 
-pub(super) fn flip_direction_from_native(value: u32) -> Option<KeynoteFlipDirection> {
+pub(super) fn flip_direction_from_native(value: u32) -> Option<FlipDirection> {
     match value {
-        11 => Some(KeynoteFlipDirection::LeftToRight),
-        12 => Some(KeynoteFlipDirection::RightToLeft),
+        11 => Some(super::FlipDirection::LeftToRight),
+        12 => Some(super::FlipDirection::RightToLeft),
         _ => None,
     }
 }
 
-pub(super) fn native_keyboard_direction(direction: KeynoteKeyboardDirection) -> u32 {
+pub(super) fn native_keyboard_direction(direction: KeyboardDirection) -> u32 {
     match direction {
-        KeynoteKeyboardDirection::Forward => 111,
-        KeynoteKeyboardDirection::Backward => 112,
+        super::KeyboardDirection::Forward => 111,
+        super::KeyboardDirection::Backward => 112,
     }
 }
 
-pub(super) fn keyboard_direction_from_native(value: u32) -> Option<KeynoteKeyboardDirection> {
+pub(super) fn keyboard_direction_from_native(value: u32) -> Option<KeyboardDirection> {
     match value {
-        111 => Some(KeynoteKeyboardDirection::Forward),
-        112 => Some(KeynoteKeyboardDirection::Backward),
+        111 => Some(super::KeyboardDirection::Forward),
+        112 => Some(super::KeyboardDirection::Backward),
         _ => None,
     }
 }
 
-pub(super) fn object_build_effect_identifier(effect: KeynoteObjectBuildEffect) -> &'static str {
+pub(super) fn object_build_effect_identifier(effect: ObjectBuildEffect) -> &'static str {
     match effect {
-        KeynoteObjectBuildEffect::Dissolve => DISSOLVE_BUILD_EFFECT,
-        KeynoteObjectBuildEffect::Shimmer => SHIMMER_BUILD_EFFECT,
-        KeynoteObjectBuildEffect::Skid { .. } => SKID_BUILD_EFFECT,
-        KeynoteObjectBuildEffect::Swoosh { .. } => SWOOSH_BUILD_EFFECT,
-        KeynoteObjectBuildEffect::Trace { .. } => TRACE_BUILD_EFFECT,
+        ObjectBuildEffect::Dissolve => DISSOLVE_BUILD_EFFECT,
+        ObjectBuildEffect::Shimmer => SHIMMER_BUILD_EFFECT,
+        ObjectBuildEffect::Skid { .. } => SKID_BUILD_EFFECT,
+        ObjectBuildEffect::Swoosh { .. } => SWOOSH_BUILD_EFFECT,
+        ObjectBuildEffect::Trace { .. } => TRACE_BUILD_EFFECT,
     }
 }
 
-pub(super) fn native_object_build_direction(effect: KeynoteObjectBuildEffect) -> Option<u32> {
+pub(super) fn native_object_build_direction(effect: ObjectBuildEffect) -> Option<u32> {
     match effect {
-        KeynoteObjectBuildEffect::Dissolve
-        | KeynoteObjectBuildEffect::Shimmer
-        | KeynoteObjectBuildEffect::Swoosh {
-            direction: KeynoteSwooshDirection::Center,
+        ObjectBuildEffect::Dissolve
+        | ObjectBuildEffect::Shimmer
+        | ObjectBuildEffect::Swoosh {
+            direction: super::SwooshDirection::Center,
         } => None,
-        KeynoteObjectBuildEffect::Skid {
-            direction: KeynoteHorizontalBuildDirection::LeftToRight,
+        ObjectBuildEffect::Skid {
+            direction: HorizontalBuildDirection::LeftToRight,
         }
-        | KeynoteObjectBuildEffect::Swoosh {
-            direction: KeynoteSwooshDirection::FromLeft,
+        | ObjectBuildEffect::Swoosh {
+            direction: super::SwooshDirection::FromLeft,
         }
-        | KeynoteObjectBuildEffect::Trace {
-            direction: KeynoteHorizontalBuildDirection::LeftToRight,
+        | ObjectBuildEffect::Trace {
+            direction: HorizontalBuildDirection::LeftToRight,
         } => Some(11),
-        KeynoteObjectBuildEffect::Skid {
-            direction: KeynoteHorizontalBuildDirection::RightToLeft,
+        ObjectBuildEffect::Skid {
+            direction: HorizontalBuildDirection::RightToLeft,
         }
-        | KeynoteObjectBuildEffect::Swoosh {
-            direction: KeynoteSwooshDirection::FromRight,
+        | ObjectBuildEffect::Swoosh {
+            direction: super::SwooshDirection::FromRight,
         }
-        | KeynoteObjectBuildEffect::Trace {
-            direction: KeynoteHorizontalBuildDirection::RightToLeft,
+        | ObjectBuildEffect::Trace {
+            direction: HorizontalBuildDirection::RightToLeft,
         } => Some(12),
     }
 }
@@ -837,71 +810,71 @@ pub(super) fn native_object_build_direction(effect: KeynoteObjectBuildEffect) ->
 pub(super) fn object_build_effect_from_native(
     effect: &str,
     direction: Option<u32>,
-) -> Option<KeynoteObjectBuildEffect> {
+) -> Option<ObjectBuildEffect> {
     match (effect, direction) {
-        (DISSOLVE_BUILD_EFFECT, None) => Some(KeynoteObjectBuildEffect::Dissolve),
-        (SHIMMER_BUILD_EFFECT, None) => Some(KeynoteObjectBuildEffect::Shimmer),
-        (SKID_BUILD_EFFECT, None | Some(11)) => Some(KeynoteObjectBuildEffect::Skid {
-            direction: KeynoteHorizontalBuildDirection::LeftToRight,
+        (DISSOLVE_BUILD_EFFECT, None) => Some(ObjectBuildEffect::Dissolve),
+        (SHIMMER_BUILD_EFFECT, None) => Some(ObjectBuildEffect::Shimmer),
+        (SKID_BUILD_EFFECT, None | Some(11)) => Some(ObjectBuildEffect::Skid {
+            direction: HorizontalBuildDirection::LeftToRight,
         }),
-        (SKID_BUILD_EFFECT, Some(12)) => Some(KeynoteObjectBuildEffect::Skid {
-            direction: KeynoteHorizontalBuildDirection::RightToLeft,
+        (SKID_BUILD_EFFECT, Some(12)) => Some(ObjectBuildEffect::Skid {
+            direction: HorizontalBuildDirection::RightToLeft,
         }),
-        (SWOOSH_BUILD_EFFECT, None) => Some(KeynoteObjectBuildEffect::Swoosh {
-            direction: KeynoteSwooshDirection::Center,
+        (SWOOSH_BUILD_EFFECT, None) => Some(ObjectBuildEffect::Swoosh {
+            direction: super::SwooshDirection::Center,
         }),
-        (SWOOSH_BUILD_EFFECT, Some(11)) => Some(KeynoteObjectBuildEffect::Swoosh {
-            direction: KeynoteSwooshDirection::FromLeft,
+        (SWOOSH_BUILD_EFFECT, Some(11)) => Some(ObjectBuildEffect::Swoosh {
+            direction: super::SwooshDirection::FromLeft,
         }),
-        (SWOOSH_BUILD_EFFECT, Some(12)) => Some(KeynoteObjectBuildEffect::Swoosh {
-            direction: KeynoteSwooshDirection::FromRight,
+        (SWOOSH_BUILD_EFFECT, Some(12)) => Some(ObjectBuildEffect::Swoosh {
+            direction: super::SwooshDirection::FromRight,
         }),
-        (TRACE_BUILD_EFFECT, None | Some(11)) => Some(KeynoteObjectBuildEffect::Trace {
-            direction: KeynoteHorizontalBuildDirection::LeftToRight,
+        (TRACE_BUILD_EFFECT, None | Some(11)) => Some(ObjectBuildEffect::Trace {
+            direction: HorizontalBuildDirection::LeftToRight,
         }),
-        (TRACE_BUILD_EFFECT, Some(12)) => Some(KeynoteObjectBuildEffect::Trace {
-            direction: KeynoteHorizontalBuildDirection::RightToLeft,
+        (TRACE_BUILD_EFFECT, Some(12)) => Some(ObjectBuildEffect::Trace {
+            direction: HorizontalBuildDirection::RightToLeft,
         }),
         _ => None,
     }
 }
 
-pub(super) fn native_jiggle_intensity(intensity: KeynoteJiggleIntensity) -> i32 {
+pub(super) fn native_jiggle_intensity(intensity: JiggleIntensity) -> i32 {
     use kn::build_attributes_archive::ActionBuildAttributesJiggleIntensity;
     match intensity {
-        KeynoteJiggleIntensity::Small => {
+        super::JiggleIntensity::Small => {
             ActionBuildAttributesJiggleIntensity::KJiggleIntensitySmall as i32
         },
-        KeynoteJiggleIntensity::Medium => {
+        super::JiggleIntensity::Medium => {
             ActionBuildAttributesJiggleIntensity::KJiggleIntensityMedium as i32
         },
-        KeynoteJiggleIntensity::Large => {
+        super::JiggleIntensity::Large => {
             ActionBuildAttributesJiggleIntensity::KJiggleIntensityLarge as i32
         },
     }
 }
 
-pub(super) fn jiggle_intensity_from_native(value: i32) -> Option<KeynoteJiggleIntensity> {
+pub(super) fn jiggle_intensity_from_native(value: i32) -> Option<JiggleIntensity> {
     use kn::build_attributes_archive::ActionBuildAttributesJiggleIntensity;
     match ActionBuildAttributesJiggleIntensity::try_from(value).ok()? {
         ActionBuildAttributesJiggleIntensity::KJiggleIntensitySmall => {
-            Some(KeynoteJiggleIntensity::Small)
+            Some(super::JiggleIntensity::Small)
         },
         ActionBuildAttributesJiggleIntensity::KJiggleIntensityMedium => {
-            Some(KeynoteJiggleIntensity::Medium)
+            Some(super::JiggleIntensity::Medium)
         },
         ActionBuildAttributesJiggleIntensity::KJiggleIntensityLarge => {
-            Some(KeynoteJiggleIntensity::Large)
+            Some(super::JiggleIntensity::Large)
         },
     }
 }
 
-pub(super) fn rotation_direction_from_native(value: i32) -> Option<KeynoteRotationDirection> {
+pub(super) fn rotation_direction_from_native(value: i32) -> Option<RotationDirection> {
     use kn::build_attributes_archive::BuildAttributesRotationDirection;
     match BuildAttributesRotationDirection::try_from(value).ok()? {
-        BuildAttributesRotationDirection::KClockwise => Some(KeynoteRotationDirection::Clockwise),
+        BuildAttributesRotationDirection::KClockwise => Some(super::RotationDirection::Clockwise),
         BuildAttributesRotationDirection::KCounterclockwise => {
-            Some(KeynoteRotationDirection::Counterclockwise)
+            Some(super::RotationDirection::Counterclockwise)
         },
     }
 }
@@ -1453,9 +1426,9 @@ pub(super) fn build_start_fields(start: BuildStart) -> (bool, bool) {
 #[allow(deprecated)]
 pub(super) fn build_settings(
     build: &kn::BuildArchive,
-    chunks: &[KeynoteBuildChunkInfo],
+    chunks: &[BuildChunkInfo],
     starts_slide_events: bool,
-) -> KeynoteBuildSettings {
+) -> BuildSettings {
     let animation = build.attributes.animation_attributes.as_ref();
     let animation_type = animation
         .and_then(|attributes| attributes.animation_type.clone())
@@ -1469,26 +1442,26 @@ pub(super) fn build_settings(
         .and_then(|attributes| attributes.direction)
         .or(build.attributes.database_direction);
     let rotation = (effect == ROTATE_ACTION_EFFECT).then(|| {
-        Some(KeynoteRotationAction {
+        Some(RotationAction {
             total_degrees: build.attributes.action_rotation_angle?,
             direction: rotation_direction_from_native(build.attributes.action_rotation_direction?)?,
             acceleration: build_acceleration_from_native(build.attributes.action_acceleration?),
         })
     });
     let scale = (effect == SCALE_ACTION_EFFECT).then(|| {
-        Some(KeynoteScaleAction {
+        Some(ScaleAction {
             scale_factor: build.attributes.action_scale_size?,
             acceleration: build_acceleration_from_native(build.attributes.action_acceleration?),
         })
     });
     let opacity = (effect == OPACITY_ACTION_EFFECT).then(|| {
-        Some(KeynoteOpacityAction {
+        Some(OpacityAction {
             opacity_percent: build.attributes.action_color_alpha?,
             acceleration: build_acceleration_from_native(build.attributes.action_acceleration?),
         })
     });
     let move_action = (effect == MOVE_ACTION_EFFECT).then(|| {
-        Some(KeynoteMoveAction {
+        Some(MoveAction {
             path: motion_path_from_native(build.attributes.action_motion_path_source.as_ref()?)?,
             align_to_path: build.attributes.custom_align_to_path.unwrap_or(false),
             acceleration: build_acceleration_from_native(build.attributes.action_acceleration?),
@@ -1499,12 +1472,12 @@ pub(super) fn build_settings(
             .attributes
             .custom_action_repeat_count
             .zip(build.attributes.custom_action_decay)
-            .map(|(repeat_count, fade)| KeynoteEmphasisAction::Blink { repeat_count, fade }),
+            .map(|(repeat_count, fade)| EmphasisAction::Blink { repeat_count, fade }),
         BOUNCE_ACTION_EFFECT => build
             .attributes
             .custom_action_repeat_count
             .zip(build.attributes.custom_action_decay)
-            .map(|(repeat_count, decay)| KeynoteEmphasisAction::Bounce {
+            .map(|(repeat_count, decay)| EmphasisAction::Bounce {
                 repeat_count,
                 decay,
             }),
@@ -1512,7 +1485,7 @@ pub(super) fn build_settings(
             .attributes
             .custom_action_repeat_count
             .zip(direction.and_then(flip_direction_from_native))
-            .map(|(repeat_count, direction)| KeynoteEmphasisAction::Flip {
+            .map(|(repeat_count, direction)| EmphasisAction::Flip {
                 repeat_count,
                 direction,
             }),
@@ -1520,21 +1493,19 @@ pub(super) fn build_settings(
             .attributes
             .custom_action_jiggle_intensity
             .and_then(jiggle_intensity_from_native)
-            .map(|intensity| KeynoteEmphasisAction::Jiggle { intensity }),
+            .map(|intensity| EmphasisAction::Jiggle { intensity }),
         POP_ACTION_EFFECT => build
             .attributes
             .custom_action_scale
-            .map(|scale_percent| KeynoteEmphasisAction::Pop { scale_percent }),
+            .map(|scale_percent| EmphasisAction::Pop { scale_percent }),
         PULSE_ACTION_EFFECT => build
             .attributes
             .custom_action_repeat_count
             .zip(build.attributes.custom_action_scale)
-            .map(
-                |(repeat_count, scale_percent)| KeynoteEmphasisAction::Pulse {
-                    repeat_count,
-                    scale_percent,
-                },
-            ),
+            .map(|(repeat_count, scale_percent)| EmphasisAction::Pulse {
+                repeat_count,
+                scale_percent,
+            }),
         _ => None,
     };
     let keyboard =
@@ -1542,7 +1513,7 @@ pub(super) fn build_settings(
             direction
                 .and_then(keyboard_direction_from_native)
                 .zip(build.attributes.custom_cursor)
-                .map(|(direction, show_cursor)| KeynoteKeyboardBuild {
+                .map(|(direction, show_cursor)| KeyboardBuild {
                     direction,
                     show_cursor,
                 })
@@ -1566,7 +1537,7 @@ pub(super) fn build_settings(
             .and_then(timing_curve_from_native)
     })
     .flatten();
-    KeynoteBuildSettings {
+    BuildSettings {
         delivery: build.delivery.clone(),
         animation_type,
         effect,
@@ -1610,7 +1581,7 @@ pub(super) fn build_settings(
         keyboard,
         object_effect,
         timing_curve,
-        custom_parameters: KeynoteBuildCustomParameters {
+        custom_parameters: BuildCustomParameters {
             bounce: build.attributes.custom_bounce,
             motion_blur: build.attributes.custom_motion_blur,
             include_endpoints: build.attributes.custom_include_endpoints,
@@ -1639,7 +1610,7 @@ pub(super) fn new_build_uuid_and_seed() -> (crate::protobuf::tsp::Uuid, u32) {
 #[allow(deprecated)]
 pub(super) fn new_build_archive(
     drawable_object_id: u64,
-    settings: &KeynoteBuildSettings,
+    settings: &BuildSettings,
     random_number_seed: u32,
 ) -> kn::BuildArchive {
     kn::BuildArchive {
@@ -1712,7 +1683,7 @@ pub(super) fn new_build_archive(
 pub(super) fn new_build_chunk(
     build_object_id: u64,
     build_uuid: crate::protobuf::tsp::Uuid,
-    settings: &KeynoteBuildSettings,
+    settings: &BuildSettings,
 ) -> kn::BuildChunkArchive {
     let (automatic, referent) = build_start_fields(settings.start);
     kn::BuildChunkArchive {
@@ -1735,7 +1706,7 @@ pub(super) fn new_build_chunk(
 
 pub(super) fn normalize_and_patch_build_object(
     object: &mut ArchiveObject,
-    settings: &KeynoteBuildSettings,
+    settings: &BuildSettings,
 ) -> Result<()> {
     let indexes = object
         .messages
@@ -1786,18 +1757,12 @@ pub(super) fn normalize_and_patch_build_object(
     Ok(())
 }
 
-pub(super) fn patch_motion_point_wire(
-    original: &[u8],
-    point: KeynoteMotionPathPoint,
-) -> Result<Vec<u8>> {
+pub(super) fn patch_motion_point_wire(original: &[u8], point: MotionPathPoint) -> Result<Vec<u8>> {
     let data = patch_fixed32_field(original, 1, true, Some(point.x.to_bits()))?;
     patch_fixed32_field(&data, 2, true, Some(point.y.to_bits()))
 }
 
-pub(super) fn patch_motion_node_wire(
-    original: &[u8],
-    node: &KeynoteMotionPathNode,
-) -> Result<Vec<u8>> {
+pub(super) fn patch_motion_node_wire(original: &[u8], node: &MotionPathNode) -> Result<Vec<u8>> {
     let data = transform_length_delimited_field(original, 1, |point| {
         patch_motion_point_wire(point, node.in_control_point)
     })?;
@@ -1816,7 +1781,7 @@ pub(super) fn patch_motion_node_wire(
 }
 
 pub(super) fn native_motion_node(
-    node: &KeynoteMotionPathNode,
+    node: &MotionPathNode,
 ) -> tsd::editable_bezier_path_source_archive::Node {
     tsd::editable_bezier_path_source_archive::Node {
         in_control_point: native_motion_point(node.in_control_point),
@@ -1828,7 +1793,7 @@ pub(super) fn native_motion_node(
 
 pub(super) fn patch_motion_subpath_wire(
     original: &[u8],
-    subpath: &KeynoteMotionSubpath,
+    subpath: &MotionSubpath,
 ) -> Result<Vec<u8>> {
     let existing = repeated_length_delimited_payloads(original, 1)?;
     let replacements = subpath
@@ -1847,7 +1812,7 @@ pub(super) fn patch_motion_subpath_wire(
 }
 
 pub(super) fn native_motion_subpath(
-    subpath: &KeynoteMotionSubpath,
+    subpath: &MotionSubpath,
 ) -> tsd::editable_bezier_path_source_archive::Subpath {
     tsd::editable_bezier_path_source_archive::Subpath {
         nodes: subpath.nodes.iter().map(native_motion_node).collect(),
@@ -1857,7 +1822,7 @@ pub(super) fn native_motion_subpath(
 
 pub(super) fn patch_editable_motion_path_wire(
     original: &[u8],
-    path: &KeynoteMotionPath,
+    path: &MotionPath,
 ) -> Result<Vec<u8>> {
     let existing = repeated_length_delimited_payloads(original, 1)?;
     let replacements = path
@@ -1878,10 +1843,7 @@ pub(super) fn patch_editable_motion_path_wire(
     })
 }
 
-pub(super) fn patch_motion_path_source_wire(
-    original: &[u8],
-    path: &KeynoteMotionPath,
-) -> Result<Vec<u8>> {
+pub(super) fn patch_motion_path_source_wire(original: &[u8], path: &MotionPath) -> Result<Vec<u8>> {
     let source = tsd::PathSourceArchive::decode(original)?;
     let mut data = patch_varint_field(
         original,
@@ -1903,7 +1865,7 @@ pub(super) fn patch_motion_path_source_wire(
 #[allow(deprecated)]
 pub(super) fn patch_build_settings_wire(
     original: &[u8],
-    settings: &KeynoteBuildSettings,
+    settings: &BuildSettings,
 ) -> Result<Vec<u8>> {
     let build = kn::BuildArchive::decode(original)?;
     let animation = build
@@ -2190,7 +2152,7 @@ pub(super) fn patch_build_settings_wire(
     })?;
     let verified = kn::BuildArchive::decode(data.as_slice())?;
     let (automatic, referent) = build_start_fields(settings.start);
-    let chunk = KeynoteBuildChunkInfo {
+    let chunk = BuildChunkInfo {
         object_id: 0,
         delay: Some(settings.delay),
         duration: Some(settings.duration),
@@ -2213,7 +2175,7 @@ pub(super) fn patch_build_settings_wire(
 
 pub(super) fn patch_build_chunk_object(
     object: &mut ArchiveObject,
-    settings: &KeynoteBuildSettings,
+    settings: &BuildSettings,
 ) -> Result<()> {
     let indexes = object
         .messages

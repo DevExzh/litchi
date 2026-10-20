@@ -1,7 +1,7 @@
 use super::*;
-use crate::keynote::KeynoteDocumentBuilder;
-use crate::numbers::NumbersDocumentBuilder;
-use crate::pages::PagesEditor;
+use crate::keynote;
+use crate::numbers;
+use crate::pages;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use crate::text::TextPosition;
 
@@ -21,10 +21,6 @@ fn deep_start() -> TextPosition {
 }
 
 #[test]
-#[expect(
-    deprecated,
-    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-)]
 fn list_levels_round_trip_coalesce_and_reset_in_every_suite() {
     let level_two = ParagraphListLevel::new(2).unwrap();
     let expected = vec![
@@ -33,7 +29,7 @@ fn list_levels_round_trip_coalesce_and_reset_in_every_suite() {
         ParagraphListLevelPlacement::new(deep_start(), level_two),
     ];
 
-    let mut pages = PagesEditor::create_with_text("Lists").unwrap();
+    let mut pages = pages::Editor::create_with_text("Lists").unwrap();
     let pages_box = pages.add_text_box(5, TEXT, POSITION, SIZE).unwrap();
     pages
         .set_text_box_paragraph_list(pages_box.drawable_object_id, ParagraphList::Bullet)
@@ -54,7 +50,7 @@ fn list_levels_round_trip_coalesce_and_reset_in_every_suite() {
             .unwrap(),
         expected
     );
-    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_paragraph_list_level(pages_box.drawable_object_id, deep_start())
@@ -86,7 +82,7 @@ fn list_levels_round_trip_coalesce_and_reset_in_every_suite() {
             .unwrap()
     );
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(sheet_id, TEXT, POSITION, SIZE)
@@ -106,7 +102,7 @@ fn list_levels_round_trip_coalesce_and_reset_in_every_suite() {
             ParagraphListLevel::ONE,
         )
         .unwrap();
-    let numbers = crate::numbers::NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_paragraph_list_level(
@@ -118,7 +114,7 @@ fn list_levels_round_trip_coalesce_and_reset_in_every_suite() {
         ParagraphListLevel::ONE
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote.add_slide_text_box(0, TEXT, POSITION, SIZE).unwrap();
     keynote
         .set_slide_text_box_paragraph_list(0, keynote_box.drawable_object_id, ParagraphList::Bullet)
@@ -131,7 +127,7 @@ fn list_levels_round_trip_coalesce_and_reset_in_every_suite() {
             level_two,
         )
         .unwrap();
-    let keynote = crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_paragraph_list_level(0, keynote_box.drawable_object_id, deep_start())
@@ -142,7 +138,7 @@ fn list_levels_round_trip_coalesce_and_reset_in_every_suite() {
 
 #[test]
 fn non_paragraph_list_level_updates_are_rejected_transactionally() {
-    let mut pages = PagesEditor::create_with_text("Lists").unwrap();
+    let mut pages = pages::Editor::create_with_text("Lists").unwrap();
     let text_box = pages.add_text_box(5, TEXT, POSITION, SIZE).unwrap();
     let before = pages.to_bytes().unwrap();
     assert!(

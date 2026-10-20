@@ -5,7 +5,7 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersSheetAudioOptions};
+use litchi_iwa::numbers::{self};
 use litchi_iwa::shapes::DrawablePoint;
 use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 
@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .file_name()
         .and_then(|name| name.to_str())
         .ok_or("audio path has no UTF-8 basename")?;
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .sheet_name("Source-built Audio")
         .table_name("Scratch Table")
         .build()?;
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sheet_id,
         preferred_filename,
         &audio,
-        NumbersSheetAudioOptions::new(DrawablePoint { x: 420.0, y: 180.0 }, duration),
+        numbers::SheetAudioOptions::new(DrawablePoint { x: 420.0, y: 180.0 }, duration),
     )?;
     let mut properties = editor.sheet_audio_properties(sheet_id, created.drawable_object_id)?;
     properties.accessibility_description = Some(format!("Embedded audio: {preferred_filename}"));

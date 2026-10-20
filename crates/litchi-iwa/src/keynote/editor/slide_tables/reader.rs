@@ -22,7 +22,7 @@ use litchi_keynote::{
 };
 use litchi_numbers::table::merge::Region;
 
-use super::super::KeynoteEditor;
+use super::super::Editor;
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::{Error, IWorkPackage, Result};
 
@@ -58,7 +58,7 @@ const ROLE_MESSAGE_TYPES: &[u32] = &[
 
 /// Read merged-cell regions through the cached focused Keynote owner.
 pub(super) fn regions_in_editor(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     model_object_id: u64,
 ) -> Result<Vec<Region>> {
@@ -111,7 +111,7 @@ pub(super) fn regions_in_editor(
 /// writer; only the canonical model message is admitted to the focused
 /// writable transaction.
 pub(super) fn focused_table_position_for_mutation(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     model_object_id: u64,
 ) -> Result<Option<usize>> {

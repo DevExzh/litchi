@@ -15,7 +15,7 @@ use litchi_numbers::cell::{
     data_format::custom::{Custom, Name, Number as CustomNumber, NumberPattern},
 };
 use litchi_numbers::table::cells::Storage;
-use litchi_numbers::{CellPosition, Package};
+use litchi_numbers::{At, Package};
 
 #[path = "support/table_cell_data_format_fixture.rs"]
 mod fixture;
@@ -52,12 +52,12 @@ fn retirement_cleared_fixture_path() -> PathBuf {
         .join("../../test-data/iwork/numbers/custom-retirement-cleared.numbers")
 }
 
-fn position() -> CellPosition {
-    CellPosition::new(1, 1)
+fn position() -> At {
+    At::new(1, 1)
 }
 
-fn marker_position() -> CellPosition {
-    CellPosition::new(1, 2)
+fn marker_position() -> At {
+    At::new(1, 2)
 }
 
 fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {

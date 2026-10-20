@@ -134,7 +134,7 @@ struct NumbersTextBoxGraph {
 pub(crate) fn compatibility_document_from_bytes(
     bytes: &[u8],
 ) -> crate::Result<litchi_numbers::Workbook> {
-    let editor = NumbersEditor::from_bytes(bytes)?;
+    let editor = Editor::from_bytes(bytes)?;
     let descriptors = table_models(editor.package())?;
     let tables = litchi_numbers::compatibility_tables_from_bytes(bytes)
         .map_err(|error| crate::Error::InvalidFormat(error.to_string()))?;
@@ -228,10 +228,7 @@ pub use crate::charts::Direction;
 use model::*;
 
 #[cfg(test)]
-pub(crate) fn test_sheet_selector(
-    editor: &NumbersEditor,
-    native_id: u64,
-) -> SheetSelector<'static> {
+pub(crate) fn test_sheet_selector(editor: &Editor, native_id: u64) -> SheetSelector<'static> {
     let index = editor
         .sheets()
         .ok()
@@ -245,10 +242,7 @@ pub(crate) fn test_sheet_selector(
 }
 
 #[cfg(test)]
-pub(crate) fn test_table_selector(
-    editor: &NumbersEditor,
-    native_id: u64,
-) -> TableSelector<'static> {
+pub(crate) fn test_table_selector(editor: &Editor, native_id: u64) -> TableSelector<'static> {
     let index = editor
         .tables()
         .ok()
@@ -263,7 +257,7 @@ pub(crate) fn test_table_selector(
 
 #[cfg(test)]
 fn test_cell_selectors(
-    editor: &NumbersEditor,
+    editor: &Editor,
     native_id: u64,
 ) -> Result<(SheetSelector<'static>, TableSelector<'static>)> {
     selectors::focused_table_location(editor, native_id)
@@ -288,11 +282,11 @@ fn test_cell_input(value: CellValue) -> Result<Option<litchi_numbers::table::cel
 
 #[cfg(test)]
 pub(crate) fn test_set_cells(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     native_id: u64,
     updates: impl IntoIterator<Item = TableCellUpdate>,
 ) -> Result<usize> {
-    use litchi_numbers::table::CellPosition;
+    use litchi_numbers::table::At;
 
     let (sheet, table) = test_cell_selectors(editor, native_id)?;
     let source = litchi_numbers::Package::from_bytes(&editor.to_bytes()?)
@@ -301,7 +295,7 @@ pub(crate) fn test_set_cells(
         .edit_table_cells(sheet, table)
         .map_err(|error| Error::ParseError(error.to_string()))?;
     for update in updates {
-        let position = CellPosition::try_from_usize(update.row, update.column)
+        let position = At::try_from_usize(update.row, update.column)
             .map_err(|error| Error::ParseError(error.to_string()))?;
         edit = match test_cell_input(update.value)? {
             Some(input) => edit.set(position, input),
@@ -318,13 +312,13 @@ pub(crate) fn test_set_cells(
     target
         .write_to(&mut bytes)
         .map_err(|error| Error::ParseError(error.to_string()))?;
-    *editor = NumbersEditor::from_bytes(&bytes)?;
+    *editor = Editor::from_bytes(&bytes)?;
     Ok(count)
 }
 
 #[cfg(test)]
 pub(crate) fn test_set_cell(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     native_id: u64,
     row: usize,
     column: usize,
@@ -340,7 +334,7 @@ pub(crate) fn test_set_cell(
 
 #[cfg(test)]
 pub(crate) fn set_cell_fixture(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     native_id: u64,
     row: usize,
     column: usize,
@@ -355,7 +349,7 @@ pub(crate) fn set_cell_fixture(
 
 #[cfg(test)]
 pub(crate) fn apply_numbers_fixture(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     native_id: u64,
     updates: impl IntoIterator<Item = TableCellUpdate>,
 ) -> Result<usize> {
@@ -378,11 +372,11 @@ pub(crate) fn apply_numbers_fixture(
 }
 
 pub use semantic::*;
-pub use sheet_audio::{NumbersSheetAudioInfo, NumbersSheetAudioOptions, RemovedNumbersSheetAudio};
-pub use sheet_charts::{NumbersSheetChartInfo, RemovedNumbersSheetChart};
-pub use sheet_images::{NumbersSheetImageInfo, NumbersSheetImageOptions, RemovedNumbersSheetImage};
-pub use sheet_movies::{NumbersSheetMovieInfo, NumbersSheetMovieOptions, RemovedNumbersSheetMovie};
-pub use sheet_shapes::{NumbersSheetShapeInfo, RemovedNumbersSheetShape};
+pub use sheet_audio::{RemovedNumbersSheetAudio, SheetAudioInfo, SheetAudioOptions};
+pub use sheet_charts::{RemovedNumbersSheetChart, SheetChartInfo};
+pub use sheet_images::{RemovedNumbersSheetImage, SheetImageInfo, SheetImageOptions};
+pub use sheet_movies::{RemovedNumbersSheetMovie, SheetMovieInfo, SheetMovieOptions};
+pub use sheet_shapes::{RemovedNumbersSheetShape, SheetShapeInfo};
 use storage::*;
 pub(crate) use table_cells::TableCellBatch;
 pub(crate) use table_duplicate::{duplicate_attached_table_graph_in_package, duplicate_table_name};
@@ -390,8 +384,8 @@ use table_duplicate::{
     register_cloned_numbers_objects, register_numbers_component_reference, table_owned_graph,
 };
 pub use table_sort::{
-    NumbersTableSortColumnIndex, NumbersTableSortDirection, NumbersTableSortOrder,
-    NumbersTableSortRowRange, NumbersTableSortRule, NumbersTableSortScope,
+    TableSortColumnIndex, TableSortDirection, TableSortOrder, TableSortRowRange, TableSortRule,
+    TableSortScope,
 };
 pub(crate) use table_sort::{
     apply_table_sort_order_in_package, apply_table_sort_order_to_rows_in_package,

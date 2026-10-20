@@ -17,7 +17,7 @@ use std::{
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    CellPosition, Package, Error as PackageError,
+    At, Package, Error as PackageError,
     SheetSelector, TableSelector,
     cell::data_format::custom::{
         Condition, ConditionValue, Custom, DateTime as CustomDateTime, DateTimePattern,
@@ -46,9 +46,9 @@ const PRIVATE_TABLE: &str = "__litchi_private_custom_format_table_9e31__";
 const PRIVATE_INPUT: &[u8] = b"__litchi_private_custom_format_input_9e31__";
 const NATIVE_NUMBERS: &[u8] = include_bytes!("../../../../test-data/iwork/numbers/basic.numbers");
 
-const FIXTURE_POSITION: CellPosition = CellPosition::new(0, 0);
-const FIXTURE_SIBLING_POSITION: CellPosition = CellPosition::new(0, 1);
-const NATIVE_POSITION: CellPosition = CellPosition::new(2, 1);
+const FIXTURE_POSITION: At = At::new(0, 0);
+const FIXTURE_SIBLING_POSITION: At = At::new(0, 1);
+const NATIVE_POSITION: At = At::new(2, 1);
 
 fuzz_target!(|data: &[u8]| {
     // Arbitrary ingress remains useful for package-level parser coverage, but
@@ -286,7 +286,7 @@ fn exercise_custom_package(package: &Package, family: fixture::CustomFamily, dat
     assert_eq!(package_bytes(package), source_bytes);
 }
 
-fn exercise_selector_reads(package: &Package, data: &[u8], position: CellPosition) {
+fn exercise_selector_reads(package: &Package, data: &[u8], position: At) {
     let random = random_position(data);
     observe_result(package.table_cell_custom_format(
         SheetSelector::index(usize::from(control(data, 0))),
@@ -307,7 +307,7 @@ fn exercise_selector_reads(package: &Package, data: &[u8], position: CellPositio
     }
 }
 
-fn exercise_selector_errors(package: &Package, position: CellPosition) {
+fn exercise_selector_errors(package: &Package, position: At) {
     let source_bytes = package_bytes(package);
     let sheet_count = package.workbook_ref().sheets().len();
     observe_result(package.table_cell_custom_format(
@@ -332,7 +332,7 @@ fn exercise_selector_errors(package: &Package, position: CellPosition) {
     observe_result(package.table_cell_custom_format(
         SheetSelector::index(0),
         TableSelector::index(0),
-        CellPosition::new(u32::MAX, u32::MAX),
+        At::new(u32::MAX, u32::MAX),
     ));
     assert_eq!(package_bytes(package), source_bytes);
 }
@@ -375,7 +375,7 @@ fn wrong_family_packages() -> &'static [(fixture::FormatFamily, Package)] {
         .as_slice()
 }
 
-fn assert_custom_refusal(package: &Package, data: &[u8], position: CellPosition) {
+fn assert_custom_refusal(package: &Package, data: &[u8], position: At) {
     let source_bytes = package_bytes(package);
     let read = package.table_cell_custom_format(0usize, 0usize, position);
     assert!(
@@ -836,8 +836,8 @@ fn exercise_output_limit() {
     });
 }
 
-fn random_position(data: &[u8]) -> CellPosition {
-    CellPosition::new(
+fn random_position(data: &[u8]) -> At {
+    At::new(
         u32::from(control(data, 4) % 8),
         u32::from(control(data, 5) % 8),
     )

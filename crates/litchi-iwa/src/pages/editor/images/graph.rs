@@ -94,7 +94,7 @@ impl ImageObjectIds {
 pub(super) struct BodyImageGraph {
     pub(super) archive_name: String,
     pub(super) attachment_id: u64,
-    pub(super) info: PagesImageInfo,
+    pub(super) info: ImageInfo,
     pub(super) object_ids: Vec<u64>,
     pub(super) uuid_object_ids: Vec<u64>,
     pub(super) data_references: Vec<(u64, u64)>,
@@ -188,7 +188,7 @@ pub(super) fn image_caption_theme(
     ))
 }
 
-pub(super) fn body_image_infos(editor: &PagesEditor) -> Result<Vec<PagesImageInfo>> {
+pub(super) fn body_image_infos(editor: &Editor) -> Result<Vec<ImageInfo>> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
         editor.body_storage_id.get(),
@@ -252,10 +252,7 @@ pub(super) fn body_image_infos(editor: &PagesEditor) -> Result<Vec<PagesImageInf
     Ok(images)
 }
 
-pub(super) fn body_image_graph(
-    editor: &PagesEditor,
-    drawable_object_id: u64,
-) -> Result<BodyImageGraph> {
+pub(super) fn body_image_graph(editor: &Editor, drawable_object_id: u64) -> Result<BodyImageGraph> {
     let info = body_image_infos(editor)?
         .into_iter()
         .find(|image| image.drawable_object_id == drawable_object_id)
@@ -403,7 +400,7 @@ pub(super) fn body_image_graph(
 }
 
 pub(super) fn image_title_caption(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
 ) -> Result<DrawableTitleCaption> {
     body_image_graph(editor, drawable_object_id)?;
@@ -445,7 +442,7 @@ pub(super) fn image_title_caption(
 }
 
 pub(super) fn image_caption_slot(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
     kind: DrawableCaptionKind,
 ) -> Result<ImageCaptionSlot> {
@@ -639,7 +636,7 @@ fn image_info(
     payload: &[u8],
     identifier: u64,
     anchor_character_index: u32,
-) -> Result<PagesImageInfo> {
+) -> Result<ImageInfo> {
     let image = tsd::ImageArchive::decode(payload)?;
     let image_data_identifier = MediaAssetId::try_from(
         image
@@ -662,7 +659,7 @@ fn image_info(
             identifier,
             "Pages image",
         )?;
-    Ok(PagesImageInfo {
+    Ok(ImageInfo {
         drawable_object_id: identifier,
         anchor_character_index,
         image_data_identifier,

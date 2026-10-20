@@ -41,7 +41,7 @@ use super::table_topology::{
     storage,
 };
 use crate::selector::{SheetSelector, TableSelector};
-use crate::table::CellPosition;
+use crate::table::At;
 
 structure::structural_family!("cell-text-style");
 
@@ -135,7 +135,7 @@ pub struct Edit<'a> {
     table: usize,
     rows: u32,
     columns: u32,
-    cells: Vec<(CellPosition, CharacterProperties)>,
+    cells: Vec<(At, CharacterProperties)>,
 }
 
 impl fmt::Debug for Edit<'_> {
@@ -156,11 +156,7 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// [`Error::CellNotFound`] outside the table, [`Error::EmptyStyle`].
-    pub fn set(
-        mut self,
-        position: CellPosition,
-        properties: CharacterProperties,
-    ) -> Result<Self, Error> {
+    pub fn set(mut self, position: At, properties: CharacterProperties) -> Result<Self, Error> {
         if properties.is_empty() {
             return Err(Error::EmptyStyle);
         }
@@ -228,7 +224,7 @@ struct Located {
 fn locate_cell(
     working: &Working<'_>,
     store: &[u8],
-    position: CellPosition,
+    position: At,
 ) -> Result<Option<Located>, Error> {
     let (tiles, size) = topology::tiles(store).map_err(from_topology)?;
     let key = u64::from(position.row()) / size;
@@ -287,11 +283,7 @@ fn list_reference(working: &Working<'_>, list: &[u8], key: u32) -> Result<Option
 }
 
 /// The section base text style of `position`.
-fn base_style(
-    model: &[u8],
-    geometry: topology::Geometry,
-    position: CellPosition,
-) -> Result<u64, Error> {
+fn base_style(model: &[u8], geometry: topology::Geometry, position: At) -> Result<u64, Error> {
     let field = if position.row() < geometry.header_rows {
         25
     } else if position.row() >= geometry.rows.saturating_sub(geometry.footer_rows) {
@@ -310,7 +302,7 @@ fn current_style(
     working: &Working<'_>,
     sheet: usize,
     table: usize,
-    position: CellPosition,
+    position: At,
 ) -> Result<u64, Error> {
     let target = topology::locate(working, sheet, table).map_err(from_topology)?;
     let (_, model) = topology::message(working, target.model, &[6_001]).map_err(Error::from)?;
@@ -363,7 +355,7 @@ fn text_style(
     package: &Package,
     sheet: usize,
     table: usize,
-    position: CellPosition,
+    position: At,
 ) -> Result<CharacterProperties, Error> {
     let working = Working::new(package)?;
     let style = current_style(&working, sheet, table, position)?;
@@ -422,7 +414,7 @@ fn publish(
     source: &Package,
     sheet: usize,
     table: usize,
-    cells: &[(CellPosition, CharacterProperties)],
+    cells: &[(At, CharacterProperties)],
 ) -> Result<structure::Published, Error> {
     let mut working = Working::new(source)?;
     let target = topology::locate(&working, sheet, table).map_err(from_topology)?;
@@ -446,7 +438,7 @@ fn publish(
         .0;
     let mut releases: BTreeMap<u32, u32> = BTreeMap::new();
     let mut appended: Vec<u64> = Vec::new();
-    let mut cell_updates: Vec<(CellPosition, u32)> = Vec::new();
+    let mut cell_updates: Vec<(At, u32)> = Vec::new();
     for (position, properties) in cells {
         let located = locate_cell(&working, &store, *position)?.ok_or(Error::EmptyCell)?;
         let cell = litchi_numbers_wire::BncCell::parse(&located.bytes)
@@ -616,7 +608,7 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-        position: CellPosition,
+        position: At,
     ) -> Result<CharacterProperties, Error> {
         let (sheet, table) = self.resolve_text_style_target(sheet.into(), table.into())?;
         text_style(self, sheet, table, position)
@@ -626,7 +618,7 @@ impl Package {
     ///
     /// ```no_run
     /// use litchi_numbers::cell::text_style::CharacterProperties;
-    /// use litchi_numbers::{CellPosition, Package};
+    /// use litchi_numbers::{At, Package};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let package = Package::open("input.numbers")?;
@@ -634,7 +626,7 @@ impl Package {
     /// bold.bold = Some(true);
     /// let commit = package
     ///     .edit_table_cell_text_style(0, 0)?
-    ///     .set(CellPosition::new(1, 1), bold)?
+    ///     .set(At::new(1, 1), bold)?
     ///     .commit()?;
     /// let restored = commit
     ///     .package()

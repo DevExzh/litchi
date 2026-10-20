@@ -7,7 +7,7 @@ use crate::charts::radar_start_angle::{
     set_chart_radar_start_angle as set_native_chart_radar_start_angle,
 };
 
-impl PagesEditor {
+impl Editor {
     /// Read one radar chart's `Rotation Angle`.
     pub fn body_chart_radar_start_angle(
         &self,
@@ -49,7 +49,7 @@ impl PagesEditor {
             graph.info.kind,
             angle,
         )?;
-        let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_radar_start_angle(drawable_object_id)? != angle {
             return Err(Error::InvalidFormat(
                 "Pages radar chart start-angle update failed validation".to_owned(),
@@ -63,12 +63,12 @@ impl PagesEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pages::PagesDocumentBuilder;
+    use crate::pages;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_document_supports_radar_start_angle_crud() {
-        let mut editor = PagesDocumentBuilder::new().build().unwrap();
+        let mut editor = pages::Builder::new().build().unwrap();
         let chart = editor
             .add_body_chart(
                 0,
@@ -91,7 +91,7 @@ mod tests {
         editor
             .set_body_chart_radar_start_angle(chart.drawable_object_id, angle)
             .unwrap();
-        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_chart_radar_start_angle(chart.drawable_object_id)
@@ -102,7 +102,7 @@ mod tests {
 
     #[test]
     fn non_radar_chart_rejects_start_angle_access() {
-        let mut editor = PagesDocumentBuilder::new().build().unwrap();
+        let mut editor = pages::Builder::new().build().unwrap();
         let chart = editor
             .add_body_chart(
                 0,

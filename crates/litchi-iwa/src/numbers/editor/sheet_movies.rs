@@ -24,7 +24,7 @@ use graph::*;
 
 /// One ordinary file-backed movie owned directly by a Numbers sheet.
 #[derive(Debug, Clone, PartialEq)]
-pub struct NumbersSheetMovieInfo {
+pub struct SheetMovieInfo {
     pub sheet_id: u64,
     pub drawable_object_id: u64,
     pub movie_data_identifier: MediaAssetId,
@@ -41,7 +41,7 @@ pub struct NumbersSheetMovieInfo {
 
 /// Typed layout and playback metadata for a newly created Numbers movie.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct NumbersSheetMovieOptions {
+pub struct SheetMovieOptions {
     /// Top-left position on the sheet, in points.
     pub position: DrawablePoint,
     /// Displayed movie size, in points.
@@ -52,7 +52,7 @@ pub struct NumbersSheetMovieOptions {
     pub duration: Duration,
 }
 
-impl NumbersSheetMovieOptions {
+impl SheetMovieOptions {
     /// Create options whose displayed and natural dimensions are identical.
     pub const fn new(position: DrawablePoint, size: DrawableSize, duration: Duration) -> Self {
         Self {
@@ -74,7 +74,7 @@ impl NumbersSheetMovieOptions {
 /// Result of removing one sheet-owned movie and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedNumbersSheetMovie {
-    pub movie: NumbersSheetMovieInfo,
+    pub movie: SheetMovieInfo,
     /// Assets culled because the removed movie held their final package reference.
     pub removed_data_identifiers: Vec<MediaAssetId>,
 }
@@ -85,9 +85,9 @@ enum MovieClonePlacement {
     Preserve,
 }
 
-impl NumbersEditor {
+impl Editor {
     /// List ordinary file-backed movies owned directly by one reachable sheet.
-    pub fn sheet_movies(&self, sheet_id: u64) -> Result<Vec<NumbersSheetMovieInfo>> {
+    pub fn sheet_movies(&self, sheet_id: u64) -> Result<Vec<SheetMovieInfo>> {
         movie_infos(self, sheet_id)
     }
 
@@ -103,8 +103,8 @@ impl NumbersEditor {
         movie_data: &[u8],
         preferred_poster_filename: &str,
         poster_data: &[u8],
-        options: NumbersSheetMovieOptions,
-    ) -> Result<NumbersSheetMovieInfo> {
+        options: SheetMovieOptions,
+    ) -> Result<SheetMovieInfo> {
         let (geometry, duration_seconds) = movie_creation_values(options)?;
         let context = movie_creation_context(self, sheet_id)?;
         let ids = MovieObjectIds::allocate(next_object_identifier(&self.package)?)?;
@@ -380,7 +380,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         source_drawable_object_id: u64,
-    ) -> Result<NumbersSheetMovieInfo> {
+    ) -> Result<SheetMovieInfo> {
         self.clone_sheet_movie(
             sheet_id,
             source_drawable_object_id,
@@ -394,7 +394,7 @@ impl NumbersEditor {
         source_sheet_id: u64,
         source_drawable_object_id: u64,
         target_sheet_id: u64,
-    ) -> Result<NumbersSheetMovieInfo> {
+    ) -> Result<SheetMovieInfo> {
         self.clone_sheet_movie(
             source_sheet_id,
             source_drawable_object_id,
@@ -409,7 +409,7 @@ impl NumbersEditor {
         source_drawable_object_id: u64,
         target_sheet_id: u64,
         placement: MovieClonePlacement,
-    ) -> Result<NumbersSheetMovieInfo> {
+    ) -> Result<SheetMovieInfo> {
         let source = movie_graph(self, source_sheet_id, source_drawable_object_id)?;
         let (target_archive_name, _, _) = numbers_sheet(&self.package, target_sheet_id)?;
         if target_archive_name != source.archive_name {
@@ -665,7 +665,7 @@ impl NumbersEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::{NumbersDocumentBuilder, NumbersSheetImageOptions};
+    use crate::numbers::{self, SheetImageOptions};
     use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-numbers-movie";
@@ -682,8 +682,8 @@ mod tests {
         height: 360.0,
     };
 
-    fn options() -> NumbersSheetMovieOptions {
-        NumbersSheetMovieOptions::new(POSITION, SIZE, Duration::from_secs(8))
+    fn options() -> SheetMovieOptions {
+        SheetMovieOptions::new(POSITION, SIZE, Duration::from_secs(8))
             .with_natural_size(NATURAL_SIZE)
     }
 
@@ -699,7 +699,7 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn scratch_spreadsheet_supports_movie_crud_without_a_source_package() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Movies")
             .build()
             .unwrap();
@@ -734,7 +734,7 @@ mod tests {
             POSTER
         );
 
-        let roundtripped = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let roundtripped = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             roundtripped.sheet_movies(sheet_id).unwrap(),
             std::slice::from_ref(&created)
@@ -891,12 +891,12 @@ mod tests {
         );
         assert!(editor.sheet_movies(sheet_id).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
     fn scratch_spreadsheet_supports_native_movie_title_caption_crud() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Movie labels")
             .build()
             .unwrap();
@@ -970,7 +970,7 @@ mod tests {
             crate::DrawableTitleCaption::default()
         );
 
-        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_movie_title_caption(sheet_id, duplicate.drawable_object_id)
@@ -992,7 +992,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_movie_duplication() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Movies")
             .build()
             .unwrap();
@@ -1115,7 +1115,7 @@ mod tests {
             REPLACEMENT_POSTER
         );
 
-        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.sheet_movies(sheet_id).unwrap().len(), 2);
         assert_eq!(
             reopened
@@ -1145,12 +1145,12 @@ mod tests {
         );
         assert!(editor.sheet_movies(sheet_id).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
     fn invalid_movie_creation_and_cross_type_edits_are_transactional() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let baseline = editor.to_bytes().unwrap();
         assert!(editor.duplicate_sheet_movie(sheet_id, 999).is_err());
@@ -1172,7 +1172,7 @@ mod tests {
                 MOVIE,
                 "poster.png",
                 POSTER,
-                NumbersSheetMovieOptions::new(POSITION, SIZE, Duration::ZERO),
+                SheetMovieOptions::new(POSITION, SIZE, Duration::ZERO),
             ),
             editor.add_sheet_movie(999, "movie.mov", MOVIE, "poster.png", POSTER, options()),
         ] {
@@ -1185,7 +1185,7 @@ mod tests {
                 sheet_id,
                 "poster.png",
                 POSTER,
-                NumbersSheetImageOptions::new(POSITION, SIZE),
+                SheetImageOptions::new(POSITION, SIZE),
             )
             .unwrap();
         let before = editor.to_bytes().unwrap();

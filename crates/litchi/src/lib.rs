@@ -481,9 +481,9 @@ pub mod numbers {
     // profiles and the focused transaction modules keep their ADR 0034
     // names (record 0297).
     pub use litchi_numbers::{
-        AddressError, Builder, Cell, CellPosition, CellRange, ColumnDeletion, CoordinateError,
-        Dimension, Dimensions, Error, Grid, GridBudget, Identity, InsertError, InsertResult,
-        LimitKind, MAX_MATERIALIZED_CELLS, MAX_OBJECTS, MAX_REFERENCES, MAX_SHEETS, MAX_TABLES,
+        AddressError, Area, At, Builder, Cell, ColumnDeletion, CoordinateError, Dimension,
+        Dimensions, Error, Grid, GridBudget, Identity, InsertError, InsertResult, LimitKind,
+        MAX_MATERIALIZED_CELLS, MAX_OBJECTS, MAX_REFERENCES, MAX_SHEETS, MAX_TABLES,
         MAX_TEXT_BYTES, MergeReader, OpenOptions, Package, PayloadLimitKind, Points, ResourceError,
         Result, RowDeletion, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,
         SemanticPath, Sheet, SheetBuilder, SheetSelector, Size, SourceLimitKind, SourceLimits,
@@ -534,9 +534,7 @@ pub mod numbers {
         /// caller can use typed A1 coordinates and presence-preserving values
         /// without importing the package adapter.
         pub mod table {
-            pub use litchi_numbers::{
-                AddressError, CellPosition, CellRange, CoordinateError, Dimensions, View,
-            };
+            pub use litchi_numbers::{AddressError, Area, At, CoordinateError, Dimensions, View};
 
             pub mod cells {
                 pub use litchi_numbers::table::cells::{State, Storage};

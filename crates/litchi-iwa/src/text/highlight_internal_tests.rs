@@ -1,5 +1,5 @@
 use crate::archive::RawMessage;
-use crate::pages::PagesEditor;
+use crate::pages;
 use crate::protobuf::tswp;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use crate::text::highlight_object::validate_plain_highlight_graph;
@@ -23,7 +23,7 @@ const SIZE: DrawableSize = DrawableSize {
 };
 
 fn fixture() -> (super::super::IWorkTextEditor, TextStorageId) {
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, "Alpha Beta", POSITION, SIZE).unwrap();
     (
         super::super::IWorkTextEditor::from_package(pages.into_package()),
@@ -238,7 +238,7 @@ fn highlight_with_an_additional_owner_cannot_be_updated_or_deleted() {
 
 #[test]
 fn comment_backed_annotations_are_classified_without_mutation() {
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, "Alpha Beta", POSITION, SIZE).unwrap();
     let storage_id = text_box.storage.id;
     let mut package = pages.into_package();
@@ -296,7 +296,7 @@ fn comment_backed_annotations_are_classified_without_mutation() {
 
 #[test]
 fn duplicate_comment_text_is_rejected_before_highlight_use() {
-    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let mut pages = pages::Editor::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, "Alpha Beta", POSITION, SIZE).unwrap();
     let storage_id = text_box.storage.id;
     let mut package = pages.into_package();

@@ -7,7 +7,7 @@ use crate::charts::series_gap_3d::{
     set_chart_3d_series_gap as set_native_chart_3d_series_gap,
 };
 
-impl NumbersEditor {
+impl Editor {
     /// Read one 3D line/area chart's `Between Series` gap.
     pub fn sheet_chart_3d_series_gap(
         &self,
@@ -51,7 +51,7 @@ impl NumbersEditor {
             graph.info.kind,
             gap,
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_3d_series_gap(sheet_id, drawable_object_id)? != gap {
             return Err(Error::InvalidFormat(
                 "Numbers chart 3D series-gap update failed validation".to_owned(),
@@ -65,12 +65,12 @@ impl NumbersEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn duplicated_charts_have_copy_on_write_3d_series_gaps() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
             .add_sheet_chart(

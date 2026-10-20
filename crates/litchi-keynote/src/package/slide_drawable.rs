@@ -2353,7 +2353,7 @@ fn verify_table(
     name: &str,
     table: &NewTable,
 ) -> Result<(), Error> {
-    use crate::slide::table::cells::{CellPosition, Value};
+    use crate::slide::table::cells::{At, Value};
     let inventory = expected
         .iter()
         .find(|inventory| inventory.item(drawable).is_some())
@@ -2382,7 +2382,7 @@ fn verify_table(
         return Err(Error::Verification);
     }
     for (row, column, value) in &table.cells {
-        let stored = read.get(CellPosition::new(*row, *column));
+        let stored = read.get(At::new(*row, *column));
         let matches = match (value, stored) {
             (TableCellValue::Text(text), Some(Value::Text(stored))) => stored == text,
             (TableCellValue::Number(number), Some(Value::Number(stored))) => {

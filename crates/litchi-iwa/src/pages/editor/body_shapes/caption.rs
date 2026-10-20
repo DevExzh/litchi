@@ -27,7 +27,7 @@ pub(super) struct BodyShapeCaptionSlot {
     pub(super) object_ids: Vec<u64>,
 }
 
-impl PagesEditor {
+impl Editor {
     /// Read the native title and caption attached to one ordinary body shape.
     pub fn body_shape_title_caption(
         &self,
@@ -70,7 +70,7 @@ impl PagesEditor {
 }
 
 pub(super) fn body_shape_title_caption(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
 ) -> Result<DrawableTitleCaption> {
     let title = body_shape_caption_slot(editor, drawable_object_id, DrawableCaptionKind::Title)?;
@@ -98,7 +98,7 @@ pub(super) fn body_shape_title_caption(
 }
 
 pub(super) fn body_shape_caption_slot(
-    editor: &PagesEditor,
+    editor: &Editor,
     drawable_object_id: u64,
     kind: DrawableCaptionKind,
 ) -> Result<BodyShapeCaptionSlot> {
@@ -289,7 +289,7 @@ pub(super) fn insert_body_shape_caption_standin(
 }
 
 fn set_body_shape_caption(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     text: &str,
     kind: DrawableCaptionKind,
@@ -331,7 +331,7 @@ fn set_body_shape_caption(
         set_package_last_object_identifier(&mut staged, ids.last())?;
         staged
     };
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_shape_title_caption(drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Pages shape title/caption update failed validation".to_owned(),
@@ -342,7 +342,7 @@ fn set_body_shape_caption(
 }
 
 fn remove_body_shape_caption(
-    editor: &mut PagesEditor,
+    editor: &mut Editor,
     drawable_object_id: u64,
     kind: DrawableCaptionKind,
 ) -> Result<bool> {
@@ -368,7 +368,7 @@ fn remove_body_shape_caption(
     )?;
     add_component_object_uuids(&mut staged, DOCUMENT_OBJECT_ID, &[standin_id])?;
     set_package_last_object_identifier(&mut staged, standin_id)?;
-    let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.body_shape_title_caption(drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Pages shape title/caption removal failed validation".to_owned(),
@@ -378,7 +378,7 @@ fn remove_body_shape_caption(
     Ok(true)
 }
 
-fn body_shape_caption_theme(editor: &PagesEditor) -> Result<(CaptionThemeStyle, Option<String>)> {
+fn body_shape_caption_theme(editor: &Editor) -> Result<(CaptionThemeStyle, Option<String>)> {
     let root = pages_document_root_facts(editor.package())?;
     let theme_id = root
         .theme
@@ -587,7 +587,7 @@ mod tests {
 
     #[test]
     fn scratch_document_supports_native_shape_title_caption_crud() {
-        let mut editor = PagesEditor::create_with_text("Shape labels").unwrap();
+        let mut editor = Editor::create_with_text("Shape labels").unwrap();
         let shape = editor
             .add_body_shape(0, "Quarterly trend", POSITION, SIZE, Preset::RightArrow)
             .unwrap();
@@ -651,7 +651,7 @@ mod tests {
             DrawableTitleCaption::default()
         );
 
-        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_shape_title_caption(duplicate.drawable_object_id)

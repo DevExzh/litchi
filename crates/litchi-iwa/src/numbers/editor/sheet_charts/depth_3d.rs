@@ -6,7 +6,7 @@ use crate::charts::depth_3d::{
     chart_3d_depth as read_native_chart_3d_depth, set_chart_3d_depth as set_native_chart_3d_depth,
 };
 
-impl NumbersEditor {
+impl Editor {
     /// Read one sheet chart's depth in Chart-inspector percent.
     pub fn sheet_chart_3d_depth(
         &self,
@@ -52,7 +52,7 @@ impl NumbersEditor {
             graph.info.kind,
             depth,
         )?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_3d_depth(sheet_id, drawable_object_id)? != depth {
             return Err(Error::InvalidFormat(
                 "Numbers chart 3D depth update failed validation".to_owned(),
@@ -75,12 +75,12 @@ fn require_3d_depth(kind: Kind, drawable_object_id: u64) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn duplicated_sheet_charts_have_copy_on_write_3d_depths() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
             .add_sheet_chart(

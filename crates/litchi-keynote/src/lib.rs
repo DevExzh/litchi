@@ -543,8 +543,8 @@ pub use slide::movie::MovieSelector;
 pub use slide::table::TableSelector;
 pub use slide::table::merge::Region;
 pub use slide::table::number_format::{
-    CellPosition, CellPositionError, DecimalPlaces, FixedDecimalPlaces, NegativeStyle, Number,
-    NumberError, ThousandsSeparator,
+    At, AtError, DecimalPlaces, FixedDecimalPlaces, NegativeStyle, Number, NumberError,
+    ThousandsSeparator,
 };
 pub use slide::{Slide, Transition};
 pub use time::Seconds;

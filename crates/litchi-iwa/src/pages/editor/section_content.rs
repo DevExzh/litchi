@@ -2,7 +2,7 @@
 
 use std::ops::Range;
 
-use super::PagesEditor;
+use super::Editor;
 use crate::text::{
     TextBookmark, TextBookmarkId, TextBookmarkSettings, TextDateTimeField, TextDateTimeFieldId,
     TextPosition, TextRange,
@@ -10,7 +10,7 @@ use crate::text::{
 use crate::{Error, Result};
 use litchi_iwa_text::date_time::{DisplayText, Settings};
 
-impl PagesEditor {
+impl Editor {
     /// Read every native ranged bookmark in the main body.
     pub fn body_bookmarks(&self) -> Result<Vec<TextBookmark>> {
         self.text.text_bookmarks(self.body_storage_id)

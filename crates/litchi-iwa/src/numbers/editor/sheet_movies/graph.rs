@@ -204,15 +204,13 @@ pub(super) struct SheetMovieGraph {
     pub(super) sheet_id: u64,
     pub(super) archive_name: String,
     pub(super) component_id: u64,
-    pub(super) info: NumbersSheetMovieInfo,
+    pub(super) info: SheetMovieInfo,
     pub(super) object_ids: Vec<u64>,
     pub(super) uuid_object_ids: Vec<u64>,
     pub(super) data_references: Vec<(u64, u64)>,
 }
 
-pub(super) fn movie_creation_values(
-    options: NumbersSheetMovieOptions,
-) -> Result<(DrawableGeometry, f32)> {
+pub(super) fn movie_creation_values(options: SheetMovieOptions) -> Result<(DrawableGeometry, f32)> {
     if !options.natural_size.width.is_finite()
         || !options.natural_size.height.is_finite()
         || options.natural_size.width <= 0.0
@@ -239,7 +237,7 @@ pub(super) fn movie_creation_values(
 }
 
 pub(in crate::numbers::editor) fn movie_creation_context(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
 ) -> Result<MovieCreationContext> {
     let (archive_name, _, _) = numbers_sheet(editor.package(), sheet_id)?;
@@ -355,10 +353,7 @@ pub(super) fn movie_caption_theme(
     })
 }
 
-pub(super) fn movie_infos(
-    editor: &NumbersEditor,
-    sheet_id: u64,
-) -> Result<Vec<NumbersSheetMovieInfo>> {
+pub(super) fn movie_infos(editor: &Editor, sheet_id: u64) -> Result<Vec<SheetMovieInfo>> {
     let (_, _, sheet) = numbers_sheet(editor.package(), sheet_id)?;
     let locations = object_locations(editor.package())?;
     let mut movies = Vec::new();
@@ -404,7 +399,7 @@ pub(super) fn movie_infos(
 }
 
 pub(super) fn movie_graph(
-    editor: &NumbersEditor,
+    editor: &Editor,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<SheetMovieGraph> {
@@ -556,11 +551,7 @@ pub(super) fn movie_graph(
     })
 }
 
-fn movie_info(
-    package: &IWorkPackage,
-    sheet_id: u64,
-    identifier: u64,
-) -> Result<NumbersSheetMovieInfo> {
+fn movie_info(package: &IWorkPackage, sheet_id: u64, identifier: u64) -> Result<SheetMovieInfo> {
     let locations = object_locations(package)?;
     let archive_name = locations
         .get(&identifier)
@@ -611,7 +602,7 @@ fn movie_info(
             ))
         },
     )?;
-    Ok(NumbersSheetMovieInfo {
+    Ok(SheetMovieInfo {
         sheet_id,
         drawable_object_id: identifier,
         movie_data_identifier,

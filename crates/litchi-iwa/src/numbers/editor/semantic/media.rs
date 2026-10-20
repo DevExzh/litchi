@@ -5,7 +5,7 @@
 use super::*;
 use crate::media::MediaAssetId;
 
-impl NumbersEditor {
+impl Editor {
     /// List metadata-backed media reachable from this spreadsheet package.
     pub fn media_assets(&self) -> Result<Vec<EmbeddedMediaAsset>> {
         reachable_embedded_assets(&self.package, [1])

@@ -7,7 +7,7 @@ use crate::charts::pie_start_angle::{
     set_chart_pie_start_angle as set_native_chart_pie_start_angle,
 };
 
-impl KeynoteEditor {
+impl Editor {
     /// Read the Wedges rotation angle of one pie or donut chart.
     pub fn slide_chart_pie_start_angle(
         &self,
@@ -29,7 +29,7 @@ impl KeynoteEditor {
 }
 
 fn slide_chart_pie_start_angle(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<ChartPieStartAngle> {
@@ -44,7 +44,7 @@ fn slide_chart_pie_start_angle(
 }
 
 fn set_slide_chart_pie_start_angle(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     angle: ChartPieStartAngle,
@@ -68,7 +68,7 @@ fn set_slide_chart_pie_start_angle(
         "Keynote",
         angle,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_pie_start_angle(slide_index, drawable_object_id)? != angle {
         return Err(Error::InvalidFormat(
             "Keynote chart pie start-angle update failed validation".to_owned(),

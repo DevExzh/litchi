@@ -80,7 +80,7 @@ fn invalidate_slide_preview(
     })
 }
 
-impl KeynoteEditor {
+impl Editor {
     /// Reassign an existing slide to a theme layout without replacing user content.
     ///
     /// Keynote retains the slide's text, notes, builds, transition, and ordinary
@@ -88,11 +88,7 @@ impl KeynoteEditor {
     /// style, title/body placeholder presentation and visibility, and cloned
     /// layout-owned images or live-video objects. Replaced layout media graphs
     /// are removed safely.
-    pub fn set_slide_layout(
-        &mut self,
-        slide_index: usize,
-        layout: KeynoteSlideLayoutId,
-    ) -> Result<()> {
+    pub fn set_slide_layout(&mut self, slide_index: usize, layout: SlideLayoutId) -> Result<()> {
         let slides = self.slides()?;
         let before = slides.get(slide_index).cloned().ok_or_else(|| {
             Error::ParseError(format!(
@@ -156,7 +152,7 @@ impl KeynoteEditor {
         let preserved_text_boxes = self
             .slide_text_storages(slide_index)?
             .into_iter()
-            .filter(|storage| storage.role == KeynoteSlideTextRole::TextBox)
+            .filter(|storage| storage.role == SlideTextRole::TextBox)
             .collect::<Vec<_>>();
 
         let mut staged = self.package().clone();
@@ -230,7 +226,7 @@ impl KeynoteEditor {
         let after_text_boxes = verified
             .slide_text_storages(slide_index)?
             .into_iter()
-            .filter(|storage| storage.role == KeynoteSlideTextRole::TextBox)
+            .filter(|storage| storage.role == SlideTextRole::TextBox)
             .collect::<Vec<_>>();
         if after_text_boxes != preserved_text_boxes {
             return Err(Error::InvalidFormat(
@@ -309,9 +305,9 @@ fn placeholder_plan(
 }
 
 fn verify_slide_semantics(
-    before: &KeynoteSlideInfo,
-    after: &KeynoteSlideInfo,
-    layout: KeynoteSlideLayoutId,
+    before: &SlideInfo,
+    after: &SlideInfo,
+    layout: SlideLayoutId,
     title: &Option<PlaceholderPlan>,
     body: &Option<PlaceholderPlan>,
 ) -> Result<()> {

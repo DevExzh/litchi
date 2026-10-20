@@ -4,7 +4,7 @@
 //! private.  The deprecated generic editor is used here only as a migration
 //! oracle: it exposes the native storage IDs needed to prove COW, physical
 //! component ownership, archive census, and PackageMetadata behavior.  The
-//! test never calls the seven KeynoteEditor drawable-comment wrappers.
+//! test never calls the seven keynote::Editor drawable-comment wrappers.
 
 #![allow(deprecated)]
 

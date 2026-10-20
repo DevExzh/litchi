@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::Path;
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages;
 use litchi_iwa_common::comment::DrawableId;
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_pages::image::Options as ImageOptions;
@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|name| name.to_str())
         .ok_or("image path has no UTF-8 filename")?;
 
-    let mut editor = PagesEditor::create_with_text(body_text)?;
+    let mut editor = pages::Editor::create_with_text(body_text)?;
     let source = editor.add_body_image(
         editor.body_text()?.encode_utf16().count(),
         filename,

@@ -70,7 +70,7 @@ pub(super) struct TextBoxThemeStyles {
     list: Option<tsp::Reference>,
 }
 
-impl NumbersEditor {
+impl Editor {
     /// Add an independently editable text box to a reachable sheet.
     ///
     /// The shape, writable storage, title/caption stand-ins, sheet ownership,
@@ -83,7 +83,7 @@ impl NumbersEditor {
         text: &str,
         position: DrawablePoint,
         size: DrawableSize,
-    ) -> Result<NumbersTextBoxInfo> {
+    ) -> Result<TextBoxInfo> {
         let geometry = validate_text_box_geometry(position, size)?;
         let (archive_name, _, _) = numbers_sheet(&self.package, sheet_id)?;
         let document = numbers_document(&self.package)?;
@@ -436,7 +436,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_text_box_crud_without_a_source_drawable() {
-        let mut editor = NumbersEditor::create().unwrap();
+        let mut editor = Editor::create().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         assert!(editor.sheet_text_boxes(sheet_id).unwrap().is_empty());
         let baseline = editor.to_bytes().unwrap();
@@ -474,7 +474,7 @@ mod tests {
             .unwrap();
         assert_ne!(duplicate.storage.id, created.storage.id);
 
-        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let text_boxes = reopened.sheet_text_boxes(sheet_id).unwrap();
         assert_eq!(text_boxes.len(), 2);
         assert_eq!(
@@ -498,7 +498,7 @@ mod tests {
 
     #[test]
     fn scratch_text_box_creation_is_transactional() {
-        let mut editor = NumbersEditor::create().unwrap();
+        let mut editor = Editor::create().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let baseline = editor.to_bytes().unwrap();
 
@@ -531,7 +531,7 @@ mod tests {
 
     #[test]
     fn created_text_box_graph_has_private_objects_and_document_uuids() {
-        let mut editor = NumbersEditor::create().unwrap();
+        let mut editor = Editor::create().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let created = editor
             .add_sheet_text_box(sheet_id, "Metadata", FIRST_POSITION, FIRST_SIZE)

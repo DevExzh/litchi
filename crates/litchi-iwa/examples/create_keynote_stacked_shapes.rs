@@ -1,7 +1,7 @@
 //! Create overlapping Keynote shapes and move one to the front without a template.
 
 use litchi_iwa::DrawableLayerMove;
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill};
 use litchi_iwa_common::shape::path::Preset;
 
@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
         .nth(1)
         .ok_or("usage: create_keynote_stacked_shapes <output.key>")?;
-    let mut editor = KeynoteDocumentBuilder::new()
+    let mut editor = keynote::Builder::new()
         .title("Layered Shapes")
         .subtitle("Typed Arrange operations")
         .build()?;

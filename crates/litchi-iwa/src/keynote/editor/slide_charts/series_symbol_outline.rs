@@ -9,7 +9,7 @@ use crate::charts::series_symbol_outline::{
 };
 use crate::charts::{ChartSeriesStroke, Index};
 
-impl KeynoteEditor {
+impl Editor {
     pub fn slide_chart_series_symbol_outlines(
         &self,
         slide_index: usize,
@@ -77,7 +77,7 @@ impl KeynoteEditor {
             count,
             series.zero_based(),
         )?;
-        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_series_symbol_outline(slide_index, drawable_object_id, series)?
             != inherited
         {
@@ -91,7 +91,7 @@ impl KeynoteEditor {
 }
 
 fn read(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Vec<Option<ChartSeriesStroke>>> {
@@ -107,7 +107,7 @@ fn read(
 }
 
 fn set(
-    editor: &mut KeynoteEditor,
+    editor: &mut Editor,
     slide_index: usize,
     drawable_object_id: u64,
     outlines: &[Option<ChartSeriesStroke>],
@@ -126,7 +126,7 @@ fn set(
         series_count(&graph, drawable_object_id)?,
         outlines,
     )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_series_symbol_outlines(slide_index, drawable_object_id)? != outlines {
         return Err(Error::InvalidFormat(
             "Keynote chart data-symbol outline update failed validation".to_owned(),

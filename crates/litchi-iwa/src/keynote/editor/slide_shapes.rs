@@ -38,7 +38,7 @@ const DEFAULT_ROTATION_DEGREES: f32 = 0.0;
 
 /// One ordinary, non-text-box shape owned directly by a Keynote slide.
 #[derive(Debug, Clone, PartialEq)]
-pub struct KeynoteSlideShapeInfo {
+pub struct SlideShapeInfo {
     pub slide_index: usize,
     pub drawable_object_id: u64,
     pub kind: ShapePathKind,
@@ -56,21 +56,21 @@ pub struct KeynoteSlideShapeInfo {
 /// Result of removing an ordinary shape and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedKeynoteSlideShape {
-    pub shape: KeynoteSlideShapeInfo,
+    pub shape: SlideShapeInfo,
 }
 
 struct SlideShapeGraph {
     slide_id: u64,
     component_id: u64,
     archive_name: String,
-    info: KeynoteSlideShapeInfo,
+    info: SlideShapeInfo,
     object_ids: Vec<u64>,
     uuid_object_ids: Vec<u64>,
 }
 
-impl KeynoteEditor {
+impl Editor {
     /// List ordinary non-text-box shapes owned directly by one slide.
-    pub fn slide_shapes(&self, slide_index: usize) -> Result<Vec<KeynoteSlideShapeInfo>> {
+    pub fn slide_shapes(&self, slide_index: usize) -> Result<Vec<SlideShapeInfo>> {
         shape_infos(self, slide_index)
     }
 
@@ -85,7 +85,7 @@ impl KeynoteEditor {
         text: &str,
         position: DrawablePoint,
         size: DrawableSize,
-    ) -> Result<KeynoteSlideShapeInfo> {
+    ) -> Result<SlideShapeInfo> {
         self.add_slide_shape(slide_index, text, position, size, Preset::Rectangle)
     }
 
@@ -101,7 +101,7 @@ impl KeynoteEditor {
         position: DrawablePoint,
         size: DrawableSize,
         preset: Preset,
-    ) -> Result<KeynoteSlideShapeInfo> {
+    ) -> Result<SlideShapeInfo> {
         let geometry = new_shape_geometry(position, size)?;
         self.add_slide_shape_path(
             slide_index,
@@ -122,7 +122,7 @@ impl KeynoteEditor {
         size: DrawableSize,
         preset: Preset,
         fill: ShapeFill,
-    ) -> Result<KeynoteSlideShapeInfo> {
+    ) -> Result<SlideShapeInfo> {
         let created = self.add_slide_shape(slide_index, text, position, size, preset)?;
         self.set_slide_shape_fill(slide_index, created.drawable_object_id, &fill)?;
         Ok(shape_graph(self, slide_index, created.drawable_object_id)?.info)
@@ -138,7 +138,7 @@ impl KeynoteEditor {
         slide_index: usize,
         start: DrawablePoint,
         end: DrawablePoint,
-    ) -> Result<KeynoteSlideShapeInfo> {
+    ) -> Result<SlideShapeInfo> {
         let segment = LineSegment::new(start, end)?;
         self.add_slide_shape_path(
             slide_index,
@@ -157,7 +157,7 @@ impl KeynoteEditor {
         start: DrawablePoint,
         end: DrawablePoint,
         endpoints: Endpoints,
-    ) -> Result<KeynoteSlideShapeInfo> {
+    ) -> Result<SlideShapeInfo> {
         let created = self.add_slide_line(slide_index, start, end)?;
         self.set_slide_line_endpoints(slide_index, created.drawable_object_id, endpoints)?;
         Ok(shape_graph(self, slide_index, created.drawable_object_id)?.info)
@@ -170,7 +170,7 @@ impl KeynoteEditor {
         start: DrawablePoint,
         end: DrawablePoint,
         style: LineStyle,
-    ) -> Result<KeynoteSlideShapeInfo> {
+    ) -> Result<SlideShapeInfo> {
         let created = self.add_slide_line(slide_index, start, end)?;
         self.set_slide_shape_stroke(slide_index, created.drawable_object_id, style.stroke)?;
         self.set_slide_line_endpoints(slide_index, created.drawable_object_id, style.endpoints)?;
@@ -185,7 +185,7 @@ impl KeynoteEditor {
         path_source: tsd::PathSourceArchive,
         expected_preset: Option<Preset>,
         expected_line: Option<LineSegment>,
-    ) -> Result<KeynoteSlideShapeInfo> {
+    ) -> Result<SlideShapeInfo> {
         let graph = ObjectGraph::read(self.package())?;
         let context = text_box_context(&graph, slide_index)?;
         let styles = text_box_theme_styles(&graph, context.theme_id, context.stylesheet_id)?;
@@ -855,7 +855,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         source_drawable_object_id: u64,
-    ) -> Result<KeynoteSlideShapeInfo> {
+    ) -> Result<SlideShapeInfo> {
         let source = shape_graph(self, slide_index, source_drawable_object_id)?;
         let mut staged = self.package().clone();
         let first_identifier = next_object_identifier(&staged)?;
@@ -1006,7 +1006,7 @@ fn new_shape_geometry(position: DrawablePoint, size: DrawableSize) -> Result<Dra
     .validate()
 }
 
-fn shape_infos(editor: &KeynoteEditor, slide_index: usize) -> Result<Vec<KeynoteSlideShapeInfo>> {
+fn shape_infos(editor: &Editor, slide_index: usize) -> Result<Vec<SlideShapeInfo>> {
     let slides = editor.slides()?;
     let slide = slides.get(slide_index).ok_or_else(|| {
         Error::ParseError(format!(
@@ -1050,7 +1050,7 @@ fn shape_infos(editor: &KeynoteEditor, slide_index: usize) -> Result<Vec<Keynote
 }
 
 fn shape_graph(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<SlideShapeGraph> {
@@ -1133,12 +1133,12 @@ fn shape_graph(
 
 #[allow(deprecated)]
 fn shape_info(
-    editor: &KeynoteEditor,
+    editor: &Editor,
     graph: &ObjectGraph,
     slide_index: usize,
     drawable_object_id: u64,
     shape: &tswp::ShapeInfoArchive,
-) -> Result<KeynoteSlideShapeInfo> {
+) -> Result<SlideShapeInfo> {
     let storage_id = shape
         .owned_storage
         .as_ref()
@@ -1164,7 +1164,7 @@ fn shape_info(
     let line_endpoints = line_segment
         .map(|_| shape_line_endpoints(editor.package(), archive_name, drawable_object_id))
         .transpose()?;
-    Ok(KeynoteSlideShapeInfo {
+    Ok(SlideShapeInfo {
         slide_index,
         drawable_object_id,
         kind: shape_path_kind(shape)?,
@@ -1247,7 +1247,7 @@ mod tests {
     use std::{fs, path::PathBuf};
 
     use super::*;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::media::MediaAssetId;
     use crate::shapes::{
         Appearance, BlurRadius, Curve, Curved, Endpoint, Offset, Pattern, RgbColorSpace, RgbaColor,
@@ -1284,12 +1284,8 @@ mod tests {
     }
 
     #[test]
-    #[expect(
-        deprecated,
-        reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-    )]
     fn scratch_presentation_supports_rectangle_crud_without_a_source_drawable() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Scratch shape")
             .subtitle("No embedded package")
             .build()
@@ -1311,7 +1307,7 @@ mod tests {
                 .find(|text| text.drawable_object_id == created.drawable_object_id)
                 .unwrap()
                 .role,
-            KeynoteSlideTextRole::Shape
+            SlideTextRole::Shape
         );
         let horizontally_flipped = editor
             .flip_slide_shape(0, created.drawable_object_id, DrawableFlipAxis::Horizontal)
@@ -1359,7 +1355,7 @@ mod tests {
             .set_slide_shape_properties(0, created.drawable_object_id, properties.clone())
             .unwrap();
 
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let shape = &reopened.slide_shapes(0).unwrap()[0];
         assert_eq!(shape.storage.storage.text(), "Made from typed objects");
         assert_eq!(shape.geometry, geometry);
@@ -1374,7 +1370,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_native_shape_duplication() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Shape clone")
             .subtitle("Independent rich text")
             .build()
@@ -1439,7 +1435,7 @@ mod tests {
                 .text(),
             "Source shape"
         );
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_shapes(0)
@@ -1463,7 +1459,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_straight_line_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Scratch line")
             .subtitle("No embedded package")
             .build()
@@ -1478,7 +1474,7 @@ mod tests {
             LineSegment::new(LINE_START, LINE_END).unwrap()
         ));
 
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(line_segments_match(
             reopened
                 .slide_line_segment(0, created.drawable_object_id)
@@ -1540,7 +1536,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_typed_shape_stroke_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Stroke")
             .subtitle("Typed native style")
             .build()
@@ -1559,7 +1555,7 @@ mod tests {
                 LineStyle::new(stroke).with_endpoints(endpoints),
             )
             .unwrap();
-        let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_shape_stroke(0, created.drawable_object_id)
@@ -1593,7 +1589,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_typed_shape_fill_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Fill")
             .subtitle("Typed native style")
             .build()
@@ -1625,7 +1621,7 @@ mod tests {
         editor
             .set_slide_shape_fill(0, created.drawable_object_id, &fill)
             .unwrap();
-        let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_shape_fill(0, created.drawable_object_id)
@@ -1648,7 +1644,7 @@ mod tests {
     #[test]
     fn scratch_presentation_supports_embedded_shape_image_fill_crud() {
         let bytes = fixture("test-data/images/png/lena.png");
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Image fill")
             .subtitle("Embedded from scratch")
             .build()
@@ -1680,7 +1676,7 @@ mod tests {
             bytes
         );
 
-        let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_shape_fill(0, created.drawable_object_id)
@@ -1703,7 +1699,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_shape_effect_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Effects")
             .subtitle("Typed object opacity and reflection")
             .build()
@@ -1722,7 +1718,7 @@ mod tests {
             .set_slide_shape_effects(0, created.drawable_object_id, effects)
             .unwrap();
 
-        let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_shape_effects(0, created.drawable_object_id)
@@ -1744,7 +1740,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_curved_shadow_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Shadows")
             .subtitle("Typed curved shadow")
             .build()
@@ -1769,7 +1765,7 @@ mod tests {
             .set_slide_shape_shadow(0, created.drawable_object_id, shadow)
             .unwrap();
 
-        let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_shape_shadow(0, created.drawable_object_id)
@@ -1791,7 +1787,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_shape_text_layout_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Layout")
             .subtitle("Typed frame layout")
             .build()
@@ -1811,7 +1807,7 @@ mod tests {
             .set_slide_shape_text_layout(0, created.drawable_object_id, layout)
             .unwrap();
 
-        let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_shape_text_layout(0, created.drawable_object_id)
@@ -1838,7 +1834,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_typed_line_endpoint_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Endpoint styles")
             .subtitle("Built from native line-end paths")
             .build()
@@ -1859,7 +1855,7 @@ mod tests {
             ))
         );
 
-        let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let replacement = Endpoints::new(Endpoint::SimpleArrow, Endpoint::OpenCircle);
         reopened
             .set_slide_line_endpoints(0, created.drawable_object_id, replacement)
@@ -1885,7 +1881,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_typed_preset_shape_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Preset shapes")
             .subtitle("Built from typed paths")
             .build()
@@ -1897,7 +1893,7 @@ mod tests {
         assert_eq!(created.kind, ShapePathKind::RoundedRectangle);
         assert_eq!(created.preset, Some(Preset::ROUNDED_RECTANGLE));
 
-        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_shape_preset(0, created.drawable_object_id)
@@ -1929,12 +1925,8 @@ mod tests {
     }
 
     #[test]
-    #[expect(
-        deprecated,
-        reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
-    )]
     fn invalid_rectangle_creation_and_cross_type_updates_are_transactional() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let baseline = editor.to_bytes().unwrap();
         assert!(
             editor

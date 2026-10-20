@@ -1,6 +1,6 @@
 //! Named paragraph-style lifecycle for sheet-owned text boxes.
 
-use super::{NumbersEditor, numbers_text_box_graph};
+use super::{Editor, numbers_text_box_graph};
 use crate::text::{
     AppliedParagraphStyle, IWorkTextEditor, NamedParagraphStyle, ParagraphStyleId,
     ParagraphStyleName, applied_named_paragraph_style_in_storage,
@@ -8,7 +8,7 @@ use crate::text::{
 };
 use crate::{Error, Result};
 
-impl NumbersEditor {
+impl Editor {
     /// List named paragraph styles selectable for a sheet-owned text box.
     pub fn sheet_text_box_named_paragraph_styles(
         &self,

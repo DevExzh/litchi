@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use litchi_keynote::slide::drawable::{
     Error, Geometry, Kind, NewTable, TableCellValue, Unsupported,
 };
-use litchi_keynote::slide::table::cells::{CellPosition, Value};
+use litchi_keynote::slide::table::cells::{At, Value};
 use litchi_keynote::{Package, SlideSelector, TableSelector};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -91,17 +91,14 @@ fn tables_are_created_read_back_reopened_and_inverted() -> TestResult {
         (4, 3)
     );
     assert_eq!(
-        table.get(CellPosition::new(0, 0)),
+        table.get(At::new(0, 0)),
         Some(&Value::Text("Region".into()))
     );
     assert!(matches!(
-        table.get(CellPosition::new(1, 2)),
+        table.get(At::new(1, 2)),
         Some(Value::Number(number)) if number.get() == 12.5
     ));
-    assert_eq!(
-        table.get(CellPosition::new(3, 1)),
-        Some(&Value::Boolean(true))
-    );
+    assert_eq!(table.get(At::new(3, 1)), Some(&Value::Boolean(true)));
     // The template table reads as before.
     let original = package.slide_table_cells(SlideSelector::index(0), TableSelector::index(0))?;
     let again = reopened.slide_table_cells(SlideSelector::index(0), TableSelector::index(0))?;
@@ -150,7 +147,7 @@ fn every_corpus_deck_creates_a_table_or_refuses_typed() -> TestResult {
                 TableSelector::index(last_table(&reopened, slide)?),
             )?;
             assert_eq!(
-                read.table().get(CellPosition::new(1, 1)),
+                read.table().get(At::new(1, 1)),
                 Some(&Value::Text("x".into())),
                 "{}",
                 path.display()

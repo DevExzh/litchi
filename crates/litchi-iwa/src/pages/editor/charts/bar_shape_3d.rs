@@ -7,7 +7,7 @@ use crate::charts::bar_shape_3d::{
     set_chart_3d_bar_shape as set_native_chart_3d_bar_shape,
 };
 
-impl PagesEditor {
+impl Editor {
     /// Read the rectangular/cylindrical geometry of one 3D bar or column chart.
     pub fn body_chart_3d_bar_shape(&self, drawable_object_id: u64) -> Result<BarShape> {
         let graph = body_chart_graph(self, drawable_object_id)?;
@@ -45,7 +45,7 @@ impl PagesEditor {
             "Pages",
             shape,
         )?;
-        let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_3d_bar_shape(drawable_object_id)? != shape {
             return Err(Error::InvalidFormat(
                 "Pages chart 3D bar-shape update failed validation".to_owned(),
@@ -68,12 +68,12 @@ fn require_3d_bar_shape(kind: Kind, drawable_object_id: u64) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pages::PagesDocumentBuilder;
+    use crate::pages;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_document_supports_3d_bar_shape_crud() {
-        let mut editor = PagesDocumentBuilder::new().build().unwrap();
+        let mut editor = pages::Builder::new().build().unwrap();
         let chart = editor
             .add_body_chart(
                 0,
@@ -98,7 +98,7 @@ mod tests {
         let duplicate = editor
             .duplicate_body_chart(chart.drawable_object_id, 1)
             .unwrap();
-        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_chart_3d_bar_shape(chart.drawable_object_id)
@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn charts_without_3d_bars_reject_bar_shape_access() {
-        let mut editor = PagesDocumentBuilder::new().build().unwrap();
+        let mut editor = pages::Builder::new().build().unwrap();
         let chart = editor
             .add_body_chart(
                 0,

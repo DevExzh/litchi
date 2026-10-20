@@ -1521,10 +1521,10 @@ fn verify_property(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keynote::KeynoteDocumentBuilder;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::keynote;
+    use crate::numbers;
     use crate::numbers::cell::CellValue;
-    use crate::pages::PagesDocumentBuilder;
+    use crate::pages;
     use crate::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
     use crate::text::{
         Background, IndentPoints, Indents, LineSpacing, LineSpacingMultiple, Outline,
@@ -1591,7 +1591,7 @@ mod tests {
         .unwrap()
     }
 
-    fn explicit_style_id(editor: &NumbersEditor, table_id: u64, row: usize, column: usize) -> u64 {
+    fn explicit_style_id(editor: &Editor, table_id: u64, row: usize, column: usize) -> u64 {
         let descriptor = model::attached_table_descriptor(&editor.package, table_id).unwrap();
         let locations = storage::object_locations(&editor.package).unwrap();
         local_style_id(&editor.package, &descriptor, &locations, row, column)
@@ -1601,7 +1601,7 @@ mod tests {
 
     #[test]
     fn scratch_alignment_reuses_and_reclaims_private_style() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(3, 3)
             .build()
             .unwrap();
@@ -1670,7 +1670,7 @@ mod tests {
 
     #[test]
     fn shared_alignment_is_copy_on_write_and_reset_is_idempotent() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(2, 3)
             .build()
             .unwrap();
@@ -1758,7 +1758,7 @@ mod tests {
 
     #[test]
     fn paragraph_properties_compose_with_alignment_and_reclaim_independently() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(2, 2)
             .build()
             .unwrap();
@@ -2065,7 +2065,7 @@ mod tests {
 
     #[test]
     fn shared_character_properties_use_copy_on_write() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(2, 3)
             .build()
             .unwrap();
@@ -2294,7 +2294,7 @@ mod tests {
 
     #[test]
     fn shared_text_style_uses_copy_on_write() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(2, 3)
             .build()
             .unwrap();
@@ -2377,7 +2377,7 @@ mod tests {
         let pages_paragraph_spacing = test_paragraph_spacing();
         let pages_indents = test_indents();
         let pages_tab_stops = test_tab_stops();
-        let mut pages = PagesDocumentBuilder::new()
+        let mut pages = pages::Builder::new()
             .body_table("Aligned", 2, 2)
             .build()
             .unwrap();
@@ -2433,7 +2433,7 @@ mod tests {
         pages
             .set_table_cell_paragraph_tab_stops(pages_table, 1, 1, pages_tab_stops.clone())
             .unwrap();
-        let mut pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let mut pages = crate::pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages.table_cell_text_alignment(pages_table, 1, 1).unwrap(),
             Alignment::Justified
@@ -2610,10 +2610,7 @@ mod tests {
         let keynote_paragraph_spacing = test_paragraph_spacing();
         let keynote_indents = test_indents();
         let keynote_tab_stops = test_tab_stops();
-        let mut keynote = KeynoteDocumentBuilder::new()
-            .title("Aligned")
-            .build()
-            .unwrap();
+        let mut keynote = keynote::Builder::new().title("Aligned").build().unwrap();
         let table = keynote
             .add_slide_table(
                 0,
@@ -2738,8 +2735,7 @@ mod tests {
                 keynote_tab_stops.clone(),
             )
             .unwrap();
-        let mut keynote =
-            crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
             keynote
                 .slide_table_cell_text_alignment(0, table.model_object_id, 1, 1)
@@ -2926,7 +2922,7 @@ mod tests {
 
     #[test]
     fn invalid_paragraph_style_coordinate_is_transactional() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(2, 2)
             .build()
             .unwrap();

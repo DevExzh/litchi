@@ -18,7 +18,7 @@ use litchi_numbers::cell::{
     data_format::custom::{Custom, DateTime as CustomDateTime, DateTimePattern, Name},
 };
 use litchi_numbers::table::cells::Storage;
-use litchi_numbers::{CellPosition, Package};
+use litchi_numbers::{At, Package};
 use litchi_numbers_wire::{BncCell, CachedScalar, StoredValue};
 use prost::Message as _;
 
@@ -47,12 +47,12 @@ fn resaved_fixture_path() -> PathBuf {
         .join("../../test-data/iwork/numbers/custom-datetime-native-resaved.numbers")
 }
 
-fn position() -> CellPosition {
-    CellPosition::new(1, 1)
+fn position() -> At {
+    At::new(1, 1)
 }
 
-fn marker_position() -> CellPosition {
-    CellPosition::new(1, 2)
+fn marker_position() -> At {
+    At::new(1, 2)
 }
 
 fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {

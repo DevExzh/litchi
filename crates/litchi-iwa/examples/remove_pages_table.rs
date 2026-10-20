@@ -1,6 +1,6 @@
 use std::env;
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = env::args().skip(1);
@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = args
         .next()
         .ok_or("usage: remove_pages_table INPUT OUTPUT")?;
-    let mut editor = PagesEditor::open(input)?;
+    let mut editor = pages::Editor::open(input)?;
     let table = editor
         .tables()?
         .into_iter()

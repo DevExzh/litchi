@@ -50,21 +50,20 @@ struct FocusedCellLocation {
     source: FocusedNumbersPackage,
     sheet: litchi_numbers::SheetSelector<'static>,
     table: litchi_numbers::TableSelector<'static>,
-    position: litchi_numbers::table::CellPosition,
+    position: litchi_numbers::table::At,
     source_len: usize,
 }
 
 fn focused_cell_location(
-    editor: &NumbersEditor,
+    editor: &Editor,
     table_id: u64,
     row: usize,
     column: usize,
 ) -> Result<FocusedCellLocation> {
     let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
-    let position =
-        litchi_numbers::table::CellPosition::try_from_usize(row, column).map_err(|error| {
-            Error::InvalidFormat(format!("invalid Numbers cell coordinate: {error}"))
-        })?;
+    let position = litchi_numbers::table::At::try_from_usize(row, column).map_err(|error| {
+        Error::InvalidFormat(format!("invalid Numbers cell coordinate: {error}"))
+    })?;
     let (source, source_len) = if let Some(source_bytes) = editor.package.exact_source_bytes() {
         let source_len = source_bytes.len();
         (parse_focused_source(source_bytes)?, source_len)
@@ -118,10 +117,7 @@ impl Write for FalliblePackageBytes {
     }
 }
 
-fn focused_package_to_editor(
-    package: &FocusedNumbersPackage,
-    source_len: usize,
-) -> Result<NumbersEditor> {
+fn focused_package_to_editor(package: &FocusedNumbersPackage, source_len: usize) -> Result<Editor> {
     let mut output = FalliblePackageBytes::with_capacity(source_len)?;
     if let Err(error) = package.write_to(&mut output) {
         if let Some(amount) = output.allocation_failure {
@@ -129,10 +125,10 @@ fn focused_package_to_editor(
         }
         return Err(Error::Io(error.into_io_error()));
     }
-    NumbersEditor::from_bytes(&output.bytes)
+    Editor::from_bytes(&output.bytes)
 }
 
-fn parse_focused_merge_source(editor: &NumbersEditor) -> Result<FocusedNumbersPackage> {
+fn parse_focused_merge_source(editor: &Editor) -> Result<FocusedNumbersPackage> {
     let source = editor.package.exact_source_owner().ok_or_else(|| {
         Error::InvalidFormat("focused Numbers merge source is not exact".to_owned())
     })?;
@@ -157,7 +153,7 @@ fn focused_merge_package_to_editor(
     package: &FocusedNumbersPackage,
     source_len: usize,
     package_limits: crate::package::PackageLimits,
-) -> Result<NumbersEditor> {
+) -> Result<Editor> {
     let mut output = FalliblePackageBytes::with_capacity(source_len)?;
     if let Err(error) = package.write_to(&mut output) {
         if let Some(amount) = output.allocation_failure {
@@ -166,7 +162,7 @@ fn focused_merge_package_to_editor(
         return Err(Error::Io(error.into_io_error()));
     }
     let package = IWorkPackage::from_bytes_with_limits(&output.bytes, package_limits)?;
-    NumbersEditor::from_package(package)
+    Editor::from_package(package)
 }
 
 struct FocusedMergeLocation {
@@ -182,10 +178,7 @@ struct FocusedMergeLocation {
 /// host's bounded compatibility writer.  Once this preadmission succeeds,
 /// focused transaction errors are terminal and are never reclassified as a
 /// compatibility request.
-fn focused_merge_location(
-    editor: &NumbersEditor,
-    table_id: u64,
-) -> Result<Option<FocusedMergeLocation>> {
+fn focused_merge_location(editor: &Editor, table_id: u64) -> Result<Option<FocusedMergeLocation>> {
     // Source-built and normalized packages intentionally use the bounded
     // compatibility writer.  Check provenance before the metadata selector so
     // they never get misclassified as canonical focused sources.
@@ -207,7 +200,7 @@ fn focused_merge_location(
 }
 
 fn focused_control_format(
-    editor: &NumbersEditor,
+    editor: &Editor,
     table_id: u64,
     row: usize,
     column: usize,
@@ -229,10 +222,10 @@ fn focused_set_data_format(
     source: &FocusedNumbersPackage,
     sheet: litchi_numbers::SheetSelector<'static>,
     table: litchi_numbers::TableSelector<'static>,
-    position: litchi_numbers::table::CellPosition,
+    position: litchi_numbers::table::At,
     source_len: usize,
     format: &DataFormat,
-) -> Result<Option<NumbersEditor>> {
+) -> Result<Option<Editor>> {
     macro_rules! commit_set {
         ($edit:expr, $value:expr) => {{
             let commit = $edit
@@ -327,10 +320,10 @@ fn focused_clear_data_format(
     source: &FocusedNumbersPackage,
     sheet: litchi_numbers::SheetSelector<'static>,
     table: litchi_numbers::TableSelector<'static>,
-    position: litchi_numbers::table::CellPosition,
+    position: litchi_numbers::table::At,
     source_len: usize,
     format: &DataFormat,
-) -> Result<Option<NumbersEditor>> {
+) -> Result<Option<Editor>> {
     macro_rules! commit_clear {
         ($edit:expr) => {{
             let commit = $edit
@@ -433,7 +426,7 @@ fn focused_cell_value(
     source: &FocusedNumbersPackage,
     sheet: litchi_numbers::SheetSelector<'static>,
     table: litchi_numbers::TableSelector<'static>,
-    position: litchi_numbers::table::CellPosition,
+    position: litchi_numbers::table::At,
 ) -> Result<Option<litchi_numbers::cell::Value>> {
     source
         .table_cell(sheet, table, position)
@@ -442,7 +435,7 @@ fn focused_cell_value(
 }
 
 fn focused_cell_storage(
-    editor: &NumbersEditor,
+    editor: &Editor,
     table_id: u64,
     row: usize,
     column: usize,
@@ -591,7 +584,7 @@ fn uses_focused_data_format_owner(current: &DataFormat, requested: &DataFormat) 
 /// commit path; failures after owner selection remain terminal and never fall
 /// back to the compatibility writer.
 fn focused_data_format_owner_is_eligible(
-    editor: &NumbersEditor,
+    editor: &Editor,
     table_id: u64,
     row: usize,
     column: usize,
@@ -617,13 +610,13 @@ fn focused_data_format_owner_is_eligible(
 }
 
 fn commit_exact_focused_data_format(
-    editor: &NumbersEditor,
+    editor: &Editor,
     table_id: u64,
     row: usize,
     column: usize,
     current: &DataFormat,
     requested: &DataFormat,
-) -> Result<NumbersEditor> {
+) -> Result<Editor> {
     let location = focused_cell_location(editor, table_id, row, column)?;
     commit_exact_focused_data_format_with_location(
         editor, table_id, row, column, current, requested, location,
@@ -631,14 +624,14 @@ fn commit_exact_focused_data_format(
 }
 
 fn commit_exact_focused_data_format_with_location(
-    editor: &NumbersEditor,
+    editor: &Editor,
     table_id: u64,
     row: usize,
     column: usize,
     current: &DataFormat,
     requested: &DataFormat,
     location: FocusedCellLocation,
-) -> Result<NumbersEditor> {
+) -> Result<Editor> {
     let FocusedCellLocation {
         source,
         sheet,
@@ -731,11 +724,11 @@ fn commit_focused_data_format_transition(
     source: &FocusedNumbersPackage,
     sheet: litchi_numbers::SheetSelector<'static>,
     table: litchi_numbers::TableSelector<'static>,
-    position: litchi_numbers::table::CellPosition,
+    position: litchi_numbers::table::At,
     source_len: usize,
     current: &DataFormat,
     requested: &DataFormat,
-) -> Result<NumbersEditor> {
+) -> Result<Editor> {
     let before_value = focused_cell_value(source, sheet, table, position)?;
     let Some(cleared) =
         focused_clear_data_format(source, sheet, table, position, source_len, current)?
@@ -787,7 +780,7 @@ fn commit_focused_data_format_transition(
 }
 
 fn verify_focused_data_format(
-    editor: &NumbersEditor,
+    editor: &Editor,
     table_id: u64,
     row: usize,
     column: usize,
@@ -803,13 +796,13 @@ fn verify_focused_data_format(
 
 /// Apply the legacy native control writer to an editor-owned package.
 ///
-/// Packages produced by `NumbersDocumentBuilder` intentionally do not carry
+/// Packages produced by `numbers::Builder` intentionally do not carry
 /// an exact-source owner for the interactive-control graph yet. Keep the
 /// focused owner strict for exact packages, while allowing these in-memory
 /// compatibility packages to acquire the same canonical control/list state
 /// through the existing transactional writer.
 fn commit_compatibility_control_format(
-    editor: &mut NumbersEditor,
+    editor: &mut Editor,
     table_id: u64,
     row: usize,
     column: usize,
@@ -818,7 +811,7 @@ fn commit_compatibility_control_format(
     let mut staged = editor.package.clone();
     cell_data_format::set_cell_data_format(&mut staged, table_id, row, column, format)?;
     staged.validate()?;
-    let verified = NumbersEditor::from_package(staged)?;
+    let verified = Editor::from_package(staged)?;
     if cell_data_format::cell_data_format(&verified.package, table_id, row, column)? != *format {
         return Err(Error::InvalidFormat(
             "Numbers compatibility cell-control write failed package validation".to_owned(),
@@ -829,7 +822,7 @@ fn commit_compatibility_control_format(
 }
 
 enum FocusedCommentReplacement {
-    Published(NumbersEditor),
+    Published(Editor),
     LegacyFallback,
 }
 
@@ -840,7 +833,7 @@ fn focused_comment_error(error: TableCellCommentError) -> Error {
 }
 
 fn replace_cell_comment_with_focused_owner(
-    editor: &NumbersEditor,
+    editor: &Editor,
     table_id: u64,
     row: usize,
     column: usize,
@@ -854,10 +847,9 @@ fn replace_cell_comment_with_focused_owner(
         return Ok(FocusedCommentReplacement::LegacyFallback);
     }
     let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
-    let position =
-        litchi_numbers::table::CellPosition::try_from_usize(row, column).map_err(|error| {
-            Error::InvalidFormat(format!("invalid Numbers comment coordinate: {error}"))
-        })?;
+    let position = litchi_numbers::table::At::try_from_usize(row, column).map_err(|error| {
+        Error::InvalidFormat(format!("invalid Numbers comment coordinate: {error}"))
+    })?;
     let source_bytes = editor.to_bytes()?;
     let source = FocusedNumbersPackage::from_bytes(&source_bytes).map_err(|error| {
         Error::InvalidFormat(format!(
@@ -880,7 +872,7 @@ fn replace_cell_comment_with_focused_owner(
         .package()
         .write_to(&mut bytes)
         .map_err(|error| Error::Io(error.into_io_error()))?;
-    let verified = NumbersEditor::from_bytes(&bytes)?;
+    let verified = Editor::from_bytes(&bytes)?;
     let observed =
         cell_comment_in_package(verified.package(), table_id, row, column)?.ok_or_else(|| {
             Error::InvalidFormat(
@@ -899,20 +891,20 @@ struct FocusedCommentReplySource {
     source: FocusedNumbersPackage,
     sheet: litchi_numbers::SheetSelector<'static>,
     table: litchi_numbers::TableSelector<'static>,
-    position: litchi_numbers::table::CellPosition,
+    position: litchi_numbers::table::At,
     source_bytes: Vec<u8>,
 }
 
 enum FocusedCommentReplyPublication {
     Published {
-        editor: NumbersEditor,
+        editor: Editor,
         reply_id: Option<u64>,
     },
     LegacyFallback,
 }
 
 fn focused_comment_reply_source(
-    editor: &NumbersEditor,
+    editor: &Editor,
     table_id: u64,
     row: usize,
     column: usize,
@@ -927,10 +919,9 @@ fn focused_comment_reply_source(
     let table = litchi_numbers::TableSelector::position(table.as_position().ok_or_else(|| {
         Error::InvalidFormat("focused Numbers comment-reply table was not positional".to_owned())
     })?);
-    let position =
-        litchi_numbers::table::CellPosition::try_from_usize(row, column).map_err(|error| {
-            Error::InvalidFormat(format!("invalid Numbers comment-reply coordinate: {error}"))
-        })?;
+    let position = litchi_numbers::table::At::try_from_usize(row, column).map_err(|error| {
+        Error::InvalidFormat(format!("invalid Numbers comment-reply coordinate: {error}"))
+    })?;
     let source_bytes = editor.to_bytes()?;
     let source = FocusedNumbersPackage::from_bytes(&source_bytes).map_err(|error| {
         Error::InvalidFormat(format!(
@@ -964,7 +955,7 @@ fn focused_comment_reply_can_fallback(error: FocusedCommentReplyError) -> bool {
 fn publish_focused_comment_reply_package(
     source_bytes: &[u8],
     package: &FocusedNumbersPackage,
-) -> Result<NumbersEditor> {
+) -> Result<Editor> {
     let mut bytes = Vec::new();
     bytes.try_reserve_exact(source_bytes.len()).map_err(|_| {
         Error::InvalidFormat(
@@ -974,11 +965,11 @@ fn publish_focused_comment_reply_package(
     package
         .write_to(&mut bytes)
         .map_err(|error| Error::Io(error.into_io_error()))?;
-    NumbersEditor::from_bytes(&bytes)
+    Editor::from_bytes(&bytes)
 }
 
 fn focused_add_cell_comment_reply(
-    editor: &NumbersEditor,
+    editor: &Editor,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1024,7 +1015,7 @@ fn focused_add_cell_comment_reply(
 }
 
 fn focused_set_cell_comment_reply(
-    editor: &NumbersEditor,
+    editor: &Editor,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1080,7 +1071,7 @@ fn focused_set_cell_comment_reply(
 }
 
 fn focused_remove_cell_comment_reply(
-    editor: &NumbersEditor,
+    editor: &Editor,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1134,13 +1125,13 @@ fn focused_remove_cell_comment_reply(
     })
 }
 
-impl NumbersEditor {
+impl Editor {
     /// List absolute pivot categories backed by valid calculation-engine
     /// aggregate coordinates.
-    pub fn pivot_categories(&self) -> Result<Vec<NumbersPivotCategoryInfo>> {
+    pub fn pivot_categories(&self) -> Result<Vec<PivotCategoryInfo>> {
         let mut categories = formula_pivot_categories(&self.package)?
             .into_iter()
-            .map(|(key, value)| NumbersPivotCategoryInfo {
+            .map(|(key, value)| PivotCategoryInfo {
                 reference: FormulaPivotCategoryReference::new(
                     key.group_by_uid,
                     key.column_uid,
@@ -1514,7 +1505,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellParagraphList> {
+    ) -> Result<TableCellParagraphList> {
         cell_paragraph_list::paragraph_list(&self.package, table_id, row, column)
     }
 
@@ -1524,7 +1515,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        list: NumbersTableCellParagraphList,
+        list: TableCellParagraphList,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_list::set_paragraph_list(&mut staged, table_id, row, column, list)?;
@@ -1560,7 +1551,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Vec<NumbersTableCellParagraphListPlacement>> {
+    ) -> Result<Vec<TableCellParagraphListPlacement>> {
         cell_paragraph_list::paragraph_lists(&self.package, table_id, row, column)
     }
 
@@ -1570,7 +1561,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        placements: &[NumbersTableCellParagraphListPlacement],
+        placements: &[TableCellParagraphListPlacement],
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_list::set_paragraph_lists(&mut staged, table_id, row, column, placements)?;
@@ -1591,7 +1582,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Vec<NumbersTableCellParagraphListLevelPlacement>> {
+    ) -> Result<Vec<TableCellParagraphListLevelPlacement>> {
         cell_paragraph_list::paragraph_list_levels(&self.package, table_id, row, column)
     }
 
@@ -1602,7 +1593,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-        level: NumbersTableCellParagraphListLevel,
+        level: TableCellParagraphListLevel,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_list::set_paragraph_list_level(
@@ -1659,7 +1650,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-    ) -> Result<NumbersTableCellParagraphListNumbering> {
+    ) -> Result<TableCellParagraphListNumbering> {
         cell_paragraph_list::paragraph_list_numbering(
             &self.package,
             table_id,
@@ -1676,7 +1667,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-        numbering: NumbersTableCellParagraphListNumbering,
+        numbering: TableCellParagraphListNumbering,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_list::set_paragraph_list_numbering(
@@ -1711,7 +1702,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-    ) -> Result<NumbersTableCellParagraphListNumberFormat> {
+    ) -> Result<TableCellParagraphListNumberFormat> {
         cell_paragraph_list::paragraph_list_number_format(
             &self.package,
             table_id,
@@ -1728,7 +1719,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-        format: NumbersTableCellParagraphListNumberFormat,
+        format: TableCellParagraphListNumberFormat,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_list::set_paragraph_list_number_format(
@@ -1781,7 +1772,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-    ) -> Result<NumbersTableCellParagraphListNumberTiering> {
+    ) -> Result<TableCellParagraphListNumberTiering> {
         cell_paragraph_list::paragraph_list_number_tiering(
             &self.package,
             table_id,
@@ -1798,7 +1789,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-        tiering: NumbersTableCellParagraphListNumberTiering,
+        tiering: TableCellParagraphListNumberTiering,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_list::set_paragraph_list_number_tiering(
@@ -1851,7 +1842,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-    ) -> Result<NumbersTableCellParagraphListNumberScale> {
+    ) -> Result<TableCellParagraphListNumberScale> {
         cell_paragraph_list::paragraph_list_number_scale(
             &self.package,
             table_id,
@@ -1868,7 +1859,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-        scale: NumbersTableCellParagraphListNumberScale,
+        scale: TableCellParagraphListNumberScale,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_list::set_paragraph_list_number_scale(
@@ -1921,7 +1912,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-    ) -> Result<NumbersTableCellParagraphListBullet> {
+    ) -> Result<TableCellParagraphListBullet> {
         cell_paragraph_list::paragraph_list_bullet(&self.package, table_id, row, column, paragraph)
     }
 
@@ -1932,7 +1923,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-        bullet: &NumbersTableCellParagraphListBullet,
+        bullet: &TableCellParagraphListBullet,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_list::set_paragraph_list_bullet(
@@ -1982,7 +1973,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-    ) -> Result<NumbersTableCellParagraphListBulletGeometry> {
+    ) -> Result<TableCellParagraphListBulletGeometry> {
         cell_paragraph_list::paragraph_list_bullet_geometry(
             &self.package,
             table_id,
@@ -1999,7 +1990,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-        geometry: NumbersTableCellParagraphListBulletGeometry,
+        geometry: TableCellParagraphListBulletGeometry,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_list::set_paragraph_list_bullet_geometry(
@@ -2051,7 +2042,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-    ) -> Result<NumbersTableCellParagraphListIndentation> {
+    ) -> Result<TableCellParagraphListIndentation> {
         cell_paragraph_list::paragraph_list_indentation(
             &self.package,
             table_id,
@@ -2068,7 +2059,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-        indentation: NumbersTableCellParagraphListIndentation,
+        indentation: TableCellParagraphListIndentation,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_list::set_paragraph_list_indentation(
@@ -2121,7 +2112,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-    ) -> Result<NumbersTableCellParagraphListLabelColor> {
+    ) -> Result<TableCellParagraphListLabelColor> {
         cell_paragraph_list::paragraph_list_label_color(
             &self.package,
             table_id,
@@ -2138,7 +2129,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
         paragraph: TextPosition,
-        color: NumbersTableCellParagraphListLabelColor,
+        color: TableCellParagraphListLabelColor,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_list::set_paragraph_list_label_color(
@@ -2235,7 +2226,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellParagraphTabStops> {
+    ) -> Result<TableCellParagraphTabStops> {
         cell_paragraph_style::tab_stops(&self.package, table_id, row, column)
     }
 
@@ -2245,7 +2236,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        stops: NumbersTableCellParagraphTabStops,
+        stops: TableCellParagraphTabStops,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_tab_stops(&mut staged, table_id, row, column, stops.clone())?;
@@ -2280,7 +2271,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellTextBackground> {
+    ) -> Result<TableCellTextBackground> {
         cell_paragraph_style::background(&self.package, table_id, row, column)
     }
 
@@ -2290,7 +2281,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        background: NumbersTableCellTextBackground,
+        background: TableCellTextBackground,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_background(&mut staged, table_id, row, column, background)?;
@@ -2325,7 +2316,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellTextBaselineShift> {
+    ) -> Result<TableCellTextBaselineShift> {
         cell_paragraph_style::baseline_shift(&self.package, table_id, row, column)
     }
 
@@ -2335,7 +2326,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        shift: NumbersTableCellTextBaselineShift,
+        shift: TableCellTextBaselineShift,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_baseline_shift(&mut staged, table_id, row, column, shift)?;
@@ -2371,7 +2362,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellTextCapitalization> {
+    ) -> Result<TableCellTextCapitalization> {
         cell_paragraph_style::capitalization(&self.package, table_id, row, column)
     }
 
@@ -2381,7 +2372,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        capitalization: NumbersTableCellTextCapitalization,
+        capitalization: TableCellTextCapitalization,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_capitalization(
@@ -2423,7 +2414,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellTextCharacterSpacing> {
+    ) -> Result<TableCellTextCharacterSpacing> {
         cell_paragraph_style::character_spacing(&self.package, table_id, row, column)
     }
 
@@ -2433,7 +2424,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        spacing: NumbersTableCellTextCharacterSpacing,
+        spacing: TableCellTextCharacterSpacing,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_character_spacing(&mut staged, table_id, row, column, spacing)?;
@@ -2469,7 +2460,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellTextColor> {
+    ) -> Result<TableCellTextColor> {
         cell_paragraph_style::text_color(&self.package, table_id, row, column)
     }
 
@@ -2479,7 +2470,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        color: NumbersTableCellTextColor,
+        color: TableCellTextColor,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_text_color(&mut staged, table_id, row, column, color)?;
@@ -2514,7 +2505,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellTextDecorations> {
+    ) -> Result<TableCellTextDecorations> {
         cell_paragraph_style::decorations(&self.package, table_id, row, column)
     }
 
@@ -2524,7 +2515,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        decorations: NumbersTableCellTextDecorations,
+        decorations: TableCellTextDecorations,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_decorations(&mut staged, table_id, row, column, decorations)?;
@@ -2559,7 +2550,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellTextFont> {
+    ) -> Result<TableCellTextFont> {
         cell_paragraph_style::font(&self.package, table_id, row, column)
     }
 
@@ -2569,7 +2560,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        font: NumbersTableCellTextFont,
+        font: TableCellTextFont,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_font(&mut staged, table_id, row, column, font.clone())?;
@@ -2604,7 +2595,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellTextLigatures> {
+    ) -> Result<TableCellTextLigatures> {
         cell_paragraph_style::ligatures(&self.package, table_id, row, column)
     }
 
@@ -2614,7 +2605,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        ligatures: NumbersTableCellTextLigatures,
+        ligatures: TableCellTextLigatures,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_ligatures(&mut staged, table_id, row, column, ligatures)?;
@@ -2649,7 +2640,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellTextOutline> {
+    ) -> Result<TableCellTextOutline> {
         cell_paragraph_style::outline(&self.package, table_id, row, column)
     }
 
@@ -2659,7 +2650,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        outline: NumbersTableCellTextOutline,
+        outline: TableCellTextOutline,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_outline(&mut staged, table_id, row, column, outline)?;
@@ -2694,7 +2685,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellTextScript> {
+    ) -> Result<TableCellTextScript> {
         cell_paragraph_style::script(&self.package, table_id, row, column)
     }
 
@@ -2704,7 +2695,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        script: NumbersTableCellTextScript,
+        script: TableCellTextScript,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_script(&mut staged, table_id, row, column, script)?;
@@ -2739,7 +2730,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellTextShadow> {
+    ) -> Result<TableCellTextShadow> {
         cell_paragraph_style::shadow(&self.package, table_id, row, column)
     }
 
@@ -2749,7 +2740,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        shadow: NumbersTableCellTextShadow,
+        shadow: TableCellTextShadow,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_shadow(&mut staged, table_id, row, column, shadow)?;
@@ -2784,7 +2775,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellTextStyle> {
+    ) -> Result<TableCellTextStyle> {
         cell_paragraph_style::text_style(&self.package, table_id, row, column)
     }
 
@@ -2794,7 +2785,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        style: NumbersTableCellTextStyle,
+        style: TableCellTextStyle,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_text_style(&mut staged, table_id, row, column, style)?;
@@ -3127,7 +3118,7 @@ impl NumbersEditor {
     /// ID-free semantic read.
     #[deprecated(
         since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment-reply read; use litchi_numbers::Package::table_cell_comment_replies with SheetSelector, TableSelector, and CellPosition for the selector-first semantic read; reply identity remains compatibility-host scope"
+        note = "legacy raw-ID Numbers cell-comment-reply read; use litchi_numbers::Package::table_cell_comment_replies with SheetSelector, TableSelector, and At for the selector-first semantic read; reply identity remains compatibility-host scope"
     )]
     pub fn cell_comment_replies(
         &self,
@@ -3144,7 +3135,7 @@ impl NumbersEditor {
     /// this deprecated raw-ID surface remains as a compatibility fallback.
     #[deprecated(
         since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment-reply creation API; use litchi_numbers::Package::add_table_cell_comment_reply with SheetSelector, TableSelector, and CellPosition for selector-first writes; this method delegates supported graphs and retains a compatibility fallback"
+        note = "legacy raw-ID Numbers cell-comment-reply creation API; use litchi_numbers::Package::add_table_cell_comment_reply with SheetSelector, TableSelector, and At for selector-first writes; this method delegates supported graphs and retains a compatibility fallback"
     )]
     pub fn add_cell_comment_reply(
         &mut self,
@@ -3179,7 +3170,7 @@ impl NumbersEditor {
     /// this deprecated raw-ID surface remains as a compatibility fallback.
     #[deprecated(
         since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment-reply replacement API; use litchi_numbers::Package::set_table_cell_comment_reply with SheetSelector, TableSelector, CellPosition, and CommentReplyIndex for selector-first writes; this method delegates supported graphs and retains a compatibility fallback"
+        note = "legacy raw-ID Numbers cell-comment-reply replacement API; use litchi_numbers::Package::set_table_cell_comment_reply with SheetSelector, TableSelector, At, and CommentReplyIndex for selector-first writes; this method delegates supported graphs and retains a compatibility fallback"
     )]
     pub fn set_cell_comment_reply(
         &mut self,
@@ -3229,7 +3220,7 @@ impl NumbersEditor {
     /// this deprecated raw-ID surface remains as a compatibility fallback.
     #[deprecated(
         since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment-reply removal API; use litchi_numbers::Package::remove_table_cell_comment_reply with SheetSelector, TableSelector, CellPosition, and CommentReplyIndex for selector-first writes; this method delegates supported graphs and retains a compatibility fallback"
+        note = "legacy raw-ID Numbers cell-comment-reply removal API; use litchi_numbers::Package::remove_table_cell_comment_reply with SheetSelector, TableSelector, At, and CommentReplyIndex for selector-first writes; this method delegates supported graphs and retains a compatibility fallback"
     )]
     pub fn remove_cell_comment_reply(
         &mut self,
@@ -3271,13 +3262,13 @@ mod focused_custom_tests {
 
     use super::*;
     use crate::numbers::cell::CellValue;
-    use crate::numbers::{NumbersDocumentBuilder, NumbersEditor};
+    use crate::numbers::{self, Editor};
     use litchi_iwa_archive::package::Catalog;
     use litchi_numbers::cell::data_format::custom::{
         Custom, DateTime as CustomDateTime, DateTimePattern, Name, Number as CustomNumber,
         NumberPattern, Text as CustomText,
     };
-    use litchi_numbers::{CellPosition, SheetSelector, TableSelector};
+    use litchi_numbers::{At, SheetSelector, TableSelector};
     use prost::Message as _;
 
     fn custom_number(name: &str, pattern: &str) -> Custom {
@@ -3298,7 +3289,7 @@ mod focused_custom_tests {
         )
     }
 
-    fn native_custom_table_id(editor: &NumbersEditor) -> u64 {
+    fn native_custom_table_id(editor: &Editor) -> u64 {
         editor
             .tables()
             .expect("native table catalog")
@@ -3358,7 +3349,7 @@ mod focused_custom_tests {
         source_bytes: &[u8],
         corruption: NativeCustomRouteCorruption,
     ) -> Vec<u8> {
-        let mut editor = NumbersEditor::from_bytes(source_bytes).expect("native source editor");
+        let mut editor = Editor::from_bytes(source_bytes).expect("native source editor");
         editor
             .package
             .update_archive("Index/Document.iwa", |archive| {
@@ -3452,7 +3443,7 @@ mod focused_custom_tests {
             .as_slice(),
         ];
         for source_bytes in fixtures {
-            let mut editor = NumbersEditor::from_bytes(source_bytes).expect("native number editor");
+            let mut editor = Editor::from_bytes(source_bytes).expect("native number editor");
             let table_id = native_custom_table_id(&editor);
             let current = editor
                 .table_cell_data_format(table_id, 1, 1)
@@ -3485,7 +3476,7 @@ mod focused_custom_tests {
                 .edit_table_cell_custom_format(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(1, 1),
+                    At::new(1, 1),
                 )
                 .expect("focused replacement clear edit")
                 .clear()
@@ -3513,14 +3504,14 @@ mod focused_custom_tests {
     fn native_custom_data_format_compatibility_preserves_native_text_value() {
         let source_bytes =
             include_bytes!("../../../../../../test-data/iwork/numbers/custom-text-native.numbers");
-        let mut editor = NumbersEditor::from_bytes(source_bytes).expect("native Text editor");
+        let mut editor = Editor::from_bytes(source_bytes).expect("native Text editor");
         let table_id = native_custom_table_id(&editor);
         let original_value = FocusedNumbersPackage::from_bytes(source_bytes)
             .expect("focused native Text source")
             .table_cell(
                 SheetSelector::index(0),
                 TableSelector::index(0),
-                CellPosition::new(1, 1),
+                At::new(1, 1),
             )
             .expect("native Text cell")
             .storage()
@@ -3544,7 +3535,7 @@ mod focused_custom_tests {
                 .table_cell(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(1, 1)
+                    At::new(1, 1)
                 )
                 .expect("reopened Text cell")
                 .storage()
@@ -3573,7 +3564,7 @@ mod focused_custom_tests {
                 .table_cell_custom_format(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(1, 1)
+                    At::new(1, 1)
                 )
                 .expect("Text reset format"),
             None
@@ -3583,7 +3574,7 @@ mod focused_custom_tests {
                 .table_cell(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(1, 1)
+                    At::new(1, 1)
                 )
                 .expect("Text reset cell")
                 .storage()
@@ -3606,7 +3597,7 @@ mod focused_custom_tests {
             NativeCustomRouteCorruption::MalformedReference,
         ] {
             let hostile_bytes = corrupt_native_custom_route(source_bytes, corruption);
-            let Ok(mut editor) = NumbersEditor::from_bytes(&hostile_bytes) else {
+            let Ok(mut editor) = Editor::from_bytes(&hostile_bytes) else {
                 continue;
             };
             accepted += 1;
@@ -3656,7 +3647,7 @@ mod focused_custom_tests {
             "../../../../../../test-data/iwork/synthetic/numbers/custom-focused.numbers"
         );
         let source = FocusedNumbersPackage::from_bytes(source_bytes).expect("focused source");
-        let position = CellPosition::new(0, 0);
+        let position = At::new(0, 0);
         let before_value = source
             .table_cell(SheetSelector::index(0), TableSelector::index(0), position)
             .expect("original focused cell")
@@ -3685,9 +3676,9 @@ mod focused_custom_tests {
             before_value
         );
 
-        let mut actual = NumbersEditor::from_bytes(source_bytes).expect("exact editor");
+        let mut actual = Editor::from_bytes(source_bytes).expect("exact editor");
         // The focused fixture intentionally omits the appearance dependency
-        // required by `NumbersEditor::tables`; its table-model object is still
+        // required by `Editor::tables`; its table-model object is still
         // the stable native table id used by the cell APIs.
         let table_id = 4;
         assert!(matches!(
@@ -3732,12 +3723,12 @@ mod focused_custom_tests {
                 .table_cell_custom_format(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(0, 1),
+                    At::new(0, 1),
                 )
                 .expect("shared registry custom")
                 .is_some()
         );
-        let original_editor = NumbersEditor::from_bytes(source_bytes).expect("original editor");
+        let original_editor = Editor::from_bytes(source_bytes).expect("original editor");
         assert_eq!(
             actual.package().entry("Index/Unrelated.iwa"),
             original_editor.package().entry("Index/Unrelated.iwa")
@@ -3817,7 +3808,7 @@ mod focused_custom_tests {
                 .table_cell_custom_format(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(0, 1),
+                    At::new(0, 1),
                 )
                 .expect("shared registry after clear")
                 .is_some()
@@ -3838,7 +3829,7 @@ mod focused_custom_tests {
         let source_bytes = include_bytes!(
             "../../../../../../test-data/iwork/synthetic/numbers/custom-focused.numbers"
         );
-        let position = CellPosition::new(0, 0);
+        let position = At::new(0, 0);
         let source = FocusedNumbersPackage::from_bytes(source_bytes).expect("focused source");
         let before_value = source
             .table_cell(SheetSelector::index(0), TableSelector::index(0), position)
@@ -3846,7 +3837,7 @@ mod focused_custom_tests {
             .storage()
             .value()
             .cloned();
-        let original = NumbersEditor::from_bytes(source_bytes).expect("exact editor");
+        let original = Editor::from_bytes(source_bytes).expect("exact editor");
 
         let mut editor = original.clone();
         editor
@@ -3880,7 +3871,7 @@ mod focused_custom_tests {
                 .table_cell_custom_format(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(0, 1),
+                    At::new(0, 1),
                 )
                 .expect("shared registry after focused reset")
                 .is_some()
@@ -3906,7 +3897,7 @@ mod focused_custom_tests {
 
     #[test]
     fn builder_custom_reopen_keeps_compatibility_profile() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(2, 2)
             .build()
             .expect("builder source");
@@ -3936,7 +3927,7 @@ mod focused_custom_tests {
         );
 
         let source_bytes = editor.to_bytes().expect("builder bytes");
-        let mut reopened = NumbersEditor::from_bytes(&source_bytes).expect("reopened builder");
+        let mut reopened = Editor::from_bytes(&source_bytes).expect("reopened builder");
         assert_eq!(
             reopened
                 .table_cell_data_format(table_id, 0, 0)
@@ -3960,7 +3951,7 @@ mod focused_custom_tests {
                 .table_cell(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(0, 0),
+                    At::new(0, 0),
                 )
                 .expect("builder replacement cell")
                 .storage()
@@ -4044,7 +4035,7 @@ mod focused_custom_tests {
                 .table_cell(
                     SheetSelector::index(0),
                     TableSelector::index(0),
-                    CellPosition::new(0, 0),
+                    At::new(0, 0),
                 )
                 .expect("builder clear cell")
                 .storage()
@@ -4092,7 +4083,7 @@ mod focused_custom_tests {
 
         for (label, initial, requested, value, refuses) in cases {
             for reopen in [false, true] {
-                let mut editor = NumbersDocumentBuilder::new()
+                let mut editor = numbers::Builder::new()
                     .table_name("Custom compatibility")
                     .table_dimensions(2, 2)
                     .build()
@@ -4112,7 +4103,7 @@ mod focused_custom_tests {
 
                 if reopen {
                     let bytes = editor.to_bytes().expect("initial compatibility bytes");
-                    editor = NumbersEditor::from_bytes(&bytes)
+                    editor = Editor::from_bytes(&bytes)
                         .unwrap_or_else(|error| panic!("{label}: reopen failed: {error}"));
                 }
                 assert_eq!(
@@ -4153,7 +4144,7 @@ mod focused_custom_tests {
                 );
 
                 let bytes = editor.to_bytes().expect("mutated compatibility bytes");
-                let reopened_editor = NumbersEditor::from_bytes(&bytes)
+                let reopened_editor = Editor::from_bytes(&bytes)
                     .unwrap_or_else(|error| panic!("{label}: mutated reopen failed: {error}"));
                 assert_eq!(
                     reopened_editor
@@ -4173,7 +4164,7 @@ mod focused_custom_tests {
                         .table_cell(
                             SheetSelector::index(0),
                             TableSelector::index(0),
-                            CellPosition::new(0, 0),
+                            At::new(0, 0),
                         )
                         .unwrap_or_else(|error| panic!(
                             "{label}: focused cell read failed: {error}"
@@ -4193,7 +4184,7 @@ mod focused_custom_tests {
         let source_bytes = include_bytes!(
             "../../../../../../test-data/iwork/synthetic/numbers/custom-focused.numbers"
         );
-        let mut malformed = NumbersEditor::from_bytes(source_bytes).expect("focused source");
+        let mut malformed = Editor::from_bytes(source_bytes).expect("focused source");
         malformed
             .package
             .update_archive("Index/Tables.iwa", |archive| {
@@ -4251,7 +4242,7 @@ mod focused_custom_tests {
             })
             .expect("malformed source mutation");
         let malformed_bytes = malformed.to_bytes().expect("malformed bytes");
-        let mut actual = NumbersEditor::from_bytes(&malformed_bytes).expect("malformed editor");
+        let mut actual = Editor::from_bytes(&malformed_bytes).expect("malformed editor");
         let current = actual
             .table_cell_data_format(4, 0, 0)
             .expect("malformed custom read");
@@ -4304,7 +4295,7 @@ mod focused_custom_tests {
         let source_bytes = include_bytes!(
             "../../../../../../test-data/iwork/synthetic/numbers/custom-focused.numbers"
         );
-        let mut malformed = NumbersEditor::from_bytes(source_bytes).expect("focused source");
+        let mut malformed = Editor::from_bytes(source_bytes).expect("focused source");
         malformed
             .package
             .update_archive("Index/Document.iwa", |archive| {
@@ -4320,7 +4311,7 @@ mod focused_custom_tests {
             })
             .expect("duplicate registry edge");
         let bytes = malformed.to_bytes().expect("malformed source bytes");
-        let mut editor = NumbersEditor::from_bytes(&bytes).expect("discovery defers registry");
+        let mut editor = Editor::from_bytes(&bytes).expect("discovery defers registry");
         let current = editor
             .table_cell_data_format(4, 0, 0)
             .expect("legacy custom read");

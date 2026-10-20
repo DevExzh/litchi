@@ -1,12 +1,12 @@
 //! Named paragraph-style lifecycle for ordinary slide text boxes.
 
-use super::KeynoteEditor;
+use super::Editor;
 use crate::text::{
     AppliedParagraphStyle, NamedParagraphStyle, ParagraphStyleId, ParagraphStyleName,
 };
 use crate::{Error, Result};
 
-impl KeynoteEditor {
+impl Editor {
     /// List named paragraph styles selectable for an ordinary slide text box.
     pub fn slide_text_box_named_paragraph_styles(
         &self,
