@@ -128,8 +128,8 @@ pub struct PagesEditor {
 
 impl PagesEditor {
     /// Start configuring a new Pages package built from typed IWA objects.
-    pub fn builder() -> crate::pages::PagesDocumentBuilder {
-        crate::pages::PagesDocumentBuilder::new()
+    pub fn builder() -> crate::pages::Builder {
+        crate::pages::Builder::new()
     }
 
     /// Create a blank, independent Pages document without a bundled template.

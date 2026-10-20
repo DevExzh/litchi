@@ -442,7 +442,7 @@ impl PagesMessageType {
 /// The resulting package is encoded from typed protobuf values and newly
 /// generated identities. It does not copy or embed an Apple template.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PagesDocumentBuilder {
+pub struct Builder {
     body_text: String,
     language: String,
     locale: String,
@@ -456,7 +456,7 @@ struct InitialPagesTable {
     columns: usize,
 }
 
-impl Default for PagesDocumentBuilder {
+impl Default for Builder {
     fn default() -> Self {
         Self {
             body_text: String::new(),
@@ -467,7 +467,7 @@ impl Default for PagesDocumentBuilder {
     }
 }
 
-impl PagesDocumentBuilder {
+impl Builder {
     /// Start a blank Pages document with US Letter page geometry.
     pub fn new() -> Self {
         Self::default()
@@ -1425,7 +1425,7 @@ fn install_initial_table_graph(
     language: &str,
     locale: &str,
 ) -> Result<()> {
-    let source = crate::numbers::NumbersDocumentBuilder::new()
+    let source = crate::numbers::Builder::new()
         .table_name(&table.name)
         .table_dimensions(table.rows, table.columns)
         .language(language)
@@ -1687,7 +1687,7 @@ mod tests {
 
     #[test]
     fn generated_theme_exposes_distinct_canonical_list_presets() {
-        let package = PagesDocumentBuilder::new().build_package().unwrap();
+        let package = Builder::new().build_package().unwrap();
         let document = package.archive(DOCUMENT_ARCHIVE_ENTRY).unwrap();
         let theme = document.object(PagesObjectId::Theme.value()).unwrap();
         let theme = IWorkThemeArchive::decode(&theme.messages[0].data).unwrap();
@@ -1721,7 +1721,7 @@ mod tests {
 
     #[test]
     fn generated_theme_exposes_unique_native_paragraph_style_catalog() {
-        let package = PagesDocumentBuilder::new().build_package().unwrap();
+        let package = Builder::new().build_package().unwrap();
         let styles = crate::text::paragraph_alignment::native::named_paragraph_styles(
             &package,
             PagesObjectId::ParagraphStyle.value(),
@@ -1806,7 +1806,7 @@ mod tests {
 
     #[test]
     fn creates_and_edits_pages_entirely_from_typed_objects() {
-        let mut editor = PagesDocumentBuilder::new()
+        let mut editor = Builder::new()
             .body_text("Created from scratch")
             .build()
             .unwrap();
@@ -1822,7 +1822,7 @@ mod tests {
     #[test]
     fn repeated_body_table_calls_append_independent_tables() {
         let body = "Tables 🙂\n";
-        let editor = PagesDocumentBuilder::new()
+        let editor = Builder::new()
             .body_text(body)
             .body_table("First", 2, 3)
             .body_table("Second", 4, 1)
@@ -1860,7 +1860,7 @@ mod tests {
 
     #[test]
     fn blank_package_contains_only_generated_required_entries() {
-        let package = PagesDocumentBuilder::new().build_package().unwrap();
+        let package = Builder::new().build_package().unwrap();
         assert_eq!(package.entry_names().collect::<Vec<_>>(), EXPECTED_ENTRIES);
         assert_eq!(package.len(), EXPECTED_ENTRIES.len());
         assert!(package.entry_names().all(|name| !name.starts_with("Data/")));
@@ -1880,7 +1880,7 @@ mod tests {
 
     #[test]
     fn scratch_package_has_native_save_scaffolding() {
-        let package = PagesDocumentBuilder::new().build_package().unwrap();
+        let package = Builder::new().build_package().unwrap();
         assert!(package.iwa_entry_names().all(|member| {
             package
                 .archive(member)
@@ -1964,8 +1964,8 @@ mod tests {
 
     #[test]
     fn new_documents_receive_independent_package_and_object_identities() {
-        let first = PagesDocumentBuilder::new().build_package().unwrap();
-        let second = PagesDocumentBuilder::new().build_package().unwrap();
+        let first = Builder::new().build_package().unwrap();
+        let second = Builder::new().build_package().unwrap();
         assert_ne!(
             first.entry(DOCUMENT_IDENTIFIER_ENTRY),
             second.entry(DOCUMENT_IDENTIFIER_ENTRY)
@@ -2019,7 +2019,7 @@ mod tests {
 
     #[test]
     fn rejects_empty_language_and_locale() {
-        assert!(PagesDocumentBuilder::new().language(" ").build().is_err());
-        assert!(PagesDocumentBuilder::new().locale("").build().is_err());
+        assert!(Builder::new().language(" ").build().is_err());
+        assert!(Builder::new().locale("").build().is_err());
     }
 }

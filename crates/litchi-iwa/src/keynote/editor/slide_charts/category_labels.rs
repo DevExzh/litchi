@@ -72,13 +72,13 @@ fn set_slide_chart_category_label_layout(
 mod tests {
     use super::*;
     use crate::charts::{ChartData, Kind};
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{DrawablePoint, DrawableSize};
     use litchi_iwa_common::chart::category_labels::{Frequency, Interval};
 
     #[test]
     fn scratch_presentation_supports_category_label_layout_crud() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let chart = editor
             .add_slide_chart(
                 0,

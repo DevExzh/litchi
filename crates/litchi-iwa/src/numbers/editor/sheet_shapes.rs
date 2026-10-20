@@ -1363,7 +1363,7 @@ mod tests {
     use std::{fs, path::PathBuf};
 
     use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::{
         Appearance, BlurRadius, Contact, Endpoint, Offset, Pattern, RgbColorSpace, RgbaColor, Width,
     };
@@ -1392,7 +1392,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_rectangle_crud_without_a_source_drawable() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Scratch Shape")
             .table_name("Scratch Table")
             .build()
@@ -1475,7 +1475,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_shape_duplication() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Shape clone")
             .table_name("Source data")
             .build()
@@ -1574,7 +1574,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_straight_line_crud() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Scratch Line")
             .table_name("Source Data")
             .build()
@@ -1659,7 +1659,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_typed_shape_stroke_crud() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Stroke")
             .table_name("Data")
             .build()
@@ -1713,7 +1713,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_typed_shape_fill_crud() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Fill")
             .table_name("Data")
             .build()
@@ -1756,7 +1756,7 @@ mod tests {
     #[test]
     fn scratch_spreadsheet_supports_embedded_shape_image_fill_crud() {
         let bytes = fixture("test-data/images/png/lena.png");
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Image Fill")
             .table_name("Data")
             .build()
@@ -1810,7 +1810,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_shape_effect_crud() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Effects")
             .table_name("Data")
             .build()
@@ -1852,7 +1852,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_contact_shadow_crud() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Shadows")
             .table_name("Data")
             .build()
@@ -1899,7 +1899,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_shape_text_layout_crud() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Layout")
             .table_name("Data")
             .build()
@@ -1949,7 +1949,7 @@ mod tests {
     fn scratch_spreadsheet_supports_typed_line_endpoint_crud() {
         use crate::shapes::{Endpoint, Endpoints};
 
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Endpoint Styles")
             .table_name("Source Data")
             .build()
@@ -1994,7 +1994,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_typed_preset_shape_crud() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Preset Shapes")
             .table_name("Source Data")
             .build()
@@ -2046,7 +2046,7 @@ mod tests {
 
     #[test]
     fn invalid_rectangle_creation_and_cross_type_updates_are_transactional() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let baseline = editor.to_bytes().unwrap();
         assert!(

@@ -1223,9 +1223,9 @@ fn take_id(next: &mut u64) -> Result<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keynote::KeynoteDocumentBuilder;
-    use crate::numbers::NumbersDocumentBuilder;
-    use crate::pages::PagesDocumentBuilder;
+    use crate::keynote;
+    use crate::numbers;
+    use crate::pages;
     use crate::shapes::{DrawablePoint, DrawableSize};
     use crate::text::{
         ParagraphListBulletBaselineOffset, ParagraphListBulletGeometry, ParagraphListBulletScale,
@@ -1382,7 +1382,7 @@ mod tests {
 
     #[test]
     fn scratch_documents_promote_plain_cells_and_roundtrip_lists() {
-        let mut numbers = NumbersDocumentBuilder::new()
+        let mut numbers = numbers::Builder::new()
             .table_dimensions(3, 3)
             .build()
             .unwrap();
@@ -1422,7 +1422,7 @@ mod tests {
                 .unwrap()
         );
 
-        let mut pages = PagesDocumentBuilder::new()
+        let mut pages = pages::Builder::new()
             .body_table("Lists", 3, 3)
             .build()
             .unwrap();
@@ -1441,7 +1441,7 @@ mod tests {
             ParagraphList::Numbered
         );
 
-        let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut keynote = keynote::Builder::new().build().unwrap();
         let table = keynote
             .add_slide_table(
                 0,
@@ -1486,7 +1486,7 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn duplicated_rich_text_cells_are_list_copy_on_write() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(3, 3)
             .build()
             .unwrap();
@@ -1526,7 +1526,7 @@ mod tests {
     #[test]
     fn scratch_documents_roundtrip_mixed_cell_lists_in_every_suite() {
         let expected = mixed_lists();
-        let mut numbers = NumbersDocumentBuilder::new()
+        let mut numbers = numbers::Builder::new()
             .table_dimensions(3, 3)
             .build()
             .unwrap();
@@ -1550,7 +1550,7 @@ mod tests {
             expected
         );
 
-        let mut pages = PagesDocumentBuilder::new()
+        let mut pages = pages::Builder::new()
             .body_table("Mixed Lists", 3, 3)
             .build()
             .unwrap();
@@ -1574,7 +1574,7 @@ mod tests {
             expected
         );
 
-        let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut keynote = keynote::Builder::new().build().unwrap();
         let table = keynote
             .add_slide_table(
                 0,
@@ -1623,7 +1623,7 @@ mod tests {
             ParagraphListTextGap::from_points(18.0, TextPointSize::TWELVE).unwrap(),
         );
 
-        let mut numbers = NumbersDocumentBuilder::new()
+        let mut numbers = numbers::Builder::new()
             .table_dimensions(3, 3)
             .build()
             .unwrap();
@@ -1733,7 +1733,7 @@ mod tests {
                 .unwrap()
         );
 
-        let mut pages = PagesDocumentBuilder::new()
+        let mut pages = pages::Builder::new()
             .body_table("Bullets", 3, 3)
             .build()
             .unwrap();
@@ -1790,7 +1790,7 @@ mod tests {
             indentation
         );
 
-        let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut keynote = keynote::Builder::new().build().unwrap();
         let table = keynote
             .add_slide_table(
                 0,
@@ -1906,7 +1906,7 @@ mod tests {
             ParagraphListLabelIndent::from_points(24.0).unwrap(),
             ParagraphListTextGap::from_em(2.0).unwrap(),
         );
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(3, 3)
             .build()
             .unwrap();
@@ -1979,7 +1979,7 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn duplicated_rich_text_cells_are_mixed_list_copy_on_write() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(3, 3)
             .build()
             .unwrap();
@@ -2022,7 +2022,7 @@ mod tests {
 
     #[test]
     fn invalid_mixed_list_boundary_is_transactional() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(2, 2)
             .build()
             .unwrap();
@@ -2055,7 +2055,7 @@ mod tests {
     fn scratch_documents_roundtrip_isolated_cell_list_levels_in_every_suite() {
         let paragraph = TextPosition::from_utf16_index(9).unwrap();
         let expected = nested_second_paragraph();
-        let mut numbers = NumbersDocumentBuilder::new()
+        let mut numbers = numbers::Builder::new()
             .table_dimensions(3, 3)
             .build()
             .unwrap();
@@ -2098,7 +2098,7 @@ mod tests {
                 .unwrap()
         );
 
-        let mut pages = PagesDocumentBuilder::new()
+        let mut pages = pages::Builder::new()
             .body_table("Nested Lists", 3, 3)
             .build()
             .unwrap();
@@ -2131,7 +2131,7 @@ mod tests {
             expected
         );
 
-        let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut keynote = keynote::Builder::new().build().unwrap();
         let table = keynote
             .add_slide_table(
                 0,
@@ -2189,7 +2189,7 @@ mod tests {
         let restart =
             ParagraphListNumbering::StartAt(crate::text::ParagraphListStart::new(7).unwrap());
 
-        let mut numbers = NumbersDocumentBuilder::new()
+        let mut numbers = numbers::Builder::new()
             .table_dimensions(3, 3)
             .build()
             .unwrap();
@@ -2231,7 +2231,7 @@ mod tests {
             mixed_lists()
         );
 
-        let mut pages = PagesDocumentBuilder::new()
+        let mut pages = pages::Builder::new()
             .body_table("Numbering", 3, 3)
             .build()
             .unwrap();
@@ -2258,7 +2258,7 @@ mod tests {
             restart
         );
 
-        let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut keynote = keynote::Builder::new().build().unwrap();
         let table = keynote
             .add_slide_table(
                 0,
@@ -2320,7 +2320,7 @@ mod tests {
     #[allow(deprecated)]
     fn duplicated_rich_text_cells_are_list_level_copy_on_write() {
         let paragraph = TextPosition::from_utf16_index(9).unwrap();
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(3, 3)
             .build()
             .unwrap();
@@ -2386,7 +2386,7 @@ mod tests {
             ParagraphListNumberSequence::RomanUppercase,
             ParagraphListNumberPunctuation::RightParenthesis,
         );
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(3, 3)
             .build()
             .unwrap();
@@ -2470,7 +2470,7 @@ mod tests {
     fn plain_cell_default_list_metadata_is_a_validated_no_op() {
         let paragraph = TextPosition::from_utf16_index(9).unwrap();
         let invalid = TextPosition::from_utf16_index(8).unwrap();
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(2, 2)
             .build()
             .unwrap();
@@ -2553,7 +2553,7 @@ mod tests {
 
     #[test]
     fn invalid_cell_list_level_boundary_is_transactional() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(2, 2)
             .build()
             .unwrap();
@@ -2583,7 +2583,7 @@ mod tests {
 
     #[test]
     fn invalid_coordinate_is_transactional() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(2, 2)
             .build()
             .unwrap();

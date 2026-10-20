@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::archive::RawMessage;
-use crate::pages::PagesDocumentBuilder;
+use crate::pages;
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 use litchi_iwa_common::shape::stroke::{Pattern as StrokePattern, Stroke, Width as StrokeWidth};
 use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
@@ -302,7 +302,7 @@ fn malformed_table_model_payload_is_reported() {
 
 #[test]
 fn table_model_discovery_projects_borrowed_name_and_dimensions() {
-    let editor = PagesDocumentBuilder::new()
+    let editor = pages::Builder::new()
         .body_table("Discovery", 3, 4)
         .build()
         .expect("source-built Pages table");
@@ -412,7 +412,7 @@ fn table_model_discovery_rejects_missing_and_duplicate_payloads_without_collecti
     let no_messages: [RawMessage; 0] = [];
     assert!(decode_unique_table_model(no_messages.iter(), 42).is_err());
 
-    let editor = PagesDocumentBuilder::new()
+    let editor = pages::Builder::new()
         .body_table("Duplicate", 2, 2)
         .build()
         .expect("source-built Pages table");
@@ -437,7 +437,7 @@ fn table_model_discovery_rejects_missing_and_duplicate_payloads_without_collecti
 
 #[test]
 fn source_built_table_has_no_conditional_highlighting_and_clear_is_idempotent() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Conditional", 2, 2)
         .build()
         .unwrap();
@@ -463,7 +463,7 @@ fn source_built_table_has_no_conditional_highlighting_and_clear_is_idempotent() 
 
 #[test]
 fn source_built_table_creates_and_replaces_conditional_highlighting() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Conditional", 2, 2)
         .build()
         .unwrap();
@@ -500,7 +500,7 @@ fn source_built_table_creates_and_replaces_conditional_highlighting() {
 
 #[test]
 fn source_built_table_roundtrips_cell_border_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Borders", 3, 3)
         .build()
         .unwrap();
@@ -530,7 +530,7 @@ fn source_built_table_roundtrips_cell_border_crud() {
 
 #[test]
 fn source_built_table_roundtrips_cell_fill_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Fills", 3, 3)
         .build()
         .unwrap();
@@ -550,7 +550,7 @@ fn source_built_table_roundtrips_cell_fill_crud() {
 
 #[test]
 fn source_built_table_roundtrips_cell_layout_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Layout", 3, 3)
         .build()
         .unwrap();
@@ -577,7 +577,7 @@ fn source_built_table_roundtrips_cell_layout_crud() {
 
 #[test]
 fn source_built_table_roundtrips_number_format_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Formats", 3, 3)
         .build()
         .unwrap();
@@ -617,7 +617,7 @@ fn source_built_table_roundtrips_number_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_percentage_data_format() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Percentages", 3, 3)
         .build()
         .unwrap();
@@ -661,7 +661,7 @@ fn source_built_table_roundtrips_percentage_data_format() {
 
 #[test]
 fn source_built_table_roundtrips_currency_format_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Currencies", 3, 3)
         .build()
         .unwrap();
@@ -703,7 +703,7 @@ fn source_built_table_roundtrips_currency_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_scientific_format_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Scientific", 3, 3)
         .build()
         .unwrap();
@@ -741,7 +741,7 @@ fn source_built_table_roundtrips_scientific_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_fraction_format_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Fractions", 3, 3)
         .build()
         .unwrap();
@@ -777,7 +777,7 @@ fn source_built_table_roundtrips_fraction_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_numeral_system_format_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Numeral Systems", 3, 3)
         .build()
         .unwrap();
@@ -820,7 +820,7 @@ fn source_built_table_roundtrips_numeral_system_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_date_time_format_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Dates", 3, 3)
         .build()
         .unwrap();
@@ -858,7 +858,7 @@ fn source_built_table_roundtrips_date_time_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_duration_format_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Durations", 3, 3)
         .build()
         .unwrap();
@@ -895,7 +895,7 @@ fn source_built_table_roundtrips_duration_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_checkbox_format_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Checkboxes", 3, 3)
         .build()
         .unwrap();
@@ -926,7 +926,7 @@ fn source_built_table_roundtrips_checkbox_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_star_rating_format_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Ratings", 3, 3)
         .build()
         .unwrap();
@@ -959,7 +959,7 @@ fn source_built_table_roundtrips_star_rating_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_slider_format_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Sliders", 3, 3)
         .build()
         .unwrap();
@@ -992,7 +992,7 @@ fn source_built_table_roundtrips_slider_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_stepper_format_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Steppers", 3, 3)
         .build()
         .unwrap();
@@ -1025,7 +1025,7 @@ fn source_built_table_roundtrips_stepper_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_text_format_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Text", 3, 3)
         .build()
         .unwrap();
@@ -1057,7 +1057,7 @@ fn source_built_table_roundtrips_text_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_custom_format_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Custom Text", 3, 3)
         .build()
         .unwrap();
@@ -1095,7 +1095,7 @@ fn source_built_table_roundtrips_custom_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_pop_up_menu_format_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Menus", 3, 3)
         .build()
         .unwrap();
@@ -1131,7 +1131,7 @@ fn source_built_table_roundtrips_pop_up_menu_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_cell_updates() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Report 🙂\n")
         .body_table("Results", 3, 2)
         .build()
@@ -1193,7 +1193,7 @@ fn source_built_table_roundtrips_cell_updates() {
 
 #[test]
 fn source_built_table_duplication_clones_formula_storage_and_attachment() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Budget\n")
         .body_table("Budget", 3, 2)
         .build()
@@ -1295,7 +1295,7 @@ fn source_built_table_duplication_clones_formula_storage_and_attachment() {
 
 #[test]
 fn focused_source_built_table_roundtrips_hidden_axes_transactionally() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Pages hidden-axis source-built oracle — 2026-09-09\n")
         .body_table("Hidden", 5, 4)
         .build()
@@ -1416,7 +1416,7 @@ fn focused_source_built_table_roundtrips_hidden_axes_transactionally() {
 
 #[test]
 fn source_built_table_roundtrips_full_table_sort_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Cities", 5, 2)
         .build()
         .unwrap();
@@ -1639,7 +1639,7 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
 
 #[test]
 fn source_built_table_roundtrips_formula_crud_transactionally() {
-    let editor = PagesDocumentBuilder::new()
+    let editor = pages::Builder::new()
         .body_table("Formula", 3, 2)
         .build()
         .unwrap();
@@ -1716,7 +1716,7 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
 
 #[test]
 fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Topology", 4, 4)
         .build()
         .unwrap();
@@ -1789,7 +1789,7 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
 
 #[test]
 fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Footer aggregate", 4, 3)
         .build()
         .unwrap();
@@ -1841,7 +1841,7 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
 
 #[test]
 fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Fixed sections", 4, 4)
         .build()
         .unwrap();
@@ -1923,7 +1923,7 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
 #[test]
 fn inserts_independent_table_and_shifts_existing_anchor() {
     let body = "Alpha 🙂\nBeta\n";
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text(body)
         .body_table("Source", 3, 2)
         .build()
@@ -2003,7 +2003,7 @@ fn inserts_independent_table_and_shifts_existing_anchor() {
 
 #[test]
 fn inserts_and_removes_first_table_without_a_template() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Before 🙂 after")
         .build()
         .unwrap();
@@ -2034,7 +2034,7 @@ fn inserts_and_removes_first_table_without_a_template() {
 
 #[test]
 fn first_table_bootstrap_rejects_reserved_id_collision_transactionally() {
-    let mut package = PagesDocumentBuilder::new()
+    let mut package = pages::Builder::new()
         .body_text("Collision")
         .build_package()
         .unwrap();
@@ -2059,7 +2059,7 @@ fn first_table_bootstrap_rejects_reserved_id_collision_transactionally() {
 
 #[test]
 fn invalid_insertion_anchor_is_transactional() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Short")
         .body_table("Template", 2, 2)
         .build()
@@ -2071,7 +2071,7 @@ fn invalid_insertion_anchor_is_transactional() {
 
 #[test]
 fn out_of_bounds_cell_update_is_transactional() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Bounded", 2, 2)
         .build()
         .unwrap();
@@ -2087,7 +2087,7 @@ fn out_of_bounds_cell_update_is_transactional() {
 
 #[test]
 fn source_built_table_roundtrips_focused_rename_and_resize() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Original", 3, 2)
         .build()
         .unwrap();
@@ -2118,7 +2118,7 @@ fn source_built_table_roundtrips_focused_rename_and_resize() {
 
 #[test]
 fn source_built_table_roundtrips_layout_crud_transactionally() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Layout", 4, 3)
         .build()
         .unwrap();
@@ -2206,7 +2206,7 @@ fn source_built_table_roundtrips_layout_crud_transactionally() {
 
 #[test]
 fn table_occupied_shrink_is_transactional() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Protected", 3, 3)
         .build()
         .unwrap();
@@ -2228,7 +2228,7 @@ fn table_occupied_shrink_is_transactional() {
 #[test]
 fn source_built_table_deletion_removes_private_graph_and_anchor() {
     let body = "Before 🙂 after";
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text(body)
         .body_table("Disposable", 3, 2)
         .build()
@@ -2264,7 +2264,7 @@ fn source_built_table_deletion_removes_private_graph_and_anchor() {
 
 #[test]
 fn source_built_table_deletion_preserves_compatibility_provenance() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Before 🙂 after")
         .body_table("Disposable", 3, 2)
         .build()
@@ -2280,7 +2280,7 @@ fn source_built_table_deletion_preserves_compatibility_provenance() {
 
 #[test]
 fn source_built_popup_table_deletion_prunes_private_control_storage() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Before 🙂 after")
         .body_table("Menus", 3, 3)
         .body_table("Retained", 3, 3)
@@ -2401,7 +2401,7 @@ fn source_built_popup_table_deletion_prunes_private_control_storage() {
 
 #[test]
 fn missing_table_deletion_is_transactional() {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_table("Retained", 2, 2)
         .build()
         .unwrap();

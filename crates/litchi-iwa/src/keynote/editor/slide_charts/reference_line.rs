@@ -72,12 +72,12 @@ mod tests {
     use super::*;
     use crate::charts::reference_line::Value;
     use crate::charts::{ChartData, Kind};
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_presentation_supports_reference_line_crud() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let chart = editor
             .add_slide_chart(
                 0,

@@ -4,9 +4,9 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_iwa::pages::PagesDocumentBuilder;
+use litchi_iwa::keynote;
+use litchi_iwa::numbers;
+use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 
@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_name("Review")
         .table_dimensions(TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
@@ -55,7 +55,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Cross-suite table comments\n")
         .body_table("Review", TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
@@ -72,7 +72,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = KeynoteDocumentBuilder::new()
+    let mut editor = keynote::Builder::new()
         .title("Cross-suite table comments")
         .build()?;
     let table = editor.add_slide_table(

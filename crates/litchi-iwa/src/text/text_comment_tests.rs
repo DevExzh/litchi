@@ -1,6 +1,6 @@
 use super::{TextCommentBody, TextCommentReplyBody, TextPosition, TextRange};
-use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use crate::numbers::{NumbersDocumentBuilder, NumbersEditor};
+use crate::keynote::{self, KeynoteEditor};
+use crate::numbers::{self, NumbersEditor};
 use crate::pages::PagesEditor;
 use crate::shapes::{DrawablePoint, DrawableSize};
 
@@ -154,7 +154,7 @@ fn text_comment_crud_round_trips_and_restores_pages_exactly() {
     reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
 )]
 fn scratch_text_comments_work_in_numbers_and_keynote() {
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(sheet_id, TEXT, POSITION, SIZE)
@@ -210,7 +210,7 @@ fn scratch_text_comments_work_in_numbers_and_keynote() {
         .unwrap();
     assert_eq!(numbers.to_bytes().unwrap(), numbers_baseline);
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote.add_slide_text_box(0, TEXT, POSITION, SIZE).unwrap();
     let keynote_baseline = keynote.to_bytes().unwrap();
     let keynote_comment = keynote

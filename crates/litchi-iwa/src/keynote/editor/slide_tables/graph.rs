@@ -797,7 +797,7 @@ pub(super) fn table_template_from_catalog(
 mod tests {
     use super::*;
     use crate::archive::{Archive, ArchiveObject, RawMessage};
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::protobuf::{tsp, tss, tst};
     use prost::Message;
 
@@ -1335,7 +1335,7 @@ mod tests {
 
     #[test]
     fn source_built_reopen_keeps_compatibility_appearance_route() {
-        let editor = KeynoteDocumentBuilder::new().build().expect("builder");
+        let editor = keynote::Builder::new().build().expect("builder");
         assert!(
             focused_table_appearance_package(editor.package())
                 .expect("source-built route")
@@ -1353,7 +1353,7 @@ mod tests {
 
     #[test]
     fn exact_unmarked_package_is_not_allowed_to_fallback_after_focused_refusal() {
-        let mut editor = KeynoteDocumentBuilder::new().build().expect("builder");
+        let mut editor = keynote::Builder::new().build().expect("builder");
         let geometry = DrawableGeometry {
             position: Some(DrawablePoint { x: 40.0, y: 40.0 }),
             size: Some(DrawableSize {
@@ -1479,7 +1479,7 @@ mod tests {
 
     #[test]
     fn direct_table_graph_matches_catalog_listing_without_mutation() {
-        let mut editor = KeynoteDocumentBuilder::new().build().expect("builder");
+        let mut editor = keynote::Builder::new().build().expect("builder");
         let geometry = DrawableGeometry {
             position: Some(DrawablePoint { x: 40.0, y: 40.0 }),
             size: Some(DrawableSize {

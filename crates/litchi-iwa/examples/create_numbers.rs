@@ -2,8 +2,7 @@
 use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 
 use litchi_iwa::numbers::{
-    FormulaCachedValue, FormulaCellReference, FormulaExpression, NumbersDocumentBuilder,
-    NumbersEditor,
+    self, FormulaCachedValue, FormulaCellReference, FormulaExpression, NumbersEditor,
 };
 use litchi_iwa::text::{Font, TextStyle};
 use litchi_numbers::table::At;
@@ -15,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
         .nth(1)
         .ok_or("usage: create_numbers <output.numbers>")?;
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_name("Forecast")
         .table_dimensions(4, 3)
         .build()?;

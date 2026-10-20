@@ -1,7 +1,7 @@
 //! Create a Keynote presentation with a native editable custom action timing curve.
 
 use litchi_iwa::keynote::{
-    KeynoteBuildSettings, KeynoteBuildTimingCurve, KeynoteDocumentBuilder, KeynoteMotionPathPoint,
+    self, KeynoteBuildSettings, KeynoteBuildTimingCurve, KeynoteMotionPathPoint,
     KeynoteRotationDirection,
 };
 
@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .ok_or("usage: create_keynote_custom_timing_curve <output.key>")?;
 
-    let mut keynote = KeynoteDocumentBuilder::new()
+    let mut keynote = keynote::Builder::new()
         .title("Custom timing curve")
         .subtitle("Created entirely by litchi-iwa")
         .build()?;

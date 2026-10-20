@@ -550,7 +550,7 @@ fn require_exact_message_count(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{DrawablePoint, DrawableSize};
     use litchi_iwa_common::shape::path::Preset;
 
@@ -562,7 +562,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_native_shape_title_caption_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Shape labels")
             .build()
             .unwrap();

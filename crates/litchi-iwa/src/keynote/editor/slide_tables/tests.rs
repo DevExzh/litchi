@@ -1,5 +1,5 @@
 use super::*;
-use crate::keynote::KeynoteDocumentBuilder;
+use crate::keynote;
 use crate::numbers::cell::CellValue;
 use litchi_iwa_common::table::cell::BorderSide;
 use litchi_iwa_common::table::cell::conditional_highlight::{
@@ -230,7 +230,7 @@ fn table_geometry() -> (DrawablePoint, DrawableSize) {
 
 #[test]
 fn source_built_table_has_no_conditional_highlighting_and_clear_is_idempotent() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Conditional", 2, 2, position, size)
@@ -256,7 +256,7 @@ fn source_built_table_has_no_conditional_highlighting_and_clear_is_idempotent() 
 
 #[test]
 fn source_built_table_creates_and_replaces_conditional_highlighting() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Conditional", 2, 2, position, size)
@@ -308,7 +308,7 @@ fn source_built_table_creates_and_replaces_conditional_highlighting() {
 
 #[test]
 fn source_built_table_roundtrips_cell_border_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Borders", 3, 3, position, size)
@@ -345,7 +345,7 @@ fn source_built_table_roundtrips_cell_border_crud() {
 
 #[test]
 fn source_built_table_roundtrips_cell_fill_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Fills", 3, 3, position, size)
@@ -383,7 +383,7 @@ fn source_built_table_roundtrips_cell_fill_crud() {
 
 #[test]
 fn source_built_table_roundtrips_cell_layout_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Layout", 3, 3, position, size)
@@ -423,7 +423,7 @@ fn source_built_table_roundtrips_cell_layout_crud() {
 
 #[test]
 fn source_built_table_roundtrips_number_data_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Formats", 3, 3, position, size)
@@ -467,7 +467,7 @@ fn source_built_table_roundtrips_number_data_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_percentage_data_format() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Percentages", 3, 3, position, size)
@@ -516,7 +516,7 @@ fn source_built_table_roundtrips_percentage_data_format() {
 
 #[test]
 fn source_built_table_roundtrips_currency_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Currencies", 3, 3, position, size)
@@ -563,7 +563,7 @@ fn source_built_table_roundtrips_currency_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_scientific_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Scientific", 3, 3, position, size)
@@ -604,7 +604,7 @@ fn source_built_table_roundtrips_scientific_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_fraction_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Fractions", 3, 3, position, size)
@@ -645,7 +645,7 @@ fn source_built_table_roundtrips_fraction_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_numeral_system_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Numeral Systems", 3, 3, position, size)
@@ -691,7 +691,7 @@ fn source_built_table_roundtrips_numeral_system_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_date_time_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Dates", 3, 3, position, size)
@@ -732,7 +732,7 @@ fn source_built_table_roundtrips_date_time_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_duration_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Durations", 3, 3, position, size)
@@ -774,7 +774,7 @@ fn source_built_table_roundtrips_duration_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_checkbox_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Checkboxes", 3, 3, position, size)
@@ -812,7 +812,7 @@ fn source_built_table_roundtrips_checkbox_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_star_rating_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Ratings", 3, 3, position, size)
@@ -850,7 +850,7 @@ fn source_built_table_roundtrips_star_rating_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_slider_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Sliders", 3, 3, position, size)
@@ -890,7 +890,7 @@ fn source_built_table_roundtrips_slider_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_stepper_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Steppers", 3, 3, position, size)
@@ -930,7 +930,7 @@ fn source_built_table_roundtrips_stepper_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_text_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Text", 3, 3, position, size)
@@ -977,7 +977,7 @@ fn source_built_table_roundtrips_text_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_custom_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Custom Numbers", 3, 3, position, size)
@@ -1021,7 +1021,7 @@ fn source_built_table_roundtrips_custom_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_pop_up_menu_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Menus", 3, 3, position, size)
@@ -1060,7 +1060,7 @@ fn source_built_table_roundtrips_pop_up_menu_format_crud() {
 
 #[test]
 fn source_built_table_roundtrips_full_crud() {
-    let editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let editor = keynote::Builder::new().build().unwrap();
     assert!(editor.slide_tables(0).unwrap().is_empty());
     let mut package = editor.into_package();
     let engine = package.remove_entry("Index/CalculationEngine.iwa").unwrap();
@@ -1203,7 +1203,7 @@ fn source_built_table_roundtrips_full_crud() {
 
 #[test]
 fn source_built_table_duplication_clones_formula_storage_and_geometry() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let source = editor
         .add_slide_table(0, "Budget", 3, 2, position, size)
@@ -1313,7 +1313,7 @@ fn source_built_table_duplication_clones_formula_storage_and_geometry() {
 
 #[test]
 fn source_built_table_roundtrips_formula_crud_transactionally() {
-    let editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let editor = keynote::Builder::new().build().unwrap();
     let mut package = editor.into_package();
     let engine = package.remove_entry("Index/CalculationEngine.iwa").unwrap();
     package
@@ -1410,7 +1410,7 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
 
 #[test]
 fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Topology", 4, 4, position, size)
@@ -1496,7 +1496,7 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
 
 #[test]
 fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Footer aggregate", 4, 3, position, size)
@@ -1554,7 +1554,7 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
 
 #[test]
 fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Fixed sections", 4, 4, position, size)
@@ -1655,7 +1655,7 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
 
 #[test]
 fn source_built_table_roundtrips_title_settings_transactionally() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
         .add_slide_table(0, "Forecast", 2, 2, position, size)
@@ -1705,7 +1705,7 @@ fn source_built_table_roundtrips_title_settings_transactionally() {
 
 #[test]
 fn tables_on_multiple_slides_remain_isolated() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let layout = editor
         .slide_layouts()
         .unwrap()
@@ -1728,7 +1728,7 @@ fn tables_on_multiple_slides_remain_isolated() {
 
 #[test]
 fn source_built_tables_list_in_z_order_and_roundtrip_through_catalog() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let (position, size) = table_geometry();
     editor
         .add_slide_table(0, "First", 2, 2, position, size)

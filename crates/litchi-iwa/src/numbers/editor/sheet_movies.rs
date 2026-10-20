@@ -665,7 +665,7 @@ impl NumbersEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::{NumbersDocumentBuilder, NumbersSheetImageOptions};
+    use crate::numbers::{self, NumbersSheetImageOptions};
     use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-numbers-movie";
@@ -699,7 +699,7 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn scratch_spreadsheet_supports_movie_crud_without_a_source_package() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Movies")
             .build()
             .unwrap();
@@ -896,7 +896,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_movie_title_caption_crud() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Movie labels")
             .build()
             .unwrap();
@@ -992,7 +992,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_movie_duplication() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Movies")
             .build()
             .unwrap();
@@ -1150,7 +1150,7 @@ mod tests {
 
     #[test]
     fn invalid_movie_creation_and_cross_type_edits_are_transactional() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let baseline = editor.to_bytes().unwrap();
         assert!(editor.duplicate_sheet_movie(sheet_id, 999).is_err());

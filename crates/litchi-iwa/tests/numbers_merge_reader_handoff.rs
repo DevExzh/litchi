@@ -9,7 +9,7 @@ use std::error::Error as StdError;
 
 use litchi_iwa::{
     Error as IwaError,
-    numbers::{NumbersDocumentBuilder, NumbersEditor},
+    numbers::{self, NumbersEditor},
 };
 use litchi_iwa_archive::{
     Limits as ArchiveLimits,
@@ -148,7 +148,7 @@ fn find_native_tile_identifier(catalog: &Catalog) -> TestResult<u64> {
 /// compatibility reader can still recover the merge owner while the focused
 /// reader must reject the malformed rooted graph.
 fn undeclared_model_reference_source() -> TestResult<(Vec<u8>, u64)> {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .sheet_name("Merges")
         .table_name("Original")
         .table_dimensions(4, 4)

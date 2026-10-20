@@ -382,13 +382,13 @@ mod tests {
 
     use super::*;
     use crate::archive::RawMessage;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE};
     use crate::protobuf::tsp::{ObjectUuidMapEntry, PackageMetadata};
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     fn chart_editor() -> (KeynoteEditor, u64) {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let data = ChartData::new(
             vec!["Series".to_owned()],
             vec!["Category".to_owned()],

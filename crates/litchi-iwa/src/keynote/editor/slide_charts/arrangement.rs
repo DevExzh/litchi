@@ -89,12 +89,12 @@ fn map_focused_chart_arrangement_error(error: litchi_keynote::chart::arrangement
 mod tests {
     use super::*;
     use crate::charts::{ChartData, Kind};
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_presentation_supports_chart_arrangement_selector_crud() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let chart = editor
             .add_slide_chart(
                 0,
@@ -176,7 +176,7 @@ mod tests {
         const CHART_COUNT: usize = 32;
         const TARGET_POSITION: usize = 17;
 
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         editor
             .add_slide_chart(
                 0,

@@ -1392,7 +1392,7 @@ mod tests {
     use super::*;
     use crate::numbers::cell::CellValue;
     use crate::numbers::editor::compatibility_document_from_bytes;
-    use crate::numbers::{NumbersDocumentBuilder, NumbersEditor, SemanticTableCellAssertions};
+    use crate::numbers::{self, NumbersEditor, SemanticTableCellAssertions};
     use litchi_numbers::cell::data_format::control::Range;
     use litchi_numbers::cell::data_format::custom::{
         Condition, ConditionValue, Custom, DateTime as CustomDateTime, DateTimePattern, Name,
@@ -1609,7 +1609,7 @@ mod tests {
 
     #[test]
     fn source_built_table_roundtrips_reuses_and_resets_cell_control_checkbox() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_name("Checkboxes")
             .table_dimensions(3, 3)
             .build()
@@ -1691,7 +1691,7 @@ mod tests {
 
     #[test]
     fn source_built_table_roundtrips_reuses_and_resets_cell_control_star_rating() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_name("Ratings")
             .table_dimensions(3, 3)
             .build()
@@ -1783,7 +1783,7 @@ mod tests {
 
     #[test]
     fn source_built_table_roundtrips_reuses_and_resets_cell_control_slider() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_name("Sliders")
             .table_dimensions(3, 3)
             .build()
@@ -1896,7 +1896,7 @@ mod tests {
 
     #[test]
     fn source_built_table_roundtrips_reuses_and_resets_cell_control_stepper() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_name("Steppers")
             .table_dimensions(3, 3)
             .build()
@@ -2009,7 +2009,7 @@ mod tests {
 
     #[test]
     fn source_built_table_roundtrips_reuses_and_resets_generic_text_formats() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_name("Text")
             .table_dimensions(3, 3)
             .build()
@@ -2087,7 +2087,7 @@ mod tests {
 
     #[test]
     fn source_built_table_roundtrips_reuses_and_cleans_up_custom_formats() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_name("Custom Formats")
             .table_dimensions(4, 4)
             .build()
@@ -2202,7 +2202,7 @@ mod tests {
 
     #[test]
     fn source_built_table_roundtrips_reuses_and_resets_duration_formats() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_name("Durations")
             .table_dimensions(3, 3)
             .build()
@@ -2307,7 +2307,7 @@ mod tests {
 
     #[test]
     fn source_built_table_roundtrips_reuses_and_resets_date_time_formats() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_name("Dates")
             .table_dimensions(3, 3)
             .build()
@@ -2368,7 +2368,7 @@ mod tests {
 
     #[test]
     fn source_built_table_roundtrips_reuses_and_resets_numeral_system_formats() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_name("Numeral Systems")
             .table_dimensions(3, 3)
             .build()
@@ -2434,7 +2434,7 @@ mod tests {
 
     #[test]
     fn source_built_table_roundtrips_reuses_and_resets_scientific_formats() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_name("Scientific")
             .table_dimensions(3, 3)
             .build()
@@ -2487,7 +2487,7 @@ mod tests {
 
     #[test]
     fn source_built_table_roundtrips_reuses_and_resets_currency_formats() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_name("Currencies")
             .table_dimensions(3, 3)
             .build()
@@ -2546,7 +2546,7 @@ mod tests {
 
     #[test]
     fn source_built_table_roundtrips_and_reuses_number_formats() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_name("Formats")
             .table_dimensions(3, 3)
             .build()
@@ -2621,7 +2621,7 @@ mod tests {
 
     #[test]
     fn invalid_number_format_coordinate_is_transactional() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(2, 2)
             .build()
             .unwrap();
@@ -2637,7 +2637,7 @@ mod tests {
 
     #[test]
     fn source_built_table_converts_and_reuses_percentage_formats() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_name("Percentages")
             .table_dimensions(3, 3)
             .build()

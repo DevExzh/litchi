@@ -1,6 +1,6 @@
 //! Create a source-built Numbers workbook with cells across sparse tile boundaries.
 
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
+use litchi_iwa::numbers::{self, NumbersEditor};
 use litchi_numbers::table::At;
 use litchi_numbers::table::cells::{Change, Input};
 use litchi_numbers::{Package, SheetSelector, TableSelector};
@@ -9,7 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
         .nth(1)
         .ok_or("usage: create_numbers_sparse_table <output.numbers>")?;
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_name("Sparse inventory")
         .table_dimensions(257, 2)
         .build()?;

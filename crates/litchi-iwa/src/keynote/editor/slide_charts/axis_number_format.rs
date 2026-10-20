@@ -77,12 +77,12 @@ fn set_slide_chart_axis_number_format(
 mod tests {
     use super::*;
     use crate::charts::{ChartData, DecimalPlaces, Kind, NegativeStyle};
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_presentation_supports_axis_number_format_crud() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let chart = editor
             .add_slide_chart(
                 0,

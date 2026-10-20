@@ -10,7 +10,7 @@ use std::error::Error;
 use std::io;
 use std::time::Duration;
 
-use litchi_iwa::keynote::{BuildStart, KeynoteDocumentBuilder, KeynoteEditor};
+use litchi_iwa::keynote::{self, BuildStart, KeynoteEditor};
 use litchi_iwa_archive::{iwa::Archive, package::Catalog};
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_iwa_protos::{kn, tsd};
@@ -400,7 +400,7 @@ fn set_movie_labels(
 
 #[allow(deprecated)]
 fn source_fixture() -> Result<SourceFixture, Box<dyn Error>> {
-    let mut editor = KeynoteDocumentBuilder::new()
+    let mut editor = keynote::Builder::new()
         .title("Focused media lifecycle")
         .subtitle("Source-built compatibility fixture")
         .build()?;

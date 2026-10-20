@@ -142,7 +142,7 @@ fn replace_slide_drawable_order(
 mod tests {
     use super::*;
     use crate::DrawableLayerMove;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     const OVERLAP_POSITION: DrawablePoint = DrawablePoint { x: 704.0, y: 284.0 };
@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_drawable_order_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Layered")
             .subtitle("Arrange API")
             .build()

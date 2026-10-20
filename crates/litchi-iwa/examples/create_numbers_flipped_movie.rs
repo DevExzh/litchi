@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersSheetMovieOptions};
+use litchi_iwa::numbers::{self, NumbersSheetMovieOptions};
 use litchi_iwa::shapes::{DrawableFlipAxis, DrawablePoint, DrawableSize};
 
 const MOVIE_DURATION: Duration = Duration::from_secs(8);
@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let movie = fs::read(&movie_path)?;
     let poster = fs::read(&poster_path)?;
 
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .sheet_name("Flipped Movie")
         .build()?;
     let sheet_id = editor.sheets()?[0].id();

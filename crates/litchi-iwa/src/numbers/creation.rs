@@ -213,7 +213,7 @@ const DOCUMENT_OBJECTS: &[u64] = &[
 /// Every archive and identity is generated from typed values. No Apple template
 /// or prebuilt blank package is copied into the result.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NumbersDocumentBuilder {
+pub struct Builder {
     sheet_name: String,
     table_name: String,
     rows: usize,
@@ -222,7 +222,7 @@ pub struct NumbersDocumentBuilder {
     locale: String,
 }
 
-impl Default for NumbersDocumentBuilder {
+impl Default for Builder {
     fn default() -> Self {
         Self {
             sheet_name: DEFAULT_SHEET_NAME.to_owned(),
@@ -235,7 +235,7 @@ impl Default for NumbersDocumentBuilder {
     }
 }
 
-impl NumbersDocumentBuilder {
+impl Builder {
     /// Start a spreadsheet containing one sheet and one empty table.
     pub fn new() -> Self {
         Self::default()
@@ -336,16 +336,16 @@ impl NumbersDocumentBuilder {
 }
 
 impl NumbersEditor {
-    pub fn builder() -> NumbersDocumentBuilder {
-        NumbersDocumentBuilder::new()
+    pub fn builder() -> Builder {
+        Builder::new()
     }
 
     pub fn create() -> Result<Self> {
-        NumbersDocumentBuilder::new().build()
+        Builder::new().build()
     }
 }
 
-fn document_archive(builder: &NumbersDocumentBuilder, table_uuid: &tsp::Uuid) -> Result<Archive> {
+fn document_archive(builder: &Builder, table_uuid: &tsp::Uuid) -> Result<Archive> {
     let document = tn::DocumentArchive {
         sheets: vec![reference(SHEET)],
         super_: tsa::DocumentArchive {
@@ -1413,7 +1413,7 @@ mod tests {
 
     #[test]
     fn generated_theme_exposes_distinct_canonical_list_presets() {
-        let package = NumbersDocumentBuilder::new().build_package().unwrap();
+        let package = Builder::new().build_package().unwrap();
         let document = package.archive(DOCUMENT_ARCHIVE_ENTRY).unwrap();
         let theme = document.object(THEME).unwrap();
         let theme = IWorkThemeArchive::decode(&theme.messages[0].data).unwrap();
@@ -1443,7 +1443,7 @@ mod tests {
 
     #[test]
     fn generated_theme_exposes_unique_native_paragraph_style_catalog() {
-        let package = NumbersDocumentBuilder::new().build_package().unwrap();
+        let package = Builder::new().build_package().unwrap();
         let styles = crate::text::paragraph_alignment::native::named_paragraph_styles(
             &package,
             PARAGRAPH_STYLE,
@@ -1500,7 +1500,7 @@ mod tests {
 
     #[test]
     fn creates_and_reopens_independent_spreadsheet() {
-        let editor = NumbersDocumentBuilder::new()
+        let editor = Builder::new()
             .sheet_name("Inventory")
             .table_name("Stock")
             .table_dimensions(12, 4)
@@ -1566,7 +1566,7 @@ mod tests {
                 .unwrap()
         }
 
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = Builder::new().build().unwrap();
         let initial = editor.tables().unwrap().remove(0);
         assert_eq!(
             uid_map_message_type(&editor, initial.object_id),
@@ -1610,8 +1610,8 @@ mod tests {
             "Metadata/BuildVersionHistory.plist",
         ];
 
-        let first = NumbersDocumentBuilder::new().build_package().unwrap();
-        let second = NumbersDocumentBuilder::new().build_package().unwrap();
+        let first = Builder::new().build_package().unwrap();
+        let second = Builder::new().build_package().unwrap();
         assert_eq!(first.entry_names().collect::<Vec<_>>(), EXPECTED_ENTRIES);
         assert_eq!(first.len(), EXPECTED_ENTRIES.len());
         assert!(first.entry_names().all(|name| !name.starts_with("Data/")));
@@ -1956,18 +1956,8 @@ mod tests {
 
     #[test]
     fn rejects_invalid_creation_parameters() {
-        assert!(
-            NumbersDocumentBuilder::new()
-                .sheet_name(" ")
-                .build()
-                .is_err()
-        );
-        assert!(
-            NumbersDocumentBuilder::new()
-                .table_dimensions(0, 1)
-                .build()
-                .is_err()
-        );
-        assert!(NumbersDocumentBuilder::new().locale("").build().is_err());
+        assert!(Builder::new().sheet_name(" ").build().is_err());
+        assert!(Builder::new().table_dimensions(0, 1).build().is_err());
+        assert!(Builder::new().locale("").build().is_err());
     }
 }

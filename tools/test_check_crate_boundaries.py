@@ -7661,7 +7661,7 @@ def add_pages_table_hidden_axes_retirement_evidence(
             host_test.read_text(encoding="utf-8")
             + "\n#[test]\n"
             "fn focused_source_built_table_roundtrips_hidden_axes_transactionally() {\n"
-            "    let mut editor = PagesDocumentBuilder::new()\n"
+            "    let mut editor = pages::Builder::new()\n"
             "        .body_table(\"Hidden\", 4, 3)\n"
             "        .build()\n"
             "        .unwrap();\n"
@@ -7690,7 +7690,7 @@ def add_pages_table_hidden_axes_retirement_evidence(
         example.write_text(
             example.read_text(encoding="utf-8")
             + "\nfn focused_source_built_pages_hidden_axes_example() {\n"
-            "    let mut editor = PagesDocumentBuilder::new()\n"
+            "    let mut editor = pages::Builder::new()\n"
             "        .body_table(\"Hidden\", 4, 3)\n"
             "        .build()\n"
             "        .unwrap();\n"
@@ -7721,11 +7721,11 @@ def add_pages_table_hidden_axes_retirement_evidence(
         host_test = root / boundaries.PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_SOURCE
         host_test.write_text(
             "use litchi_pages::{BodyTableSelector, Package as PagesPackage};\n"
-            "use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};\n"
+            "use litchi_iwa::pages::{self, PagesEditor};\n"
             "use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};\n"
             "#[test]\n"
             "fn focused_source_built_table_roundtrips_hidden_axes_transactionally() {\n"
-            "    let mut editor = PagesDocumentBuilder::new().body_table(\"Hidden\", 4, 3).build().unwrap();\n"
+            "    let mut editor = pages::Builder::new().body_table(\"Hidden\", 4, 3).build().unwrap();\n"
             "    let selector = BodyTableSelector::name(\"Hidden\");\n"
             "    let hidden = HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)]).unwrap();\n"
             "    let package = PagesPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();\n"
@@ -7746,7 +7746,7 @@ def add_pages_table_hidden_axes_retirement_evidence(
         example = root / boundaries.PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_EXAMPLE
         example.write_text(
             "fn create_pages(output: &Path) {\n"
-            "    let mut editor = PagesDocumentBuilder::new()\n"
+            "    let mut editor = pages::Builder::new()\n"
             "        .body_table(\"Hidden\", 4, 3).build().unwrap();\n"
             "    let selector = BodyTableSelector::name(\"Hidden\");\n"
             "    let package = PagesPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();\n"
@@ -11343,7 +11343,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             module = root / boundaries.IWA_KEYNOTE_MODULE_SOURCE
             module.parent.mkdir(parents=True)
             module.write_text(
-                "pub use creation::KeynoteDocumentBuilder;\n"
+                "pub use creation::Builder;\n"
                 "pub use litchi_keynote::Package;\n",
                 encoding="utf-8",
             )
@@ -11355,7 +11355,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 path = root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(
-                    "use litchi_iwa::keynote::KeynoteDocumentBuilder;\n"
+                    "use litchi_iwa::keynote;\n"
                     "use litchi_keynote::{Package, document::Document};\n"
                     "pub struct KeynoteDocuments;\n"
                     "pub struct LegacyKeynoteDocumentStats;\n"
@@ -11364,7 +11364,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 )
             readme = root / boundaries.IWA_KEYNOTE_README
             readme.write_text(
-                "Use `KeynoteDocumentBuilder`, `litchi_keynote::Package`, or "
+                "Use `keynote::Builder`, `litchi_keynote::Package`, or "
                 "`litchi_keynote::document::Document`.\n",
                 encoding="utf-8",
             )
@@ -19626,7 +19626,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             source = root / "crates/litchi-iwa/src/numbers/creation.rs"
             source.parent.mkdir(parents=True)
             source.write_text(
-                "pub struct NumbersDocumentBuilder;\n"
+                "pub struct numbers::Builder;\n"
                 "pub struct NumbersEditor;\n"
                 "pub struct NumbersTable;\n"
                 "pub struct TableDataExtractor;\n"
@@ -19928,7 +19928,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             module = root / boundaries.IWA_PAGES_MODULE_SOURCE
             module.parent.mkdir(parents=True)
             module.write_text(
-                "pub use creation::PagesDocumentBuilder;\n"
+                "pub use creation::Builder;\n"
                 "pub use editor::PagesEditor;\n"
                 "use litchi_pages::{Document as FocusedDocument, "
                 "Package as FocusedPackage};\n"
@@ -19943,7 +19943,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 path = root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(
-                    "use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};\n"
+                    "use litchi_iwa::pages::{self, PagesEditor};\n"
                     "use litchi_pages::{Document, Package};\n"
                     "pub struct PagesDocuments;\n"
                     "pub struct LegacyPagesDocumentStats;\n"
@@ -19952,7 +19952,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 )
             readme = root / boundaries.IWA_PAGES_README
             readme.write_text(
-                "Use `PagesDocumentBuilder`, `PagesEditor`, "
+                "Use `pages::Builder`, `PagesEditor`, "
                 "`litchi_pages::Document`, or `litchi_pages::Package`.\n",
                 encoding="utf-8",
             )

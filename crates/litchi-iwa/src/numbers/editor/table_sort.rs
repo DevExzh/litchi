@@ -447,7 +447,7 @@ pub(super) fn delete_table_sort_column(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use litchi_numbers::table::topology::{
         ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion,
     };
@@ -490,7 +490,7 @@ mod tests {
 
     #[test]
     fn table_sort_selector_resolves_by_name_and_catalog_index() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_name("Revenue")
             .table_dimensions(2, 2)
             .build()
@@ -518,7 +518,7 @@ mod tests {
 
     #[test]
     fn full_table_sort_rules_survive_native_topology_semantics() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(4, 4)
             .build()
             .unwrap();

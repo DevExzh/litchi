@@ -5,7 +5,7 @@
 use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 
 use litchi_iwa::numbers::{
-    NumbersDocumentBuilder, NumbersEditor, NumbersTableSortColumnIndex, NumbersTableSortDirection,
+    self, NumbersEditor, NumbersTableSortColumnIndex, NumbersTableSortDirection,
     NumbersTableSortOrder, NumbersTableSortRule,
 };
 use litchi_numbers::table::At;
@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
         .nth(1)
         .ok_or("usage: create_numbers_sorted <output.numbers>")?;
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_name("Forecast")
         .table_dimensions(5, 3)
         .build()?;

@@ -559,7 +559,7 @@ impl NumbersEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::DrawableSize;
     use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 
@@ -583,10 +583,7 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn scratch_spreadsheet_supports_audio_crud_without_a_source_package() {
-        let mut editor = NumbersDocumentBuilder::new()
-            .sheet_name("Audio")
-            .build()
-            .unwrap();
+        let mut editor = numbers::Builder::new().sheet_name("Audio").build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         assert!(editor.sheet_audio(sheet_id).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
@@ -698,10 +695,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_audio_duplication() {
-        let mut editor = NumbersDocumentBuilder::new()
-            .sheet_name("Audio")
-            .build()
-            .unwrap();
+        let mut editor = numbers::Builder::new().sheet_name("Audio").build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_audio(sheet_id, "audio.aiff", AUDIO, options())
@@ -811,7 +805,7 @@ mod tests {
 
     #[test]
     fn invalid_audio_creation_and_cross_type_edits_are_transactional() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let baseline = editor.to_bytes().unwrap();
         assert!(editor.duplicate_sheet_audio(sheet_id, 999).is_err());
@@ -876,7 +870,7 @@ mod tests {
 
     #[test]
     fn removing_one_sheet_audio_preserves_another() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let first = editor
             .add_sheet_audio(sheet_id, "first.aiff", AUDIO, options())

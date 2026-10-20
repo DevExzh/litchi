@@ -203,11 +203,11 @@ fn require_reply(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pages::PagesDocumentBuilder;
+    use crate::pages;
 
     #[test]
     fn source_built_table_comment_threads_support_full_crud() {
-        let mut editor = PagesDocumentBuilder::new()
+        let mut editor = pages::Builder::new()
             .body_text("Comment validation\n")
             .body_table("Review", 2, 2)
             .build()

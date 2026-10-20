@@ -1,7 +1,7 @@
 //! Create and physically sort a plain-text Numbers table without an input document.
 
 use litchi_iwa::numbers::{
-    NumbersDocumentBuilder, NumbersEditor, NumbersTableSortColumnIndex, NumbersTableSortDirection,
+    self, NumbersEditor, NumbersTableSortColumnIndex, NumbersTableSortDirection,
     NumbersTableSortOrder, NumbersTableSortRule,
 };
 use litchi_numbers::table::At;
@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
         .nth(1)
         .ok_or("usage: create_numbers_text_sorted <output.numbers>")?;
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_name("Cities")
         .table_dimensions(5, 2)
         .build()?;

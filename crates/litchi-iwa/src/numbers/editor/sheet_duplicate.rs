@@ -508,8 +508,7 @@ mod tests {
 
     use super::*;
     use crate::numbers::{
-        NumbersDocumentBuilder, NumbersSheetAudioOptions, NumbersSheetImageOptions,
-        NumbersSheetMovieOptions,
+        self, NumbersSheetAudioOptions, NumbersSheetImageOptions, NumbersSheetMovieOptions,
     };
     use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, RgbaColor, ShapeFill};
     use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
@@ -547,10 +546,7 @@ mod tests {
 
     #[test]
     fn source_built_movie_sheet_duplicates_with_native_shared_asset_semantics() {
-        let mut editor = NumbersDocumentBuilder::new()
-            .sheet_name("Movie")
-            .build()
-            .unwrap();
+        let mut editor = numbers::Builder::new().sheet_name("Movie").build().unwrap();
         let source_sheet = editor.sheets().unwrap().remove(0);
         let source = editor
             .add_sheet_movie(
@@ -674,10 +670,7 @@ mod tests {
 
     #[test]
     fn source_built_audio_sheet_duplicates_with_native_shared_asset_semantics() {
-        let mut editor = NumbersDocumentBuilder::new()
-            .sheet_name("Audio")
-            .build()
-            .unwrap();
+        let mut editor = numbers::Builder::new().sheet_name("Audio").build().unwrap();
         let source_sheet = editor.sheets().unwrap().remove(0);
         let source = editor
             .add_sheet_audio(
@@ -747,7 +740,7 @@ mod tests {
 
     #[test]
     fn source_built_shape_sheet_duplicates_with_native_independent_storage() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Shapes")
             .build()
             .unwrap();
@@ -849,10 +842,7 @@ mod tests {
 
     #[test]
     fn source_built_image_sheet_duplicates_with_native_shared_asset_semantics() {
-        let mut editor = NumbersDocumentBuilder::new()
-            .sheet_name("Media")
-            .build()
-            .unwrap();
+        let mut editor = numbers::Builder::new().sheet_name("Media").build().unwrap();
         let source_sheet = editor.sheets().unwrap().remove(0);
         let source = editor
             .add_sheet_image(

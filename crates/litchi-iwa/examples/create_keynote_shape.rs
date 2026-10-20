@@ -2,7 +2,7 @@
 
 use std::{env, fs, path::Path};
 
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote;
 use litchi_iwa::shapes::{
     Appearance, BlurRadius, Curve, Curved, DrawablePoint, DrawableSize, Offset, RgbColorSpace,
     RgbaColor, Shadow, ShapeFill, ShapeImageFillTechnique,
@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = KeynoteDocumentBuilder::new()
+    let mut editor = keynote::Builder::new()
         .title("Created from scratch")
         .subtitle("Shape built from typed IWA objects")
         .build()?;

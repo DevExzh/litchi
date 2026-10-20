@@ -13,7 +13,7 @@ mod cases {
     use std::time::Duration;
 
     use crate::archive::RawMessage;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{DrawablePoint, DrawableSize};
     use crate::wire::remove_repeated_length_delimited_field_where;
     use litchi_keynote::slide::audio::Options as SlideAudioOptions;
@@ -461,7 +461,7 @@ mod cases {
 
     #[test]
     fn source_built_movie_properties_project_through_focused_updates() -> TestResult {
-        let mut seed = KeynoteDocumentBuilder::new()
+        let mut seed = keynote::Builder::new()
             .title("Movie properties projection")
             .build()?;
         add_movie(
@@ -558,7 +558,7 @@ mod cases {
 
     #[test]
     fn source_built_movie_properties_support_an_absent_poster() -> TestResult {
-        let mut seed = KeynoteDocumentBuilder::new()
+        let mut seed = keynote::Builder::new()
             .title("Movie properties without poster")
             .build()?;
         add_movie(
@@ -611,7 +611,7 @@ mod cases {
 
     #[test]
     fn source_built_movie_properties_support_missing_content_data() -> TestResult {
-        let mut seed = KeynoteDocumentBuilder::new()
+        let mut seed = keynote::Builder::new()
             .title("Movie properties without content")
             .build()?;
         add_movie(
@@ -670,7 +670,7 @@ mod cases {
 
     #[test]
     fn scratch_presentation_supports_movie_crud_without_a_source_drawable() -> TestResult {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Scratch movie")
             .subtitle("No embedded package")
             .build()?;
@@ -862,9 +862,7 @@ mod cases {
 
     #[test]
     fn scratch_presentation_supports_native_movie_title_caption_crud() -> TestResult {
-        let mut editor = KeynoteDocumentBuilder::new()
-            .title("Movie labels")
-            .build()?;
+        let mut editor = keynote::Builder::new().title("Movie labels").build()?;
         add_movie(
             &mut editor,
             "movie.mov",
@@ -924,7 +922,7 @@ mod cases {
 
     #[test]
     fn movie_caption_package_preserves_movie_selector_order_after_audio() -> TestResult {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Movie caption selector order")
             .build()?;
         add_audio(
@@ -970,7 +968,7 @@ mod cases {
 
     #[test]
     fn invalid_movie_creation_is_transactional() -> TestResult {
-        let mut editor = KeynoteDocumentBuilder::new().build()?;
+        let mut editor = keynote::Builder::new().build()?;
         let baseline = editor.to_bytes()?;
 
         for result in [

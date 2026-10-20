@@ -2,8 +2,8 @@ use prost::Message;
 
 use super::*;
 use crate::archive::{ArchiveObject, MessageInfo, RawMessage};
-use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use crate::numbers::{NumbersDocumentBuilder, NumbersEditor};
+use crate::keynote::{self, KeynoteEditor};
+use crate::numbers::{self, NumbersEditor};
 use crate::pages::PagesEditor;
 use crate::protobuf::tswp;
 use crate::shapes::{
@@ -95,7 +95,7 @@ fn pages_following_paragraph_style_catalog_round_trips_and_resets() {
 
 #[test]
 fn source_theme_paragraph_presets_are_deduplicated_across_suite_wrappers() {
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -126,7 +126,7 @@ fn source_theme_paragraph_presets_are_deduplicated_across_suite_wrappers() {
         ]
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -281,7 +281,7 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
     );
     assert_eq!(pages.to_bytes().unwrap(), before_last_delete);
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -335,7 +335,7 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
     );
     assert_eq!(numbers_text.package().to_bytes().unwrap(), initial_numbers);
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -505,7 +505,7 @@ fn named_paragraph_style_application_and_replacement_deletion_are_transactional(
     );
     assert_eq!(pages.to_bytes().unwrap(), initial_pages);
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -520,7 +520,7 @@ fn named_paragraph_style_application_and_replacement_deletion_are_transactional(
         .unwrap();
     assert_numbers_style_lifecycle(&mut numbers, sheet_id, numbers_box.drawable_object_id);
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -751,7 +751,7 @@ fn named_paragraph_style_redefinition_propagates_across_suites() {
         );
     }
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let first = numbers
         .add_sheet_text_box(
@@ -813,7 +813,7 @@ fn named_paragraph_style_redefinition_propagates_across_suites() {
         );
     }
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let first = keynote
         .add_slide_text_box(
             0,
@@ -1610,7 +1610,7 @@ fn uniform_text_script_round_trips_isolates_and_resets_in_every_suite() {
         TextCapitalization::AllCaps
     );
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -1657,7 +1657,7 @@ fn uniform_text_script_round_trips_isolates_and_resets_in_every_suite() {
         TextCapitalization::SmallCaps
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -1768,7 +1768,7 @@ fn uniform_baseline_shift_round_trips_isolates_and_resets_in_every_suite() {
     );
 
     let numbers_shift = TextBaselineShift::from_points(-3.0).unwrap();
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -1816,7 +1816,7 @@ fn uniform_baseline_shift_round_trips_isolates_and_resets_in_every_suite() {
     );
 
     let keynote_shift = TextBaselineShift::from_points(5.0).unwrap();
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -1924,7 +1924,7 @@ fn uniform_character_spacing_round_trips_isolates_and_resets_in_every_suite() {
     );
 
     let numbers_spacing = TextCharacterSpacing::from_percent(-8.0).unwrap();
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -1972,7 +1972,7 @@ fn uniform_character_spacing_round_trips_isolates_and_resets_in_every_suite() {
     );
 
     let keynote_spacing = TextCharacterSpacing::from_percent(6.0).unwrap();
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -2087,7 +2087,7 @@ fn uniform_ligatures_round_trip_isolate_and_reset_in_every_suite() {
     );
 
     let numbers_shift = TextBaselineShift::from_points(-3.0).unwrap();
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -2134,7 +2134,7 @@ fn uniform_ligatures_round_trip_isolate_and_reset_in_every_suite() {
         numbers_shift
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -2243,7 +2243,7 @@ fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
     );
 
     let numbers_shift = TextBaselineShift::from_points(-3.0).unwrap();
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -2290,7 +2290,7 @@ fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
         numbers_shift
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -2395,7 +2395,7 @@ fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
     );
 
     let numbers_shift = TextBaselineShift::from_points(-3.0).unwrap();
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -2442,7 +2442,7 @@ fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
         numbers_shift
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -2552,7 +2552,7 @@ fn uniform_text_background_round_trips_isolates_and_resets_in_every_suite() {
     let numbers_background =
         Background::Color(RgbaColor::new(0.22, 0.82, 0.38, 1.0, RgbColorSpace::Srgb).unwrap());
     let numbers_shift = TextBaselineShift::from_points(-3.0).unwrap();
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -2602,7 +2602,7 @@ fn uniform_text_background_round_trips_isolates_and_resets_in_every_suite() {
     let keynote_background = Background::Color(
         RgbaColor::new(0.18, 0.44, 0.92, 0.84, RgbColorSpace::DisplayP3).unwrap(),
     );
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -2702,7 +2702,7 @@ fn paragraph_background_round_trips_isolates_and_resets_in_every_suite() {
     );
     assert_eq!(pages.to_bytes().unwrap(), pages_before);
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -2730,7 +2730,7 @@ fn paragraph_background_round_trips_isolates_and_resets_in_every_suite() {
         background
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -2819,7 +2819,7 @@ fn paragraph_borders_round_trip_isolate_and_reset_in_every_suite() {
     );
     assert_eq!(pages.to_bytes().unwrap(), pages_before);
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -2851,7 +2851,7 @@ fn paragraph_borders_round_trip_isolate_and_reset_in_every_suite() {
     );
     assert_eq!(numbers.to_bytes().unwrap(), numbers_before);
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -2943,7 +2943,7 @@ fn paragraph_flow_round_trips_isolates_and_resets_in_every_suite() {
     );
     assert_eq!(pages.to_bytes().unwrap(), pages_before);
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -2975,7 +2975,7 @@ fn paragraph_flow_round_trips_isolates_and_resets_in_every_suite() {
     );
     assert_eq!(numbers.to_bytes().unwrap(), numbers_before);
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -3046,7 +3046,7 @@ fn paragraph_writing_direction_round_trips_and_resets_in_every_suite() {
     );
     assert_eq!(pages.to_bytes().unwrap(), pages_before);
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -3085,7 +3085,7 @@ fn paragraph_writing_direction_round_trips_and_resets_in_every_suite() {
     );
     assert_eq!(numbers.to_bytes().unwrap(), numbers_before);
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -3180,7 +3180,7 @@ fn paragraph_tab_defaults_round_trip_compose_and_reset_in_every_suite() {
     );
     assert_eq!(pages.to_bytes().unwrap(), pages_before);
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -3255,7 +3255,7 @@ fn paragraph_tab_defaults_round_trip_compose_and_reset_in_every_suite() {
     );
     assert_eq!(numbers.to_bytes().unwrap(), numbers_before);
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -3391,7 +3391,7 @@ fn uniform_text_font_round_trips_isolates_and_resets_in_every_suite() {
     );
 
     let numbers_font = TextFont::named("TimesNewRomanPS-ItalicMT").unwrap();
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -3435,7 +3435,7 @@ fn uniform_text_font_round_trips_isolates_and_resets_in_every_suite() {
     );
 
     let keynote_font = TextFont::named("AvenirNext-BoldItalic").unwrap();
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -3541,7 +3541,7 @@ fn uniform_capitalization_round_trips_isolates_and_resets_in_every_suite() {
         pages_color
     );
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -3575,7 +3575,7 @@ fn uniform_capitalization_round_trips_isolates_and_resets_in_every_suite() {
             .unwrap()
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -3678,7 +3678,7 @@ fn uniform_text_color_round_trips_isolates_and_resets_in_every_suite() {
     );
 
     let numbers_color = RgbaColor::new(0.2, 0.8, 0.3, 1.0, RgbColorSpace::Srgb).unwrap();
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -3709,7 +3709,7 @@ fn uniform_text_color_round_trips_isolates_and_resets_in_every_suite() {
     );
 
     let keynote_color = RgbaColor::new(0.1, 0.5, 1.0, 0.75, RgbColorSpace::Srgb).unwrap();
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -3809,7 +3809,7 @@ fn uniform_text_decorations_round_trip_and_reset_independently_in_every_suite() 
 
     let numbers_decorations =
         TextDecorations::new(TextUnderline::Double, TextStrikethrough::Triple);
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -3857,7 +3857,7 @@ fn uniform_text_decorations_round_trip_and_reset_independently_in_every_suite() 
     );
 
     let keynote_decorations = TextDecorations::new(TextUnderline::Wavy, TextStrikethrough::Single);
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -3964,7 +3964,7 @@ fn uniform_text_style_round_trips_and_resets_independently_in_every_suite() {
     );
 
     let numbers_style = TextStyle::new(TextPointSize::from_points(21.0).unwrap()).with_italic(true);
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(
@@ -4019,7 +4019,7 @@ fn uniform_text_style_round_trips_and_resets_independently_in_every_suite() {
     let keynote_style = TextStyle::new(TextPointSize::from_points(23.0).unwrap())
         .with_bold(true)
         .with_italic(true);
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(
             0,
@@ -4292,7 +4292,7 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
 
 #[test]
 fn every_native_line_spacing_mode_round_trips_in_numbers() {
-    let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+    let mut editor = numbers::Builder::new().build().unwrap();
     let sheet_id = editor.sheets().unwrap()[0].object_id;
     let created = editor
         .add_sheet_text_box(
@@ -4409,7 +4409,7 @@ fn every_native_line_spacing_mode_round_trips_in_numbers() {
     reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
 )]
 fn keynote_spacing_reset_preserves_alignment() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let created = editor
         .add_slide_text_box(
             0,

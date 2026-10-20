@@ -654,10 +654,10 @@ The complete drawable graph and metadata are generated from typed values; no
 existing text box or blank package is required:
 
 ```rust
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersSheetImageOptions};
+use litchi_iwa::numbers::{self, NumbersSheetImageOptions};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
-let mut numbers = NumbersDocumentBuilder::new()
+let mut numbers = numbers::Builder::new()
     .sheet_name("Forecast")
     .table_name("Revenue")
     .build()?;
@@ -679,10 +679,10 @@ storage, stand-ins, style relationship, ownership, and UUIDs. No source
 drawable or package is copied:
 
 ```rust
-use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::numbers;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Preset};
 
-let mut numbers = NumbersDocumentBuilder::new().build()?;
+let mut numbers = numbers::Builder::new().build()?;
 let sheet_id = numbers.sheets()?[0].id();
 let shape = numbers.add_sheet_shape(
     sheet_id,
@@ -704,10 +704,10 @@ native endpoint styles. The path, empty storage, stand-ins, ownership, style
 inheritance, and UUID graph are emitted without a source package:
 
 ```rust
-use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::numbers;
 use litchi_iwa::shapes::{DrawablePoint, Endpoint, Endpoints};
 
-let mut numbers = NumbersDocumentBuilder::new().build()?;
+let mut numbers = numbers::Builder::new().build()?;
 let sheet_id = numbers.sheets()?[0].id();
 let line = numbers.add_sheet_line_with_endpoints(
     sheet_id,
@@ -738,11 +738,11 @@ asset are generated from typed values; no blank Numbers package is embedded:
 
 ```rust
 use std::fs;
-use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::numbers;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
 let image = fs::read("chart.png")?;
-let mut numbers = NumbersDocumentBuilder::new().build()?;
+let mut numbers = numbers::Builder::new().build()?;
 let sheet_id = numbers.sheets()?[0].id();
 let source = numbers.add_sheet_image(
     sheet_id,
@@ -772,12 +772,12 @@ and component data references are generated without an input package:
 ```rust
 use std::fs;
 use std::time::Duration;
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersSheetMovieOptions};
+use litchi_iwa::numbers::{self, NumbersSheetMovieOptions};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
 let movie = fs::read("demo.mov")?;
 let poster = fs::read("demo-poster.png")?;
-let mut numbers = NumbersDocumentBuilder::new().build()?;
+let mut numbers = numbers::Builder::new().build()?;
 let sheet_id = numbers.sheets()?[0].id();
 let source = numbers.add_sheet_movie(
     sheet_id,
@@ -812,11 +812,11 @@ objects:
 ```rust
 use std::fs;
 use std::time::Duration;
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersSheetAudioOptions};
+use litchi_iwa::numbers::{self, NumbersSheetAudioOptions};
 use litchi_iwa::shapes::DrawablePoint;
 
 let audio = fs::read("interview.aiff")?;
-let mut numbers = NumbersDocumentBuilder::new().build()?;
+let mut numbers = numbers::Builder::new().build()?;
 let sheet_id = numbers.sheets()?[0].id();
 let source = numbers.add_sheet_audio(
     sheet_id,
@@ -847,10 +847,10 @@ Builder-only work stays in the host, then hands the completed artifact to the
 focused package API for a transition edit. The handoff has no native IDs:
 
 ```rust,no_run
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote;
 use litchi_keynote::Package;
 
-let keynote = KeynoteDocumentBuilder::new().title("Draft").build()?;
+let keynote = keynote::Builder::new().title("Draft").build()?;
 let package = Package::from_bytes(&keynote.to_bytes()?)?;
 # let _ = package;
 # Ok::<(), Box<dyn std::error::Error>>(())
@@ -862,9 +862,9 @@ retained hidden for later toggling; fresh slides cloned from the layout preserve
 the same native behavior:
 
 ```rust
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote;
 
-let mut keynote = KeynoteDocumentBuilder::new()
+let mut keynote = keynote::Builder::new()
     .title("Native slide numbers")
     .slide_number_visible(true)
     .build()?;
@@ -882,11 +882,11 @@ the same model reads, updates, and removes the native curve payload:
 
 ```rust
 use litchi_iwa::keynote::{
-    KeynoteBuildSettings, KeynoteBuildTimingCurve, KeynoteDocumentBuilder,
+    KeynoteBuildSettings, KeynoteBuildTimingCurve, self,
     KeynoteMotionPathPoint, KeynoteRotationDirection,
 };
 
-let mut keynote = KeynoteDocumentBuilder::new().title("Custom timing").build()?;
+let mut keynote = keynote::Builder::new().title("Custom timing").build()?;
 let drawable = keynote.slide_drawables(0)?.into_iter().next().ok_or("slide has no drawable")?;
 let settings = KeynoteBuildSettings::rotate_action(720.0, KeynoteRotationDirection::Clockwise)
     .with_custom_timing_curve(KeynoteBuildTimingCurve::cubic(
@@ -905,10 +905,10 @@ slide. The shape, text storage, stand-ins, ownership, z-order, and metadata are
 encoded from typed values; no existing drawable or blank package is required:
 
 ```rust
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 
-let mut keynote = KeynoteDocumentBuilder::new()
+let mut keynote = keynote::Builder::new()
     .title("Quarterly review")
     .subtitle("Created entirely by litchi-iwa")
     .build()?;
@@ -929,10 +929,10 @@ storage, stand-ins, style relationship, ownership, z-order, and UUIDs. No source
 drawable or package is copied:
 
 ```rust
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Preset};
 
-let mut keynote = KeynoteDocumentBuilder::new().build()?;
+let mut keynote = keynote::Builder::new().build()?;
 let shape = keynote.add_slide_shape(
     0,
     "A fully editable shape",
@@ -953,10 +953,10 @@ the native two-element Bézier representation. Their path, empty storage,
 stand-ins, ownership, z-order, style inheritance, and UUIDs are source-built:
 
 ```rust
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote;
 use litchi_iwa::shapes::{DrawablePoint, Endpoint, Endpoints};
 
-let mut keynote = KeynoteDocumentBuilder::new().build()?;
+let mut keynote = keynote::Builder::new().build()?;
 let line = keynote.add_slide_line_with_endpoints(
     0,
     DrawablePoint { x: 720.0, y: 660.0 },
@@ -986,12 +986,12 @@ asset are all created directly; no blank Keynote package is embedded:
 
 ```rust
 use std::fs;
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote;
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_keynote::slide::image::Options as ImageOptions;
 
 let image = fs::read("chart.png")?;
-let mut keynote = KeynoteDocumentBuilder::new().build()?;
+let mut keynote = keynote::Builder::new().build()?;
 let source = keynote.add_slide_image(
     0,
     "chart.png",
@@ -1020,14 +1020,14 @@ build and timing chunk are generated from typed values:
 ```rust
 use std::fs;
 use std::time::Duration;
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote;
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_keynote::slide::movie::Options as SlideMovieOptions;
 use litchi_keynote::{MovieSelector, Package, SlideSelector};
 
 let movie = fs::read("demo.mov")?;
 let poster = fs::read("demo-poster.png")?;
-let source = KeynoteDocumentBuilder::new().build()?;
+let source = keynote::Builder::new().build()?;
 let package = Package::from_bytes(&source.to_bytes()?)?;
 let commit = package.add_slide_movie(
     SlideSelector::index(0),
@@ -1068,13 +1068,13 @@ without copying a package or drawable:
 ```rust
 use std::fs;
 use std::time::Duration;
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote;
 use litchi_iwa_common::shape::geometry::Point;
 use litchi_keynote::slide::audio::Options as SlideAudioOptions;
 use litchi_keynote::{MovieSelector, Package, SlideSelector};
 
 let audio = fs::read("narration.aiff")?;
-let keynote = KeynoteDocumentBuilder::new().build()?;
+let keynote = keynote::Builder::new().build()?;
 let source = Package::from_bytes(&keynote.to_bytes()?)?;
 let created = source.add_slide_audio(
     SlideSelector::index(0),
@@ -2946,7 +2946,7 @@ RowRange)`, while the old raw-ID `apply_*` methods remain deprecated
 declarations for source compatibility and the boundary checker rejects
 production calls to them. There is no lock or physical-sort fallback for an
 exact package: focused errors propagate. A guarded source-built-only writer is
-retained for `KeynoteDocumentBuilder` graphs carrying the explicit
+retained for `keynote::Builder` graphs carrying the explicit
 `Application/Litchi/Blank/Wide` marker; unmarked exact packages cannot fall
 back after focused-owner refusal. Physical row/value reading, formulas, rich
 cells, and broader table compatibility remain outside the focused owner.

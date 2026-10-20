@@ -210,9 +210,7 @@ fn storage_discovery_uses_strict_projection_without_mutating_source() {
 
 #[test]
 fn generated_section_settings_accept_nested_template_references() {
-    let package = crate::pages::PagesDocumentBuilder::new()
-        .build_package()
-        .unwrap();
+    let package = crate::pages::Builder::new().build_package().unwrap();
     let document = package.archive("Index/Document.iwa").unwrap();
     let section = document
         .object(105)

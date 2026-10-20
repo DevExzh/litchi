@@ -19,7 +19,7 @@ use litchi_iwa::charts::{
     ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Kind, LabelAffixes, MajorStepCount,
     MinorStepCount, NegativeStyle, NumberFormat, Scale, Steps, Visibility,
 };
-use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::numbers;
 use litchi_iwa::shapes::{
     Appearance, BlurRadius, DrawablePoint, DrawableSize, Drop, Offset, Pattern, RgbColorSpace,
     RgbaColor, ShapeFill, Stroke, Width,
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .sheet_name("Quarterly Results")
         .table_name("Source Data")
         .build()?;

@@ -1,6 +1,6 @@
 use super::{TextLanguage, TextLanguageRun, TextPosition};
-use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use crate::numbers::{NumbersDocumentBuilder, NumbersEditor};
+use crate::keynote::{self, KeynoteEditor};
+use crate::numbers::{self, NumbersEditor};
 use crate::pages::PagesEditor;
 use crate::shapes::{DrawablePoint, DrawableSize};
 
@@ -122,10 +122,7 @@ fn scratch_text_language_runs_round_trip_in_every_suite() {
         ]
     );
 
-    let mut numbers = NumbersDocumentBuilder::new()
-        .language("de")
-        .build()
-        .unwrap();
+    let mut numbers = numbers::Builder::new().language("de").build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(sheet_id, TEXT, POSITION, SIZE)
@@ -156,10 +153,7 @@ fn scratch_text_language_runs_round_trip_in_every_suite() {
         explicit("fr")
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new()
-        .language("ja")
-        .build()
-        .unwrap();
+    let mut keynote = keynote::Builder::new().language("ja").build().unwrap();
     let keynote_box = keynote.add_slide_text_box(0, TEXT, POSITION, SIZE).unwrap();
     assert_eq!(
         keynote

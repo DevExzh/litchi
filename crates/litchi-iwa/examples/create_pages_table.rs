@@ -1,8 +1,8 @@
 use std::env;
 
 use litchi_iwa::pages::{
-    PagesCellValue, PagesDocumentBuilder, PagesEditor, PagesTableCellUpdate,
-    PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
+    self, PagesCellValue, PagesEditor, PagesTableCellUpdate, PagesTableFormulaCachedValue,
+    PagesTableFormulaCellReference, PagesTableFormulaExpression,
 };
 use litchi_numbers::table::topology::{ColumnInsertion, RowInsertion};
 use litchi_pages::table::dimension::{Dimension, Size};
@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
         .nth(1)
         .unwrap_or_else(|| "scratch-table.pages".to_owned());
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Quarterly revenue\n")
         .body_table("Revenue", 4, 3)
         .build()?;

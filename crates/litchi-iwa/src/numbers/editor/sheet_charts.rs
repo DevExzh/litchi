@@ -891,7 +891,7 @@ mod tests {
         LabelVisibility, LeaderLineVisibility, MajorStepCount, MinorStepCount, NegativeStyle,
         NumberFormat, Scale, Steps, TickMarkLocation, Visibility,
     };
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::package_metadata::{component_identifier_for_entry, component_uuid_identifiers};
     use crate::protobuf::tsch;
     use crate::shapes::{
@@ -1561,7 +1561,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_standalone_chart_crud() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Scratch Chart")
             .table_name("Source Data")
             .build()
@@ -1639,7 +1639,7 @@ mod tests {
 
     #[test]
     fn chart_creation_rejects_invalid_kind_and_geometry_transactionally() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let baseline = editor.to_bytes().unwrap();
 
@@ -1667,7 +1667,7 @@ mod tests {
 
     #[test]
     fn multiple_chart_theme_registrations_are_removed_independently() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let baseline = editor.to_bytes().unwrap();
         let first = editor
@@ -1706,7 +1706,7 @@ mod tests {
 
     #[test]
     fn duplicate_sheet_chart_clones_the_private_graph_and_inline_data() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -1783,7 +1783,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_caption_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -1860,7 +1860,7 @@ mod tests {
 
     #[test]
     fn native_chart_caption_rewrite_preserves_unknown_chart_fields() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -1924,7 +1924,7 @@ mod tests {
     #[test]
     fn native_chart_caption_retarget_preserves_unknown_archive_header_and_metadata_on_width_growth()
     {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -2003,7 +2003,7 @@ mod tests {
             NumbersCaptionMetadataMode::DataReference,
         ];
         for mode in modes {
-            let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+            let mut editor = numbers::Builder::new().build().unwrap();
             let sheet_id = editor.sheets().unwrap()[0].object_id;
             let source = editor
                 .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -2031,7 +2031,7 @@ mod tests {
             assert_eq!(editor.to_bytes().unwrap(), before);
         }
 
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -2073,7 +2073,7 @@ mod tests {
 
     #[test]
     fn native_chart_caption_rejects_two_caption_infos_sharing_one_storage_atomically() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -2105,7 +2105,7 @@ mod tests {
 
     #[test]
     fn native_chart_caption_rejects_two_chart_payloads_sharing_one_caption_info_atomically() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -2161,7 +2161,7 @@ mod tests {
 
     #[test]
     fn native_chart_caption_rejects_caption_info_owner_on_unrelated_object_atomically() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -2194,7 +2194,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_title_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -2279,7 +2279,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_axis_title_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -2412,7 +2412,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_value_axis_bounds_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -2485,7 +2485,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_value_axis_steps_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -2568,7 +2568,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_value_axis_minimum_label_visibility_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -2659,7 +2659,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_category_axis_series_names_visibility_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -2744,7 +2744,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_axis_label_visibility_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -2836,7 +2836,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_axis_line_visibility_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -2907,7 +2907,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_axis_major_gridline_visibility_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -3027,7 +3027,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_axis_minor_gridline_visibility_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -3120,7 +3120,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_axis_minor_tick_mark_visibility_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -3242,7 +3242,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_axis_tick_mark_location_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -3393,7 +3393,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_legend_visibility_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -3463,7 +3463,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_exact_chart_legend_fill_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -3506,7 +3506,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_exact_chart_legend_frame_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -3547,7 +3547,7 @@ mod tests {
 
     #[test]
     fn legend_style_copy_on_write_is_shared_across_properties() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -3632,7 +3632,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_exact_chart_legend_typography_crud() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Legend Font Size")
             .build()
             .unwrap();
@@ -3712,7 +3712,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_exact_chart_legend_stroke_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -3755,7 +3755,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_exact_chart_legend_shadow_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -3802,7 +3802,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_hidden_data_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -3882,7 +3882,7 @@ mod tests {
 
     #[test]
     fn native_chart_caption_graphs_tolerate_partial_uuid_registration() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -3926,7 +3926,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_value_axis_scale_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -3994,7 +3994,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_border_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -4054,7 +4054,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_rounded_corner_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -4125,7 +4125,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_gap_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -4185,7 +4185,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_border_stroke_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -4250,7 +4250,7 @@ mod tests {
     #[test]
     fn scratch_spreadsheet_supports_native_chart_background_fill_crud() {
         let image_bytes = fixture("test-data/images/png/lena.png");
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -4323,7 +4323,7 @@ mod tests {
     #[test]
     fn scratch_spreadsheet_supports_inherited_series_fill_crud() {
         let image_bytes = fixture("test-data/images/png/lena.png");
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -4414,7 +4414,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_inherited_series_stroke_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -4485,7 +4485,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_chart_shadow_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -4547,7 +4547,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_pie_start_angle_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Pie2d, pie_data(), POSITION, SIZE)
@@ -4647,7 +4647,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_donut_inner_radius_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Donut2d, pie_data(), POSITION, SIZE)
@@ -4742,7 +4742,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_pie_wedge_explosion_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Pie2d, pie_data(), POSITION, SIZE)
@@ -4888,7 +4888,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_pie_label_visibility_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Pie2d, pie_data(), POSITION, SIZE)
@@ -5010,7 +5010,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_pie_label_distance_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Pie2d, pie_data(), POSITION, SIZE)
@@ -5240,7 +5240,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_series_value_label_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -5356,7 +5356,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_series_value_label_location_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -5472,7 +5472,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_series_value_label_affix_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -5576,7 +5576,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_series_value_label_number_format_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -5681,7 +5681,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_series_value_label_auto_fit_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -5781,7 +5781,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_series_trendline_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -5887,7 +5887,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_series_error_bar_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)

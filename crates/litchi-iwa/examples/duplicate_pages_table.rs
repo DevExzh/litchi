@@ -1,7 +1,7 @@
 use std::env;
 
 use litchi_iwa::pages::{
-    PagesCellValue, PagesDocumentBuilder, PagesTableCellUpdate, PagesTableFormulaCachedValue,
+    self, PagesCellValue, PagesTableCellUpdate, PagesTableFormulaCachedValue,
     PagesTableFormulaExpression,
 };
 
@@ -9,7 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
         .nth(1)
         .unwrap_or_else(|| "pages-duplicated-table.pages".to_owned());
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Budget scenarios\n")
         .body_table("Budget", 3, 2)
         .build()?;

@@ -29,7 +29,7 @@
 mod creation;
 pub mod editor;
 
-pub use creation::PagesDocumentBuilder;
+pub use creation::Builder;
 pub use editor::{
     PagesAudioInfo, PagesBodyChartInfo, PagesBodyShapeInfo, PagesCellValue, PagesDrawableTextInfo,
     PagesEditor, PagesImageInfo, PagesMovieInfo, PagesSectionInfo, PagesTable,

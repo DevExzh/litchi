@@ -690,7 +690,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::DrawablePoint;
     use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 
@@ -715,7 +715,7 @@ mod tests {
     fn scratch_presentation_supports_image_crud_without_a_source_drawable() {
         let original = fixture("test-data/images/png/lena.png");
         let replacement = fixture("crates/soapberry-zip/assets/gophercolor16x16.png");
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Scratch image")
             .subtitle("No embedded package")
             .build()
@@ -900,7 +900,7 @@ mod tests {
     #[test]
     fn scratch_presentation_supports_native_image_title_caption_crud() {
         let original = fixture("test-data/images/png/lena.png");
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Image labels")
             .build()
             .unwrap();
@@ -974,7 +974,7 @@ mod tests {
     fn scratch_presentation_supports_native_image_duplication() {
         let original = fixture("test-data/images/png/lena.png");
         let replacement = fixture("crates/soapberry-zip/assets/gophercolor16x16.png");
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Image clone")
             .subtitle("Shared native media")
             .build()
@@ -1139,7 +1139,7 @@ mod tests {
     #[test]
     fn invalid_image_creation_and_geometry_are_transactional() {
         let original = fixture("test-data/images/png/lena.png");
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let baseline = editor.to_bytes().unwrap();
 
         assert!(editor.duplicate_slide_image(0, 999).is_err());

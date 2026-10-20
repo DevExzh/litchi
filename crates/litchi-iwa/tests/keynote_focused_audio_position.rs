@@ -6,7 +6,7 @@
 
 use std::{env, error::Error, fs, io, path::PathBuf, time::Duration};
 
-use litchi_iwa::keynote::{BuildStart, KeynoteDocumentBuilder, KeynoteEditor};
+use litchi_iwa::keynote::{self, BuildStart, KeynoteEditor};
 use litchi_iwa_archive::{iwa::Archive, package::Catalog};
 use litchi_iwa_common::shape::geometry::{Point as HostPoint, Size};
 use litchi_iwa_protos::{kn, tsd};
@@ -264,7 +264,7 @@ fn add_movie(
 }
 
 fn source_fixture() -> TestResult<SourceFixture> {
-    let mut editor = KeynoteDocumentBuilder::new()
+    let mut editor = keynote::Builder::new()
         .title("Focused audio position")
         .subtitle("Source-built selector compatibility")
         .build()?;

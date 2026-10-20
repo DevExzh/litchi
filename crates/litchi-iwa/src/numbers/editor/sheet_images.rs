@@ -779,7 +779,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
     use litchi_numbers::{
         Package as FocusedNumbersPackage, SheetSelector as FocusedSheetSelector,
@@ -856,10 +856,7 @@ mod tests {
     fn scratch_spreadsheet_supports_image_crud_without_a_source_package() {
         let original = fixture("test-data/images/png/lena.png");
         let replacement = fixture("crates/soapberry-zip/assets/gophercolor16x16.png");
-        let mut editor = NumbersDocumentBuilder::new()
-            .sheet_name("Media")
-            .build()
-            .unwrap();
+        let mut editor = numbers::Builder::new().sheet_name("Media").build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
 
         assert!(editor.sheet_images(sheet_id).unwrap().is_empty());
@@ -1034,10 +1031,7 @@ mod tests {
     #[test]
     fn scratch_spreadsheet_supports_native_image_title_caption_crud() {
         let original = fixture("test-data/images/png/lena.png");
-        let mut editor = NumbersDocumentBuilder::new()
-            .sheet_name("Media")
-            .build()
-            .unwrap();
+        let mut editor = numbers::Builder::new().sheet_name("Media").build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let image = editor
             .add_sheet_image(sheet_id, "lena.png", &original, options())
@@ -1109,10 +1103,7 @@ mod tests {
     fn scratch_spreadsheet_supports_native_image_duplication() {
         let original = fixture("test-data/images/png/lena.png");
         let replacement = fixture("crates/soapberry-zip/assets/gophercolor16x16.png");
-        let mut editor = NumbersDocumentBuilder::new()
-            .sheet_name("Media")
-            .build()
-            .unwrap();
+        let mut editor = numbers::Builder::new().sheet_name("Media").build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source = editor
             .add_sheet_image(sheet_id, "lena.png", &original, options())

@@ -1,13 +1,13 @@
 //! Create a Keynote presentation with a native editable Dissolve Build In.
 
-use litchi_iwa::keynote::{KeynoteBuildSettings, KeynoteDocumentBuilder};
+use litchi_iwa::keynote::{self, KeynoteBuildSettings};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
         .nth(1)
         .ok_or("usage: create_keynote_dissolve_build <output.key>")?;
 
-    let mut keynote = KeynoteDocumentBuilder::new()
+    let mut keynote = keynote::Builder::new()
         .title("Dissolve build")
         .subtitle("Created entirely by litchi-iwa")
         .build()?;

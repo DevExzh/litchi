@@ -33,7 +33,7 @@
 pub mod creation;
 pub mod editor;
 
-pub use creation::KeynoteDocumentBuilder;
+pub use creation::Builder;
 pub use editor::Effect;
 pub use editor::{
     BuildAcceleration, BuildStart, KeynoteBuildChunkInfo, KeynoteBuildCustomParameters,

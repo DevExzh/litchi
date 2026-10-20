@@ -2,8 +2,8 @@ use prost::Message;
 
 use super::*;
 use crate::archive::RawMessage;
-use crate::keynote::KeynoteDocumentBuilder;
-use crate::numbers::NumbersDocumentBuilder;
+use crate::keynote;
+use crate::numbers;
 use crate::pages::PagesEditor;
 use crate::protobuf::tsp;
 use crate::protobuf::tswp::{self, object_attribute_table::ObjectAttribute};
@@ -65,7 +65,7 @@ fn canonical_lists_round_trip_update_and_reset_in_every_suite() {
             .unwrap()
     );
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(sheet_id, "One\nTwo", POSITION, SIZE)
@@ -91,7 +91,7 @@ fn canonical_lists_round_trip_update_and_reset_in_every_suite() {
             .unwrap()
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(0, "Alpha\nBeta", POSITION, SIZE)
         .unwrap();
@@ -147,7 +147,7 @@ fn text_boxes_round_trip_custom_bullets_in_every_suite() {
     );
     assert_eq!(pages.to_bytes().unwrap(), pages_before_custom_bullet);
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(sheet_id, "First\nSecond", POSITION, SIZE)
@@ -179,7 +179,7 @@ fn text_boxes_round_trip_custom_bullets_in_every_suite() {
         arrow
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(0, "First\nSecond", POSITION, SIZE)
         .unwrap();
@@ -244,7 +244,7 @@ fn text_boxes_round_trip_bullet_geometry_in_every_suite() {
     );
     assert_eq!(pages.to_bytes().unwrap(), before_geometry);
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(sheet_id, "First\nSecond", POSITION, SIZE)
@@ -276,7 +276,7 @@ fn text_boxes_round_trip_bullet_geometry_in_every_suite() {
         geometry
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(0, "First\nSecond", POSITION, SIZE)
         .unwrap();
@@ -345,7 +345,7 @@ fn text_boxes_round_trip_list_indentation_in_every_suite() {
     );
     assert_eq!(pages.to_bytes().unwrap(), pages_before_indentation);
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(sheet_id, "First\nSecond", POSITION, SIZE)
@@ -377,7 +377,7 @@ fn text_boxes_round_trip_list_indentation_in_every_suite() {
         indentation
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(0, "First\nSecond", POSITION, SIZE)
         .unwrap();
@@ -441,7 +441,7 @@ fn text_boxes_round_trip_list_label_colors_in_every_suite() {
     );
     assert_eq!(pages.to_bytes().unwrap(), pages_before_color);
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(sheet_id, "First\nSecond", POSITION, SIZE)
@@ -473,7 +473,7 @@ fn text_boxes_round_trip_list_label_colors_in_every_suite() {
         color
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(0, "First\nSecond", POSITION, SIZE)
         .unwrap();
@@ -538,7 +538,7 @@ fn text_boxes_round_trip_number_formats_in_every_suite() {
     );
     assert_eq!(pages.to_bytes().unwrap(), pages_before_format);
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(sheet_id, "First\nSecond", POSITION, SIZE)
@@ -570,7 +570,7 @@ fn text_boxes_round_trip_number_formats_in_every_suite() {
         ParagraphListNumberFormat::Circled
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(0, "First\nSecond", POSITION, SIZE)
         .unwrap();
@@ -636,7 +636,7 @@ fn text_boxes_round_trip_number_tiering_in_every_suite() {
     );
     assert_eq!(pages.to_bytes().unwrap(), pages_before_tiering);
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(sheet_id, "First\nSecond", POSITION, SIZE)
@@ -668,7 +668,7 @@ fn text_boxes_round_trip_number_tiering_in_every_suite() {
         tiered
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(0, "First\nSecond", POSITION, SIZE)
         .unwrap();
@@ -760,7 +760,7 @@ fn text_boxes_round_trip_number_scale_in_every_suite() {
     );
     assert_eq!(pages.to_bytes().unwrap(), pages_before_scale);
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(sheet_id, "First\nSecond", POSITION, SIZE)
@@ -792,7 +792,7 @@ fn text_boxes_round_trip_number_scale_in_every_suite() {
         scale
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(0, "First\nSecond", POSITION, SIZE)
         .unwrap();

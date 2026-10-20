@@ -3,9 +3,9 @@ use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSet
 
 use std::path::PathBuf;
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
-use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
+use litchi_iwa::keynote::{self, KeynoteEditor};
+use litchi_iwa::numbers::{self, NumbersEditor};
+use litchi_iwa::pages::{self, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_keynote::slide::table::headers::{
     Count as KeynoteHeaderCount, Settings as KeynoteHeaderSettings,
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(&output)?;
 
     let numbers_path = output.join("table-appearance.numbers");
-    let mut numbers = NumbersDocumentBuilder::new()
+    let mut numbers = numbers::Builder::new()
         .table_name("Appearance")
         .table_dimensions(6, 3)
         .build()?;
@@ -62,7 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let pages_path = output.join("table-appearance.pages");
-    let mut pages = PagesDocumentBuilder::new()
+    let mut pages = pages::Builder::new()
         .body_text("Created from scratch with litchi-iwa.\n")
         .body_table("Appearance", 6, 3)
         .build()?;
@@ -85,7 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let keynote_path = output.join("table-appearance.key");
-    let mut keynote = KeynoteDocumentBuilder::new()
+    let mut keynote = keynote::Builder::new()
         .title("Native table appearance")
         .build()?;
     let _keynote_table = keynote.add_slide_table(

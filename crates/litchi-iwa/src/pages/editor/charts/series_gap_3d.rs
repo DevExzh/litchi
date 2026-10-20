@@ -60,12 +60,12 @@ impl PagesEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pages::PagesDocumentBuilder;
+    use crate::pages;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_document_supports_3d_series_gap_crud() {
-        let mut editor = PagesDocumentBuilder::new().build().unwrap();
+        let mut editor = pages::Builder::new().build().unwrap();
         let chart = editor
             .add_body_chart(
                 0,
@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn charts_without_between_series_control_reject_access() {
-        let mut editor = PagesDocumentBuilder::new().build().unwrap();
+        let mut editor = pages::Builder::new().build().unwrap();
         for kind in [Kind::Area2d, Kind::StackedArea3d, Kind::Column3d] {
             let chart = editor
                 .add_body_chart(

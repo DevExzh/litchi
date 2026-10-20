@@ -469,13 +469,13 @@ pub(crate) fn unmerge_in_package(
 mod tests {
     use super::*;
     use crate::archive::{ArchiveObject, RawMessage};
-    use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
+    use crate::keynote::{self, KeynoteEditor};
     use crate::numbers::editor::compatibility_document_from_bytes;
     use crate::numbers::{
-        FormulaAxisReference, FormulaCachedValue, FormulaCellReference, FormulaExpression,
-        NumbersDocumentBuilder, SemanticTableCellAssertions,
+        self, FormulaAxisReference, FormulaCachedValue, FormulaCellReference, FormulaExpression,
+        SemanticTableCellAssertions,
     };
-    use crate::pages::{PagesDocumentBuilder, PagesEditor};
+    use crate::pages::{self, PagesEditor};
     use crate::shapes::{DrawablePoint, DrawableSize};
     use crate::wire::{
         repeated_length_delimited_payloads, transform_length_delimited_fields_at_path,
@@ -562,7 +562,7 @@ mod tests {
 
     #[test]
     fn scratch_numbers_table_merge_crud_is_transactional_and_byte_exact() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(4, 5)
             .build()
             .unwrap();
@@ -617,7 +617,7 @@ mod tests {
 
     #[test]
     fn scratch_numbers_legacy_merge_read_preserves_source_built_compatibility() {
-        let editor = NumbersDocumentBuilder::new()
+        let editor = numbers::Builder::new()
             .table_dimensions(4, 5)
             .build()
             .unwrap();
@@ -669,7 +669,7 @@ mod tests {
 
     #[test]
     fn scratch_numbers_merged_table_axis_insertions_follow_native_semantics() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(5, 6)
             .build()
             .unwrap();
@@ -719,7 +719,7 @@ mod tests {
 
     #[test]
     fn scratch_numbers_merged_table_axis_deletions_relocate_anchor_content() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(5, 6)
             .build()
             .unwrap();
@@ -810,7 +810,7 @@ mod tests {
 
     #[test]
     fn scratch_numbers_merged_formula_anchor_survives_axis_deletions() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(5, 6)
             .build()
             .unwrap();
@@ -875,7 +875,7 @@ mod tests {
 
     #[test]
     fn merged_cross_table_formula_anchor_rebases_uuid_hosts_and_external_edges() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(5, 6)
             .build()
             .unwrap();
@@ -963,7 +963,7 @@ mod tests {
 
     #[test]
     fn merged_cross_table_range_anchor_rebases_expanded_edges_and_cache() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(5, 6)
             .build()
             .unwrap();
@@ -1056,7 +1056,7 @@ mod tests {
 
     #[test]
     fn merged_cross_table_range_anchor_rebases_native_range_records_and_cache() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(5, 6)
             .build()
             .unwrap();
@@ -1182,7 +1182,7 @@ mod tests {
 
     #[test]
     fn merged_cross_table_whole_row_anchor_rebases_expanded_edges_and_cache() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(5, 6)
             .build()
             .unwrap();
@@ -1280,7 +1280,7 @@ mod tests {
 
     #[test]
     fn merged_cross_table_whole_column_anchor_rebases_native_range_records_and_cache() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(5, 6)
             .build()
             .unwrap();
@@ -1380,7 +1380,7 @@ mod tests {
 
     #[test]
     fn merged_table_axis_deletion_removes_and_rewrites_formula_pairs_together() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(5, 6)
             .build()
             .unwrap();
@@ -1427,7 +1427,7 @@ mod tests {
         const TRACT_UNKNOWN_VALUE: u64 = 870;
         const RANGE_UNKNOWN_VALUE: u64 = 860;
 
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(4, 4)
             .build()
             .unwrap();
@@ -1579,7 +1579,7 @@ mod tests {
 
     #[test]
     fn scratch_pages_table_merge_crud_round_trips() {
-        let mut editor = PagesDocumentBuilder::new()
+        let mut editor = pages::Builder::new()
             .body_text("Merged table\n")
             .body_table("Merge", 4, 5)
             .build()
@@ -1597,7 +1597,7 @@ mod tests {
 
     #[test]
     fn scratch_pages_and_keynote_merged_table_axis_insertions_round_trip() {
-        let mut pages = PagesDocumentBuilder::new()
+        let mut pages = pages::Builder::new()
             .body_text("Merged table\n")
             .body_table("Merge", 4, 5)
             .build()
@@ -1623,7 +1623,7 @@ mod tests {
             vec![pages_expected]
         );
 
-        let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut keynote = keynote::Builder::new().build().unwrap();
         let keynote_table = keynote
             .add_slide_table(
                 0,
@@ -1668,7 +1668,7 @@ mod tests {
 
     #[test]
     fn scratch_pages_and_keynote_merged_table_axis_deletions_relocate_anchor_content() {
-        let mut pages = PagesDocumentBuilder::new()
+        let mut pages = pages::Builder::new()
             .body_text("Merged table\n")
             .body_table("Merge", 4, 5)
             .build()
@@ -1702,7 +1702,7 @@ mod tests {
         let pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert!(pages.table_cell_merges(pages_table_id).unwrap().is_empty());
 
-        let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut keynote = keynote::Builder::new().build().unwrap();
         let keynote_table = keynote
             .add_slide_table(
                 0,
@@ -1766,7 +1766,7 @@ mod tests {
     fn scratch_pages_and_keynote_merged_formula_anchors_survive_axis_deletions() {
         let region = Region::new(1, 1, 2, 2).unwrap();
 
-        let mut pages = PagesDocumentBuilder::new()
+        let mut pages = pages::Builder::new()
             .body_table("Merge Formula", 5, 6)
             .build()
             .unwrap();
@@ -1805,7 +1805,7 @@ mod tests {
             Some("=D3".to_owned())
         );
 
-        let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut keynote = keynote::Builder::new().build().unwrap();
         let keynote_table = keynote
             .add_slide_table(
                 0,
@@ -1876,7 +1876,7 @@ mod tests {
 
     #[test]
     fn scratch_keynote_table_merge_crud_round_trips() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let table = editor
             .add_slide_table(
                 0,
@@ -1918,7 +1918,7 @@ mod tests {
 
     #[test]
     fn scratch_keynote_legacy_table_model_merge_read_uses_compatibility_fallback() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let table = editor
             .add_slide_table(
                 0,

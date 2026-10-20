@@ -73,13 +73,13 @@ fn map_focused_chart_arrangement_error(error: litchi_pages::chart::arrangement::
 mod tests {
     use super::*;
     use crate::charts::{ChartData, Kind};
-    use crate::pages::PagesDocumentBuilder;
+    use crate::pages;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_document_supports_focused_chart_arrangement_selector_crud() {
         let body = "Chart arrangement";
-        let mut editor = PagesDocumentBuilder::new().body_text(body).build().unwrap();
+        let mut editor = pages::Builder::new().body_text(body).build().unwrap();
         let chart = editor
             .add_body_chart(
                 body.encode_utf16().count(),
@@ -158,7 +158,7 @@ mod tests {
 
     #[test]
     fn focused_chart_arrangement_edit_reopens_and_inverts_exactly() {
-        let mut editor = PagesDocumentBuilder::new()
+        let mut editor = pages::Builder::new()
             .body_text("Chart arrangement")
             .build()
             .unwrap();
@@ -204,7 +204,7 @@ mod tests {
         const CHART_COUNT: usize = 32;
         const TARGET_POSITION: usize = 17;
 
-        let mut editor = PagesDocumentBuilder::new()
+        let mut editor = pages::Builder::new()
             .body_text("Chart arrangement")
             .build()
             .unwrap();

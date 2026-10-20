@@ -1,7 +1,7 @@
 //! Create and physically sort a plain-text Pages table without an input document.
 use std::env;
 
-use litchi_iwa::pages::{PagesCellValue, PagesDocumentBuilder, PagesTableCellUpdate};
+use litchi_iwa::pages::{self, PagesCellValue, PagesTableCellUpdate};
 use litchi_pages::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 use litchi_pages::table::sort::{ColumnIndex, Direction, Order, Rule};
 use litchi_pages::{BodyTableSelector, Package};
@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
         .nth(1)
         .ok_or("usage: create_pages_sorted_table <output.pages>")?;
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Cities sorted by name\n")
         .body_table("Cities", 5, 2)
         .build()?;

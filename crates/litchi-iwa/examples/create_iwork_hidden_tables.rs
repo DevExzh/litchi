@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
-use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
+use litchi_iwa::keynote::{self, KeynoteEditor};
+use litchi_iwa::numbers::{self, NumbersEditor};
+use litchi_iwa::pages::{self, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 use litchi_numbers::{
@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let hidden = HiddenAxes::new([AxisIndex::row(HIDDEN_ROW), AxisIndex::column(HIDDEN_COLUMN)])?;
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_name("Hidden Axes")
         .table_dimensions(TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
@@ -48,7 +48,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 
 fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let hidden = HiddenAxes::new([AxisIndex::row(HIDDEN_ROW), AxisIndex::column(HIDDEN_COLUMN)])?;
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Hidden table axes created by litchi-iwa\n")
         .body_table("Hidden Axes", TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
@@ -72,9 +72,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 
 fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let hidden = HiddenAxes::new([AxisIndex::row(HIDDEN_ROW), AxisIndex::column(HIDDEN_COLUMN)])?;
-    let mut editor = KeynoteDocumentBuilder::new()
-        .title("Hidden table axes")
-        .build()?;
+    let mut editor = keynote::Builder::new().title("Hidden table axes").build()?;
     let table = editor.add_slide_table(
         0,
         "Hidden Axes",

@@ -1,6 +1,6 @@
 use std::env;
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteTableCellUpdate, KeynoteTableCellValue};
+use litchi_iwa::keynote::{self, KeynoteTableCellUpdate, KeynoteTableCellValue};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_keynote::slide::table::formula::{FormulaCachedValue, FormulaExpression};
 
@@ -8,9 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
         .nth(1)
         .unwrap_or_else(|| "keynote-duplicated-table.key".to_owned());
-    let mut editor = KeynoteDocumentBuilder::new()
-        .title("Budget scenarios")
-        .build()?;
+    let mut editor = keynote::Builder::new().title("Budget scenarios").build()?;
     let source = editor.add_slide_table(
         0,
         "Budget",

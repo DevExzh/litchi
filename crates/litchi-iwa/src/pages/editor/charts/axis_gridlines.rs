@@ -188,7 +188,7 @@ fn set_body_chart_axis_minor_gridlines_visible(
 mod tests {
     use super::*;
     use crate::charts::{ChartData, Kind};
-    use crate::pages::PagesDocumentBuilder;
+    use crate::pages;
     use crate::shapes::{
         DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Stroke, Width,
     };
@@ -196,7 +196,7 @@ mod tests {
     #[test]
     fn scratch_document_supports_axis_gridline_stroke_crud() {
         let body = "Gridline stroke";
-        let mut editor = PagesDocumentBuilder::new().body_text(body).build().unwrap();
+        let mut editor = pages::Builder::new().body_text(body).build().unwrap();
         let chart = editor
             .add_body_chart(
                 body.encode_utf16().count(),

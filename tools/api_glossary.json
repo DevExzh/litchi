@@ -8294,6 +8294,40 @@
       "families": []
     },
     {
+      "id": "iwa",
+      "package": "litchi-iwa",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "PagesDocumentBuilder",
+          "scope": "litchi_iwa",
+          "replacement": "use litchi_iwa::pages::Builder; the per-format builder is `Builder` in its format module (ADR 0034 option-bearing fresh authoring, record 0352)"
+        },
+        {
+          "name": "KeynoteDocumentBuilder",
+          "scope": "litchi_iwa",
+          "replacement": "use litchi_iwa::keynote::Builder; the per-format builder is `Builder` in its format module (ADR 0034 option-bearing fresh authoring, record 0352)"
+        },
+        {
+          "name": "NumbersDocumentBuilder",
+          "scope": "litchi_iwa",
+          "replacement": "use litchi_iwa::numbers::Builder; the per-format builder is `Builder` in its format module (ADR 0034 option-bearing fresh authoring, record 0352)"
+        },
+        {
+          "name": "CellPosition",
+          "scope": "litchi_iwa",
+          "replacement": "use litchi_iwa_common::table::coordinate::At; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "CellRange",
+          "scope": "litchi_iwa",
+          "replacement": "use litchi_iwa_common::table::coordinate::Area; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        }
+      ],
+      "families": []
+    },
+    {
       "id": "numbers-minimal",
       "features": [],
       "package": "litchi-numbers",

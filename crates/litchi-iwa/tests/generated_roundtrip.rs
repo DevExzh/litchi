@@ -11,8 +11,8 @@ use std::sync::Arc;
 
 use litchi_iwa::Document;
 use litchi_iwa::application::Application;
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
+use litchi_iwa::keynote::{self, KeynoteEditor};
+use litchi_iwa::numbers::{self, NumbersEditor};
 use litchi_iwa::pages::PagesEditor;
 use litchi_keynote::Package as KeynotePackage;
 use litchi_numbers::Workbook as NumbersSemanticDocument;
@@ -30,7 +30,7 @@ fn builders_emit_packages_that_all_public_readers_can_open() -> Result<(), Box<d
     verify_package(&pages_path, Application::Pages)?;
 
     let numbers_path = directory.path().join("generated.numbers");
-    NumbersDocumentBuilder::new()
+    numbers::Builder::new()
         .table_name("Verification")
         .table_dimensions(2, 2)
         .build()?
@@ -38,7 +38,7 @@ fn builders_emit_packages_that_all_public_readers_can_open() -> Result<(), Box<d
     verify_package(&numbers_path, Application::Numbers)?;
 
     let keynote_path = directory.path().join("generated.key");
-    KeynoteDocumentBuilder::new()
+    keynote::Builder::new()
         .title("Generated Keynote verification")
         .subtitle("Created without a native template")
         .build()?

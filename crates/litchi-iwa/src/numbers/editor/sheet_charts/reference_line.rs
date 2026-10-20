@@ -72,12 +72,12 @@ mod tests {
     use super::*;
     use crate::charts::reference_line::Value;
     use crate::charts::{ChartData, Kind};
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_spreadsheet_supports_reference_line_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
             .add_sheet_chart(

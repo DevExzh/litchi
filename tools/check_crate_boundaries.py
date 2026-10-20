@@ -18689,7 +18689,7 @@ PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_MARKERS = {
         rf"(?m)^[ \t]*fn[ \t]+"
         rf"{re.escape(PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_NAME)}\b"
     ),
-    "source-built Pages builder": re.compile(r"\bPagesDocumentBuilder\s*::\s*new\s*\("),
+    "source-built Pages builder": re.compile(r"\bpages\s*::\s*Builder\s*::\s*new\s*\("),
     "source-built table": re.compile(r"\bbody_table\s*\("),
     # The focused test deliberately uses the semantic Package transaction
     # directly.  Do not require the old litchi-iwa adapter helper names here:
@@ -18716,7 +18716,7 @@ PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_EXAMPLE_MARKERS = {
     "Pages migration branch": re.compile(
         r"(?m)^[ \t]*fn[ \t]+create_pages\b"
     ),
-    "Pages source-built builder": re.compile(r"\bPagesDocumentBuilder\s*::\s*new\s*\("),
+    "Pages source-built builder": re.compile(r"\bpages\s*::\s*Builder\s*::\s*new\s*\("),
     "Pages source-built table": re.compile(r"\bbody_table\s*\("),
     "Pages focused package ingress": re.compile(
         r"\bPagesPackage\s*::\s*from_bytes\s*\("
@@ -65064,7 +65064,7 @@ def audit_keynote_slide_table_physical_sort_resource_source_topology(
 
     # Exact/native packages must not call the old Numbers mutation writer once
     # the owner is active. The sole temporary exception is the marker-proven
-    # KeynoteDocumentBuilder compatibility graph, including its save/reopen
+    # keynote::Builder compatibility graph, including its save/reopen
     # form; its writer is isolated behind one guarded dispatcher. Scan all
     # production Keynote helpers, including split child modules, while masking
     # cfg(test) bodies to avoid fixture decoys.

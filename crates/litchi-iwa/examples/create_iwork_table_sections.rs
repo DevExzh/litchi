@@ -3,9 +3,9 @@ use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSet
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
-use litchi_iwa::pages::PagesDocumentBuilder;
+use litchi_iwa::keynote::{self, KeynoteEditor};
+use litchi_iwa::numbers::{self, NumbersEditor};
+use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_keynote::slide::table::headers::{
     Count as KeynoteHeaderCount, Settings as KeynoteHeaderSettings,
@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn create_numbers(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_name("Section CRUD")
         .table_dimensions(TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
@@ -83,7 +83,7 @@ fn set_focused_table_headers(
 }
 
 fn create_pages(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Section-aware table CRUD\n")
         .body_table("Section CRUD", TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
@@ -110,7 +110,7 @@ fn create_pages(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std::
 }
 
 fn create_keynote(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = KeynoteDocumentBuilder::new()
+    let mut editor = keynote::Builder::new()
         .title("Section-aware table CRUD")
         .build()?;
     let table = editor.add_slide_table(

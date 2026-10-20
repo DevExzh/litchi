@@ -460,7 +460,7 @@ fn reference(identifier: u64) -> tsp::Reference {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
 
     const FIRST_POSITION: DrawablePoint = DrawablePoint { x: 144.0, y: 216.0 };
     const FIRST_SIZE: DrawableSize = DrawableSize {
@@ -474,7 +474,7 @@ mod tests {
         reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
     )]
     fn scratch_presentation_supports_text_box_crud_without_a_source_drawable() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Scratch presentation")
             .subtitle("No embedded package")
             .build()
@@ -539,7 +539,7 @@ mod tests {
 
     #[test]
     fn scratch_text_box_creation_is_transactional() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let baseline = editor.to_bytes().unwrap();
 
         assert!(
@@ -566,7 +566,7 @@ mod tests {
 
     #[test]
     fn slide_without_placeholders_uses_theme_text_styles() {
-        let editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let editor = keynote::Builder::new().build().unwrap();
         let graph = ObjectGraph::read(editor.package()).unwrap();
         let context = text_box_context(&graph, 0).unwrap();
         let slide_id = context.slide_id;
@@ -615,7 +615,7 @@ mod tests {
         reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
     )]
     fn created_text_box_graph_has_private_objects_and_component_uuids() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let created = editor
             .add_slide_text_box(0, "Metadata", FIRST_POSITION, FIRST_SIZE)
             .unwrap();

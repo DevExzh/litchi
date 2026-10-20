@@ -66,7 +66,7 @@ impl From<litchi_numbers::table::merge::Error> for crate::Error {
     }
 }
 
-pub use creation::NumbersDocumentBuilder;
+pub use creation::Builder;
 pub use editor::{
     Direction, NumbersEditor, NumbersPivotCategoryInfo, NumbersSheetAudioInfo,
     NumbersSheetAudioOptions, NumbersSheetChartInfo, NumbersSheetImageInfo,

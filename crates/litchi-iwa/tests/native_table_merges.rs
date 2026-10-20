@@ -4,7 +4,7 @@ use std::error::Error;
 
 use litchi_iwa::{
     keynote::KeynoteEditor,
-    numbers::{NumbersDocumentBuilder, NumbersEditor},
+    numbers::{self, NumbersEditor},
     pages::PagesEditor,
 };
 use litchi_iwa_common::table::merge::Region;
@@ -26,7 +26,7 @@ type TestResult = Result<(), Box<dyn Error>>;
 
 #[test]
 fn numbers_merge_selectors_keep_distinct_table_geometry() -> TestResult {
-    let mut host = NumbersDocumentBuilder::new()
+    let mut host = numbers::Builder::new()
         .sheet_name("Merges")
         .table_name("Original")
         .table_dimensions(4, 4)

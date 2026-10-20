@@ -1,6 +1,6 @@
 use super::{TextHyperlinkTarget, TextPosition, TextRange};
-use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use crate::numbers::{NumbersDocumentBuilder, NumbersEditor};
+use crate::keynote::{self, KeynoteEditor};
+use crate::numbers::{self, NumbersEditor};
 use crate::pages::PagesEditor;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_text::date_time::{
@@ -151,7 +151,7 @@ fn scratch_text_box_date_time_fields_work_across_the_suite() {
         .remove_text_box_date_time_field(pages_box.drawable_object_id, pages_field.id)
         .unwrap();
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(sheet_id, prefix, POSITION, SIZE)
@@ -181,7 +181,7 @@ fn scratch_text_box_date_time_fields_work_across_the_suite() {
         )
         .unwrap();
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(0, prefix, POSITION, SIZE)
         .unwrap();

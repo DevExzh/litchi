@@ -700,11 +700,11 @@ pub(super) fn focused_merge_table_indices(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
 
     #[test]
     fn selectors_share_the_editor_catalog_and_reject_invalid_entries() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Summary")
             .table_name("Revenue")
             .table_dimensions(2, 2)
@@ -740,7 +740,7 @@ mod tests {
 
     #[test]
     fn table_name_resolution_reports_cross_sheet_ambiguity() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Summary")
             .table_name("Revenue")
             .table_dimensions(2, 2)
@@ -756,7 +756,7 @@ mod tests {
 
     #[test]
     fn selectors_keep_exact_case_and_ambiguous_operations_atomic() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Summary")
             .table_name("Revenue")
             .table_dimensions(2, 2)
@@ -781,7 +781,7 @@ mod tests {
 
     #[test]
     fn focused_table_selector_index_preserves_native_table_order() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Summary")
             .table_name("First")
             .table_dimensions(2, 2)
@@ -813,7 +813,7 @@ mod tests {
 
     #[test]
     fn focused_table_selector_index_rejects_orphaned_descriptors() {
-        let editor = NumbersDocumentBuilder::new()
+        let editor = numbers::Builder::new()
             .sheet_name("Summary")
             .table_name("First")
             .table_dimensions(2, 2)
@@ -832,7 +832,7 @@ mod tests {
 
     #[test]
     fn focused_table_selector_index_rejects_cross_sheet_ownership() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Summary")
             .table_name("First")
             .table_dimensions(2, 2)

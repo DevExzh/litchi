@@ -72,13 +72,13 @@ fn set_sheet_chart_category_label_layout(
 mod tests {
     use super::*;
     use crate::charts::{ChartData, Kind};
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::{DrawablePoint, DrawableSize};
     use litchi_iwa_common::chart::category_labels::{Frequency, Interval};
 
     #[test]
     fn scratch_spreadsheet_supports_category_label_layout_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
             .add_sheet_chart(

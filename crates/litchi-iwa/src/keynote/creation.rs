@@ -328,7 +328,7 @@ impl KeynoteMessageType {
 /// Every archive, relationship, and identity is encoded from typed values. No
 /// Apple presentation, blank package, or other prebuilt template is copied.
 #[derive(Debug, Clone, PartialEq)]
-pub struct KeynoteDocumentBuilder {
+pub struct Builder {
     title: String,
     subtitle: String,
     presenter_notes: String,
@@ -339,7 +339,7 @@ pub struct KeynoteDocumentBuilder {
     slide_number_visible: bool,
 }
 
-impl Default for KeynoteDocumentBuilder {
+impl Default for Builder {
     fn default() -> Self {
         Self {
             title: DEFAULT_TITLE.to_owned(),
@@ -354,7 +354,7 @@ impl Default for KeynoteDocumentBuilder {
     }
 }
 
-impl KeynoteDocumentBuilder {
+impl Builder {
     /// Start a presentation containing one title-and-subtitle slide.
     pub fn new() -> Self {
         Self::default()
@@ -466,7 +466,7 @@ impl KeynoteDocumentBuilder {
 /// has no slide parent, and is therefore never rendered as presentation
 /// content. Keynote and Numbers share these TST/TSCE archive types.
 fn install_table_template(package: &mut IWorkPackage, language: &str, locale: &str) -> Result<()> {
-    let source = crate::numbers::NumbersDocumentBuilder::new()
+    let source = crate::numbers::Builder::new()
         .table_name("Table Template")
         .table_dimensions(5, 4)
         .language(language)
@@ -569,16 +569,16 @@ fn install_table_template(package: &mut IWorkPackage, language: &str, locale: &s
 }
 
 impl KeynoteEditor {
-    pub fn builder() -> KeynoteDocumentBuilder {
-        KeynoteDocumentBuilder::new()
+    pub fn builder() -> Builder {
+        Builder::new()
     }
 
     pub fn create() -> Result<Self> {
-        KeynoteDocumentBuilder::new().build()
+        Builder::new().build()
     }
 }
 
-fn document_archive(builder: &KeynoteDocumentBuilder, template_id: tsp::Uuid) -> Result<Archive> {
+fn document_archive(builder: &Builder, template_id: tsp::Uuid) -> Result<Archive> {
     let document = kn::DocumentArchive {
         super_: tsa::DocumentArchive {
             super_: tsk::DocumentArchive {
@@ -807,7 +807,7 @@ fn document_archive(builder: &KeynoteDocumentBuilder, template_id: tsp::Uuid) ->
     })
 }
 
-fn template_archive(builder: &KeynoteDocumentBuilder) -> Result<Archive> {
+fn template_archive(builder: &Builder) -> Result<Archive> {
     let slide = slide(
         TEMPLATE_TITLE,
         TEMPLATE_BODY,
@@ -885,7 +885,7 @@ fn template_archive(builder: &KeynoteDocumentBuilder) -> Result<Archive> {
     })
 }
 
-fn slide_archive(builder: &KeynoteDocumentBuilder) -> Result<Archive> {
+fn slide_archive(builder: &Builder) -> Result<Archive> {
     let slide = slide(
         LIVE_TITLE,
         LIVE_BODY,
@@ -1110,7 +1110,7 @@ fn rectangle_path_source(size: &tsp::Size) -> tsd::PathSourceArchive {
     }
 }
 
-fn title_geometry(builder: &KeynoteDocumentBuilder) -> tsd::GeometryArchive {
+fn title_geometry(builder: &Builder) -> tsd::GeometryArchive {
     geometry(
         builder.width * 0.1,
         builder.height * 0.24,
@@ -1119,7 +1119,7 @@ fn title_geometry(builder: &KeynoteDocumentBuilder) -> tsd::GeometryArchive {
     )
 }
 
-fn body_geometry(builder: &KeynoteDocumentBuilder) -> tsd::GeometryArchive {
+fn body_geometry(builder: &Builder) -> tsd::GeometryArchive {
     geometry(
         builder.width * 0.15,
         builder.height * 0.52,
@@ -1842,7 +1842,7 @@ mod tests {
 
     #[test]
     fn generated_theme_exposes_distinct_canonical_list_presets() {
-        let package = KeynoteDocumentBuilder::new().build_package().unwrap();
+        let package = Builder::new().build_package().unwrap();
         let document = package.archive(DOCUMENT_ARCHIVE_ENTRY).unwrap();
         let theme = document.object(THEME).unwrap();
         let theme = IWorkThemeArchive::decode(&theme.messages[0].data).unwrap();
@@ -1872,7 +1872,7 @@ mod tests {
 
     #[test]
     fn generated_theme_exposes_unique_native_paragraph_style_catalog() {
-        let package = KeynoteDocumentBuilder::new().build_package().unwrap();
+        let package = Builder::new().build_package().unwrap();
         let styles = crate::text::paragraph_alignment::native::named_paragraph_styles(
             &package,
             PARAGRAPH_STYLE,
@@ -1943,7 +1943,7 @@ mod tests {
 
     #[test]
     fn generated_table_template_keeps_numbers_paragraph_style_dependencies() {
-        let package = KeynoteDocumentBuilder::new().build_package().unwrap();
+        let package = Builder::new().build_package().unwrap();
         let stylesheet = package.archive(STYLESHEET_ARCHIVE_ENTRY).unwrap();
         assert!(
             TableTemplateParagraphStyle::ALL
@@ -1970,8 +1970,8 @@ mod tests {
             "Metadata/BuildVersionHistory.plist",
         ];
 
-        let first = KeynoteDocumentBuilder::new().build_package().unwrap();
-        let second = KeynoteDocumentBuilder::new().build_package().unwrap();
+        let first = Builder::new().build_package().unwrap();
+        let second = Builder::new().build_package().unwrap();
         assert_eq!(first.entry_names().collect::<Vec<_>>(), EXPECTED_ENTRIES);
         assert_eq!(first.len(), EXPECTED_ENTRIES.len());
         assert!(first.entry_names().all(|name| !name.starts_with("Data/")));
@@ -1984,7 +1984,7 @@ mod tests {
 
     #[test]
     fn generated_presentation_round_trips_and_is_editable() {
-        let editor = KeynoteDocumentBuilder::new()
+        let editor = Builder::new()
             .title("Quarterly Review")
             .subtitle("Built without a template")
             .presenter_notes("Start with the result.")
@@ -2144,10 +2144,7 @@ mod tests {
             Some(State::Hidden)
         );
 
-        let mut visible = KeynoteDocumentBuilder::new()
-            .slide_number_visible(true)
-            .build()
-            .unwrap();
+        let mut visible = Builder::new().slide_number_visible(true).build().unwrap();
         let layout = visible.default_slide_layout().unwrap();
         let created = visible.add_slide(layout).unwrap();
         assert_eq!(created.index, 1);
@@ -2227,7 +2224,7 @@ mod tests {
     fn invalid_slide_dimensions_are_rejected() {
         for (width, height) in [(0.0, 1.0), (1.0, f32::NAN), (f32::INFINITY, 1.0)] {
             assert!(
-                KeynoteDocumentBuilder::new()
+                Builder::new()
                     .slide_size(width, height)
                     .build_package()
                     .is_err()

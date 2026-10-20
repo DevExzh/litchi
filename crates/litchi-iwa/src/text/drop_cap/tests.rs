@@ -1,6 +1,6 @@
 use crate::archive::RawMessage;
-use crate::keynote::KeynoteDocumentBuilder;
-use crate::numbers::NumbersDocumentBuilder;
+use crate::keynote;
+use crate::numbers;
 use crate::pages::PagesEditor;
 use crate::protobuf::tswp;
 use crate::shapes::{DrawablePoint, DrawableSize};
@@ -100,7 +100,7 @@ fn scratch_numbers_and_keynote_support_drop_cap_crud() {
         .with_padding(Padding::from_points(8.0).unwrap())
         .with_outdent(Outdent::from_ratio(0.4).unwrap());
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(sheet_id, "Numbers Drop Cap", position, size)
@@ -125,7 +125,7 @@ fn scratch_numbers_and_keynote_support_drop_cap_crud() {
         Some(expected)
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote
         .add_slide_text_box(0, "Keynote Drop Cap", position, size)
         .unwrap();
@@ -161,7 +161,7 @@ fn shared_numbers_style_uses_copy_on_write() {
     let updated = model(7, 2)
         .with_wrap(Wrap::Contour)
         .with_outdent(Outdent::from_ratio(0.3).unwrap());
-    let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+    let mut editor = numbers::Builder::new().build().unwrap();
     let sheet_id = editor.sheets().unwrap()[0].object_id;
     let source = editor
         .add_sheet_text_box(sheet_id, "Shared style source", position, size)

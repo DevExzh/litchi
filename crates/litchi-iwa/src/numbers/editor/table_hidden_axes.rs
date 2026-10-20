@@ -41,7 +41,7 @@ impl NumbersEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::table_hidden_axes::table_hidden_graph_snapshot;
     use crate::table_hidden_axes::{
         FILTER_SET_MESSAGE_TYPE, HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE,
@@ -50,7 +50,7 @@ mod tests {
 
     #[test]
     fn scratch_table_hidden_axes_round_trip_transactionally() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(4, 3)
             .build()
             .unwrap();
@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn legacy_table_info_type_6003_keeps_canonical_model_and_axis_graph() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(4, 3)
             .build()
             .unwrap();
@@ -154,7 +154,7 @@ mod tests {
 
     #[test]
     fn hidden_axes_follow_table_insertion_and_deletion() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(4, 3)
             .build()
             .unwrap();

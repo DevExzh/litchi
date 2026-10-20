@@ -5,7 +5,7 @@ use super::*;
 use std::time::Duration;
 
 use crate::archive::{Archive, ArchiveObject, FieldInfo, FieldPath};
-use crate::keynote::KeynoteDocumentBuilder;
+use crate::keynote;
 use crate::media::MediaAssetId;
 use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE};
 use crate::protobuf::tsp::{ComponentInfo, ObjectUuidMapEntry, PackageMetadata, Reference, Uuid};
@@ -3234,7 +3234,7 @@ fn hand_built_slide_movie_admission_rejection_is_transactional() {
 
 #[test]
 fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let package = FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let commit = package
         .add_slide_movie(

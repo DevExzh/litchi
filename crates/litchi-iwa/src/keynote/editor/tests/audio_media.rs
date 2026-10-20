@@ -24,7 +24,7 @@ mod cases {
     use prost::Message as _;
 
     use super::super::*;
-    use crate::keynote::{KeynoteBuildSettings, KeynoteDocumentBuilder, KeynoteEditor};
+    use crate::keynote::{self, KeynoteBuildSettings, KeynoteEditor};
     use crate::shapes::DrawablePoint;
 
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsource-built-audio";
@@ -524,7 +524,7 @@ mod cases {
 
     #[test]
     fn source_built_audio_properties_project_through_focused_updates() -> TestResult {
-        let mut seed = KeynoteDocumentBuilder::new()
+        let mut seed = keynote::Builder::new()
             .title("Audio properties projection")
             .build()?;
         let created = add_audio(
@@ -574,7 +574,7 @@ mod cases {
 
     #[test]
     fn scratch_presentation_supports_slide_audio_crud() -> TestResult {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Scratch audio")
             .subtitle("No embedded package")
             .build()?;
@@ -671,7 +671,7 @@ mod cases {
 
     #[test]
     fn scratch_presentation_supports_native_audio_duplication() -> TestResult {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Scratch audio")
             .subtitle("No embedded package")
             .build()?;
@@ -796,7 +796,7 @@ mod cases {
 
     #[test]
     fn invalid_slide_audio_creation_and_cross_type_edits_are_transactional() -> TestResult {
-        let mut editor = KeynoteDocumentBuilder::new().build()?;
+        let mut editor = keynote::Builder::new().build()?;
         let baseline = editor.to_bytes()?;
         assert!(
             focused_audio_package(&editor)?

@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
-use litchi_iwa::pages::PagesDocumentBuilder;
+use litchi_iwa::keynote;
+use litchi_iwa::numbers::{self, NumbersEditor};
+use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeFill};
 use litchi_numbers::cell::Value as CellValue;
 
@@ -35,7 +35,7 @@ fn fill() -> Result<ShapeFill, Box<dyn std::error::Error>> {
 }
 
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_name("Fills")
         .table_dimensions(3, 3)
         .build()?;
@@ -119,7 +119,7 @@ fn numbers_cell_change(
 }
 
 fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Created from scratch with a native table-cell fill.\n")
         .body_table("Fills", 3, 3)
         .build()?;
@@ -131,7 +131,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = KeynoteDocumentBuilder::new()
+    let mut editor = keynote::Builder::new()
         .title("Native table-cell fills")
         .build()?;
     let table = editor.add_slide_table(

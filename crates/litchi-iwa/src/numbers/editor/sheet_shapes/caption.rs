@@ -612,7 +612,7 @@ fn require_exact_message_count(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::{DrawablePoint, DrawableSize};
     use litchi_iwa_common::shape::path::Preset;
 
@@ -624,7 +624,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_native_shape_title_caption_crud() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Shape labels")
             .build()
             .unwrap();

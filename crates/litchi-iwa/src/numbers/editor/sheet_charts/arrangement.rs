@@ -176,12 +176,12 @@ fn chart_position(
 mod tests {
     use super::*;
     use crate::charts::{ChartData, Kind};
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_spreadsheet_supports_chart_arrangement_selector_crud() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let chart = editor
             .add_sheet_chart(
@@ -281,7 +281,7 @@ mod tests {
         const CHART_COUNT: usize = 32;
         const TARGET_POSITION: usize = 17;
 
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let first = editor
             .add_sheet_chart(

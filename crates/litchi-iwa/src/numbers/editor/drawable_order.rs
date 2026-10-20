@@ -81,7 +81,7 @@ impl NumbersEditor {
 mod tests {
     use super::*;
     use crate::DrawableLayerMove;
-    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     const OVERLAP_POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 180.0 };
@@ -92,7 +92,7 @@ mod tests {
 
     #[test]
     fn scratch_spreadsheet_supports_drawable_order_crud() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .sheet_name("Layered")
             .table_name("Data")
             .build()

@@ -5,7 +5,7 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersSheetMovieOptions};
+use litchi_iwa::numbers::{self, NumbersSheetMovieOptions};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 
@@ -40,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .file_name()
         .and_then(|name| name.to_str())
         .ok_or("poster path has no UTF-8 basename")?;
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .sheet_name("Source-built Movie")
         .table_name("Scratch Table")
         .build()?;

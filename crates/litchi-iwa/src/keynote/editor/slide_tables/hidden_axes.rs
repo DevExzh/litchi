@@ -42,13 +42,13 @@ impl KeynoteEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{DrawablePoint, DrawableSize};
     use litchi_iwa_common::table::axis::AxisIndex;
 
     #[test]
     fn scratch_slide_table_roundtrips_hidden_axes_transactionally() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let table = editor
             .add_slide_table(
                 0,

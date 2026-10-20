@@ -14,7 +14,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 
 use litchi_iwa::comments::IWorkDrawableCommentEditor;
-use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor, PagesTableInfo};
+use litchi_iwa::pages::{self, PagesEditor, PagesTableInfo};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Preset};
 use litchi_iwa_archive::iwa::{Archive, ArchiveObject, SnappyStream};
 use litchi_iwa_archive::package::Catalog;
@@ -69,7 +69,7 @@ struct ObjectRecord {
 }
 
 fn pages_shape_package() -> TestResult<(Vec<u8>, DrawableId)> {
-    let mut pages = PagesDocumentBuilder::new().body_text("Body text").build()?;
+    let mut pages = pages::Builder::new().body_text("Body text").build()?;
     let shape = pages.add_body_shape(
         4,
         "A source-built shape",
@@ -85,7 +85,7 @@ fn pages_shape_package() -> TestResult<(Vec<u8>, DrawableId)> {
 }
 
 fn pages_table_package() -> TestResult<(Vec<u8>, u64, u64, PagesTableInfo)> {
-    let pages = PagesDocumentBuilder::new()
+    let pages = pages::Builder::new()
         .body_text("Body text")
         .body_table("Cities", 5, 2)
         .body_table("Unrelated", 2, 2)

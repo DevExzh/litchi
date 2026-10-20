@@ -26,7 +26,7 @@ use crate::package_metadata::{
     add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
     remove_component_external_reference, remove_component_object_uuids,
 };
-use crate::pages::PagesDocumentBuilder;
+use crate::pages;
 use crate::shapes::{
     Appearance, BlurRadius, Drop, Offset, Pattern, RgbColorSpace, RgbaColor, ShapeFill,
     ShapeImageFillTechnique, Stroke, Width,
@@ -3015,10 +3015,7 @@ fn scratch_document_supports_exact_chart_legend_fill_crud() {
 
 #[test]
 fn scratch_document_supports_exact_chart_legend_frame_crud() {
-    let mut editor = PagesDocumentBuilder::new()
-        .body_text("Legend")
-        .build()
-        .unwrap();
+    let mut editor = pages::Builder::new().body_text("Legend").build().unwrap();
     let chart = editor
         .add_body_chart(
             "Legend".encode_utf16().count(),
@@ -3052,7 +3049,7 @@ fn scratch_document_supports_exact_chart_legend_frame_crud() {
 
 #[test]
 fn scratch_document_supports_exact_chart_legend_typography_crud() {
-    let mut editor = PagesDocumentBuilder::new().build().unwrap();
+    let mut editor = pages::Builder::new().build().unwrap();
     let chart = editor
         .add_body_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();

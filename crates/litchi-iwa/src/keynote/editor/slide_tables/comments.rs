@@ -229,11 +229,11 @@ fn require_reply(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
 
     #[test]
     fn scratch_table_comment_threads_support_full_crud() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let table = editor
             .add_slide_table(
                 0,

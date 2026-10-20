@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
-use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
+use litchi_iwa::keynote::{self, KeynoteEditor};
+use litchi_iwa::numbers::{self, NumbersEditor};
+use litchi_iwa::pages::{self, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
 use litchi_iwa::text::{
     Alignment, Background, IndentPoints, Indents, LineSpacing, LineSpacingMultiple,
@@ -912,7 +912,7 @@ fn keynote_paragraph_tab_stops() -> Result<ParagraphTabStops, litchi_iwa::Error>
 }
 
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_name("Layouts")
         .table_dimensions(3, 3)
         .build()?;
@@ -1097,7 +1097,7 @@ fn numbers_cell_change(
 }
 
 fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = PagesDocumentBuilder::new()
+    let mut editor = pages::Builder::new()
         .body_text("Created from scratch with native table-cell text layout.\n")
         .body_table("Layouts", 3, 3)
         .build()?;
@@ -1210,7 +1210,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = KeynoteDocumentBuilder::new()
+    let mut editor = keynote::Builder::new()
         .title("Native table-cell text layouts")
         .build()?;
     let table = editor.add_slide_table(

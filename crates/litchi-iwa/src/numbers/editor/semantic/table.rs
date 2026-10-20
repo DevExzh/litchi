@@ -802,7 +802,7 @@ fn verify_focused_data_format(
 
 /// Apply the legacy native control writer to an editor-owned package.
 ///
-/// Packages produced by `NumbersDocumentBuilder` intentionally do not carry
+/// Packages produced by `numbers::Builder` intentionally do not carry
 /// an exact-source owner for the interactive-control graph yet. Keep the
 /// focused owner strict for exact packages, while allowing these in-memory
 /// compatibility packages to acquire the same canonical control/list state
@@ -3268,7 +3268,7 @@ mod focused_custom_tests {
 
     use super::*;
     use crate::numbers::cell::CellValue;
-    use crate::numbers::{NumbersDocumentBuilder, NumbersEditor};
+    use crate::numbers::{self, NumbersEditor};
     use litchi_iwa_archive::package::Catalog;
     use litchi_numbers::cell::data_format::custom::{
         Custom, DateTime as CustomDateTime, DateTimePattern, Name, Number as CustomNumber,
@@ -3903,7 +3903,7 @@ mod focused_custom_tests {
 
     #[test]
     fn builder_custom_reopen_keeps_compatibility_profile() {
-        let mut editor = NumbersDocumentBuilder::new()
+        let mut editor = numbers::Builder::new()
             .table_dimensions(2, 2)
             .build()
             .expect("builder source");
@@ -4089,7 +4089,7 @@ mod focused_custom_tests {
 
         for (label, initial, requested, value, refuses) in cases {
             for reopen in [false, true] {
-                let mut editor = NumbersDocumentBuilder::new()
+                let mut editor = numbers::Builder::new()
                     .table_name("Custom compatibility")
                     .table_dimensions(2, 2)
                     .build()

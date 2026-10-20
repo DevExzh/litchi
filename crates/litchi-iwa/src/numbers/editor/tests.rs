@@ -1,7 +1,7 @@
 use super::compatibility_document_from_bytes;
 use super::*;
 use crate::archive::{Archive, ArchiveObject, FieldInfo, FieldPath};
-use crate::numbers::{NumbersDocumentBuilder, SemanticTableCellAssertions};
+use crate::numbers::{self, SemanticTableCellAssertions};
 use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE};
 use crate::protobuf::tn;
 use crate::protobuf::tsp::{ComponentInfo, ObjectUuidMapEntry, PackageMetadata, Reference, Uuid};
@@ -1790,7 +1790,7 @@ fn source_created_dimension_storage_uses_neutral_codec_and_preserves_unknowns() 
 {
     use litchi_numbers::table::dimension::{Dimension, Size};
 
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_name("Neutral dimension builder")
         .table_dimensions(3, 2)
         .build()?;
@@ -3806,7 +3806,7 @@ fn whole_row_formula_ranges_round_trip_with_complete_external_edges() {
 
 #[test]
 fn focused_table_lock_edits_round_trip_through_legacy_host_creation() {
-    let editor = NumbersDocumentBuilder::new()
+    let editor = numbers::Builder::new()
         .table_name("Locked Table")
         .table_dimensions(3, 2)
         .build()
@@ -3961,7 +3961,7 @@ fn focused_number_format_edit_round_trips_through_legacy_host_writer() {
 
 #[test]
 fn exact_control_to_number_preserves_boolean_against_compatibility_writer() {
-    let mut source_editor = NumbersDocumentBuilder::new()
+    let mut source_editor = numbers::Builder::new()
         .table_name("Focused control scalar transition")
         .table_dimensions(3, 3)
         .build()
@@ -4071,7 +4071,7 @@ fn exact_control_to_number_preserves_boolean_against_compatibility_writer() {
 fn nonnumeric_controls_to_scientific_keep_compatibility_writer() {
     let scientific = Scientific::new(FixedDecimalPlaces::new(3).unwrap());
 
-    let mut checkbox_source = NumbersDocumentBuilder::new()
+    let mut checkbox_source = numbers::Builder::new()
         .table_name("Boolean scientific compatibility")
         .table_dimensions(3, 3)
         .build()
@@ -4154,7 +4154,7 @@ fn nonnumeric_controls_to_scientific_keep_compatibility_writer() {
         Some(CellValue::Boolean(true))
     );
 
-    let mut text_source = NumbersDocumentBuilder::new()
+    let mut text_source = numbers::Builder::new()
         .table_name("Text scientific compatibility")
         .table_dimensions(3, 3)
         .build()
@@ -4224,7 +4224,7 @@ fn nonnumeric_formula_caches_keep_compatibility_numeric_routes() {
     ];
 
     for cached_value in cached_values {
-        let mut source = NumbersDocumentBuilder::new()
+        let mut source = numbers::Builder::new()
             .table_name("Nonnumeric formula cache")
             .table_dimensions(3, 3)
             .build()
@@ -4410,7 +4410,7 @@ fn exact_numeric_cross_family_transitions_preserve_typed_value() {
 
 #[test]
 fn exact_formula_numeric_transitions_preserve_formula_and_cached_value() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_name("Focused formula scalar transition")
         .table_dimensions(3, 3)
         .build()
@@ -4587,7 +4587,7 @@ fn exact_number_numeral_system_conversions_keep_compatibility_writer() {
 
 #[test]
 fn exact_control_numeral_system_conversions_keep_compatibility_writer() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_name("Control compatibility")
         .table_dimensions(3, 3)
         .build()
@@ -4629,7 +4629,7 @@ fn builder_empty_table_accepts_focused_commit_apply_and_inverse() {
         output
     }
 
-    let editor = NumbersDocumentBuilder::new()
+    let editor = numbers::Builder::new()
         .table_name("Focused Builder")
         .table_dimensions(2, 3)
         .build()
@@ -5355,7 +5355,7 @@ fn table_cell_border_crud_allocates_sparse_layers_and_round_trips() {
 
 #[test]
 fn table_cell_fill_crud_round_trips_and_reuses_private_style() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .sheet_name("Fill")
         .table_name("Colors")
         .table_dimensions(3, 3)
@@ -5392,7 +5392,7 @@ fn table_cell_fill_crud_round_trips_and_reuses_private_style() {
 
 #[test]
 fn table_cell_layout_composes_with_fill_and_resets_independently() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_name("Layout")
         .table_dimensions(3, 3)
         .build()
@@ -5444,7 +5444,7 @@ fn table_cell_layout_composes_with_fill_and_resets_independently() {
 
 #[test]
 fn table_cell_layout_rejects_invalid_coordinates_transactionally() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(2, 2)
         .build()
         .unwrap();
@@ -7887,7 +7887,7 @@ fn focused_compat_sort_order_locked_idempotence_and_changed_refusal_are_exact() 
 
 #[test]
 fn source_created_sparse_boundary_supports_formula_and_comment_crud() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(257, 2)
         .build()
         .unwrap();
@@ -7946,7 +7946,7 @@ fn source_created_sparse_boundary_supports_formula_and_comment_crud() {
 fn source_created_large_table_allocates_header_buckets_only_when_needed() {
     const SECOND_HEADER_BUCKET_ROW: usize = 65_536;
 
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(SECOND_HEADER_BUCKET_ROW + 1, 1)
         .build()
         .unwrap();
@@ -7993,7 +7993,7 @@ fn source_created_large_table_allocates_header_buckets_only_when_needed() {
 
 #[test]
 fn source_created_table_supports_focused_sort_order_configuration_crud() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(4, 3)
         .build()
         .unwrap();
@@ -8021,7 +8021,7 @@ fn source_created_table_supports_focused_sort_order_configuration_crud() {
 
 #[test]
 fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
-    let editor = NumbersDocumentBuilder::new()
+    let editor = numbers::Builder::new()
         .table_dimensions(6, 2)
         .build()
         .unwrap();
@@ -8159,7 +8159,7 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
 
 #[test]
 fn table_sort_order_executes_stable_body_sort_and_remaps_row_uids() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(5, 2)
         .build()
         .unwrap();
@@ -8274,7 +8274,7 @@ fn table_sort_order_executes_stable_body_sort_and_remaps_row_uids() {
 
 #[test]
 fn source_created_table_executes_stable_plain_text_sort() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(5, 2)
         .build()
         .unwrap();
@@ -8807,7 +8807,7 @@ fn table_string_storage_later_malformed_segment_fails_without_mutation() {
 
 #[test]
 fn source_created_table_executes_sort_order_without_moving_headers_or_footers() {
-    let editor = NumbersDocumentBuilder::new()
+    let editor = numbers::Builder::new()
         .table_dimensions(5, 3)
         .build()
         .unwrap();
@@ -8962,7 +8962,7 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
 fn table_sort_keeps_user_hidden_axes_at_their_physical_positions() {
     use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 
-    let editor = NumbersDocumentBuilder::new()
+    let editor = numbers::Builder::new()
         .table_dimensions(5, 2)
         .build()
         .unwrap();
@@ -9679,7 +9679,7 @@ fn creates_independent_empty_table_on_an_existing_sheet() {
 
 #[test]
 fn recreates_first_table_after_removing_the_last_scratch_table() {
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_dimensions(2, 2)
         .build()
         .unwrap();
@@ -9724,7 +9724,7 @@ fn recreates_first_table_after_removing_the_last_scratch_table() {
 
 #[test]
 fn first_table_bootstrap_uses_the_target_sheet() {
-    let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+    let mut editor = numbers::Builder::new().build().unwrap();
     let original_table_id = editor.tables().unwrap()[0].object_id;
     editor
         .remove_table(test_table_selector(&editor, original_table_id))
@@ -9753,7 +9753,7 @@ fn first_table_bootstrap_uses_the_target_sheet() {
 
 #[test]
 fn first_table_bootstrap_rejects_a_missing_theme_preset_transactionally() {
-    let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+    let mut editor = numbers::Builder::new().build().unwrap();
     let sheet_id = editor.sheets().unwrap()[0].object_id;
     let original_table_id = editor.tables().unwrap()[0].object_id;
     editor

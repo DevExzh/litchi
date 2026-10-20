@@ -73,13 +73,13 @@ fn set_body_chart_axis_number_format(
 mod tests {
     use super::*;
     use crate::charts::{ChartData, DecimalPlaces, Kind, NegativeStyle};
-    use crate::pages::PagesDocumentBuilder;
+    use crate::pages;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
     #[test]
     fn scratch_document_supports_axis_number_format_crud() {
         let body = "Axis format";
-        let mut editor = PagesDocumentBuilder::new().body_text(body).build().unwrap();
+        let mut editor = pages::Builder::new().body_text(body).build().unwrap();
         let chart = editor
             .add_body_chart(
                 body.encode_utf16().count(),

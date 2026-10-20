@@ -10,7 +10,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 
-use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
+use litchi_iwa::pages::{self, PagesEditor};
 use litchi_iwa_archive::iwa::{Archive, ArchiveObject, SnappyStream};
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_protos::{tss, tst};
@@ -371,7 +371,7 @@ fn assert_native_stylesheet_fixture(source: &[u8], label: &str) -> TestResult<()
 
 #[test]
 fn source_built_pages_table_retains_numbers_stylesheet_closure() -> TestResult {
-    let pages = PagesDocumentBuilder::new()
+    let pages = pages::Builder::new()
         .body_text("Body text")
         .body_table("Imported Numbers table", 5, 4)
         .build()?;

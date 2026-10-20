@@ -1247,7 +1247,7 @@ mod tests {
     use std::{fs, path::PathBuf};
 
     use super::*;
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::media::MediaAssetId;
     use crate::shapes::{
         Appearance, BlurRadius, Curve, Curved, Endpoint, Offset, Pattern, RgbColorSpace, RgbaColor,
@@ -1289,7 +1289,7 @@ mod tests {
         reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
     )]
     fn scratch_presentation_supports_rectangle_crud_without_a_source_drawable() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Scratch shape")
             .subtitle("No embedded package")
             .build()
@@ -1374,7 +1374,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_native_shape_duplication() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Shape clone")
             .subtitle("Independent rich text")
             .build()
@@ -1463,7 +1463,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_straight_line_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Scratch line")
             .subtitle("No embedded package")
             .build()
@@ -1540,7 +1540,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_typed_shape_stroke_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Stroke")
             .subtitle("Typed native style")
             .build()
@@ -1593,7 +1593,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_typed_shape_fill_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Fill")
             .subtitle("Typed native style")
             .build()
@@ -1648,7 +1648,7 @@ mod tests {
     #[test]
     fn scratch_presentation_supports_embedded_shape_image_fill_crud() {
         let bytes = fixture("test-data/images/png/lena.png");
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Image fill")
             .subtitle("Embedded from scratch")
             .build()
@@ -1703,7 +1703,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_shape_effect_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Effects")
             .subtitle("Typed object opacity and reflection")
             .build()
@@ -1744,7 +1744,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_curved_shadow_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Shadows")
             .subtitle("Typed curved shadow")
             .build()
@@ -1791,7 +1791,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_shape_text_layout_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Layout")
             .subtitle("Typed frame layout")
             .build()
@@ -1838,7 +1838,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_typed_line_endpoint_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Endpoint styles")
             .subtitle("Built from native line-end paths")
             .build()
@@ -1885,7 +1885,7 @@ mod tests {
 
     #[test]
     fn scratch_presentation_supports_typed_preset_shape_crud() {
-        let mut editor = KeynoteDocumentBuilder::new()
+        let mut editor = keynote::Builder::new()
             .title("Preset shapes")
             .subtitle("Built from typed paths")
             .build()
@@ -1934,7 +1934,7 @@ mod tests {
         reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
     )]
     fn invalid_rectangle_creation_and_cross_type_updates_are_transactional() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let baseline = editor.to_bytes().unwrap();
         assert!(
             editor

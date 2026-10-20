@@ -22,7 +22,7 @@ use crate::charts::{
     LabelVisibility, LeaderLineVisibility, NegativeStyle, NumberFormat, TickMarkLocation,
     Visibility,
 };
-use crate::keynote::KeynoteDocumentBuilder;
+use crate::keynote;
 use crate::media::MediaAssetId;
 use crate::shapes::{
     Appearance, BlurRadius, Drop, Offset, Pattern, RgbColorSpace, RgbaColor, ShapeFill,
@@ -369,7 +369,7 @@ fn mutate_keynote_chart_title_standin(editor: &mut KeynoteEditor, drawable_objec
 
 #[test]
 fn scratch_presentation_supports_standalone_chart_crud() {
-    let mut editor = KeynoteDocumentBuilder::new()
+    let mut editor = keynote::Builder::new()
         .title("Source-built chart")
         .build()
         .unwrap();
@@ -448,7 +448,7 @@ fn scratch_presentation_supports_standalone_chart_crud() {
 
 #[test]
 fn chart_creation_rejects_invalid_inputs_transactionally() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let baseline = editor.to_bytes().unwrap();
     assert!(
         editor
@@ -479,7 +479,7 @@ fn chart_creation_rejects_invalid_inputs_transactionally() {
 
 #[test]
 fn lifecycle_chart_apis_accept_semantic_selectors_and_reject_out_of_range_positions() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let chart = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -504,7 +504,7 @@ fn lifecycle_chart_apis_accept_semantic_selectors_and_reject_out_of_range_positi
 
 #[test]
 fn chart_name_selectors_match_titles_exactly_and_reject_ambiguity() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -580,7 +580,7 @@ fn chart_name_selectors_match_titles_exactly_and_reject_ambiguity() {
 
 #[test]
 fn multiple_chart_theme_registrations_are_removed_independently() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let baseline = editor.to_bytes().unwrap();
     let first = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
@@ -618,7 +618,7 @@ fn multiple_chart_theme_registrations_are_removed_independently() {
 
 #[test]
 fn duplicate_slide_chart_clones_the_private_graph_and_inline_data() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -698,7 +698,7 @@ fn duplicate_slide_chart_clones_the_private_graph_and_inline_data() {
 
 #[test]
 fn scratch_presentation_supports_native_chart_caption_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -827,7 +827,7 @@ fn scratch_presentation_supports_native_chart_caption_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_chart_title_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -882,7 +882,7 @@ fn keynote_chart_title_rewrite_is_field_local_and_lossless() {
     const UNKNOWN_OUTER_FIELD: u32 = 4_096;
     const UNKNOWN_GENERATED_FIELD: u32 = 4_097;
 
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let chart = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -936,7 +936,7 @@ fn keynote_chart_title_rewrite_is_field_local_and_lossless() {
 
 #[test]
 fn keynote_chart_title_rejects_duplicate_selected_field_without_publication() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let chart = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -973,7 +973,7 @@ fn keynote_chart_title_rejects_duplicate_selected_field_without_publication() {
 
 #[test]
 fn keynote_chart_title_clear_hidden_stale_value_is_an_exact_no_op() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let chart = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -1011,7 +1011,7 @@ fn keynote_chart_title_clear_hidden_stale_value_is_an_exact_no_op() {
 
 #[test]
 fn keynote_chart_title_rejects_non_standin_title_graph_without_publication() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let chart = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -1037,7 +1037,7 @@ fn keynote_chart_title_rejects_non_standin_title_graph_without_publication() {
 
 #[test]
 fn selector_chart_title_rejects_non_standin_title_graph_without_publication() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let chart = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -1070,7 +1070,7 @@ fn selector_chart_title_host_paths_interoperate_with_focused_package() {
     const UNKNOWN_OUTER_FIELD: u32 = 4_096;
     const UNKNOWN_GENERATED_FIELD: u32 = 4_097;
 
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let chart = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -1161,7 +1161,7 @@ fn selector_chart_title_host_paths_interoperate_with_focused_package() {
 
 #[test]
 fn scratch_presentation_supports_selector_chart_title_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -1184,7 +1184,7 @@ fn scratch_presentation_supports_selector_chart_title_crud() {
 
 #[test]
 fn selector_chart_title_set_accepts_owned_text() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -1198,7 +1198,7 @@ fn selector_chart_title_set_accepts_owned_text() {
 
 #[test]
 fn selector_chart_axis_title_builder_route_is_semantic_and_atomic() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -1246,7 +1246,7 @@ fn selector_chart_axis_title_builder_route_is_semantic_and_atomic() {
 
 #[test]
 fn scratch_presentation_supports_native_chart_border_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -1305,7 +1305,7 @@ fn scratch_presentation_supports_native_chart_border_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_chart_rounded_corner_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -1371,7 +1371,7 @@ fn scratch_presentation_supports_native_chart_rounded_corner_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_chart_gap_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -1430,7 +1430,7 @@ fn scratch_presentation_supports_native_chart_gap_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_chart_value_axis_minimum_label_visibility_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -1514,7 +1514,7 @@ fn scratch_presentation_supports_native_chart_value_axis_minimum_label_visibilit
 
 #[test]
 fn scratch_presentation_supports_native_chart_category_axis_series_names_visibility_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -1576,7 +1576,7 @@ fn scratch_presentation_supports_native_chart_category_axis_series_names_visibil
 
 #[test]
 fn scratch_presentation_supports_native_chart_axis_label_visibility_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -1647,7 +1647,7 @@ fn scratch_presentation_supports_native_chart_axis_label_visibility_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_chart_axis_line_visibility_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -1717,7 +1717,7 @@ fn scratch_presentation_supports_native_chart_axis_line_visibility_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_chart_axis_major_gridline_visibility_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -1816,7 +1816,7 @@ fn scratch_presentation_supports_native_chart_axis_major_gridline_visibility_cru
 
 #[test]
 fn scratch_presentation_supports_native_chart_axis_minor_gridline_visibility_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -1892,7 +1892,7 @@ fn scratch_presentation_supports_native_chart_axis_minor_gridline_visibility_cru
 
 #[test]
 fn scratch_presentation_supports_native_chart_axis_minor_tick_mark_visibility_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -1989,7 +1989,7 @@ fn scratch_presentation_supports_native_chart_axis_minor_tick_mark_visibility_cr
 
 #[test]
 fn scratch_presentation_supports_native_chart_axis_tick_mark_location_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -2107,7 +2107,7 @@ fn scratch_presentation_supports_native_chart_axis_tick_mark_location_crud() {
 
 #[test]
 fn scratch_presentation_supports_exact_chart_legend_fill_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let chart = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -2145,7 +2145,7 @@ fn scratch_presentation_supports_exact_chart_legend_fill_crud() {
 
 #[test]
 fn scratch_presentation_supports_exact_chart_legend_frame_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let chart = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -2179,7 +2179,7 @@ fn scratch_presentation_supports_exact_chart_legend_frame_crud() {
 
 #[test]
 fn scratch_presentation_supports_exact_chart_legend_typography_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let chart = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -2256,7 +2256,7 @@ fn scratch_presentation_supports_exact_chart_legend_typography_crud() {
 
 #[test]
 fn duplicated_legend_typography_is_copy_on_write() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let chart = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -2312,7 +2312,7 @@ fn duplicated_legend_typography_is_copy_on_write() {
 
 #[test]
 fn scratch_presentation_supports_exact_chart_legend_stroke_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let chart = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -2363,7 +2363,7 @@ fn scratch_presentation_supports_exact_chart_legend_stroke_crud() {
 
 #[test]
 fn scratch_presentation_supports_exact_chart_legend_shadow_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let chart = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -2434,7 +2434,7 @@ fn scratch_presentation_supports_exact_chart_legend_shadow_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_chart_border_stroke_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -2498,7 +2498,7 @@ fn scratch_presentation_supports_native_chart_border_stroke_crud() {
 #[test]
 fn scratch_presentation_supports_native_chart_background_fill_crud() {
     let image_bytes = fixture("test-data/images/png/lena.png");
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -2568,7 +2568,7 @@ fn scratch_presentation_supports_native_chart_background_fill_crud() {
 #[test]
 fn scratch_presentation_supports_inherited_series_fill_crud() {
     let image_bytes = fixture("test-data/images/png/lena.png");
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -2651,7 +2651,7 @@ fn scratch_presentation_supports_inherited_series_fill_crud() {
 
 #[test]
 fn scratch_presentation_supports_inherited_series_stroke_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -2721,7 +2721,7 @@ fn scratch_presentation_supports_inherited_series_stroke_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_chart_shadow_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -2782,7 +2782,7 @@ fn scratch_presentation_supports_native_chart_shadow_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_pie_start_angle_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Pie2d, pie_data(), POSITION, SIZE)
         .unwrap();
@@ -2873,7 +2873,7 @@ fn scratch_presentation_supports_native_pie_start_angle_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_donut_inner_radius_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Donut2d, pie_data(), POSITION, SIZE)
         .unwrap();
@@ -2967,7 +2967,7 @@ fn scratch_presentation_supports_native_donut_inner_radius_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_pie_wedge_explosion_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Pie2d, pie_data(), POSITION, SIZE)
         .unwrap();
@@ -3098,7 +3098,7 @@ fn scratch_presentation_supports_native_pie_wedge_explosion_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_pie_label_visibility_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Pie2d, pie_data(), POSITION, SIZE)
         .unwrap();
@@ -3201,7 +3201,7 @@ fn scratch_presentation_supports_native_pie_label_visibility_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_pie_label_distance_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Pie2d, pie_data(), POSITION, SIZE)
         .unwrap();
@@ -3407,7 +3407,7 @@ fn scratch_presentation_supports_native_pie_label_distance_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_series_value_label_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -3503,7 +3503,7 @@ fn scratch_presentation_supports_native_series_value_label_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_series_value_label_location_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -3602,7 +3602,7 @@ fn scratch_presentation_supports_native_series_value_label_location_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_series_value_label_affix_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -3703,7 +3703,7 @@ fn scratch_presentation_supports_native_series_value_label_affix_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_series_value_label_number_format_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -3800,7 +3800,7 @@ fn scratch_presentation_supports_native_series_value_label_number_format_crud() 
 
 #[test]
 fn scratch_presentation_supports_native_series_value_label_auto_fit_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -3891,7 +3891,7 @@ fn scratch_presentation_supports_native_series_value_label_auto_fit_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_series_trendline_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
@@ -3984,7 +3984,7 @@ fn scratch_presentation_supports_native_series_trendline_crud() {
 
 #[test]
 fn scratch_presentation_supports_native_series_error_bar_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut editor = keynote::Builder::new().build().unwrap();
     let source = editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();

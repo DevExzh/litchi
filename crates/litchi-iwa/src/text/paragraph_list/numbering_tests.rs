@@ -1,6 +1,6 @@
 use super::*;
-use crate::keynote::KeynoteDocumentBuilder;
-use crate::numbers::NumbersDocumentBuilder;
+use crate::keynote;
+use crate::numbers;
 use crate::pages::PagesEditor;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use crate::text::TextPosition;
@@ -67,7 +67,7 @@ fn list_numbering_round_trips_and_continues_independently_in_every_suite() {
         .unwrap();
     assert_eq!(pages.to_bytes().unwrap(), pages_before);
 
-    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let mut numbers = numbers::Builder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
     let numbers_box = numbers
         .add_sheet_text_box(sheet_id, TEXT, POSITION, SIZE)
@@ -99,7 +99,7 @@ fn list_numbering_round_trips_and_continues_independently_in_every_suite() {
         restart
     );
 
-    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let mut keynote = keynote::Builder::new().build().unwrap();
     let keynote_box = keynote.add_slide_text_box(0, TEXT, POSITION, SIZE).unwrap();
     keynote
         .set_slide_text_box_paragraph_list(

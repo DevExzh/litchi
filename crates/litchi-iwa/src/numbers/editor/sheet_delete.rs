@@ -241,8 +241,7 @@ mod tests {
     use super::*;
     use crate::charts::{ChartData, Kind};
     use crate::numbers::{
-        NumbersDocumentBuilder, NumbersSheetAudioOptions, NumbersSheetImageOptions,
-        NumbersSheetMovieOptions,
+        self, NumbersSheetAudioOptions, NumbersSheetImageOptions, NumbersSheetMovieOptions,
     };
     use crate::shapes::{DrawablePoint, DrawableSize};
 
@@ -266,7 +265,7 @@ mod tests {
 
     #[test]
     fn source_built_sheet_deletion_reclaims_every_supported_private_graph() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let mut editor = numbers::Builder::new().build().unwrap();
         let baseline_ids = object_ids(editor.package());
         let baseline_entries = editor
             .package()

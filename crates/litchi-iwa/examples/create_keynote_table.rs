@@ -1,8 +1,6 @@
 use std::env;
 
-use litchi_iwa::keynote::{
-    KeynoteDocumentBuilder, KeynoteEditor, KeynoteTableCellUpdate, KeynoteTableCellValue,
-};
+use litchi_iwa::keynote::{self, KeynoteEditor, KeynoteTableCellUpdate, KeynoteTableCellValue};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_keynote::slide::table::dimension::{Dimension, Size};
 use litchi_keynote::slide::table::formula::{
@@ -18,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
         .nth(1)
         .unwrap_or_else(|| "keynote-table.key".to_owned());
-    let mut editor = KeynoteDocumentBuilder::new()
+    let mut editor = keynote::Builder::new()
         .title("Regional outlook")
         .subtitle("Created entirely by litchi-iwa")
         .build()?;
@@ -145,7 +143,7 @@ fn set_focused_keynote_table_dimension(
     let commit = match result {
         Ok(commit) => commit,
         Err(litchi_keynote::slide::table::dimension::transaction::Error::UnsupportedDependency) => {
-            // KeynoteDocumentBuilder snapshots intentionally do not satisfy
+            // keynote::Builder snapshots intentionally do not satisfy
             // the focused owner's exact-source authority proof. Keep the
             // builder's private physical sizing and do not fall back to the
             // retired raw-ID writer.

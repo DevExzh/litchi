@@ -4,7 +4,7 @@ use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSet
 use std::path::PathBuf;
 
 use litchi_iwa::numbers::{
-    NumbersDocumentBuilder, NumbersEditor, NumbersTableSortColumnIndex, NumbersTableSortDirection,
+    self, NumbersEditor, NumbersTableSortColumnIndex, NumbersTableSortDirection,
     NumbersTableSortOrder, NumbersTableSortRule,
 };
 use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .nth(1)
             .ok_or("usage: create_numbers_hidden_row_sort <output.numbers>")?,
     );
-    let mut editor = NumbersDocumentBuilder::new()
+    let mut editor = numbers::Builder::new()
         .table_name("Hidden Forecast")
         .table_dimensions(5, 2)
         .build()?;

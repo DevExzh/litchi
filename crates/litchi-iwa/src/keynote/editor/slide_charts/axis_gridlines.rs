@@ -220,14 +220,14 @@ fn set_slide_chart_axis_minor_gridlines_visible(
 mod tests {
     use super::*;
     use crate::charts::{ChartData, Kind};
-    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::keynote;
     use crate::shapes::{
         DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Stroke, Width,
     };
 
     #[test]
     fn scratch_presentation_supports_axis_gridline_stroke_crud() {
-        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let mut editor = keynote::Builder::new().build().unwrap();
         let chart = editor
             .add_slide_chart(
                 0,
