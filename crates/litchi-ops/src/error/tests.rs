@@ -427,6 +427,50 @@ fn row_malformed_input_is_corrupt_file() {
 
 // Row: `ResourceLimit`, OPC `Limit`, leaf limit errors -> `limit_exceeded`
 // (record 0007, Q1), with the limit detail kept in the typed source.
+/// The typed budgets of the shared OOXML families (Custom XML, Web
+/// Extensions, Ribbon), carried by each OOXML crate's shared-error variant,
+/// are limit errors (record 0360).
+#[test]
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+fn shared_ooxml_family_limits_are_limit_exceeded() {
+    let shared = || {
+        [
+            litchi_ooxml_common::Error::CustomXmlLimit {
+                kind: litchi_ooxml_common::custom_xml::LimitKind::Items,
+                observed: 11,
+                maximum: 10,
+            },
+            litchi_ooxml_common::Error::WebLimit {
+                kind: litchi_ooxml_common::web::LimitKind::Panes,
+                observed: 11,
+                maximum: 10,
+            },
+            litchi_ooxml_common::Error::RibbonLimit {
+                kind: litchi_ooxml_common::ribbon::LimitKind::XmlBytes,
+                observed: 11,
+                maximum: 10,
+            },
+        ]
+    };
+    let check = |error: Error| assert_eq!(error.code(), Code::LimitExceeded, "{error:?}");
+    #[cfg(feature = "docx")]
+    for error in shared() {
+        check(litchi_docx::Error::Common(error).into());
+    }
+    #[cfg(feature = "pptx")]
+    for error in shared() {
+        check(litchi_pptx::Error::CustomProperties(error).into());
+    }
+    #[cfg(feature = "xlsx")]
+    for error in shared() {
+        check(litchi_xlsx::Error::Common(error).into());
+    }
+    #[cfg(feature = "xlsb")]
+    for error in shared() {
+        check(litchi_xlsb::package::PackageError::Common(error).into());
+    }
+}
+
 #[test]
 fn row_resource_limits_are_limit_exceeded() {
     let check = |error: Error| {

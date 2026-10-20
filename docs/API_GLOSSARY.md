@@ -1712,7 +1712,6 @@ Wave residue that still exposes a glossary-banned name (owner: record 0248):
 
 | Crate | Public name | Canonical | Owner |
 |---|---|---|---|
-| ooxml-common | `custom_xml::Transaction`, `Transaction::is_changed`, `Commit::snapshot` | `Edit`, `diagnostics().changed()`, `Commit::package()` | follow-up of record 0253 (not cheap: the in-place `&mut OpcPackage` owner needs a family reshape and docx call sites) |
 | ooxml-common | `custom_data::Limits` | `SemanticLimits` | follow-up of record 0253 (re-exported by xlsx/xlsb, which uo2/p4 and step 7d own) |
 | core | `Limits`, `Error::ResourceLimit` (execution budgets) | not banned by §4; rename only on an owner decision | owner decision |
 | pptx, xlsx, opc, ops | names listed in record 0248 §2 | §2–§4 | Phase B steps 4–5, ops follow-ups |
