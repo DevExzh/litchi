@@ -916,6 +916,9 @@ Work packages, in waves of up to four agents:
 
 - Merged `w1-docx` 0355a: 13 source-backed DOCX families commit to a `Package` (`write_to` the only output; `publish_*_to_stream`/`*Publication` banned; the shape is the reference for PPTX 0356a); alt-chunk edits, revision budgets and `max_output_bytes` restored; typed `LimitKind`; refusals classified by kind (OfficeCLI corpus unchanged); 1k DOCX batch 1.03–1.05× the leaf (was 302×); the flaky OPC cancellation test is deterministic.
 
+- Merged `w3-ppt` 0357a: public routes restored on the contract shape (primary-edit durable patches, `join`, three-way planning, master and table-style verbs; `text_edit` splice family); record-sized family patches (6.4× smaller, peak RSS 0.18×); animation no-op and signed rules; no-object decks editable; notes-master validator fixed; POI title-master fixture. 0357b (lazy target digest for the +10.7% commit, durable master/table-style verbs) in progress.
+- Merged `w2-pptx` 0356a: source-backed PPTX editing on `source::Package::edit` and `source::svg` (deferred source-backed commits, the 0355a shape); 20 `SourceBacked*` editor types private and banned; no public raw `OpcPackage` mutators (11 new families); selector-typed family keys (`MasterId`, `LayoutId`, `Owner`; a string selector is a slide name); inventory regenerated. 0356b (retire `SourceBackedPresentationEditor`) in progress.
+
 ## Coordinator status (2026-10-19): code work for the definition of done complete
 The third audit (`.coord/r9/dod-audit-2026-10-19-final.md`, outside the repository) listed three code items: PPTX batch budget (0348), the 34 DOCX chart rows (deferred-P1, owner memo 30) and docs hygiene. All three are done, and the workspace-wide gate now passes on trunk. What remains is the owner's:
 - the 30 decisions in [0331](0331-owner-decision-memo.md); items 12, 27, 28 and 29 decide definition-of-done verdicts;
