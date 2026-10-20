@@ -16,7 +16,7 @@ mod support;
 )]
 mod tests;
 
-pub use editor::Editor;
+pub use editor::Edit;
 pub use package::{PropertySetReader, SharedPropertySetReader};
 
 use super::model::{Section, Value};

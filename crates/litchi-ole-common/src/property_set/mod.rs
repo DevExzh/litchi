@@ -2,7 +2,7 @@
 //!
 //! The semantic model follows [MS-OLEPS] and the shared property-set rules in
 //! [MS-OSHARED]. Parsing and serialization are lossless within the supported
-//! typed grammar, while [`Editor`] stages complete CFB rewrites and publishes
+//! typed grammar, while [`Edit`] stages complete CFB rewrites and publishes
 //! them only after every requested mutation has validated successfully.
 //!
 //! [`PropertySetReader`] is an extension trait because the CFB container owns
@@ -48,7 +48,7 @@ pub use binding::{
     clippy::module_name_repetitions,
     reason = "the public extension-trait name distinguishes property-set readers from other readers"
 )]
-pub use codec::{Editor, PropertySetReader, SharedPropertySetReader};
+pub use codec::{Edit, PropertySetReader, SharedPropertySetReader};
 pub use model::{
     Array, CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Dimension, DocParts, Guid, HeadingPair,
     HeadingPairs, IndirectPropertyName, Metadata, PID_DOC_PARTS, PID_HEADING_PAIRS,

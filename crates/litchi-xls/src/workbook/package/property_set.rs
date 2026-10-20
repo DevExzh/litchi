@@ -16,8 +16,8 @@ use litchi_cfb::{OleError, OleFile};
 use litchi_ole_common::property_set::document_summary::Snapshot as DocumentSummary;
 use litchi_ole_common::property_set::summary_information::Snapshot as SummaryInformation;
 use litchi_ole_common::property_set::{
-    Binding, CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Editor, PropertySetReader,
-    SUMMARY_INFORMATION_FMTID, Section, USER_DEFINED_PROPERTIES_FMTID,
+    Binding, CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Edit as PropertySetEdit,
+    PropertySetReader, SUMMARY_INFORMATION_FMTID, Section, USER_DEFINED_PROPERTIES_FMTID,
 };
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
@@ -125,7 +125,7 @@ pub struct Edit {
     /// The package a commit republishes; `None` only for codec-level tests.
     base: Option<Package>,
     source: Snapshot,
-    editor: Editor,
+    editor: PropertySetEdit,
 }
 
 impl std::fmt::Debug for Edit {
@@ -140,7 +140,7 @@ impl Edit {
             return Err(Error::EncryptionPolicy);
         }
         let source = Snapshot::from_bytes(base.to_bytes()?)?;
-        let editor = Editor::new(source.bytes.to_vec()).map_err(crate::Error::from)?;
+        let editor = PropertySetEdit::new(source.bytes.to_vec()).map_err(crate::Error::from)?;
         Ok(Self {
             base: Some(base.clone()),
             source,
@@ -151,7 +151,7 @@ impl Edit {
     /// A codec-level edit of a bare property-set snapshot (tests only).
     #[cfg(test)]
     fn detached(source: Snapshot) -> Result<Self> {
-        let editor = Editor::new(source.bytes.to_vec()).map_err(crate::Error::from)?;
+        let editor = PropertySetEdit::new(source.bytes.to_vec()).map_err(crate::Error::from)?;
         Ok(Self {
             base: None,
             source,
@@ -160,13 +160,13 @@ impl Edit {
     }
 
     /// The shared property-set editor, for the package metadata transaction.
-    pub(crate) const fn editor(&self) -> &Editor {
+    pub(crate) const fn editor(&self) -> &PropertySetEdit {
         &self.editor
     }
 
     /// Mutable access to the shared editor, for the package metadata
     /// transaction.
-    pub(crate) fn editor_mut(&mut self) -> &mut Editor {
+    pub(crate) fn editor_mut(&mut self) -> &mut PropertySetEdit {
         &mut self.editor
     }
 

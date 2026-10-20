@@ -132,7 +132,7 @@ impl Snapshot {
 /// [`Edit`] and the package metadata family.
 pub(crate) struct Staging {
     source: Snapshot,
-    editor: property_set::Editor,
+    editor: property_set::Edit,
     changed: bool,
     protection_policy: ProtectionPolicy,
 }
@@ -142,7 +142,7 @@ impl Staging {
         source: Snapshot,
         protection_policy: ProtectionPolicy,
     ) -> PackageResult<Self> {
-        let editor = property_set::Editor::new(source.bytes.to_vec())?;
+        let editor = property_set::Edit::new(source.bytes.to_vec())?;
         Ok(Self {
             source,
             editor,
@@ -152,13 +152,13 @@ impl Staging {
     }
 
     /// The shared property-set editor, for the package metadata transaction.
-    pub(crate) const fn editor(&self) -> &property_set::Editor {
+    pub(crate) const fn editor(&self) -> &property_set::Edit {
         &self.editor
     }
 
     /// Mutable access to the shared editor; staging through it marks the
     /// transaction changed.
-    pub(crate) fn editor_mut(&mut self) -> &mut property_set::Editor {
+    pub(crate) fn editor_mut(&mut self) -> &mut property_set::Edit {
         self.changed = true;
         &mut self.editor
     }
