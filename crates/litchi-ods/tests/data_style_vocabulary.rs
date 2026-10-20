@@ -12,11 +12,12 @@ use std::{
 
 use litchi_core::{Error, Result};
 use litchi_ods::{
-    FlatSpreadsheet, Package, data_style,
+    Package, data_style,
     document::{
         DataStyleAttributePatch, DataStyleFamily, DataStyleOwner, DataStyleSelector,
         StyleGraphExtension,
     },
+    flat::Workbook as FlatSpreadsheet,
 };
 use zip::ZipArchive;
 

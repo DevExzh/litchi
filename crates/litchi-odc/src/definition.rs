@@ -1,4 +1,10 @@
-//! Granular transactions over detached typed chart definitions.
+//! Granular edits of a chart's typed definition.
+//!
+//! [`Edit`] is the draft a package chart edit hands out
+//! ([`crate::Edit::definition_edit`]): its verbs stage axis, series, data
+//! point, cached-table and style changes that the package commit publishes as
+//! one chart replacement. [`Change`] records each change in the package
+//! patch ([`crate::Patch::definition_changes`]).
 
 use crate::{
     AxisSpec, CachedCell, CachedRow, CachedTable, DataPointSpec, Definition, Limits, PlotAreaSpec,
@@ -26,7 +32,7 @@ pub enum StyleTarget {
 /// One granular semantic operation retained by a definition patch.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum DefinitionChange {
+pub enum Change {
     DefinitionUpdated,
     PlotAreaUpdated,
     AxisInserted {
@@ -94,18 +100,18 @@ pub enum DefinitionChange {
 
 /// An immutable validated chart definition and its retained limits.
 #[derive(Clone, Debug)]
-pub struct DefinitionSnapshot {
+pub(crate) struct Snapshot {
     pub(crate) definition: Arc<Definition>,
     pub(crate) limits: Limits,
 }
 
-impl DefinitionSnapshot {
+impl Snapshot {
     /// Validate and retain a typed definition with caller-selected limits.
     ///
     /// # Errors
     ///
     /// Returns an error when the definition violates semantic or size limits.
-    pub fn new(definition: Definition, limits: Limits) -> Result<Self> {
+    pub(crate) fn new(definition: Definition, limits: Limits) -> Result<Self> {
         crate::validation::validate_definition(&definition, limits)?;
         Ok(Self {
             definition: Arc::new(definition),
@@ -113,28 +119,14 @@ impl DefinitionSnapshot {
         })
     }
 
-    /// Validate with default limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the definition is invalid.
-    pub fn with_default_limits(definition: Definition) -> Result<Self> {
-        Self::new(definition, Limits::default())
-    }
-
     #[must_use]
-    pub fn definition(&self) -> &Definition {
+    pub(crate) fn definition(&self) -> &Definition {
         &self.definition
     }
 
     #[must_use]
-    pub const fn limits(&self) -> Limits {
-        self.limits
-    }
-
-    #[must_use]
-    pub fn edit(&self) -> DefinitionEdit {
-        DefinitionEdit {
+    pub(crate) fn edit(&self) -> Edit {
+        Edit {
             source: self.clone(),
             candidate: self.definition().clone(),
             changes: Vec::new(),
@@ -143,13 +135,13 @@ impl DefinitionSnapshot {
 }
 
 /// A source-bound granular chart-definition transaction.
-pub struct DefinitionEdit {
-    source: DefinitionSnapshot,
+pub struct Edit {
+    source: Snapshot,
     candidate: Definition,
-    changes: Vec<DefinitionChange>,
+    changes: Vec<Change>,
 }
 
-impl DefinitionEdit {
+impl Edit {
     #[must_use]
     pub fn definition(&self) -> &Definition {
         &self.candidate
@@ -159,7 +151,7 @@ impl DefinitionEdit {
     /// represented by [`Self::clear_plot_area`].
     pub fn update_plot_area(&mut self, plot: PlotAreaSpec) {
         self.candidate.plot_area = plot;
-        self.changes.push(DefinitionChange::PlotAreaUpdated);
+        self.changes.push(Change::PlotAreaUpdated);
     }
 
     /// Reset the required plot area to an empty typed value.
@@ -177,7 +169,7 @@ impl DefinitionEdit {
             return selector("ODC axis insertion selector is out of bounds");
         }
         self.candidate.plot_area.axes.insert(index, axis);
-        self.changes.push(DefinitionChange::AxisInserted { index });
+        self.changes.push(Change::AxisInserted { index });
         Ok(())
     }
 
@@ -193,7 +185,7 @@ impl DefinitionEdit {
             .axes
             .get_mut(index)
             .ok_or_else(|| invalid("ODC axis selector is out of bounds"))? = axis;
-        self.changes.push(DefinitionChange::AxisUpdated { index });
+        self.changes.push(Change::AxisUpdated { index });
         Ok(())
     }
 
@@ -206,7 +198,7 @@ impl DefinitionEdit {
         if index >= self.candidate.plot_area.axes.len() {
             return selector("ODC axis selector is out of bounds");
         }
-        self.changes.push(DefinitionChange::AxisRemoved { index });
+        self.changes.push(Change::AxisRemoved { index });
         Ok(self.candidate.plot_area.axes.remove(index))
     }
 
@@ -220,8 +212,7 @@ impl DefinitionEdit {
             return selector("ODC series insertion selector is out of bounds");
         }
         self.candidate.plot_area.series.insert(index, series);
-        self.changes
-            .push(DefinitionChange::SeriesInserted { index });
+        self.changes.push(Change::SeriesInserted { index });
         Ok(())
     }
 
@@ -237,7 +228,7 @@ impl DefinitionEdit {
             .series
             .get_mut(index)
             .ok_or_else(|| invalid("ODC series selector is out of bounds"))? = series;
-        self.changes.push(DefinitionChange::SeriesUpdated { index });
+        self.changes.push(Change::SeriesUpdated { index });
         Ok(())
     }
 
@@ -250,7 +241,7 @@ impl DefinitionEdit {
         if index >= self.candidate.plot_area.series.len() {
             return selector("ODC series selector is out of bounds");
         }
-        self.changes.push(DefinitionChange::SeriesRemoved { index });
+        self.changes.push(Change::SeriesRemoved { index });
         Ok(self.candidate.plot_area.series.remove(index))
     }
 
@@ -271,7 +262,7 @@ impl DefinitionEdit {
         }
         points.insert(index, point);
         self.changes
-            .push(DefinitionChange::DataPointInserted { series, index });
+            .push(Change::DataPointInserted { series, index });
         Ok(())
     }
 
@@ -291,7 +282,7 @@ impl DefinitionEdit {
             .get_mut(index)
             .ok_or_else(|| invalid("ODC data-point selector is out of bounds"))? = point;
         self.changes
-            .push(DefinitionChange::DataPointUpdated { series, index });
+            .push(Change::DataPointUpdated { series, index });
         Ok(())
     }
 
@@ -307,13 +298,13 @@ impl DefinitionEdit {
         }
         let removed = points.remove(index);
         self.changes
-            .push(DefinitionChange::DataPointRemoved { series, index });
+            .push(Change::DataPointRemoved { series, index });
         Ok(removed)
     }
 
     pub fn set_cached_table(&mut self, table: Option<CachedTable>) {
         self.candidate.cached_table = table;
-        self.changes.push(DefinitionChange::CachedTableUpdated);
+        self.changes.push(Change::CachedTableUpdated);
     }
 
     /// Insert a row into the header or body cached-table collection.
@@ -328,7 +319,7 @@ impl DefinitionEdit {
         }
         rows.insert(index, row);
         self.changes
-            .push(DefinitionChange::CachedRowInserted { header, index });
+            .push(Change::CachedRowInserted { header, index });
         Ok(())
     }
 
@@ -343,7 +334,7 @@ impl DefinitionEdit {
             .get_mut(index)
             .ok_or_else(|| invalid("ODC cached-row selector is out of bounds"))? = row;
         self.changes
-            .push(DefinitionChange::CachedRowUpdated { header, index });
+            .push(Change::CachedRowUpdated { header, index });
         Ok(())
     }
 
@@ -359,7 +350,7 @@ impl DefinitionEdit {
         }
         let removed = rows.remove(index);
         self.changes
-            .push(DefinitionChange::CachedRowRemoved { header, index });
+            .push(Change::CachedRowRemoved { header, index });
         Ok(removed)
     }
 
@@ -381,7 +372,7 @@ impl DefinitionEdit {
         }
         cells.insert(index, cell);
         self.changes
-            .push(DefinitionChange::CachedCellInserted { header, row, index });
+            .push(Change::CachedCellInserted { header, row, index });
         Ok(())
     }
 
@@ -402,7 +393,7 @@ impl DefinitionEdit {
             .get_mut(index)
             .ok_or_else(|| invalid("ODC cached-cell selector is out of bounds"))? = cell;
         self.changes
-            .push(DefinitionChange::CachedCellUpdated { header, row, index });
+            .push(Change::CachedCellUpdated { header, row, index });
         Ok(())
     }
 
@@ -423,7 +414,7 @@ impl DefinitionEdit {
         }
         let removed = cells.remove(index);
         self.changes
-            .push(DefinitionChange::CachedCellRemoved { header, row, index });
+            .push(Change::CachedCellRemoved { header, row, index });
         Ok(removed)
     }
 
@@ -482,7 +473,7 @@ impl DefinitionEdit {
             )?,
         };
         *field = style_name;
-        self.changes.push(DefinitionChange::StyleUpdated { target });
+        self.changes.push(Change::StyleUpdated { target });
         Ok(())
     }
 
@@ -491,18 +482,18 @@ impl DefinitionEdit {
     /// # Errors
     ///
     /// Returns an error when the completed definition violates retained limits.
-    pub fn commit(mut self) -> Result<DefinitionCommit> {
+    pub(crate) fn commit(mut self) -> Result<Commit> {
         crate::validation::validate_definition(&self.candidate, self.source.limits)?;
         if self.candidate == *self.source.definition {
             self.changes.clear();
         }
-        let target = DefinitionSnapshot {
+        let target = Snapshot {
             definition: Arc::new(self.candidate),
             limits: self.source.limits,
         };
-        Ok(DefinitionCommit {
+        Ok(Commit {
             snapshot: target.clone(),
-            patch: DefinitionPatch {
+            patch: Patch {
                 source: self.source,
                 target,
                 changes: self.changes,
@@ -541,91 +532,35 @@ impl DefinitionEdit {
 }
 
 /// A committed definition snapshot and its reversible patch.
-pub struct DefinitionCommit {
-    snapshot: DefinitionSnapshot,
-    patch: DefinitionPatch,
+pub(crate) struct Commit {
+    snapshot: Snapshot,
+    patch: Patch,
 }
 
-impl DefinitionCommit {
+impl Commit {
     #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.changes.is_empty()
-    }
-
-    #[must_use]
-    pub fn snapshot(&self) -> &DefinitionSnapshot {
-        &self.snapshot
-    }
-
-    #[must_use]
-    pub fn patch(&self) -> &DefinitionPatch {
+    pub(crate) fn patch(&self) -> &Patch {
         &self.patch
     }
 
     #[must_use]
-    pub fn into_snapshot(self) -> DefinitionSnapshot {
+    pub(crate) fn into_snapshot(self) -> Snapshot {
         self.snapshot
     }
 }
 
 /// A semantic exact-source patch that supports inversion and composition.
 #[derive(Clone, Debug)]
-pub struct DefinitionPatch {
-    pub(crate) source: DefinitionSnapshot,
-    pub(crate) target: DefinitionSnapshot,
-    pub(crate) changes: Vec<DefinitionChange>,
+pub(crate) struct Patch {
+    pub(crate) source: Snapshot,
+    pub(crate) target: Snapshot,
+    pub(crate) changes: Vec<Change>,
 }
 
-impl DefinitionPatch {
+impl Patch {
     #[must_use]
-    pub fn changes(&self) -> &[DefinitionChange] {
+    pub(crate) fn changes(&self) -> &[Change] {
         &self.changes
-    }
-
-    #[must_use]
-    pub fn is_applicable_to(&self, source: &DefinitionSnapshot) -> bool {
-        self.source.limits == source.limits && *self.source.definition == *source.definition
-    }
-
-    /// Apply this patch to its exact semantic source.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the supplied snapshot is stale or unrelated.
-    pub fn apply(&self, source: &DefinitionSnapshot) -> Result<DefinitionSnapshot> {
-        if !self.is_applicable_to(source) {
-            return selector("ODC definition patch source does not match");
-        }
-        Ok(self.target.clone())
-    }
-
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            source: self.target.clone(),
-            target: self.source.clone(),
-            changes: self.changes.iter().rev().map(inverse_change).collect(),
-        }
-    }
-
-    /// Compose two contiguous patches into one exact-source patch.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the first target is not the second source.
-    pub fn compose(&self, next: &Self) -> Result<Self> {
-        if self.target.limits != next.source.limits
-            || *self.target.definition != *next.source.definition
-        {
-            return selector("ODC definition patches are not contiguous");
-        }
-        let mut changes = self.changes.clone();
-        changes.extend_from_slice(&next.changes);
-        Ok(Self {
-            source: self.source.clone(),
-            target: next.target.clone(),
-            changes,
-        })
     }
 
     /// Join two patches that share the same semantic source.
@@ -633,7 +568,7 @@ impl DefinitionPatch {
     /// Inputs remain immutable. Independent paths merge; divergent edits to
     /// one path are reported as deterministic conflicts.
     #[must_use]
-    pub fn join(&self, other: &Self) -> crate::DefinitionMerge {
+    pub(crate) fn join(&self, other: &Self) -> crate::merge::DefinitionMerge {
         crate::merge::join(self, other)
     }
 
@@ -642,171 +577,62 @@ impl DefinitionPatch {
     /// The destination remains unchanged. Dangling axis references and other
     /// invalid combined dependencies are returned as `chart.dependencies`.
     #[must_use]
-    pub fn transfer_to(&self, destination: &DefinitionSnapshot) -> crate::DefinitionMerge {
+    pub(crate) fn transfer_to(&self, destination: &Snapshot) -> crate::merge::DefinitionMerge {
         crate::merge::transfer(self, destination)
     }
 }
 
-/// Bounded undo/redo history for validated definition patches.
-pub struct DefinitionHistory {
-    current: DefinitionSnapshot,
-    undo: Vec<DefinitionPatch>,
-    redo: Vec<DefinitionPatch>,
-}
-
-impl DefinitionHistory {
-    #[must_use]
-    pub fn new(snapshot: DefinitionSnapshot) -> Self {
-        Self {
-            current: snapshot,
-            undo: Vec::new(),
-            redo: Vec::new(),
-        }
-    }
-
-    #[must_use]
-    pub fn current(&self) -> &DefinitionSnapshot {
-        &self.current
-    }
-
-    /// Record a contiguous committed patch and discard the redo branch.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for a stale patch or exhausted history limit.
-    pub fn record(&mut self, patch: &DefinitionPatch) -> Result<()> {
-        if !patch.is_applicable_to(&self.current) {
-            return selector("ODC history patch is not contiguous");
-        }
-        if patch.changes.is_empty() {
-            return Ok(());
-        }
-        if self.undo.len() >= self.current.limits.max_history() {
-            return selector("ODC history exceeds the caller-selected limit");
-        }
-        self.current = patch.target.clone();
-        self.undo.push(patch.clone());
-        self.redo.clear();
-        Ok(())
-    }
-
-    /// Restore the previous definition when present.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if retained history is internally non-contiguous.
-    pub fn undo(&mut self) -> Result<bool> {
-        let Some(patch) = self.undo.pop() else {
-            return Ok(false);
-        };
-        let inverse = patch.inverse();
-        self.current = inverse.apply(&self.current)?;
-        self.redo.push(patch);
-        Ok(true)
-    }
-
-    /// Reapply the next definition when present.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if retained history is internally non-contiguous.
-    pub fn redo(&mut self) -> Result<bool> {
-        let Some(patch) = self.redo.pop() else {
-            return Ok(false);
-        };
-        self.current = patch.apply(&self.current)?;
-        self.undo.push(patch);
-        Ok(true)
-    }
-
-    #[must_use]
-    pub fn undo_len(&self) -> usize {
-        self.undo.len()
-    }
-
-    #[must_use]
-    pub fn redo_len(&self) -> usize {
-        self.redo.len()
-    }
-}
-
-pub(crate) fn inverse_change(change: &DefinitionChange) -> DefinitionChange {
+pub(crate) fn inverse_change(change: &Change) -> Change {
     match change {
-        DefinitionChange::DefinitionUpdated => DefinitionChange::DefinitionUpdated,
-        DefinitionChange::AxisInserted { index } => DefinitionChange::AxisRemoved { index: *index },
-        DefinitionChange::AxisRemoved { index } => DefinitionChange::AxisInserted { index: *index },
-        DefinitionChange::SeriesInserted { index } => {
-            DefinitionChange::SeriesRemoved { index: *index }
+        Change::DefinitionUpdated => Change::DefinitionUpdated,
+        Change::AxisInserted { index } => Change::AxisRemoved { index: *index },
+        Change::AxisRemoved { index } => Change::AxisInserted { index: *index },
+        Change::SeriesInserted { index } => Change::SeriesRemoved { index: *index },
+        Change::SeriesRemoved { index } => Change::SeriesInserted { index: *index },
+        Change::DataPointInserted { series, index } => Change::DataPointRemoved {
+            series: *series,
+            index: *index,
         },
-        DefinitionChange::SeriesRemoved { index } => {
-            DefinitionChange::SeriesInserted { index: *index }
+        Change::DataPointRemoved { series, index } => Change::DataPointInserted {
+            series: *series,
+            index: *index,
         },
-        DefinitionChange::DataPointInserted { series, index } => {
-            DefinitionChange::DataPointRemoved {
-                series: *series,
-                index: *index,
-            }
+        Change::CachedRowInserted { header, index } => Change::CachedRowRemoved {
+            header: *header,
+            index: *index,
         },
-        DefinitionChange::DataPointRemoved { series, index } => {
-            DefinitionChange::DataPointInserted {
-                series: *series,
-                index: *index,
-            }
+        Change::CachedRowRemoved { header, index } => Change::CachedRowInserted {
+            header: *header,
+            index: *index,
         },
-        DefinitionChange::CachedRowInserted { header, index } => {
-            DefinitionChange::CachedRowRemoved {
-                header: *header,
-                index: *index,
-            }
+        Change::CachedCellInserted { header, row, index } => Change::CachedCellRemoved {
+            header: *header,
+            row: *row,
+            index: *index,
         },
-        DefinitionChange::CachedRowRemoved { header, index } => {
-            DefinitionChange::CachedRowInserted {
-                header: *header,
-                index: *index,
-            }
+        Change::CachedCellRemoved { header, row, index } => Change::CachedCellInserted {
+            header: *header,
+            row: *row,
+            index: *index,
         },
-        DefinitionChange::CachedCellInserted { header, row, index } => {
-            DefinitionChange::CachedCellRemoved {
-                header: *header,
-                row: *row,
-                index: *index,
-            }
+        Change::PlotAreaUpdated => Change::PlotAreaUpdated,
+        Change::AxisUpdated { index } => Change::AxisUpdated { index: *index },
+        Change::SeriesUpdated { index } => Change::SeriesUpdated { index: *index },
+        Change::DataPointUpdated { series, index } => Change::DataPointUpdated {
+            series: *series,
+            index: *index,
         },
-        DefinitionChange::CachedCellRemoved { header, row, index } => {
-            DefinitionChange::CachedCellInserted {
-                header: *header,
-                row: *row,
-                index: *index,
-            }
+        Change::CachedTableUpdated => Change::CachedTableUpdated,
+        Change::CachedRowUpdated { header, index } => Change::CachedRowUpdated {
+            header: *header,
+            index: *index,
         },
-        DefinitionChange::PlotAreaUpdated => DefinitionChange::PlotAreaUpdated,
-        DefinitionChange::AxisUpdated { index } => DefinitionChange::AxisUpdated { index: *index },
-        DefinitionChange::SeriesUpdated { index } => {
-            DefinitionChange::SeriesUpdated { index: *index }
+        Change::CachedCellUpdated { header, row, index } => Change::CachedCellUpdated {
+            header: *header,
+            row: *row,
+            index: *index,
         },
-        DefinitionChange::DataPointUpdated { series, index } => {
-            DefinitionChange::DataPointUpdated {
-                series: *series,
-                index: *index,
-            }
-        },
-        DefinitionChange::CachedTableUpdated => DefinitionChange::CachedTableUpdated,
-        DefinitionChange::CachedRowUpdated { header, index } => {
-            DefinitionChange::CachedRowUpdated {
-                header: *header,
-                index: *index,
-            }
-        },
-        DefinitionChange::CachedCellUpdated { header, row, index } => {
-            DefinitionChange::CachedCellUpdated {
-                header: *header,
-                row: *row,
-                index: *index,
-            }
-        },
-        DefinitionChange::StyleUpdated { target } => {
-            DefinitionChange::StyleUpdated { target: *target }
-        },
+        Change::StyleUpdated { target } => Change::StyleUpdated { target: *target },
     }
 }
 

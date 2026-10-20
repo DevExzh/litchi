@@ -1,7 +1,7 @@
 //! Source-checked master-document title edits: the `title` family.
 //!
 //! [`Package::edit_title`](crate::Package::edit_title) stages an [`Edit`];
-//! [`Edit::commit`] publishes a new [`Package`](crate::Package) with its
+//! [`Edit::commit`] publishes a new [`Package`] with its
 //! [`Patch`] and [`Diagnostics`];
 //! [`Package::apply_title`](crate::Package::apply_title) replays a patch onto
 //! its exact source.

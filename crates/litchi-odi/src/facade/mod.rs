@@ -299,13 +299,13 @@ impl Package {
     /// Starts a source-bound package image transaction.
     ///
     /// This supports the same lossless existing-name and existing-source edits
-    /// as [`crate::FlatImage`], while rebuilding a validated ODI package and
+    /// as [`crate::flat::Image`], while rebuilding a validated ODI package and
     /// preserving all untouched member payloads.
     #[must_use]
     pub fn edit(&self) -> Edit<'_> {
         Edit {
             source: self,
-            transaction: self.image.package.content_snapshot().transaction(),
+            transaction: self.image.package.content_snapshot().edit(),
             resource_changes: Vec::new(),
             metadata: None,
             styles: None,
@@ -492,7 +492,7 @@ impl Image {
 /// A source-bound package image and resource transaction.
 pub struct Edit<'a> {
     source: &'a Package,
-    transaction: crate::FlatImageTransaction,
+    transaction: crate::flat::Edit,
     resource_changes: Vec<ResourceEdit>,
     metadata: Option<MetadataEdit>,
     styles: Option<StyleEdit>,
@@ -786,7 +786,7 @@ impl Edit<'_> {
     }
 
     fn commit_inner(self) -> Result<Commit> {
-        let content = self.transaction.commit()?;
+        let content = self.transaction.commit_core()?;
         let changes = content.patch().changes().to_vec();
         let inverse_changes = content.patch().inverse().changes().to_vec();
         let mut resource_edits = self.resource_changes;
@@ -818,7 +818,7 @@ impl Edit<'_> {
         {
             self.source.clone()
         } else {
-            let xml = std::str::from_utf8(content.snapshot().as_bytes()).map_err(|error| {
+            let xml = std::str::from_utf8(content.package().as_bytes()).map_err(|error| {
                 Error::InvalidFormat(format!("ODI edited content.xml is not UTF-8: {error}"))
             })?;
             let replacements = resource_edits

@@ -2,7 +2,7 @@
 //!
 //! [`Package::edit_link`](crate::Package::edit_link) stages an [`Edit`] of
 //! one `text:section-source` target; [`Edit::commit`] publishes a new
-//! [`Package`](crate::Package) with its [`Patch`] (which records the
+//! [`Package`] with its [`Patch`] (which records the
 //! [`Change`]) and [`Diagnostics`];
 //! [`Package::apply_link`](crate::Package::apply_link) replays a patch onto
 //! its exact source.

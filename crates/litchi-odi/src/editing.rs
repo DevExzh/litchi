@@ -6,7 +6,7 @@ use litchi_core::Result;
 /// The common lossless frame mutation surface implemented by both artifact kinds.
 ///
 /// Generic callers can stage the same semantic edits on [`crate::Edit`] and
-/// [`crate::FlatImageTransaction`]. Publication remains artifact-specific so a
+/// [`crate::flat::Edit`]. Publication remains artifact-specific so a
 /// package can also stage resource and metadata changes.
 pub trait FrameEditor {
     /// Replaces one optional frame name.
@@ -177,7 +177,7 @@ macro_rules! impl_frame_editor {
     };
 }
 
-impl_frame_editor!(crate::FlatImageTransaction);
+impl_frame_editor!(crate::flat::Edit);
 impl_frame_editor!(crate::Edit<'_>);
 
 /// Common metadata mutation contract for flat and packaged ODI transactions.
@@ -216,5 +216,5 @@ macro_rules! impl_metadata_editor {
     };
 }
 
-impl_metadata_editor!(crate::FlatImageTransaction);
+impl_metadata_editor!(crate::flat::Edit);
 impl_metadata_editor!(crate::Edit<'_>);

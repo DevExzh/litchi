@@ -18,8 +18,9 @@ use std::sync::Arc;
 
 use litchi_core::OwnedSource;
 use litchi_odf_common::{ContentDefect, Defect, DefectLocation, ToleranceReport};
+use litchi_ods::flat::Workbook as FlatSnapshot;
 use litchi_ods::worksheet::{CellValue, Sheet};
-use litchi_ods::{FlatSnapshot, Package, SourceBackedSpreadsheet, SourceBackedSpreadsheetCatalog};
+use litchi_ods::{Package, SourceBackedSpreadsheet, SourceBackedSpreadsheetCatalog};
 
 type Recorded = (Defect, u16, Option<DefectLocation>);
 

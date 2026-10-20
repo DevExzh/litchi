@@ -14,17 +14,6 @@ pub mod embedded {
     pub use litchi_odf_common::embedded::{Kind, Object, Parameter, Root, Source};
 }
 
-/// Source-bound flat-presentation reads and checked edits.
-pub mod flat {
-    #[allow(
-        clippy::module_name_repetitions,
-        reason = "re-exporting the flat presentation type under its own module is the intended public API shape"
-    )]
-    pub use crate::authoring::flat::{
-        Commit, FlatPresentation, Patch, Selector, Snapshot, Transaction,
-    };
-}
-
 /// Validated image-authoring values shared by builders and transactions.
 pub mod image {
     pub use litchi_odf_common::drawing::authoring::Length;
@@ -75,7 +64,6 @@ pub mod slide {
 }
 
 pub use crate::authoring::Builder;
-pub use crate::authoring::flat::FlatPresentation;
 pub use crate::package::{
     MasterPage, Presentation, SlideCatalogEntry, SourceBackedPresentation,
     SourceBackedPresentationCatalog,

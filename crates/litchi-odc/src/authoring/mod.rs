@@ -32,7 +32,7 @@ pub fn serialize_content(definition: &Definition) -> Result<String> {
 /// # Errors
 ///
 /// Returns an error when validation, serialization, or compactness checks fail.
-pub fn serialize_content_with_limits(
+pub(crate) fn serialize_content_with_limits(
     definition: &Definition,
     limits: crate::Limits,
 ) -> Result<String> {

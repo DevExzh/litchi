@@ -20,7 +20,7 @@ use litchi_odt::constants::{
     get_mime_type_from_extension, is_odf_extension,
 };
 use litchi_odt::core::PackageWriter;
-use litchi_odt::flat::{Document, Limits};
+use litchi_odt::flat::Document;
 use litchi_odt::generic::{Family, FlatDocument, Package};
 use litchi_odt::variable_declaration::{Body, Declaration, Group, Kind, Part, Scope, ValueType};
 use litchi_odt::{RdfaAttributes, RdfaOccurrence, TextMeta, XFormsModel};
@@ -879,21 +879,19 @@ fn flat_template_ingress_accepts_exact_cap_and_rejects_cap_plus_one() {
         Err(Error::ResourceLimit(_))
     ));
 
-    let limits = Limits::new()
-        .with_max_document_bytes(TEMPLATE_XML.len())
-        .unwrap();
-    assert!(Document::from_bytes_with_limits(template_bytes(), limits).is_ok());
-    assert!(Document::from_reader_with_limits(Cursor::new(template_bytes()), limits).is_ok());
+    let limits = document_limit(TEMPLATE_XML.len());
+    assert!(Document::from_bytes_with_options(&template_bytes(), limits).is_ok());
+    assert!(Document::from_reader_with_options(Cursor::new(template_bytes()), limits).is_ok());
 
     let mut oversized = template_bytes();
     oversized.push(b'x');
     assert!(matches!(
-        Document::from_bytes_with_limits(oversized.clone(), limits),
-        Err(Error::ResourceLimit(_))
+        Document::from_bytes_with_options(&oversized, limits),
+        Err(litchi_odt::flat::Error::Core(Error::ResourceLimit(_)))
     ));
     assert!(matches!(
-        Document::from_reader_with_limits(Cursor::new(oversized), limits),
-        Err(Error::ResourceLimit(_))
+        Document::from_reader_with_options(Cursor::new(oversized), limits),
+        Err(litchi_odt::flat::Error::Core(Error::ResourceLimit(_)))
     ));
 }
 
@@ -901,26 +899,30 @@ fn flat_template_ingress_accepts_exact_cap_and_rejects_cap_plus_one() {
 fn specialized_template_edit_no_op_change_inverse_and_stale_source_are_atomic() {
     let source = Document::from_bytes(&template_bytes()).unwrap();
     let no_op = source.edit().commit().unwrap();
-    assert_eq!(no_op.document().as_bytes(), source.as_bytes());
-    assert_template_metadata(no_op.document());
-    let no_op_applied = no_op.patch().apply(&source).unwrap();
+    assert_eq!(no_op.package().as_bytes(), source.as_bytes());
+    assert_template_metadata(no_op.package());
+    let no_op_applied = source.apply(no_op.patch()).unwrap().into_package();
     assert_eq!(no_op_applied.as_bytes(), source.as_bytes());
     assert_template_metadata(&no_op_applied);
 
     let mut edit = source.edit();
     edit.update_paragraph(0, "Omega").unwrap().unwrap();
     let commit = edit.commit().unwrap();
-    assert_template_metadata(commit.document());
-    assert!(commit.document().xml().contains("<t:p>Omega</t:p>"));
+    assert_template_metadata(commit.package());
+    assert!(commit.package().xml().contains("<t:p>Omega</t:p>"));
     assert_eq!(source.as_bytes(), TEMPLATE_XML.as_bytes());
 
-    let reverted = commit.patch().inverse().apply(commit.document()).unwrap();
+    let reverted = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(reverted.as_bytes(), source.as_bytes());
     assert_template_metadata(&reverted);
 
     let normal = Document::from_bytes(&normal_xml().into_bytes()).unwrap();
     assert!(!normal.is_template());
-    assert!(commit.patch().apply(&normal).is_err());
+    assert!(normal.apply(commit.patch()).is_err());
     assert_eq!(normal.as_bytes(), normal_xml().as_bytes());
 
     let mut structured = source.edit();
@@ -930,19 +932,21 @@ fn specialized_template_edit_no_op_change_inverse_and_stale_source_are_atomic() 
 
 #[test]
 fn specialized_template_output_limit_accepts_exact_output_and_rejects_one_over() {
-    let exact_limits = Limits::new()
-        .with_max_document_bytes(TEMPLATE_XML.len())
-        .unwrap();
-    let source = Document::from_bytes_with_limits(template_bytes(), exact_limits).unwrap();
+    let source =
+        Document::from_bytes_with_options(&template_bytes(), document_limit(TEMPLATE_XML.len()))
+            .unwrap();
     let mut exact_edit = source.edit();
     exact_edit.update_paragraph(0, "Omega").unwrap().unwrap();
     let exact_commit = exact_edit.commit().unwrap();
-    assert_template_metadata(exact_commit.document());
-    assert_eq!(exact_commit.document().as_bytes().len(), TEMPLATE_XML.len());
+    assert_template_metadata(exact_commit.package());
+    assert_eq!(exact_commit.package().as_bytes().len(), TEMPLATE_XML.len());
 
     let mut over_edit = source.edit();
     over_edit.update_paragraph(0, "Omega!").unwrap().unwrap();
-    assert!(matches!(over_edit.commit(), Err(Error::ResourceLimit(_))));
+    assert!(matches!(
+        over_edit.commit(),
+        Err(litchi_odt::flat::Error::Core(Error::ResourceLimit(_)))
+    ));
     assert_eq!(source.as_bytes(), TEMPLATE_XML.as_bytes());
 }
 
@@ -951,12 +955,15 @@ fn formatted_template_no_op_is_exact_but_changed_edit_keeps_compactness_refusal(
     let formatted = TEMPLATE_XML.replace("<o:body>", "\n<o:body>");
     let source = Document::from_bytes(formatted.as_bytes()).unwrap();
     let no_op = source.edit().commit().unwrap();
-    assert_eq!(no_op.document().as_bytes(), formatted.as_bytes());
-    assert_template_metadata(no_op.document());
+    assert_eq!(no_op.package().as_bytes(), formatted.as_bytes());
+    assert_template_metadata(no_op.package());
 
     let mut edit = source.edit();
     edit.update_paragraph(0, "Omega").unwrap().unwrap();
-    assert!(matches!(edit.commit(), Err(Error::XmlCompactness { .. })));
+    assert!(matches!(
+        edit.commit(),
+        Err(litchi_odt::flat::Error::Core(Error::XmlCompactness { .. }))
+    ));
     assert_eq!(source.as_bytes(), formatted.as_bytes());
 }
 
@@ -1084,4 +1091,14 @@ fn packaged_ott_template_behavior_remains_package_owned() {
     assert_eq!(package.to_bytes(), bytes);
     assert!(FlatDocument::from_bytes(bytes.clone()).is_err());
     assert!(Document::from_bytes(&bytes).is_err());
+}
+
+fn document_limit(bytes: usize) -> litchi_odt::OpenOptions {
+    litchi_odt::OpenOptions::new().source_limits(
+        litchi_odt::SourceLimits::builder()
+            .max_input_bytes(u64::try_from(bytes).unwrap())
+            .unwrap()
+            .build()
+            .unwrap(),
+    )
 }

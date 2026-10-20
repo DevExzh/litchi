@@ -15,7 +15,7 @@ use std::path::Path;
 /// immutable snapshot. Failed edits leave the document unchanged. New code
 /// should prefer [`crate::Package::edit`] and the source-checked
 /// `Edit`/`Commit`/`Patch` families of individual feature owners, or
-/// `FlatSpreadsheet` for flat-ODS cell edits; this attached compatibility
+/// [`crate::flat::Workbook`] for flat-ODS cell edits; this attached compatibility
 /// facade cannot safely edit every source-level worksheet extension.
 pub struct MutableSpreadsheet {
     spreadsheet: Workbook,

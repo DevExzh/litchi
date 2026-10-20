@@ -1,6 +1,6 @@
 //! Immutable chart package ownership and bounded content-part rebuilding.
 
-use crate::FlatChart;
+use crate::flat::Chart as FlatChart;
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::{
     OpenOptions, compact_xml,
@@ -240,7 +240,7 @@ impl Snapshot {
     pub(crate) fn rebuild(
         &self,
         content: &str,
-        content_splice: Option<&crate::FlatChartPatch>,
+        content_splice: Option<&crate::flat::Patch>,
         styles: StylesReplacement<'_>,
         replacements: &[ResourceReplacement<'_>],
     ) -> Result<Self> {
@@ -354,7 +354,7 @@ fn validate_manifest_contract(
 
 fn publish_content_splice<W: Write>(
     source: &OwnedPackage,
-    patch: &crate::FlatChartPatch,
+    patch: &crate::flat::Patch,
     content: &str,
     writer: &mut PackageWriter<W>,
 ) -> Result<()> {

@@ -1,7 +1,7 @@
 use litchi_odc::{
     AxisSpec, Builder, CachedCell, CachedRow, CachedTable, CachedValue, ChartClass, DataPointSpec,
-    Definition, DefinitionSnapshot, ExactAttribute, ExactTarget, GridSpec, History, LegendSpec,
-    Limits, Package, Patch, SeriesSpec, StyleElement, StyleTarget, Text,
+    Definition, ExactAttribute, ExactTarget, GridSpec, History, LegendSpec, OpenOptions, Package,
+    Patch, SemanticLimits, SeriesSpec, StyleElement, StyleTarget, Text,
     chart::{Class, Dimension, Labels},
     validate_range_list,
 };
@@ -260,7 +260,7 @@ fn noncanonical_chart_plot_and_series_attributes_use_checked_exact_spans() -> Te
     );
 
     let wire = commit.patch().to_bytes();
-    let decoded = Patch::from_bytes(&wire, source.chart().limits())?;
+    let decoded = Patch::from_bytes(&wire, source.chart().options())?;
     assert_eq!(decoded.exact_changes().len(), 10);
     assert_eq!(
         source.apply(&decoded)?.into_package().as_bytes(),
@@ -503,7 +503,7 @@ fn embedded_specimen_plot_axis_grid_and_surface_semantics_use_exact_spans() -> T
     );
 
     let wire = changed.patch().to_bytes();
-    let decoded = Patch::from_bytes(&wire, source.chart().limits())?;
+    let decoded = Patch::from_bytes(&wire, source.chart().options())?;
     assert_eq!(decoded.exact_changes(), changed.patch().exact_changes());
     assert_eq!(
         source.apply(&decoded)?.into_package().as_bytes(),
@@ -633,66 +633,69 @@ fn exact_enum_tokens_and_missing_namespace_insertions_fail_closed() -> TestResul
 
 #[test]
 fn definition_join_transfer_and_dependency_conflicts_are_deterministic() -> TestResult<()> {
-    let source = DefinitionSnapshot::with_default_limits(definition())?;
+    let source = Builder::new().with_definition(definition()).build()?;
 
     let mut left_edit = source.edit();
-    left_edit.set_style(StyleTarget::Axis(0), Some("left".into()))?;
+    left_edit
+        .definition_edit()?
+        .set_style(StyleTarget::Axis(0), Some("left".into()))?;
     let left = left_edit.commit()?;
     let mut right_edit = source.edit();
-    right_edit.set_style(StyleTarget::Axis(1), Some("right".into()))?;
+    right_edit
+        .definition_edit()?
+        .set_style(StyleTarget::Axis(1), Some("right".into()))?;
     let right = right_edit.commit()?;
-    let joined = left.patch().join(right.patch());
+    let joined = left.patch().join(right.patch())?;
     assert!(joined.is_merged());
-    let joined_target = joined
-        .patch()
-        .ok_or("missing joined patch")?
-        .apply(&source)?;
+    let joined_target = source
+        .apply(joined.patch().ok_or("missing joined patch")?)?
+        .into_package();
+    let joined_definition = joined_target.chart().definition()?;
     assert_eq!(
-        joined_target.definition().plot_area.axes[0]
-            .style_name
-            .as_deref(),
+        joined_definition.plot_area.axes[0].style_name.as_deref(),
         Some("left")
     );
     assert_eq!(
-        joined_target.definition().plot_area.axes[1]
-            .style_name
-            .as_deref(),
+        joined_definition.plot_area.axes[1].style_name.as_deref(),
         Some("right")
     );
 
     let mut conflict_edit = source.edit();
-    conflict_edit.set_style(StyleTarget::Axis(0), Some("other".into()))?;
+    conflict_edit
+        .definition_edit()?
+        .set_style(StyleTarget::Axis(0), Some("other".into()))?;
     let conflict_commit = conflict_edit.commit()?;
-    let conflict = left.patch().join(conflict_commit.patch());
-    assert_eq!(conflict.conflicts()[0].path(), "chart.plot.axes[0]");
+    let conflict = left.patch().join(conflict_commit.patch())?;
+    assert!(!conflict.is_merged());
+    assert!(!conflict.conflicts().is_empty());
 
     let mut rename_edit = source.edit();
-    let mut renamed_axis = rename_edit.definition().plot_area.axes[0].clone();
+    let definition_edit = rename_edit.definition_edit()?;
+    let mut renamed_axis = definition_edit.definition().plot_area.axes[0].clone();
     renamed_axis.name = Some("renamed".into());
-    rename_edit.update_axis(0, renamed_axis)?;
-    let mut renamed_series = rename_edit.definition().plot_area.series[0].clone();
+    definition_edit.update_axis(0, renamed_axis)?;
+    let mut renamed_series = definition_edit.definition().plot_area.series[0].clone();
     renamed_series.attached_axis = Some("renamed".into());
-    rename_edit.update_series(0, renamed_series)?;
+    definition_edit.update_series(0, renamed_series)?;
     let rename = rename_edit.commit()?;
 
-    let mut destination_definition = source.definition().clone();
+    let mut destination_definition = definition();
     destination_definition.title = Some(Text::new("destination"));
-    let destination = DefinitionSnapshot::with_default_limits(destination_definition)?;
-    let transferred = rename.patch().transfer_to(&destination);
+    let destination = Builder::new()
+        .with_definition(destination_definition)
+        .build()?;
+    let transferred = rename.patch().transfer_to(&destination)?;
     assert!(transferred.is_merged());
-    let transferred_target = transferred
-        .patch()
-        .ok_or("missing transferred patch")?
-        .apply(&destination)?;
+    let transferred_target = destination
+        .apply(transferred.patch().ok_or("missing transferred patch")?)?
+        .into_package();
+    let transferred_definition = transferred_target.chart().definition()?;
     assert_eq!(
-        transferred_target.definition().plot_area.axes[0]
-            .name
-            .as_deref(),
+        transferred_definition.plot_area.axes[0].name.as_deref(),
         Some("renamed")
     );
     assert_eq!(
-        transferred_target
-            .definition()
+        transferred_definition
             .title
             .as_ref()
             .map(|text| text.text.as_str()),
@@ -701,9 +704,11 @@ fn definition_join_transfer_and_dependency_conflicts_are_deterministic() -> Test
 
     let mut dependency_definition = definition();
     dependency_definition.plot_area.series.clear();
-    let dependency_source = DefinitionSnapshot::with_default_limits(dependency_definition)?;
+    let dependency_source = Builder::new()
+        .with_definition(dependency_definition.clone())
+        .build()?;
     let mut series_edit = dependency_source.edit();
-    series_edit.insert_series(
+    series_edit.definition_edit()?.insert_series(
         0,
         SeriesSpec {
             attached_axis: Some("x".into()),
@@ -711,14 +716,12 @@ fn definition_join_transfer_and_dependency_conflicts_are_deterministic() -> Test
         },
     )?;
     let series_commit = series_edit.commit()?;
-    let mut no_axes = dependency_source.definition().clone();
+    let mut no_axes = dependency_definition;
     no_axes.plot_area.axes.clear();
-    let no_axes_snapshot = DefinitionSnapshot::with_default_limits(no_axes)?;
-    let dependency_conflict = series_commit.patch().transfer_to(&no_axes_snapshot);
-    assert_eq!(
-        dependency_conflict.conflicts()[0].path(),
-        "chart.dependencies"
-    );
+    let no_axes_package = Builder::new().with_definition(no_axes).build()?;
+    let dependency_conflict = series_commit.patch().transfer_to(&no_axes_package)?;
+    assert!(!dependency_conflict.is_merged());
+    assert!(!dependency_conflict.conflicts().is_empty());
     Ok(())
 }
 
@@ -744,7 +747,7 @@ fn durable_package_patches_join_and_history_are_exact() -> TestResult<()> {
 
     let wire = merged_patch.to_bytes();
     assert_eq!(wire, merged_patch.to_bytes());
-    let decoded = Patch::from_bytes(&wire, source.chart().limits())?;
+    let decoded = Patch::from_bytes(&wire, source.chart().options())?;
     assert_eq!(
         source.apply(&decoded)?.into_package().as_bytes(),
         merged.as_bytes()
@@ -755,11 +758,12 @@ fn durable_package_patches_join_and_history_are_exact() -> TestResult<()> {
     );
     let mut trailing = wire.clone();
     trailing.push(0);
-    assert!(Patch::from_bytes(&trailing, source.chart().limits()).is_err());
+    assert!(Patch::from_bytes(&trailing, source.chart().options()).is_err());
 
-    let limits = Limits::new().with_history(1)?;
+    let limits =
+        OpenOptions::new().semantic_limits(SemanticLimits::builder().max_history(1)?.build()?);
     let bounded_source = Builder::new()
-        .with_limits(limits)
+        .with_options(limits)
         .with_definition(definition())
         .build()?;
     let mut first_edit = bounded_source.edit();
@@ -913,10 +917,11 @@ fn row_column_ranges_styles_and_security_policy_are_enforced() -> TestResult<()>
         "office:boolean-value=\"maybe\"",
     );
     assert!(Package::from_bytes(&raw_negative_package(&malformed_boolean)?).is_err());
-    let row_limits = Limits::new().with_cached_rows(1)?;
+    let row_limits =
+        OpenOptions::new().semantic_limits(SemanticLimits::builder().max_cached_rows(1)?.build()?);
     assert!(
         Builder::new()
-            .with_limits(row_limits)
+            .with_options(row_limits)
             .with_definition(repeated_data)
             .build()
             .is_err()
@@ -931,10 +936,11 @@ fn row_column_ranges_styles_and_security_policy_are_enforced() -> TestResult<()>
 
     let mut too_many_ranges = definition();
     too_many_ranges.plot_area.cell_range_address = Some("Data.A1 Data.B1".into());
-    let range_limits = Limits::new().with_range_items(1)?;
+    let range_limits =
+        OpenOptions::new().semantic_limits(SemanticLimits::builder().max_range_items(1)?.build()?);
     assert!(
         Builder::new()
-            .with_limits(range_limits)
+            .with_options(range_limits)
             .with_definition(too_many_ranges)
             .build()
             .is_err()

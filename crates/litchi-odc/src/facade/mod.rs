@@ -131,9 +131,13 @@ impl Chart {
         self.0.package.as_bytes()
     }
 
-    /// Return the limits retained for edits and patch application.
-    #[must_use]
-    pub fn limits(&self) -> crate::Limits {
+    /// The options this chart was opened (or built) with, retained for its
+    /// edits and patch application.
+    pub fn options(&self) -> OpenOptions {
+        self.0.package.limits().options()
+    }
+
+    pub(crate) fn limits(&self) -> crate::Limits {
         self.0.package.limits()
     }
 
@@ -224,6 +228,12 @@ impl Package {
     /// The retained physical package (metadata transactions, record 0288).
     pub(crate) fn owned_package(&self) -> &litchi_odf_common::OwnedPackage {
         self.chart.0.package.owned_package()
+    }
+
+    /// The options this package was opened (or built) with, retained for
+    /// its edits and patch application.
+    pub fn options(&self) -> OpenOptions {
+        self.chart.options()
     }
 
     /// Adopt bytes a metadata commit published, under this chart's limits.
@@ -480,9 +490,9 @@ fn copy_input(source: &[u8]) -> Result<Vec<u8>> {
 /// A source-bound package chart transaction.
 pub struct Edit<'a> {
     source: &'a Chart,
-    transaction: crate::FlatChartEdit,
+    transaction: crate::flat::Edit,
     replacement: Option<Definition>,
-    typed_transaction: Option<crate::DefinitionEdit>,
+    typed_transaction: Option<crate::definition::Edit>,
     flat_content_staged: bool,
     staged_styles: Option<StagedStyles>,
     style_property_changes: Vec<crate::ChartStylePropertyChange>,
@@ -558,7 +568,7 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error after a flat axis edit or when projection is lossy.
-    pub fn definition_edit(&mut self) -> Result<&mut crate::DefinitionEdit> {
+    pub fn definition_edit(&mut self) -> Result<&mut crate::definition::Edit> {
         if self.flat_content_staged {
             return Err(Error::InvalidFormat(
                 "ODC granular definition edits cannot follow a flat axis edit".into(),
@@ -569,7 +579,7 @@ impl Edit<'_> {
                 .replacement
                 .clone()
                 .map_or_else(|| self.source.definition(), Ok)?;
-            let snapshot = crate::DefinitionSnapshot::new(definition, self.source.limits())?;
+            let snapshot = crate::definition::Snapshot::new(definition, self.source.limits())?;
             self.typed_transaction = Some(snapshot.edit());
         }
         self.typed_transaction
@@ -909,7 +919,7 @@ impl Edit<'_> {
             definition_changes = definition_commit.patch().changes().to_vec();
             self.replacement = Some(definition_commit.into_snapshot().definition().clone());
         }
-        let content_commit = self.transaction.commit()?;
+        let content_commit = self.transaction.commit_core()?;
         let replacement = self.replacement.take();
         let changes = if replacement.is_some() {
             Vec::new()
@@ -922,9 +932,9 @@ impl Edit<'_> {
             content_commit.patch().exact_changes().to_vec()
         };
         let content = if let Some(definition) = replacement.as_ref() {
-            crate::serialize_content_with_limits(definition, self.source.limits())?
+            crate::authoring::serialize_content_with_limits(definition, self.source.limits())?
         } else {
-            std::str::from_utf8(content_commit.snapshot().as_bytes())
+            std::str::from_utf8(content_commit.package().as_bytes())
                 .map_err(|_utf8_error| {
                     Error::InvalidFormat("edited ODC content is not UTF-8".to_string())
                 })?
@@ -1165,7 +1175,7 @@ pub struct Patch {
     style_change: Option<StylesChange>,
     style_property_changes: Vec<crate::ChartStylePropertyChange>,
     resource_changes: Vec<ResourceChange>,
-    definition_changes: Vec<crate::DefinitionChange>,
+    definition_changes: Vec<crate::definition::Change>,
 }
 
 impl Patch {
@@ -1229,7 +1239,8 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error for invalid framing, limits, or either package.
-    pub fn from_bytes(bytes: &[u8], limits: crate::Limits) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8], options: OpenOptions) -> Result<Self> {
+        let limits = crate::Limits::from_options(options);
         let header = Self::WIRE_MAGIC.len().saturating_add(16);
         if bytes.len() < header || !bytes.starts_with(Self::WIRE_MAGIC) {
             return Err(Error::InvalidFormat("invalid ODC patch wire header".into()));
@@ -1300,7 +1311,7 @@ impl Patch {
 
     /// Return granular typed definition changes committed with this package.
     #[must_use]
-    pub fn definition_changes(&self) -> &[crate::DefinitionChange] {
+    pub fn definition_changes(&self) -> &[crate::definition::Change] {
         &self.definition_changes
     }
 
@@ -1429,7 +1440,7 @@ impl Patch {
                 .definition_changes
                 .iter()
                 .rev()
-                .map(crate::transaction::inverse_change)
+                .map(crate::definition::inverse_change)
                 .collect(),
         }
     }
@@ -1670,15 +1681,15 @@ fn merge_package_content(
         return Ok(());
     };
     let limits = left.source.limits();
-    let base_snapshot = crate::DefinitionSnapshot::new(base_definition, limits)?;
-    let left_snapshot = crate::DefinitionSnapshot::new(left_definition, limits)?;
-    let right_snapshot = crate::DefinitionSnapshot::new(right_definition, limits)?;
-    let left_patch = crate::DefinitionPatch {
+    let base_snapshot = crate::definition::Snapshot::new(base_definition, limits)?;
+    let left_snapshot = crate::definition::Snapshot::new(left_definition, limits)?;
+    let right_snapshot = crate::definition::Snapshot::new(right_definition, limits)?;
+    let left_patch = crate::definition::Patch {
         source: base_snapshot.clone(),
         target: left_snapshot,
         changes: left.definition_changes.clone(),
     };
-    let right_patch = crate::DefinitionPatch {
+    let right_patch = crate::definition::Patch {
         source: base_snapshot,
         target: right_snapshot,
         changes: right.definition_changes.clone(),
@@ -1753,11 +1764,11 @@ fn transfer_package_content(
         }
         return Ok(());
     };
-    let source = crate::DefinitionSnapshot::new(source_definition, patch.source.limits())?;
-    let target = crate::DefinitionSnapshot::new(target_definition, patch.target.limits())?;
+    let source = crate::definition::Snapshot::new(source_definition, patch.source.limits())?;
+    let target = crate::definition::Snapshot::new(target_definition, patch.target.limits())?;
     let destination_snapshot =
-        crate::DefinitionSnapshot::new(destination_definition, destination.limits())?;
-    let definition_patch = crate::DefinitionPatch {
+        crate::definition::Snapshot::new(destination_definition, destination.limits())?;
+    let definition_patch = crate::definition::Patch {
         source,
         target,
         changes: patch.definition_changes.clone(),
@@ -1792,7 +1803,7 @@ fn flat_summary_matches(patch: &Patch) -> bool {
                 change.after().map(str::to_owned),
             )?;
         }
-        Ok(edit.commit()?.snapshot().as_bytes() == patch.target.content_xml().as_bytes())
+        Ok(edit.commit_core()?.package().as_bytes() == patch.target.content_xml().as_bytes())
     };
     replay().unwrap_or(false)
 }
@@ -2303,7 +2314,7 @@ fn patch_between(source: Chart, target: Chart) -> Result<Patch> {
     let resource_changes = resource_changes_between(&source, &target);
     let definition_changes = match (source.definition(), target.definition()) {
         (Ok(before), Ok(after)) if before != after => {
-            vec![crate::DefinitionChange::DefinitionUpdated]
+            vec![crate::definition::Change::DefinitionUpdated]
         },
         _ => Vec::new(),
     };

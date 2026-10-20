@@ -1,7 +1,6 @@
 //! Immutable image package ownership and bounded content-part rebuilding.
 
 use crate::{
-    FlatImage,
     active::{ActiveContent, ActiveContentLocation},
     frame::Frame,
     resource::{Edge, Graph, Node, Resource},
@@ -18,7 +17,7 @@ use std::{collections::HashMap, path::Path, sync::Arc};
 
 pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.image";
 // The shared package owner only needs a coarse non-empty XML marker here;
-// `FlatImage::from_content_xml` performs the namespace-aware ODI grammar check.
+// `crate::flat::Image::from_content_xml` performs the namespace-aware ODI grammar check.
 const BODY_MARKER: &str = "<";
 const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
 
@@ -37,7 +36,7 @@ pub(crate) enum StylesReplacement<'a> {
 
 struct State {
     package: Package,
-    content: FlatImage,
+    content: crate::flat::Image,
     resources: Vec<Resource>,
     resource_graph: Graph,
     active_content: Vec<ActiveContent>,
@@ -149,7 +148,8 @@ impl Snapshot {
     }
 
     fn from_package(package: Package) -> Result<Self> {
-        let content = FlatImage::from_content_xml(package.content_xml().as_bytes().to_vec())?;
+        let content =
+            crate::flat::Image::from_content_xml(package.content_xml().as_bytes().to_vec())?;
         let resources = scan_resources(&package)?;
         let resource_graph = build_resource_graph(&package, &resources)?;
         let files = package.files()?;
@@ -255,7 +255,7 @@ impl Snapshot {
         self.0.content.frames()
     }
 
-    pub(crate) fn content_snapshot(&self) -> FlatImage {
+    pub(crate) fn content_snapshot(&self) -> crate::flat::Image {
         self.0.content.clone()
     }
 

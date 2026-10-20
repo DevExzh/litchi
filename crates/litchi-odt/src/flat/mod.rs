@@ -1,4 +1,13 @@
-//! Immutable flat ODT snapshots and failure-atomic text edits.
+//! Immutable flat (single-file) ODT owners and failure-atomic text edits.
+//!
+//! [`Document`] is the immutable owner of one `.fodt` document, opened under
+//! one [`OpenOptions`] envelope: the source `input_bytes` and the semantic
+//! `content_bytes` bound the XML (at most 64 MiB, the compact-XML checker's
+//! ceiling), `depth` its nesting, `edits` the paragraphs one edit stages and
+//! `text_bytes` (at most 1 MiB) one replacement paragraph. [`Document::edit`]
+//! stages an [`Edit`]; [`Edit::commit`] publishes a new [`Document`] with its
+//! [`Patch`] and [`Diagnostics`]; [`Document::apply`] replays a patch onto its
+//! exact source.
 
 use std::io::Read;
 use std::ops::Range;
@@ -6,7 +15,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::core::ResolvedReader;
-use litchi_core::{Error, Metadata, Resource, ResourceLimit, Result};
+use litchi_core::{Error as CoreError, Metadata, Resource, ResourceLimit, Result};
+use litchi_odf_common::SemanticLimitKind;
 use quick_xml::events::Event;
 
 use crate::elements::parser::{OrderElement, Parser};
@@ -15,13 +25,24 @@ use crate::generic::{Family, FlatDocument};
 
 pub(crate) mod atomic;
 
+/// Whether a commit changed the document bytes.
+pub use litchi_core::edit::Diagnostics;
+/// The family error: typed limits and refusals plus the common-core payload.
+pub use litchi_odf_common::Error;
+/// The dimension named by [`Error::Limit`] and [`Error::InvalidLimit`].
+pub use litchi_odf_common::LimitKind;
+pub use litchi_odf_common::OpenOptions;
+
+/// A committed flat edit: the published document, its patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Document, Patch>;
+
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 
-/// Finite resource limits for opening and editing a flat ODT snapshot.
+/// The bounds one flat ODT document is read and edited under, resolved from
+/// its [`OpenOptions`] and clamped to the readers' ceilings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[non_exhaustive]
-pub struct Limits {
+pub(crate) struct Limits {
     /// Maximum flat XML document size.
     max_document_bytes: usize,
     /// Maximum replacement text size for one paragraph edit.
@@ -30,117 +51,53 @@ pub struct Limits {
     max_edits: usize,
     /// Maximum XML nesting depth inspected by an edit.
     max_xml_depth: usize,
+    options: OpenOptions,
 }
 
 impl Limits {
-    /// Default flat XML document byte limit.
-    pub const DEFAULT_MAX_DOCUMENT_BYTES: usize = 16 * 1024 * 1024;
-    /// Default replacement paragraph UTF-8 byte limit.
-    pub const DEFAULT_MAX_PARAGRAPH_TEXT_BYTES: usize = 256 * 1024;
-    /// Default staged paragraph edit limit.
-    pub const DEFAULT_MAX_EDITS: usize = 256;
-    /// Default inspected XML nesting limit.
-    pub const DEFAULT_MAX_XML_DEPTH: usize = 256;
-    /// Hard safety ceiling for flat XML document bytes.
-    pub const HARD_MAX_DOCUMENT_BYTES: usize = 64 * 1024 * 1024;
-    /// Hard safety ceiling for one replacement paragraph's UTF-8 bytes.
-    pub const HARD_MAX_PARAGRAPH_TEXT_BYTES: usize = 1024 * 1024;
-    /// Hard safety ceiling for staged paragraph edits.
-    pub const HARD_MAX_EDITS: usize = 1_024;
-    /// Hard safety ceiling for inspected XML nesting depth.
-    pub const HARD_MAX_XML_DEPTH: usize = 4_096;
+    /// Ceiling of the flat XML document bytes (the compact-XML checker's).
+    const HARD_MAX_DOCUMENT_BYTES: usize = 64 * 1024 * 1024;
+    /// Ceiling of one replacement paragraph's UTF-8 bytes.
+    const HARD_MAX_PARAGRAPH_TEXT_BYTES: usize = 1024 * 1024;
+    /// Ceiling of the staged paragraph edits.
+    const HARD_MAX_EDITS: usize = 1_024;
+    /// Ceiling of the inspected XML nesting depth.
+    const HARD_MAX_XML_DEPTH: usize = 4_096;
 
-    /// Returns the production-safe default limits.
-    #[must_use]
-    pub const fn new() -> Self {
+    pub(crate) fn from_options(options: OpenOptions) -> Self {
+        let semantic = options.semantic_limits_value();
+        let input =
+            usize::try_from(options.source_limits_value().max_input_bytes()).unwrap_or(usize::MAX);
         Self {
-            max_document_bytes: Self::DEFAULT_MAX_DOCUMENT_BYTES,
-            max_paragraph_text_bytes: Self::DEFAULT_MAX_PARAGRAPH_TEXT_BYTES,
-            max_edits: Self::DEFAULT_MAX_EDITS,
-            max_xml_depth: Self::DEFAULT_MAX_XML_DEPTH,
+            max_document_bytes: input
+                .min(semantic.usize_value(SemanticLimitKind::ContentBytes))
+                .min(Self::HARD_MAX_DOCUMENT_BYTES),
+            max_paragraph_text_bytes: semantic
+                .usize_value(SemanticLimitKind::TextBytes)
+                .min(Self::HARD_MAX_PARAGRAPH_TEXT_BYTES),
+            max_edits: semantic
+                .usize_value(SemanticLimitKind::Edits)
+                .min(Self::HARD_MAX_EDITS),
+            max_xml_depth: semantic
+                .usize_value(SemanticLimitKind::Depth)
+                .min(Self::HARD_MAX_XML_DEPTH),
+            options,
         }
-    }
-
-    /// Sets the flat XML byte limit without exceeding the hard safety ceiling.
-    pub fn with_max_document_bytes(mut self, value: usize) -> Result<Self> {
-        check_limit(
-            value,
-            Self::HARD_MAX_DOCUMENT_BYTES,
-            Resource::InputBytes,
-            "flat ODT configured document bytes",
-        )?;
-        self.max_document_bytes = value;
-        Ok(self)
-    }
-
-    /// Sets the paragraph replacement byte limit without exceeding the hard ceiling.
-    pub fn with_max_paragraph_text_bytes(mut self, value: usize) -> Result<Self> {
-        check_limit(
-            value,
-            Self::HARD_MAX_PARAGRAPH_TEXT_BYTES,
-            Resource::InputBytes,
-            "flat ODT configured paragraph text bytes",
-        )?;
-        self.max_paragraph_text_bytes = value;
-        Ok(self)
-    }
-
-    /// Sets the edit count limit without exceeding the hard safety ceiling.
-    pub fn with_max_edits(mut self, value: usize) -> Result<Self> {
-        check_limit(
-            value,
-            Self::HARD_MAX_EDITS,
-            Resource::Objects,
-            "flat ODT configured edit count",
-        )?;
-        self.max_edits = value;
-        Ok(self)
-    }
-
-    /// Sets the XML nesting limit without exceeding the hard safety ceiling.
-    pub fn with_max_xml_depth(mut self, value: usize) -> Result<Self> {
-        check_limit(
-            value,
-            Self::HARD_MAX_XML_DEPTH,
-            Resource::Depth,
-            "flat ODT configured XML depth",
-        )?;
-        self.max_xml_depth = value;
-        Ok(self)
-    }
-
-    /// Returns the configured flat XML byte limit.
-    #[must_use]
-    pub const fn max_document_bytes(self) -> usize {
-        self.max_document_bytes
-    }
-
-    /// Returns the configured paragraph replacement byte limit.
-    #[must_use]
-    pub const fn max_paragraph_text_bytes(self) -> usize {
-        self.max_paragraph_text_bytes
-    }
-
-    /// Returns the configured edit count limit.
-    #[must_use]
-    pub const fn max_edits(self) -> usize {
-        self.max_edits
-    }
-
-    /// Returns the configured XML nesting limit.
-    #[must_use]
-    pub const fn max_xml_depth(self) -> usize {
-        self.max_xml_depth
     }
 }
 
 impl Default for Limits {
     fn default() -> Self {
-        Self::new()
+        Self::from_options(OpenOptions::new())
     }
 }
 
-/// Immutable, cheap-to-share flat OpenDocument Text snapshot.
+/// The immutable, cheap-to-share owner of one flat OpenDocument Text
+/// document.
+///
+/// A commit publishes a new document and never changes its source. The
+/// document keeps the [`OpenOptions`] it was opened with; its edits,
+/// replays and republication use them.
 #[derive(Clone)]
 pub struct Document {
     inner: Arc<FlatDocument>,
@@ -148,24 +105,54 @@ pub struct Document {
 }
 
 impl Document {
-    /// Opens and validates a flat ODT document with default finite limits.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::open_with_limits(path, Limits::default())
+    /// Opens and validates a flat ODT document with the default
+    /// [`OpenOptions`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, Error> {
+        Self::open_with_options(path, OpenOptions::new())
     }
 
-    /// Opens and validates a flat ODT document with caller-selected finite limits.
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: Limits) -> Result<Self> {
-        Self::from_reader_with_limits(std::fs::File::open(path)?, limits)
+    /// Opens and validates a flat ODT document under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, Error> {
+        Self::from_reader_with_options(std::fs::File::open(path)?, options)
     }
 
-    /// Reads and validates a flat ODT document with default finite limits.
-    pub fn from_reader(reader: impl Read) -> Result<Self> {
-        Self::from_reader_with_limits(reader, Limits::default())
+    /// Reads and validates a flat ODT document with the default
+    /// [`OpenOptions`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn from_reader(reader: impl Read) -> std::result::Result<Self, Error> {
+        Self::from_reader_with_options(reader, OpenOptions::new())
     }
 
-    /// Reads and validates a flat ODT document with caller-selected finite limits.
-    pub fn from_reader_with_limits(reader: impl Read, limits: Limits) -> Result<Self> {
-        validate_limits(limits)?;
+    /// Reads and validates a flat ODT document under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn from_reader_with_options(
+        reader: impl Read,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, Error> {
+        Ok(Self::from_reader_with_limits(
+            reader,
+            Limits::from_options(options),
+        )?)
+    }
+
+    fn from_reader_with_limits(reader: impl Read, limits: Limits) -> Result<Self> {
         let maximum = u64::try_from(limits.max_document_bytes).map_err(|_error| {
             resource_limit_error(
                 Resource::InputBytes,
@@ -184,14 +171,42 @@ impl Document {
         })
     }
 
-    /// Validates flat ODT bytes with default finite limits; the bytes are copied.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes.to_vec(), Limits::default())
+    /// Validates flat ODT bytes with the default [`OpenOptions`]; the bytes
+    /// are copied.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`].
+    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, Error> {
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
     }
 
-    /// Validates owned flat ODT bytes with caller-selected finite limits.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        validate_limits(limits)?;
+    /// Validates flat ODT bytes under caller-selected limits; the bytes are
+    /// copied after the size check.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Core`] carrying a resource-limit failure when a
+    /// selected dimension is exceeded, or the validation failure of a
+    /// malformed or non-text flat document.
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: OpenOptions,
+    ) -> std::result::Result<Self, Error> {
+        let limits = Limits::from_options(options);
+        if bytes.len() > limits.max_document_bytes {
+            return Err(resource_limit_error(
+                Resource::InputBytes,
+                bytes.len(),
+                limits.max_document_bytes,
+                "flat ODT input",
+            )
+            .into());
+        }
+        Ok(Self::from_bytes_with_limits(bytes.to_vec(), limits)?)
+    }
+
+    pub(crate) fn from_bytes_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         if bytes.len() > limits.max_document_bytes {
             return Err(resource_limit_error(
                 Resource::InputBytes,
@@ -228,7 +243,7 @@ impl Document {
     ///
     /// Returns an error when the parts cannot be split or the packaged
     /// reader refuses them.
-    pub fn to_package(&self) -> std::result::Result<crate::Package, litchi_odf_common::Error> {
+    pub fn to_package(&self) -> std::result::Result<crate::Package, Error> {
         let parts = litchi_odf_common::flat::Parts::split(self.inner.xml().as_bytes())?;
         crate::Package::from_bytes(&parts.to_bytes()?)
     }
@@ -244,10 +259,7 @@ impl Document {
     /// document cannot hold (a changed part root, added or removed
     /// top-level elements, an added package member), and the flat reader's
     /// error when the result does not reopen under this document's limits.
-    pub fn republish(
-        &self,
-        edited: &crate::Package,
-    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+    pub fn republish(&self, edited: &crate::Package) -> std::result::Result<Self, Error> {
         let parts = litchi_odf_common::flat::Parts::split(self.as_bytes())?;
         let bytes = parts.merge_package(self.as_bytes(), edited.as_bytes())?;
         Ok(Self::from_bytes_with_limits(bytes, self.limits)?)
@@ -320,10 +332,30 @@ impl Document {
         crate::package::scripts::document_scripts(self.xml())
     }
 
-    /// Returns the finite resource limits attached to this snapshot.
-    #[must_use]
-    pub const fn limits(&self) -> Limits {
-        self.limits
+    /// The options this document was opened with, retained for its edits,
+    /// replays and republication.
+    pub const fn options(&self) -> OpenOptions {
+        self.limits.options
+    }
+
+    /// Replays a patch onto this exact source document.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this document is not the
+    /// patch's exact source.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, Error> {
+        if self.as_bytes() != patch.before.as_bytes() {
+            return Err(Error::patch_conflict(
+                "flat.apply",
+                "the document is not the patch source",
+            ));
+        }
+        Ok(Commit::new(
+            patch.after.clone(),
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
     }
 
     /// Parses modeled top-level text elements in document order.
@@ -347,7 +379,7 @@ impl Document {
             };
             result
                 .try_reserve(text.len())
-                .map_err(|source| Error::Allocation {
+                .map_err(|source| CoreError::Allocation {
                     resource: "flat ODT extracted text",
                     source,
                 })?;
@@ -369,7 +401,7 @@ impl Document {
     /// Atomically replaces a filesystem destination with these exact bytes.
     ///
     /// Unix and Windows use a same-directory temporary and atomic replacement;
-    /// other targets return [`Error::Unsupported`].
+    /// other targets return [`CoreError::Unsupported`].
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
         self.inner.save_with_attached_context_and_scopes(
             path,
@@ -402,6 +434,17 @@ pub struct Edit {
 }
 
 impl Edit {
+    /// The source document this edit stages against.
+    #[must_use]
+    pub fn package(&self) -> &Document {
+        &self.source
+    }
+
+    /// Discards every staged paragraph edit in place.
+    pub fn reset(&mut self) {
+        self.operations.clear();
+    }
+
     /// Stages replacement of a zero-based top-level paragraph's text payload.
     pub fn update_paragraph(&mut self, index: usize, text: &str) -> Result<Option<&mut Self>> {
         if self.operations.len() >= self.source.limits.max_edits {
@@ -448,14 +491,14 @@ impl Edit {
         let mut owned_text = String::new();
         owned_text
             .try_reserve_exact(text.len())
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "flat ODT paragraph text",
                 source,
             })?;
         owned_text.push_str(text);
         self.operations
             .try_reserve(1)
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "flat ODT edit operations",
                 source,
             })?;
@@ -468,18 +511,26 @@ impl Edit {
     }
 
     /// Validates and publishes all staged operations as one commit.
-    pub fn commit(mut self) -> Result<Commit> {
+    ///
+    /// An edit with no staged operation commits the source itself:
+    /// `diagnostics().changed()` is false and `patch().is_noop()` holds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the edited document exceeds its limits, is not
+    /// compact XML, or fails semantic readback.
+    pub fn commit(self) -> std::result::Result<Commit, Error> {
+        Ok(self.commit_core()?)
+    }
+
+    pub(crate) fn commit_core(mut self) -> Result<Commit> {
         if self.operations.is_empty() {
             let document = self.source.clone();
             let patch = Patch {
                 before: self.source,
                 after: document.clone(),
             };
-            return Ok(Commit {
-                document,
-                patch,
-                diagnostics: Vec::new(),
-            });
+            return Ok(Commit::new(document, patch, Diagnostics::UNCHANGED));
         }
         self.operations
             .sort_unstable_by_key(|operation| operation.index);
@@ -489,21 +540,18 @@ impl Edit {
             self.source.limits.max_document_bytes,
             self.source.limits.max_xml_depth,
         )
-        .map_err(Error::from)?;
+        .map_err(CoreError::from)?;
         litchi_odf_common::compact_xml::validate(candidate.as_bytes(), compact_limits)
-            .map_err(Error::from)?;
+            .map_err(CoreError::from)?;
         let document =
             Document::from_bytes_with_limits(candidate.into_bytes(), self.source.limits)?;
         semantic_readback(&document, &self.operations)?;
+        let changed = self.source.as_bytes() != document.as_bytes();
         let patch = Patch {
             before: self.source,
             after: document.clone(),
         };
-        Ok(Commit {
-            document,
-            patch,
-            diagnostics: Vec::new(),
-        })
+        Ok(Commit::new(document, patch, Diagnostics::new(changed)))
     }
 }
 
@@ -519,49 +567,6 @@ enum ParagraphSite {
     Opaque,
 }
 
-/// A validated flat ODT commit.
-pub struct Commit {
-    document: Document,
-    patch: Patch,
-    diagnostics: Vec<Diagnostic>,
-}
-
-impl Commit {
-    /// Returns the committed immutable snapshot.
-    #[must_use]
-    pub const fn document(&self) -> &Document {
-        &self.document
-    }
-
-    /// Returns the reversible exact-byte patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Returns deterministic diagnostics produced during commit validation.
-    #[must_use]
-    pub fn diagnostics(&self) -> &[Diagnostic] {
-        &self.diagnostics
-    }
-
-    /// Consumes the commit and returns its snapshot.
-    #[must_use]
-    pub fn into_document(self) -> Document {
-        self.document
-    }
-}
-
-/// A structured commit diagnostic.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[non_exhaustive]
-pub struct Diagnostic {
-    /// Stable diagnostic code.
-    pub code: &'static str,
-    /// Human-readable diagnostic message.
-    pub message: String,
-}
-
 /// Reversible, exact-byte flat ODT patch.
 #[derive(Clone)]
 pub struct Patch {
@@ -570,12 +575,16 @@ pub struct Patch {
 }
 
 impl Patch {
-    /// Applies this patch only to its exact immutable source snapshot.
-    pub fn apply(&self, source: &Document) -> Result<Document> {
-        if source.as_bytes() != self.before.as_bytes() {
-            return invalid("flat ODT patch source does not match its expected snapshot");
-        }
-        Ok(self.after.clone())
+    /// Whether this patch was made from exactly `source`'s bytes.
+    #[must_use]
+    pub fn is_applicable_to(&self, source: &Document) -> bool {
+        source.as_bytes() == self.before.as_bytes()
+    }
+
+    /// Whether replaying this patch keeps the source bytes.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.before.as_bytes() == self.after.as_bytes()
     }
 
     /// Returns a patch that restores the exact source bytes.
@@ -620,7 +629,7 @@ fn render_paragraph_edits(
     let mut output = String::new();
     output
         .try_reserve_exact(output_len)
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "flat ODT paragraph edit",
             source,
         })?;
@@ -646,7 +655,7 @@ fn index_direct_paragraphs(xml: &str, limits: Limits) -> Result<Vec<ParagraphSit
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("invalid flat ODT XML: {error}")))?;
+            .map_err(|error| CoreError::InvalidFormat(format!("invalid flat ODT XML: {error}")))?;
         let is_office = crate::elements::xml::normalized_namespace_matches(
             &namespace,
             OFFICE_NAMESPACE,
@@ -681,23 +690,27 @@ fn index_direct_paragraphs(xml: &str, limits: Limits) -> Result<Vec<ParagraphSit
                     buffer.clear();
                     let site =
                         classify_paragraph_end(&mut reader, &mut buffer, event_end, depth, limits)?;
-                    sites.try_reserve(1).map_err(|source| Error::Allocation {
-                        resource: "flat ODT paragraph selector index",
-                        source,
-                    })?;
+                    sites
+                        .try_reserve(1)
+                        .map_err(|source| CoreError::Allocation {
+                            resource: "flat ODT paragraph selector index",
+                            source,
+                        })?;
                     sites.push(site);
                     depth = depth.checked_sub(1).ok_or_else(|| {
-                        Error::InvalidFormat("flat ODT XML depth underflow".to_string())
+                        CoreError::InvalidFormat("flat ODT XML depth underflow".to_string())
                     })?;
                 }
             },
             Event::Empty(ref element) => {
                 let local = element.local_name();
                 if office_text_depth == Some(depth) && is_text && local.as_ref() == b"p" {
-                    sites.try_reserve(1).map_err(|source| Error::Allocation {
-                        resource: "flat ODT paragraph selector index",
-                        source,
-                    })?;
+                    sites
+                        .try_reserve(1)
+                        .map_err(|source| CoreError::Allocation {
+                            resource: "flat ODT paragraph selector index",
+                            source,
+                        })?;
                     sites.push(ParagraphSite::Opaque);
                 }
             },
@@ -707,7 +720,7 @@ fn index_direct_paragraphs(xml: &str, limits: Limits) -> Result<Vec<ParagraphSit
                     office_text_depth = None;
                 }
                 depth = depth.checked_sub(1).ok_or_else(|| {
-                    Error::InvalidFormat("flat ODT XML depth underflow".to_string())
+                    CoreError::InvalidFormat("flat ODT XML depth underflow".to_string())
                 })?;
             },
             Event::DocType(_) => return invalid("flat ODT edits refuse documents with a doctype"),
@@ -739,7 +752,7 @@ fn classify_paragraph_end(
         })?;
         let (_, event) = reader
             .read_resolved_event_into(buffer)
-            .map_err(|error| Error::InvalidFormat(format!("invalid flat ODT XML: {error}")))?;
+            .map_err(|error| CoreError::InvalidFormat(format!("invalid flat ODT XML: {error}")))?;
         match event {
             Event::End(_) if nested_depth == 0 => {
                 return Ok(if opaque {
@@ -786,7 +799,7 @@ fn semantic_readback(document: &Document, operations: &[ParagraphEdit]) -> Resul
         };
         let value =
             quick_xml::escape::unescape(&document.xml()[range.clone()]).map_err(|error| {
-                Error::InvalidFormat(format!("invalid committed paragraph: {error}"))
+                CoreError::InvalidFormat(format!("invalid committed paragraph: {error}"))
             })?;
         if value.as_ref() != operation.text {
             return invalid("committed flat ODT paragraph value did not round-trip");
@@ -840,52 +853,12 @@ fn validate_xml_text(text: &str) -> Result<()> {
     Ok(())
 }
 
-fn validate_limits(limits: Limits) -> Result<()> {
-    check_limit(
-        limits.max_document_bytes,
-        Limits::HARD_MAX_DOCUMENT_BYTES,
-        Resource::InputBytes,
-        "flat ODT configured document bytes",
-    )?;
-    check_limit(
-        limits.max_paragraph_text_bytes,
-        Limits::HARD_MAX_PARAGRAPH_TEXT_BYTES,
-        Resource::InputBytes,
-        "flat ODT configured paragraph text bytes",
-    )?;
-    check_limit(
-        limits.max_edits,
-        Limits::HARD_MAX_EDITS,
-        Resource::Objects,
-        "flat ODT configured edit count",
-    )?;
-    check_limit(
-        limits.max_xml_depth,
-        Limits::HARD_MAX_XML_DEPTH,
-        Resource::Depth,
-        "flat ODT configured XML depth",
-    )?;
-    Ok(())
-}
-
-fn check_limit(
-    value: usize,
-    hard_max: usize,
-    resource: Resource,
-    scope: &'static str,
-) -> Result<()> {
-    if value == 0 || value > hard_max {
-        return Err(resource_limit_error(resource, value, hard_max, scope));
-    }
-    Ok(())
-}
-
 fn resource_limit_error(
     resource: Resource,
     observed: usize,
     limit: usize,
     scope: &'static str,
-) -> Error {
+) -> CoreError {
     ResourceLimit {
         resource,
         observed: u64::try_from(observed).unwrap_or(u64::MAX),
@@ -916,5 +889,5 @@ fn checked_depth(depth: usize, limits: Limits) -> Result<usize> {
 }
 
 fn invalid<T>(message: &str) -> Result<T> {
-    Err(Error::InvalidFormat(message.to_string()))
+    Err(CoreError::InvalidFormat(message.to_string()))
 }

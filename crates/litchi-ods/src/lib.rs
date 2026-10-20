@@ -103,10 +103,6 @@ pub use facade::{
     SourceCellCommit, SourceCellEdit, SourceCellPatch, SourceCellPublicationReport,
     SourceCellSnapshot, SourceReadMetrics, Workbook,
 };
-pub use flat::{
-    FlatCommit, FlatEdit, FlatSpreadsheet, Limits as FlatLimits, Patch as FlatPatch,
-    SheetSelector as FlatSheetSelector, Snapshot as FlatSnapshot,
-};
 pub use litchi_core::Metadata;
 pub use litchi_odf_common::rdf;
 pub use litchi_odf_common::{

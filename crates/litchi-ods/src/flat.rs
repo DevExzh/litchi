@@ -1,7 +1,8 @@
 //! Source-bound flat `OpenDocument` Spreadsheet (`.fods`) support.
 
 use crate::{Cell, CellValue, CellView, Row, Sheet};
-use litchi_core::{Error, Metadata, Result};
+use litchi_core::{Error as CoreError, Metadata, Result};
+use litchi_odf_common::{SemanticLimitKind, SemanticLimits};
 use litchi_odf_common::{
     compact_xml::{self, Limits as CompactLimits},
     core::metadata::Metadata as OdfMetadata,
@@ -12,7 +13,18 @@ use quick_xml::{
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
-use std::sync::Arc;
+use std::{io::Read, path::Path, sync::Arc};
+
+/// Whether a commit changed the workbook bytes.
+pub use litchi_core::edit::Diagnostics;
+/// The family error: typed limits and refusals plus the common-core payload.
+pub use litchi_odf_common::Error;
+/// The dimension named by [`Error::Limit`] and [`Error::InvalidLimit`].
+pub use litchi_odf_common::LimitKind;
+pub use litchi_odf_common::OpenOptions;
+
+/// A committed flat edit: the published workbook, its patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Workbook, Patch>;
 
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadsheet";
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -25,39 +37,61 @@ const MAX_ATTRIBUTES: usize = 256;
 const MAX_ATTRIBUTE_BYTES: usize = 64 * 1024;
 const MAX_RULES_PER_FORMAT: usize = 1_024;
 
+/// The bounds one flat workbook is read and edited under, resolved from its
+/// [`OpenOptions`]: the source `input_bytes` and the semantic `content_bytes`
+/// bound the XML, `output_bytes` one published document.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Limits {
+struct Limits {
     input_bytes: usize,
     output_bytes: usize,
+    semantic: SemanticLimits,
+    options: OpenOptions,
 }
 
 impl Default for Limits {
     fn default() -> Self {
-        Self {
-            input_bytes: MAX_XML_BYTES,
-            output_bytes: MAX_XML_BYTES,
-        }
+        Self::new(OpenOptions::new())
     }
 }
 
 impl Limits {
-    #[must_use]
-    pub fn with_input_bytes(mut self, input_bytes: usize) -> Self {
-        self.input_bytes = input_bytes;
-        self
-    }
-
-    #[must_use]
-    pub fn with_output_bytes(mut self, output_bytes: usize) -> Self {
-        self.output_bytes = output_bytes;
-        self
-    }
-
-    fn validate(self) -> Result<Self> {
-        if self.input_bytes > MAX_XML_BYTES || self.output_bytes > MAX_XML_BYTES {
-            return Err(invalid("flat ODS limits exceed hard safety ceilings"));
+    fn new(options: OpenOptions) -> Self {
+        let semantic = options.semantic_limits_value();
+        let input =
+            usize::try_from(options.source_limits_value().max_input_bytes()).unwrap_or(usize::MAX);
+        Self {
+            input_bytes: input
+                .min(semantic.usize_value(SemanticLimitKind::ContentBytes))
+                .min(MAX_XML_BYTES),
+            output_bytes: semantic
+                .usize_value(SemanticLimitKind::OutputBytes)
+                .min(MAX_XML_BYTES),
+            semantic,
+            options,
         }
-        Ok(self)
+    }
+
+    fn input_exceeded(self, observed: usize) -> CoreError {
+        if observed > self.semantic.usize_value(SemanticLimitKind::ContentBytes) {
+            return self
+                .semantic
+                .check_core(SemanticLimitKind::ContentBytes, observed)
+                .err()
+                .unwrap_or_else(|| invalid("flat ODS limit accounting failed"));
+        }
+        CoreError::ResourceLimit(litchi_core::ResourceLimit {
+            resource: litchi_core::Resource::InputBytes,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            limit: u64::try_from(self.input_bytes).unwrap_or(u64::MAX),
+            scope: "ODF owned package input".into(),
+        })
+    }
+
+    fn output_exceeded(self, observed: usize) -> CoreError {
+        self.semantic
+            .check_core(SemanticLimitKind::OutputBytes, observed)
+            .err()
+            .unwrap_or_else(|| invalid("flat ODS output exceeds the byte limit"))
     }
 }
 
@@ -81,6 +115,7 @@ impl From<usize> for SheetSelector<'_> {
 
 #[derive(Debug)]
 struct State {
+    limits: Limits,
     source: Arc<str>,
     sheets: Arc<[Sheet]>,
     metadata: Metadata,
@@ -88,47 +123,150 @@ struct State {
     tolerance: litchi_odf_common::leniency::ToleranceReport,
 }
 
-/// Immutable, Arc-backed, lossless flat-spreadsheet snapshot.
+/// The immutable, Arc-backed, lossless owner of one flat spreadsheet
+/// (`.fods`).
+///
+/// Cheap to clone; a commit publishes a new workbook and never changes its
+/// source. The workbook keeps the [`OpenOptions`] it was opened with; its
+/// edits and replays use them.
 #[derive(Clone, Debug)]
-pub struct Snapshot {
+pub struct Workbook {
     state: Arc<State>,
 }
 
-pub type FlatSpreadsheet = Snapshot;
-
-impl Snapshot {
+impl Workbook {
+    /// Opens a flat spreadsheet from a path with the default
+    /// [`OpenOptions`].
     ///
     /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with(bytes.to_vec(), Limits::default())
+    ///
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, Error> {
+        Self::open_with_options(path, OpenOptions::new())
     }
 
+    /// Opens a flat spreadsheet from a path under caller-selected limits.
     ///
     /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn from_bytes_with(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
+    ///
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, Error> {
+        let file = std::fs::File::open(path)?;
+        Self::from_reader_with_options(file, options)
+    }
+
+    /// Reads a flat spreadsheet from a stream with the default
+    /// [`OpenOptions`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn from_reader(reader: impl Read) -> std::result::Result<Self, Error> {
+        Self::from_reader_with_options(reader, OpenOptions::new())
+    }
+
+    /// Reads a flat spreadsheet from a stream under caller-selected limits;
+    /// the stream is read through an `input_bytes + 1` guard.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`], plus the read failure.
+    pub fn from_reader_with_options(
+        reader: impl Read,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, Error> {
+        let limits = Limits::new(options);
+        let mut bytes = Vec::new();
+        let guard = u64::try_from(limits.input_bytes)
+            .unwrap_or(u64::MAX)
+            .saturating_add(1);
+        reader.take(guard).read_to_end(&mut bytes)?;
+        Ok(Self::from_vec(bytes, limits)?)
+    }
+
+    /// Opens a flat spreadsheet with the default [`OpenOptions`]; the bytes
+    /// are copied.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_bytes_with_options`].
+    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, Error> {
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
+    }
+
+    /// Opens a flat spreadsheet under caller-selected limits; the bytes are
+    /// copied after the size check.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Limit`] when a selected dimension is exceeded and
+    /// [`Error::Core`] when the XML is not a valid flat spreadsheet.
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: OpenOptions,
+    ) -> std::result::Result<Self, Error> {
+        let limits = Limits::new(options);
         if bytes.len() > limits.input_bytes {
-            return Err(invalid("flat ODS XML exceeds the input byte limit"));
+            return Err(limits.input_exceeded(bytes.len()).into());
+        }
+        Ok(Self::from_vec(bytes.to_vec(), limits)?)
+    }
+
+    fn from_vec(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+        if bytes.len() > limits.input_bytes {
+            return Err(limits.input_exceeded(bytes.len()));
         }
         let source = String::from_utf8(bytes)
             .map_err(|_error| invalid("flat ODS XML is not valid UTF-8"))?;
         Self::from_source(Arc::from(source), limits)
     }
 
+    /// The options this workbook was opened with.
+    pub fn options(&self) -> OpenOptions {
+        self.state.limits.options
+    }
+
+    /// Replays a patch onto this exact source workbook.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this workbook is not the
+    /// patch's exact source.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, Error> {
+        if self.state.source.as_ref() != patch.before.as_ref() {
+            return Err(Error::patch_conflict(
+                "flat.apply",
+                "the workbook is not the patch source",
+            ));
+        }
+        let limits = self.state.limits;
+        if patch.after.len() > limits.output_bytes {
+            return Err(limits.output_exceeded(patch.after.len()).into());
+        }
+        ensure_compact_or_unchanged(&patch.before, &patch.after, limits.output_bytes)?;
+        let target = Self::from_source(patch.after.clone(), limits)?;
+        Ok(Commit::new(
+            target,
+            patch.clone(),
+            Diagnostics::new(patch.before != patch.after),
+        ))
+    }
+
     fn from_source(source: Arc<str>, limits: Limits) -> Result<Self> {
         if source.len() > limits.input_bytes {
-            return Err(invalid("flat ODS XML exceeds the input byte limit"));
+            return Err(limits.input_exceeded(source.len()));
         }
         validate_flat_xml(&source)?;
         let mut tolerance = litchi_odf_common::leniency::ToleranceReport::default();
         let sheets = crate::worksheet::codec::parse_flat(&source, &mut tolerance)?;
         crate::dde::Snapshot::parse(&source).map_err(|error| {
-            Error::InvalidFormat(format!("flat ODS DDE metadata inspection failed: {error}"))
+            CoreError::InvalidFormat(format!("flat ODS DDE metadata inspection failed: {error}"))
         })?;
         crate::scenario::Snapshot::parse(&source).map_err(|error| {
-            Error::InvalidFormat(format!(
+            CoreError::InvalidFormat(format!(
                 "flat ODS scenario metadata inspection failed: {error}"
             ))
         })?;
@@ -136,6 +274,7 @@ impl Snapshot {
         let metadata = odf_metadata.clone().into();
         Ok(Self {
             state: Arc::new(State {
+                limits,
                 source,
                 sheets: Arc::from(sheets),
                 metadata,
@@ -222,7 +361,7 @@ impl Snapshot {
     /// metadata.
     pub fn dde(&self) -> Result<crate::dde::Snapshot> {
         crate::dde::Snapshot::parse(&self.state.source).map_err(|error| {
-            Error::InvalidFormat(format!("flat ODS DDE metadata inspection failed: {error}"))
+            CoreError::InvalidFormat(format!("flat ODS DDE metadata inspection failed: {error}"))
         })
     }
 
@@ -234,30 +373,28 @@ impl Snapshot {
     /// scenario metadata.
     pub fn scenarios(&self) -> Result<crate::scenario::Snapshot> {
         crate::scenario::Snapshot::parse(&self.state.source).map_err(|error| {
-            Error::InvalidFormat(format!(
+            CoreError::InvalidFormat(format!(
                 "flat ODS scenario metadata inspection failed: {error}"
             ))
         })
     }
 
+    /// Starts a detached, failure-atomic edit bound to this workbook.
     ///
     /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn transaction(&self) -> Result<Transaction> {
-        self.transaction_with(Limits::default())
+    /// Returns an error when the staging buffer cannot be reserved.
+    pub fn edit(&self) -> std::result::Result<Edit, Error> {
+        Ok(self.edit_core()?)
     }
 
-    ///
-    /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn transaction_with(&self, limits: Limits) -> Result<Transaction> {
-        let limits = limits.validate()?;
+    fn edit_core(&self) -> Result<Edit> {
+        let limits = self.state.limits;
         let mut staged = Vec::new();
         staged
             .try_reserve_exact(self.state.sheets.len())
             .map_err(|_error| invalid("flat ODS transaction allocation failed"))?;
         staged.resize_with(self.state.sheets.len(), || None);
-        Ok(Transaction {
+        Ok(Edit {
             base: self.clone(),
             staged,
             limits,
@@ -281,16 +418,27 @@ fn select<'s>(sheets: &'s [Sheet], selector: SheetSelector<'_>) -> Result<Option
     }
 }
 
-/// Detached failure-atomic transaction bound to an immutable source snapshot.
-pub struct Transaction {
-    base: Snapshot,
+/// A detached, failure-atomic edit bound to an immutable source workbook.
+pub struct Edit {
+    base: Workbook,
     staged: Vec<Option<Sheet>>,
     limits: Limits,
 }
 
-pub type FlatEdit = Transaction;
+impl Edit {
+    /// The source workbook this edit stages against.
+    #[must_use]
+    pub fn package(&self) -> &Workbook {
+        &self.base
+    }
 
-impl Transaction {
+    /// Discards every staged change in place.
+    pub fn reset(&mut self) {
+        for staged in &mut self.staged {
+            *staged = None;
+        }
+    }
+
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
@@ -336,19 +484,25 @@ impl Transaction {
         Ok(Some(()))
     }
 
+    /// Validates the staged cells and publishes one immutable workbook.
+    ///
+    /// An edit with no staged change commits the source itself:
+    /// `diagnostics().changed()` is false and `patch().is_noop()` holds.
     ///
     /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn commit(self) -> Result<Commit> {
+    /// Returns an error when the edit cannot be published losslessly within
+    /// the workbook's limits.
+    pub fn commit(self) -> std::result::Result<Commit, Error> {
+        Ok(self.commit_core()?)
+    }
+
+    fn commit_core(self) -> Result<Commit> {
         if self.staged.iter().all(Option::is_none) {
             let patch = Patch {
                 before: self.base.state.source.clone(),
                 after: self.base.state.source.clone(),
             };
-            return Ok(Commit {
-                snapshot: self.base,
-                patch,
-            });
+            return Ok(Commit::new(self.base, patch, Diagnostics::UNCHANGED));
         }
         ensure_compact(&self.base.state.source, self.limits.output_bytes)?;
         let staged = self.staged.iter().map(Option::as_ref).collect::<Vec<_>>();
@@ -361,7 +515,7 @@ impl Transaction {
         )?;
         ensure_compact(&xml, self.limits.output_bytes)?;
         let after: Arc<str> = Arc::from(xml);
-        let snapshot = Snapshot::from_source(after.clone(), self.limits)?;
+        let snapshot = Workbook::from_source(after.clone(), self.limits)?;
         for (index, staged) in self.staged.iter().enumerate() {
             if staged
                 .as_ref()
@@ -372,14 +526,16 @@ impl Transaction {
                 ));
             }
         }
+        let changed = self.base.state.source != after;
         let patch = Patch {
             before: self.base.state.source.clone(),
             after,
         };
-        Ok(Commit { snapshot, patch })
+        Ok(Commit::new(snapshot, patch, Diagnostics::new(changed)))
     }
 }
 
+/// An exact-source, reversible flat workbook patch.
 #[derive(Clone, Debug)]
 pub struct Patch {
     before: Arc<str>,
@@ -387,31 +543,10 @@ pub struct Patch {
 }
 
 impl Patch {
+    /// Whether replaying this patch keeps the source bytes.
     #[must_use]
-    pub fn changed(&self) -> bool {
-        self.before != self.after
-    }
-
-    ///
-    /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn apply(&self, snapshot: &Snapshot) -> Result<Snapshot> {
-        self.apply_with(snapshot, Limits::default())
-    }
-
-    ///
-    /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn apply_with(&self, snapshot: &Snapshot, limits: Limits) -> Result<Snapshot> {
-        let limits = limits.validate()?;
-        if snapshot.state.source.as_ref() != self.before.as_ref() {
-            return Err(invalid("flat ODS patch source snapshot is stale"));
-        }
-        if self.after.len() > limits.output_bytes || self.after.len() > limits.input_bytes {
-            return Err(invalid("flat ODS patch output exceeds the byte limit"));
-        }
-        ensure_compact_or_unchanged(&self.before, &self.after, limits.output_bytes)?;
-        Snapshot::from_source(self.after.clone(), limits)
+    pub fn is_noop(&self) -> bool {
+        self.before == self.after
     }
 
     #[must_use]
@@ -420,45 +555,6 @@ impl Patch {
             before: self.after.clone(),
             after: self.before.clone(),
         }
-    }
-}
-
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
-
-pub type FlatCommit = Commit;
-
-impl Commit {
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.patch.changed()
-    }
-
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    #[must_use]
-    pub fn spreadsheet(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    #[must_use]
-    pub fn into_spreadsheet(self) -> Snapshot {
-        self.snapshot
     }
 }
 
@@ -471,8 +567,8 @@ fn ensure_compact_or_unchanged(before: &str, after: &str, max_bytes: usize) -> R
 
 fn ensure_compact(xml: &str, max_bytes: usize) -> Result<()> {
     let max_bytes = max_bytes.min(compact_xml::HARD_MAX_BYTES);
-    let limits = CompactLimits::new(max_bytes, MAX_XML_DEPTH).map_err(Error::from)?;
-    compact_xml::validate(xml.as_bytes(), limits).map_err(Error::from)
+    let limits = CompactLimits::new(max_bytes, MAX_XML_DEPTH).map_err(CoreError::from)?;
+    compact_xml::validate(xml.as_bytes(), limits).map_err(CoreError::from)
 }
 
 fn clone_string_fallible(value: &str) -> Result<String> {
@@ -779,6 +875,6 @@ fn office_attribute(
     Ok(None)
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> CoreError {
+    CoreError::InvalidFormat(message.into())
 }

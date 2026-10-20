@@ -1,8 +1,8 @@
 use litchi_core::OwnedSource;
 use litchi_odf_common::{constants, core::PackageWriter, package::raw_identical_members};
 use litchi_ods::{
-    Actuate, Builder, Cell, CellValue, CellView, FlatSnapshot, Link, Package, Show,
-    SourceBackedSpreadsheet,
+    Actuate, Builder, Cell, CellValue, CellView, Link, Package, Show, SourceBackedSpreadsheet,
+    flat::Workbook as FlatSnapshot,
     worksheet::{CellChange, Snapshot},
 };
 use std::sync::Arc;
@@ -439,13 +439,16 @@ fn flat_transaction_rejects_new_unsafe_public_link_without_staging() -> litchi_c
     dangerous.set_range(0.."前置".len());
     bypass.hyperlinks.insert(0, dangerous);
 
-    let mut edit = flat.transaction()?;
+    let mut edit = flat.edit()?;
     assert_eq!(edit.set_cell("Data", 0, 0, bypass)?, Some(()));
     let error = match edit.commit() {
         Ok(_) => panic!("unsafe flat hyperlink commit unexpectedly succeeded"),
         Err(error) => error,
     };
-    assert!(matches!(error, litchi_core::Error::InvalidFormat(_)));
+    assert!(matches!(
+        error,
+        litchi_ods::flat::Error::Core(litchi_core::Error::InvalidFormat(_))
+    ));
     assert_eq!(flat.as_bytes(), before.as_slice());
     Ok(())
 }

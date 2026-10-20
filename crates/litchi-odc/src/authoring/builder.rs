@@ -49,10 +49,11 @@ impl Builder {
         &mut self.definition
     }
 
-    /// Retain caller-selected limits for validation and package publication.
+    /// Retain caller-selected [`crate::OpenOptions`] for validation and
+    /// package publication; the built package keeps them.
     #[must_use]
-    pub fn with_limits(mut self, limits: crate::Limits) -> Self {
-        self.limits = limits;
+    pub fn with_options(mut self, options: crate::OpenOptions) -> Self {
+        self.limits = crate::Limits::from_options(options);
         self
     }
 

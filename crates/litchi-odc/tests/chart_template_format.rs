@@ -1,7 +1,7 @@
 use litchi_odc::{
     AxisSpec, AxisUpdate, Builder, ChartErrorCategory, ChartPackageKind, ChartStyleProperty,
-    ChartStyleValue, ChartSymbolName, ChartSymbolType, Definition, Limits, Package,
-    chart::Dimension,
+    ChartStyleValue, ChartSymbolName, ChartSymbolType, Definition, OpenOptions, Package,
+    SemanticLimits, chart::Dimension,
 };
 use litchi_odf_common::core::OwnedPackage;
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
@@ -140,7 +140,7 @@ fn chart_style_properties_are_typed_atomic_and_exact() -> TestResult<()> {
     let commit = edit.commit()?;
     assert_eq!(commit.patch().style_property_changes().len(), 6);
     let decoded =
-        litchi_odc::Patch::from_bytes(&commit.patch().to_bytes(), source.chart().limits())?;
+        litchi_odc::Patch::from_bytes(&commit.patch().to_bytes(), source.chart().options())?;
     let mut decoded_changes = decoded.style_property_changes().to_vec();
     let mut committed_changes = commit.patch().style_property_changes().to_vec();
     decoded_changes.sort_by_key(|change| (change.style_name().to_owned(), change.property()));
@@ -459,9 +459,13 @@ fn typed_style_publication_rejects_output_above_content_limit_before_rebuild() -
         .with_styles_xml(padded_styles.clone())
         .build()?;
     let content_limit = unconstrained.chart().styles_xml().map_or(0, str::len);
-    let limits = Limits::new().with_content_bytes(content_limit)?;
+    let limits = OpenOptions::new().semantic_limits(
+        SemanticLimits::builder()
+            .max_content_bytes(u64::try_from(content_limit)?)?
+            .build()?,
+    );
     let bounded = Builder::new()
-        .with_limits(limits)
+        .with_options(limits)
         .with_definition(definition())
         .with_styles_xml(padded_styles)
         .build()?;
@@ -549,7 +553,7 @@ fn composed_style_changes_collapse_replays_and_survive_wire_roundtrip() -> TestR
         Some(ChartStyleValue::Boolean(false))
     );
 
-    let durable = litchi_odc::Patch::from_bytes(&composed.to_bytes(), source.chart().limits())?;
+    let durable = litchi_odc::Patch::from_bytes(&composed.to_bytes(), source.chart().options())?;
     assert_eq!(
         durable.style_property_changes(),
         composed.style_property_changes()
@@ -573,7 +577,7 @@ fn durable_added_style_falls_back_to_lossless_whole_part_join_and_transfer() -> 
     style_edit.set_styles_xml(added_styles.clone());
     let style_commit = style_edit.commit()?;
     let durable =
-        litchi_odc::Patch::from_bytes(&style_commit.patch().to_bytes(), source.chart().limits())?;
+        litchi_odc::Patch::from_bytes(&style_commit.patch().to_bytes(), source.chart().options())?;
     assert!(
         durable
             .style_property_changes()
@@ -617,7 +621,7 @@ fn durable_added_style_falls_back_to_lossless_whole_part_join_and_transfer() -> 
     invalid_edit.set_styles_xml(invalid_styles);
     let invalid_commit = invalid_edit.commit()?;
     assert!(
-        litchi_odc::Patch::from_bytes(&invalid_commit.patch().to_bytes(), source.chart().limits())
+        litchi_odc::Patch::from_bytes(&invalid_commit.patch().to_bytes(), source.chart().options())
             .is_err()
     );
     Ok(())
@@ -646,7 +650,7 @@ fn durable_symbol_image_child_uses_whole_part_join_and_transfer() -> TestResult<
     edit.set_styles_xml(image_styles.clone());
     let committed = edit.commit()?;
     let durable =
-        litchi_odc::Patch::from_bytes(&committed.patch().to_bytes(), source.chart().limits())?;
+        litchi_odc::Patch::from_bytes(&committed.patch().to_bytes(), source.chart().options())?;
     assert!(
         durable
             .style_property_changes()
