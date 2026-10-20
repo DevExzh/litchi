@@ -48,7 +48,9 @@ use litchi_core::patch::{
 };
 use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_core::{Position, ReadAt, SourceVersion};
-use litchi_ole_common::object::{Edit as PackageEditor, Limits, Targets};
+/// The object and record limits a cell-value snapshot is read under.
+pub use litchi_ole_common::object::Limits;
+use litchi_ole_common::object::{Edit as PackageEditor, Targets};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 use std::collections::BTreeMap;
 use std::fmt;
