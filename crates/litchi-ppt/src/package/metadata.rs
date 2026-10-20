@@ -9,7 +9,7 @@
 //!
 //! The edit reads the three sections into the shared [`SummaryProperties`]
 //! model and stages back only the sections that changed, through the PPT
-//! property-set transaction ([`super::property_set`]), so an exact no-op
+//! property-set transaction, so an exact no-op
 //! commits the source package unchanged and a changed commit keeps every other
 //! stream and the root class identifier. A missing stream, or the blank
 //! section a presentation built without properties carries, is replaced by

@@ -5591,6 +5591,36 @@
           "name": "FontPatch",
           "scope": "litchi_ppt",
           "replacement": "use litchi_ppt::font::Patch"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::client_anchor",
+          "replacement": "the record-level edit is crate-private; Package::edit is the route (record 0357)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::client_anchor",
+          "replacement": "use commit.diagnostics().changed()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::client_anchor",
+          "replacement": "the record-level edit is crate-private; Package::edit is the route (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::document_structure",
+          "replacement": "the record-level edit is crate-private; Package::edit is the route (record 0357)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::document_structure",
+          "replacement": "use commit.diagnostics().changed()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::document_structure",
+          "replacement": "the record-level edit is crate-private; Package::edit is the route (record 0357)"
         }
       ],
       "families": [
@@ -5957,6 +5987,36 @@
           "name": "FontPatch",
           "scope": "litchi_ppt",
           "replacement": "use litchi_ppt::font::Patch"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::client_anchor",
+          "replacement": "the record-level edit is crate-private; Package::edit is the route (record 0357)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::client_anchor",
+          "replacement": "use commit.diagnostics().changed()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::client_anchor",
+          "replacement": "the record-level edit is crate-private; Package::edit is the route (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::document_structure",
+          "replacement": "the record-level edit is crate-private; Package::edit is the route (record 0357)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::document_structure",
+          "replacement": "use commit.diagnostics().changed()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::document_structure",
+          "replacement": "the record-level edit is crate-private; Package::edit is the route (record 0357)"
         }
       ],
       "families": [
