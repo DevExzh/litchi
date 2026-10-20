@@ -2,11 +2,9 @@
 
 use std::borrow::Cow;
 
-use litchi_core::sheet::{
-    Cell as CellTrait, CellValue, Result as SheetResult, Worksheet as WorksheetTrait,
-};
+use litchi_core::sheet::{Cell as CellTrait, CellValue, Worksheet as WorksheetTrait};
 
-use crate::error::Error;
+use crate::error::{Error, Result};
 
 /// One cell: a one-based position and its value.
 #[derive(Debug, Clone, PartialEq)]
@@ -102,6 +100,7 @@ fn coordinate(text: &str) -> Option<(u32, u32)> {
 }
 
 impl<'w> WorksheetTrait for Worksheet<'w> {
+    type Error = Error;
     type Cell<'a>
         = Cell
     where
@@ -136,11 +135,11 @@ impl<'w> WorksheetTrait for Worksheet<'w> {
         Some((1, 1, rows, columns))
     }
 
-    fn cell(&self, row: u32, column: u32) -> SheetResult<Cell> {
+    fn cell(&self, row: u32, column: u32) -> Result<Cell> {
         Ok(Cell::new(row, column, self.value(row, column).clone()))
     }
 
-    fn cell_by_coordinate(&self, text: &str) -> SheetResult<Cell> {
+    fn cell_by_coordinate(&self, text: &str) -> Result<Cell> {
         let (row, column) = coordinate(text).ok_or(Error::InvalidCoordinate)?;
         self.cell(row, column)
     }
@@ -159,14 +158,14 @@ impl<'w> WorksheetTrait for Worksheet<'w> {
         }
     }
 
-    fn row(&self, row: usize) -> SheetResult<Cow<'_, [CellValue]>> {
+    fn row(&self, row: usize) -> Result<Cow<'_, [CellValue]>> {
         self.rows
             .get(row)
             .map(|cells| Cow::Borrowed(cells.as_slice()))
-            .ok_or_else(|| Error::RowOutOfRange { row }.into())
+            .ok_or(Error::RowOutOfRange { row })
     }
 
-    fn cell_value(&self, row: u32, column: u32) -> SheetResult<Cow<'_, CellValue>> {
+    fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>> {
         Ok(Cow::Borrowed(self.value(row, column)))
     }
 }
@@ -186,7 +185,7 @@ impl<'a> Worksheets<'a> {
 }
 
 impl<'a> Iterator for Worksheets<'a> {
-    type Item = SheetResult<Worksheet<'a>>;
+    type Item = Result<Worksheet<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.worksheet.take().map(Ok)
@@ -202,7 +201,7 @@ pub struct Cells<'a> {
 }
 
 impl Iterator for Cells<'_> {
-    type Item = SheetResult<Cell>;
+    type Item = Result<Cell>;
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(cells) = self.rows.get(self.row) {
@@ -229,7 +228,7 @@ pub struct Rows<'a> {
 }
 
 impl<'a> Iterator for Rows<'a> {
-    type Item = SheetResult<Cow<'a, [CellValue]>>;
+    type Item = Result<Cow<'a, [CellValue]>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.rows

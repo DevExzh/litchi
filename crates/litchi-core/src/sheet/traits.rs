@@ -3,11 +3,14 @@
 //! The traits dispatch statically: each implementation names the concrete
 //! cell, worksheet and iterator types it returns as associated types (generic
 //! associated types borrowing from the implementation), so a read through the
-//! traits allocates nothing for dispatch. Code generic over the traits takes
+//! traits allocates nothing for dispatch. Each implementation also names its
+//! error type, so a format's typed error reaches the caller unchanged; the
+//! formula engine classifies it into [`super::Error`]. Code generic over the traits takes
 //! `W: WorkbookTrait` (or `S: Worksheet`) rather than a trait object; a
 //! collection of different formats uses an enum over the concrete types.
 
-use super::types::{CellValue, Result};
+use super::error::Result;
+use super::types::CellValue;
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -44,6 +47,9 @@ pub trait Cell: Send + Sync {
 
 /// Represents a worksheet (sheet) in a workbook.
 pub trait Worksheet: Send + Sync {
+    /// The error a read reports.
+    type Error: std::error::Error + Send + Sync + 'static;
+
     /// The cell [`Self::cell`] returns and [`Self::cells`] yields, which may
     /// borrow from the worksheet.
     type Cell<'a>: Cell
@@ -51,13 +57,13 @@ pub trait Worksheet: Send + Sync {
         Self: 'a;
 
     /// The iterator [`Self::cells`] returns.
-    type Cells<'a>: Iterator<Item = Result<Self::Cell<'a>>>
+    type Cells<'a>: Iterator<Item = Result<Self::Cell<'a>, Self::Error>>
     where
         Self: 'a;
 
     /// The iterator [`Self::rows`] returns: each row as a slice of cell
     /// values, wrapped in `Cow` for zero-copy when possible.
-    type Rows<'a>: Iterator<Item = Result<Cow<'a, [CellValue]>>>
+    type Rows<'a>: Iterator<Item = Result<Cow<'a, [CellValue]>, Self::Error>>
     where
         Self: 'a;
 
@@ -66,14 +72,14 @@ pub trait Worksheet: Send + Sync {
     /// # Errors
     ///
     /// Returns an error if the cell cannot be read.
-    fn cell(&self, row: u32, column: u32) -> Result<Self::Cell<'_>>;
+    fn cell(&self, row: u32, column: u32) -> Result<Self::Cell<'_>, Self::Error>;
 
     /// Get a cell by coordinate (e.g., "A1").
     ///
     /// # Errors
     ///
     /// Returns an error if the coordinate is invalid or the cell cannot be read.
-    fn cell_by_coordinate(&self, coordinate: &str) -> Result<Self::Cell<'_>>;
+    fn cell_by_coordinate(&self, coordinate: &str) -> Result<Self::Cell<'_>, Self::Error>;
 
     /// Get cell value by row and column (1-based indexing).
     ///
@@ -83,7 +89,7 @@ pub trait Worksheet: Send + Sync {
     /// # Errors
     ///
     /// Returns an error if the cell value cannot be resolved.
-    fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>>;
+    fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>, Self::Error>;
 
     /// Get all cells as an iterator.
     fn cells(&self) -> Self::Cells<'_>;
@@ -106,7 +112,7 @@ pub trait Worksheet: Send + Sync {
     /// # Errors
     ///
     /// Returns an error if the row cannot be read.
-    fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>>;
+    fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>, Self::Error>;
 
     /// Get the number of rows in the worksheet.
     fn row_count(&self) -> usize;
@@ -120,14 +126,17 @@ pub trait Worksheet: Send + Sync {
 /// **Note**: This is the low-level trait API. For high-level usage, use the
 /// unified `Workbook` struct from `crate::sheet::Workbook`.
 pub trait WorkbookTrait: Debug + Send + Sync {
+    /// The error a lookup or a worksheet read reports.
+    type Error: std::error::Error + Send + Sync + 'static;
+
     /// The worksheet the lookups return and [`Self::worksheets`] yields,
     /// which may borrow from the workbook.
-    type Worksheet<'a>: Worksheet
+    type Worksheet<'a>: Worksheet<Error = Self::Error>
     where
         Self: 'a;
 
     /// The iterator [`Self::worksheets`] returns.
-    type Worksheets<'a>: Iterator<Item = Result<Self::Worksheet<'a>>>
+    type Worksheets<'a>: Iterator<Item = Result<Self::Worksheet<'a>, Self::Error>>
     where
         Self: 'a;
 
@@ -139,7 +148,7 @@ pub trait WorkbookTrait: Debug + Send + Sync {
     /// # Errors
     ///
     /// Returns an error if the active worksheet cannot be determined.
-    fn active_worksheet(&self) -> Result<Self::Worksheet<'_>>;
+    fn active_worksheet(&self) -> Result<Self::Worksheet<'_>, Self::Error>;
 
     /// Returns true if the workbook uses the 1904 date system (Mac).
     ///
@@ -153,14 +162,14 @@ pub trait WorkbookTrait: Debug + Send + Sync {
     /// # Errors
     ///
     /// Returns an error if the index is out of range.
-    fn worksheet_by_index(&self, index: usize) -> Result<Self::Worksheet<'_>>;
+    fn worksheet_by_index(&self, index: usize) -> Result<Self::Worksheet<'_>, Self::Error>;
 
     /// Get a worksheet by name.
     ///
     /// # Errors
     ///
     /// Returns an error if no worksheet with that name exists.
-    fn worksheet_by_name(&self, name: &str) -> Result<Self::Worksheet<'_>>;
+    fn worksheet_by_name(&self, name: &str) -> Result<Self::Worksheet<'_>, Self::Error>;
 
     /// Get the number of worksheets.
     fn worksheet_count(&self) -> usize;
@@ -241,6 +250,7 @@ impl<T: Cell + Clone> Cell for Cow<'_, T> {
 /// Forward every worksheet read through a pointer to the worksheet.
 macro_rules! forward_worksheet {
     () => {
+        type Error = T::Error;
         type Cell<'a>
             = T::Cell<'a>
         where
@@ -254,15 +264,15 @@ macro_rules! forward_worksheet {
         where
             Self: 'a;
 
-        fn cell(&self, row: u32, column: u32) -> Result<Self::Cell<'_>> {
+        fn cell(&self, row: u32, column: u32) -> Result<Self::Cell<'_>, T::Error> {
             (**self).cell(row, column)
         }
 
-        fn cell_by_coordinate(&self, coordinate: &str) -> Result<Self::Cell<'_>> {
+        fn cell_by_coordinate(&self, coordinate: &str) -> Result<Self::Cell<'_>, T::Error> {
             (**self).cell_by_coordinate(coordinate)
         }
 
-        fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>> {
+        fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>, T::Error> {
             (**self).cell_value(row, column)
         }
 
@@ -282,7 +292,7 @@ macro_rules! forward_worksheet {
             (**self).name()
         }
 
-        fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>> {
+        fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>, T::Error> {
             (**self).row(row_idx)
         }
 

@@ -373,33 +373,23 @@ impl From<OleError> for PptValidationError {
     }
 }
 
-/// Validates a positional PPT source under default finite bounds.
+/// Validates a positional PPT source under explicit finite bounds
+/// ([`PptValidationLimits::default`] is the standard profile).
 ///
-/// The source remains untouched. The report is presence-only at security
-/// boundaries: it records encryption, signatures, macros, protection, and
-/// external references without decrypting, verifying, executing, fetching, or
-/// repairing any of them.
+/// The validator checks CFB topology, the canonical root or
+/// `PP97_DUALSTORAGE` stream layout, `Current User`, strict bounded record
+/// framing, and inert security/presence markers. It never mutates the source.
+/// The report is presence-only at security boundaries: it records
+/// encryption, signatures, macros, protection, and external references
+/// without decrypting, verifying, executing, fetching, or repairing any of
+/// them.
 ///
 /// # Errors
 ///
 /// Returns an error for source I/O/version instability, bounded validator
 /// allocation failure, or failure to retain the bounded report. Definite
 /// format rejection and configured limits are represented in the report.
-pub fn validate_source(source: Arc<dyn ReadAt>) -> Result<ValidateReport, PptValidationError> {
-    validate_source_with_limits(source, PptValidationLimits::default())
-}
-
-/// Validates a positional PPT source under explicit finite bounds.
-///
-/// The validator checks CFB topology, the canonical root or
-/// `PP97_DUALSTORAGE` stream layout, `Current User`, strict bounded record
-/// framing, and inert security/presence markers. It never mutates the source.
-///
-/// # Errors
-///
-/// Returns an error for source I/O/version instability, bounded validator
-/// allocation failure, or failure to retain the bounded report.
-pub fn validate_source_with_limits(
+pub fn validate_source(
     source: Arc<dyn ReadAt>,
     limits: PptValidationLimits,
 ) -> Result<ValidateReport, PptValidationError> {

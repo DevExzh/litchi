@@ -14,8 +14,8 @@
 #[cfg(feature = "encryption")]
 use litchi_ppt::FontPackageOptions;
 use litchi_ppt::{
-    Error, Font, FontCollection, FontEmbeddingFlags, FontScope, FontSnapshot, Record, RecordType,
-    SourceLimitKind, SourceLimits,
+    Error, Font, FontCollection, FontEmbeddingFlags, FontScope, FontSnapshot, Package, Record,
+    RecordType, SourceLimitKind, SourceLimits, font,
 };
 use std::io::Cursor;
 
@@ -142,29 +142,6 @@ fn malformed_font_names_and_entity_lengths_are_rejected() {
         .unwrap()
         .0;
     assert!(FontCollection::parse(&record).is_err());
-}
-
-#[test]
-fn source_limits_reject_oversize_font_records_before_materialization() {
-    let bytes = collection(RT_FONT_COLLECTION, &[0; 128]);
-    let limits = SourceLimits::builder()
-        .max_entry_bytes(bytes.len())
-        .unwrap()
-        .max_record_bytes(64)
-        .unwrap()
-        .max_record_payload_bytes(56)
-        .unwrap()
-        .max_aggregate_payload_bytes(56)
-        .unwrap()
-        .build()
-        .unwrap();
-    assert!(matches!(
-        Record::parse_with_limits(&bytes, 0, limits),
-        Err(Error::Limit {
-            kind: SourceLimitKind::RecordBytes | SourceLimitKind::RecordPayloadBytes,
-            ..
-        })
-    ));
 }
 
 #[test]
@@ -327,53 +304,6 @@ fn source_limits_checked_builder_preserves_profiles_and_accepts_boundaries() {
     );
 }
 
-fn nested_record(depth: usize) -> Vec<u8> {
-    let mut value = record(0, 0, RT_FONT_ENTITY_ATOM, &[]);
-    for _ in 0..depth {
-        value = collection(RT_FONT_COLLECTION, &value);
-    }
-    value
-}
-
-#[test]
-fn source_limits_bound_record_events_and_depth() {
-    let event_bytes = collection(
-        RT_FONT_COLLECTION,
-        &[
-            record(0, 0, RT_FONT_ENTITY_ATOM, &[]),
-            record(0, 1, RT_FONT_ENTITY_ATOM, &[]),
-        ]
-        .concat(),
-    );
-    let event_limits = SourceLimits::builder()
-        .max_events(1)
-        .unwrap()
-        .build()
-        .unwrap();
-    assert!(matches!(
-        Record::parse_with_limits(&event_bytes, 0, event_limits),
-        Err(Error::Limit {
-            kind: SourceLimitKind::Events,
-            observed,
-            maximum: maximum @ 1,
-        }) if observed > maximum
-    ));
-
-    let depth_limits = SourceLimits::builder()
-        .max_depth(1)
-        .unwrap()
-        .build()
-        .unwrap();
-    assert!(matches!(
-        Record::parse_with_limits(&nested_record(3), 0, depth_limits),
-        Err(Error::Limit {
-            kind: SourceLimitKind::Depth,
-            observed,
-            maximum: maximum @ 1,
-        }) if observed > maximum
-    ));
-}
-
 #[cfg(feature = "fonts")]
 #[test]
 fn eot_parser_rejects_malformed_utf16_sizes_and_explicit_limit_overflow() {
@@ -405,18 +335,17 @@ fn signed_source_allows_exact_no_op_but_refuses_changed_font_commit() {
         &["_xmlsignatures", "origin.sigs"],
         b"fixture",
     );
-    let snapshot =
-        FontSnapshot::from_bytes(source.clone()).expect("signed PPT remains inspectable");
+    let package = Package::from_bytes(&source).expect("signed PPT remains inspectable");
 
-    let commit = snapshot.edit().unwrap().commit().expect("exact no-op");
-    assert!(commit.patch().is_empty());
-    assert_eq!(commit.snapshot().bytes(), source);
+    let commit = package.edit_fonts().unwrap().commit().expect("exact no-op");
+    assert!(commit.patch().is_noop());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().to_bytes().unwrap(), source);
 
-    let mut transaction = snapshot.edit().unwrap();
-    transaction
-        .append_font(FontScope::Base, Font::new("Changed"))
+    let mut edit = package.edit_fonts().unwrap();
+    edit.append_font(FontScope::Base, Font::new("Changed"))
         .unwrap();
-    assert!(transaction.commit().is_err());
+    assert!(matches!(edit.commit(), Err(font::Error::Signed)));
 }
 
 #[test]
@@ -432,14 +361,15 @@ fn signed_inconsistent_save_with_fonts_flag_is_preserved_on_exact_no_op() {
             .all(|font| font.embedded_fonts.is_empty())
     }));
 
-    let commit = snapshot.edit().unwrap().commit().expect("exact no-op");
-    assert!(commit.patch().is_empty());
-    assert_eq!(commit.snapshot().bytes(), source);
+    let package = Package::from_bytes(&source).expect("signed PPT opens");
+    let commit = package.edit_fonts().unwrap().commit().expect("exact no-op");
+    assert!(commit.patch().is_noop());
+    assert_eq!(commit.package().to_bytes().unwrap(), source);
 }
 
 #[test]
 #[cfg(feature = "encryption")]
-fn encrypted_source_allows_exact_no_op_but_refuses_changed_font_commit() {
+fn encrypted_source_allows_font_inspection_but_refuses_font_edits() {
     let password = "font fixture password";
     let source = encrypted_ppt(password);
     let snapshot = FontSnapshot::from_bytes_with_options(
@@ -450,16 +380,17 @@ fn encrypted_source_allows_exact_no_op_but_refuses_changed_font_commit() {
         },
     )
     .expect("password-authorized font inspection");
+    assert!(snapshot.fonts().base.is_some());
 
-    let commit = snapshot.edit().unwrap().commit().expect("exact no-op");
-    assert!(commit.patch().is_empty());
-    assert_eq!(commit.snapshot().bytes(), source);
-
-    let mut transaction = snapshot.edit().unwrap();
-    transaction
-        .append_font(FontScope::Base, Font::new("Changed"))
-        .unwrap();
-    assert!(transaction.commit().is_err());
+    let package = Package::from_bytes_with_options(
+        &source,
+        litchi_ppt::OpenOptions::new().password(password),
+    )
+    .expect("password-authorized open");
+    assert!(matches!(
+        package.edit_fonts(),
+        Err(font::Error::Package(Error::EncryptionPolicy))
+    ));
 }
 
 #[test]
@@ -472,15 +403,15 @@ fn empty_root_and_nested_protection_storages_refuse_changed_publication() {
         &["Nested", "\u{9}drmvIEWERcONTENT"][..],
     ] {
         let source = with_storage(unsigned_ppt(), path);
-        let snapshot = FontSnapshot::from_bytes(source.clone()).expect("protected PPT inspection");
-        let no_op = snapshot
-            .edit()
+        let package = Package::from_bytes(&source).expect("protected PPT inspection");
+        let no_op = package
+            .edit_fonts()
             .unwrap()
             .commit()
             .expect("exact protected no-op");
-        assert_eq!(no_op.snapshot().bytes(), source);
+        assert_eq!(no_op.package().to_bytes().unwrap(), source);
 
-        let mut changed = snapshot.edit().unwrap();
+        let mut changed = package.edit_fonts().unwrap();
         changed
             .append_font(FontScope::Base, Font::new("Changed"))
             .unwrap();

@@ -35,7 +35,7 @@ use std::ops::Deref;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-use litchi_core::sheet::{Result as SheetResult, WorkbookTrait};
+use litchi_core::sheet::WorkbookTrait;
 use litchi_core::{FileFormat, Metadata};
 use litchi_opc::{OpcPackage, SourceBackedPackage, SourceLimits};
 use litchi_xlsb as xlsb;
@@ -76,7 +76,7 @@ pub(crate) use spec::{CELL_WRITE_TABLE, SPEC};
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
 
 use crate::view::sheet::{Worksheet as Sheet, WorksheetsInner};
-use source::{SourceWorkbook, SourceWorksheets, internal};
+use source::{SourceWorkbook, SourceWorksheets};
 
 /// An opened Excel binary workbook.
 ///
@@ -523,7 +523,7 @@ impl Xlsb {
                 for index in 0..WorkbookTrait::worksheet_count(workbook.as_ref()) {
                     let worksheet = workbook.worksheet(index)?;
                     for row in litchi_core::sheet::Worksheet::rows(&worksheet) {
-                        cell_text::append_row(&mut out, &row.map_err(sheet_error)?);
+                        cell_text::append_row(&mut out, &row?);
                     }
                 }
                 Ok(out)
@@ -651,17 +651,6 @@ fn metadata_error(error: litchi_ooxml_common::Error) -> Error {
     }
 }
 
-/// Recover the typed error from a leaf `litchi_core::sheet` trait error.
-fn sheet_error(error: Box<dyn std::error::Error + Send + Sync>) -> Error {
-    match error.downcast::<xlsb::package::PackageError>() {
-        Ok(error) => Error::from(*error),
-        Err(error) => match error.downcast::<Error>() {
-            Ok(error) => *error,
-            Err(error) => internal(error.to_string()),
-        },
-    }
-}
-
 impl std::fmt::Debug for Xlsb {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut debug = formatter.debug_struct("Xlsb");
@@ -677,6 +666,7 @@ impl std::fmt::Debug for Xlsb {
 }
 
 impl WorkbookTrait for Xlsb {
+    type Error = Error;
     type Worksheet<'a> = Sheet<'a>;
     type Worksheets<'a> = crate::view::sheet::Worksheets<'a>;
 
@@ -687,10 +677,13 @@ impl WorkbookTrait for Xlsb {
         }
     }
 
-    fn active_worksheet(&self) -> SheetResult<Sheet<'_>> {
+    fn active_worksheet(&self) -> Result<Sheet<'_>> {
         match &self.0.owner {
             XlsbOwner::Source(workbook) => workbook.active_worksheet().map(Sheet::xlsb_source),
-            XlsbOwner::Eager(workbook) => workbook.active_worksheet().map(Sheet::xlsb_eager),
+            XlsbOwner::Eager(workbook) => workbook
+                .active_worksheet()
+                .map(Sheet::xlsb_eager)
+                .map_err(Into::into),
         }
     }
 
@@ -701,17 +694,23 @@ impl WorkbookTrait for Xlsb {
         }
     }
 
-    fn worksheet_by_index(&self, index: usize) -> SheetResult<Sheet<'_>> {
+    fn worksheet_by_index(&self, index: usize) -> Result<Sheet<'_>> {
         match &self.0.owner {
             XlsbOwner::Source(workbook) => workbook.worksheet(index).map(Sheet::xlsb_source),
-            XlsbOwner::Eager(workbook) => workbook.worksheet_by_index(index).map(Sheet::xlsb_eager),
+            XlsbOwner::Eager(workbook) => workbook
+                .worksheet_by_index(index)
+                .map(Sheet::xlsb_eager)
+                .map_err(Into::into),
         }
     }
 
-    fn worksheet_by_name(&self, name: &str) -> SheetResult<Sheet<'_>> {
+    fn worksheet_by_name(&self, name: &str) -> Result<Sheet<'_>> {
         match &self.0.owner {
             XlsbOwner::Source(workbook) => workbook.worksheet_named(name).map(Sheet::xlsb_source),
-            XlsbOwner::Eager(workbook) => workbook.worksheet_by_name(name).map(Sheet::xlsb_eager),
+            XlsbOwner::Eager(workbook) => workbook
+                .worksheet_by_name(name)
+                .map(Sheet::xlsb_eager)
+                .map_err(Into::into),
         }
     }
 

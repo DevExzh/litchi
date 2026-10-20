@@ -1,29 +1,31 @@
-//! Failure-atomic edits for one inert `PowerPoint` storage payload.
+//! A failure-atomic draft of one inert `PowerPoint` storage value.
 
 use super::model::{Kind, Storage};
 use super::snapshot::Snapshot;
 use crate::package::Result;
 
-/// A transaction-local editor for one persisted `ExOleObjStg` payload.
+/// A draft of one `ExOleObjStg` storage value.
 ///
-/// Edits operate on a private candidate. Every replacement validates the
-/// complete bounded candidate before publishing it into the editor, and
-/// [`Self::commit`] revalidates before returning the new immutable storage.
-/// The source passed to [`Storage::edit`] is never mutated; the editor never
+/// The draft edits a value, not a presentation: every replacement validates
+/// the complete bounded candidate before adopting it, and
+/// [`Self::into_storage`] revalidates before returning the new immutable
+/// storage, which [`crate::embedded::object::Edit::add`] and
+/// [`crate::embedded::object::Edit::replace_storage`] stage into a package.
+/// The source passed to [`Storage::draft`] is never mutated; the draft never
 /// opens, interprets, or executes the embedded OLE2 content.
 #[derive(Clone, Debug)]
-pub struct Editor {
+pub struct Draft {
     candidate: Storage,
 }
 
-impl Editor {
+impl Draft {
     pub(super) const fn from_storage(candidate: Storage) -> Self {
         Self { candidate }
     }
 
-    /// Borrow the editor's current candidate without copying its payload.
+    /// Borrow the draft's current candidate without copying its payload.
     #[must_use]
-    pub fn snapshot(&self) -> Snapshot<'_> {
+    pub fn view(&self) -> Snapshot<'_> {
         self.candidate.snapshot()
     }
 
@@ -43,7 +45,7 @@ impl Editor {
 
     /// Replace the candidate with an uncompressed payload.
     ///
-    /// If validation fails, the editor retains its previous candidate.
+    /// If validation fails, the draft retains its previous candidate.
     ///
     /// # Errors
     ///
@@ -57,7 +59,7 @@ impl Editor {
     /// Replace the candidate with a zlib payload and its declared size.
     ///
     /// `data` excludes `PowerPoint`'s four-byte decompressed-size prefix. If
-    /// validation fails, the editor retains its previous candidate.
+    /// validation fails, the draft retains its previous candidate.
     ///
     /// # Errors
     ///
@@ -68,12 +70,12 @@ impl Editor {
         Ok(())
     }
 
-    /// Publish the fully validated candidate as a new immutable storage.
+    /// The fully validated candidate as a new immutable storage.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Storage> {
+    pub fn into_storage(self) -> Result<Storage> {
         Storage::from_parts(
             self.candidate.kind,
             self.candidate.compression,
@@ -96,15 +98,15 @@ impl Editor {
 }
 
 impl Storage {
-    /// Start an editor with an owned candidate cloned from this snapshot.
+    /// Start a draft with an owned candidate cloned from this storage.
     #[must_use]
-    pub fn edit(&self) -> Editor {
-        Editor::from_storage(self.clone())
+    pub fn draft(&self) -> Draft {
+        Draft::from_storage(self.clone())
     }
 
-    /// Start an editor by moving this snapshot without copying its payload.
+    /// Start a draft by moving this storage without copying its payload.
     #[must_use]
-    pub fn into_edit(self) -> Editor {
-        Editor::from_storage(self)
+    pub fn into_draft(self) -> Draft {
+        Draft::from_storage(self)
     }
 }

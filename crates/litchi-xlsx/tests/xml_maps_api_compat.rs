@@ -1,4 +1,4 @@
-use litchi_core::sheet::Result;
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 use litchi_xlsx::xml_maps::{
     DataBinding, XmlMap, XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMapSchema, XmlSchema,
     parse_map_info, parse_xml_map_info, serialize_map_info, serialize_xml_map_info,

@@ -10,7 +10,7 @@ enum Extremum {
     Max,
 }
 
-async fn minmax_ifs(
+fn minmax_ifs(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -24,20 +24,20 @@ async fn minmax_ifs(
         )));
     }
 
-    let target_range = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
+    let target_range = flatten_range_expr(ctx, current_sheet, &args[0])?;
 
     let mut crit_ranges: Vec<FlatRange> = Vec::new();
     let mut crits: Vec<Criteria> = Vec::new();
 
     let mut i = 1;
     while i + 1 < args.len() {
-        let r = flatten_range_expr(ctx, current_sheet, &args[i]).await?;
+        let r = flatten_range_expr(ctx, current_sheet, &args[i])?;
         if r.rows != target_range.rows || r.cols != target_range.cols {
             return Ok(CellValue::Error(format!(
                 "{func_name} criteria ranges must have the same size as the target range"
             )));
         }
-        let crit_val = super::evaluate_expression(ctx, current_sheet, &args[i + 1]).await?;
+        let crit_val = super::evaluate_expression(ctx, current_sheet, &args[i + 1])?;
         let crit_str = to_text(&crit_val);
         let c = match parse_criteria(&crit_str) {
             Some(c) => c,
@@ -73,23 +73,23 @@ async fn minmax_ifs(
     Ok(CellValue::Float(best.unwrap_or(0.0)))
 }
 
-pub(crate) async fn eval_minifs(
+pub(crate) fn eval_minifs(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    minmax_ifs(ctx, current_sheet, args, "MINIFS", Extremum::Min).await
+    minmax_ifs(ctx, current_sheet, args, "MINIFS", Extremum::Min)
 }
 
-pub(crate) async fn eval_maxifs(
+pub(crate) fn eval_maxifs(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    minmax_ifs(ctx, current_sheet, args, "MAXIFS", Extremum::Max).await
+    minmax_ifs(ctx, current_sheet, args, "MAXIFS", Extremum::Max)
 }
 
-pub(crate) async fn eval_sumif(
+pub(crate) fn eval_sumif(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -100,8 +100,8 @@ pub(crate) async fn eval_sumif(
         ));
     }
 
-    let range = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
-    let crit_val = super::evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let range = flatten_range_expr(ctx, current_sheet, &args[0])?;
+    let crit_val = super::evaluate_expression(ctx, current_sheet, &args[1])?;
     let crit_str = to_text(&crit_val);
     let criteria = match parse_criteria(&crit_str) {
         Some(c) => c,
@@ -111,7 +111,7 @@ pub(crate) async fn eval_sumif(
     };
 
     let sum_range = if args.len() == 3 {
-        let sr = flatten_range_expr(ctx, current_sheet, &args[2]).await?;
+        let sr = flatten_range_expr(ctx, current_sheet, &args[2])?;
         if sr.rows != range.rows || sr.cols != range.cols {
             return Ok(CellValue::Error(
                 "SUMIF range and sum_range must have the same size".to_string(),
@@ -138,7 +138,7 @@ pub(crate) async fn eval_sumif(
     Ok(CellValue::Float(total))
 }
 
-pub(crate) async fn eval_countif(
+pub(crate) fn eval_countif(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -149,8 +149,8 @@ pub(crate) async fn eval_countif(
         ));
     }
 
-    let range = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
-    let crit_val = super::evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let range = flatten_range_expr(ctx, current_sheet, &args[0])?;
+    let crit_val = super::evaluate_expression(ctx, current_sheet, &args[1])?;
     let crit_str = to_text(&crit_val);
     let criteria = match parse_criteria(&crit_str) {
         Some(c) => c,
@@ -169,7 +169,7 @@ pub(crate) async fn eval_countif(
     Ok(CellValue::Int(count))
 }
 
-pub(crate) async fn eval_averageif(
+pub(crate) fn eval_averageif(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -180,8 +180,8 @@ pub(crate) async fn eval_averageif(
         ));
     }
 
-    let range = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
-    let crit_val = super::evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let range = flatten_range_expr(ctx, current_sheet, &args[0])?;
+    let crit_val = super::evaluate_expression(ctx, current_sheet, &args[1])?;
     let crit_str = to_text(&crit_val);
     let criteria = match parse_criteria(&crit_str) {
         Some(c) => c,
@@ -191,7 +191,7 @@ pub(crate) async fn eval_averageif(
     };
 
     let avg_range = if args.len() == 3 {
-        let ar = flatten_range_expr(ctx, current_sheet, &args[2]).await?;
+        let ar = flatten_range_expr(ctx, current_sheet, &args[2])?;
         if ar.rows != range.rows || ar.cols != range.cols {
             return Ok(CellValue::Error(
                 "AVERAGEIF range and average_range must have the same size".to_string(),
@@ -227,7 +227,7 @@ pub(crate) async fn eval_averageif(
     Ok(CellValue::Float(total / count as f64))
 }
 
-pub(crate) async fn eval_sumifs(
+pub(crate) fn eval_sumifs(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -239,20 +239,20 @@ pub(crate) async fn eval_sumifs(
         ));
     }
 
-    let sum_range = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
+    let sum_range = flatten_range_expr(ctx, current_sheet, &args[0])?;
 
     let mut crit_ranges: Vec<FlatRange> = Vec::new();
     let mut crits: Vec<Criteria> = Vec::new();
 
     let mut i = 1;
     while i + 1 < args.len() {
-        let r = flatten_range_expr(ctx, current_sheet, &args[i]).await?;
+        let r = flatten_range_expr(ctx, current_sheet, &args[i])?;
         if r.rows != sum_range.rows || r.cols != sum_range.cols {
             return Ok(CellValue::Error(
                 "SUMIFS criteria ranges must have the same size as sum_range".to_string(),
             ));
         }
-        let crit_val = super::evaluate_expression(ctx, current_sheet, &args[i + 1]).await?;
+        let crit_val = super::evaluate_expression(ctx, current_sheet, &args[i + 1])?;
         let crit_str = to_text(&crit_val);
         let c = match parse_criteria(&crit_str) {
             Some(c) => c,
@@ -282,7 +282,7 @@ pub(crate) async fn eval_sumifs(
     Ok(CellValue::Float(total))
 }
 
-pub(crate) async fn eval_countifs(
+pub(crate) fn eval_countifs(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -294,7 +294,7 @@ pub(crate) async fn eval_countifs(
         ));
     }
 
-    let first_range = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
+    let first_range = flatten_range_expr(ctx, current_sheet, &args[0])?;
     let mut crit_ranges: Vec<FlatRange> = Vec::new();
     let mut crits: Vec<Criteria> = Vec::new();
 
@@ -303,14 +303,14 @@ pub(crate) async fn eval_countifs(
         let r = if i == 0 {
             first_range.clone()
         } else {
-            flatten_range_expr(ctx, current_sheet, &args[i]).await?
+            flatten_range_expr(ctx, current_sheet, &args[i])?
         };
         if r.rows != first_range.rows || r.cols != first_range.cols {
             return Ok(CellValue::Error(
                 "COUNTIFS criteria ranges must all have the same size".to_string(),
             ));
         }
-        let crit_val = super::evaluate_expression(ctx, current_sheet, &args[i + 1]).await?;
+        let crit_val = super::evaluate_expression(ctx, current_sheet, &args[i + 1])?;
         let crit_str = to_text(&crit_val);
         let c = match parse_criteria(&crit_str) {
             Some(c) => c,
@@ -340,7 +340,7 @@ pub(crate) async fn eval_countifs(
     Ok(CellValue::Int(count))
 }
 
-pub(crate) async fn eval_averageifs(
+pub(crate) fn eval_averageifs(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -351,19 +351,19 @@ pub(crate) async fn eval_averageifs(
         ));
     }
 
-    let avg_range = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
+    let avg_range = flatten_range_expr(ctx, current_sheet, &args[0])?;
     let mut crit_ranges: Vec<FlatRange> = Vec::new();
     let mut crits: Vec<Criteria> = Vec::new();
 
     let mut i = 1;
     while i + 1 < args.len() {
-        let r = flatten_range_expr(ctx, current_sheet, &args[i]).await?;
+        let r = flatten_range_expr(ctx, current_sheet, &args[i])?;
         if r.rows != avg_range.rows || r.cols != avg_range.cols {
             return Ok(CellValue::Error(
                 "AVERAGEIFS criteria ranges must have the same size as average_range".to_string(),
             ));
         }
-        let crit_val = super::evaluate_expression(ctx, current_sheet, &args[i + 1]).await?;
+        let crit_val = super::evaluate_expression(ctx, current_sheet, &args[i + 1])?;
         let crit_str = to_text(&crit_val);
         let c = match parse_criteria(&crit_str) {
             Some(c) => c,
@@ -431,8 +431,8 @@ mod tests {
         })
     }
 
-    #[tokio::test]
-    async fn test_eval_sumif() {
+    #[test]
+    fn test_eval_sumif() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -447,15 +447,15 @@ mod tests {
 
         // SUMIF(Sheet1!A1:D1, ">20") should sum 30 + 40 = 70
         let args = vec![range_expr("Sheet1", 1, 1, 1, 4), str_expr(">20")];
-        let result = eval_sumif(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_sumif(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 70.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_sumif_with_sum_range() {
+    #[test]
+    fn test_eval_sumif_with_sum_range() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -482,15 +482,15 @@ mod tests {
             str_expr("A"),
             range_expr("Sheet1", 2, 1, 2, 4),
         ];
-        let result = eval_sumif(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_sumif(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 40.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_countif() {
+    #[test]
+    fn test_eval_countif() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -505,12 +505,12 @@ mod tests {
 
         // COUNTIF(Sheet1!A1:D1, ">20") should count 30, 40 = 2
         let args = vec![range_expr("Sheet1", 1, 1, 1, 4), str_expr(">20")];
-        let result = eval_countif(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_countif(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(2));
     }
 
-    #[tokio::test]
-    async fn test_eval_countif_text() {
+    #[test]
+    fn test_eval_countif_text() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -525,12 +525,12 @@ mod tests {
 
         // COUNTIF(Sheet1!A1:D1, "A*") should count Apple, Apricot = 2
         let args = vec![range_expr("Sheet1", 1, 1, 1, 4), str_expr("A*")];
-        let result = eval_countif(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_countif(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(2));
     }
 
-    #[tokio::test]
-    async fn test_eval_averageif() {
+    #[test]
+    fn test_eval_averageif() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -545,15 +545,15 @@ mod tests {
 
         // AVERAGEIF(Sheet1!A1:D1, ">20") should average 30, 40 = 35
         let args = vec![range_expr("Sheet1", 1, 1, 1, 4), str_expr(">20")];
-        let result = eval_averageif(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_averageif(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 35.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_averageif_no_match() {
+    #[test]
+    fn test_eval_averageif_no_match() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -562,15 +562,15 @@ mod tests {
 
         // AVERAGEIF(Sheet1!A1:B1, ">100") - no matches
         let args = vec![range_expr("Sheet1", 1, 1, 1, 2), str_expr(">100")];
-        let result = eval_averageif(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_averageif(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("no matching")),
             _ => panic!("Expected Error result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_sumifs() {
+    #[test]
+    fn test_eval_sumifs() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -597,15 +597,15 @@ mod tests {
             range_expr("Sheet1", 2, 1, 2, 4),
             str_expr("A"),
         ];
-        let result = eval_sumifs(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_sumifs(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 40.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_sumifs_multiple_criteria() {
+    #[test]
+    fn test_eval_sumifs_multiple_criteria() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -642,15 +642,15 @@ mod tests {
             range_expr("Sheet1", 3, 1, 3, 4),
             num_expr(2.0),
         ];
-        let result = eval_sumifs(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_sumifs(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 30.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_countifs() {
+    #[test]
+    fn test_eval_countifs() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -678,12 +678,12 @@ mod tests {
             range_expr("Sheet1", 2, 1, 2, 4),
             num_expr(2.0),
         ];
-        let result = eval_countifs(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_countifs(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(1));
     }
 
-    #[tokio::test]
-    async fn test_eval_averageifs() {
+    #[test]
+    fn test_eval_averageifs() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -710,15 +710,15 @@ mod tests {
             range_expr("Sheet1", 2, 1, 2, 4),
             str_expr("A"),
         ];
-        let result = eval_averageifs(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_averageifs(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 20.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_minifs() {
+    #[test]
+    fn test_eval_minifs() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -745,15 +745,15 @@ mod tests {
             range_expr("Sheet1", 2, 1, 2, 4),
             str_expr("A"),
         ];
-        let result = eval_minifs(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_minifs(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 10.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_maxifs() {
+    #[test]
+    fn test_eval_maxifs() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -780,33 +780,33 @@ mod tests {
             range_expr("Sheet1", 2, 1, 2, 4),
             str_expr("A"),
         ];
-        let result = eval_maxifs(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_maxifs(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 30.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_sumif_wrong_args() {
+    #[test]
+    fn test_eval_sumif_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
         let args = vec![num_expr(1.0)];
-        let result = eval_sumif(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_sumif(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 2 or 3 arguments")),
             _ => panic!("Expected Error result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_countif_wrong_args() {
+    #[test]
+    fn test_eval_countif_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
         let args = vec![num_expr(1.0)];
-        let result = eval_countif(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_countif(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 2 arguments")),
             _ => panic!("Expected Error result"),

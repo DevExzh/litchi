@@ -17,7 +17,6 @@ use crate::sheet_metadata::SheetMetadata;
 use crate::source_limits::SourceLimits;
 use crate::worksheet::Worksheet;
 use litchi_cfb::OleFile;
-use litchi_core::sheet::Result as SheetResult;
 use std::io::{Read, Seek};
 use std::sync::Arc;
 
@@ -625,6 +624,7 @@ impl<R: Read + Seek> Reader<R> {
 impl<R: Read + Seek + std::fmt::Debug + Send + Sync> litchi_core::sheet::WorkbookTrait
     for Reader<R>
 {
+    type Error = Error;
     /// Worksheets are borrowed from the reader: zero-copy.
     type Worksheet<'a>
         = &'a Worksheet
@@ -635,11 +635,9 @@ impl<R: Read + Seek + std::fmt::Debug + Send + Sync> litchi_core::sheet::Workboo
     where
         Self: 'a;
 
-    fn active_worksheet(&self) -> SheetResult<&Worksheet> {
+    fn active_worksheet(&self) -> Result<&Worksheet> {
         if self.worksheets.is_empty() {
-            return Err(Box::new(Error::WorksheetNotFound(
-                "No worksheets found".to_string(),
-            )));
+            return Err(Error::WorksheetNotFound("No worksheets found".to_string()));
         }
         let index = self.active_worksheet_position().unwrap_or(0);
         Ok(&self.worksheets[index])
@@ -650,20 +648,20 @@ impl<R: Read + Seek + std::fmt::Debug + Send + Sync> litchi_core::sheet::Workboo
         &self.worksheet_names
     }
 
-    fn worksheet_by_name(&self, name: &str) -> SheetResult<&Worksheet> {
+    fn worksheet_by_name(&self, name: &str) -> Result<&Worksheet> {
         for worksheet in &self.worksheets {
             if names_equal(litchi_core::sheet::Worksheet::name(worksheet), name) {
                 return Ok(worksheet);
             }
         }
-        Err(Box::new(Error::WorksheetNotFound(name.to_string())))
+        Err(Error::WorksheetNotFound(name.to_string()))
     }
 
-    fn worksheet_by_index(&self, index: usize) -> SheetResult<&Worksheet> {
+    fn worksheet_by_index(&self, index: usize) -> Result<&Worksheet> {
         if index >= self.worksheets.len() {
-            return Err(Box::new(Error::WorksheetNotFound(format!(
+            return Err(Error::WorksheetNotFound(format!(
                 "Index {index} out of bounds"
-            ))));
+            )));
         }
         Ok(&self.worksheets[index])
     }
@@ -696,7 +694,7 @@ pub struct Worksheets<'a> {
 }
 
 impl<'a> Iterator for Worksheets<'a> {
-    type Item = SheetResult<&'a Worksheet>;
+    type Item = Result<&'a Worksheet>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.worksheets.next().map(Ok)

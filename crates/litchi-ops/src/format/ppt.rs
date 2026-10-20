@@ -11,14 +11,13 @@
 //!
 //! Both retain the canonical immutable PPT owner and its owned presentation
 //! projection. The native owner preserves the original CFB index and source,
-//! so a text editor can be built at the first edit without reopening it.
+//! so the first edit starts from it without reopening it.
 
 use std::io::{Cursor, Write};
 use std::sync::Arc;
 
 use litchi_cfb::OleFile;
-use litchi_core::{FileFormat, Metadata, OwnedSource, ReadAt};
-use litchi_ppt::text_edit::{self, SourceSnapshot};
+use litchi_core::{FileFormat, Metadata};
 use litchi_ppt::{Package, SourceBackedPackage, SourceLimits};
 
 use super::LegacyOpen;
@@ -803,51 +802,6 @@ impl Ppt {
         &self.0.presentation
     }
 
-    /// Builds the source-backed text editor over the retained source
-    /// (L-PPT-1), without indexing the container again.
-    ///
-    /// Returns `Ok(None)` when the source was released at open. The editor's
-    /// protected-container refusal and complete-artifact fingerprint run
-    /// here, at the first edit. After
-    /// [`Signed::unsign`](crate::Signed::unsign) the editor is built over a
-    /// copy of the input whose signature storages the signature leaf removed
-    /// (`litchi_sign::cfb::Editor::clear`, record 0013), so a commit from it
-    /// carries no signature.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Code::DocumentProtected`](crate::Code::DocumentProtected)
-    /// while the presentation is still signed, with a suggestion naming
-    /// `Signed::unsign`, and the leaf's typed refusal otherwise.
-    #[cfg_attr(not(test), expect(dead_code, reason = "edit verbs arrive in M2"))]
-    pub(crate) fn text_editor(&self) -> Result<Option<SourceSnapshot>> {
-        if self.0.signature() == Signature::Signed {
-            return Err(signature::refusal(FileFormat::Ppt));
-        }
-        let options = text_edit::SourceBackedOptions {
-            source_limits: self.0.source_limits,
-            ..text_edit::SourceBackedOptions::default()
-        };
-        if self.0.signature() == Signature::RemovalAuthorized {
-            let shared = match &self.0.owner {
-                PptOwner::Source(package) | PptOwner::Eager(package) => package.shared_ole_file(),
-                PptOwner::Released => return Ok(None),
-            };
-            let bytes = signature::unsign_compound_file(
-                signature::compound_file_bytes(shared)?,
-                litchi_sign::cfb::Format::Ppt,
-            )?;
-            let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes));
-            return Ok(Some(SourceSnapshot::open_with_options(source, options)?));
-        }
-        Ok(match &self.0.owner {
-            PptOwner::Source(package) | PptOwner::Eager(package) => Some(
-                SourceSnapshot::from_shared(package.shared_ole_file_arc(), options)?,
-            ),
-            PptOwner::Released => None,
-        })
-    }
-
     /// The length of the retained in-memory input, if the byte route
     /// retained one.
     #[cfg(test)]
@@ -894,7 +848,6 @@ mod tests {
 
     use super::*;
     use crate::detect::{DetectedFormat, detect_format_smart};
-    use litchi_core::Position;
     use litchi_ole_common::property_set::PropertySetReader;
     use litchi_ppt::raw::Reader;
     use std::path::PathBuf;
@@ -1053,33 +1006,43 @@ mod tests {
 
         let released = open_bytes(bytes, &OpenOptions::default().retain_source(false)).unwrap();
         assert_eq!(released.retained_input_len(), None);
-        assert!(released.text_editor().unwrap().is_none());
+        assert_eq!(
+            released.editable_package().unwrap_err().code(),
+            Code::UnsupportedCapability
+        );
         assert_eq!(released.text().unwrap(), retained.text().unwrap());
     }
 
-    /// Every shape text the editor resolves equals the fresh positional
-    /// open's, refusals included; returns how many resolved.
-    fn assert_editor_reads_like(
-        editor: &SourceSnapshot,
-        oracle: &SourceSnapshot,
-        ppt: &Ppt,
-    ) -> usize {
-        assert_eq!(editor.fingerprint(), oracle.fingerprint());
-        assert_eq!(editor.len(), oracle.len());
-        let mut resolved = 0_usize;
-        for (slide, shapes) in ppt.reader().slides().unwrap().iter().enumerate() {
-            for shape in 0..shapes.shapes().unwrap().len() {
-                let target = text_edit::Target::new(Position::new(slide), Position::new(shape));
-                let (read, expected) = (editor.read_text(target), oracle.read_text(target));
-                assert_eq!(format!("{read:?}"), format!("{expected:?}"), "{target:?}");
-                resolved += usize::from(read.is_ok());
-            }
-        }
-        resolved
+    /// Every shape text of the editable package equals the leaf's fresh
+    /// open; returns how many shapes carry text.
+    fn assert_package_reads_like(package: &Package, oracle: &[u8]) -> usize {
+        let texts = |package: &Package| -> Vec<Vec<String>> {
+            package
+                .presentation()
+                .unwrap()
+                .slides()
+                .unwrap()
+                .iter()
+                .map(|slide| {
+                    slide
+                        .shapes()
+                        .unwrap()
+                        .iter()
+                        .map(|shape| shape.text().unwrap_or_default())
+                        .collect()
+                })
+                .collect()
+        };
+        let expected = texts(&Package::from_bytes(oracle).unwrap());
+        let read = texts(package);
+        assert_eq!(read, expected);
+        read.iter()
+            .flatten()
+            .filter(|text| !text.is_empty())
+            .count()
     }
 
-    /// A presentation whose text boxes the narrow source-backed editor
-    /// admits; the corpus fixtures carry dependency records it refuses.
+    /// A presentation with three text boxes on each of two slides.
     fn editable_presentation() -> Vec<u8> {
         let mut writer = litchi_ppt::writer::Builder::new();
         for slide_index in 0..2 {
@@ -1096,44 +1059,39 @@ mod tests {
     }
 
     #[test]
-    fn editors_are_built_from_the_retained_source() {
+    fn editable_packages_are_the_retained_source() {
         let bytes = editable_presentation();
-        let oracle = SourceSnapshot::open(Arc::new(OwnedSource::new(bytes.clone()))).unwrap();
 
         let from_bytes = open_bytes(bytes.clone(), &OpenOptions::default()).unwrap();
-        let editor = from_bytes.text_editor().unwrap().expect("retained source");
-        assert_eq!(assert_editor_reads_like(&editor, &oracle, &from_bytes), 6);
-        // Built over the retained source, not over a copy: the sealed
-        // source's process-unique identity carries over.
+        let package = from_bytes.editable_package().unwrap();
+        assert_eq!(assert_package_reads_like(&package, &bytes), 6);
+        // The retained owner itself, not a copy: the sealed source's
+        // process-unique identity carries over.
         let PptOwner::Eager(shared) = &from_bytes.0.owner else {
             panic!("byte route did not retain its source");
         };
         assert_eq!(
-            editor.source_version(),
+            package.source_version().unwrap(),
             shared.shared_ole_file().captured_source_version()
         );
-
-        // The corpus is refused by the narrow editor, as by a fresh open.
-        let refused = open_bytes(fixture("text_shapes.ppt"), &OpenOptions::default()).unwrap();
-        let editor = refused.text_editor().unwrap().expect("retained source");
-        let fresh =
-            SourceSnapshot::open(Arc::new(OwnedSource::new(fixture("text_shapes.ppt")))).unwrap();
-        assert_eq!(assert_editor_reads_like(&editor, &fresh, &refused), 0);
 
         #[cfg(any(unix, windows))]
         {
             let file = tempfile::NamedTempFile::new().unwrap();
             std::fs::write(file.path(), &bytes).unwrap();
             let from_path = open_file(file.path(), &OpenOptions::default()).unwrap();
-            let editor = from_path.text_editor().unwrap().expect("retained package");
-            assert_eq!(assert_editor_reads_like(&editor, &oracle, &from_path), 6);
-            let PptOwner::Source(package) = &from_path.0.owner else {
+            let package = from_path.editable_package().unwrap();
+            assert_eq!(assert_package_reads_like(&package, &bytes), 6);
+            let PptOwner::Source(retained) = &from_path.0.owner else {
                 panic!("filesystem route did not retain its package");
             };
-            assert_eq!(editor.source_version(), package.source_version().unwrap());
+            assert_eq!(
+                package.source_version().unwrap(),
+                retained.source_version().unwrap()
+            );
             let released =
                 open_file(file.path(), &OpenOptions::default().retain_source(false)).unwrap();
-            assert!(released.text_editor().unwrap().is_none());
+            assert!(released.editable_package().is_err());
         }
     }
 

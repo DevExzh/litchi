@@ -1,4 +1,4 @@
-//! Semantic chart-package transaction and immutable snapshots.
+//! A standalone Graph chart-package draft and its borrowed read view.
 
 use litchi_ograph::Limits;
 use litchi_ograph::chart::{Chart as SemanticChart, Context};
@@ -6,20 +6,20 @@ use litchi_ograph::chart::{Chart as SemanticChart, Context};
 use super::codec;
 use crate::package::{Error, Result};
 
-/// An immutable view of one transaction state.
+/// A borrowed read view of one draft state.
 ///
-/// The workbook bytes and chart reference borrow the editor, so a snapshot is
-/// allocation-free and becomes unusable as soon as its editor is mutably
+/// The workbook bytes and chart reference borrow the draft, so a view is
+/// allocation-free and becomes unusable as soon as its draft is mutably
 /// borrowed. The chart reference is still the host-neutral typed view from
 /// `litchi-ograph`; no unsupported semantic authoring is implied.
 #[derive(Debug, Clone, Copy)]
-pub struct Snapshot<'a> {
+pub struct View<'a> {
     workbook: &'a [u8],
     chart: litchi_ograph::chart::Ref<'a>,
     dirty: bool,
 }
 
-impl Snapshot<'_> {
+impl View<'_> {
     /// Exact current `Workbook` stream bytes.
     #[must_use]
     pub fn workbook(&self) -> &[u8] {
@@ -46,23 +46,29 @@ impl Snapshot<'_> {
         SemanticChart::parse(self.chart, Context::graph()).map_err(Into::into)
     }
 
-    /// Whether an edit has been applied since the transaction was opened.
+    /// Whether a chart replacement has been staged since the draft was
+    /// opened.
     #[must_use]
     pub const fn is_dirty(&self) -> bool {
         self.dirty
     }
 }
 
-/// Bounded transaction for a standalone Microsoft Graph OLE2 chart package.
+/// A bounded draft of one standalone Microsoft Graph OLE2 chart package.
+///
+/// The draft edits a package value and returns its bytes; it never writes a
+/// presentation. Stage the result into a presentation with
+/// [`super::super::Graph::replace_package`] on an
+/// [`crate::embedded::object::Edit`].
 ///
 /// `[MS-OGRAPH]` 2.1.7.3 requires exactly one `Workbook` stream containing a
-/// globals substream followed by one chart-sheet substream. This editor
+/// globals substream followed by one chart-sheet substream. This draft
 /// replaces only that chart-sheet byte range, then rebuilds and revalidates the
 /// standalone OLE2 topology. The operation does not edit `[MS-PPT]`
 /// `ExOleObjStg` records or the `[MS-ODRAW]` picture-frame shape that hosts the
 /// package.
 #[derive(Debug)]
-pub struct PackageEditor {
+pub struct GraphPackage {
     original: Option<Vec<u8>>,
     workbook: Vec<u8>,
     comp_obj: Option<Vec<u8>>,
@@ -73,7 +79,7 @@ pub struct PackageEditor {
     dirty: bool,
 }
 
-impl PackageEditor {
+impl GraphPackage {
     /// Open a validated package with conservative `OGraph` limits.
     ///
     /// # Errors
@@ -103,7 +109,7 @@ impl PackageEditor {
         })
     }
 
-    /// Resource bounds applied to this transaction.
+    /// Resource bounds applied to this draft.
     #[must_use]
     pub const fn limits(&self) -> Limits {
         self.limits
@@ -125,7 +131,7 @@ impl PackageEditor {
     }
 
     /// Validate and own the current chart through the MS-OGRAPH semantic
-    /// model without changing transaction state.
+    /// model without changing the draft.
     ///
     /// # Errors
     ///
@@ -135,13 +141,13 @@ impl PackageEditor {
             .map_err(Into::into)
     }
 
-    /// Capture the current state without copying its bounded buffers.
+    /// Borrow the current state without copying its bounded buffers.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn snapshot(&self) -> Result<Snapshot<'_>> {
-        Ok(Snapshot {
+    pub fn view(&self) -> Result<View<'_>> {
+        Ok(View {
             workbook: &self.workbook,
             chart: self.chart_ref()?,
             dirty: self.dirty,
@@ -151,8 +157,8 @@ impl PackageEditor {
     /// Replace the one Graph-framed chart stream atomically.
     ///
     /// The input stream is checked for Graph BIFF framing and the complete
-    /// candidate OLE2 package is rebuilt and validated before this editor is
-    /// changed. This is a package transaction, not complete native chart
+    /// candidate OLE2 package is rebuilt and validated before this draft is
+    /// changed. This is a package rewrite, not complete native chart
     /// authoring: the existing `OGraph` model remains the authority for the
     /// supported chart-stream grammar and opaque records remain inert.
     ///
@@ -177,12 +183,13 @@ impl PackageEditor {
         let end = self.chart_end;
         if self.workbook.get(start..end).is_none() {
             return Err(Error::Corrupted(
-                "chart transaction range no longer matches Workbook".to_string(),
+                "chart draft range no longer matches Workbook".to_string(),
             ));
         }
-        let suffix_len = self.workbook.len().checked_sub(end).ok_or_else(|| {
-            Error::Corrupted("chart transaction range exceeds Workbook".to_string())
-        })?;
+        let suffix_len =
+            self.workbook.len().checked_sub(end).ok_or_else(|| {
+                Error::Corrupted("chart draft range exceeds Workbook".to_string())
+            })?;
         let new_end = start
             .checked_add(bytes.len())
             .ok_or(litchi_ograph::Error::SizeOverflow {
@@ -214,7 +221,7 @@ impl PackageEditor {
         candidate.extend_from_slice(&self.workbook[end..]);
 
         // Rebuilding before assignment is the atomicity boundary, so a CFB or
-        // topology failure cannot partially update the editor.
+        // topology failure cannot partially update the draft.
         let _ = codec::write(
             &candidate,
             self.comp_obj.as_deref(),
@@ -250,12 +257,13 @@ impl PackageEditor {
         self.replace_chart(stream)
     }
 
-    /// Commit the current transaction into a standalone OLE2 package.
+    /// The draft's standalone OLE2 package bytes: the exact source bytes
+    /// when no replacement was staged.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Vec<u8>> {
+    pub fn into_bytes(self) -> Result<Vec<u8>> {
         if let Some(original) = self.original {
             return Ok(original);
         }
@@ -265,15 +273,6 @@ impl PackageEditor {
             self.ole.as_deref(),
             self.limits,
         )
-    }
-
-    /// Commit alias matching the package writers' move-owned finish pattern.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn finish(self) -> Result<Vec<u8>> {
-        self.commit()
     }
 
     fn chart_ref(&self) -> Result<litchi_ograph::chart::Ref<'_>> {
@@ -290,13 +289,13 @@ impl PackageEditor {
         let chart_len = self
             .chart_end
             .checked_sub(self.chart_start)
-            .ok_or_else(|| Error::Corrupted("chart transaction range is reversed".to_string()))?;
+            .ok_or_else(|| Error::Corrupted("chart draft range is reversed".to_string()))?;
         if chart.kind() != litchi_ograph::chart::Kind::Graph
             || chart.offset() != self.chart_start
             || chart.as_bytes().len() != chart_len
         {
             return Err(Error::Corrupted(
-                "chart transaction range no longer matches Graph Workbook".to_string(),
+                "chart draft range no longer matches Graph Workbook".to_string(),
             ));
         }
         Ok(chart)

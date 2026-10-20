@@ -16089,13 +16089,10 @@ fn verify_ppt_picture_limit_gates(
     };
     let pictures_range = ppt_picture_payload_range(archive, &pictures_payload)?;
     let mut eager =
-        litchi_ppt::raw::Reader::from_reader_with_limits(Cursor::new(archive.to_vec()), exact)?;
-    eager.presentation_with_limits(exact)?;
-    let source = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(
-        Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())),
-        exact,
-    )?;
-    source.presentation_with_limits(exact)?;
+        litchi_ppt::raw::Reader::from_reader_with_options(Cursor::new(archive.to_vec()), litchi_ppt::OpenOptions::new().source_limits(exact))?;
+    eager.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(exact))?;
+    let source = litchi_ppt::SourceBackedPackage::from_read_at_with_options(Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())), litchi_ppt::OpenOptions::new().source_limits(exact))?;
+    source.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(exact))?;
 
     let package_under = ppt_source_limits_with(
         exact,
@@ -16106,18 +16103,12 @@ fn verify_ppt_picture_limit_gates(
         exact.max_entry_bytes(),
         exact.max_aggregate_bytes(),
     )?;
-    if litchi_ppt::raw::Reader::from_reader_with_limits(
-        Cursor::new(archive.to_vec()),
-        package_under,
-    )
+    if litchi_ppt::raw::Reader::from_reader_with_options(Cursor::new(archive.to_vec()), litchi_ppt::OpenOptions::new().source_limits(package_under))
     .is_ok()
     {
         return Err("PPT eager package limit accepted one byte under package size".into());
     }
-    if litchi_ppt::SourceBackedPackage::from_read_at_with_limits(
-        Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())),
-        package_under,
-    )
+    if litchi_ppt::SourceBackedPackage::from_read_at_with_options(Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())), litchi_ppt::OpenOptions::new().source_limits(package_under))
     .is_ok()
     {
         return Err("PPT source-backed package limit accepted one byte under package size".into());
@@ -16133,17 +16124,17 @@ fn verify_ppt_picture_limit_gates(
         exact.max_aggregate_bytes(),
     )?;
     let mut eager =
-        litchi_ppt::raw::Reader::from_reader_with_limits(Cursor::new(archive.to_vec()), exact)?;
-    if eager.presentation_with_limits(pictures_under).is_ok() {
+        litchi_ppt::raw::Reader::from_reader_with_options(Cursor::new(archive.to_vec()), litchi_ppt::OpenOptions::new().source_limits(exact))?;
+    if eager.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(pictures_under)).is_ok() {
         return Err("PPT eager Pictures limit accepted one byte under stream size".into());
     }
     let source = Arc::new(InstrumentedSource::new(
         archive.to_vec(),
         vec![pictures_range],
     ));
-    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source.clone(), exact)?;
+    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(source.clone(), litchi_ppt::OpenOptions::new().source_limits(exact))?;
     source.reset();
-    if package.presentation_with_limits(pictures_under).is_ok() {
+    if package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(pictures_under)).is_ok() {
         return Err("PPT source-backed Pictures limit accepted one byte under stream size".into());
     }
     let snapshot = source.snapshot();
@@ -16217,8 +16208,8 @@ fn time_ppt_pictures_eager(
     let cursor = Cursor::new(archive);
     if phase == "presentation_open_no_image_query" {
         let started = Instant::now();
-        let mut package = litchi_ppt::raw::Reader::from_reader_with_limits(cursor, source_limits)?;
-        let presentation = package.presentation_with_limits(source_limits)?;
+        let mut package = litchi_ppt::raw::Reader::from_reader_with_options(cursor, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
         std::hint::black_box(&presentation);
         let duration = started.elapsed();
         if !presentation.has_pictures() {
@@ -16229,8 +16220,8 @@ fn time_ppt_pictures_eager(
 
     if phase == "fresh_open_plus_cold_all_images_query" {
         let started = Instant::now();
-        let mut package = litchi_ppt::raw::Reader::from_reader_with_limits(cursor, source_limits)?;
-        let presentation = package.presentation_with_limits(source_limits)?;
+        let mut package = litchi_ppt::raw::Reader::from_reader_with_options(cursor, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
         let images = presentation.images()?;
         std::hint::black_box(&images);
         let duration = started.elapsed();
@@ -16238,8 +16229,8 @@ fn time_ppt_pictures_eager(
         return Ok(duration);
     }
 
-    let mut package = litchi_ppt::raw::Reader::from_reader_with_limits(cursor, source_limits)?;
-    let presentation = package.presentation_with_limits(source_limits)?;
+    let mut package = litchi_ppt::raw::Reader::from_reader_with_options(cursor, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+    let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
     if cached_repeat {
         let first = presentation.images()?;
         verify_ppt_picture_images(&first)?;
@@ -16261,8 +16252,8 @@ fn time_ppt_pictures_source_backed(
     if phase == "presentation_open_no_image_query" {
         let started = Instant::now();
         let package =
-            litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source, source_limits)?;
-        let presentation = package.presentation_with_limits(source_limits)?;
+            litchi_ppt::SourceBackedPackage::from_read_at_with_options(source, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
         std::hint::black_box(&presentation);
         let duration = started.elapsed();
         if !presentation.has_pictures() {
@@ -16274,8 +16265,8 @@ fn time_ppt_pictures_source_backed(
     if phase == "fresh_open_plus_cold_all_images_query" {
         let started = Instant::now();
         let package =
-            litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source, source_limits)?;
-        let presentation = package.presentation_with_limits(source_limits)?;
+            litchi_ppt::SourceBackedPackage::from_read_at_with_options(source, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
         let images = presentation.images()?;
         std::hint::black_box(&images);
         let duration = started.elapsed();
@@ -16283,8 +16274,8 @@ fn time_ppt_pictures_source_backed(
         return Ok(duration);
     }
 
-    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source, source_limits)?;
-    let presentation = package.presentation_with_limits(source_limits)?;
+    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(source, litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+    let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
     if cached_repeat {
         let first = presentation.images()?;
         verify_ppt_picture_images(&first)?;
@@ -16310,11 +16301,8 @@ fn collect_ppt_pictures_source_evidence(
     ));
 
     if phase == "presentation_open_no_image_query" {
-        let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(
-            source.clone(),
-            source_limits,
-        )?;
-        let presentation = package.presentation_with_limits(source_limits)?;
+        let package = litchi_ppt::SourceBackedPackage::from_read_at_with_options(source.clone(), litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+        let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
         if !presentation.has_pictures() {
             return Err("PPT source-backed evidence open lost Pictures descriptor".into());
         }
@@ -16322,8 +16310,8 @@ fn collect_ppt_pictures_source_evidence(
     }
 
     let package =
-        litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source.clone(), source_limits)?;
-    let presentation = package.presentation_with_limits(source_limits)?;
+        litchi_ppt::SourceBackedPackage::from_read_at_with_options(source.clone(), litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
+    let presentation = package.presentation_with_options(litchi_ppt::OpenOptions::new().source_limits(source_limits))?;
     if phase != "fresh_open_plus_cold_all_images_query" {
         source.reset();
     }
@@ -31818,13 +31806,13 @@ fn run_semantic_ppt(
     let selected = (linear / boxes_per_slide, linear % boxes_per_slide);
     let target = Target::new(Position::new(selected.0), Position::new(selected.1));
     let expected_changed = if case == Case::PptSemanticOneEditSave {
-        let source = Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_ppt::Package::from_bytes(&corpus.archive)?;
         let mut edit = source.edit()?;
         edit.set_shape_text(
             target,
             updated_writer_text("ppt", selected.0, selected.1, 0),
         )?;
-        edit.commit()?.snapshot().bytes().to_vec()
+        edit.commit()?.package().to_bytes()?
     } else {
         corpus.archive.clone()
     };
@@ -31906,7 +31894,9 @@ fn run_semantic_ppt(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::PptSemanticNoopEditSave | Case::PptSemanticOneEditSave => {
-                let source = Snapshot::from_bytes(corpus.archive.clone())?;
+                // Record 0357: the native slide-order owner is crate-private;
+                // the canonical primary edit drives the same publication.
+                let source = litchi_ppt::Package::from_bytes(&corpus.archive)?;
                 let updated = case == Case::PptSemanticOneEditSave;
                 let started = Instant::now();
                 let mut edit = source.edit()?;
@@ -31917,31 +31907,21 @@ fn run_semantic_ppt(
                     )?;
                 }
                 let commit = edit.commit()?;
-                let bytes = commit.snapshot().bytes().to_vec();
+                let bytes = commit.package().to_bytes()?;
                 let duration = started.elapsed();
-                if commit.patch().is_empty() == updated
-                    || commit.patch().shape_text_changes().len() != usize::from(updated)
+                if commit.patch().is_noop() == updated
+                    || commit.diagnostics().changed() != updated
+                    || commit.patch().operation_count() != usize::from(updated)
                     || bytes != expected_changed
                 {
                     return Err("semantic PPT edit/save has unexpected publication state".into());
                 }
-                if updated {
-                    let [change] = commit.patch().shape_text_changes() else {
-                        return Err("semantic PPT edit patch lacks its one shape change".into());
-                    };
-                    if change.target() != target
-                        || change.before() != writer_text("ppt", selected.0, selected.1, 0)
-                        || change.after() != updated_writer_text("ppt", selected.0, selected.1, 0)
-                    {
-                        return Err("semantic PPT shape change differs from specification".into());
-                    }
-                }
-                let applied = commit.patch().apply(&source)?;
-                if applied.bytes() != commit.snapshot().bytes() {
+                let applied = source.apply(commit.patch())?.into_package();
+                if applied.to_bytes()? != bytes {
                     return Err("semantic PPT exact patch replay differs from commit".into());
                 }
-                let restored = commit.patch().inverse().apply(&applied)?;
-                if restored.bytes() != source.bytes() {
+                let restored = applied.apply(&commit.patch().inverse())?.into_package();
+                if restored.to_bytes()? != corpus.archive {
                     return Err("semantic PPT inverse did not restore exact source bytes".into());
                 }
                 verify_semantic_ppt(&bytes, shape, updated.then_some(selected))?;
@@ -31962,7 +31942,7 @@ fn run_ppt_text_edit_one_edit_save(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
-    use litchi_ppt::text_edit::{Snapshot, Target};
+    use litchi_ppt::text_edit::Target;
 
     let shape = writer_shape(corpus)?;
     if shape == WriterShape::PayloadHeavy {
@@ -31975,54 +31955,66 @@ fn run_ppt_text_edit_one_edit_save(
     let source_text = writer_text("ppt", selected.0, selected.1, 0);
     let replacement = updated_writer_text("ppt", selected.0, selected.1, 0);
 
+    // Record 0357: the focused text owner is crate-private; the canonical
+    // primary edit's set_shape_text is the public text-edit transaction.
+    let shape_text = |package: &litchi_ppt::Package| -> Result<String, Box<dyn Error>> {
+        Ok(package
+            .presentation()?
+            .slide_at(selected.0)?
+            .ok_or("PPT text-edit selected slide is missing")?
+            .shapes()?
+            .get(selected.1)
+            .ok_or("PPT text-edit selected shape is missing")?
+            .text()?)
+    };
     let expected_changed = {
-        let source = Snapshot::from_bytes(corpus.archive.clone())?;
-        let mut edit = source.edit_text(target)?;
-        if edit.text() != source_text {
+        let source = litchi_ppt::Package::from_bytes(&corpus.archive)?;
+        if shape_text(&source)? != source_text {
             return Err("PPT text-edit source differs from writer specification".into());
         }
-        edit.set_text(replacement.clone())?;
-        edit.commit()?.snapshot().bytes().to_vec()
+        let mut edit = source.edit()?;
+        edit.set_shape_text(target, replacement.clone())?;
+        edit.commit()?.package().to_bytes()?
     };
 
     let mut elapsed = Vec::with_capacity(samples);
     let mut final_publication = None;
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        // Snapshot construction is deliberately outside the measured interval:
+        // Package construction is deliberately outside the measured interval:
         // this case attributes the public text-edit transaction itself.
-        let source = Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_ppt::Package::from_bytes(&corpus.archive)?;
         let started = Instant::now();
-        let mut edit = source.edit_text(target)?;
-        edit.set_text(replacement.clone())?;
+        let mut edit = source.edit()?;
+        edit.set_shape_text(target, replacement.clone())?;
         let commit = edit.commit()?;
         let duration = started.elapsed();
 
-        if commit.patch().is_empty()
+        if commit.patch().is_noop()
             || commit.patch().before() != corpus.archive
             || commit.patch().after() != expected_changed
-            || commit.snapshot().bytes() != expected_changed
+            || commit.package().to_bytes()? != expected_changed
         {
             return Err("PPT text-edit publication differs from specification".into());
         }
-        std::hint::black_box(commit.snapshot());
+        std::hint::black_box(commit.package());
         final_publication = Some((source, commit));
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
 
     let (source, commit) = final_publication.ok_or("PPT text-edit case produced no publication")?;
-    let applied = commit.patch().apply(&source)?;
-    if applied.bytes() != commit.snapshot().bytes() {
+    let published = commit.package().to_bytes()?;
+    let applied = source.apply(commit.patch())?.into_package();
+    if applied.to_bytes()? != published {
         return Err("PPT text-edit exact patch replay differs from commit".into());
     }
-    let restored = commit.patch().inverse().apply(&applied)?;
-    if restored.bytes() != source.bytes() {
+    let restored = applied.apply(&commit.patch().inverse())?.into_package();
+    if restored.to_bytes()? != corpus.archive {
         return Err("PPT text-edit inverse did not restore exact source bytes".into());
     }
-    let readback = commit.snapshot().edit_text(target)?;
-    if readback.target() != target || readback.text() != replacement {
+    if shape_text(commit.package())? != replacement {
         return Err("PPT text-edit public readback differs from replacement".into());
     }
-    verify_semantic_ppt(commit.snapshot().bytes(), shape, Some(selected))?;
+    verify_semantic_ppt(&published, shape, Some(selected))?;
 
     Ok(result(Case::PptTextEditOneEditSave, corpus, elapsed, None))
 }

@@ -3,8 +3,8 @@
 use std::collections::HashSet;
 use std::fmt::Write as FmtWrite;
 
+use crate::BoxedResult as SheetResult;
 use chrono::{DateTime, NaiveDateTime};
-use litchi_core::sheet::Result as SheetResult;
 use litchi_core::xml::escape_xml;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};

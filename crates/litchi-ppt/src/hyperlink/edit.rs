@@ -191,19 +191,31 @@ pub(crate) fn set_shape_click(
     shape_id: u32,
     click: Option<&[u8]>,
 ) -> Result<Option<Vec<u8>>> {
-    let mut matches = 0usize;
     let mut changed = false;
+    let rewritten = rewrite_slide_shape(slide, shape_id, &mut |shape| {
+        rewrite_shape(shape, click, &mut changed)
+    })?;
+    Ok(changed.then_some(rewritten))
+}
+
+/// Rewrite the one `OfficeArt` shape container with ID `shape_id` in the
+/// slide's single `PPDrawing` through `rewrite`; every other record keeps
+/// its bytes and the owning envelopes are re-framed.
+///
+/// # Errors
+///
+/// Refuses a slide whose drawing ownership is ambiguous, a missing shape
+/// (`ElementNotFound`) and an ambiguous shape identifier.
+pub(crate) fn rewrite_slide_shape(
+    slide: &[u8],
+    shape_id: u32,
+    rewrite: &mut dyn FnMut(&[u8]) -> Result<Vec<u8>>,
+) -> Result<Vec<u8>> {
+    let mut matches = 0usize;
     let mut drawings = 0usize;
     let rewritten = rewrite_drawings(slide, &mut |drawing| {
         drawings += 1;
-        let data = rewrite_officeart(
-            wire::payload(drawing)?,
-            shape_id,
-            click,
-            0,
-            &mut matches,
-            &mut changed,
-        )?;
+        let data = rewrite_officeart(wire::payload(drawing)?, shape_id, rewrite, 0, &mut matches)?;
         Ok(wire::rebuild(drawing, &data)?)
     })?;
     if drawings != 1 {
@@ -215,7 +227,7 @@ pub(crate) fn set_shape_click(
         0 => Err(EditError::Refused(Refusal::ElementNotFound {
             element: "shape",
         })),
-        1 => Ok(changed.then_some(rewritten)),
+        1 => Ok(rewritten),
         _ => Err(EditError::Refused(Refusal::UnsupportedElement {
             element: ELEMENT,
             reason: "the shape identifier is ambiguous in the drawing",
@@ -243,10 +255,9 @@ fn rewrite_drawings(
 fn rewrite_officeart(
     record: &[u8],
     shape_id: u32,
-    click: Option<&[u8]>,
+    rewrite: &mut dyn FnMut(&[u8]) -> Result<Vec<u8>>,
     depth: usize,
     matches: &mut usize,
-    changed: &mut bool,
 ) -> Result<Vec<u8>> {
     if depth >= 128 {
         return Err(
@@ -255,7 +266,7 @@ fn rewrite_officeart(
     }
     if wire::record_type(record)? == SP_CONTAINER && wire::shape_id_of(record)? == Some(shape_id) {
         *matches += 1;
-        return rewrite_shape(record, click, changed);
+        return rewrite(record);
     }
     if wire::record_version(record)? != 0x0F {
         return Ok(record.to_vec());
@@ -265,10 +276,9 @@ fn rewrite_officeart(
         data.extend_from_slice(&rewrite_officeart(
             child?,
             shape_id,
-            click,
+            rewrite,
             depth + 1,
             matches,
-            changed,
         )?);
     }
     Ok(wire::rebuild(record, &data)?)

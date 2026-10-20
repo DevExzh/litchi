@@ -10,8 +10,8 @@ use super::validation::{
     mark_once, optional_bool, optional_f64, optional_i32, optional_u8, optional_u32, required_bool,
     required_f64, required_i32, required_string, required_u32, validate_cell_range, validate_count,
 };
+use crate::BoxedResult as SheetResult;
 use crate::raw::namespace::{is_spreadsheetml_name, relationship_attribute_value};
-use litchi_core::sheet::Result as SheetResult;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};

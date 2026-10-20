@@ -1,8 +1,9 @@
-//! `PowerPoint` 9 picture-bullet collection parsing.
+//! `PowerPoint` 9 picture-bullet records: parsing, the read snapshot and the
+//! record-level staging owner behind [`super::Edit`].
 
-use super::package::{Error, Result, SourceLimits};
-use super::records::{Record, RecordParseSession};
 use crate::consts::RecordType;
+use crate::package::{Error, Result, SourceLimits};
+use crate::records::{Record, RecordParseSession};
 
 /// The highest `BlipEntityAtom` instance allowed by MS-PPT.
 pub const MAX_PICTURE_BULLET_INDEX: u16 = 0x80;
@@ -199,7 +200,7 @@ impl PictureBullet {
     ///
     /// Returns an error if the bullet exceeds `limits` or its OfficeArt
     /// record is malformed.
-    pub fn to_record_with_limits(&self, limits: PictureBulletLimits) -> Result<Record> {
+    pub(crate) fn to_record_with_limits(&self, limits: PictureBulletLimits) -> Result<Record> {
         limits.validate()?;
         validate_bullet_index(self.index, limits)?;
         validate_officeart_record(
@@ -262,7 +263,7 @@ impl PictureBulletCollection {
     ///
     /// Returns an error if the input cannot be read, is malformed, or exceeds
     /// `limits`.
-    pub fn parse_with_limits(record: &Record, limits: PictureBulletLimits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(record: &Record, limits: PictureBulletLimits) -> Result<Self> {
         limits.validate()?;
         if record.record_type != RecordType::BlipCollection9
             || record.version != 0x0f
@@ -337,7 +338,7 @@ impl PictureBulletCollection {
     ///
     /// Returns an error if the input is malformed or more than one owner is
     /// present.
-    pub fn parse_from_with_limits(
+    pub(crate) fn parse_from_with_limits(
         root: &Record,
         limits: PictureBulletLimits,
     ) -> Result<Option<Self>> {
@@ -375,7 +376,7 @@ impl PictureBulletCollection {
     ///
     /// Returns an error if the collection cannot be represented by the
     /// `BlipCollection9Container` grammar.
-    pub fn to_record_with_limits(&self, limits: PictureBulletLimits) -> Result<Record> {
+    pub(crate) fn to_record_with_limits(&self, limits: PictureBulletLimits) -> Result<Record> {
         limits.validate()?;
         if self.bullets.len() > limits.max_bullets {
             return Err(Error::ResourceLimit(
@@ -444,7 +445,7 @@ impl PictureBulletCollection {
     /// # Errors
     ///
     /// Returns an error if validation or bounded serialization fails.
-    pub fn to_bytes_with_limits(&self, limits: PictureBulletLimits) -> Result<Vec<u8>> {
+    pub(crate) fn to_bytes_with_limits(&self, limits: PictureBulletLimits) -> Result<Vec<u8>> {
         let record = self.to_record_with_limits(limits)?;
         let maximum = limits
             .max_collection_bytes
@@ -663,14 +664,18 @@ fn collect_source_picture_bullet_references(
 ) -> Result<Vec<u16>> {
     let mut references = collect_picture_bullet_references(document, limits)?;
     validate_admitted_picture_bullet_references(&references, collection)?;
-    let mut package = crate::raw::Reader::from_reader(std::io::Cursor::new(source.bytes()))?;
-    let presentation = package.presentation_with_limits(limits.records)?;
+    let mut package = crate::raw::Reader::from_reader_with_options(
+        std::io::Cursor::new(source.bytes()),
+        crate::OpenOptions::new()
+            .source_limits(limits.records.constrained_by(SourceLimits::default())),
+    )?;
+    let presentation = package.presentation()?;
     let shape_limits = crate::ShapeProgrammableTagLimits {
         max_style_payload_bytes: limits.max_collection_bytes,
         max_style_runs: limits.max_references,
         ..crate::ShapeProgrammableTagLimits::default()
     };
-    use crate::odraw::ShapeExt;
+    use crate::odraw::ShapeLimitsExt as _;
     for record in presentation
         .inner
         .parser
@@ -1017,7 +1022,10 @@ impl PictureBulletSnapshot {
     }
 
     /// Snapshot a borrowed CFB source under explicit limits.
-    pub fn parse_with_limits(bytes: &[u8], limits: PictureBulletPackageLimits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(
+        bytes: &[u8],
+        limits: PictureBulletPackageLimits,
+    ) -> Result<Self> {
         validate_picture_bullet_source_len(bytes.len(), limits)?;
         // Admit the borrowed bytes first. The owned CFB copy is retained only
         // after the live owner, record tree, and picture-bullet limits pass,
@@ -1041,7 +1049,7 @@ impl PictureBulletSnapshot {
     }
 
     /// Snapshot an owned CFB source under explicit limits.
-    pub fn from_bytes_with_limits(
+    pub(crate) fn from_bytes_with_limits(
         bytes: Vec<u8>,
         limits: PictureBulletPackageLimits,
     ) -> Result<Self> {
@@ -1049,7 +1057,10 @@ impl PictureBulletSnapshot {
         Self::from_arc(std::sync::Arc::from(bytes), limits)
     }
 
-    fn from_arc(bytes: std::sync::Arc<[u8]>, limits: PictureBulletPackageLimits) -> Result<Self> {
+    pub(crate) fn from_arc(
+        bytes: std::sync::Arc<[u8]>,
+        limits: PictureBulletPackageLimits,
+    ) -> Result<Self> {
         validate_picture_bullet_source_len(bytes.len(), limits)?;
         let admitted = admit_picture_bullet_source(&bytes, limits)?;
         Ok(Self::from_admitted(bytes, limits, admitted))
@@ -1134,14 +1145,14 @@ impl PictureBulletSnapshot {
     }
 
     /// Start an isolated picture-bullet transaction.
-    pub fn edit(&self) -> Result<PictureBulletTransaction> {
-        Ok(PictureBulletTransaction::new(self.clone()))
+    pub(crate) fn edit(&self) -> Result<RecordEdit> {
+        Ok(RecordEdit::new(self.clone()))
     }
 }
 
 /// Reversible, source-bound picture-bullet patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PictureBulletPatch {
+pub(crate) struct RecordPatch {
     base: PictureBulletRevision,
     target: PictureBulletRevision,
     before: std::sync::Arc<[u8]>,
@@ -1150,39 +1161,43 @@ pub struct PictureBulletPatch {
     limits: PictureBulletPackageLimits,
 }
 
-impl PictureBulletPatch {
+#[allow(
+    dead_code,
+    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+)]
+impl RecordPatch {
     #[must_use]
-    pub const fn base(&self) -> PictureBulletRevision {
+    pub(crate) const fn base(&self) -> PictureBulletRevision {
         self.base
     }
 
     #[must_use]
-    pub const fn target(&self) -> PictureBulletRevision {
+    pub(crate) const fn target(&self) -> PictureBulletRevision {
         self.target
     }
 
     #[must_use]
-    pub fn before_bytes(&self) -> &[u8] {
+    pub(crate) fn before_bytes(&self) -> &[u8] {
         &self.before
     }
 
     #[must_use]
-    pub fn after_bytes(&self) -> &[u8] {
+    pub(crate) fn after_bytes(&self) -> &[u8] {
         &self.after
     }
 
     #[must_use]
-    pub fn changes(&self) -> &[PictureBulletChange] {
+    pub(crate) fn changes(&self) -> &[PictureBulletChange] {
         &self.changes
     }
 
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.before == self.after
     }
 
     /// Apply this patch to its exact source, accepting an already-applied target.
-    pub fn apply(&self, current: &PictureBulletSnapshot) -> Result<PictureBulletSnapshot> {
+    pub(crate) fn apply(&self, current: &PictureBulletSnapshot) -> Result<PictureBulletSnapshot> {
         if current.revision() == self.target && current.bytes() == self.after.as_ref() {
             return Ok(current.clone());
         }
@@ -1195,12 +1210,12 @@ impl PictureBulletPatch {
     }
 
     /// Re-apply this patch.
-    pub fn redo(&self, current: &PictureBulletSnapshot) -> Result<PictureBulletSnapshot> {
+    pub(crate) fn redo(&self, current: &PictureBulletSnapshot) -> Result<PictureBulletSnapshot> {
         self.apply(current)
     }
 
     /// Undo this patch against its exact target.
-    pub fn undo(&self, current: &PictureBulletSnapshot) -> Result<PictureBulletSnapshot> {
+    pub(crate) fn undo(&self, current: &PictureBulletSnapshot) -> Result<PictureBulletSnapshot> {
         if current.revision() == self.base && current.bytes() == self.before.as_ref() {
             return Ok(current.clone());
         }
@@ -1213,7 +1228,7 @@ impl PictureBulletPatch {
     }
 
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         let mut changes = self.changes.clone();
         changes.reverse();
         Self {
@@ -1229,39 +1244,43 @@ impl PictureBulletPatch {
 
 /// Published picture-bullet transaction result.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PictureBulletCommit {
+pub(crate) struct RecordCommit {
     snapshot: PictureBulletSnapshot,
-    patch: PictureBulletPatch,
+    patch: RecordPatch,
 }
 
-impl PictureBulletCommit {
+#[allow(
+    dead_code,
+    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+)]
+impl RecordCommit {
     #[must_use]
-    pub const fn snapshot(&self) -> &PictureBulletSnapshot {
+    pub(crate) const fn snapshot(&self) -> &PictureBulletSnapshot {
         &self.snapshot
     }
 
     #[must_use]
-    pub const fn patch(&self) -> &PictureBulletPatch {
+    pub(crate) const fn patch(&self) -> &RecordPatch {
         &self.patch
     }
 
     #[must_use]
-    pub fn picture_bullets(&self) -> Option<&PictureBulletCollection> {
+    pub(crate) fn picture_bullets(&self) -> Option<&PictureBulletCollection> {
         self.snapshot.picture_bullets()
     }
 
-    pub fn undo(&self, current: &PictureBulletSnapshot) -> Result<PictureBulletSnapshot> {
+    pub(crate) fn undo(&self, current: &PictureBulletSnapshot) -> Result<PictureBulletSnapshot> {
         self.patch.undo(current)
     }
 
-    pub fn redo(&self, current: &PictureBulletSnapshot) -> Result<PictureBulletSnapshot> {
+    pub(crate) fn redo(&self, current: &PictureBulletSnapshot) -> Result<PictureBulletSnapshot> {
         self.patch.redo(current)
     }
 }
 
 /// Isolated transaction for source-bound picture-bullet lifecycle edits.
 #[derive(Debug, Clone)]
-pub struct PictureBulletTransaction {
+pub(crate) struct RecordEdit {
     source: PictureBulletSnapshot,
     document: std::sync::Arc<Record>,
     picture_bullets: Option<std::sync::Arc<PictureBulletCollection>>,
@@ -1272,12 +1291,6 @@ pub struct PictureBulletTransaction {
 pub type PackageLimits = PictureBulletPackageLimits;
 /// Picture-bullet snapshot under the conventional owner-module name.
 pub type Snapshot = PictureBulletSnapshot;
-/// Picture-bullet patch under the conventional owner-module name.
-pub type Patch = PictureBulletPatch;
-/// Picture-bullet commit under the conventional owner-module name.
-pub type Commit = PictureBulletCommit;
-/// Picture-bullet transaction under the conventional owner-module name.
-pub type Transaction = PictureBulletTransaction;
 /// Picture-bullet change under the conventional owner-module name.
 pub type Change = PictureBulletChange;
 /// Picture-bullet change kind under the conventional owner-module name.
@@ -1285,7 +1298,11 @@ pub type ChangeKind = PictureBulletChangeKind;
 /// Picture-bullet revision under the conventional owner-module name.
 pub type Revision = PictureBulletRevision;
 
-impl PictureBulletTransaction {
+#[allow(
+    dead_code,
+    reason = "the record-level owner behind the package-level Edit; its full surface stays exercised by the unit tests (record 0357)"
+)]
+impl RecordEdit {
     fn new(source: PictureBulletSnapshot) -> Self {
         Self {
             picture_bullets: source.picture_bullets.clone(),
@@ -1296,27 +1313,26 @@ impl PictureBulletTransaction {
     }
 
     #[must_use]
-    pub const fn source(&self) -> &PictureBulletSnapshot {
+    pub(crate) const fn source(&self) -> &PictureBulletSnapshot {
         &self.source
     }
 
     #[must_use]
-    pub fn picture_bullets(&self) -> Option<&PictureBulletCollection> {
+    pub(crate) fn picture_bullets(&self) -> Option<&PictureBulletCollection> {
         self.picture_bullets.as_deref()
     }
 
     #[must_use]
-    pub fn changes(&self) -> &[PictureBulletChange] {
+    pub(crate) fn changes(&self) -> &[PictureBulletChange] {
         &self.changes
     }
 
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.changes.is_empty()
-    }
-
     /// Replace an existing bullet without changing its index.
-    pub fn replace_picture_bullet(&mut self, index: u16, bullet: PictureBullet) -> Result<()> {
+    pub(crate) fn replace_picture_bullet(
+        &mut self,
+        index: u16,
+        bullet: PictureBullet,
+    ) -> Result<()> {
         if bullet.index != index {
             return Err(Error::InvalidFormat(
                 "picture-bullet replacement cannot change its referenced index".into(),
@@ -1352,7 +1368,7 @@ impl PictureBulletTransaction {
     }
 
     /// Append a bullet at its explicit, currently unused index.
-    pub fn append_picture_bullet(&mut self, bullet: PictureBullet) -> Result<u16> {
+    pub(crate) fn append_picture_bullet(&mut self, bullet: PictureBullet) -> Result<u16> {
         let Some(current) = self.picture_bullets.as_ref() else {
             return Err(Error::InvalidFormat(
                 "picture-bullet collection is absent; owner creation is not losslessly provable"
@@ -1383,7 +1399,7 @@ impl PictureBulletTransaction {
 
     /// Remove a bullet only when every discoverable `TextPFException9` user
     /// proves it is unreferenced.
-    pub fn remove_picture_bullet(&mut self, index: u16) -> Result<PictureBullet> {
+    pub(crate) fn remove_picture_bullet(&mut self, index: u16) -> Result<PictureBullet> {
         let Some(current) = self.picture_bullets.as_ref() else {
             return Err(Error::InvalidFormat(
                 "picture-bullet collection is absent; owner creation is not losslessly provable"
@@ -1424,7 +1440,7 @@ impl PictureBulletTransaction {
     /// Reordering is refused because it would require an exhaustive reference
     /// rewrite across all shape and master owners. Re-submitting the existing
     /// order is an exact no-op.
-    pub fn reorder_picture_bullets(&mut self, order: &[u16]) -> Result<()> {
+    pub(crate) fn reorder_picture_bullets(&mut self, order: &[u16]) -> Result<()> {
         let Some(current) = self.picture_bullets.as_ref() else {
             if order.is_empty() {
                 return Ok(());
@@ -1448,14 +1464,14 @@ impl PictureBulletTransaction {
     }
 
     /// Publish staged edits as an append-only PPT transaction.
-    pub fn commit(mut self) -> Result<PictureBulletCommit> {
+    pub(crate) fn commit(mut self) -> Result<RecordCommit> {
         if self.changes.is_empty()
             || self.picture_bullets.as_deref() == self.source.picture_bullets.as_deref()
         {
             let revision = self.source.revision();
-            return Ok(PictureBulletCommit {
+            return Ok(RecordCommit {
                 snapshot: self.source.clone(),
-                patch: PictureBulletPatch {
+                patch: RecordPatch {
                     base: revision,
                     target: revision,
                     before: self.source.bytes.clone(),
@@ -1491,9 +1507,9 @@ impl PictureBulletTransaction {
         )?;
         if target_document == self.source.document.as_ref() {
             let revision = self.source.revision();
-            return Ok(PictureBulletCommit {
+            return Ok(RecordCommit {
                 snapshot: self.source.clone(),
-                patch: PictureBulletPatch {
+                patch: RecordPatch {
                     base: revision,
                     target: revision,
                     before: self.source.bytes.clone(),
@@ -1522,7 +1538,7 @@ impl PictureBulletTransaction {
                 "published picture-bullet candidate failed semantic reopen".into(),
             ));
         }
-        let patch = PictureBulletPatch {
+        let patch = RecordPatch {
             base: self.source.revision(),
             target: snapshot.revision(),
             before: self.source.bytes,
@@ -1530,17 +1546,7 @@ impl PictureBulletTransaction {
             changes: self.changes,
             limits: snapshot.limits,
         };
-        Ok(PictureBulletCommit { snapshot, patch })
-    }
-
-    /// Consume the transaction and publish its staged changes.
-    pub fn finish(self) -> Result<PictureBulletCommit> {
-        self.commit()
-    }
-
-    #[must_use]
-    pub fn rollback(self) -> PictureBulletSnapshot {
-        self.source
+        Ok(RecordCommit { snapshot, patch })
     }
 }
 
@@ -1576,24 +1582,16 @@ fn preflight_picture_bullet_publication(
 
 /// Read the live picture-bullet collection from a cursor-backed package.
 impl<R: std::io::Read + std::io::Seek> crate::raw::Reader<R> {
-    /// Read the live picture-bullet collection under explicit limits.
-    pub fn picture_bullets_with_limits(
-        &mut self,
-        limits: PictureBulletLimits,
-    ) -> Result<Option<PictureBulletCollection>> {
-        self.presentation()?.picture_bullets_with_limits(limits)
-    }
-
-    /// Read the live picture-bullet collection with default limits.
+    /// Read the live picture-bullet collection under the reader's limits.
     pub fn picture_bullets(&mut self) -> Result<Option<PictureBulletCollection>> {
-        self.picture_bullets_with_limits(PictureBulletLimits::default())
+        self.presentation()?.picture_bullets()
     }
 }
 
 /// Read the live picture-bullet collection from a positional package.
 impl crate::SourceBackedPackage {
     /// Read the live picture-bullet collection under explicit limits.
-    pub fn picture_bullets_with_limits(
+    pub(crate) fn picture_bullets_with_limits(
         &self,
         limits: PictureBulletLimits,
     ) -> Result<Option<PictureBulletCollection>> {
@@ -1614,7 +1612,7 @@ impl crate::Presentation {
     }
 
     /// Read the live picture-bullet collection under explicit limits.
-    pub fn picture_bullets_with_limits(
+    pub(crate) fn picture_bullets_with_limits(
         &self,
         mut limits: PictureBulletLimits,
     ) -> Result<Option<PictureBulletCollection>> {
@@ -2337,5 +2335,97 @@ mod tests {
         // admitted picture-bullet owner.
         malformed[source_offset + document_offset + 8] = 0x04;
         assert!(PictureBulletSnapshot::parse(&malformed).is_err());
+    }
+
+    #[test]
+    fn package_picture_bullet_edits_publish_replay_and_invert_exactly() {
+        use litchi_core::edit::RefusalKind;
+
+        let source_bytes = source_with_bullets(false);
+        let source = crate::Package::from_bytes(&source_bytes).unwrap();
+        let source_bytes = source.to_bytes().unwrap();
+        let read =
+            |package: &crate::Package| package.presentation().unwrap().picture_bullets().unwrap();
+        assert_eq!(read(&source).unwrap().bullets.len(), 2);
+
+        let no_op = source.edit_picture_bullets().unwrap().commit().unwrap();
+        assert!(!no_op.diagnostics().changed());
+        assert!(no_op.patch().is_noop());
+        assert_eq!(no_op.package().to_bytes().unwrap(), source_bytes);
+
+        let mut edit = source.edit_picture_bullets().unwrap();
+        let mut replacement = edit.picture_bullets().unwrap().get(4).unwrap().clone();
+        replacement.unused ^= 1;
+        edit.replace_picture_bullet(4, replacement.clone()).unwrap();
+        drop(edit);
+        assert_eq!(source.to_bytes().unwrap(), source_bytes);
+
+        let mut edit = source.edit_picture_bullets().unwrap();
+        edit.replace_picture_bullet(4, replacement.clone()).unwrap();
+        let removed = edit.remove_picture_bullet(5).unwrap();
+        assert_eq!(removed.index, 5);
+        assert_eq!(edit.changes().len(), 2);
+        let commit = edit.commit().unwrap();
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.patch().before_bytes(), source_bytes.as_slice());
+        let published = read(commit.package()).unwrap();
+        assert_eq!(published.get(4), Some(&replacement));
+        assert!(published.get(5).is_none());
+
+        let replayed = source.apply_picture_bullets(commit.patch()).unwrap();
+        assert_eq!(
+            replayed.package().to_bytes().unwrap(),
+            commit.package().to_bytes().unwrap()
+        );
+        let restored = commit
+            .package()
+            .apply_picture_bullets(&commit.patch().inverse())
+            .unwrap();
+        assert_eq!(restored.package().to_bytes().unwrap(), source_bytes);
+        assert!(matches!(
+            commit.package().apply_picture_bullets(commit.patch()),
+            Err(super::super::Error::PatchConflict)
+        ));
+
+        let mut edit = source.edit_picture_bullets().unwrap();
+        let Err(super::super::Error::Refused(refusal)) = edit.remove_picture_bullet(9) else {
+            panic!("an absent picture-bullet index must be refused");
+        };
+        assert_eq!(refusal.kind(), RefusalKind::NotFound);
+        let Err(super::super::Error::Refused(refusal)) = edit.reorder_picture_bullets(&[5, 4])
+        else {
+            panic!("a changed order must be refused");
+        };
+        assert_eq!(refusal.kind(), RefusalKind::UnsupportedOperation);
+        assert!(edit.changes().is_empty());
+
+        let empty = crate::Package::from_bytes(&empty_source()).unwrap();
+        let mut edit = empty.edit_picture_bullets().unwrap();
+        assert!(edit.picture_bullets().is_none());
+        let Err(super::super::Error::Refused(refusal)) = edit.append_picture_bullet(replacement)
+        else {
+            panic!("a document without a picture-bullet collection must be refused");
+        };
+        assert_eq!(refusal.kind(), RefusalKind::UnsupportedTarget);
+    }
+
+    #[test]
+    fn package_picture_bullet_edits_refuse_changed_writes_to_signed_packages() {
+        let signed = with_stream(
+            source_with_bullets(false),
+            &["_xmlsignatures", "origin.sigs"],
+            b"signature",
+        );
+        let package = crate::Package::from_bytes(&signed).unwrap();
+        let bytes = package.to_bytes().unwrap();
+        let no_op = package.edit_picture_bullets().unwrap().commit().unwrap();
+        assert!(!no_op.diagnostics().changed());
+        assert_eq!(no_op.package().to_bytes().unwrap(), bytes);
+
+        let mut edit = package.edit_picture_bullets().unwrap();
+        let mut replacement = edit.picture_bullets().unwrap().get(4).unwrap().clone();
+        replacement.unused ^= 1;
+        edit.replace_picture_bullet(4, replacement).unwrap();
+        assert!(matches!(edit.commit(), Err(super::super::Error::Signed)));
     }
 }

@@ -1,6 +1,6 @@
-//! Transactional edits for standalone Microsoft Graph chart packages.
+//! Drafts of standalone Microsoft Graph chart packages.
 //!
-//! The transaction owns the validated OLE2 package state and only exposes the
+//! A [`GraphPackage`] draft owns the validated OLE2 package state and only exposes the
 //! operation that can be proven at this crate boundary: replacing the one
 //! framed Graph chart substream while retaining the workbook prelude and OLE
 //! host streams. It is deliberately separate from PPT presentation editing;
@@ -13,4 +13,4 @@ mod model;
 #[cfg(test)]
 mod tests;
 
-pub use model::{PackageEditor, Snapshot};
+pub use model::{GraphPackage, View};

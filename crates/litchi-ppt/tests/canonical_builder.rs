@@ -62,6 +62,7 @@ fn builder_publishes_detached_packages_that_use_canonical_edits() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         second.to_bytes().unwrap()

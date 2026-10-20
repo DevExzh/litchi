@@ -409,16 +409,13 @@ pub(crate) type XlsSheet<'a> = &'a litchi_xls::Worksheet;
 
 use crate::view::sheet::{Worksheet as Sheet, WorksheetsInner};
 
-fn boxed(error: crate::Error) -> Box<dyn std::error::Error + Send + Sync> {
-    Box::new(error)
-}
-
 /// The generic sheet traits over the eager reader.
 ///
 /// On the filesystem route the first trait call reads the whole workbook
 /// once. When that read fails, the fallible methods return its error and the
 /// infallible ones report an empty workbook.
 impl WorkbookTrait for Xls {
+    type Error = crate::Error;
     type Worksheet<'a> = Sheet<'a>;
     type Worksheets<'a> = crate::view::sheet::Worksheets<'a>;
 
@@ -427,11 +424,11 @@ impl WorkbookTrait for Xls {
             .map_or(0, WorkbookTrait::active_sheet_index)
     }
 
-    fn active_worksheet(&self) -> litchi_core::sheet::Result<Sheet<'_>> {
-        self.trait_workbook()
-            .map_err(boxed)?
+    fn active_worksheet(&self) -> Result<Sheet<'_>> {
+        self.trait_workbook()?
             .active_worksheet()
             .map(Sheet::xls)
+            .map_err(Into::into)
     }
 
     fn is_1904_date_system(&self) -> bool {
@@ -439,18 +436,18 @@ impl WorkbookTrait for Xls {
             .is_ok_and(WorkbookTrait::is_1904_date_system)
     }
 
-    fn worksheet_by_index(&self, index: usize) -> litchi_core::sheet::Result<Sheet<'_>> {
-        self.trait_workbook()
-            .map_err(boxed)?
+    fn worksheet_by_index(&self, index: usize) -> Result<Sheet<'_>> {
+        self.trait_workbook()?
             .worksheet_by_index(index)
             .map(Sheet::xls)
+            .map_err(Into::into)
     }
 
-    fn worksheet_by_name(&self, name: &str) -> litchi_core::sheet::Result<Sheet<'_>> {
-        self.trait_workbook()
-            .map_err(boxed)?
+    fn worksheet_by_name(&self, name: &str) -> Result<Sheet<'_>> {
+        self.trait_workbook()?
             .worksheet_by_name(name)
             .map(Sheet::xls)
+            .map_err(Into::into)
     }
 
     fn worksheet_count(&self) -> usize {
@@ -488,12 +485,12 @@ pub(crate) enum Worksheets<'a> {
 }
 
 impl<'a> Iterator for Worksheets<'a> {
-    type Item = litchi_core::sheet::Result<XlsSheet<'a>>;
+    type Item = Result<XlsSheet<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            Self::Read(worksheets) => worksheets.next(),
-            Self::Failed(error) => error.take().map(|error| Err(boxed(error))),
+            Self::Read(worksheets) => worksheets.next().map(|sheet| sheet.map_err(Into::into)),
+            Self::Failed(error) => error.take().map(Err),
         }
     }
 }

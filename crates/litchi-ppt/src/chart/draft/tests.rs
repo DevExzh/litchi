@@ -9,7 +9,7 @@ use std::io::Cursor;
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_ograph::PackageRef;
 
-use super::PackageEditor;
+use super::GraphPackage;
 
 const BOF: u16 = 0x0809;
 const EOF: u16 = 0x000A;
@@ -85,9 +85,9 @@ fn clean_commit_preserves_the_original_package_bytes() {
     let chart = chart_stream(1, &[2]);
     let bytes = package(&chart);
     let original = bytes.clone();
-    let editor = PackageEditor::open(bytes).expect("open Graph package");
+    let editor = GraphPackage::open(bytes).expect("open Graph package");
 
-    let snapshot = editor.snapshot().expect("snapshot");
+    let snapshot = editor.view().expect("snapshot");
     assert!(!snapshot.is_dirty());
     assert_eq!(snapshot.chart().kind(), litchi_ograph::chart::Kind::Graph);
     assert_eq!(snapshot.chart().as_bytes(), chart.as_slice());
@@ -98,7 +98,7 @@ fn clean_commit_preserves_the_original_package_bytes() {
         chart
     );
 
-    assert_eq!(editor.commit().expect("clean commit"), original);
+    assert_eq!(editor.into_bytes().expect("clean commit"), original);
 }
 
 #[test]
@@ -106,14 +106,14 @@ fn replacement_is_atomic_and_retains_ograph_host_streams() {
     let original_chart = chart_stream(1, &[2]);
     let replacement = chart_stream(3, &[4, 5, 6, 7]);
     let original_package = package(&original_chart);
-    let mut editor = PackageEditor::open(original_package.clone()).expect("open package");
+    let mut editor = GraphPackage::open(original_package.clone()).expect("open package");
 
     editor
         .replace_chart(
             litchi_ograph::chart::Stream::open(replacement.clone()).expect("typed chart stream"),
         )
         .expect("replace chart");
-    let snapshot = editor.snapshot().expect("edited snapshot");
+    let snapshot = editor.view().expect("edited snapshot");
     assert!(snapshot.is_dirty());
     assert_eq!(snapshot.chart().as_bytes(), replacement.as_slice());
     let original_workbook = PackageRef::open(&original_package)
@@ -122,7 +122,7 @@ fn replacement_is_atomic_and_retains_ograph_host_streams() {
         .expect("original Workbook");
     assert_ne!(snapshot.workbook(), original_workbook.as_bytes());
 
-    let output = editor.commit().expect("commit replacement");
+    let output = editor.into_bytes().expect("commit replacement");
     let parsed = PackageRef::open(&output).expect("reopen replacement");
     let output_workbook = parsed.workbook().expect("Workbook");
     assert_eq!(output_workbook.chart().as_bytes(), replacement);
@@ -139,8 +139,8 @@ fn replacement_is_atomic_and_retains_ograph_host_streams() {
 fn rejecting_an_excel_stream_leaves_the_transaction_untouched() {
     let chart = chart_stream(9, &[8]);
     let original = package(&chart);
-    let mut editor = PackageEditor::open(original.clone()).expect("open package");
-    let before = editor.snapshot().expect("before snapshot");
+    let mut editor = GraphPackage::open(original.clone()).expect("open package");
+    let before = editor.view().expect("before snapshot");
     let before_workbook = before.workbook().to_vec();
 
     let error = editor
@@ -151,16 +151,16 @@ fn rejecting_an_excel_stream_leaves_the_transaction_untouched() {
         .expect_err("Excel chart must not enter a Graph package");
     assert!(matches!(error, crate::package::Error::InvalidFormat(_)));
     assert!(!editor.is_dirty());
-    let after = editor.snapshot().expect("after snapshot");
+    let after = editor.view().expect("after snapshot");
     assert_eq!(after.workbook(), before_workbook.as_slice());
-    assert_eq!(editor.commit().expect("clean commit"), original);
+    assert_eq!(editor.into_bytes().expect("clean commit"), original);
 }
 
 #[test]
 fn semantic_replacement_refuses_unproven_authoring_atomically() {
     let original = package(&chart_stream(11, &[12]));
-    let mut editor = PackageEditor::open(original.clone()).expect("open package");
-    let before = editor.snapshot().expect("before snapshot");
+    let mut editor = GraphPackage::open(original.clone()).expect("open package");
+    let before = editor.view().expect("before snapshot");
     let before_workbook = before.workbook().to_vec();
 
     let candidate = litchi_ograph::chart::Chart::new(litchi_ograph::chart::Context::graph())
@@ -174,8 +174,8 @@ fn semantic_replacement_refuses_unproven_authoring_atomically() {
     ));
     assert!(!editor.is_dirty());
     assert_eq!(
-        editor.snapshot().expect("after snapshot").workbook(),
+        editor.view().expect("after snapshot").workbook(),
         before_workbook
     );
-    assert_eq!(editor.commit().expect("clean commit"), original);
+    assert_eq!(editor.into_bytes().expect("clean commit"), original);
 }

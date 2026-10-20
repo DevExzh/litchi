@@ -293,7 +293,7 @@ fn builder_refusal(file: &File) -> Error {
         #[cfg(feature = "xls")]
         File::Xls(handle) => refused(handle.cell_values_editor(), "XLS"),
         #[cfg(feature = "ppt")]
-        File::Ppt(handle) => refused(handle.text_editor(), "PPT"),
+        File::Ppt(handle) => refused(handle.editable_package(), "PPT"),
         other => panic!("{other:?} has no tier 1 or tier 2 editor"),
     }
 }
@@ -458,33 +458,24 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
         },
         #[cfg(feature = "ppt")]
         File::Ppt(handle) => {
-            use litchi_ppt::text_edit::Target;
+            use litchi_ppt::package::edit::Target;
 
-            let snapshot = handle
-                .text_editor()
-                .unwrap()
-                .expect("a retained PPT source");
-            for slide in 0..16 {
-                for shape in 0..16 {
+            let package = handle.editable_package().unwrap();
+            let presentation = package.presentation().unwrap();
+            for (slide, shapes) in presentation.slides().unwrap().iter().enumerate() {
+                for (shape, item) in shapes.shapes().unwrap().iter().enumerate() {
+                    let Some(text) = item.text().ok().and_then(|text| same_width(&text)) else {
+                        continue;
+                    };
                     let target = Target::new(Position::new(slide), Position::new(shape));
-                    let Some(text) = snapshot
-                        .read_text(target)
-                        .ok()
-                        .and_then(|text| same_width(&text))
-                    else {
-                        continue;
-                    };
-                    let Ok(mut transaction) = snapshot.edit_text(target) else {
-                        continue;
-                    };
-                    if transaction.set_text(text.clone()).is_err() {
+                    let mut edit = package.edit().unwrap();
+                    if edit.set_shape_text(target, text.clone()).is_err() {
                         continue;
                     }
-                    let Ok(commit) = transaction.commit() else {
+                    let Ok(commit) = edit.commit() else {
                         continue;
                     };
-                    let mut output = Vec::new();
-                    commit.write_to(&mut output).unwrap();
+                    let output = commit.package().to_bytes().unwrap();
                     return (output, text.trim().to_owned());
                 }
             }

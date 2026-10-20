@@ -203,7 +203,7 @@ fn invalid_shape_edit_is_failure_atomic_at_the_publication_boundary() {
     let snapshot = SlideSnapshot::parse(&source).expect("slide snapshot");
     let mut editor = snapshot.edit();
     assert!(editor.set_shape_id(Id::new(7, 42), 999).is_err());
-    assert!(!editor.is_changed());
+    assert!(editor.changes().is_empty());
     assert_eq!(
         editor.commit().unwrap().snapshot().bytes(),
         source.as_slice()

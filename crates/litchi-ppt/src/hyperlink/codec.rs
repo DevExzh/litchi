@@ -166,8 +166,8 @@ impl Interaction {
     ///
     /// # Errors
     ///
-    /// Returns an error if the container is malformed; see
-    /// [`Self::parse_with_limits`].
+    /// Returns an error if the container is malformed or exceeds the default
+    /// [`InteractionLimits`].
     pub fn parse(record: &Record) -> Result<Self> {
         Self::parse_with_limits(record, InteractionLimits::default())
     }
@@ -179,7 +179,7 @@ impl Interaction {
     /// Returns an error if the record header is malformed, the container
     /// exceeds `limits`, the child records are missing, duplicated, or
     /// malformed, or an atom payload is invalid.
-    pub fn parse_with_limits(record: &Record, limits: InteractionLimits) -> Result<Self> {
+    pub(crate) fn parse_with_limits(record: &Record, limits: InteractionLimits) -> Result<Self> {
         if record.record_type != RecordType::InteractiveInfo
             || record.record_type_raw != RecordType::InteractiveInfo.as_u16()
             || record.version != 0x0f
@@ -252,7 +252,7 @@ impl Interaction {
     /// # Errors
     ///
     /// Returns an error if the bytes are not exactly one well-formed
-    /// `InteractiveInfo` container; see [`Self::parse_bytes_with_limits`].
+    /// `InteractiveInfo` container within the default [`InteractionLimits`].
     pub fn parse_bytes(bytes: &[u8]) -> Result<Self> {
         Self::parse_bytes_with_limits(bytes, InteractionLimits::default())
     }
@@ -263,7 +263,7 @@ impl Interaction {
     ///
     /// Returns an error if the bytes exceed `limits`, contain trailing bytes
     /// after the record, or the container itself is malformed.
-    pub fn parse_bytes_with_limits(bytes: &[u8], limits: InteractionLimits) -> Result<Self> {
+    pub(crate) fn parse_bytes_with_limits(bytes: &[u8], limits: InteractionLimits) -> Result<Self> {
         if bytes.len() > limits.max_record_bytes {
             return corrupted("InteractiveInfo exceeds the configured record size limit");
         }
@@ -320,7 +320,7 @@ impl Interaction {
     /// Returns an error if the macro name data is inconsistent or exceeds the
     /// configured limits, or the serialized container would exceed the
     /// configured record size limit.
-    pub fn validate_with_limits(&self, limits: InteractionLimits) -> Result<()> {
+    pub(crate) fn validate_with_limits(&self, limits: InteractionLimits) -> Result<()> {
         let macro_name = self.validated_macro_name_data(limits)?;
         validate_serialized_interaction_size(
             macro_name.as_ref().map(|data| data.len()),
@@ -333,8 +333,8 @@ impl Interaction {
     ///
     /// # Errors
     ///
-    /// Returns an error if the interaction fails validation or serialization;
-    /// see [`Self::to_bytes_with_limits`].
+    /// Returns an error if the interaction fails validation or serialization
+    /// within the default [`InteractionLimits`].
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         self.to_bytes_with_limits(InteractionLimits::default())
     }
@@ -346,7 +346,7 @@ impl Interaction {
     /// Returns an error if the macro name data is inconsistent or exceeds the
     /// configured limits, or the serialized records exceed the configured
     /// record size limit.
-    pub fn to_bytes_with_limits(&self, limits: InteractionLimits) -> Result<Vec<u8>> {
+    pub(crate) fn to_bytes_with_limits(&self, limits: InteractionLimits) -> Result<Vec<u8>> {
         let macro_name = self.validated_macro_name_data(limits)?;
         validate_serialized_interaction_size(
             macro_name.as_ref().map(|data| data.len()),
