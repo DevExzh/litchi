@@ -584,7 +584,7 @@ pub(crate) fn encode_document(root: &Record) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn find_pp10_blob(root: &Record) -> Result<Option<Vec<usize>>> {
+pub(super) fn find_pp10_blob(root: &Record) -> Result<Option<Vec<usize>>> {
     if root.record_type != RecordType::Document {
         return corrupted("document-comparison owner requires a DocumentContainer root");
     }
@@ -635,7 +635,7 @@ fn find_pp10_blob(root: &Record) -> Result<Option<Vec<usize>>> {
     Ok(match_path)
 }
 
-fn is_pp10_tag(record: &Record) -> Result<bool> {
+pub(super) fn is_pp10_tag(record: &Record) -> Result<bool> {
     let Some(name) = record
         .children
         .iter()

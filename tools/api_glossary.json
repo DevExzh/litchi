@@ -5696,6 +5696,41 @@
           "name": "EditorLimits",
           "scope": "litchi_ppt",
           "replacement": "Package::edit_animations() admits under the source package limits (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use the family's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::document_comparison::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use Package::edit_document_comparison() -> document_comparison::Edit (record 0357)"
+        },
+        {
+          "name": "PackageCommit",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use document_comparison::Commit (record 0357)"
+        },
+        {
+          "name": "PackagePatch",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use document_comparison::Patch (record 0357)"
         }
       ],
       "families": [
@@ -5704,7 +5739,8 @@
         "litchi_ppt::font",
         "litchi_ppt::broadcast",
         "litchi_ppt::picture_bullets",
-        "litchi_ppt::animation"
+        "litchi_ppt::animation",
+        "litchi_ppt::document_comparison"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
@@ -6169,6 +6205,41 @@
           "name": "EditorLimits",
           "scope": "litchi_ppt",
           "replacement": "Package::edit_animations() admits under the source package limits (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use the family's Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::document_comparison::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use Package::edit_document_comparison() -> document_comparison::Edit (record 0357)"
+        },
+        {
+          "name": "PackageCommit",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use document_comparison::Commit (record 0357)"
+        },
+        {
+          "name": "PackagePatch",
+          "scope": "litchi_ppt::document_comparison",
+          "replacement": "use document_comparison::Patch (record 0357)"
         }
       ],
       "families": [
@@ -6177,7 +6248,8 @@
         "litchi_ppt::font",
         "litchi_ppt::broadcast",
         "litchi_ppt::picture_bullets",
-        "litchi_ppt::animation"
+        "litchi_ppt::animation",
+        "litchi_ppt::document_comparison"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
