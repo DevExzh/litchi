@@ -1,7 +1,7 @@
+use super::package::{put_presence, put_threading, remove_presence, remove_threading};
 use super::{
     AuthorPresenceSnapshot, CommentThreadingSnapshot, ParentComment, PresenceInfo, ThreadingInfo,
-    load_presence, load_presence_snapshot, load_threading, put_presence, put_threading,
-    remove_presence, remove_threading,
+    load_presence, load_presence_snapshot, load_threading,
 };
 use crate::Error;
 use crate::comments::{Author, Comment, Comments, Conformance, List, store_presentation_comments};

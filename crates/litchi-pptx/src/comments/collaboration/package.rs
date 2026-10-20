@@ -5,8 +5,8 @@ use std::sync::Arc;
 use litchi_opc::{OpcError, OpcPackage, PackURI};
 
 use super::transaction::{
-    AuthorPresenceCommit, AuthorPresencePatch, AuthorPresenceSnapshot, CommentThreadingCommit,
-    CommentThreadingPatch, CommentThreadingSnapshot,
+    AuthorPresenceSnapshot, CommentThreadingSnapshot, PresenceChange, PresencePrepared,
+    ThreadingChange, ThreadingPrepared,
 };
 use super::{PresenceInfo, ThreadingInfo};
 use crate::comments::{
@@ -89,9 +89,9 @@ pub fn load_threading_snapshot(
 
 /// Apply an author-presence patch after validating its exact part source and
 /// the complete legacy comment graph.
-pub fn apply_presence_patch(
+pub(crate) fn apply_presence_patch(
     package: &mut OpcPackage,
-    patch: &AuthorPresencePatch,
+    patch: &PresenceChange,
 ) -> Result<AuthorPresenceSnapshot> {
     let current = load_presence_snapshot(package, patch.before().author_id())?
         .ok_or_else(|| invalid("author presence source part is absent"))?;
@@ -117,18 +117,18 @@ pub fn apply_presence_patch(
 }
 
 /// Apply a committed author-presence edit atomically.
-pub fn apply_presence_commit(
+pub(crate) fn apply_presence_commit(
     package: &mut OpcPackage,
-    commit: AuthorPresenceCommit,
+    commit: PresencePrepared,
 ) -> Result<AuthorPresenceSnapshot> {
     apply_presence_patch(package, commit.patch())
 }
 
 /// Apply a comment-threading patch after validating its exact part source and
 /// the complete legacy comment graph.
-pub fn apply_threading_patch(
+pub(crate) fn apply_threading_patch(
     package: &mut OpcPackage,
-    patch: &CommentThreadingPatch,
+    patch: &ThreadingChange,
 ) -> Result<CommentThreadingSnapshot> {
     let current = load_threading_snapshot(
         package,
@@ -164,15 +164,15 @@ pub fn apply_threading_patch(
 }
 
 /// Apply a committed comment-threading edit atomically.
-pub fn apply_threading_commit(
+pub(crate) fn apply_threading_commit(
     package: &mut OpcPackage,
-    commit: CommentThreadingCommit,
+    commit: ThreadingPrepared,
 ) -> Result<CommentThreadingSnapshot> {
     apply_threading_patch(package, commit.patch())
 }
 
 /// Replace or create the selected author presence extension.
-pub fn put_presence(
+pub(crate) fn put_presence(
     package: &mut OpcPackage,
     author_id: u32,
     value: PresenceInfo,
@@ -188,7 +188,10 @@ pub fn put_presence(
 }
 
 /// Remove the selected author presence extension.
-pub fn remove_presence(package: &mut OpcPackage, author_id: u32) -> Result<Option<PresenceInfo>> {
+pub(crate) fn remove_presence(
+    package: &mut OpcPackage,
+    author_id: u32,
+) -> Result<Option<PresenceInfo>> {
     let Some(snapshot) = load_presence_snapshot(package, author_id)? else {
         return Ok(None);
     };
@@ -203,7 +206,7 @@ pub fn remove_presence(package: &mut OpcPackage, author_id: u32) -> Result<Optio
 }
 
 /// Replace or create the selected comment threading extension.
-pub fn put_threading(
+pub(crate) fn put_threading(
     package: &mut OpcPackage,
     slide_part_name: &str,
     author_id: u32,
@@ -221,7 +224,7 @@ pub fn put_threading(
 }
 
 /// Remove the selected comment threading extension.
-pub fn remove_threading(
+pub(crate) fn remove_threading(
     package: &mut OpcPackage,
     slide_part_name: &str,
     author_id: u32,

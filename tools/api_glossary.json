@@ -1840,7 +1840,19 @@
         "litchi_pptx::presentation::embedded::ink_actions",
         "litchi_pptx::presentation_properties::read_only_recommended",
         "litchi_pptx::presentation_properties::metadata::designer_tags",
-        "litchi_pptx::opc"
+        "litchi_pptx::opc",
+        "litchi_pptx::presentation_properties::metadata::guides",
+        "litchi_pptx::presentation_properties::metadata::custom_show",
+        "litchi_pptx::presentation_properties::metadata::changes",
+        "litchi_pptx::presentation_properties::metadata::structure",
+        "litchi_pptx::presentation_properties::metadata::events",
+        "litchi_pptx::presentation_properties::metadata::tracks",
+        "litchi_pptx::presentation_properties::metadata::color_map",
+        "litchi_pptx::presentation::embedded::content_parts",
+        "litchi_pptx::presentation::embedded::controls::slide",
+        "litchi_pptx::presentation::embedded::ole::slide",
+        "litchi_pptx::comments::collaboration::presence",
+        "litchi_pptx::comments::collaboration::threading"
       ],
       "immutable_owners": [
         "litchi_pptx::Presentation",
@@ -2458,7 +2470,19 @@
         "litchi_pptx::presentation::embedded::ink_actions",
         "litchi_pptx::presentation_properties::read_only_recommended",
         "litchi_pptx::presentation_properties::metadata::designer_tags",
-        "litchi_pptx::opc"
+        "litchi_pptx::opc",
+        "litchi_pptx::presentation_properties::metadata::guides",
+        "litchi_pptx::presentation_properties::metadata::custom_show",
+        "litchi_pptx::presentation_properties::metadata::changes",
+        "litchi_pptx::presentation_properties::metadata::structure",
+        "litchi_pptx::presentation_properties::metadata::events",
+        "litchi_pptx::presentation_properties::metadata::tracks",
+        "litchi_pptx::presentation_properties::metadata::color_map",
+        "litchi_pptx::presentation::embedded::content_parts",
+        "litchi_pptx::presentation::embedded::controls::slide",
+        "litchi_pptx::presentation::embedded::ole::slide",
+        "litchi_pptx::comments::collaboration::presence",
+        "litchi_pptx::comments::collaboration::threading"
       ],
       "immutable_owners": [
         "litchi_pptx::Presentation",

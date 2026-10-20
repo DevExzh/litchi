@@ -99,6 +99,8 @@ impl Edit<'_> {
         load_media(self.staged.opc(), key)
     }
 
+    /// The staged caption tracks of the package.
+    ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
@@ -106,6 +108,8 @@ impl Edit<'_> {
         load(self.staged.opc())
     }
 
+    /// Create or replace one caption track.
+    ///
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.

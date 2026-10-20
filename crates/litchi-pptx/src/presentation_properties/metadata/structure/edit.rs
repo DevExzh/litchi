@@ -105,6 +105,8 @@ impl Edit<'_> {
         self.staged.update(move |opc| package::store(opc, value))
     }
 
+    /// The staged custom show `id`.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -112,6 +114,8 @@ impl Edit<'_> {
         find_custom_show(self.staged.opc(), id)
     }
 
+    /// Add one custom show; its ID and name must be new.
+    ///
     /// A change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     /// (ADR 0006) before anything is mutated: remove the signature explicitly
@@ -127,6 +131,8 @@ impl Edit<'_> {
             .update(move |opc| package::add_custom_show(opc, show))
     }
 
+    /// Replace the custom show `id` with `replacement`.
+    ///
     /// A change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     /// (ADR 0006) before anything is mutated: remove the signature explicitly
@@ -142,6 +148,8 @@ impl Edit<'_> {
             .update(move |opc| package::update_custom_show(opc, id, replacement))
     }
 
+    /// Remove the custom show `id`. Returns whether it existed.
+    ///
     /// A change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     /// (ADR 0006) before anything is mutated: remove the signature explicitly
@@ -157,6 +165,8 @@ impl Edit<'_> {
             .update(move |opc| package::remove_custom_show(opc, id))
     }
 
+    /// Reorder the custom shows to `ordered_ids`, which must name each show once.
+    ///
     /// A change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     /// (ADR 0006) before anything is mutated: remove the signature explicitly
@@ -172,6 +182,8 @@ impl Edit<'_> {
             .update(move |opc| package::reorder_custom_shows(opc, ordered_ids))
     }
 
+    /// Append the slide `slide_id` to the custom show `show_id`.
+    ///
     /// A change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     /// (ADR 0006) before anything is mutated: remove the signature explicitly
@@ -187,6 +199,8 @@ impl Edit<'_> {
             .update(move |opc| package::add_custom_show_slide(opc, show_id, slide_id))
     }
 
+    /// Remove the slide `slide_id` from the custom show `show_id`. Returns whether it was a member.
+    ///
     /// A change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     /// (ADR 0006) before anything is mutated: remove the signature explicitly
@@ -202,6 +216,8 @@ impl Edit<'_> {
             .update(move |opc| package::remove_custom_show_slide(opc, show_id, slide_id))
     }
 
+    /// Reorder the slides of the custom show `show_id` to `ordered_slide_ids`.
+    ///
     /// A change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     /// (ADR 0006) before anything is mutated: remove the signature explicitly
@@ -221,6 +237,8 @@ impl Edit<'_> {
             .update(move |opc| package::reorder_custom_show_slides(opc, show_id, ordered_slide_ids))
     }
 
+    /// The staged section `id`.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -228,6 +246,8 @@ impl Edit<'_> {
         find_section(self.staged.opc(), id)
     }
 
+    /// Add one section, generating its GUID when it has none. Returns the section ID.
+    ///
     /// A change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     /// (ADR 0006) before anything is mutated: remove the signature explicitly
@@ -243,6 +263,8 @@ impl Edit<'_> {
             .update(move |opc| package::add_section(opc, section))
     }
 
+    /// Replace the section `id` with `replacement`, keeping slide membership in slide order.
+    ///
     /// A change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     /// (ADR 0006) before anything is mutated: remove the signature explicitly
@@ -258,6 +280,8 @@ impl Edit<'_> {
             .update(move |opc| package::update_section(opc, id, replacement))
     }
 
+    /// Remove the section `id`. Returns whether it existed.
+    ///
     /// A change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     /// (ADR 0006) before anything is mutated: remove the signature explicitly
@@ -273,6 +297,8 @@ impl Edit<'_> {
             .update(move |opc| package::remove_section(opc, id))
     }
 
+    /// Reorder the sections to `ordered_ids`, which must name each section once.
+    ///
     /// A change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     /// (ADR 0006) before anything is mutated: remove the signature explicitly
@@ -288,6 +314,8 @@ impl Edit<'_> {
             .update(move |opc| package::reorder_sections(opc, ordered_ids))
     }
 
+    /// Add the slide `slide_id` to the section `section_id`.
+    ///
     /// A change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     /// (ADR 0006) before anything is mutated: remove the signature explicitly
@@ -303,6 +331,8 @@ impl Edit<'_> {
             .update(move |opc| package::add_section_slide(opc, section_id, slide_id))
     }
 
+    /// Remove the slide `slide_id` from the section `section_id`. Returns whether it was a member.
+    ///
     /// A change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     /// (ADR 0006) before anything is mutated: remove the signature explicitly
@@ -318,6 +348,8 @@ impl Edit<'_> {
             .update(move |opc| package::remove_section_slide(opc, section_id, slide_id))
     }
 
+    /// Reorder the slides of the section `section_id` to `ordered_slide_ids`.
+    ///
     /// A change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
     /// (ADR 0006) before anything is mutated: remove the signature explicitly
