@@ -304,7 +304,7 @@ fn metadata_writes_through_the_metadata_path() {
     let metadata = reopen(&edited).metadata().expect("read").expect("present");
     assert_eq!(metadata.title.as_deref(), Some("Quarterly"));
     assert_eq!(metadata.author.as_deref(), Some("Ryker"));
-    assert_eq!(metadata.keywords.as_deref(), Some("q3"));
+    assert_eq!(metadata.keywords, ["q3"]);
     let cleared = edited
         .set(
             "/metadata",

@@ -182,11 +182,13 @@ impl<'source> Edit<'source> {
             (metadata.author.as_deref(), "ODM metadata author"),
             (metadata.subject.as_deref(), "ODM metadata subject"),
             (metadata.description.as_deref(), "ODM metadata description"),
-            (metadata.keywords.as_deref(), "ODM metadata keywords"),
         ] {
             if let Some(value) = value {
                 crate::edit_ops::validate_value(value, scope, true)?;
             }
+        }
+        for keyword in &metadata.keywords {
+            crate::edit_ops::validate_value(keyword, "ODM metadata keywords", true)?;
         }
         self.title_after.clone_from(&metadata.title);
         self.metadata = Some(metadata);
@@ -2362,17 +2364,16 @@ fn collect_metadata_conflicts(
             right.before.description.as_deref(),
             right.after.description.as_deref(),
         ),
-        (
-            "keywords",
-            left.before.keywords.as_deref(),
-            left.after.keywords.as_deref(),
-            right.before.keywords.as_deref(),
-            right.after.keywords.as_deref(),
-        ),
     ] {
         if left_before != left_after && right_before != right_after && left_after != right_after {
             conflicts.push(Conflict::MetadataField(field));
         }
+    }
+    if left.before.keywords != left.after.keywords
+        && right.before.keywords != right.after.keywords
+        && left.after.keywords != right.after.keywords
+    {
+        conflicts.push(Conflict::MetadataField("keywords"));
     }
 }
 

@@ -1,42 +1,46 @@
 //! API demonstration for text format workbooks
 //!
-//! This example shows how to open text format workbooks through the sheet
-//! module's concrete `TextWorkbook` type and its format readers. Text formats
-//! are not Office files, so `litchi::open` does not read them; a
-//! `TextWorkbook` implements the generic `WorkbookTrait` instead.
+//! This example shows how to open text format workbooks through the
+//! concrete `litchi::sheet::text::Workbook` type and the format readers of
+//! `litchi::sheet::text` (the `litchi-sheet-text` crate). Text formats are
+//! not Office files, so `litchi::open` does not read them; a text `Workbook`
+//! implements the generic `WorkbookTrait` instead.
 
 use std::fs::File;
 
 use litchi::sheet::Worksheet as _;
-use litchi::sheet::text::formats::{read_dif, read_fixed_width, read_sylk};
-use litchi::sheet::text::{TextConfig, TextWorkbook};
+use litchi::sheet::text::{Workbook, delimited, dif, fixed_width, sylk};
 use litchi::sheet::{CellValue, WorkbookTrait};
 
 type ExampleResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 /// A workbook over the cells a SYLK, DIF or fixed-width reader parsed.
-fn workbook_from_cells(cells: Vec<Vec<CellValue>>) -> litchi::sheet::Result<TextWorkbook> {
-    let mut workbook = TextWorkbook::from_bytes(&[], TextConfig::default())?;
-    workbook.set_data(cells);
-    Ok(workbook)
+fn workbook_from_cells(cells: Vec<Vec<CellValue>>) -> Workbook {
+    Workbook::new(cells, delimited::Options::default())
 }
 
 /// Open a SYLK (Symbolic Link) workbook.
-fn open_sylk(path: &str) -> litchi::sheet::Result<TextWorkbook> {
-    workbook_from_cells(read_sylk(&mut File::open(path)?, Default::default())?)
+fn open_sylk(path: &str) -> litchi::sheet::text::Result<Workbook> {
+    Ok(workbook_from_cells(sylk::read(
+        File::open(path)?,
+        &sylk::Options::default(),
+    )?))
 }
 
 /// Open a DIF (Data Interchange Format) workbook.
-fn open_dif(path: &str) -> litchi::sheet::Result<TextWorkbook> {
-    workbook_from_cells(read_dif(&mut File::open(path)?, Default::default())?)
+fn open_dif(path: &str) -> litchi::sheet::text::Result<Workbook> {
+    Ok(workbook_from_cells(dif::read(
+        File::open(path)?,
+        &dif::Options::default(),
+    )?))
 }
 
 /// Open a fixed-width PRN workbook.
-fn open_fixed_width(path: &str) -> litchi::sheet::Result<TextWorkbook> {
-    workbook_from_cells(read_fixed_width(
-        &mut File::open(path)?,
-        Default::default(),
-    )?)
+fn open_fixed_width(path: &str) -> litchi::sheet::text::Result<Workbook> {
+    Ok(workbook_from_cells(fixed_width::read(
+        File::open(path)?,
+        &fixed_width::Options::default(),
+    )?))
 }
 
 fn main() -> ExampleResult<()> {
@@ -93,7 +97,7 @@ fn test_csv_api() -> ExampleResult<()> {
     println!("\nTesting CSV API...");
 
     // Open CSV workbook (comma-delimited is the default configuration)
-    let workbook = TextWorkbook::open("sample.csv")?;
+    let workbook = Workbook::open("sample.csv")?;
 
     // Get worksheet
     let worksheet = workbook.worksheet_by_index(0)?;
@@ -126,7 +130,7 @@ fn test_csv_api() -> ExampleResult<()> {
 fn test_tsv_api() {
     println!("\nTesting TSV API...");
 
-    match TextWorkbook::from_path_with_config("sample.tsv", TextConfig::tsv()) {
+    match Workbook::open_with_options("sample.tsv", delimited::Options::tsv()) {
         Ok(workbook) => {
             let worksheet = workbook.worksheet_by_index(0).unwrap();
             println!("  ✓ Opened TSV workbook: {}", worksheet.name());
@@ -140,7 +144,7 @@ fn test_prn_api() {
     println!("\nTesting PRN API...");
 
     // Test delimited PRN
-    match TextWorkbook::from_path_with_config("sample.csv", TextConfig::prn()) {
+    match Workbook::open_with_options("sample.csv", delimited::Options::prn()) {
         // Using CSV as PRN for demo
         Ok(workbook) => {
             let worksheet = workbook.worksheet_by_index(0).unwrap();

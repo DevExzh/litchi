@@ -735,6 +735,20 @@ impl BodyEdits {
         Ok(())
     }
 
+    /// Set the keyword list, one `meta:keyword` per keyword; an empty list
+    /// removes them.
+    pub(crate) fn set_metadata_keywords(&mut self, keywords: Vec<String>) -> Result<()> {
+        for keyword in &keywords {
+            xml::check_text(keyword, "metadata value")?;
+        }
+        self.metadata
+            .set_keywords(&keywords)
+            .map_err(|error| match error {
+                litchi_odf_common::Error::Core(error) => error,
+                other => invalid(other.to_string()),
+            })
+    }
+
     /// Set or remove one `meta.xml` property.
     pub(crate) fn set_metadata(&mut self, field: Metadata, value: Option<String>) -> Result<()> {
         if let Some(value) = &value {

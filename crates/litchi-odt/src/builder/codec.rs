@@ -203,8 +203,8 @@ impl Builder {
             push_metadata_element(&mut meta, "dc:description", description);
         }
 
-        if let Some(ref keywords) = self.metadata.keywords {
-            push_metadata_element(&mut meta, "meta:keyword", keywords);
+        for keyword in &self.metadata.keywords {
+            push_metadata_element(&mut meta, "meta:keyword", keyword);
         }
 
         if let Some(ref identifier) = self.metadata.identifier {

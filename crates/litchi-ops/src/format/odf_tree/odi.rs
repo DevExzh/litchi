@@ -54,7 +54,7 @@ pub(crate) const METADATA_PROPS: &[PropSpec] = &[
     writable("author", ValueType::Text),
     writable("subject", ValueType::Text),
     writable("description", ValueType::Text),
-    writable("keywords", ValueType::Text),
+    writable("keywords", ValueType::List),
 ];
 
 static OPERATION_GAPS: [GapSpec; 4] = [
@@ -200,7 +200,10 @@ pub(crate) fn build(package: &litchi_odi::Package) -> Result<super::Tree> {
             "description",
             field(|metadata| metadata.description.as_ref()),
         )
-        .prop("keywords", field(|metadata| metadata.keywords.as_ref()))
+        .prop(
+            "keywords",
+            metadata.and_then(|metadata| crate::node::Value::owned_list(&metadata.keywords)),
+        )
         .done();
     Ok(tree.build())
 }
@@ -252,6 +255,17 @@ pub(crate) fn set(
                         },
                     )?;
                 },
+                "metadata" if key == "keywords" => {
+                    let keywords = crate::props::keyword_list(value).ok_or_else(|| {
+                        crate::Error::new(
+                            Code::InvalidValue,
+                            "the keywords take a list, or text separated by ';' or ','",
+                        )
+                        .with_property("keywords")
+                        .with_format(FileFormat::Odi)
+                    })?;
+                    edit.set_keywords(keywords).map_err(staging)?;
+                },
                 "metadata" => {
                     let value = super::write::text(value, static_key(key, METADATA_PROPS))?;
                     match key {
@@ -259,7 +273,6 @@ pub(crate) fn set(
                         "author" => edit.set_author(value),
                         "subject" => edit.set_subject(value),
                         "description" => edit.set_description(value),
-                        "keywords" => edit.set_keywords(value),
                         other => return Err(key_refusal(node, other)),
                     }
                     .map_err(staging)?;

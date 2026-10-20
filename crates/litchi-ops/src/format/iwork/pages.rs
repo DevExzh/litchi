@@ -1039,6 +1039,17 @@ fn set_metadata(
     let mut edit = package.edit_metadata();
     for (key, value) in props.iter() {
         let name = key.as_str();
+        if name.eq_ignore_ascii_case("keywords") {
+            let keywords = crate::props::keyword_list(value).ok_or_else(|| {
+                refusal(
+                    Code::InvalidValue,
+                    "the keywords take a list, or text separated by ';' or ','",
+                )
+                .with_property(name.to_owned())
+            })?;
+            edit.set_keywords(&keywords).map_err(error)?;
+            continue;
+        }
         let value = match value {
             PropValue::Null => None,
             other => Some(other.as_text().ok_or_else(|| {
@@ -1049,7 +1060,6 @@ fn set_metadata(
         match name.to_ascii_lowercase().as_str() {
             "title" => edit.set_title(value),
             "author" | "creator" => edit.set_author(value),
-            "keywords" => edit.set_keywords(value),
             "description" => edit.set_description(value),
             _ if METADATA_UNOWNED
                 .iter()

@@ -82,6 +82,7 @@ use std::ops::Range;
 
 use crate::error::{Error as UnifiedError, Result};
 use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
+use litchi_sheet_text::delimited::{Dialect, Tokenizer, declared_delimiter};
 
 #[cfg(test)]
 mod tests;
@@ -106,52 +107,9 @@ pub(crate) fn check_cell_length(text: &str, format: litchi_core::FileFormat) -> 
 /// The fixed staging charge of one imported field, beside its text.
 const FIELD_CHARGE: usize = 64;
 
-/// How the source bytes are decoded.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-#[non_exhaustive]
-pub enum Encoding {
-    /// Read the byte-order mark (UTF-8, UTF-16 LE or UTF-16 BE); without
-    /// one, UTF-8.
-    #[default]
-    Auto,
-    /// UTF-8, with or without a byte-order mark.
-    Utf8,
-    /// UTF-16 little endian, with or without a byte-order mark.
-    Utf16Le,
-    /// UTF-16 big endian, with or without a byte-order mark.
-    Utf16Be,
-}
-
-impl Encoding {
-    /// The canonical name: `auto`, `utf-8`, `utf-16le` or `utf-16be`.
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Auto => "auto",
-            Self::Utf8 => "utf-8",
-            Self::Utf16Le => "utf-16le",
-            Self::Utf16Be => "utf-16be",
-        }
-    }
-
-    /// Parse a name, ignoring ASCII case: `auto`, `utf-8`/`utf8`,
-    /// `utf-16le`/`utf16le` or `utf-16be`/`utf16be`.
-    #[must_use]
-    pub fn parse(name: &str) -> Option<Self> {
-        let name = name.trim();
-        [
-            ("auto", Self::Auto),
-            ("utf-8", Self::Utf8),
-            ("utf8", Self::Utf8),
-            ("utf-16le", Self::Utf16Le),
-            ("utf16le", Self::Utf16Le),
-            ("utf-16be", Self::Utf16Be),
-            ("utf16be", Self::Utf16Be),
-        ]
-        .into_iter()
-        .find_map(|(spelling, encoding)| name.eq_ignore_ascii_case(spelling).then_some(encoding))
-    }
-}
+/// How the source bytes are decoded: the encoding of the shared
+/// `litchi-sheet-text` decoder, which import uses.
+pub use litchi_sheet_text::Encoding;
 
 /// Import options: CSV with type inference and no formulas by default.
 ///
@@ -668,8 +626,8 @@ pub(crate) fn parse(source: &[u8], options: &Options, limits: &SemanticLimits) -
             limits.max_staged_bytes(),
         ));
     }
-    let text = decode(source, options.encoding)?;
-    let (declared, body) = declaration(&text);
+    let (text, _) = options.encoding.decode(source).map_err(leaf)?;
+    let (declared, body) = declared_delimiter(&text);
     let delimiter = match (explicit, declared) {
         (Some(delimiter), _) => delimiter,
         (None, Some(declared)) => {
@@ -683,22 +641,17 @@ pub(crate) fn parse(source: &[u8], options: &Options, limits: &SemanticLimits) -
         },
         (None, None) => b',',
     };
-    let mut parser = Parser {
-        input: body.as_bytes(),
-        body,
-        position: 0,
-        line: 1 + usize::from(declared.is_some()),
-        delimiter,
-        quote,
-        scratch: String::new(),
-    };
+    let dialect = Dialect::new(delimiter).quote(quote).refuse_controls(true);
+    let mut parser = Tokenizer::new(body, dialect)
+        .map_err(leaf)?
+        .first_line(1 + usize::from(declared.is_some()));
     let mut table = Table::default();
     let mut staged = 0usize;
     let mut record = 0u32;
-    while !parser.at_end() {
+    while parser.next_record() {
         let mut column = 0u32;
         loop {
-            let field = parser.field()?;
+            let field = parser.field().map_err(leaf)?;
             let value = infer(field, record, column, options, &mut table.text)?;
             if table.fields.len() >= limits.max_expanded_targets() {
                 return Err(limit(
@@ -727,7 +680,7 @@ pub(crate) fn parse(source: &[u8], options: &Options, limits: &SemanticLimits) -
                 value,
             });
             column = column.saturating_add(1);
-            if !parser.delimiter() {
+            if !parser.next_field() {
                 break;
             }
         }
@@ -758,209 +711,26 @@ fn ascii(character: char, option: OptionKind) -> Result<u8> {
     }
 }
 
-/// Decode the source, removing the byte-order mark.
-fn decode(source: &[u8], encoding: Encoding) -> Result<std::borrow::Cow<'_, str>> {
-    const UTF8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
-    let encoding = match encoding {
-        Encoding::Auto if source.starts_with(&[0xFF, 0xFE]) => Encoding::Utf16Le,
-        Encoding::Auto if source.starts_with(&[0xFE, 0xFF]) => Encoding::Utf16Be,
-        Encoding::Auto => Encoding::Utf8,
-        explicit => explicit,
-    };
-    match encoding {
-        Encoding::Utf16Le | Encoding::Utf16Be => {
-            let little = encoding == Encoding::Utf16Le;
-            let mark: &[u8] = if little { &[0xFF, 0xFE] } else { &[0xFE, 0xFF] };
-            let skip = if source.starts_with(mark) { 2 } else { 0 };
-            let body = &source[skip..];
-            if body.len() % 2 != 0 {
-                return Err(Error::Encoding {
-                    offset: source.len() - 1,
-                }
-                .into());
-            }
-            let units = body.chunks_exact(2).map(|pair| {
-                let pair = [pair[0], pair[1]];
-                if little {
-                    u16::from_le_bytes(pair)
-                } else {
-                    u16::from_be_bytes(pair)
-                }
-            });
-            let mut text = String::new();
-            text.try_reserve(body.len())
-                .map_err(|source| TransactionError::Allocation { source })?;
-            let mut offset = skip;
-            for unit in char::decode_utf16(units) {
-                match unit {
-                    Ok(character) => {
-                        text.push(character);
-                        offset += character.len_utf16() * 2;
-                    },
-                    Err(_) => return Err(Error::Encoding { offset }.into()),
-                }
-            }
-            Ok(std::borrow::Cow::Owned(text))
-        },
-        Encoding::Utf8 | Encoding::Auto => {
-            let skip = if source.starts_with(UTF8_BOM) { 3 } else { 0 };
-            std::str::from_utf8(&source[skip..])
-                .map(std::borrow::Cow::Borrowed)
-                .map_err(|error| {
-                    Error::Encoding {
-                        offset: skip + error.valid_up_to(),
-                    }
-                    .into()
-                })
-        },
-    }
-}
-
-/// An Excel `sep=X` first line: the declared ASCII delimiter and the text
-/// after the line.
-fn declaration(text: &str) -> (Option<u8>, &str) {
-    let Some(rest) = text.strip_prefix("sep=") else {
-        return (None, text);
-    };
-    let bytes = rest.as_bytes();
-    let Some(&delimiter) = bytes.first() else {
-        return (None, text);
-    };
-    if !delimiter.is_ascii() || matches!(delimiter, b'\r' | b'\n' | 0) {
-        return (None, text);
-    }
-    let after = &rest[1..];
-    let body = if let Some(body) = after.strip_prefix("\r\n") {
-        body
-    } else if let Some(body) = after
-        .strip_prefix('\n')
-        .or_else(|| after.strip_prefix('\r'))
-    {
-        body
-    } else if after.is_empty() {
-        after
-    } else {
-        return (None, text);
-    };
-    (Some(delimiter), body)
-}
-
-struct Parser<'a> {
-    input: &'a [u8],
-    body: &'a str,
-    position: usize,
-    line: usize,
-    delimiter: u8,
-    quote: Option<u8>,
-    scratch: String,
-}
-
-impl<'a> Parser<'a> {
-    fn at_end(&self) -> bool {
-        self.position >= self.input.len()
-    }
-
-    /// Read one field, leaving the position on its delimiter, line break or
-    /// the end. The returned text borrows the input or the scratch buffer.
-    fn field(&mut self) -> Result<&str> {
-        if self
-            .quote
-            .is_some_and(|quote| self.input.get(self.position) == Some(&quote))
-        {
-            return self.quoted();
+/// Map a tokenizer or decoder failure onto the import's own errors.
+fn leaf(error: litchi_sheet_text::Error) -> UnifiedError {
+    use litchi_sheet_text::Error as Leaf;
+    match error {
+        Leaf::Encoding { offset } => Error::Encoding { offset }.into(),
+        Leaf::UnterminatedQuote { line } => Error::UnterminatedQuote { line }.into(),
+        Leaf::InvalidCharacter { line } => Error::InvalidCharacter { line }.into(),
+        Leaf::Allocation { source } => TransactionError::Allocation { source }.into(),
+        Leaf::InvalidOption {
+            option: litchi_sheet_text::OptionKind::Quote,
+        } => Error::InvalidOption {
+            option: OptionKind::Quote,
         }
-        let start = self.position;
-        while let Some(&byte) = self.input.get(self.position) {
-            if byte == self.delimiter || byte == b'\r' || byte == b'\n' {
-                break;
-            }
-            self.check(byte)?;
-            self.position += 1;
+        .into(),
+        // The options were checked before tokenizing; the tokenizer reports
+        // nothing else for import's dialect.
+        _ => Error::InvalidOption {
+            option: OptionKind::Delimiter,
         }
-        Ok(&self.body[start..self.position])
-    }
-
-    fn quoted(&mut self) -> Result<&str> {
-        let quote = self.quote.unwrap_or(b'"');
-        let line = self.line;
-        self.position += 1;
-        self.scratch.clear();
-        let mut run = self.position;
-        loop {
-            let Some(&byte) = self.input.get(self.position) else {
-                return Err(Error::UnterminatedQuote { line }.into());
-            };
-            if byte == quote {
-                self.scratch.push_str(&self.body[run..self.position]);
-                if self.input.get(self.position + 1) == Some(&quote) {
-                    self.scratch.push(char::from(quote));
-                    self.position += 2;
-                    run = self.position;
-                    continue;
-                }
-                self.position += 1;
-                break;
-            }
-            if byte == b'\n' || (byte == b'\r' && self.input.get(self.position + 1) != Some(&b'\n'))
-            {
-                self.line += 1;
-            }
-            self.check(byte)?;
-            self.position += 1;
-        }
-        // Text after the closing quote up to the delimiter is kept verbatim,
-        // as spreadsheet applications read `"a"b`.
-        let tail = self.position;
-        while let Some(&byte) = self.input.get(self.position) {
-            if byte == self.delimiter || byte == b'\r' || byte == b'\n' {
-                break;
-            }
-            self.check(byte)?;
-            self.position += 1;
-        }
-        self.scratch.push_str(&self.body[tail..self.position]);
-        Ok(&self.scratch)
-    }
-
-    /// Refuse the byte at the current position when it starts a character
-    /// no cell can store: a C0 control other than tab and line breaks, or
-    /// U+FFFE/U+FFFF (`EF BF BE`/`EF BF BF`).
-    fn check(&self, byte: u8) -> Result<()> {
-        let invalid = (byte < 0x20 && !matches!(byte, b'\t' | b'\r' | b'\n'))
-            || (byte == 0xEF
-                && self.input.get(self.position + 1) == Some(&0xBF)
-                && matches!(self.input.get(self.position + 2), Some(0xBE | 0xBF)));
-        if invalid {
-            return Err(Error::InvalidCharacter { line: self.line }.into());
-        }
-        Ok(())
-    }
-
-    /// Consume a delimiter after a field; `false` at a line break or the end.
-    fn delimiter(&mut self) -> bool {
-        if self.input.get(self.position) == Some(&self.delimiter) {
-            self.position += 1;
-            return true;
-        }
-        false
-    }
-
-    /// Consume the line break that ends a record.
-    fn end_record(&mut self) {
-        match self.input.get(self.position) {
-            Some(b'\r') => {
-                self.position += 1;
-                if self.input.get(self.position) == Some(&b'\n') {
-                    self.position += 1;
-                }
-                self.line += 1;
-            },
-            Some(b'\n') => {
-                self.position += 1;
-                self.line += 1;
-            },
-            _ => {},
-        }
+        .into(),
     }
 }
 

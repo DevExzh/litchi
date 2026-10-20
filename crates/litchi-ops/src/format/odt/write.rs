@@ -208,7 +208,7 @@ fn coerce(value: &PropValue<'_>, ty: ValueType, key: &'static str) -> Result<Opt
                 Scalar::Token(token) => Coerced::Token(token),
                 Scalar::Length(length) => Coerced::Length(length),
                 Scalar::Color(color) => Coerced::Color(color),
-                Scalar::Number(_) => Coerced::Other,
+                Scalar::Number(_) | Scalar::List(_) => Coerced::Other,
             }))
         })
         .map_err(|error| error.with_property(key).with_format(FileFormat::Odt))
@@ -824,6 +824,11 @@ fn set_metadata(file: &Odt, props: &Props<'_>, limits: &SemanticLimits) -> Resul
             }
             .with_property(name.to_owned()));
         };
+        if *field == MetadataField::Keywords {
+            let keywords = crate::props::keyword_list(value).ok_or_else(|| wrong(key))?;
+            edit.set_keywords(&keywords).map_err(metadata_error)?;
+            continue;
+        }
         let value = coerce_text(value, key)?;
         edit.set(*field, value.as_deref()).map_err(metadata_error)?;
     }
@@ -1445,11 +1450,14 @@ fn create_tagged(
         (MetadataField::Author, &metadata.author),
         (MetadataField::LastModifiedBy, &metadata.last_modified_by),
         (MetadataField::Language, &metadata.language),
-        (MetadataField::Keywords, &metadata.keywords),
     ] {
         if let Some(value) = value {
             edit.set(field, Some(value)).map_err(metadata_error)?;
         }
+    }
+    if !metadata.keywords.is_empty() {
+        edit.set_keywords(&metadata.keywords)
+            .map_err(metadata_error)?;
     }
     let package = edit.commit().map_err(odf_error)?.into_package();
     Odt::from_package(package, None, format)

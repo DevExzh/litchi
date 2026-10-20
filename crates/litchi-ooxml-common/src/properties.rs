@@ -8,6 +8,12 @@
 //! - the core reader keeps the exact `cp:keywords` mixed content, the
 //!   W3CDTF and `xsd:dateTime` lexical forms and the Strict or Transitional
 //!   dialect, so a field the caller leaves unchanged is written back exactly;
+//! - [`Metadata::keywords`] is the keyword list of that mixed content: text
+//!   split at `;` and `,`, each `cp:value` one keyword
+//!   ([`litchi_core::metadata::Keywords::list`]). An unchanged list keeps the
+//!   source element byte for byte; a changed list is written as text joined
+//!   with `, `, a keyword holding a separator as a `cp:value` child
+//!   ([`litchi_core::metadata::Keywords::from_list`]);
 //! - the application writer ([`app`]) splices only the elements whose value
 //!   changes, so the vector properties and extension content survive;
 //! - custom properties keep their own typed collection
@@ -146,7 +152,11 @@ impl Core {
         metadata.title.clone_from(&self.title);
         metadata.subject.clone_from(&self.subject);
         metadata.author.clone_from(&self.creator);
-        metadata.keywords = self.keywords.as_ref().map(Keywords::joined);
+        metadata.keywords = self
+            .keywords
+            .as_ref()
+            .map(Keywords::list)
+            .unwrap_or_default();
         metadata.description.clone_from(&self.description);
         metadata.identifier.clone_from(&self.identifier);
         metadata.language.clone_from(&self.language);
@@ -181,10 +191,15 @@ impl Core {
                 target.clone()
             }
         }
+        // The list is the split of the mixed content (`Keywords::list`), so
+        // an unchanged list keeps the source's exact separators, values and
+        // languages; a changed one is written by `Keywords::from_list`.
         let keywords = if before.keywords == target.keywords {
             base.keywords.clone()
+        } else if target.keywords.is_empty() {
+            None
         } else {
-            target.keywords.clone().map(Keywords::from)
+            Some(Keywords::from_list(&target.keywords))
         };
         let created = if before.created == target.created {
             base.created.clone()
@@ -593,12 +608,12 @@ mod tests {
             ..Core::default()
         };
         let mut target = base.metadata();
-        assert_eq!(target.keywords.as_deref(), Some("ab"));
+        assert_eq!(target.keywords, ["a", "b"]);
         assert_eq!(target.author.as_deref(), Some("Ada"));
         let unchanged = Core::merged(Some(&base), &target).unwrap();
         assert_eq!(unchanged, base);
 
-        target.keywords = Some("plain".to_owned());
+        target.keywords = vec!["plain".to_owned()];
         target.author = None;
         let changed = Core::merged(Some(&base), &target).unwrap();
         assert_eq!(changed.keywords, Some(Keywords::from("plain")));

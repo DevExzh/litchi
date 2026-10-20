@@ -69,9 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!(
         "Keywords        : {:?}",
-        props
-            .and_then(|p| p.keywords.as_ref())
-            .map(ToString::to_string)
+        props.map(|p| p.keywords.as_slice()).unwrap_or_default()
     );
     println!(
         "Description     : {:?}",

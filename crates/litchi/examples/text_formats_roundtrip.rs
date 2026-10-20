@@ -4,7 +4,7 @@
 //! for all supported text formats.
 
 use litchi::sheet::CellValue;
-use litchi::sheet::text::formats::*;
+use litchi::sheet::text::{delimited, dif, fixed_width, sylk};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 
@@ -126,12 +126,12 @@ fn test_csv_roundtrip(data: &[Vec<CellValue>]) -> ExampleResult<()> {
     // Write
     let file = File::create("roundtrip.csv")?;
     let mut writer = BufWriter::new(file);
-    write_delimited(data, &mut writer, DelimitedConfig::csv())?;
+    delimited::write(data, &mut writer, &delimited::Options::csv())?;
     writer.flush()?;
 
     // Read back
-    let mut read_file = File::open("roundtrip.csv")?;
-    let read_data = read_delimited(&mut read_file, DelimitedConfig::csv())?;
+    let read_file = File::open("roundtrip.csv")?;
+    let read_data = delimited::read(read_file, &delimited::Options::csv())?;
 
     compare_data(data, &read_data, "CSV");
     Ok(())
@@ -143,12 +143,12 @@ fn test_tsv_roundtrip(data: &[Vec<CellValue>]) -> ExampleResult<()> {
     // Write
     let file = File::create("roundtrip.tsv")?;
     let mut writer = BufWriter::new(file);
-    write_delimited(data, &mut writer, DelimitedConfig::tsv())?;
+    delimited::write(data, &mut writer, &delimited::Options::tsv())?;
     writer.flush()?;
 
     // Read back
-    let mut read_file = File::open("roundtrip.tsv")?;
-    let read_data = read_delimited(&mut read_file, DelimitedConfig::tsv())?;
+    let read_file = File::open("roundtrip.tsv")?;
+    let read_data = delimited::read(read_file, &delimited::Options::tsv())?;
 
     compare_data(data, &read_data, "TSV");
     Ok(())
@@ -160,12 +160,12 @@ fn test_prn_delimited_roundtrip(data: &[Vec<CellValue>]) -> ExampleResult<()> {
     // Write
     let file = File::create("roundtrip_delimited.prn")?;
     let mut writer = BufWriter::new(file);
-    write_delimited(data, &mut writer, DelimitedConfig::prn())?;
+    delimited::write(data, &mut writer, &delimited::Options::prn())?;
     writer.flush()?;
 
     // Read back
-    let mut read_file = File::open("roundtrip_delimited.prn")?;
-    let read_data = read_delimited(&mut read_file, DelimitedConfig::prn())?;
+    let read_file = File::open("roundtrip_delimited.prn")?;
+    let read_data = delimited::read(read_file, &delimited::Options::prn())?;
 
     compare_data(data, &read_data, "PRN (delimited)");
     Ok(())
@@ -178,20 +178,14 @@ fn test_prn_fixed_width_roundtrip(data: &[Vec<CellValue>]) -> ExampleResult<()> 
     let file = File::create("roundtrip_fixed.prn")?;
     let mut writer = BufWriter::new(file);
 
-    let config = FixedWidthConfig {
-        column_widths: vec![15, 15, 15],
-        auto_detect_widths: false,
-        trim_fields: true,
-        strip_bom: true,
-        write_bom: None,
-    };
+    let config = fixed_width::Options::default().column_widths(vec![15, 15, 15]);
 
-    write_fixed_width(data, &mut writer, config.clone())?;
+    fixed_width::write(data, &mut writer, &config)?;
     writer.flush()?;
 
     // Read back with same widths
-    let mut read_file = File::open("roundtrip_fixed.prn")?;
-    let read_data = read_fixed_width(&mut read_file, config)?;
+    let read_file = File::open("roundtrip_fixed.prn")?;
+    let read_data = fixed_width::read(read_file, &config)?;
 
     compare_data(data, &read_data, "PRN (fixed-width)");
     Ok(())
@@ -203,12 +197,12 @@ fn test_sylk_roundtrip(data: &[Vec<CellValue>]) -> ExampleResult<()> {
     // Write
     let file = File::create("roundtrip.slk")?;
     let mut writer = BufWriter::new(file);
-    write_sylk(data, &mut writer, SylkConfig::default())?;
+    sylk::write(data, &mut writer, &sylk::Options::default())?;
     writer.flush()?;
 
     // Read back
-    let mut read_file = File::open("roundtrip.slk")?;
-    let read_data = read_sylk(&mut read_file, SylkConfig::default())?;
+    let read_file = File::open("roundtrip.slk")?;
+    let read_data = sylk::read(read_file, &sylk::Options::default())?;
 
     compare_data(data, &read_data, "SYLK");
     Ok(())
@@ -220,12 +214,12 @@ fn test_dif_roundtrip(data: &[Vec<CellValue>]) -> ExampleResult<()> {
     // Write
     let file = File::create("roundtrip.dif")?;
     let mut writer = BufWriter::new(file);
-    write_dif(data, &mut writer, DifConfig::default())?;
+    dif::write(data, &mut writer, &dif::Options::default())?;
     writer.flush()?;
 
     // Read back
-    let mut read_file = File::open("roundtrip.dif")?;
-    let read_data = read_dif(&mut read_file, DifConfig::default())?;
+    let read_file = File::open("roundtrip.dif")?;
+    let read_data = dif::read(read_file, &dif::Options::default())?;
 
     compare_data(data, &read_data, "DIF");
     Ok(())

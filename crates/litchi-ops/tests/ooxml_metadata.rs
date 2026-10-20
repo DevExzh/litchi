@@ -48,7 +48,7 @@ fn root_sets_write_core_and_app_properties_and_survive_reopen() {
             let value = metadata(file);
             assert_eq!(value.title.as_deref(), Some("Quarterly"), "{format:?}");
             assert_eq!(value.author.as_deref(), Some("Ada"), "{format:?}");
-            assert_eq!(value.keywords.as_deref(), Some("plan, review"));
+            assert_eq!(value.keywords, ["plan", "review"]);
             assert_eq!(value.category.as_deref(), Some("Finance"));
             assert_eq!(value.last_modified_by.as_deref(), Some("Lin"));
             assert_eq!(value.revision.as_deref(), Some("3"));

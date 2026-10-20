@@ -474,7 +474,7 @@ pub(crate) const METADATA_PROPS: &[PropSpec] = &[
     write("author", ValueType::Text),
     write("lastModifiedBy", ValueType::Text),
     write("language", ValueType::Text),
-    write("keywords", ValueType::Text),
+    write("keywords", ValueType::List),
     read("created", ValueType::Text),
     read("modified", ValueType::Text),
     read("application", ValueType::Text),

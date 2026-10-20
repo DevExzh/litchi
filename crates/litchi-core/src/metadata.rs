@@ -135,12 +135,15 @@ pub struct Metadata {
     /// Document author (OOXML `dc:creator`)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub author: Option<String>,
-    /// Keywords, joined into one string.
+    /// Keywords, one entry per keyword; empty means none.
     ///
-    /// The OOXML codec keeps the structured [`Keywords`] form of an
-    /// unchanged value losslessly.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub keywords: Option<String>,
+    /// Formats that store keywords as one string split it at `;` and `,`
+    /// and write a changed list joined with `, `
+    /// ([`keywords::split`], [`keywords::join`]); ODF stores one
+    /// `meta:keyword` per entry. The OOXML codec keeps the structured
+    /// [`Keywords`] mixed content of an unchanged list losslessly.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub keywords: Vec<String>,
     /// Document description/comments
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -379,7 +382,7 @@ impl Metadata {
             Field::Title => self.title.is_some(),
             Field::Subject => self.subject.is_some(),
             Field::Author => self.author.is_some(),
-            Field::Keywords => self.keywords.is_some(),
+            Field::Keywords => !self.keywords.is_empty(),
             Field::Description => self.description.is_some(),
             Field::Identifier => self.identifier.is_some(),
             Field::Language => self.language.is_some(),

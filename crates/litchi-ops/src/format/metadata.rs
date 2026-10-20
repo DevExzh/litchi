@@ -7,7 +7,8 @@
 //! and PPTX (record 0338); [`is_root`] and [`names_metadata`] decide it. The keys are the 22 OfficeCLI
 //! root-metadata spellings the legacy OLE formats accept on the same path
 //! (record 0254; matched ASCII case-insensitively), plus `custom.<name>` for
-//! custom properties. `null` removes a property. A key no OOXML part stores
+//! custom properties. `null` removes a property. `keywords` takes a list,
+//! or text split at `;` and `,` (record 0354). A key no OOXML part stores
 //! (`contentType`) is refused by the leaf with a typed error naming the
 //! field. Unlike OfficeCLI, a set never stamps `modified` (ADR 0006,
 //! determinism). The path is set-only; reads go through `File::metadata()`
@@ -222,6 +223,8 @@ pub(crate) const fn root_capability<const N: usize>(
 enum Assigned {
     Text(Option<String>),
     Time(Option<Timestamp>),
+    /// The keyword list; empty removes the keywords.
+    Keywords(Vec<String>),
 }
 
 /// Admitted `/metadata` assignments; `None` removes.
@@ -245,7 +248,6 @@ impl Assignments {
                         Field::ContentStatus => &mut metadata.content_status,
                         Field::ContentType => &mut metadata.content_type,
                         Field::Description => &mut metadata.description,
-                        Field::Keywords => &mut metadata.keywords,
                         Field::Language => &mut metadata.language,
                         Field::LastModifiedBy => &mut metadata.last_modified_by,
                         Field::Manager => &mut metadata.manager,
@@ -254,10 +256,13 @@ impl Assignments {
                         Field::Template => &mut metadata.template,
                         Field::Title => &mut metadata.title,
                         Field::Version => &mut metadata.version,
-                        Field::Created | Field::Modified | Field::LastPrinted => continue,
+                        Field::Created | Field::Modified | Field::LastPrinted | Field::Keywords => {
+                            continue;
+                        },
                     };
                     slot.clone_from(text);
                 },
+                Assigned::Keywords(keywords) => metadata.keywords.clone_from(keywords),
                 Assigned::Time(time) => {
                     let slot = match field {
                         Field::Created => &mut metadata.created,
@@ -409,6 +414,9 @@ pub(crate) fn admit(props: &Props<'_>, format: FileFormat) -> Result<Assignments
                 },
                 _ => return Err(wrong_kind(name, format)),
             }),
+            Field::Keywords => Assigned::Keywords(
+                crate::props::keyword_list(value).ok_or_else(|| wrong_kind(name, format))?,
+            ),
             _ => Assigned::Text(match value {
                 PropValue::Null => None,
                 PropValue::Text(text) => Some(text.to_string()),

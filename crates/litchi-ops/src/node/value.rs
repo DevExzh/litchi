@@ -70,6 +70,9 @@ pub enum Value<'a> {
     Length(Length),
     /// A colour.
     Color(Color),
+    /// A list of text items, a JSON array of strings (the metadata
+    /// keywords, record 0354).
+    List(Cow<'a, [String]>),
 }
 
 impl<'a> Value<'a> {
@@ -84,6 +87,26 @@ impl<'a> Value<'a> {
     #[must_use]
     pub fn number(value: f64) -> Option<Self> {
         value.is_finite().then_some(Self::Number(value))
+    }
+
+    /// An owned [`Value::List`] of `items`, or `None` for an empty list: an
+    /// empty list is an absent property, as the keyword list's `Vec` is.
+    #[cfg_attr(
+        not(any(
+            feature = "docx",
+            feature = "pptx",
+            feature = "xls",
+            feature = "xlsx",
+            feature = "xlsb",
+            feature = "odt",
+            feature = "ods",
+            feature = "odp",
+            feature = "odi"
+        )),
+        allow(dead_code, reason = "only the metadata adapters read keyword lists")
+    )]
+    pub(crate) fn owned_list(items: &[String]) -> Option<Value<'static>> {
+        (!items.is_empty()).then(|| Value::List(Cow::Owned(items.to_vec())))
     }
 
     /// The same value, borrowing its text instead of cloning it. Never
@@ -107,6 +130,7 @@ impl<'a> Value<'a> {
             Self::Token(token) => Value::Token(token),
             Self::Length(length) => Value::Length(*length),
             Self::Color(color) => Value::Color(*color),
+            Self::List(items) => Value::List(Cow::Borrowed(items)),
         }
     }
 
@@ -130,6 +154,7 @@ impl<'a> Value<'a> {
             Self::Token(token) => Value::Token(token),
             Self::Length(length) => Value::Length(length),
             Self::Color(color) => Value::Color(color),
+            Self::List(items) => Value::List(Cow::Owned(items.into_owned())),
         }
     }
 
@@ -174,6 +199,7 @@ impl<'a> Value<'a> {
             Self::Token(token) => Scalar::Token(token),
             Self::Length(length) => Scalar::Length(*length),
             Self::Color(color) => Scalar::Color(*color),
+            Self::List(items) => Scalar::List(items),
         }
     }
 
@@ -212,6 +238,7 @@ impl<'a> Value<'a> {
                 let scalar = self.as_scalar();
                 serializer.collect_str(&scalar.display(ty))
             },
+            Self::List(items) => serializer.collect_seq(items.iter()),
         }
     }
 }
@@ -272,6 +299,18 @@ impl<'a> From<Cow<'a, str>> for Value<'a> {
     }
 }
 
+impl From<Vec<String>> for Value<'_> {
+    fn from(items: Vec<String>) -> Self {
+        Self::List(Cow::Owned(items))
+    }
+}
+
+impl<'a> From<&'a [String]> for Value<'a> {
+    fn from(items: &'a [String]) -> Self {
+        Self::List(Cow::Borrowed(items))
+    }
+}
+
 impl From<Length> for Value<'_> {
     fn from(value: Length) -> Self {
         Self::Length(value)
@@ -307,6 +346,7 @@ impl<'a> From<Scalar<'a>> for Value<'a> {
             Scalar::Token(token) => Self::Token(token),
             Scalar::Length(length) => Self::Length(length),
             Scalar::Color(color) => Self::Color(color),
+            Scalar::List(items) => Self::List(Cow::Borrowed(items)),
         }
     }
 }
