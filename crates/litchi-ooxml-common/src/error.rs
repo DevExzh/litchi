@@ -81,6 +81,17 @@ pub enum Error {
         maximum: usize,
     },
 
+    /// A Ribbon (customUI) budget is exhausted (record 0360).
+    #[error("OOXML {kind} exceeds limit {maximum} (actual {observed})")]
+    RibbonLimit {
+        /// The exceeded budget.
+        kind: crate::ribbon::LimitKind,
+        /// Observed value, or `usize::MAX` when arithmetic overflowed.
+        observed: usize,
+        /// Maximum accepted value.
+        maximum: usize,
+    },
+
     /// A bounded inventory collection could not reserve its next entry.
     #[error("OOXML allocation failed for {resource}: {source}")]
     Allocation {

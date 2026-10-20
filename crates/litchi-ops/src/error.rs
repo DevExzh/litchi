@@ -1157,6 +1157,7 @@ fn common_limit(error: &litchi_ooxml_common::Error) -> bool {
         error,
         litchi_ooxml_common::Error::CustomXmlLimit { .. }
             | litchi_ooxml_common::Error::WebLimit { .. }
+            | litchi_ooxml_common::Error::RibbonLimit { .. }
     )
 }
 

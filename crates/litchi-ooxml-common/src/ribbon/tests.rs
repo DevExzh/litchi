@@ -155,7 +155,7 @@ fn xml_bytes_depth_nodes_entities_and_namespaces_are_bounded() {
     };
     assert!(matches!(
         put_with(&mut package, Version::V2007, XML_2007.to_vec(), &tiny_bytes),
-        Err(Error::Limit { .. })
+        Err(Error::RibbonLimit { .. })
     ));
     assert_eq!(package.part_count(), 0);
 
@@ -166,7 +166,7 @@ fn xml_bytes_depth_nodes_entities_and_namespaces_are_bounded() {
     let nested = br#"<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui"><ribbon/></customUI>"#;
     assert!(matches!(
         put_with(&mut package, Version::V2007, nested.to_vec(), &shallow),
-        Err(Error::Limit { .. })
+        Err(Error::RibbonLimit { .. })
     ));
 
     let few_nodes = Limits {
@@ -175,7 +175,7 @@ fn xml_bytes_depth_nodes_entities_and_namespaces_are_bounded() {
     };
     assert!(matches!(
         put_with(&mut package, Version::V2007, XML_2007.to_vec(), &few_nodes),
-        Err(Error::Limit { .. })
+        Err(Error::RibbonLimit { .. })
     ));
     assert!(put(
         &mut package,
@@ -372,7 +372,7 @@ fn aggregate_image_relationships_are_bounded() {
     };
     assert!(matches!(
         load_with(&package, &limits),
-        Err(Error::Limit { .. })
+        Err(Error::RibbonLimit { .. })
     ));
 }
 

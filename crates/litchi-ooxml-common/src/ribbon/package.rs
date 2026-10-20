@@ -2,6 +2,8 @@
 
 use crate::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
+
+use super::limit::LimitKind;
 use litchi_opc::{OpcPackage, PackURI, Part, XmlPart};
 use std::cmp::Ordering;
 use std::collections::VecDeque;
@@ -253,30 +255,30 @@ fn sorted_part_names(package: &OpcPackage) -> Result<Vec<String>> {
     let mut names = Vec::with_capacity(package.part_count().min(MAX_PART_NAMES));
     let mut bytes = 0usize;
     for part in package.iter_parts() {
-        let count = names.len().checked_add(1).ok_or(Error::Limit {
-            resource: "Ribbon part-name allocation scan",
-            max: MAX_PART_NAMES,
-            actual: usize::MAX,
+        let count = names.len().checked_add(1).ok_or(Error::RibbonLimit {
+            kind: LimitKind::PartNameAllocationScan,
+            maximum: MAX_PART_NAMES,
+            observed: usize::MAX,
         })?;
         if count > MAX_PART_NAMES {
-            return Err(Error::Limit {
-                resource: "Ribbon part-name allocation scan",
-                max: MAX_PART_NAMES,
-                actual: count,
+            return Err(Error::RibbonLimit {
+                kind: LimitKind::PartNameAllocationScan,
+                maximum: MAX_PART_NAMES,
+                observed: count,
             });
         }
         bytes = bytes
             .checked_add(part.partname().as_str().len())
-            .ok_or(Error::Limit {
-                resource: "Ribbon part-name allocation bytes",
-                max: MAX_PART_NAME_BYTES,
-                actual: usize::MAX,
+            .ok_or(Error::RibbonLimit {
+                kind: LimitKind::PartNameAllocationBytes,
+                maximum: MAX_PART_NAME_BYTES,
+                observed: usize::MAX,
             })?;
         if bytes > MAX_PART_NAME_BYTES {
-            return Err(Error::Limit {
-                resource: "Ribbon part-name allocation bytes",
-                max: MAX_PART_NAME_BYTES,
-                actual: bytes,
+            return Err(Error::RibbonLimit {
+                kind: LimitKind::PartNameAllocationBytes,
+                maximum: MAX_PART_NAME_BYTES,
+                observed: bytes,
             });
         }
         names.push(part.partname().as_str().to_ascii_lowercase());
@@ -406,16 +408,16 @@ fn removable_images(
             };
             match source_index {
                 Some(source_index) => {
-                    edges = edges.checked_add(1).ok_or(Error::Limit {
-                        resource: "Ribbon image garbage-collection edges",
-                        max: MAX_IMAGE_GC_EDGES,
-                        actual: usize::MAX,
+                    edges = edges.checked_add(1).ok_or(Error::RibbonLimit {
+                        kind: LimitKind::ImageGarbageCollectionEdges,
+                        maximum: MAX_IMAGE_GC_EDGES,
+                        observed: usize::MAX,
                     })?;
                     if edges > MAX_IMAGE_GC_EDGES {
-                        return Err(Error::Limit {
-                            resource: "Ribbon image garbage-collection edges",
-                            max: MAX_IMAGE_GC_EDGES,
-                            actual: edges,
+                        return Err(Error::RibbonLimit {
+                            kind: LimitKind::ImageGarbageCollectionEdges,
+                            maximum: MAX_IMAGE_GC_EDGES,
+                            observed: edges,
                         });
                     }
                     outgoing[source_index].push(target_index);
@@ -453,16 +455,16 @@ fn removable_images(
 }
 
 fn bump_graph_links(scanned: &mut usize) -> Result<()> {
-    *scanned = scanned.checked_add(1).ok_or(Error::Limit {
-        resource: "Ribbon package graph relationships",
-        max: MAX_GRAPH_LINKS,
-        actual: usize::MAX,
+    *scanned = scanned.checked_add(1).ok_or(Error::RibbonLimit {
+        kind: LimitKind::PackageGraphRelationships,
+        maximum: MAX_GRAPH_LINKS,
+        observed: usize::MAX,
     })?;
     if *scanned > MAX_GRAPH_LINKS {
-        return Err(Error::Limit {
-            resource: "Ribbon package graph relationships",
-            max: MAX_GRAPH_LINKS,
-            actual: *scanned,
+        return Err(Error::RibbonLimit {
+            kind: LimitKind::PackageGraphRelationships,
+            maximum: MAX_GRAPH_LINKS,
+            observed: *scanned,
         });
     }
     Ok(())

@@ -242,7 +242,7 @@ mod tests {
         assert!(matches!(
             metadata.project_with(&package, &too_small),
             Err(Error::Common(litchi_ooxml_common::Error::Vba(
-                litchi_vba::Error::LimitExceeded { .. },
+                litchi_vba::Error::Limit { .. },
             )))
         ));
 

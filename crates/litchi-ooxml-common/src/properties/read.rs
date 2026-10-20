@@ -955,7 +955,10 @@ mod tests {
             Error::ContentType { .. } => "content-type",
             Error::Relationship(_) => "relationship",
             Error::Invalid(_) => "invalid",
-            Error::Limit { .. } | Error::CustomXmlLimit { .. } | Error::WebLimit { .. } => "limit",
+            Error::Limit { .. }
+            | Error::CustomXmlLimit { .. }
+            | Error::WebLimit { .. }
+            | Error::RibbonLimit { .. } => "limit",
             Error::Allocation { .. } => "allocation",
             Error::Uri(_) => "uri",
             #[cfg(feature = "vba-inspection")]

@@ -11,7 +11,12 @@
 use crate::package::family::{graph_edit, graph_family};
 use crate::vba_project::{VbaProject, VbaSupplementalData};
 
-graph_family!("VBA-project");
+graph_family!("VBA-project", own_limits);
+
+/// The typed budgets of the VBA-project family: its limit errors are
+/// [`litchi_vba::Error::Limit`] carried by [`crate::Error::Vba`] (record
+/// 0360).
+pub use litchi_vba::LimitKind;
 graph_edit!("VBA-project", edit_vba, apply_vba);
 
 impl Edit {

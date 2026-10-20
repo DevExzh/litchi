@@ -526,10 +526,10 @@ mod tests {
 
         assert!(matches!(
             read_project_part(&package, &part_name, &limits),
-            Err(Error::Vba(litchi_vba::Error::LimitExceeded {
-                limit: "standalone VBA CFB bytes",
-                actual: 4,
-                maximum: 3,
+            Err(Error::Vba(litchi_vba::Error::Limit {
+                kind: litchi_vba::LimitKind::CfbBytes,
+                observed: 4,
+                maximum: 3
             }))
         ));
     }

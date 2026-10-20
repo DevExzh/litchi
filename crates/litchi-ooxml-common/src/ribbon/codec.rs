@@ -2,6 +2,8 @@
 
 use crate::xml_name;
 use crate::{Error, Result};
+
+use super::limit::LimitKind;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{OpcPackage, Part};
 use quick_xml::XmlVersion;
@@ -16,10 +18,10 @@ use crate::xml::attributes::BytesStartExt as _;
 
 pub(super) fn validate_xml(xml: &[u8], family: Family, limits: &Limits) -> Result<Version> {
     if xml.len() > limits.xml_bytes {
-        return Err(Error::Limit {
-            resource: "Ribbon XML bytes",
-            max: limits.xml_bytes,
-            actual: xml.len(),
+        return Err(Error::RibbonLimit {
+            kind: LimitKind::XmlBytes,
+            maximum: limits.xml_bytes,
+            observed: xml.len(),
         });
     }
 
@@ -75,32 +77,32 @@ pub(super) fn validate_xml(xml: &[u8], family: Family, limits: &Limits) -> Resul
                     version = Some(root_version);
                     root_seen = true;
                 }
-                depth = depth.checked_add(1).ok_or(Error::Limit {
-                    resource: "Ribbon XML depth",
-                    max: limits.depth,
-                    actual: usize::MAX,
+                depth = depth.checked_add(1).ok_or(Error::RibbonLimit {
+                    kind: LimitKind::XmlDepth,
+                    maximum: limits.depth,
+                    observed: usize::MAX,
                 })?;
                 if depth > limits.depth {
-                    return Err(Error::Limit {
-                        resource: "Ribbon XML depth",
-                        max: limits.depth,
-                        actual: depth,
+                    return Err(Error::RibbonLimit {
+                        kind: LimitKind::XmlDepth,
+                        maximum: limits.depth,
+                        observed: depth,
                     });
                 }
             },
             Event::Empty(element) => {
                 count_node(&mut nodes, limits)?;
                 validate_qname(element.name().as_ref(), "element")?;
-                let child_depth = depth.checked_add(1).ok_or(Error::Limit {
-                    resource: "Ribbon XML depth",
-                    max: limits.depth,
-                    actual: usize::MAX,
+                let child_depth = depth.checked_add(1).ok_or(Error::RibbonLimit {
+                    kind: LimitKind::XmlDepth,
+                    maximum: limits.depth,
+                    observed: usize::MAX,
                 })?;
                 if child_depth > limits.depth {
-                    return Err(Error::Limit {
-                        resource: "Ribbon XML depth",
-                        max: limits.depth,
-                        actual: child_depth,
+                    return Err(Error::RibbonLimit {
+                        kind: LimitKind::XmlDepth,
+                        maximum: limits.depth,
+                        observed: child_depth,
                     });
                 }
                 let root_version = if depth == 0 {
@@ -469,16 +471,16 @@ fn validate_root(
 }
 
 fn count_node(nodes: &mut usize, limits: &Limits) -> Result<()> {
-    *nodes = nodes.checked_add(1).ok_or(Error::Limit {
-        resource: "Ribbon XML nodes",
-        max: limits.nodes,
-        actual: usize::MAX,
+    *nodes = nodes.checked_add(1).ok_or(Error::RibbonLimit {
+        kind: LimitKind::XmlNodes,
+        maximum: limits.nodes,
+        observed: usize::MAX,
     })?;
     if *nodes > limits.nodes {
-        return Err(Error::Limit {
-            resource: "Ribbon XML nodes",
-            max: limits.nodes,
-            actual: *nodes,
+        return Err(Error::RibbonLimit {
+            kind: LimitKind::XmlNodes,
+            maximum: limits.nodes,
+            observed: *nodes,
         });
     }
     Ok(())
@@ -499,16 +501,16 @@ pub(super) fn validate_images(
                 relationship.reltype()
             )));
         }
-        *count = count.checked_add(1).ok_or(Error::Limit {
-            resource: "Ribbon image relationships",
-            max: limits.images,
-            actual: usize::MAX,
+        *count = count.checked_add(1).ok_or(Error::RibbonLimit {
+            kind: LimitKind::ImageRelationships,
+            maximum: limits.images,
+            observed: usize::MAX,
         })?;
         if *count > limits.images {
-            return Err(Error::Limit {
-                resource: "Ribbon image relationships",
-                max: limits.images,
-                actual: *count,
+            return Err(Error::RibbonLimit {
+                kind: LimitKind::ImageRelationships,
+                maximum: limits.images,
+                observed: *count,
             });
         }
         require_internal_target(relationship, "Ribbon image")?;
