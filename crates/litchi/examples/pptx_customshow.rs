@@ -120,14 +120,11 @@ fn main() -> Result<(), Box<dyn StdError>> {
 
     // Publish the typed values atomically into ppt/presentation.xml.
     {
-        let mut opc_edit = package.edit_opc()?;
-        opc_edit.update(|opc| {
-            for show in shows.shows.iter().cloned() {
-                structure::add_custom_show(opc, show)?;
-            }
-            Ok(())
-        })?;
-        package = opc_edit.commit()?.into_package();
+        let mut edit = package.edit_structure()?;
+        for show in shows.shows.iter().cloned() {
+            edit.add_custom_show(show)?;
+        }
+        package = edit.commit()?.into_package();
     }
 
     let graph = package.with_opc(structure::load)?;
@@ -140,12 +137,9 @@ fn main() -> Result<(), Box<dyn StdError>> {
     // Exercise a second transactional edit and verify it after reopening.
     let quick_demo_id = shows.get_by_name("Quick Demo").expect("quick demo").id;
     {
-        let mut opc_edit = package.edit_opc()?;
-        opc_edit.update(|opc| {
-            assert!(structure::remove_custom_show(opc, quick_demo_id)?);
-            Ok(())
-        })?;
-        package = opc_edit.commit()?.into_package();
+        let mut edit = package.edit_structure()?;
+        assert!(edit.remove_custom_show(quick_demo_id)?);
+        package = edit.commit()?.into_package();
     }
 
     let round_trip = Package::from_bytes(&package.to_bytes()?)?;

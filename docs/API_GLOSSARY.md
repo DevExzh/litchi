@@ -142,7 +142,7 @@ line. A line is ✅ when the wave's gate registrations pass.
 |---|---|---|---|---|---|---|---|
 | F0 foundation | `litchi-core`, gate | ➖ | ✅ shared types | ✅ bans on clean crates | ✅ shared types, ops classification | ➖ | ✅ 0351 |
 | W1 | DOCX | 🔴 | 🔴 | 🔴 | 🔴 | 🔴 | 🔴 |
-| W2 | PPTX | 🔴 | 🔴 | ✅ (0252) | 🔴 | 🔴 | 🔴 |
+| W2 | PPTX | ✅ `Package` (0356) | ✅ 33 registered families (0356) · 🔴 the five `SourceBacked*` stream-publishing editors (0356 gap 1) | ✅ (0252) | ✅ (0356) | ✅ (0356) | ✅ (0356) |
 | W3 | PPT | ✅ | 🔴 | 🔴 | ➖ | 🔴 (`raw::Reader`, record parsers) | 🔴 |
 | W4 | XLSX, XLSB, `litchi-ooxml-common` | 🔴 | 🔴 | 🔴 | ➖ | 🔴 | 🔴 |
 | W5 | DOC, XLS, RTF, `litchi-ograph`, `litchi-ole-common`, `litchi-crypto` | 🔴 (DOC `raw::Package`, RTF `raw::Document`) | 🔴 | 🔴 | 🔴 (XLS, ograph) | 🔴 | 🔴 |

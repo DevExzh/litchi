@@ -69,34 +69,25 @@ fn publish_structure(
     assert_eq!(slide_ids.len(), slide_count);
 
     {
-        let mut opc_edit = package.edit_opc()?;
-        opc_edit.update(|opc| {
-            for (id, plan) in shows.iter().enumerate() {
-                let selected = plan
-                    .positions
-                    .iter()
-                    .map(|&position| slide_ids[position])
-                    .collect::<Vec<_>>();
-                structure::add_custom_show(
-                    opc,
-                    Show::new((id + 1) as u32, plan.name).with_slides(selected),
-                )?;
-            }
+        let mut edit = package.edit_structure()?;
+        for (id, plan) in shows.iter().enumerate() {
+            let selected = plan
+                .positions
+                .iter()
+                .map(|&position| slide_ids[position])
+                .collect::<Vec<_>>();
+            edit.add_custom_show(Show::new((id + 1) as u32, plan.name).with_slides(selected))?;
+        }
 
-            for plan in &sections {
-                let selected = plan
-                    .positions
-                    .iter()
-                    .map(|&position| slide_ids[position])
-                    .collect::<Vec<_>>();
-                structure::add_section(
-                    opc,
-                    Section::new(plan.name, plan.id).with_slides(selected),
-                )?;
-            }
-            Ok(())
-        })?;
-        package = opc_edit.commit()?.into_package();
+        for plan in &sections {
+            let selected = plan
+                .positions
+                .iter()
+                .map(|&position| slide_ids[position])
+                .collect::<Vec<_>>();
+            edit.add_section(Section::new(plan.name, plan.id).with_slides(selected))?;
+        }
+        package = edit.commit()?.into_package();
     }
 
     let graph = package.with_opc(structure::load)?;
