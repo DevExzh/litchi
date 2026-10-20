@@ -10,6 +10,7 @@
 //! call succeeds keeps the canonical transaction failure-atomic.
 
 use super::{Error as PackageError, OpenOptions, Package};
+pub use crate::document_structure::CustomTableStylesPlacement;
 pub use crate::external_media::Playback;
 use crate::slide_order;
 pub use crate::slide_order::{
@@ -369,7 +370,9 @@ impl Patch {
     /// [`Error::Durable`] when `limits` cannot hold the operations, and
     /// [`slide_order::Refusal::UnsupportedPatch`] for a changed patch that a
     /// durable replay produced (it keeps the exact bytes, not the
-    /// operations; convert the durable patch that was replayed instead).
+    /// operations; convert the durable patch that was replayed instead) or
+    /// one that reorders masters, edits the custom table-style atom or sets
+    /// `fNonOutlineData` (those have no durable vocabulary).
     pub fn to_durable(
         &self,
         limits: litchi_core::patch::PatchLimits,
@@ -378,6 +381,13 @@ impl Patch {
             return Err(Error::Native(slide_order::Error::Refused(
                 slide_order::Refusal::UnsupportedPatch {
                     reason: "a replayed durable patch keeps no semantic operations",
+                },
+            )));
+        }
+        if self.inner.has_document_changes() {
+            return Err(Error::Native(slide_order::Error::Refused(
+                slide_order::Refusal::UnsupportedPatch {
+                    reason: "master order, custom table styles and fNonOutlineData have no durable form",
                 },
             )));
         }
@@ -765,6 +775,115 @@ impl Edit {
         })
     }
 
+    /// Move one main or title master to a final zero-based position in the
+    /// document's master list (record 0357a).
+    ///
+    /// Slides, notes and title masters reference a master by its `masterId`,
+    /// which is unchanged, so every reference keeps its master.
+    ///
+    /// # Errors
+    ///
+    /// [`slide_order::Refusal::ElementNotFound`] for a position outside the
+    /// master list; [`Error::Signed`] for a change on a signed package.
+    pub fn move_master(&mut self, from: Position, destination: Position) -> Result<()> {
+        self.stage(1, |inner| inner.move_master(from, destination))
+    }
+
+    /// Move the master whose `masterId` is `master_id` to a final position
+    /// (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`slide_order::Refusal::ElementNotFound`] when no master has that id.
+    pub fn move_master_id(&mut self, master_id: u32, destination: Position) -> Result<()> {
+        self.stage(1, |inner| inner.move_master_id(master_id, destination))
+    }
+
+    /// Reorder the master list: it becomes `order`, each entry a current
+    /// master position (record 0357a). The identity order is a no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`slide_order::Refusal::InvalidElementValue`] unless `order` is a
+    /// permutation of the master positions.
+    pub fn reorder_masters(&mut self, order: &[Position]) -> Result<()> {
+        let order: Vec<usize> = order.iter().map(|position| position.get()).collect();
+        self.stage(1, |inner| inner.reorder_masters(&order))
+    }
+
+    /// Insert a `RoundTripCustomTableStyles12Atom` (its complete record
+    /// bytes: the 8-byte header and the payload) before or after the
+    /// `EndDocumentAtom` (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`slide_order::Refusal::InvalidElementValue`] for bytes that are not
+    /// exactly one such atom; [`slide_order::Refusal::UnsupportedElement`]
+    /// when the document already has one.
+    pub fn insert_custom_table_styles(
+        &mut self,
+        atom: &[u8],
+        placement: CustomTableStylesPlacement,
+    ) -> Result<()> {
+        let record = custom_table_styles_record(atom)?;
+        self.stage(1, |inner| {
+            inner.insert_custom_table_styles(record, placement)
+        })
+    }
+
+    /// Remove the custom table-style atom; returns its complete record bytes
+    /// (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`slide_order::Refusal::ElementNotFound`] when the document has none.
+    pub fn remove_custom_table_styles(&mut self) -> Result<Vec<u8>> {
+        let record = self.stage(1, slide_order::Transaction::remove_custom_table_styles)?;
+        encode_atom(&record)
+    }
+
+    /// Replace the custom table-style atom in place with `atom` (its complete
+    /// record bytes); returns the previous atom's bytes (record 0357a). An
+    /// equal atom is a no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`slide_order::Refusal::ElementNotFound`] when the document has none;
+    /// [`slide_order::Refusal::InvalidElementValue`] for bytes that are not
+    /// exactly one such atom.
+    pub fn replace_custom_table_styles(&mut self, atom: &[u8]) -> Result<Vec<u8>> {
+        let record = custom_table_styles_record(atom)?;
+        let before = self.stage(1, |inner| inner.replace_custom_table_styles(record))?;
+        encode_atom(&before)
+    }
+
+    /// Move the custom table-style atom before or after the
+    /// `EndDocumentAtom` (record 0357a). Its current placement is a no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`slide_order::Refusal::ElementNotFound`] when the document has none.
+    pub fn move_custom_table_styles(
+        &mut self,
+        placement: CustomTableStylesPlacement,
+    ) -> Result<()> {
+        self.stage(1, |inner| inner.move_custom_table_styles(placement))
+    }
+
+    /// Set one slide's `SlidePersistAtom.fNonOutlineData` flag ([MS-PPT]
+    /// 2.4.14.5; record 0357a). It does not hide the slide; that is
+    /// [`Self::set_slide_hidden`].
+    ///
+    /// # Errors
+    ///
+    /// [`slide_order::Refusal::SlideNotFound`] for a position outside the
+    /// slide list.
+    pub fn set_slide_non_outline_data(&mut self, position: Position, present: bool) -> Result<()> {
+        self.stage(1, |inner| {
+            inner.set_slide_non_outline_data(position, present)
+        })
+    }
+
     /// Publish this edit as a new immutable package.
     pub fn commit(self) -> Result<Commit> {
         self.commit_with(slide_order::Transaction::commit)
@@ -1009,6 +1128,27 @@ impl Package {
         ensure_source_version(donor, donor_expected)?;
         Ok(plan?)
     }
+}
+
+/// Parse exactly one record from `atom` (the custom table-style verbs).
+fn custom_table_styles_record(atom: &[u8]) -> Result<crate::Record> {
+    let invalid = || {
+        Error::Native(slide_order::Error::Refused(
+            slide_order::Refusal::InvalidElementValue {
+                element: "custom table styles",
+                reason: "the bytes are not exactly one record",
+            },
+        ))
+    };
+    let (record, consumed) = crate::Record::parse(atom, 0).map_err(|_error| invalid())?;
+    if consumed != atom.len() {
+        return Err(invalid());
+    }
+    Ok(record)
+}
+
+fn encode_atom(record: &crate::Record) -> Result<Vec<u8>> {
+    crate::document_structure::encode_record(record, false).map_err(Error::Package)
 }
 
 fn open_options(source: &Package) -> OpenOptions<'static> {

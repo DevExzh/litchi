@@ -1787,6 +1787,116 @@ enum StructuralChange {
     Move(Change),
     Remove(ListChange),
     Insert(ListChange),
+    /// A `DocumentContainer` edit outside the slide list (record 0357a).
+    Document(DocumentChange),
+}
+
+/// A staged `DocumentContainer` edit that leaves the slide list order alone:
+/// master order, the custom table-style atom and `fNonOutlineData`
+/// (record 0357a).
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DocumentChange {
+    /// The master list became `order` (each entry a previous position).
+    Masters { order: Vec<usize> },
+    /// A custom table-style atom was inserted.
+    InsertStyles {
+        record: crate::Record,
+        placement: document_structure::CustomTableStylesPlacement,
+    },
+    /// The custom table-style atom was removed.
+    RemoveStyles {
+        record: crate::Record,
+        placement: document_structure::CustomTableStylesPlacement,
+    },
+    /// The custom table-style atom was replaced in place.
+    ReplaceStyles {
+        before: crate::Record,
+        after: crate::Record,
+    },
+    /// The custom table-style atom moved around the `EndDocumentAtom`.
+    MoveStyles {
+        before: document_structure::CustomTableStylesPlacement,
+        after: document_structure::CustomTableStylesPlacement,
+    },
+    /// One slide's `SlidePersistAtom.fNonOutlineData` changed.
+    NonOutlineData {
+        position: usize,
+        before: bool,
+        after: bool,
+    },
+}
+
+impl DocumentChange {
+    fn inverse(&self) -> Self {
+        match self {
+            Self::Masters { order } => {
+                let mut inverse = vec![0; order.len()];
+                for (position, previous) in order.iter().enumerate() {
+                    inverse[*previous] = position;
+                }
+                Self::Masters { order: inverse }
+            },
+            Self::InsertStyles { record, placement } => Self::RemoveStyles {
+                record: record.clone(),
+                placement: *placement,
+            },
+            Self::RemoveStyles { record, placement } => Self::InsertStyles {
+                record: record.clone(),
+                placement: *placement,
+            },
+            Self::ReplaceStyles { before, after } => Self::ReplaceStyles {
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::MoveStyles { before, after } => Self::MoveStyles {
+                before: *after,
+                after: *before,
+            },
+            Self::NonOutlineData {
+                position,
+                before,
+                after,
+            } => Self::NonOutlineData {
+                position: *position,
+                before: *after,
+                after: *before,
+            },
+        }
+    }
+
+    fn replay(&self, document: &mut document_structure::Transaction) -> Result<()> {
+        match self {
+            Self::Masters { order } => document.reorder_masters(order)?,
+            Self::InsertStyles { record, placement } => {
+                document.insert_custom_table_styles(record.clone(), *placement)?;
+            },
+            Self::RemoveStyles { .. } => {
+                document.remove_custom_table_styles()?;
+            },
+            Self::ReplaceStyles { after, .. } => {
+                document.replace_custom_table_styles(after.clone())?;
+            },
+            Self::MoveStyles { after, .. } => document.move_custom_table_styles(*after)?,
+            Self::NonOutlineData {
+                position, after, ..
+            } => document.set_slide_non_outline_data(*position, *after)?,
+        }
+        Ok(())
+    }
+
+    /// The semantic target this change writes, for three-way planning.
+    fn effect(&self) -> String {
+        match self {
+            Self::Masters { .. } => "document/master-list".to_owned(),
+            Self::InsertStyles { .. }
+            | Self::RemoveStyles { .. }
+            | Self::ReplaceStyles { .. }
+            | Self::MoveStyles { .. } => "document/custom-table-styles".to_owned(),
+            Self::NonOutlineData { position, .. } => {
+                format!("slide-list/position:{position}/non-outline-data")
+            },
+        }
+    }
 }
 
 /// Isolated failure-atomic edit over one opened presentation's slide order.
@@ -1978,6 +2088,230 @@ impl Transaction {
         };
         self.changes.push(change);
         self.structural.push(StructuralChange::Move(change));
+        Ok(())
+    }
+
+    /// Reorders the main and title masters (record 0357a): the master list
+    /// becomes `order`, each entry a current zero-based master position.
+    ///
+    /// Slides, notes and title masters reference masters by `masterId`, which
+    /// is unchanged, so every reference keeps its master. The identity order
+    /// is an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidElementValue`] unless `order` is a permutation of
+    /// the master positions; [`Refusal::Signed`] for a change on a signed
+    /// source.
+    pub(crate) fn reorder_masters(&mut self, order: &[usize]) -> Result<()> {
+        let count = self.document.masters()?.len();
+        let mut seen = vec![false; count];
+        if order.len() != count
+            || !order
+                .iter()
+                .all(|index| *index < count && !std::mem::replace(&mut seen[*index], true))
+        {
+            return Err(Error::Refused(Refusal::InvalidElementValue {
+                element: "master order",
+                reason: "it is not a permutation of the master positions",
+            }));
+        }
+        if order
+            .iter()
+            .enumerate()
+            .all(|(position, index)| position == *index)
+        {
+            return Ok(());
+        }
+        self.require_change_allowed()?;
+        self.document.reorder_masters(order)?;
+        self.structural
+            .push(StructuralChange::Document(DocumentChange::Masters {
+                order: order.to_vec(),
+            }));
+        Ok(())
+    }
+
+    /// Moves one master to a final zero-based position (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::ElementNotFound`] for a position outside the master list.
+    pub(crate) fn move_master(&mut self, from: Position, destination: Position) -> Result<()> {
+        let count = self.document.masters()?.len();
+        if from.get() >= count || destination.get() >= count {
+            return Err(Error::Refused(Refusal::ElementNotFound {
+                element: "master",
+            }));
+        }
+        let mut order: Vec<_> = (0..count).collect();
+        let value = order.remove(from.get());
+        order.insert(destination.get(), value);
+        self.reorder_masters(&order)
+    }
+
+    /// Moves the master with `masterId` `master_id` to a final position
+    /// (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::ElementNotFound`] when no master has that id.
+    pub(crate) fn move_master_id(&mut self, master_id: u32, destination: Position) -> Result<()> {
+        let from = self
+            .document
+            .masters()?
+            .iter()
+            .position(|master| master.master_id() == master_id)
+            .ok_or(Error::Refused(Refusal::ElementNotFound {
+                element: "master",
+            }))?;
+        self.move_master(Position::new(from), destination)
+    }
+
+    fn custom_table_styles(
+        &self,
+    ) -> Result<Option<document_structure::CustomTableStylesPlacement>> {
+        Ok(self.document.structure()?.custom_table_styles)
+    }
+
+    fn require_custom_table_styles(
+        &self,
+    ) -> Result<document_structure::CustomTableStylesPlacement> {
+        self.custom_table_styles()?
+            .ok_or(Error::Refused(Refusal::ElementNotFound {
+                element: "custom table styles",
+            }))
+    }
+
+    /// Inserts a `RoundTripCustomTableStyles12Atom` before or after the
+    /// `EndDocumentAtom` (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidElementValue`] for a record that is not such an
+    /// atom, and [`Refusal::UnsupportedElement`] when the document already
+    /// has one.
+    pub(crate) fn insert_custom_table_styles(
+        &mut self,
+        record: crate::Record,
+        placement: document_structure::CustomTableStylesPlacement,
+    ) -> Result<()> {
+        require_custom_table_styles_record(&record)?;
+        if self.custom_table_styles()?.is_some() {
+            return Err(Error::Refused(Refusal::UnsupportedElement {
+                element: "custom table styles",
+                reason: "the document already has a custom table-style atom",
+            }));
+        }
+        self.require_change_allowed()?;
+        self.document
+            .insert_custom_table_styles(record.clone(), placement)?;
+        self.structural
+            .push(StructuralChange::Document(DocumentChange::InsertStyles {
+                record,
+                placement,
+            }));
+        Ok(())
+    }
+
+    /// Removes the custom table-style atom and returns it (record 0357a).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::ElementNotFound`] when the document has none.
+    pub(crate) fn remove_custom_table_styles(&mut self) -> Result<crate::Record> {
+        let placement = self.require_custom_table_styles()?;
+        self.require_change_allowed()?;
+        let record = self.document.remove_custom_table_styles()?;
+        self.structural
+            .push(StructuralChange::Document(DocumentChange::RemoveStyles {
+                record: record.clone(),
+                placement,
+            }));
+        Ok(record)
+    }
+
+    /// Replaces the custom table-style atom in place and returns the
+    /// previous one (record 0357a). An equal record is an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::ElementNotFound`] when the document has none and
+    /// [`Refusal::InvalidElementValue`] for a record that is not such an
+    /// atom.
+    pub(crate) fn replace_custom_table_styles(
+        &mut self,
+        record: crate::Record,
+    ) -> Result<crate::Record> {
+        require_custom_table_styles_record(&record)?;
+        self.require_custom_table_styles()?;
+        let mut probe = self.document.clone();
+        let before = probe.replace_custom_table_styles(record.clone())?;
+        if before == record {
+            return Ok(before);
+        }
+        self.require_change_allowed()?;
+        self.document = probe;
+        self.structural
+            .push(StructuralChange::Document(DocumentChange::ReplaceStyles {
+                before: before.clone(),
+                after: record,
+            }));
+        Ok(before)
+    }
+
+    /// Moves the custom table-style atom before or after the
+    /// `EndDocumentAtom` (record 0357a). Its current placement is an exact
+    /// no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::ElementNotFound`] when the document has none.
+    pub(crate) fn move_custom_table_styles(
+        &mut self,
+        placement: document_structure::CustomTableStylesPlacement,
+    ) -> Result<()> {
+        let before = self.require_custom_table_styles()?;
+        if before == placement {
+            return Ok(());
+        }
+        self.require_change_allowed()?;
+        self.document.move_custom_table_styles(placement)?;
+        self.structural
+            .push(StructuralChange::Document(DocumentChange::MoveStyles {
+                before,
+                after: placement,
+            }));
+        Ok(())
+    }
+
+    /// Sets one slide's `SlidePersistAtom.fNonOutlineData` flag
+    /// ([MS-PPT] 2.4.14.5; record 0357a). It does not hide the slide. The
+    /// current value is an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::SlideNotFound`] for a position outside the slide list.
+    pub(crate) fn set_slide_non_outline_data(
+        &mut self,
+        position: Position,
+        present: bool,
+    ) -> Result<()> {
+        self.require_position(position)?;
+        let slide = self.document.slides()?[position.get()];
+        let before = slide.flags() & (1 << 2) != 0;
+        if before == present {
+            return Ok(());
+        }
+        self.require_change_allowed()?;
+        self.document
+            .set_slide_non_outline_data(position.get(), present)?;
+        self.structural
+            .push(StructuralChange::Document(DocumentChange::NonOutlineData {
+                position: position.get(),
+                before,
+                after: present,
+            }));
         Ok(())
     }
 
@@ -3377,6 +3711,14 @@ impl Patch {
         }
     }
 
+    /// Whether this patch stages a document-structure edit (master order,
+    /// custom table styles, `fNonOutlineData`), which has no durable form.
+    pub(crate) fn has_document_changes(&self) -> bool {
+        self.structural
+            .iter()
+            .any(|change| matches!(change, StructuralChange::Document(_)))
+    }
+
     /// Whether every semantic operation of this patch is a slide move.
     fn is_move_only(&self) -> bool {
         self.structural
@@ -3836,6 +4178,13 @@ impl Patch {
                             list_change.after_order,
                         )?,
                     )
+                },
+                // Master order, custom table styles and fNonOutlineData have
+                // no durable vocabulary; package::edit refuses them first.
+                StructuralChange::Document(_) => {
+                    return Err(litchi_core::patch::PatchError::InvalidText {
+                        field: "durable document-structure operation",
+                    });
                 },
             };
             structural_operations.push(ReversibleOperation::new(forward, inverse));
@@ -4770,6 +5119,25 @@ fn parse_shape_target(value: &str) -> Result<crate::text_edit::Target> {
             .map_err(|_error| invalid_durable_patch("shape-text position exceeds this platform"))
     };
     Ok(crate::text_edit::Target::new(parse(slide)?, parse(shape)?))
+}
+
+/// A `RoundTripCustomTableStyles12Atom` header the document validator
+/// accepts (instance 0, no children, a consistent length).
+fn require_custom_table_styles_record(record: &crate::Record) -> Result<()> {
+    if record.record_type != crate::consts::RecordType::RoundTripCustomTableStyles12Atom
+        || record.record_type_raw
+            != crate::consts::RecordType::RoundTripCustomTableStyles12Atom.as_u16()
+        || record.instance != 0
+        || record.version > 0x000f
+        || !record.children.is_empty()
+        || usize::try_from(record.data_length).ok() != Some(record.data.len())
+    {
+        return Err(Error::Refused(Refusal::InvalidElementValue {
+            element: "custom table styles",
+            reason: "the record is not a RoundTripCustomTableStyles12Atom",
+        }));
+    }
+    Ok(())
 }
 
 fn order_digest(transaction: &document_structure::Transaction) -> Result<[u8; 32]> {
@@ -7259,6 +7627,7 @@ fn inverse_structural(structural_change: &StructuralChange) -> StructuralChange 
             after_order: list_change.before_order,
             payload: normalized_payload(&list_change.payload),
         }),
+        StructuralChange::Document(change) => StructuralChange::Document(change.inverse()),
     }
 }
 
@@ -7286,6 +7655,7 @@ fn replay_structural_changes(
                     insert_change.payload.group.clone(),
                 )?;
             },
+            StructuralChange::Document(change) => change.replay(document)?,
         }
     }
     Ok(())
@@ -7350,6 +7720,9 @@ fn patch_effects(patch: &Patch) -> BTreeSet<String> {
                             .map(|shape_id| format!("drawing/shape-id:{shape_id}")),
                     );
                 }
+            },
+            StructuralChange::Document(change) => {
+                effects.insert(change.effect());
             },
         }
     }
