@@ -74,7 +74,7 @@ use crate::{Code, Error as OpsError, File, Result};
     feature = "odt",
     feature = "ods",
     feature = "odp",
-    feature = "odf-objects"
+    odf_objects
 ))]
 mod package;
 #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
@@ -470,7 +470,7 @@ impl File {
             feature = "odt",
             feature = "ods",
             feature = "odp",
-            feature = "odf-objects"
+            odf_objects
         ))]
         {
             package::Container::of(self)?.parts()
@@ -483,7 +483,7 @@ impl File {
             feature = "odt",
             feature = "ods",
             feature = "odp",
-            feature = "odf-objects"
+            odf_objects
         )))]
         {
             Err(no_parts(self))
@@ -508,7 +508,7 @@ impl File {
             feature = "odt",
             feature = "ods",
             feature = "odp",
-            feature = "odf-objects"
+            odf_objects
         ))]
         {
             package::Container::of(self)?.read(part)
@@ -521,7 +521,7 @@ impl File {
             feature = "odt",
             feature = "ods",
             feature = "odp",
-            feature = "odf-objects"
+            odf_objects
         )))]
         {
             let _ = part;

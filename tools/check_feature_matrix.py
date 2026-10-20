@@ -9,7 +9,8 @@ that turns on a `litchi-ops` format with a plain `"litchi-ops/<format>"` item
 (record 0334). `litchi-cli` and `litchi-py` are checked the same way when
 their manifests declare per-format features; today both pin every format, so
 each is checked once with its own feature set. `--ops` adds `litchi-ops`
-alone and with each of its format features.
+alone, with each of its format features and with each internal umbrella
+(`odf-objects`, record 0358a).
 
 Commands run one at a time, in a fixed order, through whatever `cargo` is
 first on PATH (the coordinator's memory-capped shim on this host). The build
@@ -42,6 +43,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 FACADE = ROOT / "crates" / "litchi" / "Cargo.toml"
 OPS = ROOT / "crates" / "litchi-ops" / "Cargo.toml"
+# litchi-ops features that are not formats but are checked alone with --ops.
+OPS_UMBRELLAS = ("odf-objects",)
 CLI = ROOT / "crates" / "litchi-cli" / "Cargo.toml"
 PY = ROOT / "crates" / "pyo3-litchi" / "Cargo.toml"
 
@@ -122,9 +125,13 @@ def plan(include_ops: bool) -> list[Step]:
             steps.append(Step(group, package, (), False))
 
     if include_ops:
-        ops = ops_format_features(manifest_features(OPS))
+        ops_features = manifest_features(OPS)
+        ops = ops_format_features(ops_features)
         steps.append(Step("ops", "litchi-ops", (), True))
         steps += [Step("ops", "litchi-ops", (name,), True) for name in ops]
+        # Internal umbrellas must build on their own too (record 0358a).
+        steps += [Step("ops", "litchi-ops", (name,), True)
+                  for name in OPS_UMBRELLAS if name in ops_features]
     return steps
 
 

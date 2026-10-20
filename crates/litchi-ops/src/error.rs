@@ -428,12 +428,7 @@ pub enum Source {
     #[cfg(feature = "encryption")]
     Crypto(litchi_crypto::ooxml::Error),
     /// An ODF package ingress, egress or transaction error (typed limits).
-    #[cfg(any(
-        feature = "odt",
-        feature = "ods",
-        feature = "odp",
-        feature = "odf-objects"
-    ))]
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
     Odf(litchi_odf_common::Error),
     /// A formula conversion error: Markdown output renders OMML formulas as
     /// LaTeX.
@@ -535,12 +530,7 @@ impl Source {
             Self::RtfEdit(error) => Some(error),
             #[cfg(feature = "encryption")]
             Self::Crypto(error) => Some(error),
-            #[cfg(any(
-                feature = "odt",
-                feature = "ods",
-                feature = "odp",
-                feature = "odf-objects"
-            ))]
+            #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
             Self::Odf(error) => Some(error),
             #[cfg(feature = "formula")]
             Self::Formula(error) => Some(error),
@@ -675,7 +665,7 @@ impl Error {
         feature = "pages",
         feature = "keynote",
         feature = "numbers",
-        feature = "odf-objects"
+        odf_objects
     ))]
     pub(crate) fn feature_disabled(detected: FileFormat, feature: &'static str) -> Self {
         Self::unsupported_format(Some(detected))
@@ -712,7 +702,7 @@ impl Error {
         feature = "ods",
         feature = "odt",
         feature = "odp",
-        feature = "odf-objects"
+        odf_objects
     ))]
     pub(crate) fn caused_by_argument(mut self, code: Code) -> Self {
         debug_assert!(matches!(
@@ -1870,12 +1860,7 @@ impl Classify for litchi_ppt::Error {
     }
 }
 
-#[cfg(any(
-    feature = "odt",
-    feature = "ods",
-    feature = "odp",
-    feature = "odf-objects"
-))]
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
 impl Classify for litchi_odf_common::Error {
     fn classify(&self) -> Class {
         match self {
@@ -2294,7 +2279,7 @@ from_leaf!(
 );
 from_leaf!(#[cfg(feature = "rtf")] litchi_rtf::Error => Rtf, Some(FileFormat::Rtf));
 from_leaf!(
-    #[cfg(any(feature = "odt", feature = "ods", feature = "odp", feature = "odf-objects"))]
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
     litchi_odf_common::Error => Odf, None
 );
 from_leaf!(#[cfg(feature = "rtf")] litchi_rtf::builder::Error => RtfBuild, Some(FileFormat::Rtf));

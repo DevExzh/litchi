@@ -141,7 +141,7 @@ impl<'q> Plan<'q> {
             FileFormat::Ods => super::compile::compile::<crate::format::ods::Nav<'static>>(query),
             #[cfg(feature = "odp")]
             FileFormat::Odp => super::compile::compile::<crate::format::odp::Nav<'static>>(query),
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             FileFormat::Odg
             | FileFormat::Odc
             | FileFormat::Odi

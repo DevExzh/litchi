@@ -76,7 +76,7 @@ pub enum ToleranceReport {
     Ods(litchi_odf_common::ToleranceReport),
     /// An OpenDocument drawing, chart, image, database or formula (record
     /// 0282), with the format it was read as.
-    #[cfg(feature = "odf-objects")]
+    #[cfg(odf_objects)]
     Object(FileFormat, litchi_odf_common::ToleranceReport),
     /// A format whose reader keeps no repair report: the Apple iWork
     /// formats (`File::Pages`, `File::Keynote`, `File::Numbers`).
@@ -105,7 +105,7 @@ impl ToleranceReport {
             Self::Pptx(_) => FileFormat::Pptx,
             #[cfg(feature = "odp")]
             Self::Odp(_) => FileFormat::Odp,
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Self::Object(format, _) => *format,
             #[cfg(feature = "xls")]
             Self::Xls(_) => FileFormat::Xls,
@@ -146,7 +146,7 @@ impl ToleranceReport {
             Self::Pptx(report) => report.is_clean(),
             #[cfg(feature = "odp")]
             Self::Odp(report) => report.is_clean(),
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Self::Object(_, report) => report.is_clean(),
             #[cfg(feature = "xls")]
             Self::Xls(report) => report.is_clean(),
@@ -178,7 +178,7 @@ impl ToleranceReport {
             Self::Pptx(report) => report.total(),
             #[cfg(feature = "odp")]
             Self::Odp(report) => report.total(),
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Self::Object(_, report) => report.total(),
             #[cfg(feature = "xls")]
             Self::Xls(report) => report.total(),
@@ -211,7 +211,7 @@ impl ToleranceReport {
             Self::Pptx(report) => report.unrecorded(),
             #[cfg(feature = "odp")]
             Self::Odp(report) => report.unrecorded(),
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Self::Object(_, report) => report.unrecorded(),
             #[cfg(feature = "xls")]
             Self::Xls(report) => report.unrecorded(),
@@ -257,7 +257,7 @@ impl ToleranceReport {
                 .iter()
                 .map(|entry| entry.defect.repair())
                 .collect(),
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Self::Object(_, report) => report
                 .defects()
                 .iter()
