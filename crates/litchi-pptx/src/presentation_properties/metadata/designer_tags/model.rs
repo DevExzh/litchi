@@ -57,7 +57,7 @@ impl Binding {
 ///
 /// Zero occurrences means absent. One empty [`Tags`] value means explicitly
 /// present but empty. More than one occurrence is retained for inspection,
-/// while [`Snapshot::edit`] refuses the ambiguous singular mutation.
+/// while [`Edit`](crate::presentation_properties::metadata::designer_tags::Edit) refuses the ambiguous singular mutation.
 #[derive(Debug)]
 pub struct Snapshot {
     pub(crate) presentation_part_name: String,

@@ -77,7 +77,7 @@ impl Edit<'_> {
     ///
     /// Returns an error for a missing, ambiguous or out-of-range slide, or
     /// malformed extension XML.
-    pub fn snapshot<'s>(&self, slide: impl Into<Selector<'s>>) -> Result<super::Snapshot> {
+    pub fn change_tracking<'s>(&self, slide: impl Into<Selector<'s>>) -> Result<super::Snapshot> {
         let opc = self.staged.opc();
         let owner = crate::package::resolve_slide(opc, slide.into())?;
         super::load(opc, &owner)

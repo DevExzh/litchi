@@ -60,7 +60,7 @@ impl Edit<'_> {
     ///
     /// Returns an error for a slide position out of bounds, or a malformed or
     /// unsupported typed action closure.
-    pub fn snapshot(&self, slide: usize) -> Result<super::Snapshot> {
+    pub fn ink_actions(&self, slide: usize) -> Result<super::Snapshot> {
         let opc = self.staged.opc();
         let presentation =
             crate::Presentation::new(crate::parts::PresentationPart::from_package(opc)?, opc);
@@ -79,7 +79,7 @@ impl Edit<'_> {
         slide: usize,
         change: impl FnOnce(&mut Draft) -> Result<bool>,
     ) -> Result<bool> {
-        let mut draft = self.snapshot(slide)?.edit();
+        let mut draft = self.ink_actions(slide)?.edit();
         if !change(&mut draft)? {
             return Ok(false);
         }

@@ -226,9 +226,10 @@ impl PlaceholderTypeExtension {
 
 /// A source snapshot of a placeholder's optional p232 extension.
 ///
-/// Unlike [`TypedSnapshot`], this state object also represents an absent extension.
-/// It is the transaction entry point for adding, replacing, and removing the
-/// extension on a placeholder in a slide, slide master, or slide layout.
+/// This state object also represents an absent extension.
+/// [`crate::Package::edit_placeholder_type_extension`] adds, replaces and
+/// removes the extension on a placeholder in a slide, slide master, or slide
+/// layout.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Snapshot {
     owner: PackURI,

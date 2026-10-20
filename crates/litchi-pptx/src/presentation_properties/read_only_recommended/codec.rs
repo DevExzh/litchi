@@ -318,7 +318,7 @@ fn semantic_value(xml: &[u8]) -> Result<Option<bool>> {
     let properties = Properties::parse(xml)?;
     let mut value = None;
     for extension in &properties.extensions {
-        if let crate::presentation_properties::Extension::ReadonlyRecommended(candidate) = extension
+        if let crate::presentation_properties::Extension::ReadOnlyRecommended(candidate) = extension
         {
             if value.replace(*candidate).is_some() {
                 return Err(invalid("duplicate readonlyRecommended extensions"));

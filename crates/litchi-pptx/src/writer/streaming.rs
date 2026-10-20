@@ -1,6 +1,6 @@
 //! Forward-only, bounded authoring of small semantic PresentationML decks.
 //!
-//! This module deliberately does not hydrate [`super::crate::builder::Presentation`].
+//! This module deliberately does not hydrate [`crate::builder::Presentation`].
 //! The caller declares the slide count up front and emits one slide at a time;
 //! each completed slide is released after its OPC member is finalized.  The
 //! writer is fresh-authoring only and intentionally models plain text boxes.

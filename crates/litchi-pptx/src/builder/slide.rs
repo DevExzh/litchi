@@ -11,7 +11,7 @@ use super::shape::{Shape, escape_xml};
 #[cfg(feature = "automatic-fonts")]
 use litchi_fonts::{CollectGlyphs, GlyphMap};
 
-/// Mutable slide state owned by [`Presentation`].
+/// Mutable slide state owned by [`Presentation`](super::Presentation).
 #[derive(Debug, Clone)]
 #[allow(
     clippy::module_name_repetitions,

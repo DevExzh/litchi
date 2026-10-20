@@ -1790,14 +1790,61 @@
           "name": "into_snapshot",
           "scope": "litchi_pptx",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_pptx",
+          "replacement": "map each refusal by its reason: Refused(Refusal) with a RefusalKind, PatchConflict or Internal (record 0351 / 0356)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_pptx",
+          "replacement": "stage changes in a family Edit (opened) or builder::{Presentation, Slide, Shape} (fresh); no Mutable* draft types (record 0351 / 0356)",
+          "match": "prefix"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_pptx",
+          "replacement": "limits come from OpenOptions/EditOptions or a required Limits argument (record 0351 / 0356)",
+          "match": "suffix"
+        },
+        {
+          "name": "readonly_recommended",
+          "scope": "litchi_pptx",
+          "replacement": "use read_only_recommended (record 0351 / 0356)"
+        },
+        {
+          "name": "ReadonlyRecommended",
+          "scope": "litchi_pptx",
+          "replacement": "use ReadOnlyRecommended (record 0351 / 0356)"
         }
       ],
       "families": [
         "litchi_pptx::metadata",
-        "litchi_pptx::opened"
+        "litchi_pptx::opened",
+        "litchi_pptx::tag",
+        "litchi_pptx::tag::shape",
+        "litchi_pptx::font",
+        "litchi_pptx::table::style",
+        "litchi_pptx::presentation_properties::math",
+        "litchi_pptx::shape::zoom",
+        "litchi_pptx::shape::classification",
+        "litchi_pptx::shape::designer",
+        "litchi_pptx::shape::designer::properties",
+        "litchi_pptx::model3d",
+        "litchi_pptx::web",
+        "litchi_pptx::master_layout",
+        "litchi_pptx::master_layout::placeholder",
+        "litchi_pptx::notes",
+        "litchi_pptx::change_tracking",
+        "litchi_pptx::presentation::embedded::ink_actions",
+        "litchi_pptx::presentation_properties::read_only_recommended",
+        "litchi_pptx::presentation_properties::metadata::designer_tags",
+        "litchi_pptx::opc"
       ],
       "immutable_owners": [
-        "litchi_pptx::Presentation"
+        "litchi_pptx::Presentation",
+        "litchi_pptx::Package"
       ],
       "family_methods": true
     },
@@ -2361,14 +2408,61 @@
           "name": "into_snapshot",
           "scope": "litchi_pptx",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_pptx",
+          "replacement": "map each refusal by its reason: Refused(Refusal) with a RefusalKind, PatchConflict or Internal (record 0351 / 0356)"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_pptx",
+          "replacement": "stage changes in a family Edit (opened) or builder::{Presentation, Slide, Shape} (fresh); no Mutable* draft types (record 0351 / 0356)",
+          "match": "prefix"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_pptx",
+          "replacement": "limits come from OpenOptions/EditOptions or a required Limits argument (record 0351 / 0356)",
+          "match": "suffix"
+        },
+        {
+          "name": "readonly_recommended",
+          "scope": "litchi_pptx",
+          "replacement": "use read_only_recommended (record 0351 / 0356)"
+        },
+        {
+          "name": "ReadonlyRecommended",
+          "scope": "litchi_pptx",
+          "replacement": "use ReadOnlyRecommended (record 0351 / 0356)"
         }
       ],
       "families": [
         "litchi_pptx::metadata",
-        "litchi_pptx::opened"
+        "litchi_pptx::opened",
+        "litchi_pptx::tag",
+        "litchi_pptx::tag::shape",
+        "litchi_pptx::font",
+        "litchi_pptx::table::style",
+        "litchi_pptx::presentation_properties::math",
+        "litchi_pptx::shape::zoom",
+        "litchi_pptx::shape::classification",
+        "litchi_pptx::shape::designer",
+        "litchi_pptx::shape::designer::properties",
+        "litchi_pptx::model3d",
+        "litchi_pptx::web",
+        "litchi_pptx::master_layout",
+        "litchi_pptx::master_layout::placeholder",
+        "litchi_pptx::notes",
+        "litchi_pptx::change_tracking",
+        "litchi_pptx::presentation::embedded::ink_actions",
+        "litchi_pptx::presentation_properties::read_only_recommended",
+        "litchi_pptx::presentation_properties::metadata::designer_tags",
+        "litchi_pptx::opc"
       ],
       "immutable_owners": [
-        "litchi_pptx::Presentation"
+        "litchi_pptx::Presentation",
+        "litchi_pptx::Package"
       ],
       "family_methods": true
     },
