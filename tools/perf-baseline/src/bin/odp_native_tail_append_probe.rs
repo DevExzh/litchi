@@ -4,7 +4,7 @@ use std::{fs::OpenOptions, sync::Arc};
 
 use litchi_core::FileSource;
 use litchi_odf_common::SourceContentPublicationOptions;
-use litchi_odp::{SourceBackedPresentation, SourceBackedTailAppendEdit};
+use litchi_odp::{SourceBackedPresentation, tail_append::Edit as SourceBackedTailAppendEdit};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();

@@ -34,10 +34,9 @@ pub use litchi_odf_common::{
     Error, LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,
     SourceLimitKind, SourceLimits, SourceLimitsBuilder,
 };
-pub use package::{
-    SourceBackedTailAppendEdit, SourceBackedTailAppendPublicationPlan, TailAppendError,
-    TailAppendLimits, TailAppendSourceProof,
-};
+/// Bounded, source-backed append of one plain slide (`Edit`, `Limits`,
+/// `PublicationPlan`, `SourceProof`, `Error`).
+pub use package::source_append as tail_append;
 
 // Keep implementation modules ergonomic internally without flattening their
 // semantic vocabulary into the public crate root.
