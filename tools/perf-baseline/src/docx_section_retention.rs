@@ -468,7 +468,7 @@ fn prevalidate(
             return Err("diagnostic preflight commit is not changed".into());
         }
         let mut output = Vec::new();
-        let publication = package.publish_section_layout_commit_to_stream(&mut output, &commit)?;
+        let publication = package.apply_section_layout(commit.patch()).and_then(|committed| committed.package().write_to(&mut output))?;
         let output_package = open_source_package(&output)?;
         let output_snapshot = output_package.section_layout_snapshot()?;
         verify_snapshot_shape(&output_snapshot, section_count, columns)?;
@@ -500,7 +500,7 @@ fn validate_measured_commit(
     columns: u16,
 ) -> Result<(), Box<dyn Error>> {
     let mut output = Vec::new();
-    let publication = package.publish_section_layout_commit_to_stream(&mut output, commit)?;
+    let publication = package.apply_section_layout(commit.patch()).and_then(|committed| committed.package().write_to(&mut output))?;
     if output != expected_output {
         return Err("measured publication differs from preflight output bytes".into());
     }

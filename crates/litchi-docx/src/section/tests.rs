@@ -441,7 +441,7 @@ fn inventory_preflights_reference_limits_before_semantic_retention() {
     assert!(matches!(
         Inventory::parse(xml, &limits),
         Err(crate::Error::SectionInventoryLimit {
-            resource: "header/footer reference bytes",
+            kind: crate::section::LimitKind::HeaderFooterReferenceBytes,
             ..
         })
     ));
@@ -460,7 +460,7 @@ fn inventory_bounds_inherited_namespace_materialization() {
     assert!(matches!(
         Inventory::parse(&xml, &limits),
         Err(crate::Error::SectionInventoryLimit {
-            resource: "section bytes",
+            kind: crate::section::LimitKind::Bytes,
             ..
         })
     ));
@@ -549,7 +549,7 @@ fn inventory_enforces_explicit_section_limit_at_the_boundary() {
     assert!(matches!(
         Inventory::parse(two.as_bytes(), &one_limit),
         Err(crate::Error::SectionInventoryLimit {
-            resource: "sections",
+            kind: crate::section::LimitKind::Sections,
             maximum: 1,
             actual: 2,
         })

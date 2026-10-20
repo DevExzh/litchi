@@ -18,7 +18,7 @@ impl Package {
         self.check_source()?;
         topology.check_source()?;
         let result = (|| {
-            if topology.physical_source_lineage() != self.physical.source_lineage() {
+            if topology.physical_source_lineage() != self.physical_source()?.source_lineage() {
                 return Err(Error::conflict(
                     "with_prepared_topology",
                     "the candidate belongs to a different physical source",
@@ -26,8 +26,9 @@ impl Package {
             }
             let main = topology.main_document_part()?;
             validate_document_main_content_type(main.content_type())?;
-            let mut owner = Self::with_execution(self.physical.clone(), self.execution.clone())?
-                .with_semantic_limits(self.semantic_limits().clone());
+            let mut owner =
+                Self::with_execution(self.physical_source()?.clone(), self.execution.clone())?
+                    .with_semantic_limits(self.semantic_limits().clone());
             owner.effective = Some(topology.clone());
             Ok(owner)
         })();
@@ -47,9 +48,8 @@ impl Package {
             Some(topology) => {
                 paragraph.inlines_with_relationships(topology.main_document_part()?.rels())
             },
-            None => {
-                paragraph.inlines_with_relationships(self.physical.main_document_part()?.rels())
-            },
+            None => paragraph
+                .inlines_with_relationships(self.physical_source()?.main_document_part()?.rels()),
         })();
         self.check_source()?;
         result
@@ -60,17 +60,22 @@ impl Package {
         match &self.effective {
             Some(topology) => Ok(topology.check_source()?),
             None => {
-                self.physical.source_version()?;
-                Ok(self.physical.check_execution()?)
+                if let Some(deferred) = &self.deferred {
+                    deferred.base.check_source()?;
+                }
+                let physical = self.physical_source()?;
+                physical.source_version()?;
+                Ok(physical.check_execution()?)
             },
         }
     }
 
     /// Publish the effective package, preserving unchanged physical members.
-    pub fn write_to<W: Write>(&self, writer: W) -> Result<()> {
-        match &self.effective {
-            Some(topology) => Ok(topology.publish_to_stream(writer)?),
-            None => Ok(self
+    pub fn write_to<W: Write>(&self, mut writer: W) -> Result<()> {
+        match (&self.effective, &self.deferred) {
+            (Some(topology), _) => Ok(topology.publish_to_stream(writer)?),
+            (None, Some(deferred)) => deferred.write(&mut writer),
+            (None, None) => Ok(self
                 .physical
                 .clone()
                 .write_topology_to_stream(writer, SourceTopologyPlan::new())?),
@@ -196,7 +201,10 @@ impl Package {
             // physical path's signed managed snapshot fallback without
             // weakening the guard on any changed effective owner.
             if topology.is_noop() {
-                let physical = Self::with_execution(self.physical.clone(), self.execution.clone())?;
+                let physical = Self::with_execution(
+                    self.physical_source().map_err(Error::from)?.clone(),
+                    self.execution.clone(),
+                )?;
                 return physical.main_document_snapshot_with_before(
                     operation,
                     source_authorized,
@@ -405,7 +413,7 @@ impl Package {
                 Ok(MainTextData::Effective(data))
             },
             None => {
-                let main = self.physical.main_document_part()?;
+                let main = self.physical_source()?.main_document_part()?;
                 preflight(main.content_type(), main.declared_uncompressed_size()?)?;
                 Ok(MainTextData::Physical(self.main_data(main)?))
             },

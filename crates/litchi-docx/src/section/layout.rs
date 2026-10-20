@@ -16,7 +16,7 @@ use crate::namespace::is_wordprocessing_namespace;
 use litchi_core::xml::ReaderOrigin;
 use litchi_core::{Position, SourceVersion};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
-use litchi_opc::{SourceArtifact, SourceArtifactFingerprint, SourceLineage};
+use litchi_opc::{SourceArtifactFingerprint, SourceLineage};
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, PrefixDeclaration, ResolveResult};
@@ -128,22 +128,13 @@ impl Snapshot {
         self.xml.as_slice() == xml
     }
 
-    pub(crate) fn retained_bytes(&self) -> Option<usize> {
-        size_of::<Self>().checked_add(self.inventory.retained_bytes()?)
+    /// The fingerprint of the complete artifact the snapshot was read from.
+    pub(crate) const fn artifact_fingerprint(&self) -> Option<SourceArtifactFingerprint> {
+        self.artifact_fingerprint
     }
 
-    pub(crate) fn with_artifact_fingerprint(
-        &self,
-        artifact_fingerprint: SourceArtifactFingerprint,
-    ) -> Self {
-        Self {
-            xml: Arc::clone(&self.xml),
-            inventory: self.inventory.clone(),
-            source_version: None,
-            lineage: None,
-            artifact_fingerprint: Some(artifact_fingerprint),
-            limits: self.limits.clone(),
-        }
+    pub(crate) fn retained_bytes(&self) -> Option<usize> {
+        size_of::<Self>().checked_add(self.inventory.retained_bytes()?)
     }
 
     fn with_source_identity(&self, source: &Self) -> Self {
@@ -386,7 +377,7 @@ impl Edit {
             && replacement.len() > self.base.limits.max_section_bytes
         {
             return Err(Error::SectionInventoryLimit {
-                resource: "section bytes",
+                kind: crate::section::LimitKind::Bytes,
                 maximum: self.base.limits.max_section_bytes,
                 actual: replacement.len(),
             });
@@ -528,9 +519,6 @@ enum PatchAuthorization {
         lineage: SourceLineage,
         artifact_fingerprint: SourceArtifactFingerprint,
     },
-    EmittedArtifact {
-        artifact_fingerprint: SourceArtifactFingerprint,
-    },
 }
 
 impl PatchAuthorization {
@@ -550,62 +538,6 @@ impl PatchAuthorization {
             },
             _ => Err(Error::SectionLayoutAuthorizationConflict),
         }
-    }
-}
-
-/// Exact publication evidence for one changed section-layout artifact.
-///
-/// The retained inverse is authorized for the exact ZIP artifact emitted by
-/// the forward publication. Use the package inverse-publication method to
-/// reauthorize that inverse after reopening the emitted artifact.
-pub struct Publication {
-    snapshot: Snapshot,
-    original_snapshot: Snapshot,
-    original_artifact: SourceArtifact,
-    inverse_patch: Patch,
-}
-
-impl Publication {
-    pub(crate) fn new(
-        snapshot: Snapshot,
-        original_snapshot: Snapshot,
-        original_artifact: SourceArtifact,
-        inverse_patch: Patch,
-    ) -> Self {
-        Self {
-            snapshot,
-            original_snapshot,
-            original_artifact,
-            inverse_patch,
-        }
-    }
-
-    /// Borrow the semantic snapshot represented by the emitted artifact.
-    ///
-    /// Its source identity is the emitted artifact fingerprint retained by
-    /// the publication authorization; the process-local source lineage and
-    /// revision are intentionally not reused for a reopened artifact.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the inverse patch authorized for the emitted artifact.
-    ///
-    /// Applying this patch is still source-checked; a reopened package must
-    /// be explicitly reauthorized through the package inverse-publication
-    /// method rather than by bypassing the complete-artifact check.
-    #[must_use]
-    pub const fn inverse_patch(&self) -> &Patch {
-        &self.inverse_patch
-    }
-
-    pub(crate) const fn original_snapshot(&self) -> &Snapshot {
-        &self.original_snapshot
-    }
-
-    pub(crate) const fn original_artifact(&self) -> &SourceArtifact {
-        &self.original_artifact
     }
 }
 
@@ -641,9 +573,8 @@ impl Patch {
     }
 
     /// Apply only to a snapshot with the exact source bytes, source lineage,
-    /// and semantic limits used to create this patch. The public inverse
-    /// retained by a [`Publication`] is the explicit fingerprint-only
-    /// reauthorization mode for the emitted artifact.
+    /// and semantic limits used to create this patch. A package replays a
+    /// patch through `source_backed::Package::apply_section_layout`.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         self.authorize_source(source)?;
         if self.is_noop() {
@@ -686,13 +617,6 @@ impl Patch {
                     return Err(Error::SectionLayoutFingerprintConflict);
                 }
             },
-            PatchAuthorization::EmittedArtifact {
-                artifact_fingerprint,
-            } => {
-                if source.artifact_fingerprint != Some(*artifact_fingerprint) {
-                    return Err(Error::SectionLayoutFingerprintConflict);
-                }
-            },
         }
         if source.limits != self.limits {
             return Err(Error::SectionLayoutPolicyConflict);
@@ -704,10 +628,26 @@ impl Patch {
         &self.limits
     }
 
-    pub(crate) fn reauthorize_for_artifact(&mut self, fingerprint: SourceArtifactFingerprint) {
-        self.authorization = PatchAuthorization::EmittedArtifact {
-            artifact_fingerprint: fingerprint,
-        };
+    /// Apply to a snapshot with the patch's exact before bytes and limits,
+    /// from any source (record 0355a: a package replay reads the snapshot it
+    /// applies to).
+    pub(crate) fn apply_content(&self, source: &Snapshot) -> Result<Snapshot> {
+        if source.xml.as_slice() != self.before.as_slice() {
+            return Err(Error::SectionLayoutStaleSource);
+        }
+        if source.limits != self.limits {
+            return Err(Error::SectionLayoutPolicyConflict);
+        }
+        if self.is_noop() {
+            return Ok(source.clone());
+        }
+        Snapshot::from_shared_xml(
+            Arc::clone(&self.after),
+            source.source_version,
+            source.lineage.clone(),
+            source.artifact_fingerprint,
+            self.limits.clone(),
+        )
     }
 }
 
@@ -804,13 +744,17 @@ impl FragmentContext {
             .checked_add(section.len())
             .and_then(|value| value.checked_add(suffix_bytes.len()))
             .ok_or_else(|| Error::InvalidFormat("section wrapper size overflow".into()))?;
-        enforce_layout_limit("section bytes", section.len(), limits.max_section_bytes)?;
+        enforce_layout_limit(
+            crate::section::LimitKind::Bytes,
+            section.len(),
+            limits.max_section_bytes,
+        )?;
         let wrapper_limit = limits
             .max_section_bytes
             .checked_add(prefix.len())
             .and_then(|value| value.checked_add(suffix_bytes.len()))
             .ok_or_else(|| Error::InvalidFormat("section wrapper limit overflow".into()))?;
-        enforce_layout_limit("section bytes", capacity, wrapper_limit)?;
+        enforce_layout_limit(crate::section::LimitKind::Bytes, capacity, wrapper_limit)?;
         let mut xml = Vec::new();
         xml.try_reserve_exact(capacity)
             .map_err(|source| Error::Allocation {
@@ -958,7 +902,11 @@ impl FragmentAnalysis {
             events = events
                 .checked_add(1)
                 .ok_or_else(|| Error::InvalidFormat("section event counter overflow".into()))?;
-            enforce_layout_limit("XML events", events, limits.max_events)?;
+            enforce_layout_limit(
+                crate::section::LimitKind::XmlEvents,
+                events,
+                limits.max_events,
+            )?;
             let resolver = reader.resolver().clone();
             let (namespace, event) = resolver.resolve_event(event);
             match event {
@@ -967,7 +915,11 @@ impl FragmentAnalysis {
                         .checked_add(1)
                         .ok_or_else(|| Error::InvalidFormat("section XML depth overflow".into()))?;
                     let relative_depth = depth.saturating_sub(1);
-                    enforce_layout_limit("XML depth", relative_depth, limits.max_depth)?;
+                    enforce_layout_limit(
+                        crate::section::LimitKind::XmlDepth,
+                        relative_depth,
+                        limits.max_depth,
+                    )?;
                     let is_section_root = start == section_start;
                     if is_section_root {
                         if section_root.is_some()
@@ -1002,7 +954,11 @@ impl FragmentAnalysis {
                         .checked_add(1)
                         .ok_or_else(|| Error::InvalidFormat("section XML depth overflow".into()))?;
                     let relative_depth = child_depth.saturating_sub(1);
-                    enforce_layout_limit("XML depth", relative_depth, limits.max_depth)?;
+                    enforce_layout_limit(
+                        crate::section::LimitKind::XmlDepth,
+                        relative_depth,
+                        limits.max_depth,
+                    )?;
                     let is_section_root = start == section_start;
                     if is_section_root {
                         if section_root.is_some()
@@ -1179,10 +1135,14 @@ fn word_attribute_info_from_element(
     Ok(info)
 }
 
-fn enforce_layout_limit(resource: &'static str, actual: usize, maximum: usize) -> Result<()> {
+fn enforce_layout_limit(
+    resource: crate::section::LimitKind,
+    actual: usize,
+    maximum: usize,
+) -> Result<()> {
     if actual > maximum {
         return Err(Error::SectionInventoryLimit {
-            resource,
+            kind: resource,
             maximum,
             actual,
         });
@@ -2398,21 +2358,15 @@ mod tests {
         released.release_retained_base();
         assert_eq!(released.retained_base_bytes(), 0);
 
-        let mut output = Vec::new();
-        let publication = package
-            .publish_section_layout_commit_to_stream(&mut output, &at_cap)
+        // The retained base spares the commit a second scan: the target the
+        // package publishes is the commit's own XML allocation.
+        let (_, target, _) = package
+            .section_layout_target(at_cap.patch(), Some(&at_cap), "test")
             .unwrap();
-        assert!(
-            at_cap
-                .snapshot()
-                .inventory()
-                .shares_allocation_with(publication.snapshot().inventory())
-        );
-        assert!(
-            source
-                .inventory()
-                .shares_allocation_with(publication.original_snapshot().inventory())
-        );
+        assert!(std::sync::Arc::ptr_eq(
+            &target,
+            &at_cap.snapshot().shared_xml()
+        ));
 
         let noop = source.edit(0).unwrap().commit().unwrap();
         assert_eq!(noop.retained_base_bytes(), 0);

@@ -49781,7 +49781,7 @@ fn verify_docx_section_layout_controls(
         return Err("DOCX section-layout no-op control produced a changed patch".into());
     }
     let mut noop_output = Vec::new();
-    noop_package.publish_section_layout_commit_to_stream(&mut noop_output, &noop)?;
+    noop_package.apply_section_layout(noop.patch()).and_then(|committed| committed.package().write_to(&mut noop_output))?;
     if noop_output != corpus.archive {
         return Err("DOCX section-layout no-op publication changed source bytes".into());
     }
@@ -49791,7 +49791,7 @@ fn verify_docx_section_layout_controls(
     )))?;
     let mut foreign_output = Vec::new();
     if !matches!(
-        foreign.publish_section_layout_commit_to_stream(&mut foreign_output, commit),
+        foreign.apply_section_layout(commit.patch()).and_then(|committed| committed.package().write_to(&mut foreign_output)),
         Err(litchi_docx::Error::SectionLayoutForeignSource)
     ) || !foreign_output.is_empty()
     {
@@ -49825,7 +49825,7 @@ fn verify_docx_section_layout_controls(
     }
     let mut signed_noop_output = Vec::new();
     signed_noop
-        .publish_section_layout_commit_to_stream(&mut signed_noop_output, &signed_noop_commit)?;
+        .apply_section_layout(signed_noop_commit.patch()).and_then(|committed| committed.package().write_to(&mut signed_noop_output))?;
     if signed_noop_output != signed_archive {
         return Err("DOCX section-layout signed no-op changed source bytes".into());
     }
@@ -49847,7 +49847,7 @@ fn verify_docx_section_layout_controls(
     let signed_commit = signed_edit.commit()?;
     let mut signed_output = Vec::new();
     if !matches!(
-        signed.publish_section_layout_commit_to_stream(&mut signed_output, &signed_commit),
+        signed.apply_section_layout(signed_commit.patch()).and_then(|committed| committed.package().write_to(&mut signed_output)),
         Err(litchi_docx::Error::Opc(
             OpcError::SignedSourceRequiresExplicitPolicy
         ))
@@ -49893,7 +49893,7 @@ fn verify_docx_section_layout_controls(
         limit: 128,
     };
     if !matches!(
-        partial.publish_section_layout_commit_to_stream(&mut partial_sink, &partial_commit),
+        partial.apply_section_layout(partial_commit.patch()).and_then(|committed| committed.package().write_to(&mut partial_sink)),
         Err(litchi_docx::Error::Opc(OpcError::IncompleteOutput { .. }))
     ) || partial_sink.accepted != 128
     {
@@ -50238,7 +50238,7 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
     }
     let mut expected_output = Vec::new();
     let expected_publication = expected_package
-        .publish_section_layout_commit_to_stream(&mut expected_output, &expected_commit)?;
+        .apply_section_layout(expected_commit.patch()).and_then(|committed| committed.package().write_to(&mut expected_output))?;
     verify_docx_section_layout_output(corpus, &expected_output, [3, 2, 2])?;
     verify_docx_section_layout_controls(corpus, &expected_commit, &expected_publication)?;
     let expected_digest = sha256_hex(&expected_output);
@@ -50497,7 +50497,7 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         let before_publication_after_commit = package.cache_diagnostics();
 
         let publication_started = Instant::now();
-        let publication = package.publish_section_layout_commit_to_stream(&mut sink, &commit)?;
+        let publication = package.apply_section_layout(commit.patch()).and_then(|committed| committed.package().write_to(&mut sink))?;
         std::hint::black_box(&publication);
         let publication_ns = elapsed_ns(publication_started.elapsed())?;
         let total_ns = preparation_ns
@@ -61528,7 +61528,7 @@ mod tests {
         }))?;
         let commit = edit.commit()?;
         let mut output = Vec::new();
-        package.publish_section_layout_commit_to_stream(&mut output, &commit)?;
+        package.apply_section_layout(commit.patch()).and_then(|committed| committed.package().write_to(&mut output))?;
         Ok(output)
     }
 
@@ -61591,7 +61591,7 @@ mod tests {
             .ok_or("DOCX section-layout diagnostic output ceiling overflows u64")?;
         let mut sink = super::CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
-        let publication = package.publish_section_layout_commit_to_stream(&mut sink, &commit)?;
+        let publication = package.apply_section_layout(commit.patch()).and_then(|committed| committed.package().write_to(&mut sink))?;
         let publication_snapshot = docx_read_diagnostic_snapshot(&range_source, &provider_counter)?;
         snapshots.push(("publication", publication_snapshot));
         let provider_version_at_publication = range_source.version()?;

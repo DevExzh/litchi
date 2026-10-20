@@ -191,7 +191,7 @@ fn protected_docx_security() -> Result<(), Box<dyn Error>> {
     let no_op = docx.edit_document_variables()?.commit()?;
     assert!(!no_op.changed());
     let mut no_op_output = Vec::new();
-    docx.publish_document_variables_commit_to_stream(&mut no_op_output, &no_op)?;
+    docx.apply_document_variables(no_op.patch()).and_then(|committed| committed.package().write_to(&mut no_op_output))?;
     assert_eq!(no_op_output, bytes);
 
     let package = SourceBackedPackage::from_vec_with_limits(bytes, security_read_limits()?)?;
@@ -201,7 +201,7 @@ fn protected_docx_security() -> Result<(), Box<dyn Error>> {
     let commit = edit.commit()?;
     assert!(commit.changed());
     let mut output = Vec::new();
-    let error = match docx.publish_document_variables_commit_to_stream(&mut output, &commit) {
+    let error = match docx.apply_document_variables(commit.patch()).and_then(|committed| committed.package().write_to(&mut output)) {
         Ok(_) => return Err("protected DOCX publication unexpectedly succeeded".into()),
         Err(error) => error,
     };

@@ -423,7 +423,7 @@ fn prepare_oracle(corpus: &super::Corpus) -> Result<Oracle, Box<dyn Error>> {
         return Err("DOCX owned attribution oracle commit is not changed".into());
     }
     let mut output = Vec::new();
-    let publication = package.publish_section_layout_commit_to_stream(&mut output, &commit)?;
+    let publication = package.apply_section_layout(commit.patch()).and_then(|committed| committed.package().write_to(&mut output))?;
     super::verify_docx_section_layout_output(corpus, &output, [3, 2, 2])?;
     super::verify_docx_section_layout_controls(corpus, &commit, &publication)?;
     let output_sha256 = super::sha256_hex(&output);
@@ -857,7 +857,7 @@ fn run_workload(
         let before_publication_after_commit = package.cache_diagnostics();
         let publication_started = Instant::now();
         let layout_publication =
-            package.publish_section_layout_commit_to_stream(&mut sink, &layout_commit)?;
+            package.apply_section_layout(layout_commit.patch()).and_then(|committed| committed.package().write_to(&mut sink))?;
         black_box(&layout_publication);
         let publication_ns = super::elapsed_ns(publication_started.elapsed())?;
         let operation_ns = preparation_ns

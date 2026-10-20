@@ -8,6 +8,7 @@
 //! transactions retain the raw XML and may be published to a sequential sink
 //! while raw-copying every unselected ZIP member.
 
+mod deferred;
 pub(crate) mod document_policy;
 mod ingress;
 mod ink;
@@ -19,9 +20,17 @@ mod document_memo_tests;
 #[cfg(test)]
 mod paragraph_index_tests;
 
+pub mod alt_chunk_payload;
+pub mod document_variables;
+pub mod glossary_text;
+pub mod hyperlink_detachment;
+pub mod hyperlink_redaction;
 pub mod paragraph_copy;
 pub mod paragraph_remove;
+pub mod section_layout;
+pub mod story_hyperlink_redaction;
 pub mod story_text;
+pub mod story_text_edit;
 pub mod tail_append;
 pub mod tail_append_stream;
 
@@ -29,10 +38,9 @@ pub use litchi_opc::{SourceReadDiagnostics, SourceReadPolicy, SourceReadPolicyEr
 
 pub use story_text::{
     Commit as StoryTextCommit, Edit as StoryTextEdit, Error as StoryTextError, GlossaryBatchCommit,
-    GlossaryBatchEdit, GlossaryBatchPatch, GlossaryBatchPublication, GlossaryBatchSelector,
-    GlossaryBatchSnapshot, GlossarySelector, GlossarySelectorKind, Limits as StoryTextLimits,
-    Patch as StoryTextPatch, Publication as StoryTextPublication, Selector as StorySelector,
-    Snapshot as StoryTextSnapshot,
+    GlossaryBatchEdit, GlossaryBatchPatch, GlossaryBatchSelector, GlossaryBatchSnapshot,
+    GlossarySelector, GlossarySelectorKind, Limits as StoryTextLimits, Patch as StoryTextPatch,
+    Selector as StorySelector, Snapshot as StoryTextSnapshot,
 };
 pub use svg_lifecycle::{
     PictureSelector, PictureSelector as SvgPictureSelector, RasterResourceSourceView,
@@ -86,7 +94,6 @@ pub use tail_append_stream::patch::{
     apply_exact_inverse as apply_tail_append_exact_inverse,
 };
 
-use crate::alt::Data;
 use crate::document::snapshot::Commit;
 use crate::document::{Result as TransactionResult, Snapshot};
 use crate::error::{Error, Result};
@@ -161,6 +168,9 @@ pub struct Package {
     /// current payload, so one revision is scanned once, not once per edit
     /// and again per commit.
     main_snapshot: Arc<Mutex<Option<Snapshot>>>,
+    /// The pending output of a committed package (record 0355a); its
+    /// physical source is the materialized output.
+    deferred: Option<Arc<deferred::Deferred>>,
 }
 
 /// A checked selector for one active `w:altChunk` anchor in the main story.
@@ -193,22 +203,6 @@ struct DocumentVariablesSource {
     snapshot: variables::Snapshot,
     protected: bool,
     unique_inbound_owner: bool,
-}
-
-/// Products of one exact source-backed document-variable publication.
-pub struct DocumentVariablesPublication {
-    snapshot: variables::Snapshot,
-    original_snapshot: variables::Snapshot,
-    original_artifact: SourceArtifact,
-    published_artifact: SourceArtifactFingerprint,
-}
-
-impl DocumentVariablesPublication {
-    /// Borrow the published settings snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &variables::Snapshot {
-        &self.snapshot
-    }
 }
 
 /// A completed main-document publication with authority to restore its exact
@@ -345,7 +339,16 @@ impl Package {
                 reason: "this DOCX operation requires migration to the effective graph".into(),
             });
         }
-        Ok(&self.physical)
+        self.physical_source()
+    }
+
+    /// The physical source: the opened archive, or the materialized output
+    /// of a committed package (record 0355a).
+    fn physical_source(&self) -> litchi_opc::Result<&SourceBackedPackage> {
+        match &self.deferred {
+            Some(deferred) => deferred.materialized(),
+            None => Ok(&self.physical),
+        }
     }
 
     /// Open an immutable filesystem source using the standard finite policies.
@@ -487,6 +490,7 @@ impl Package {
             properties_recorded: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             main_admission: Arc::new(Mutex::new(None)),
             main_snapshot: Arc::new(Mutex::new(None)),
+            deferred: None,
         })
     }
 
@@ -541,7 +545,7 @@ impl Package {
     pub fn to_owned_package(&self) -> Result<crate::Package> {
         let package = match &self.effective {
             Some(effective) => effective.to_opc_package()?,
-            None => self.physical.to_opc_package()?,
+            None => self.physical_source()?.to_opc_package()?,
         };
         let result = crate::Package::from_opc_package(package);
         // The OPC conversion checks freshness through its final payload read,
@@ -565,7 +569,7 @@ impl Package {
     pub fn to_owned_package_preserving_source(&self) -> Result<crate::Package> {
         let package = match &self.effective {
             Some(effective) => effective.to_opc_package_preserving_source()?,
-            None => self.physical.to_opc_package_preserving_source()?,
+            None => self.physical_source()?.to_opc_package_preserving_source()?,
         };
         let result = crate::Package::from_opc_package(package);
         self.check_source()?;
@@ -978,14 +982,6 @@ impl Package {
         Ok(snapshot)
     }
 
-    /// Start an isolated edit of one existing locally authored section.
-    pub fn edit_section_layout(
-        &self,
-        selector: impl Into<crate::section::Selector>,
-    ) -> Result<layout::Edit> {
-        self.section_layout_snapshot()?.edit(selector)
-    }
-
     /// Return content-free cache activity for this source-backed DOCX.
     #[must_use]
     pub fn cache_diagnostics(&self) -> SourceCacheDiagnostics {
@@ -1002,7 +998,7 @@ impl Package {
     pub fn source_version(&self) -> Result<SourceVersion> {
         match &self.effective {
             Some(topology) => Ok(topology.physical_source_version()?),
-            None => Ok(self.physical.source_version()?),
+            None => Ok(self.physical_source()?.source_version()?),
         }
     }
 
@@ -1272,7 +1268,7 @@ impl Package {
                 litchi_ooxml_common::properties::read_prepared_with_report(topology, &mut repaired)
             },
             None => litchi_ooxml_common::properties::read_source_backed_with_report(
-                &self.physical,
+                self.physical_source()?,
                 &mut repaired,
             ),
         };
@@ -1377,38 +1373,18 @@ impl Package {
             .snapshot)
     }
 
-    /// Start an isolated edit of variables in the existing settings Part.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same failures as [`Self::document_variables_snapshot`].
-    pub fn edit_document_variables(&self) -> Result<variables::Edit> {
-        self.document_variables_snapshot()?.try_edit()
-    }
-
-    /// Publish a source-checked document-variable commit to a sequential sink.
-    ///
-    /// Only the existing settings payload may change. Every other physical ZIP
-    /// member is raw-copied. Exact no-ops reproduce the complete source artifact
-    /// byte for byte, including signatures and protected settings. A real change
-    /// refuses signed, protected, MCE-selected, or unmodeled selected-variable
-    /// sources before output begins.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed source-conflict, relationship, content-type, protection,
-    /// preservation, signature, limit, XML-publication, or incomplete-output
-    /// error.
-    pub fn publish_document_variables_commit_to_stream<W: Write>(
+    /// Check a document-variable patch against the current settings part
+    /// and return the part and its rewritten XML (record 0355a). Exact
+    /// no-ops skip the rewrite checks.
+    pub(crate) fn document_variables_target(
         &self,
-        writer: W,
-        commit: &variables::Commit,
-    ) -> Result<DocumentVariablesPublication> {
+        patch: &variables::Patch,
+        operation: &'static str,
+    ) -> Result<(PackURI, Arc<Vec<u8>>)> {
         self.trim_clean_paragraph_index_for_operation();
-        let current =
-            self.settings_document_variables_source("publish_document_variables_commit_to_stream")?;
-        let target = commit.patch().apply(&current.snapshot)?;
-        if !commit.patch().is_empty() {
+        let current = self.settings_document_variables_source(operation)?;
+        let target = patch.apply_content(&current.snapshot)?;
+        if !patch.is_empty() {
             if !current.unique_inbound_owner {
                 return Err(Error::DocumentVariablesPreservation(
                     "the settings Part has an additional internal inbound relationship",
@@ -1417,7 +1393,7 @@ impl Package {
             if current.protected {
                 return Err(Error::refused(
                     litchi_core::edit::RefusalKind::Protected,
-                    "publish_document_variables_commit_to_stream",
+                    operation,
                     "document or write protection is enforced",
                 ));
             }
@@ -1426,158 +1402,53 @@ impl Package {
                 current.snapshot.variables(),
             )?;
         }
-        let original_artifact = self.physical_package()?.source_artifact();
-        let mut output = FingerprintingWriter {
-            inner: writer,
-            hasher: Sha256::new(),
-        };
-        if commit.patch().is_empty() {
-            self.physical_package()?
-                .clone()
-                .write_part_overlays_shared_to_stream(&mut output, Vec::new())?;
-        } else {
-            self.physical_package()?
-                .clone()
-                .write_part_overlay_shared_to_stream(
-                    &mut output,
-                    &current.partname,
-                    target.shared_xml(),
-                )?;
-        }
-        let published_artifact =
-            SourceArtifactFingerprint::from_sha256(output.hasher.finalize().into());
-        Ok(DocumentVariablesPublication {
-            snapshot: target,
-            original_snapshot: commit.patch().before_snapshot().clone(),
-            original_artifact,
-            published_artifact,
-        })
+        Ok((current.partname, target.shared_xml()))
     }
 
-    /// Apply the exact inverse of a completed source-backed publication.
-    ///
-    /// The supplied package must be the byte-exact artifact emitted by
-    /// `publication`; a reopened foreign or subsequently modified artifact is
-    /// rejected before output begins. Successful publication copies the exact
-    /// retained original artifact, including all untouched physical ZIP bytes.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed conflict, source-change, allocation, or incomplete-
-    /// output error.
-    pub fn publish_document_variables_inverse_to_stream<W: Write>(
+    /// Write this package with one part's payload replaced (record 0355a):
+    /// the output of a committed single-part family change.
+    pub(crate) fn write_part_overlay(
         &self,
-        writer: W,
-        publication: &DocumentVariablesPublication,
-    ) -> Result<variables::Snapshot> {
-        self.trim_clean_paragraph_index_for_operation();
-        let current = self
-            .settings_document_variables_source("publish_document_variables_inverse_to_stream")?;
-        if !current.snapshot.same_content(&publication.snapshot)
-            || self.physical_package()?.source_artifact().fingerprint()?
-                != publication.published_artifact
-        {
-            return Err(Error::DocumentVariablesConflict);
-        }
-        publication.original_artifact.write_to(writer)?;
-        Ok(publication.original_snapshot.clone())
+        writer: &mut dyn Write,
+        partname: &PackURI,
+        payload: &Arc<Vec<u8>>,
+    ) -> Result<()> {
+        self.physical_package()?
+            .clone()
+            .write_part_overlay_shared_to_stream(writer, partname, Arc::clone(payload))?;
+        Ok(())
     }
 
-    /// Publish one exact-source-checked existing-section layout commit to a
-    /// sequential stream. Only the existing main-document Part is overlaid;
-    /// all other ZIP members are copied through the source-backed preservation
-    /// plan.
-    pub fn publish_section_layout_commit_to_stream<W: Write>(
+    /// Check a section-layout patch against the current main document and
+    /// return the part and its rewritten XML (record 0355a). `commit`, the
+    /// commit that made the patch, lets its retained base inventory spare a
+    /// second scan of an unchanged source.
+    pub(crate) fn section_layout_target(
         &self,
-        writer: W,
-        commit: &layout::Commit,
-    ) -> Result<layout::Publication> {
-        self.trim_clean_paragraph_index_for_operation();
-        // Preserve the second trim performed by the delegated patch route.
-        self.trim_clean_paragraph_index_for_operation();
-        let retained_base = commit.base_snapshot_for_publication();
-        let (main, current) = self.main_section_layout_snapshot(
-            "publish_section_layout_patch_to_stream",
-            commit.patch().limits(),
-            retained_base,
-        )?;
-        let target = commit.apply_to_current(&current)?;
-        self.publish_section_layout_target_to_stream(writer, &main, commit.patch(), current, target)
-    }
-
-    /// Publish an exact-source-checked section-layout patch to a sequential
-    /// stream. The returned publication retains an inverse authorization for
-    /// the exact emitted artifact.
-    pub fn publish_section_layout_patch_to_stream<W: Write>(
-        &self,
-        writer: W,
         patch: &layout::Patch,
-    ) -> Result<layout::Publication> {
+        commit: Option<&layout::Commit>,
+        operation: &'static str,
+    ) -> Result<(PackURI, Arc<Vec<u8>>, SourceArtifactFingerprint)> {
         self.trim_clean_paragraph_index_for_operation();
         let (main, current) = self.main_section_layout_snapshot(
-            "publish_section_layout_patch_to_stream",
+            operation,
             patch.limits(),
-            None,
+            commit.and_then(layout::Commit::base_snapshot_for_publication),
         )?;
-        let target = patch.apply(&current)?;
-        self.publish_section_layout_target_to_stream(writer, &main, patch, current, target)
-    }
-
-    fn publish_section_layout_target_to_stream<W: Write>(
-        &self,
-        writer: W,
-        main: &PackURI,
-        patch: &layout::Patch,
-        current: layout::Snapshot,
-        target: layout::Snapshot,
-    ) -> Result<layout::Publication> {
-        let original_artifact = self.physical_package()?.source_artifact();
-        let mut output = FingerprintingWriter {
-            inner: writer,
-            hasher: Sha256::new(),
+        let target = match commit.map(|commit| commit.apply_to_current(&current)) {
+            Some(Ok(target)) => target,
+            _ => patch.apply_content(&current)?,
         };
-        if patch.is_noop() {
-            original_artifact.write_to(&mut output)?;
-        } else {
-            self.physical_package()?
-                .clone()
-                .write_part_overlay_shared_to_stream(&mut output, main, target.shared_xml())?;
-        }
-        let published_fingerprint =
-            SourceArtifactFingerprint::from_sha256(output.hasher.finalize().into());
-        let mut inverse_patch = patch.inverse();
-        inverse_patch.reauthorize_for_artifact(published_fingerprint);
-        Ok(layout::Publication::new(
-            target.with_artifact_fingerprint(published_fingerprint),
-            current,
-            original_artifact,
-            inverse_patch,
-        ))
+        let fingerprint = match current.artifact_fingerprint() {
+            Some(fingerprint) => fingerprint,
+            None => self.source_artifact_fingerprint()?,
+        };
+        Ok((main, target.shared_xml(), fingerprint))
     }
 
-    /// Restore the exact original package from a section-layout publication.
-    ///
-    /// This is the explicit reauthorization boundary for a reopened emitted
-    /// artifact. The complete emitted ZIP fingerprint and target main-story
-    /// bytes are checked before the sink receives any output; a foreign or
-    /// stale package is rejected without partial output.
-    pub fn publish_section_layout_inverse_to_stream<W: Write>(
-        &self,
-        writer: W,
-        publication: &layout::Publication,
-    ) -> Result<layout::Snapshot> {
-        self.trim_clean_paragraph_index_for_operation();
-        let (_, current) = self.main_section_layout_snapshot(
-            "publish_section_layout_inverse_to_stream",
-            publication.snapshot().limits(),
-            None,
-        )?;
-        publication.inverse_patch().apply(&current)?;
-        publication
-            .original_artifact()
-            .write_to(writer)
-            .map_err(Error::from)?;
-        Ok(publication.original_snapshot().clone())
+    /// The fingerprint of the complete source artifact.
+    pub(crate) fn source_artifact_fingerprint(&self) -> Result<SourceArtifactFingerprint> {
+        Ok(self.physical_package()?.source_artifact().fingerprint()?)
     }
 
     /// Capture the exact source closure used to detach external hyperlinks in
@@ -1862,105 +1733,55 @@ impl Package {
         Ok(publication.original_snapshot.clone())
     }
 
-    /// Replace the opaque payload behind one existing main-story altChunk.
-    ///
-    /// This is an opt-in one-edit save path for foreign HTML, RTF, text, XML,
-    /// or nested-Office payloads. The selected relationship, Part URI, media
-    /// type, and relationship closure are immutable; only the existing target
-    /// payload is replaced. Every other ZIP member is copied through the
-    /// source-backed OPC preservation plan, including unsupported members and
-    /// the source's local ZIP framing.
-    ///
-    /// A positional selector resolves only active main-story anchors. An
-    /// external relationship, an ambiguous/shared target, a target with its
-    /// own relationships, a non-`/word/` direct-child target, a media-type or
-    /// extension mismatch, and other unsafe layouts are refused before output.
-    /// Exact payload no-ops preserve the complete source artifact, including
-    /// signatures. A real change to signed input is refused until the caller
-    /// chooses an explicit signature-stripping or resigning workflow.
-    ///
-    /// The payload is inert: it is never imported, parsed as a nested Office
-    /// document, rendered, fetched, or executed.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed source, selector, relationship, target-layout,
-    /// signature, XML-publication, or sink error. A sink failure after output
-    /// begins is reported by the underlying incomplete-output error.
-    pub fn publish_alt_chunk_to_stream<W: Write>(
+    /// The payload part behind one active main-story altChunk anchor, for
+    /// a replacement of `media_type` and `extension` (record 0355a).
+    pub(crate) fn alt_chunk_payload_target(
         &self,
-        writer: W,
-        selector: impl Into<AltChunkSelector>,
-        replacement: Data,
-    ) -> Result<()> {
+        selector: AltChunkSelector,
+        media_type: &str,
+        extension: &str,
+    ) -> Result<PackURI> {
         self.trim_clean_paragraph_index_for_operation();
-        replacement.validate()?;
-        let target = self.alt_chunk_target(
-            selector.into(),
-            replacement.media_type(),
-            replacement.extension(),
-        )?;
-        self.physical_package()?
-            .clone()
-            .write_part_overlay_to_stream(writer, &target, replacement.into_bytes())
-            .map_err(Error::from)
+        self.alt_chunk_target(selector, media_type, extension)
     }
 
-    /// Publish an explicit external-hyperlink sanitization commit to a
-    /// sequential stream.
-    ///
-    /// Only the main-document payload is regenerated. Every other physical
-    /// member and the relationship topology are preserved. Consequently the
-    /// detached hyperlinks' external relationship records remain present and
-    /// are counted in [`sanitize::EffectReport`]. An exact no-op reproduces
-    /// every source byte, including signatures; a real change to a signed
-    /// package is refused because this API has no resigning policy.
-    ///
-    /// All source, protection, patch, XML, signature, and preservation checks
-    /// complete before output. A later sink failure is reported as the
-    /// underlying typed incomplete-output error.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed package, source-conflict, protection, signature, XML,
-    /// resource-limit, or sink error.
-    pub fn publish_external_hyperlink_sanitization_to_stream<W: Write>(
+    /// The exact payload bytes of `part`.
+    pub(crate) fn part_payload(&self, part: &PackURI) -> Result<Arc<Vec<u8>>> {
+        Ok(self.physical_package()?.part(part)?.data()?.into_arc()?)
+    }
+
+    /// The main-document part name.
+    pub(crate) fn main_part_name(&self) -> Result<PackURI> {
+        Ok(self
+            .physical_package()?
+            .main_document_part()?
+            .partname()
+            .clone())
+    }
+
+    /// Check an external-hyperlink detachment patch against the current main
+    /// document and return the part and its rewritten XML (record 0355a).
+    pub(crate) fn external_hyperlink_detachment_target(
         &self,
-        writer: W,
-        commit: &sanitize::Commit,
-    ) -> Result<sanitize::Snapshot> {
+        patch: &sanitize::Patch,
+    ) -> Result<(PackURI, Arc<Vec<u8>>)> {
         self.trim_clean_paragraph_index_for_operation();
         let main = self
             .physical_package()?
             .main_document_part()?
             .partname()
             .clone();
-        let current =
-            self.external_hyperlink_sanitization_snapshot_bounded(commit.patch().limits())?;
-        let target = commit.patch().apply(&current)?;
-        if commit.patch().is_noop() {
-            self.physical_package()?
-                .clone()
-                .write_part_overlays_shared_to_stream(writer, Vec::new())?;
-        } else {
-            self.physical_package()?
-                .clone()
-                .write_part_overlay_shared_to_stream(writer, &main, target.shared_xml())?;
-        }
-        Ok(target)
+        let current = self.external_hyperlink_sanitization_snapshot_bounded(patch.limits())?;
+        let target = patch.apply(&current)?;
+        Ok((main, target.shared_xml()))
     }
 
-    /// Irreversibly publish a source-checked external-hyperlink redaction.
-    ///
-    /// Selected wrappers are unwrapped, selected external relationship records
-    /// are removed, visible children are retained, and every other ZIP member
-    /// is raw-copied. This operation retains the source and exposes no inverse
-    /// API. It is never called by ordinary save or detachment operations.
-    pub fn publish_external_hyperlink_redaction_to_stream<W: Write>(
+    /// Check an external-hyperlink redaction commit against the current main
+    /// document and return the main part (record 0355a).
+    pub(crate) fn external_hyperlink_redaction_target(
         &self,
-        writer: W,
         commit: &redact::Commit,
-    ) -> Result<redact::EffectReport> {
+    ) -> Result<PackURI> {
         self.trim_clean_paragraph_index_for_operation();
         let main = self
             .physical_package()?
@@ -1970,23 +1791,27 @@ impl Package {
         let current =
             self.external_hyperlink_redaction_snapshot_bounded(commit.patch().limits())?;
         commit.patch().validate_source(&current)?;
-        let report = commit.effect_report();
-        if report.is_noop() {
-            self.physical_package()?
-                .source_artifact()
-                .write_to(writer)?;
-            return Ok(report);
-        }
+        Ok(main)
+    }
+
+    /// Write this package with a redaction's main-document replacement and
+    /// relationship removals (record 0355a).
+    pub(crate) fn write_external_hyperlink_redaction(
+        &self,
+        writer: &mut dyn Write,
+        main: &PackURI,
+        commit: &redact::Commit,
+    ) -> Result<()> {
         let (replacement, removed_ids) = redact::publication_parts(commit);
         self.physical_package()?
             .clone()
             .write_part_overlay_with_external_relationship_removals_to_stream(
                 writer,
-                &main,
+                main,
                 replacement,
                 removed_ids,
             )?;
-        Ok(report)
+        Ok(())
     }
 
     /// Capture the package-wide, relationship-owned story hyperlink closure.
@@ -2036,34 +1861,31 @@ impl Package {
             .plan_target_urls_with_mode(target_urls, mode)
     }
 
-    /// Publish a sealed forward-only story hyperlink redaction.
-    ///
-    /// Selected story XML and `.rels` members are regenerated as one bounded
-    /// preservation plan. Every untouched ZIP member is raw-copied. Exact
-    /// no-ops copy the source byte-for-byte; changed signed/protected or stale
-    /// sources are refused before output begins.
-    pub fn publish_story_hyperlink_redaction_to_stream<W: Write>(
+    /// Check a story-hyperlink redaction against this exact source (record
+    /// 0355a).
+    pub(crate) fn story_hyperlink_redaction_admit(
         &self,
-        writer: W,
         commit: &crate::story_hyperlinks::Commit,
-    ) -> Result<crate::story_hyperlinks::Report> {
+    ) -> Result<()> {
         self.trim_clean_paragraph_index_for_operation();
         self.physical_package()?.check_execution()?;
         commit
             .patch()
-            .validate_source_identity(self.physical_package()?)?;
-        let report = commit.report().clone();
-        if report.effect().is_noop() {
-            self.physical_package()?
-                .source_artifact()
-                .write_to(writer)?;
-            return Ok(report);
-        }
+            .validate_source_identity(self.physical_package()?)
+    }
+
+    /// Write this package with a story-hyperlink redaction's story
+    /// replacements and relationship removals (record 0355a).
+    pub(crate) fn write_story_hyperlink_redaction(
+        &self,
+        writer: &mut dyn Write,
+        commit: &crate::story_hyperlinks::Commit,
+    ) -> Result<()> {
         let parts = crate::story_hyperlinks::publication_parts(commit)?;
         self.physical_package()?
             .clone()
             .write_part_overlays_with_external_relationship_removals_to_stream(writer, parts)?;
-        Ok(report)
+        Ok(())
     }
 
     fn alt_chunk_target(
@@ -3118,7 +2940,7 @@ pub(crate) fn ensure_source_section_inventory_xml(
 ) -> Result<()> {
     if xml.len() > limits.max_input_bytes {
         return Err(Error::SectionInventoryLimit {
-            resource: "input bytes",
+            kind: crate::section::LimitKind::InputBytes,
             maximum: limits.max_input_bytes,
             actual: xml.len(),
         });
@@ -3137,7 +2959,7 @@ pub(crate) fn ensure_source_section_inventory_xml(
             .ok_or_else(|| Error::InvalidFormat("section XML event counter overflow".into()))?;
         if events > limits.max_events {
             return Err(Error::SectionInventoryLimit {
-                resource: "XML events",
+                kind: crate::section::LimitKind::XmlEvents,
                 maximum: limits.max_events,
                 actual: events,
             });
@@ -3163,7 +2985,7 @@ pub(crate) fn ensure_source_section_inventory_xml(
                     .ok_or_else(|| Error::InvalidFormat("section XML depth overflow".into()))?;
                 if depth > limits.max_depth {
                     return Err(Error::SectionInventoryLimit {
-                        resource: "XML depth",
+                        kind: crate::section::LimitKind::XmlDepth,
                         maximum: limits.max_depth,
                         actual: depth,
                     });
@@ -3185,7 +3007,7 @@ pub(crate) fn ensure_source_section_inventory_xml(
                     .ok_or_else(|| Error::InvalidFormat("section XML depth overflow".into()))?;
                 if element_depth > limits.max_depth {
                     return Err(Error::SectionInventoryLimit {
-                        resource: "XML depth",
+                        kind: crate::section::LimitKind::XmlDepth,
                         maximum: limits.max_depth,
                         actual: element_depth,
                     });

@@ -470,7 +470,9 @@ fn managed_document_variables_check_cancellation_before_relationship_metadata() 
     cancellation_source.cancel();
     let mut output = Vec::new();
     assert!(matches!(
-        package.publish_document_variables_commit_to_stream(&mut output, &commit),
+        package
+            .apply_document_variables(commit.patch())
+            .and_then(|committed| committed.package().write_to(&mut output)),
         Err(Error::Opc(OpcError::Cancelled))
     ));
     assert!(output.is_empty());

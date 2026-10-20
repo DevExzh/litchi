@@ -332,10 +332,10 @@ pub enum Error {
     },
 
     /// A bounded external hyperlink-wrapper detachment ceiling was exceeded.
-    #[error("DOCX external hyperlink detachment {resource} limit exceeded: {actual} > {maximum}")]
+    #[error("DOCX external hyperlink detachment {kind} limit exceeded: {actual} > {maximum}")]
     ExternalHyperlinkDetachmentLimit {
         /// Bounded resource.
-        resource: &'static str,
+        kind: crate::sanitize::LimitKind,
         /// Maximum accepted value.
         maximum: usize,
         /// Observed value.
@@ -343,10 +343,10 @@ pub enum Error {
     },
 
     /// A bounded irreversible external-hyperlink redaction ceiling was exceeded.
-    #[error("DOCX external hyperlink redaction {resource} limit exceeded: {actual} > {maximum}")]
+    #[error("DOCX external hyperlink redaction {kind} limit exceeded: {actual} > {maximum}")]
     ExternalHyperlinkRedactionLimit {
         /// Bounded resource.
-        resource: &'static str,
+        kind: crate::redact::LimitKind,
         /// Maximum accepted value.
         maximum: usize,
         /// Observed value.
@@ -354,10 +354,10 @@ pub enum Error {
     },
 
     /// A bounded main-document section inventory ceiling was exceeded.
-    #[error("DOCX section inventory {resource} limit exceeded: {actual} > {maximum}")]
+    #[error("DOCX section inventory {kind} limit exceeded: {actual} > {maximum}")]
     SectionInventoryLimit {
-        /// Bounded resource.
-        resource: &'static str,
+        /// The exceeded budget (record 0355a).
+        kind: crate::section::LimitKind,
         /// Maximum accepted value.
         maximum: usize,
         /// Observed value.
