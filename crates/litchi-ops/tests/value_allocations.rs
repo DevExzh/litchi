@@ -336,7 +336,7 @@ fn failed_parses_are_free_until_reported() {
 
 #[cfg(feature = "xls")]
 mod xls_allocations {
-    use litchi_core::sheet::Worksheet as _;
+    use litchi_core::sheet::{Cell as _, Worksheet as _};
     use litchi_ops::{File, OpenOptions, SourceMode};
     use litchi_xls::writer::Builder;
 

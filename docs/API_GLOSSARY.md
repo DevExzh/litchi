@@ -2882,3 +2882,23 @@ raw query surface only).
 | `litchi_ops` PPTX `placeholder` add (`phType`, alias `type`; `text`), returning the canonical `/slide[N]/shape[K]`; `notes` add (`text`); slide `title`/`text` on add and `layout` set | adopted (0346) |
 
 See [0346](unified-ops/0346-pptx-p0-final.md).
+
+## Sheet traits: static dispatch (record 0353)
+
+Owner decision 0350 (memo item 29): the `litchi-core::sheet` traits no
+longer return trait objects. Each implementation names its concrete types
+as generic associated types, and the iterators are standard `Iterator`s.
+The traits are therefore not object-safe: generic code takes
+`W: WorkbookTrait`, and a heterogeneous collection is an enum over the
+concrete formats. The removed iterator traits are deleted, not aliased.
+
+| Name | Status |
+|---|---|
+| `litchi_core::sheet::Worksheet::{Cell, Cells, Rows}`, `WorkbookTrait::{Worksheet, Worksheets}` (associated types) | adopted (0353), replacing `Box<dyn Cell>`, `Box<dyn Worksheet>` and the boxed iterators |
+| `litchi_core::sheet::{CellIterator, RowIterator, WorksheetIterator}` (and their `litchi::sheet` re-exports) | deleted (0353): `Worksheet::cells`, `Worksheet::rows` and `WorkbookTrait::worksheets` return `Iterator`s |
+| `Cell for &T`, `Cell for Cow<'_, T>`, `Worksheet for &T`, `Worksheet for Arc<T>` (blanket impls in `litchi_core::sheet`) | adopted (0353); the XLS `Cell for &Cell` and `Worksheet for &Worksheet` impls they supersede are removed |
+| `litchi_ops::view::sheet::{Worksheet, Cell, Cells, Rows, Worksheets}` | adopted (0353): the associated types of `WorkbookView`, `Xlsx`, `Xlsb` and `Xls`, enums over the per-format types |
+| `litchi_xls::worksheet::{Cells, Rows}`, `litchi_xls::workbook::Worksheets` | adopted (0353): the XLS reader's trait iterators (`Worksheet::cell` lends `Cow<'_, Cell>`, `WorkbookTrait` lends `&Worksheet`) |
+| `litchi_xlsb::sheet::{StoredCells, Rows}`, `litchi_xlsb::workbook::Worksheets` | adopted (0353); `litchi_xlsb::workbook::WorksheetIterator` renamed `Worksheets`. The eager `Workbook` lends the cache's `Arc<Worksheet>` instead of a clone of the worksheet |
+
+See [0353](unified-ops/0353-sheet-trait-static-dispatch.md).

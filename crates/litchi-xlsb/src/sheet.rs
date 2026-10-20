@@ -14,9 +14,7 @@ use crate::package::data_validation::{Settings, Validation};
 use crate::package::scenarios::Manager;
 use crate::package::web_extension_bindings::Binding;
 use crate::slicer;
-use litchi_core::sheet::{
-    Cell as SheetCell, CellIterator, CellValue, Result, RowIterator, Worksheet as SheetWorksheet,
-};
+use litchi_core::sheet::{Cell as SheetCell, CellValue, Result, Worksheet as SheetWorksheet};
 use litchi_sheet::view::View;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -534,6 +532,12 @@ impl Worksheet {
 }
 
 impl SheetWorksheet for Worksheet {
+    /// Stored cells are borrowed; an absent position reads as an owned
+    /// empty cell.
+    type Cell<'a> = Cow<'a, Cell>;
+    type Cells<'a> = StoredCells<'a>;
+    type Rows<'a> = Rows<'a>;
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -554,34 +558,31 @@ impl SheetWorksheet for Worksheet {
         }
     }
 
-    fn cell(&self, row: u32, column: u32) -> Result<Box<dyn SheetCell + '_>> {
+    fn cell(&self, row: u32, column: u32) -> Result<Cow<'_, Cell>> {
         match self.cells.get(&(row, column)) {
-            Some(cell) => Ok(Box::new(cell.clone())),
-            None => {
-                // Return empty cell for missing positions
-                let empty_cell = Cell::new(row, column, CellValue::Empty);
-                Ok(Box::new(empty_cell))
-            },
+            Some(cell) => Ok(Cow::Borrowed(cell)),
+            // Return empty cell for missing positions
+            None => Ok(Cow::Owned(Cell::new(row, column, CellValue::Empty))),
         }
     }
 
-    fn cell_by_coordinate(&self, coordinate: &str) -> Result<Box<dyn SheetCell + '_>> {
+    fn cell_by_coordinate(&self, coordinate: &str) -> Result<Cow<'_, Cell>> {
         let (row, col) = crate::package::utils::parse_cell_reference(coordinate)
             .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
         self.cell(row, col)
     }
 
-    fn cells(&self) -> Box<dyn CellIterator<'_> + '_> {
-        Box::new(XlsbCellIterator {
+    fn cells(&self) -> StoredCells<'_> {
+        StoredCells {
             cells: self.cells.values(),
-        })
+        }
     }
 
-    fn rows(&self) -> Box<dyn RowIterator<'_> + '_> {
-        Box::new(XlsbRowIterator {
+    fn rows(&self) -> Rows<'_> {
+        Rows {
             worksheet: self,
             current_row: 0,
-        })
+        }
     }
 
     fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>> {
@@ -606,28 +607,31 @@ impl SheetWorksheet for Worksheet {
     }
 }
 
-/// Cell iterator for XLSB worksheets
-struct XlsbCellIterator<'a> {
+/// The stored cells of an eager XLSB worksheet, in row-major order: the
+/// iterator [`Worksheet::cells`](SheetWorksheet::cells) returns.
+pub struct StoredCells<'a> {
     cells: std::collections::btree_map::Values<'a, (u32, u32), Cell>,
 }
 
-impl<'a> CellIterator<'a> for XlsbCellIterator<'a> {
-    fn next(&mut self) -> Option<Result<Box<dyn SheetCell + 'a>>> {
-        self.cells.next().map(|cell| {
-            let boxed: Box<dyn SheetCell + 'a> = Box::new(cell.clone());
-            Ok(boxed)
-        })
+impl<'a> Iterator for StoredCells<'a> {
+    type Item = Result<Cow<'a, Cell>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.cells.next().map(|cell| Ok(Cow::Borrowed(cell)))
     }
 }
 
-/// Row iterator for XLSB worksheets
-struct XlsbRowIterator<'a> {
+/// The rows of an eager XLSB worksheet: the iterator
+/// [`Worksheet::rows`](SheetWorksheet::rows) returns.
+pub struct Rows<'a> {
     worksheet: &'a Worksheet,
     current_row: usize,
 }
 
-impl<'a> RowIterator<'a> for XlsbRowIterator<'a> {
-    fn next(&mut self) -> Option<Result<Cow<'a, [CellValue]>>> {
+impl<'a> Iterator for Rows<'a> {
+    type Item = Result<Cow<'a, [CellValue]>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         if self.current_row >= self.worksheet.row_count() {
             None
         } else {

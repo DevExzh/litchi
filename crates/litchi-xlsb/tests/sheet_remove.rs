@@ -14,6 +14,7 @@
 use std::collections::{BTreeSet, HashMap};
 
 use litchi_core::Position;
+use litchi_core::sheet::{Cell as _, Worksheet as _};
 use litchi_core::sheet::{CellValue, WorkbookTrait as _};
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{BlobPart, PackURI, Part as _, TargetMode};

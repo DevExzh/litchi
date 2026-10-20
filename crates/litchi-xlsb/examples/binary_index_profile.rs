@@ -513,8 +513,7 @@ impl Corpus {
         let worksheet = workbook.worksheet(sheet_index)?;
         let dimensions = worksheet.dimensions();
         let mut cells = Vec::new();
-        let mut iterator = WorksheetTrait::cells(&worksheet);
-        while let Some(cell) = iterator.next() {
+        for cell in WorksheetTrait::cells(&worksheet) {
             let cell = cell?;
             cells.push((cell.row(), cell.column(), canonical_value(cell.value())));
         }

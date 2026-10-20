@@ -1,6 +1,6 @@
 //! The XLSX worksheet cells formula evaluation loads (record 0266).
 
-use litchi_core::sheet::{CellValue, Worksheet as _};
+use litchi_core::sheet::{Cell as _, CellValue, Worksheet as _};
 
 use super::Xlsx;
 use super::node::SheetHandle;
@@ -22,8 +22,7 @@ pub(crate) fn cells(
         return Ok(());
     }
     let sheet = file.sheet_at(position)?;
-    let mut cells = sheet.cells();
-    while let Some(cell) = cells.next() {
+    for cell in sheet.cells() {
         let cell = cell.map_err(crate::calc::sheet_error)?;
         // The generic worksheet trait is one-based.
         visit(

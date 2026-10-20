@@ -18,7 +18,7 @@ mod tests;
 mod validation_only_tests;
 
 pub use crate::source_limits::{SourceLimitKind, SourceLimits, SourceLimitsBuilder};
-pub use model::OpenOptions;
+pub use model::{OpenOptions, Worksheets};
 pub use source::{
     CellCursor, SourceBackedCell, SourceBackedError, SourceBackedLimits, SourceBackedOptions,
     SourceBackedWorkbook, SourceBackedWorksheet, SourceBackedWorksheetDescriptor, StyleTables,

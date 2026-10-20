@@ -25,6 +25,7 @@ use crate::error::{Code, Result};
 use crate::node::{Node, SerializeError, ViewOptions};
 use crate::options::{OpenOptions, SourceMode};
 use crate::view::Mode;
+use litchi_core::sheet::Worksheet as _;
 
 fn fixture_path(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))

@@ -34,16 +34,15 @@
 //! # Generic sheet traits
 //!
 //! [`Xlsx`] implements [`WorkbookTrait`] directly, so the workbook view that
-//! S6 adds delegates to it by a `match`, with no boxed workbook. The trait's
-//! worksheet and error types stay boxed because the trait defines them so;
+//! S6 adds delegates to it by a `match`, with no boxed workbook. Its
+//! worksheets and cells are the statically dispatched
+//! [`crate::view::sheet`] types; only the trait's error type is boxed, and
 //! its errors are boxed [`crate::Error`] values.
 
 use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
 
-use litchi_core::sheet::{
-    Result as SheetResult, WorkbookTrait, Worksheet as CoreWorksheet, WorksheetIterator,
-};
+use litchi_core::sheet::{Result as SheetResult, WorkbookTrait};
 use litchi_core::{FileFormat, Metadata};
 use litchi_opc::{OpcPackage, SourceBackedPackage};
 use litchi_xlsx as xlsx;
@@ -75,7 +74,7 @@ mod node;
 mod publish;
 mod runs;
 mod selection;
-mod sheet;
+pub(crate) mod sheet;
 mod sheet_write;
 mod spec;
 mod structure;
@@ -707,7 +706,10 @@ impl std::fmt::Debug for Xlsx {
 }
 
 impl WorkbookTrait for Xlsx {
-    fn active_worksheet(&self) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
+    type Worksheet<'a> = crate::view::sheet::Worksheet<'a>;
+    type Worksheets<'a> = crate::view::sheet::Worksheets<'a>;
+
+    fn active_worksheet(&self) -> SheetResult<Self::Worksheet<'_>> {
         let sheet = self
             .0
             .owner
@@ -718,14 +720,14 @@ impl WorkbookTrait for Xlsx {
                 })
             })
             .map_err(boxed)?;
-        Ok(Box::new(sheet))
+        Ok(crate::view::sheet::Worksheet::xlsx(sheet))
     }
 
     fn worksheet_names(&self) -> &[String] {
         self.names()
     }
 
-    fn worksheet_by_name(&self, name: &str) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
+    fn worksheet_by_name(&self, name: &str) -> SheetResult<Self::Worksheet<'_>> {
         let sheet = self
             .0
             .owner
@@ -736,19 +738,21 @@ impl WorkbookTrait for Xlsx {
                 })
             })
             .map_err(boxed)?;
-        Ok(Box::new(sheet))
+        Ok(crate::view::sheet::Worksheet::xlsx(sheet))
     }
 
-    fn worksheet_by_index(&self, index: usize) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
-        Ok(Box::new(self.sheet_at(index).map_err(boxed)?))
+    fn worksheet_by_index(&self, index: usize) -> SheetResult<Self::Worksheet<'_>> {
+        Ok(crate::view::sheet::Worksheet::xlsx(
+            self.sheet_at(index).map_err(boxed)?,
+        ))
     }
 
-    fn worksheets(&self) -> Box<dyn WorksheetIterator<'_> + '_> {
-        Box::new(Worksheets {
+    fn worksheets(&self) -> Self::Worksheets<'_> {
+        crate::view::sheet::Worksheets::new(crate::view::sheet::WorksheetsInner::Xlsx(Worksheets {
             workbook: self,
             index: 0,
             done: false,
-        })
+        }))
     }
 
     fn worksheet_count(&self) -> usize {
@@ -768,14 +772,17 @@ impl WorkbookTrait for Xlsx {
     }
 }
 
-struct Worksheets<'a> {
+/// The worksheets of an [`Xlsx`] handle, in catalog order.
+pub(crate) struct Worksheets<'a> {
     workbook: &'a Xlsx,
     index: usize,
     done: bool,
 }
 
-impl<'a> WorksheetIterator<'a> for Worksheets<'a> {
-    fn next(&mut self) -> Option<SheetResult<Box<dyn CoreWorksheet + 'a>>> {
+impl Iterator for Worksheets<'_> {
+    type Item = SheetResult<Sheet>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         if self.done {
             return None;
         }
@@ -788,7 +795,7 @@ impl<'a> WorksheetIterator<'a> for Worksheets<'a> {
         match result {
             Ok(Some(sheet)) => {
                 self.index += 1;
-                Some(Ok(Box::new(sheet)))
+                Some(Ok(sheet))
             },
             Ok(None) => {
                 self.done = true;

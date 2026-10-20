@@ -46,10 +46,9 @@ mod web;
 #[cfg(test)]
 pub(crate) mod test_helpers {
     use super::*;
-    use crate::BoxFuture;
+    use crate::CellRead;
     #[cfg(feature = "web_functions")]
     use crate::Fetch;
-    use litchi_core::sheet::Result;
     use std::collections::HashMap;
     use std::sync::{Arc, RwLock};
 
@@ -127,33 +126,19 @@ pub(crate) mod test_helpers {
     }
 
     impl EngineCtx for TestEngine {
-        fn get_cell_value<'a>(
-            &'a self,
-            sheet_name: &'a str,
-            row: u32,
-            col: u32,
-        ) -> BoxFuture<'a, Result<CellValue>> {
-            let cells = self.cells.clone();
-            let sheet = sheet_name.to_string();
-            Box::pin(async move {
-                let cells = cells.read().unwrap();
-                Ok(cells
-                    .get(&(sheet, row, col))
-                    .cloned()
-                    .unwrap_or(CellValue::Empty))
-            })
+        fn get_cell_value<'a>(&'a self, sheet_name: &'a str, row: u32, col: u32) -> CellRead<'a> {
+            let cells = self.cells.read().unwrap();
+            CellRead::ready(Ok(cells
+                .get(&(sheet_name.to_string(), row, col))
+                .cloned()
+                .unwrap_or(CellValue::Empty)))
         }
 
         fn current_position(&self) -> Option<(String, u32, u32)> {
             self.current_pos.read().unwrap().clone()
         }
 
-        fn raw_cell_value<'a>(
-            &'a self,
-            sheet_name: &'a str,
-            row: u32,
-            col: u32,
-        ) -> BoxFuture<'a, Result<CellValue>> {
+        fn raw_cell_value<'a>(&'a self, sheet_name: &'a str, row: u32, col: u32) -> CellRead<'a> {
             self.get_cell_value(sheet_name, row, col)
         }
 
@@ -207,7 +192,7 @@ pub(crate) async fn evaluate_expression(
             CellValue::Error("Range cannot be used as a scalar expression".to_string())
         },
         Expr::UnaryMinus(inner) => {
-            let v = Box::pin(evaluate_expression(ctx, current_sheet, inner)).await?;
+            let v = evaluate_operand(ctx, current_sheet, inner).await?;
             match v {
                 CellValue::Int(i) => CellValue::Int(-i),
                 CellValue::Float(f) => CellValue::Float(-f),
@@ -215,8 +200,8 @@ pub(crate) async fn evaluate_expression(
             }
         },
         Expr::Binary { op, left, right } => {
-            let left_val = Box::pin(evaluate_expression(ctx, current_sheet, left)).await?;
-            let right_val = Box::pin(evaluate_expression(ctx, current_sheet, right)).await?;
+            let left_val = evaluate_operand(ctx, current_sheet, left).await?;
+            let right_val = evaluate_operand(ctx, current_sheet, right).await?;
             bin_op::eval_binary_op(*op, left_val, right_val)
         },
         Expr::FunctionCall { name, args } => {
@@ -225,6 +210,22 @@ pub(crate) async fn evaluate_expression(
     };
 
     Ok(value)
+}
+
+/// Evaluate an operand of a unary or binary operator.
+///
+/// A literal or a cell reference resolves inline; only a nested expression
+/// recurses, through the boxed future the async recursion requires.
+async fn evaluate_operand(
+    ctx: &dyn DispatchCtx,
+    current_sheet: &str,
+    expr: &Expr,
+) -> Result<CellValue> {
+    match expr {
+        Expr::Literal(value) => Ok(value.clone()),
+        Expr::Reference { sheet, row, col } => ctx.get_cell_value(sheet.as_str(), *row, *col).await,
+        other => Box::pin(evaluate_expression(ctx, current_sheet, other)).await,
+    }
 }
 
 pub(crate) fn to_number(value: &CellValue) -> Option<f64> {
