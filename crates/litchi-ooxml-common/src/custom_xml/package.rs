@@ -3,6 +3,8 @@
 use crate::mce::Name;
 use crate::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
+
+use super::limit::LimitKind;
 use litchi_opc::part::XmlPart;
 use litchi_opc::{OpcError, OpcPackage, PackURI, Part, TargetMode};
 use std::collections::HashMap;
@@ -229,8 +231,8 @@ fn scan(
         {
             occurrences = occurrences
                 .checked_add(1)
-                .ok_or_else(|| limit("custom XML items", MAX_ITEMS, usize::MAX))?;
-            require_at_most("custom XML items", occurrences, MAX_ITEMS)?;
+                .ok_or_else(|| limit(LimitKind::Items, MAX_ITEMS, usize::MAX))?;
+            require_at_most(LimitKind::Items, occurrences, MAX_ITEMS)?;
             if relationship.is_external() {
                 return Err(Error::Relationship(format!(
                     "custom XML relationship '{}' from '{}' must be internal",

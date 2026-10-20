@@ -4,6 +4,8 @@ use crate::mce::{Capabilities, Limits, Name, process_markup_compatibility};
 use crate::xml::decode_xml_reference;
 use crate::xml_name;
 use crate::{Error, Result};
+
+use super::limit::LimitKind;
 use litchi_opc::ContentType;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesDecl, BytesStart, Event};
@@ -24,7 +26,7 @@ use crate::xml::attributes::BytesStartExt as _;
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
 pub fn read_props(xml: &[u8]) -> Result<Props> {
-    require_at_most("custom XML properties bytes", xml.len(), MAX_PROPS_BYTES)?;
+    require_at_most(LimitKind::PropertiesBytes, xml.len(), MAX_PROPS_BYTES)?;
     let mut capabilities = Capabilities::ooxml_baseline();
     capabilities
         .understand_namespace(TRANSITIONAL_NAMESPACE)
@@ -211,7 +213,7 @@ pub fn validate_props(props: &Props) -> Result<()> {
         return invalid(format!("custom XML itemID '{}' is not ST_Guid", props.id));
     }
     require_at_most(
-        "custom XML schema references",
+        LimitKind::SchemaReferences,
         props.schemas.len(),
         MAX_SCHEMA_REFS,
     )?;
@@ -221,16 +223,12 @@ pub fn validate_props(props: &Props) -> Result<()> {
             return invalid("custom XML schema reference URI must not be empty");
         }
         validate_xml_chars(schema)?;
-        string_bytes = string_bytes.checked_add(schema.len()).ok_or_else(|| {
-            limit(
-                "custom XML property string bytes",
-                MAX_STRING_BYTES,
-                usize::MAX,
-            )
-        })?;
+        string_bytes = string_bytes
+            .checked_add(schema.len())
+            .ok_or_else(|| limit(LimitKind::PropertyStringBytes, MAX_STRING_BYTES, usize::MAX))?;
     }
     require_at_most(
-        "custom XML property string bytes",
+        LimitKind::PropertyStringBytes,
         string_bytes,
         MAX_STRING_BYTES,
     )
@@ -260,7 +258,7 @@ pub fn valid_guid(value: &str) -> bool {
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
 pub fn validate_payload(xml: &[u8]) -> Result<Name> {
-    require_at_most("custom XML payload bytes", xml.len(), MAX_PART_BYTES)?;
+    require_at_most(LimitKind::PayloadBytes, xml.len(), MAX_PART_BYTES)?;
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_comments = true;
@@ -293,7 +291,7 @@ pub fn validate_payload(xml: &[u8]) -> Result<Name> {
                 }
                 depth = depth
                     .checked_add(1)
-                    .ok_or_else(|| limit("custom XML depth", MAX_DEPTH, usize::MAX))?;
+                    .ok_or_else(|| limit(LimitKind::Depth, MAX_DEPTH, usize::MAX))?;
             },
             Event::Empty(element) => {
                 require_nested_depth(depth)?;
@@ -667,10 +665,11 @@ fn props_start(
             if root_namespace.as_deref() == Some(element.namespace.as_str())
                 && element.local_name == "schemaRef" =>
         {
-            let next = schemas.len().checked_add(1).ok_or_else(|| {
-                limit("custom XML schema references", MAX_SCHEMA_REFS, usize::MAX)
-            })?;
-            require_at_most("custom XML schema references", next, MAX_SCHEMA_REFS)?;
+            let next = schemas
+                .len()
+                .checked_add(1)
+                .ok_or_else(|| limit(LimitKind::SchemaReferences, MAX_SCHEMA_REFS, usize::MAX))?;
+            require_at_most(LimitKind::SchemaReferences, next, MAX_SCHEMA_REFS)?;
             reject_attributes_except(element, &[(element.namespace.as_str(), "uri")]);
             schemas.push(required_attr(element, &element.namespace, "uri")?.into());
             Ok(PropsContext::Schema)
@@ -814,11 +813,7 @@ fn props_output_len(props: &Props, conformance: Conformance) -> Result<usize> {
         add_len(&mut total, SCHEMAS_END.len())?;
     }
     add_len(&mut total, ROOT_END.len())?;
-    require_at_most(
-        "custom XML serialized properties bytes",
-        total,
-        MAX_PROPS_BYTES,
-    )?;
+    require_at_most(LimitKind::SerializedPropertiesBytes, total, MAX_PROPS_BYTES)?;
     Ok(total)
 }
 
@@ -832,7 +827,7 @@ fn escaped_attr_len(value: &str) -> Result<usize> {
         };
         total.checked_add(width).ok_or_else(|| {
             limit(
-                "custom XML serialized properties bytes",
+                LimitKind::SerializedPropertiesBytes,
                 MAX_PROPS_BYTES,
                 usize::MAX,
             )
@@ -843,7 +838,7 @@ fn escaped_attr_len(value: &str) -> Result<usize> {
 fn add_len(total: &mut usize, value: usize) -> Result<()> {
     *total = total.checked_add(value).ok_or_else(|| {
         limit(
-            "custom XML serialized properties bytes",
+            LimitKind::SerializedPropertiesBytes,
             MAX_PROPS_BYTES,
             usize::MAX,
         )
@@ -928,11 +923,7 @@ fn valid_encoding_name(value: &str) -> bool {
 
 fn require_nested_depth(depth: usize) -> Result<()> {
     if depth >= MAX_DEPTH {
-        Err(limit(
-            "custom XML depth",
-            MAX_DEPTH,
-            depth.saturating_add(1),
-        ))
+        Err(limit(LimitKind::Depth, MAX_DEPTH, depth.saturating_add(1)))
     } else {
         Ok(())
     }
@@ -941,24 +932,24 @@ fn require_nested_depth(depth: usize) -> Result<()> {
 fn bump_elements(elements: usize) -> Result<usize> {
     let next = elements
         .checked_add(1)
-        .ok_or_else(|| limit("custom XML elements", MAX_ELEMENTS, usize::MAX))?;
-    require_at_most("custom XML elements", next, MAX_ELEMENTS)?;
+        .ok_or_else(|| limit(LimitKind::Elements, MAX_ELEMENTS, usize::MAX))?;
+    require_at_most(LimitKind::Elements, next, MAX_ELEMENTS)?;
     Ok(next)
 }
 
-pub(super) fn require_at_most(resource: &'static str, actual: usize, max: usize) -> Result<()> {
+pub(super) fn require_at_most(kind: LimitKind, actual: usize, max: usize) -> Result<()> {
     if actual > max {
-        Err(limit(resource, max, actual))
+        Err(limit(kind, max, actual))
     } else {
         Ok(())
     }
 }
 
-pub(super) fn limit(resource: &'static str, max: usize, actual: usize) -> Error {
-    Error::Limit {
-        resource,
-        max,
-        actual,
+pub(super) fn limit(kind: LimitKind, max: usize, actual: usize) -> Error {
+    Error::CustomXmlLimit {
+        kind,
+        maximum: max,
+        observed: actual,
     }
 }
 

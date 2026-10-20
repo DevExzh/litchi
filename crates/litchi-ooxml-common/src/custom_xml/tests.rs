@@ -197,8 +197,8 @@ fn enforces_guid_depth_size_and_content_type_caps() {
     let error = validate_payload(too_deep.as_bytes()).unwrap_err();
     assert!(matches!(
         error,
-        Error::Limit {
-            resource: "custom XML depth",
+        Error::CustomXmlLimit {
+            kind: LimitKind::Depth,
             ..
         }
     ));
@@ -262,7 +262,7 @@ fn transaction_preserves_opaque_payload_and_relationship_topology() {
 
     let before = Snapshot::load(&package).unwrap();
     assert_eq!(before.items()[0].relationships().len(), 2);
-    let mut transaction = Transaction::new(&mut package).unwrap();
+    let mut transaction = Edit::new(&package).unwrap();
     assert!(
         transaction
             .set_item_xml(
@@ -272,7 +272,8 @@ fn transaction_preserves_opaque_payload_and_relationship_topology() {
             .unwrap()
     );
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
+    let package = commit.package().clone();
     assert_eq!(package.get_part(&props).unwrap().blob(), props_before);
     assert_eq!(
         package
@@ -286,8 +287,9 @@ fn transaction_preserves_opaque_payload_and_relationship_topology() {
     );
 
     let patch = commit.patch().clone();
-    assert!(patch.inverse().apply(&mut package).unwrap());
-    assert_eq!(Snapshot::load(&package).unwrap(), before);
+    let restored = patch.inverse().apply(&package).unwrap();
+    assert!(restored.diagnostics().changed());
+    assert_eq!(Snapshot::load(restored.package()).unwrap(), before);
 }
 
 #[test]
@@ -318,11 +320,11 @@ fn properties_edits_retain_future_markup() {
         .get_part_mut(&props_part)
         .unwrap()
         .set_blob(source.into_bytes());
-    let mut transaction = Transaction::new(&mut package).unwrap();
+    let mut transaction = Edit::new(&package).unwrap();
     let mut updated = sample_props();
     updated.id = "{22222222-2222-2222-2222-222222222222}".into();
     assert!(transaction.set_properties(0, updated).unwrap());
-    transaction.commit().unwrap();
+    let package = transaction.commit().unwrap().into_package();
     let xml = std::str::from_utf8(package.get_part(&props_part).unwrap().blob()).unwrap();
     assert!(xml.contains("x:marker=\"keep\""));
     assert!(xml.contains("<x:future>opaque</x:future>"));
@@ -331,11 +333,11 @@ fn properties_edits_retain_future_markup() {
 
 #[test]
 fn transaction_crud_is_source_checked_and_failure_atomic() {
-    let mut package = package_with_source();
+    let original = package_with_source();
     let source = PackURI::new("/word/document.xml").unwrap();
-    let initial_parts = package.part_count();
-    let initial_relationships = package.get_part(&source).unwrap().rels().len();
-    let mut transaction = Transaction::new(&mut package).unwrap();
+    let initial_parts = original.part_count();
+    let initial_relationships = original.get_part(&source).unwrap().rels().len();
+    let mut transaction = Edit::new(&original).unwrap();
     let index = transaction
         .insert(NewItem {
             source: source.clone(),
@@ -353,9 +355,12 @@ fn transaction_crud_is_source_checked_and_failure_atomic() {
         .unwrap();
     assert_eq!(index, 0);
     let commit = transaction.commit().unwrap();
-    assert_eq!(discover(&package).unwrap().len(), 1);
+    assert!(discover(&original).unwrap().is_empty());
+    assert_eq!(discover(commit.package()).unwrap().len(), 1);
     let patch = commit.patch().clone();
-    assert!(patch.inverse().apply(&mut package).unwrap());
+    let restored = patch.inverse().apply(commit.package()).unwrap();
+    assert!(restored.diagnostics().changed());
+    let mut package = restored.into_package();
     assert!(discover(&package).unwrap().is_empty());
     assert_eq!(package.part_count(), initial_parts);
     assert_eq!(
@@ -363,8 +368,8 @@ fn transaction_crud_is_source_checked_and_failure_atomic() {
         initial_relationships
     );
 
-    let mut stale = package_with_source();
-    let mut source_edit = Transaction::new(&mut stale).unwrap();
+    let stale = package_with_source();
+    let mut source_edit = Edit::new(&stale).unwrap();
     source_edit
         .insert(NewItem {
             source: source.clone(),
@@ -382,7 +387,7 @@ fn transaction_crud_is_source_checked_and_failure_atomic() {
         .unwrap()
         .set_blob(b"<changed/>".to_vec());
     let before_parts = package.part_count();
-    assert!(stale_patch.apply(&mut package).is_err());
+    assert!(stale_patch.apply(&package).is_err());
     assert_eq!(package.part_count(), before_parts);
     assert_eq!(package.get_part(&source).unwrap().blob(), b"<changed/>");
 }
@@ -408,13 +413,14 @@ fn exact_noop_does_not_unsign_or_rewrite() {
         litchi_opc::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN,
     );
     let before = Snapshot::load(&package).unwrap();
-    let mut transaction = Transaction::new(&mut package).unwrap();
+    let mut transaction = Edit::new(&package).unwrap();
     assert!(!transaction.set_xml(0, b"<root/>".to_vec()).unwrap());
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
+    assert!(commit.package().is_signed());
+    assert_eq!(Snapshot::load(commit.package()).unwrap(), before);
     assert!(package.is_signed());
-    assert_eq!(Snapshot::load(&package).unwrap(), before);
 }
 
 fn package_with_source() -> OpcPackage {
@@ -456,25 +462,26 @@ fn changed_transactions_and_patches_refuse_a_signed_package() {
     let patch = {
         let mut unsigned = package.clone();
         unsigned.unsign();
-        let mut edit = Transaction::new(&mut unsigned).unwrap();
+        let mut edit = Edit::new(&unsigned).unwrap();
         edit.insert(item()).unwrap();
         edit.commit().unwrap().patch().clone()
     };
     let parts = package.part_count();
 
     // An unchanged transaction publishes nothing and keeps the signature.
-    let unchanged = Transaction::new(&mut package).unwrap().commit().unwrap();
-    assert!(!unchanged.changed());
+    let unchanged = Edit::new(&package).unwrap().commit().unwrap();
+    assert!(!unchanged.diagnostics().changed());
+    assert!(unchanged.package().is_signed());
     assert!(
         unchanged
             .patch()
             .inverse()
-            .apply(&mut package)
-            .is_ok_and(|changed| !changed)
+            .apply(&package)
+            .is_ok_and(|commit| !commit.diagnostics().changed())
     );
 
     // A changed transaction and a changed patch are refused (ADR 0006).
-    let mut edit = Transaction::new(&mut package).unwrap();
+    let mut edit = Edit::new(&package).unwrap();
     edit.insert(item()).unwrap();
     assert!(matches!(
         edit.commit(),
@@ -483,7 +490,7 @@ fn changed_transactions_and_patches_refuse_a_signed_package() {
         ))
     ));
     assert!(matches!(
-        patch.apply(&mut package),
+        patch.apply(&package),
         Err(Error::Opc(
             litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
         ))
@@ -492,6 +499,31 @@ fn changed_transactions_and_patches_refuse_a_signed_package() {
     assert_eq!(package.part_count(), parts);
 
     package.unsign();
-    assert!(patch.apply(&mut package).unwrap());
-    assert_eq!(discover(&package).unwrap().len(), 1);
+    let commit = patch.apply(&package).unwrap();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(discover(commit.package()).unwrap().len(), 1);
+    assert!(discover(&package).unwrap().is_empty());
+}
+
+#[test]
+fn reset_discards_staged_changes_and_the_source_stays_unchanged() {
+    let package = package_with_source();
+    let mut edit = Edit::new(&package).unwrap();
+    edit.insert(NewItem {
+        source: PackURI::new("/word/document.xml").unwrap(),
+        rel_id: "rIdData".into(),
+        part: PackURI::new("/customXml/item1.xml").unwrap(),
+        content_type: "application/xml".into(),
+        xml: b"<root/>".to_vec(),
+        props: None,
+        conformance: Conformance::Transitional,
+    })
+    .unwrap();
+    assert_eq!(edit.items().len(), 1);
+    edit.reset();
+    assert!(edit.items().is_empty());
+    let commit = edit.commit().unwrap();
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
+    assert!(discover(&package).unwrap().is_empty());
 }

@@ -1149,6 +1149,13 @@ impl Classify for litchi_core::Error {
     }
 }
 
+/// Whether a shared OOXML error is a typed budget of a shared family
+/// (record 0360).
+#[cfg(feature = "docx")]
+fn common_limit(error: &litchi_ooxml_common::Error) -> bool {
+    matches!(error, litchi_ooxml_common::Error::CustomXmlLimit { .. })
+}
+
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 impl Classify for litchi_opc::OpcError {
     fn classify(&self) -> Class {
@@ -1245,6 +1252,8 @@ impl Classify for litchi_docx::Error {
             | Self::ExternalHyperlinkDetachmentLimit { .. }
             | Self::ExternalHyperlinkRedactionLimit { .. }
             | Self::SectionInventoryLimit { .. } => Class::of(Code::LimitExceeded),
+            // The shared OOXML families' typed budgets (record 0360).
+            Self::Common(error) if common_limit(error) => Class::of(Code::LimitExceeded),
             Self::OutOfBounds { .. } => Class::of(Code::OutOfRange),
             Self::Refused(refusal) => refusal.classify(),
             Self::PatchConflict { .. } => Class::of(Code::InvalidInput),

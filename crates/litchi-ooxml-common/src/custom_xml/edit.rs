@@ -1,4 +1,4 @@
-//! Source-checked Custom XML package transactions.
+//! Source-checked Custom XML package edits (record 0360).
 
 use crate::signature::refuse_signed_change;
 use crate::{Error, Result};
@@ -11,30 +11,50 @@ use super::codec::{
 };
 use super::model::{Conformance, Item, NewItem, Props, Relationship};
 use super::package;
-use super::patch::{Commit, Patch};
+use super::patch::{Commit, Diagnostics, Patch};
 use super::snapshot::Snapshot;
 use super::validation;
 
 /// A bounded edit over one complete Custom XML package graph.
-pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+///
+/// The edit shares the source package (an [`OpcPackage`] clone shares every
+/// part payload) and never changes it: [`Edit::commit`] publishes a new
+/// package, and dropping the edit discards it.
+#[derive(Clone)]
+pub struct Edit {
+    source: OpcPackage,
     before: Snapshot,
     draft: Vec<Item>,
 }
 
-impl<'a> Transaction<'a> {
-    /// Capture the package graph and start an isolated transaction.
+impl std::fmt::Debug for Edit {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field("items", &self.draft.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl Edit {
+    /// Capture the package graph and start an isolated edit. O(parts of the
+    /// Custom XML graph): the package itself is shared, not copied.
     /// # Errors
     ///
     /// Returns an error when input violates OOXML constraints, exceeds a configured
     /// bound, or an underlying XML or package operation fails.
-    pub fn new(target: &'a mut OpcPackage) -> Result<Self> {
-        let before = Snapshot::load(target)?;
+    pub fn new(package: &OpcPackage) -> Result<Self> {
+        let before = Snapshot::load(package)?;
         Ok(Self {
-            target,
+            source: package.clone(),
             draft: before.items().to_vec(),
             before,
         })
+    }
+
+    /// Discard every staged change, keeping the edit.
+    pub fn reset(&mut self) {
+        self.draft = self.before.items().to_vec();
     }
 
     /// Immutable source snapshot used for conflict checks and inverse patches.
@@ -227,7 +247,7 @@ impl<'a> Transaction<'a> {
     /// Returns an error when input violates OOXML constraints, exceeds a configured
     /// bound, or an underlying XML or package operation fails.
     pub fn insert(&mut self, value: NewItem) -> Result<usize> {
-        let item = new_item(self.target, value)?;
+        let item = new_item(&self.source, value)?;
         if self.draft.iter().any(|existing| {
             existing.source() == item.source() && existing.rel_id() == item.rel_id()
         }) {
@@ -255,7 +275,7 @@ impl<'a> Transaction<'a> {
         {
             let mut hints = self.before.scope_names();
             push_name(&mut hints, item.source());
-            self.before = Snapshot::load_scoped(self.target, &hints)?;
+            self.before = Snapshot::load_scoped(&self.source, &hints)?;
         }
         self.draft.push(item);
         validation::items(&self.draft)?;
@@ -275,17 +295,15 @@ impl<'a> Transaction<'a> {
         Ok(Some(self.draft.remove(index)))
     }
 
-    /// Whether the staged occurrence set differs from the source snapshot.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_staged(&self) -> bool {
         self.before.items() != self.draft.as_slice()
     }
 
-    /// Validate and atomically publish the transaction.
+    /// Validate the staged graph and publish it as a new package.
     ///
-    /// An unchanged transaction publishes nothing, so a signed package keeps
-    /// its signature; a changed one is refused for a signed package before
-    /// it is published (ADR 0006): remove the signature explicitly first, with
+    /// An unchanged edit publishes the source package itself, so a signed
+    /// package keeps its signature; a changed one is refused for a signed
+    /// package (ADR 0006): remove the signature explicitly first, with
     /// [`OpcPackage::unsign`] or the format facade's `unsign`.
     /// # Errors
     ///
@@ -295,18 +313,14 @@ impl<'a> Transaction<'a> {
     /// OOXML constraints, exceeds a configured bound, or an underlying XML or
     /// package operation fails.
     pub fn commit(self) -> Result<Commit> {
-        let current = Snapshot::load_scoped(self.target, &self.before.scope_names())?;
-        if !self.before.same_source(&current) {
-            return Err(super::snapshot::source_mismatch());
-        }
-        if !self.is_changed() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
-            return Ok(Commit::new(self.before, patch, false));
+        if !self.is_staged() {
+            let patch = Patch::new(self.before.clone(), self.before);
+            return Ok(Commit::new(self.source, patch, Diagnostics::UNCHANGED));
         }
         validation::items(&self.draft)?;
-        refuse_signed_change(self.target)?;
+        refuse_signed_change(&self.source)?;
 
-        let mut candidate = self.target.clone();
+        let mut candidate = self.source;
         package::apply_items(&mut candidate, &self.before, &self.draft)?;
         let mut hints = self.before.scope_names();
         for item in &self.draft {
@@ -322,9 +336,8 @@ impl<'a> Transaction<'a> {
                 "custom XML publication changed the staged occurrence set".into(),
             ));
         }
-        let patch = Patch::new(self.before, after.clone());
-        *self.target = candidate;
-        Ok(Commit::new(after, patch, true))
+        let patch = Patch::new(self.before, after);
+        Ok(Commit::new(candidate, patch, Diagnostics::CHANGED))
     }
 }
 

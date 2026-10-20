@@ -59,6 +59,17 @@ pub enum Error {
         actual: usize,
     },
 
+    /// A Custom XML budget is exhausted (record 0360).
+    #[error("OOXML {kind} exceeds limit {maximum} (actual {observed})")]
+    CustomXmlLimit {
+        /// The exceeded budget.
+        kind: crate::custom_xml::LimitKind,
+        /// Observed value, or `usize::MAX` when arithmetic overflowed.
+        observed: usize,
+        /// Maximum accepted value.
+        maximum: usize,
+    },
+
     /// A bounded inventory collection could not reserve its next entry.
     #[error("OOXML allocation failed for {resource}: {source}")]
     Allocation {
