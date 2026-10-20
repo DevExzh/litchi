@@ -4912,7 +4912,9 @@ fn hex_digest(digest: [u8; 32]) -> String {
     text
 }
 
-fn external_media_snapshot(snapshot: &Snapshot) -> Result<crate::external_media::Snapshot> {
+pub(crate) fn external_media_snapshot(
+    snapshot: &Snapshot,
+) -> Result<crate::external_media::Snapshot> {
     let limits = crate::external_media::Limits {
         max_root_bytes: snapshot
             .limits

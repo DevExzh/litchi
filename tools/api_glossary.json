@@ -5731,6 +5731,26 @@
           "name": "PackagePatch",
           "scope": "litchi_ppt::document_comparison",
           "replacement": "use document_comparison::Patch (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::external_media",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::external_media",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::external_media",
+          "replacement": "use Package::edit_external_media() -> external_media::Edit (record 0357)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::external_media::Edit",
+          "replacement": "a commit publishes the Package"
         }
       ],
       "families": [
@@ -5740,7 +5760,8 @@
         "litchi_ppt::broadcast",
         "litchi_ppt::picture_bullets",
         "litchi_ppt::animation",
-        "litchi_ppt::document_comparison"
+        "litchi_ppt::document_comparison",
+        "litchi_ppt::external_media"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
@@ -6240,6 +6261,26 @@
           "name": "PackagePatch",
           "scope": "litchi_ppt::document_comparison",
           "replacement": "use document_comparison::Patch (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::external_media",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::external_media",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::external_media",
+          "replacement": "use Package::edit_external_media() -> external_media::Edit (record 0357)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::external_media::Edit",
+          "replacement": "a commit publishes the Package"
         }
       ],
       "families": [
@@ -6249,7 +6290,8 @@
         "litchi_ppt::broadcast",
         "litchi_ppt::picture_bullets",
         "litchi_ppt::animation",
-        "litchi_ppt::document_comparison"
+        "litchi_ppt::document_comparison",
+        "litchi_ppt::external_media"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
