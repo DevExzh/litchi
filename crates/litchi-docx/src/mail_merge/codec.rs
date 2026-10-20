@@ -118,7 +118,11 @@ impl Recipients {
                 )));
             }
             if recipients.len() >= MAX_RECIPIENTS {
-                return Err(invalid("too many mail-merge recipients"));
+                return Err(Error::MailMergeLimit {
+                    kind: crate::mail_merge::LimitKind::Recipients,
+                    actual: (recipients.len()).saturating_add(1),
+                    maximum: MAX_RECIPIENTS,
+                });
             }
             recipients.push(parse_recipient(child)?);
         }
@@ -131,7 +135,11 @@ impl Recipients {
     /// Returns an error if the operation cannot be completed.
     pub fn to_xml(&self, conformance: Conformance) -> Result<String> {
         if self.recipients.len() > MAX_RECIPIENTS {
-            return Err(invalid("too many mail-merge recipients"));
+            return Err(Error::MailMergeLimit {
+                kind: crate::mail_merge::LimitKind::Recipients,
+                actual: self.recipients.len(),
+                maximum: MAX_RECIPIENTS,
+            });
         }
         let mut xml = format!(r#"<w:recipients xmlns:w="{}">"#, conformance.word());
         for recipient in &self.recipients {
@@ -417,7 +425,11 @@ fn parse_odso(node: &Node) -> Result<DataSourceObject> {
             5 => value.first_row_header = on_off(child)?,
             6 => {
                 if value.field_maps.len() >= MAX_FIELD_MAPS {
-                    return Err(invalid("too many odso field maps"));
+                    return Err(Error::MailMergeLimit {
+                        kind: crate::mail_merge::LimitKind::FieldMaps,
+                        actual: (value.field_maps.len()).saturating_add(1),
+                        maximum: MAX_FIELD_MAPS,
+                    });
                 }
                 value.field_maps.push(parse_field_map(child)?);
             },
@@ -573,7 +585,11 @@ fn validate_model(value: &Settings) -> Result<()> {
     if let Some(odso) = &value.odso
         && odso.field_maps.len() > MAX_FIELD_MAPS
     {
-        return Err(invalid("too many odso field maps"));
+        return Err(Error::MailMergeLimit {
+            kind: crate::mail_merge::LimitKind::FieldMaps,
+            actual: odso.field_maps.len(),
+            maximum: MAX_FIELD_MAPS,
+        });
     }
     Ok(())
 }
@@ -716,7 +732,11 @@ fn parse_tree_processed(xml: &[u8]) -> Result<Node> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("mail-merge XML node count overflow"))?;
                 if nodes > MAX_NODES {
-                    return Err(invalid("mail-merge XML has too many nodes"));
+                    return Err(Error::MailMergeLimit {
+                        kind: crate::mail_merge::LimitKind::XmlNodes,
+                        actual: nodes,
+                        maximum: MAX_NODES,
+                    });
                 }
                 stack.push(make_node(namespace, &element, decoder, &resolver)?);
             },
@@ -725,7 +745,11 @@ fn parse_tree_processed(xml: &[u8]) -> Result<Node> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("mail-merge XML node count overflow"))?;
                 if nodes > MAX_NODES {
-                    return Err(invalid("mail-merge XML has too many nodes"));
+                    return Err(Error::MailMergeLimit {
+                        kind: crate::mail_merge::LimitKind::XmlNodes,
+                        actual: nodes,
+                        maximum: MAX_NODES,
+                    });
                 }
                 append_node(
                     make_node(namespace, &element, decoder, &resolver)?,
@@ -797,9 +821,11 @@ fn make_node(
             continue;
         }
         if attributes.len() >= MAX_ATTRIBUTES_PER_NODE {
-            return Err(invalid(
-                "mail-merge XML has too many attributes on one node",
-            ));
+            return Err(Error::MailMergeLimit {
+                kind: crate::mail_merge::LimitKind::XmlAttributes,
+                actual: (attributes.len()).saturating_add(1),
+                maximum: MAX_ATTRIBUTES_PER_NODE,
+            });
         }
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
         attributes.push(Attribute {

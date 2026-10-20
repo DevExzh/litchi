@@ -195,7 +195,8 @@ fn plan_is_non_mutating_and_detaches_first_middle_last_while_retaining_text() {
     let fresh_commit = fresh_plan.apply().unwrap();
     let mut output = Vec::new();
     package
-        .publish_external_hyperlink_sanitization_to_stream(&mut output, &fresh_commit)
+        .apply_external_hyperlink_detachment(&fresh_commit.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     let reopened = OpcPackage::from_bytes(&output).unwrap();
     let main = reopened.main_document_part().unwrap();
@@ -265,7 +266,8 @@ fn exact_noop_shares_snapshot_and_reproduces_signed_source_bytes() {
 
     let mut output = Vec::new();
     package
-        .publish_external_hyperlink_sanitization_to_stream(&mut output, &commit)
+        .apply_external_hyperlink_detachment(&commit.patch().clone().into())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     assert_eq!(output, bytes);
 }
@@ -420,7 +422,7 @@ fn protected_malformed_active_and_over_limit_sources_fail_closed() {
             )
             .plan_external_hyperlink_detachment(),
         Err(Error::ExternalHyperlinkDetachmentLimit {
-            resource: "external hyperlinks",
+            kind: litchi_docx::sanitize::LimitKind::ExternalHyperlinks,
             maximum: 2,
             actual: 3,
         })
@@ -510,7 +512,9 @@ fn changed_signed_publication_and_partial_sink_are_typed_failures() {
         .unwrap();
     let mut output = Vec::new();
     assert!(matches!(
-        package.publish_external_hyperlink_sanitization_to_stream(&mut output, &commit),
+        package
+            .apply_external_hyperlink_detachment(&commit.patch().clone().into())
+            .and_then(|committed| committed.package().write_to(&mut output)),
         Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
     ));
     assert!(output.is_empty());
@@ -530,7 +534,9 @@ fn changed_signed_publication_and_partial_sink_are_typed_failures() {
         limit: 128,
     };
     assert!(matches!(
-        package.publish_external_hyperlink_sanitization_to_stream(&mut sink, &commit),
+        package
+            .apply_external_hyperlink_detachment(&commit.patch().clone().into())
+            .and_then(|committed| committed.package().write_to(&mut sink)),
         Err(Error::Opc(OpcError::IncompleteOutput { .. }))
     ));
     assert_eq!(sink.accepted, 128);

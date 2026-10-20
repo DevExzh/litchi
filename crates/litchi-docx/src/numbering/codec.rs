@@ -123,17 +123,19 @@ impl Collection {
                         .checked_add(1)
                         .ok_or_else(|| invalid("numbering XML element counter overflow"))?;
                     if nodes > validation::MAX_XML_NODES {
-                        return Err(invalid(&format!(
-                            "numbering XML exceeds {} elements",
-                            validation::MAX_XML_NODES
-                        )));
+                        return Err(Error::NumberingLimit {
+                            kind: crate::numbering::LimitKind::XmlNodes,
+                            actual: nodes,
+                            maximum: validation::MAX_XML_NODES,
+                        });
                     }
                     depth = depth.checked_add(1).ok_or_else(too_deep)?;
                     if depth > validation::MAX_XML_DEPTH {
-                        return Err(invalid(&format!(
-                            "numbering XML nesting exceeds {}",
-                            validation::MAX_XML_DEPTH
-                        )));
+                        return Err(Error::NumberingLimit {
+                            kind: crate::numbering::LimitKind::XmlDepth,
+                            actual: depth,
+                            maximum: validation::MAX_XML_DEPTH,
+                        });
                     }
                     let effective_ignorable =
                         effective_ignorable(&element, decoder, &resolver, ignorable.last())?;
@@ -161,17 +163,19 @@ impl Collection {
                         .checked_add(1)
                         .ok_or_else(|| invalid("numbering XML element counter overflow"))?;
                     if nodes > validation::MAX_XML_NODES {
-                        return Err(invalid(&format!(
-                            "numbering XML exceeds {} elements",
-                            validation::MAX_XML_NODES
-                        )));
+                        return Err(Error::NumberingLimit {
+                            kind: crate::numbering::LimitKind::XmlNodes,
+                            actual: nodes,
+                            maximum: validation::MAX_XML_NODES,
+                        });
                     }
                     let child_depth = depth.checked_add(1).ok_or_else(too_deep)?;
                     if child_depth > validation::MAX_XML_DEPTH {
-                        return Err(invalid(&format!(
-                            "numbering XML nesting exceeds {}",
-                            validation::MAX_XML_DEPTH
-                        )));
+                        return Err(Error::NumberingLimit {
+                            kind: crate::numbering::LimitKind::XmlDepth,
+                            actual: child_depth,
+                            maximum: validation::MAX_XML_DEPTH,
+                        });
                     }
                     let effective_ignorable =
                         effective_ignorable(&element, decoder, &resolver, ignorable.last())?;
@@ -1430,17 +1434,19 @@ fn locate_definitions(xml: &[u8]) -> Result<Layout> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("numbering XML element counter overflow"))?;
                 if nodes > validation::MAX_XML_NODES {
-                    return Err(invalid(&format!(
-                        "numbering XML exceeds {} elements",
-                        validation::MAX_XML_NODES
-                    )));
+                    return Err(Error::NumberingLimit {
+                        kind: crate::numbering::LimitKind::XmlNodes,
+                        actual: nodes,
+                        maximum: validation::MAX_XML_NODES,
+                    });
                 }
                 depth = depth.checked_add(1).ok_or_else(too_deep)?;
                 if depth > validation::MAX_XML_DEPTH {
-                    return Err(invalid(&format!(
-                        "numbering XML nesting exceeds {}",
-                        validation::MAX_XML_DEPTH
-                    )));
+                    return Err(Error::NumberingLimit {
+                        kind: crate::numbering::LimitKind::XmlDepth,
+                        actual: depth,
+                        maximum: validation::MAX_XML_DEPTH,
+                    });
                 }
                 let tag = xml
                     .get(event_start..event_end)
@@ -1466,17 +1472,19 @@ fn locate_definitions(xml: &[u8]) -> Result<Layout> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("numbering XML element counter overflow"))?;
                 if nodes > validation::MAX_XML_NODES {
-                    return Err(invalid(&format!(
-                        "numbering XML exceeds {} elements",
-                        validation::MAX_XML_NODES
-                    )));
+                    return Err(Error::NumberingLimit {
+                        kind: crate::numbering::LimitKind::XmlNodes,
+                        actual: nodes,
+                        maximum: validation::MAX_XML_NODES,
+                    });
                 }
                 let child_depth = depth.checked_add(1).ok_or_else(too_deep)?;
                 if child_depth > validation::MAX_XML_DEPTH {
-                    return Err(invalid(&format!(
-                        "numbering XML nesting exceeds {}",
-                        validation::MAX_XML_DEPTH
-                    )));
+                    return Err(Error::NumberingLimit {
+                        kind: crate::numbering::LimitKind::XmlDepth,
+                        actual: child_depth,
+                        maximum: validation::MAX_XML_DEPTH,
+                    });
                 }
                 let tag = xml
                     .get(event_start..event_end)

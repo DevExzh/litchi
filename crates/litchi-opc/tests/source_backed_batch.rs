@@ -612,6 +612,8 @@ struct GateState {
     active_calls: usize,
     overlap: bool,
     released: bool,
+    /// Keep admitted calls blocked even when two overlap, until `release`.
+    hold: bool,
 }
 
 #[derive(Debug, Default)]
@@ -625,6 +627,15 @@ impl ReadGate {
         let mut state = self.state.lock().unwrap();
         *state = GateState::default();
         state.armed = true;
+    }
+
+    /// Arm the gate so admitted calls stay blocked until [`Self::release`],
+    /// even when two of them overlap. A test that acts (for example,
+    /// cancels) while a load is in flight uses this, so the loads cannot
+    /// finish before the action however the threads are scheduled.
+    fn arm_holding(&self) {
+        self.arm();
+        self.state.lock().unwrap().hold = true;
     }
 
     fn before_read(&self) {
@@ -641,7 +652,7 @@ impl ReadGate {
         self.changed.notify_all();
         if state.active_calls >= 2 {
             state.overlap = true;
-            state.released = true;
+            state.released |= !state.hold;
             self.changed.notify_all();
         }
         while !state.released {
@@ -1628,7 +1639,7 @@ fn batch_cancellation_during_a_gated_load_returns_cancelled_and_joins_workers() 
     let (budget, cancellation, context) =
         managed_context(2, 2, u64::try_from(PART_BYTES * 2).unwrap(), 1, u64::MAX);
     let package = package_with_context(probe, context);
-    gate.arm();
+    gate.arm_holding();
     let worker = thread::spawn(move || {
         let result = package.read_parts_ordered(&requested_uris());
         (result, package)

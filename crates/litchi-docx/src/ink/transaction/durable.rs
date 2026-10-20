@@ -6,6 +6,7 @@
 //! used only to rebuild a private proof source for inverse replay; it is never
 //! a permission to copy arbitrary package bytes into the published package.
 
+use crate::ink::LimitKind;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::mem::size_of;
@@ -893,7 +894,7 @@ impl<'a> IntentDecoder<'a> {
         ))
     }
 
-    fn u64(&mut self, resource: &'static str, maximum: usize) -> Result<usize> {
+    fn u64(&mut self, resource: LimitKind, maximum: usize) -> Result<usize> {
         let value = usize::try_from(u64::from_le_bytes(
             self.take(8)?
                 .try_into()
@@ -902,7 +903,7 @@ impl<'a> IntentDecoder<'a> {
         .map_err(|_| invalid_durable("Ink durable integer exceeds this platform"))?;
         if value > maximum {
             return Err(Error::InkLimit {
-                resource,
+                kind: resource,
                 actual: value,
                 maximum,
             });
@@ -928,7 +929,7 @@ impl<'a> IntentDecoder<'a> {
         }
     }
 
-    fn bytes(&mut self, resource: &'static str, maximum: usize) -> Result<Vec<u8>> {
+    fn bytes(&mut self, resource: LimitKind, maximum: usize) -> Result<Vec<u8>> {
         let source = self.bytes_slice(resource, maximum)?;
         let length = source.len();
         let mut bytes = Vec::new();
@@ -942,7 +943,7 @@ impl<'a> IntentDecoder<'a> {
         Ok(bytes)
     }
 
-    fn bytes_slice(&mut self, resource: &'static str, maximum: usize) -> Result<&'a [u8]> {
+    fn bytes_slice(&mut self, resource: LimitKind, maximum: usize) -> Result<&'a [u8]> {
         let length = self.u64(resource, maximum)?;
         self.take(length)
     }
@@ -952,14 +953,14 @@ fn decode_intents(bytes: &[u8], limits: EditOptions) -> Result<Vec<SemanticInten
     let maximum = MAX_INTENT_BYTES.min(limits.max_staged_bytes);
     if bytes.len() > maximum {
         return Err(Error::InkLimit {
-            resource: "durable intent bytes",
+            kind: LimitKind::DurableIntentBytes,
             actual: bytes.len(),
             maximum,
         });
     }
     let mut decoder = IntentDecoder::new(bytes, INTENT_HEADER)?;
     let count = decoder.u64(
-        "durable intent count",
+        LimitKind::DurableIntentCount,
         MAX_INTENTS.min(limits.max_operations),
     )?;
     if count == 0 {
@@ -974,7 +975,7 @@ fn decode_intents(bytes: &[u8], limits: EditOptions) -> Result<Vec<SemanticInten
         .ok_or_else(|| invalid_durable("Ink durable intent allocation overflow"))?;
     if retained_bytes > limits.max_staged_bytes {
         return Err(Error::InkLimit {
-            resource: "durable intent records",
+            kind: LimitKind::DurableIntentRecords,
             actual: retained_bytes,
             maximum: limits.max_staged_bytes,
         });
@@ -990,11 +991,11 @@ fn decode_intents(bytes: &[u8], limits: EditOptions) -> Result<Vec<SemanticInten
         match decoder.u8()? {
             0 => {
                 let kind = story_kind_from_code(decoder.u8()?)?;
-                let story_position = decoder.u64("durable story position", usize::MAX)?;
-                let paragraph = decoder.u64("durable paragraph position", usize::MAX)?;
+                let story_position = decoder.u64(LimitKind::DurableStoryPosition, usize::MAX)?;
+                let paragraph = decoder.u64(LimitKind::DurableParagraphPosition, usize::MAX)?;
                 let payload = decode_prepared(
                     decoder.bytes_slice(
-                        "durable prepared Ink bytes",
+                        LimitKind::DurablePreparedInkBytes,
                         limits.inventory.max_payload_bytes,
                     )?,
                     limits.inventory.max_payload_bytes,
@@ -1010,10 +1011,10 @@ fn decode_intents(bytes: &[u8], limits: EditOptions) -> Result<Vec<SemanticInten
                 });
             },
             1 => {
-                let position = decoder.u64("durable annotation position", usize::MAX)?;
+                let position = decoder.u64(LimitKind::DurableAnnotationPosition, usize::MAX)?;
                 let payload = decode_prepared(
                     decoder.bytes_slice(
-                        "durable prepared Ink bytes",
+                        LimitKind::DurablePreparedInkBytes,
                         limits.inventory.max_payload_bytes,
                     )?,
                     limits.inventory.max_payload_bytes,
@@ -1026,7 +1027,7 @@ fn decode_intents(bytes: &[u8], limits: EditOptions) -> Result<Vec<SemanticInten
                 });
             },
             2 => {
-                let position = decoder.u64("durable annotation position", usize::MAX)?;
+                let position = decoder.u64(LimitKind::DurableAnnotationPosition, usize::MAX)?;
                 intents.push(SemanticIntent::Remove { position });
             },
             _ => return Err(invalid_durable("unknown Ink durable intent")),
@@ -1070,8 +1071,8 @@ fn decode_style(decoder: &mut IntentDecoder<'_>, maximum: usize) -> Result<Style
 
 fn decode_placement(decoder: &mut IntentDecoder<'_>) -> Result<Placement> {
     let kind = decoder.u8()?;
-    let width = decoder.u64("durable geometry width", u64::MAX as usize)? as u64;
-    let height = decoder.u64("durable geometry height", u64::MAX as usize)? as u64;
+    let width = decoder.u64(LimitKind::DurableGeometryWidth, u64::MAX as usize)? as u64;
+    let height = decoder.u64(LimitKind::DurableGeometryHeight, u64::MAX as usize)? as u64;
     let extent = Geometry::new(width, height)
         .map_err(|error| invalid_durable(format!("invalid Ink durable geometry: {error}")))?;
     match kind {
@@ -1150,7 +1151,7 @@ fn decode_fallback(
                     invalid_durable(format!("invalid Ink durable dimensions: {error}"))
                 })?;
             let bytes = decoder.bytes(
-                "durable fallback image bytes",
+                LimitKind::DurableFallbackImageBytes,
                 maximum.min(16 * 1024 * 1024),
             )?;
             FallbackImage::new(Arc::new(bytes), media, dimensions)
@@ -1168,18 +1169,18 @@ fn decode_restore(bytes: &[u8], limits: EditOptions) -> Result<(&[u8], &[u8])> {
         .ok_or_else(|| invalid_durable("durable restore bound overflow"))?;
     if bytes.len() > maximum {
         return Err(Error::InkLimit {
-            resource: "durable restore bytes",
+            kind: LimitKind::DurableRestoreBytes,
             actual: bytes.len(),
             maximum,
         });
     }
     let mut decoder = IntentDecoder::new(bytes, RESTORE_HEADER)?;
     let intent = decoder.bytes_slice(
-        "durable restore intent bytes",
+        LimitKind::DurableRestoreIntentBytes,
         MAX_INTENT_BYTES.min(limits.max_staged_bytes),
     )?;
     let delta = decoder.bytes_slice(
-        "durable restore closure bytes",
+        LimitKind::DurableRestoreClosureBytes,
         MAX_DELTA_BYTES.min(limits.max_package_bytes),
     )?;
     if decoder.offset != bytes.len() {
@@ -1861,7 +1862,7 @@ impl<'a> Decoder<'a> {
         self.bytes.len().saturating_sub(self.offset)
     }
 
-    fn u64(&mut self, resource: &'static str, maximum: usize) -> Result<usize> {
+    fn u64(&mut self, resource: LimitKind, maximum: usize) -> Result<usize> {
         let bytes: [u8; 8] = self
             .take(8)?
             .try_into()
@@ -1870,7 +1871,7 @@ impl<'a> Decoder<'a> {
             .map_err(|_| invalid_durable("Ink durable integer exceeds this platform"))?;
         if value > maximum {
             return Err(Error::InkLimit {
-                resource,
+                kind: resource,
                 actual: value,
                 maximum,
             });
@@ -1878,7 +1879,7 @@ impl<'a> Decoder<'a> {
         Ok(value)
     }
 
-    fn bytes(&mut self, resource: &'static str, maximum: usize) -> Result<Vec<u8>> {
+    fn bytes(&mut self, resource: LimitKind, maximum: usize) -> Result<Vec<u8>> {
         let length = self.u64(resource, maximum)?;
         let source = self.take(length)?;
         let mut bytes = Vec::new();
@@ -1892,7 +1893,7 @@ impl<'a> Decoder<'a> {
         Ok(bytes)
     }
 
-    fn text(&mut self, resource: &'static str, maximum: usize) -> Result<String> {
+    fn text(&mut self, resource: LimitKind, maximum: usize) -> Result<String> {
         let bytes = self.bytes(resource, maximum)?;
         let text = std::str::from_utf8(&bytes)
             .map_err(|_| invalid_durable("Ink durable closure text is not UTF-8"))?;
@@ -1911,13 +1912,13 @@ fn decode_delta(
     let maximum = limits.max_package_bytes.min(MAX_DELTA_BYTES);
     if bytes.len() > maximum {
         return Err(Error::InkLimit {
-            resource: "durable closure bytes",
+            kind: LimitKind::DurableClosureBytes,
             actual: bytes.len(),
             maximum,
         });
     }
     let mut decoder = Decoder::new(bytes)?;
-    let count = decoder.u64("durable closure records", MAX_DELTA_RECORDS)?;
+    let count = decoder.u64(LimitKind::DurableClosureRecords, MAX_DELTA_RECORDS)?;
     if count == 0 {
         return Err(invalid_durable("empty Ink durable closure"));
     }
@@ -1930,7 +1931,7 @@ fn decode_delta(
         .ok_or_else(|| invalid_durable("Ink durable closure allocation overflow"))?;
     if retained_bytes > maximum {
         return Err(Error::InkLimit {
-            resource: "durable closure records",
+            kind: LimitKind::DurableClosureRecords,
             actual: retained_bytes,
             maximum,
         });
@@ -1953,7 +1954,7 @@ fn decode_delta(
             return Err(invalid_durable("unknown Ink durable closure member kind"));
         }
         let name = decoder.text(
-            "durable member name",
+            LimitKind::DurableMemberName,
             MAX_MEMBER_NAME.min(limits.inventory.stories.max_topology_bytes),
         )?;
         if kind == 0 && name != "[Content_Types].xml" {
@@ -2057,7 +2058,7 @@ fn add_closure_metadata_bytes(
         .ok_or_else(|| invalid_durable("Ink durable closure metadata overflow"))?;
     if total > maximum {
         return Err(Error::InkLimit {
-            resource: "durable closure metadata bytes",
+            kind: LimitKind::DurableClosureMetadataBytes,
             actual: total,
             maximum,
         });
@@ -2071,7 +2072,7 @@ fn add_closure_metadata_size(current: usize, additional: usize, maximum: usize) 
         .ok_or_else(|| invalid_durable("Ink durable closure metadata overflow"))?;
     if total > maximum {
         return Err(Error::InkLimit {
-            resource: "durable closure metadata bytes",
+            kind: LimitKind::DurableClosureMetadataBytes,
             actual: total,
             maximum,
         });
@@ -2096,7 +2097,7 @@ fn add_closure_relationship_count(
         .ok_or_else(|| invalid_durable("Ink durable relationship count overflow"))?;
     if total > limits.max_relationships {
         return Err(Error::InkLimit {
-            resource: "durable closure relationships",
+            kind: LimitKind::DurableClosureRelationships,
             actual: total,
             maximum: limits.max_relationships,
         });
@@ -2120,7 +2121,7 @@ fn decode_member(
     }
     if kind == 2 {
         let content_type = decoder.text(
-            "durable content type",
+            LimitKind::DurableContentType,
             MAX_CONTENT_TYPE.min(limits.inventory.stories.max_topology_bytes),
         )?;
         let payload_maximum = if story_names.contains(name) || is_story_content_type(&content_type)
@@ -2129,13 +2130,13 @@ fn decode_member(
         } else {
             limits.inventory.max_payload_bytes
         };
-        let payload = decoder.bytes("durable part payload", payload_maximum)?;
+        let payload = decoder.bytes(LimitKind::DurablePartPayload, payload_maximum)?;
         let relationship_present = decoder.u8()?;
         if relationship_present > 1 {
             return Err(invalid_durable("invalid Ink durable relationship presence"));
         }
         let relationships = decoder.bytes(
-            "durable relationship bytes",
+            LimitKind::DurableRelationshipBytes,
             MAX_RELATIONSHIPS_BYTES
                 .min(limits.inventory.stories.max_topology_bytes)
                 .min(limits.max_package_bytes),
@@ -2149,7 +2150,7 @@ fn decode_member(
         Ok(Some(Member {
             content_type: None,
             payload: decoder.bytes(
-                "durable package XML",
+                LimitKind::DurablePackageXml,
                 (MAX_RELATIONSHIPS_BYTES * 16)
                     .min(limits.inventory.stories.max_topology_bytes)
                     .min(limits.max_package_bytes),
@@ -2844,7 +2845,7 @@ fn relationship_tokens(
 fn parse_relationships(bytes: &[u8], limits: Limits) -> Result<Vec<RelationshipSpec>> {
     if bytes.len() > limits.stories.max_topology_bytes {
         return Err(Error::InkLimit {
-            resource: "Ink relationship metadata bytes",
+            kind: LimitKind::RelationshipMetadataBytes,
             actual: bytes.len(),
             maximum: limits.stories.max_topology_bytes,
         });

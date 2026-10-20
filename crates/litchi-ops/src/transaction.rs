@@ -1473,16 +1473,33 @@ impl Edit {
             // Let its ordinary handler resolve and admit once, including mixed
             // text/formatting calls. The native setter check remains defensive
             // for any future text alias that is not recognized by this hint.
-            if _props
+            //
+            // The exception is `text` alone on a direct body paragraph: its
+            // ordinal is stable across text replacement, so it joins the
+            // run (record 0355a). A run that has replaced text closes
+            // before any target it cannot prove against its base.
+            let text = _props
                 .iter()
-                .any(|(key, _)| key.eq_ignore_ascii_case("text"))
+                .any(|(key, _)| key.eq_ignore_ascii_case("text"));
+            let planned = match (&self.formatting, _spelling, text) {
+                (Some(run), _, true) => run.text_plan(_target, _props),
+                (None, _, true) => handle.text_plan(_target, _props),
+                (Some(run), Some(spelling), false) => {
+                    run.formatting_plan(spelling, _target, _props)
+                },
+                (_, _, false) => handle.formatting_plan(_target, _props),
+            };
+            if self.formatting.as_ref().is_some_and(|run| run.has_text())
+                && planned.as_ref().map_or(true, |plan| {
+                    plan.as_ref().is_none_or(|plan| {
+                        !self.formatting.as_ref().is_some_and(|run| run.admits(plan))
+                    })
+                })
             {
+                // Resolve against the published candidate instead.
+                self.flush_pending()?;
                 return Ok(None);
             }
-            let planned = match (&self.formatting, _spelling) {
-                (Some(run), Some(spelling)) => run.formatting_plan(spelling, _target, _props),
-                _ => handle.formatting_plan(_target, _props),
-            };
             let Some(plan) = planned? else {
                 return Ok(None);
             };

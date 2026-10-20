@@ -434,7 +434,9 @@ fn prepare(corpus: &Corpus) -> Result<Prepared, Box<dyn std::error::Error>> {
         corpus.base.archive.len(),
         "DOCX story hyperlink output",
     )?;
-    package.publish_story_hyperlink_redaction_to_stream(&mut output, &commit)?;
+    package
+        .apply_story_hyperlink_redaction(&commit.clone().into())
+        .and_then(|committed| committed.package().write_to(&mut output))?;
     let output_sha256 = super::sha256_hex(&output);
     let output_parts_verified = verify_output_parts(&output)?;
     let output_package = source_package(owned_source(&output)?)?;
@@ -460,7 +462,8 @@ fn prepare(corpus: &Corpus) -> Result<Prepared, Box<dyn std::error::Error>> {
     let second_plan = second_snapshot.plan_target_urls(&[target])?;
     let second_commit = second_plan.apply()?;
     second_package
-        .publish_story_hyperlink_redaction_to_stream(&mut second_output, &second_commit)?;
+        .apply_story_hyperlink_redaction(&second_commit.clone().into())
+        .and_then(|committed| committed.package().write_to(&mut second_output))?;
     let deterministic_output_verified = second_output == output;
     let publication_verified = output_inventory_verified
         && output_relationships_verified

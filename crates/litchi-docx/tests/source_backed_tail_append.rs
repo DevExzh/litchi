@@ -34,6 +34,44 @@ use soapberry_zip::office::StreamingArchiveWriter;
 use litchi_docx::source_backed::tail_append::{Error as TailAppendError, Refusal};
 use litchi_docx::source_backed::{TailAppendLimits, TailAppendOptions, TailAppendPlan};
 
+/// Record 0355a: a tail-append plan commits to a new source-backed package;
+/// writing that package publishes the splice. This keeps the plan-level
+/// call shape of the tests.
+struct Published {
+    commit: source_backed::tail_append::Commit,
+}
+
+impl Published {
+    fn is_noop(&self) -> bool {
+        self.commit.patch().is_noop()
+    }
+
+    /// The inverse restores the commit's own source artifact exactly.
+    fn write_inverse(&self, writer: impl Write) -> Result<(), TailAppendError> {
+        self.commit
+            .package()
+            .apply_tail_append(&self.commit.patch().inverse())?
+            .package()
+            .write_to(writer)
+            .map_err(TailAppendError::Document)
+    }
+}
+
+trait WritePlan {
+    fn write_to(self, writer: impl Write) -> Result<Published, TailAppendError>;
+}
+
+impl WritePlan for TailAppendPlan<'_> {
+    fn write_to(self, writer: impl Write) -> Result<Published, TailAppendError> {
+        let commit = self.commit()?;
+        commit
+            .package()
+            .write_to(writer)
+            .map_err(TailAppendError::Document)?;
+        Ok(Published { commit })
+    }
+}
+
 const WORD: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const STRICT_WORD: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
 const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
@@ -945,9 +983,8 @@ fn appends_before_exact_opaque_section_and_preserves_untouched_store_and_deflate
         }
 
         let mut inverse = Vec::new();
-        let candidate = bounded_package(output.clone());
         publication
-            .write_inverse_to_stream(&candidate, &mut inverse)
+            .write_inverse(&mut inverse)
             .expect("immediate inverse must restore exact source");
         assert_eq!(inverse, source_archive);
         drop(package);
@@ -1051,7 +1088,7 @@ fn explicit_noop_is_exact_and_reversible_without_a_generated_paragraph() {
 
     let mut inverse = Vec::new();
     publication
-        .write_inverse_to_stream(&package, &mut inverse)
+        .write_inverse(&mut inverse)
         .expect("no-op inverse must publish");
     assert_eq!(inverse, source_archive);
 }
@@ -1629,7 +1666,7 @@ fn supported_settings_mce_fallback_is_admitted_at_exact_source_limit() {
             matches!(
                 &result,
                 Err(TailAppendError::Limit {
-                    resource: "settings XML bytes",
+                    kind: source_backed::tail_append::LimitKind::SettingsXmlBytes,
                     ..
                 })
             ),
@@ -1911,7 +1948,7 @@ fn inherited_settings_namespace_copies_hit_the_workspace_ceiling() {
             .and_then(|plan| plan.write_to(&mut large_output));
         match result {
             Err(TailAppendError::Limit {
-                resource: "settings XML workspace",
+                kind: source_backed::tail_append::LimitKind::SettingsXmlWorkspace,
                 ..
             }) => {},
             Err(error) => panic!(
@@ -1964,7 +2001,7 @@ fn nested_long_mce_directives_account_for_decoded_expanded_names() {
             .and_then(|plan| plan.write_to(&mut large_output));
         match result {
             Err(TailAppendError::Limit {
-                resource: "settings XML workspace",
+                kind: source_backed::tail_append::LimitKind::SettingsXmlWorkspace,
                 ..
             }) => {},
             Err(error) => panic!(

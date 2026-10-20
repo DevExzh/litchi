@@ -14,7 +14,32 @@ use super::package::PackageDraft;
 use super::{Checksum, FormattingAllowed};
 use crate::package::family::{Staged, graph_family};
 
-graph_family!("content-control");
+graph_family!("content-control", own_limits);
+
+pub use super::limit::LimitKind;
+
+/// Options of a content-control edit (record 0355a).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: Option<super::PackageLimits>,
+}
+
+impl EditOptions {
+    /// Bound the edit's snapshot and its published stories (including
+    /// `max_output_bytes`) by `limits` instead of the package's semantic
+    /// content-control limits.
+    #[must_use]
+    pub fn limits(mut self, limits: super::PackageLimits) -> Self {
+        self.limits = Some(limits);
+        self
+    }
+
+    /// The configured limits; `None` uses the package's semantic limits.
+    #[must_use]
+    pub const fn limits_value(&self) -> Option<&super::PackageLimits> {
+        self.limits.as_ref()
+    }
+}
 
 /// A staged content-control change over one package snapshot. The source is
 /// never changed: [`Self::commit`] publishes a new package, and dropping the
@@ -22,6 +47,7 @@ graph_family!("content-control");
 #[derive(Clone)]
 pub struct Edit {
     staged: Staged,
+    limits: super::PackageLimits,
     draft: Option<PackageDraft>,
 }
 
@@ -34,7 +60,12 @@ impl std::fmt::Debug for Edit {
 impl Edit {
     fn draft(&mut self) -> Result<&mut PackageDraft> {
         if self.draft.is_none() {
-            self.draft = Some(self.staged.working().content_control_snapshot()?.edit()?);
+            self.draft = Some(
+                self.staged
+                    .working()
+                    .content_control_snapshot_bounded(self.limits.clone())?
+                    .edit()?,
+            );
         }
         Ok(self
             .draft
@@ -140,8 +171,18 @@ impl crate::Package {
     /// Stage a content-control change over this package. O(1).
     #[must_use]
     pub fn edit_content_controls(&self) -> Edit {
+        self.edit_content_controls_with_options(EditOptions::default())
+    }
+
+    /// Stage a content-control change over this package under `options`.
+    /// O(1).
+    #[must_use]
+    pub fn edit_content_controls_with_options(&self, options: EditOptions) -> Edit {
         Edit {
             staged: Staged::new(self),
+            limits: options
+                .limits
+                .unwrap_or_else(|| self.semantic_limits().content_controls_value().clone()),
             draft: None,
         }
     }

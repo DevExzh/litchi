@@ -13,6 +13,7 @@
 //! new text.  Corpus construction and all independent archive/semantic
 //! oracles are outside the measured lifecycle.
 
+use crate::docx_family_publication::{CopyPublish as _, TailPlanPublish as _};
 use std::{
     collections::BTreeMap,
     ffi::OsString,

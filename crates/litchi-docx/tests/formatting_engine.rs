@@ -945,7 +945,11 @@ fn both_owners_publish_formatting_and_structure_identically() {
         let commit = stage(&backed.edit().unwrap().source().clone());
         let mut backed_bytes = Vec::new();
         backed
-            .publish_document_commit_to_stream(&mut backed_bytes, &commit)
+            .apply(commit.patch())
+            .and_then(|committed| {
+                committed.write_to(&mut backed_bytes)?;
+                committed.document_snapshot()
+            })
             .unwrap();
 
         assert_eq!(
@@ -1007,7 +1011,10 @@ fn signed_packages_refuse_formatting_until_explicitly_unsigned() {
     let backed_commit = stage(&backed.document_snapshot().unwrap());
     let mut output = Vec::new();
     assert!(matches!(
-        backed.publish_document_commit_to_stream(&mut output, &backed_commit),
+        backed.apply(backed_commit.patch()).and_then(|committed| {
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        }),
         Err(litchi_docx::document::Error::Document(
             litchi_docx::Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy)
         ))

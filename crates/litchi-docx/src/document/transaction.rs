@@ -186,21 +186,11 @@ pub enum Refusal {
 
 impl Refusal {
     /// The shared refusal kind litchi-ops classifies this reason by (record
-    /// 0351).
-    ///
-    /// Only an invalid property value is a value error. Every other reason
-    /// is a request this route cannot perform on the selected content: a
-    /// selector that does not resolve to a direct child the route edits, a
-    /// target without editable text, or content it would lose. Those keep
-    /// the single `unsupported_capability` code the unified layer reported
-    /// before record 0355; finer kinds (`NotFound`, `UnsupportedTarget`,
-    /// `UnsupportedProperty`) would change OfficeCLI-visible codes and are
-    /// follow-up 0355-F3.
+    /// 0351 §2.4, one taxonomy across formats; record 0355a).
     #[must_use]
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
         match self {
-            Self::InvalidPropertyValue => RefusalKind::InvalidValue,
             Self::HyperlinkNotFound
             | Self::RunNotFound
             | Self::FieldNotFound
@@ -208,14 +198,16 @@ impl Refusal {
             | Self::RevisionNotFound
             | Self::ContentControlNotFound
             | Self::CellNotFound
-            | Self::BlockNotFound
-            | Self::AmbiguousCompositeSelector
-            | Self::TransitionalValue
-            | Self::ComplexRun
-            | Self::SectionBreak
-            | Self::FieldInterior
-            | Self::UnmodelledProperty => RefusalKind::UnsupportedOperation,
-            Self::ComplexContent
+            | Self::BlockNotFound => RefusalKind::NotFound,
+            Self::AmbiguousCompositeSelector
+            | Self::InvalidPropertyValue
+            | Self::TransitionalValue => RefusalKind::InvalidValue,
+            // The selected element is not an editable target of this route.
+            Self::SectionBreak | Self::FieldInterior => RefusalKind::UnsupportedTarget,
+            Self::UnmodelledProperty => RefusalKind::UnsupportedProperty,
+            // Content the route cannot rewrite without losing it.
+            Self::ComplexRun
+            | Self::ComplexContent
             | Self::RevisionDependency
             | Self::StructuralText
             | Self::DuplicateProperty
@@ -6496,6 +6488,7 @@ impl Edit {
             inverse_operations,
             inverse_admission,
             inverse_string_admission,
+            restore: None,
         };
         Ok(Commit {
             snapshot: projected,
@@ -6719,9 +6712,31 @@ pub struct Patch {
     inverse_operations: OperationList,
     inverse_admission: Option<Arc<OperationAdmission>>,
     inverse_string_admission: Option<Arc<StringAdmission>>,
+    /// The exact package pair of a source-backed commit (record 0355a):
+    /// applied to a package writing the first artifact, the patch returns
+    /// the second, so an inverse restores the original archive bytes.
+    restore: Option<Arc<(crate::source_backed::Package, crate::source_backed::Package)>>,
 }
 
 impl Patch {
+    /// This patch carrying the exact source-backed `before` and `after`
+    /// packages of a commit.
+    pub(crate) fn with_restore(
+        mut self,
+        before: crate::source_backed::Package,
+        after: crate::source_backed::Package,
+    ) -> Self {
+        self.restore = Some(Arc::new((before, after)));
+        self
+    }
+
+    /// The exact source-backed package pair of a commit, if any.
+    pub(crate) fn restore(
+        &self,
+    ) -> Option<&(crate::source_backed::Package, crate::source_backed::Package)> {
+        self.restore.as_deref()
+    }
+
     /// The operation-free patch that moves `before` to `after`: a recorded
     /// history transition replayed as one main-document replacement.
     pub(crate) fn transition(before: Snapshot, after: Snapshot) -> Self {
@@ -6734,6 +6749,7 @@ impl Patch {
             inverse_operations: OperationList::Empty,
             inverse_admission: None,
             inverse_string_admission: None,
+            restore: None,
         }
     }
 
@@ -6780,6 +6796,10 @@ impl Patch {
             inverse_operations: self.operations.clone(),
             inverse_admission: self.operation_admission.clone(),
             inverse_string_admission: self.operation_string_admission.clone(),
+            restore: self
+                .restore
+                .as_ref()
+                .map(|pair| Arc::new((pair.1.clone(), pair.0.clone()))),
         }
     }
 

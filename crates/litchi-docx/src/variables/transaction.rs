@@ -93,10 +93,6 @@ impl Snapshot {
             && self.variables == other.variables
     }
 
-    pub(crate) fn same_content(&self, other: &Self) -> bool {
-        self.xml.as_slice() == other.xml.as_slice() && self.variables == other.variables
-    }
-
     pub(crate) fn shared_xml(&self) -> Arc<Vec<u8>> {
         Arc::clone(&self.xml)
     }
@@ -359,6 +355,18 @@ impl Patch {
             before: self.after.clone(),
             after: self.before.clone(),
         }
+    }
+
+    /// Apply to a snapshot with the patch's exact before bytes and
+    /// variables, from any source (record 0355a: a package replay reads the
+    /// snapshot it applies to).
+    pub(crate) fn apply_content(&self, source: &Snapshot) -> Result<Snapshot> {
+        if source.xml.as_slice() != self.before.xml.as_slice()
+            || source.variables != self.before.variables
+        {
+            return Err(Error::DocumentVariablesConflict);
+        }
+        Ok(self.after.clone())
     }
 
     /// Apply only to a snapshot matching both source preconditions.

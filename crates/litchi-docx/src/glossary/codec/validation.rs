@@ -12,7 +12,11 @@ use super::xml::{Content, Node};
 
 pub(in crate::glossary) fn validate_catalog_fields(v: &Catalog) -> Result<()> {
     if v.entries.len() > MAX_PARTS {
-        return Err(invalid("glossary entry limit exceeded"));
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::Entry,
+            actual: v.entries.len(),
+            maximum: MAX_PARTS,
+        });
     }
     for e in &v.entries {
         validate_entry_fields(e)?;

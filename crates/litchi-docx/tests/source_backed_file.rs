@@ -232,7 +232,11 @@ fn exact_noop_and_changed_document_overlay_preserve_raw_unselected_members() {
         .unwrap();
     let mut output = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut output, &noop)
+        .apply(noop.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     assert_eq!(output, source_bytes);
 
@@ -243,7 +247,11 @@ fn exact_noop_and_changed_document_overlay_preserve_raw_unselected_members() {
     let commit = edit.commit().unwrap();
     let mut changed = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut changed, &commit)
+        .apply(commit.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut changed)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     assert_ne!(changed, source_bytes);
     assert_eq!(

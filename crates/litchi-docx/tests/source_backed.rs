@@ -400,7 +400,11 @@ fn document_commit_edits_only_the_main_part_and_reopens() {
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     let published = package
-        .publish_document_commit_to_stream(&mut output, &commit)
+        .apply(commit.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
 
     assert_eq!(published.xml_bytes(), commit.snapshot().xml_bytes());
@@ -453,7 +457,11 @@ fn exact_noop_reproduces_every_source_byte() {
     let mut output = Vec::new();
 
     package
-        .publish_document_commit_to_stream(&mut output, &commit)
+        .apply(commit.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     assert_eq!(output, source_bytes);
 }
@@ -493,7 +501,11 @@ fn rolled_back_document_operations_use_the_exact_signed_source_path() {
     assert!(canonical.commit().is_err());
     let mut output = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut output, &commit)
+        .apply(commit.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     assert_eq!(output, source_bytes);
 }
@@ -511,7 +523,10 @@ fn stale_commit_and_changed_source_fail_before_output() {
     source.changed();
     let mut output = Vec::new();
     assert!(matches!(
-        package.publish_document_commit_to_stream(&mut output, &commit),
+        package.apply(commit.patch()).and_then(|committed| {
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        }),
         Err(TransactionError::Document(Error::Opc(
             OpcError::SourceChanged { .. }
         )))
@@ -528,7 +543,10 @@ fn stale_commit_and_changed_source_fail_before_output() {
     let stale_read_at: Arc<dyn ReadAt> = stale_source;
     let stale_package = source_backed::Package::from_read_at(stale_read_at).unwrap();
     assert!(matches!(
-        stale_package.publish_document_commit_to_stream(&mut output, &commit),
+        stale_package.apply(commit.patch()).and_then(|committed| {
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        }),
         Err(TransactionError::PatchConflict)
     ));
     assert!(output.is_empty());
@@ -552,7 +570,10 @@ fn markup_compatibility_branch_selection_is_refused_before_output() {
     let mut output = Vec::new();
 
     assert!(matches!(
-        package.publish_document_commit_to_stream(&mut output, &commit),
+        package.apply(commit.patch()).and_then(|committed| {
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        }),
         Err(TransactionError::Document(Error::Refused(_)))
     ));
     assert!(output.is_empty());
@@ -580,7 +601,11 @@ fn signed_changes_are_refused_but_signed_noops_are_exact() {
         .unwrap();
     let mut output = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut output, &noop)
+        .apply(noop.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     assert_eq!(output, signed_bytes);
 
@@ -593,7 +618,10 @@ fn signed_changes_are_refused_but_signed_noops_are_exact() {
     let commit = edit.commit().unwrap();
     output.clear();
     assert!(matches!(
-        package.publish_document_commit_to_stream(&mut output, &commit),
+        package.apply(commit.patch()).and_then(|committed| {
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        }),
         Err(TransactionError::Document(Error::Opc(
             OpcError::SignedSourceRequiresExplicitPolicy
         )))
@@ -617,7 +645,10 @@ fn sequential_sink_failure_is_typed_as_incomplete_output() {
     };
 
     assert!(matches!(
-        package.publish_document_commit_to_stream(&mut sink, &commit),
+        package.apply(commit.patch()).and_then(|committed| {
+            committed.write_to(&mut sink)?;
+            committed.document_snapshot()
+        }),
         Err(TransactionError::Document(Error::Opc(
             OpcError::IncompleteOutput { .. }
         )))
@@ -642,7 +673,11 @@ fn strict_main_document_relationship_uses_the_same_overlay_contract() {
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut output, &commit)
+        .apply(commit.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
 
     let reopened = Package::from_reader(io::Cursor::new(output)).unwrap();
@@ -667,11 +702,10 @@ fn alt_chunk_payload_overlay_is_one_edit_and_preserves_raw_unselected_members() 
     let mut output = Vec::new();
 
     package
-        .publish_alt_chunk_to_stream(
-            &mut output,
-            source_backed::AltChunkSelector::index(0),
-            Data::Html(replacement.clone()),
-        )
+        .edit_alt_chunk_payload(source_backed::AltChunkSelector::index(0))
+        .replace(Data::Html(replacement.clone()))
+        .and_then(|edit| edit.clone().commit())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
 
     assert_ne!(output, source_bytes);
@@ -703,11 +737,10 @@ fn alt_chunk_real_libreoffice_fixture_preserves_untouched_zip_members() {
     let mut output = Vec::new();
 
     package
-        .publish_alt_chunk_to_stream(
-            &mut output,
-            source_backed::AltChunkSelector::index(0),
-            Data::Html(replacement.clone()),
-        )
+        .edit_alt_chunk_payload(source_backed::AltChunkSelector::index(0))
+        .replace(Data::Html(replacement.clone()))
+        .and_then(|edit| edit.clone().commit())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
 
     for member in [
@@ -738,11 +771,11 @@ fn alt_chunk_overlay_refuses_shared_targets_and_signed_changes_but_keeps_signed_
     let shared_package = source_backed::Package::from_read_at(shared_source).unwrap();
     let mut output = Vec::new();
     assert!(matches!(
-        shared_package.publish_alt_chunk_to_stream(
-            &mut output,
-            source_backed::AltChunkSelector::index(0),
-            Data::Html(b"<html><body>ambiguous</body></html>".to_vec()),
-        ),
+        shared_package
+            .edit_alt_chunk_payload(source_backed::AltChunkSelector::index(0))
+            .replace(Data::Html(b"<html><body>ambiguous</body></html>".to_vec()))
+            .and_then(|edit| edit.clone().commit())
+            .and_then(|committed| committed.package().write_to(&mut output)),
         Err(Error::Refused(_))
     ));
     assert!(output.is_empty());
@@ -751,11 +784,10 @@ fn alt_chunk_overlay_refuses_shared_targets_and_signed_changes_but_keeps_signed_
     let signed_source = Arc::new(ObservedSource::new(signed_bytes.clone(), 0..0, 0..0));
     let signed_package = source_backed::Package::from_read_at(signed_source).unwrap();
     signed_package
-        .publish_alt_chunk_to_stream(
-            &mut output,
-            source_backed::AltChunkSelector::index(0),
-            Data::Html(b"<html><body>original</body></html>".to_vec()),
-        )
+        .edit_alt_chunk_payload(source_backed::AltChunkSelector::index(0))
+        .replace(Data::Html(b"<html><body>original</body></html>".to_vec()))
+        .and_then(|edit| edit.clone().commit())
+        .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     assert_eq!(output, signed_bytes);
 
@@ -763,11 +795,13 @@ fn alt_chunk_overlay_refuses_shared_targets_and_signed_changes_but_keeps_signed_
     let signed_package = source_backed::Package::from_read_at(signed_source).unwrap();
     output.clear();
     assert!(matches!(
-        signed_package.publish_alt_chunk_to_stream(
-            &mut output,
-            source_backed::AltChunkSelector::index(0),
-            Data::Html(b"<html><body>signed change</body></html>".to_vec()),
-        ),
+        signed_package
+            .edit_alt_chunk_payload(source_backed::AltChunkSelector::index(0))
+            .replace(Data::Html(
+                b"<html><body>signed change</body></html>".to_vec()
+            ))
+            .and_then(|edit| edit.clone().commit())
+            .and_then(|committed| committed.package().write_to(&mut output)),
         Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
     ));
     assert!(output.is_empty());
@@ -780,11 +814,11 @@ fn alt_chunk_overlay_refuses_non_body_anchor_layouts() {
     let package = source_backed::Package::from_read_at(source).unwrap();
     let mut output = Vec::new();
     assert!(matches!(
-        package.publish_alt_chunk_to_stream(
-            &mut output,
-            source_backed::AltChunkSelector::index(0),
-            Data::Html(b"<html><body>nested</body></html>".to_vec()),
-        ),
+        package
+            .edit_alt_chunk_payload(source_backed::AltChunkSelector::index(0))
+            .replace(Data::Html(b"<html><body>nested</body></html>".to_vec()))
+            .and_then(|edit| edit.clone().commit())
+            .and_then(|committed| committed.package().write_to(&mut output)),
         Err(Error::OutOfBounds { .. })
     ));
     assert!(output.is_empty());
@@ -797,11 +831,11 @@ fn alt_chunk_overlay_rejects_oversized_payload_before_reading_source() {
     let package = source_backed::Package::from_read_at(source).unwrap();
     let mut output = Vec::new();
     assert!(matches!(
-        package.publish_alt_chunk_to_stream(
-            &mut output,
-            source_backed::AltChunkSelector::index(0),
-            Data::Html(vec![b'x'; MAX_DATA_BYTES + 1]),
-        ),
+        package
+            .edit_alt_chunk_payload(source_backed::AltChunkSelector::index(0))
+            .replace(Data::Html(vec![b'x'; MAX_DATA_BYTES + 1]))
+            .and_then(|edit| edit.clone().commit())
+            .and_then(|committed| committed.package().write_to(&mut output)),
         Err(Error::Invalid(_))
     ));
     assert!(output.is_empty());
@@ -829,16 +863,28 @@ fn shared_source_publishes_repeatedly_without_reopen_or_consumption() {
     };
     assert!(
         shared
-            .publish_document_commit_to_stream(&mut failure, &commit)
+            .apply(commit.patch())
+            .and_then(|committed| {
+                committed.write_to(&mut failure)?;
+                committed.document_snapshot()
+            })
             .is_err()
     );
     let mut first = Vec::new();
     shared
-        .publish_document_commit_to_stream(&mut first, &commit)
+        .apply(commit.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut first)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     let mut second = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut second, &commit)
+        .apply(commit.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut second)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     assert_eq!(first, second);
     assert_eq!(
@@ -851,13 +897,20 @@ fn shared_source_publishes_repeatedly_without_reopen_or_consumption() {
     let noop = shared.document_snapshot().unwrap().edit().commit().unwrap();
     let mut original = Vec::new();
     shared
-        .publish_document_commit_to_stream(&mut original, &noop)
+        .apply(noop.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut original)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     assert_eq!(original, bytes);
     source.changed();
     let mut rejected = Vec::new();
     assert!(matches!(
-        shared.publish_document_commit_to_stream(&mut rejected, &commit),
+        shared.apply(commit.patch()).and_then(|committed| {
+            committed.write_to(&mut rejected)?;
+            committed.document_snapshot()
+        }),
         Err(TransactionError::Document(Error::Opc(
             OpcError::SourceChanged { .. }
         )))
@@ -881,7 +934,11 @@ fn concurrent_source_shares_keep_the_same_noop_artifact() {
                 .unwrap();
             let mut output = Vec::new();
             package
-                .publish_document_commit_to_stream(&mut output, &commit)
+                .apply(commit.patch())
+                .and_then(|committed| {
+                    committed.write_to(&mut output)?;
+                    committed.document_snapshot()
+                })
                 .unwrap();
             output
         };

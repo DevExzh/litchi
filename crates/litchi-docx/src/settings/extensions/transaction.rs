@@ -66,7 +66,9 @@ impl Snapshot {
     }
 }
 
-graph_family!("settings-extension");
+graph_family!("settings-extension", own_limits);
+
+pub use super::super::limit::LimitKind;
 
 /// A staged settings-extension change over one package snapshot.
 ///
