@@ -1,3 +1,4 @@
+use super::package::Editor;
 use super::*;
 use crate::parts::fib::FileInformationBlock;
 use crate::writer::fib::FibBuilder;
@@ -176,13 +177,14 @@ fn command_bar_snapshots_are_owned_and_failure_atomic() {
     transaction.clear();
     let commit = transaction.commit().expect("semantic commit");
 
-    assert!(!commit.is_noop());
-    assert!(!commit.snapshot().is_present());
-    assert!(commit.apply(&snapshot).is_ok());
+    let patch = commit.patch();
+    assert!(!patch.is_noop());
+    assert!(!commit.package().is_present());
+    assert!(patch.apply(&snapshot).is_ok());
     let mut changed_stale = stale;
     changed_stale.clear();
-    assert!(commit.apply(changed_stale.snapshot()).is_err());
-    assert_eq!(commit.inverse().apply(commit.snapshot()).unwrap(), snapshot);
+    assert!(patch.apply(changed_stale.staged()).is_err());
+    assert_eq!(patch.inverse().apply(commit.package()).unwrap(), snapshot);
     assert_eq!(snapshot.command_bars().unwrap(), &source.into_owned());
 }
 

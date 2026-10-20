@@ -53,9 +53,14 @@ fn invalid(key: &'static str, message: impl Into<String>) -> Error {
 fn native(leaf: sf::edit::Error) -> Error {
     use sf::edit::Error as Leaf;
     match leaf {
-        Leaf::Invalid(message) => error(Code::InvalidValue, message),
-        Leaf::Unsupported(message) => error(Code::UnsupportedCapability, message),
-        Leaf::Missing(message) => error(features::MISSING, message),
+        Leaf::Refused(refusal) => {
+            let code = match refusal.kind() {
+                litchi_core::edit::RefusalKind::InvalidValue => Code::InvalidValue,
+                litchi_core::edit::RefusalKind::NotFound => features::MISSING,
+                _ => Code::UnsupportedCapability,
+            };
+            error(code, refusal.reason())
+        },
         Leaf::Limit {
             observed, maximum, ..
         } => error(
@@ -576,7 +581,9 @@ impl Xls {
         }
         let (commit, ()) = publish!(self, limits, |edit| {
             match edit.set_note(sheet, cell, target, &author, &text) {
-                Err(sf::edit::Error::Invalid(message)) if message.contains("already has") => {
+                Err(sf::edit::Error::Refused(refusal))
+                    if refusal.reason().contains("already has") =>
+                {
                     return Err(
                         error(Code::InvalidArgument, "the target cell already has a note")
                             .with_property("ref"),

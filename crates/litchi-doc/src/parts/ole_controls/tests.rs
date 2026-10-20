@@ -270,6 +270,6 @@ fn editor_commit_round_trips_without_mutating_the_source_snapshot() {
     let commit = editor.commit().unwrap();
     assert_eq!(commit.patch().changes().len(), 2);
     assert_eq!(source.infos(), &[sample()]);
-    let bytes = to_bytes(commit.snapshot()).unwrap();
-    assert_eq!(&parse_bytes(&bytes).unwrap(), commit.snapshot());
+    let bytes = to_bytes(commit.package()).unwrap();
+    assert_eq!(&parse_bytes(&bytes).unwrap(), commit.package());
 }

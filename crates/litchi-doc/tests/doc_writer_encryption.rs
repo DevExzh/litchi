@@ -35,7 +35,7 @@
 use litchi_cfb::OleFile;
 use litchi_doc::builder::Builder;
 use litchi_doc::writer::{EncryptionProfile, FootnoteEntry};
-use litchi_doc::{Error, OpenOptions, raw::Package};
+use litchi_doc::{Error, OpenOptions, raw::Reader};
 use std::io::Cursor;
 
 fn encrypted_document(profile: EncryptionProfile, password: &str) -> Vec<u8> {
@@ -60,7 +60,7 @@ fn streams(file: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
 
 fn assert_round_trip(profile: EncryptionProfile, password: &str) -> Vec<u8> {
     let bytes = encrypted_document(profile, password);
-    let mut package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
     assert!(matches!(package.document(), Err(Error::PasswordRequired)));
     assert!(matches!(
         package.document_with_options(OpenOptions::default().password("wrong".to_owned().into())),

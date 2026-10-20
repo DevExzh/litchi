@@ -3,6 +3,7 @@
 use super::model::{UserCheck, UserEntry, UserGuid, UserNames, validate_user_name};
 use crate::user_routing::{CUsr, CbUsr, UsrInfo};
 use crate::{Error, Result};
+use litchi_core::edit::RefusalKind;
 
 pub(crate) const C_USR_RECORD_TYPE: u16 = 401;
 pub(crate) const CB_USR_RECORD_TYPE: u16 = 402;
@@ -51,10 +52,11 @@ pub(crate) fn frame_record(record_type: u16, payload: &[u8]) -> Result<Vec<u8>> 
 
 pub(crate) fn scan_records(source: &[u8], max_stream_bytes: usize) -> Result<Vec<RecordSpan>> {
     if source.len() > max_stream_bytes {
-        return Err(Error::UnsafeEdit(format!(
-            "User Names stream has {} bytes; maximum is {max_stream_bytes}",
-            source.len()
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit user names",
+            "the User Names stream exceeds its byte limit",
+        ));
     }
     let mut records = Vec::new();
     records
@@ -137,10 +139,11 @@ pub(crate) fn parse_stream(
     let cusr = CUsr::parse(records[0].payload(source))?;
     let count = usize::from(cusr.count());
     if count > limits.max_users {
-        return Err(Error::UnsafeEdit(format!(
-            "User Names stream has {count} users; maximum is {}",
-            limits.max_users
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit user names",
+            "the User Names stream exceeds its user limit",
+        ));
     }
     if records.len() != 4 + count {
         return Err(Error::InvalidData(format!(
@@ -306,11 +309,17 @@ impl UserEntry {
 
 pub(crate) fn encode_cusr(count: usize) -> Result<[u8; 2]> {
     let count = u16::try_from(count).map_err(|_error| {
-        Error::UnsafeEdit("User Names count does not fit in CUsr.iCount".to_string())
+        Error::refused(
+            RefusalKind::InvalidValue,
+            "edit user names",
+            "User Names count does not fit in CUsr.iCount",
+        )
     })?;
     if count > 255 {
-        return Err(Error::UnsafeEdit(
-            "User Names count exceeds the CUsr.iCount maximum of 255".to_string(),
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit user names",
+            "User Names count exceeds the CUsr.iCount maximum of 255",
         ));
     }
     Ok(count.to_le_bytes())

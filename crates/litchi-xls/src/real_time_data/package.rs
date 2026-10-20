@@ -11,6 +11,7 @@ use super::codec::{
 use super::model::{Cell, Record, UnknownRecord, Value};
 use super::validation::{RecordSpan, frame_logical_payload, replace_range, scan_records};
 use crate::error::{Error, Result};
+use litchi_core::edit::RefusalKind;
 
 #[derive(Debug, Clone, Copy)]
 struct Span {
@@ -123,9 +124,11 @@ impl Package {
         value: &Record,
     ) -> Result<Vec<u8>> {
         let span = self.real_time_data_spans.get(index).ok_or_else(|| {
-            Error::UnsafeEdit(format!(
-                "RealTimeData index {index} is outside the source collection"
-            ))
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit real-time data",
+                "RealTimeData index is outside the source collection",
+            )
         })?;
         let payload = value.to_payload()?;
         let replacement = frame_logical_payload(
@@ -145,9 +148,11 @@ impl Package {
         value: &Record,
     ) -> Result<Vec<u8>> {
         if index > self.real_time_data.len() {
-            return Err(Error::UnsafeEdit(format!(
-                "RealTimeData insertion index {index} is outside the source collection"
-            )));
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit real-time data",
+                "RealTimeData insertion index is outside the source collection",
+            ));
         }
         let payload = value.to_payload()?;
         let replacement = frame_logical_payload(
@@ -165,9 +170,11 @@ impl Package {
 
     pub(crate) fn remove_real_time_data(&self, bytes: &[u8], index: usize) -> Result<Vec<u8>> {
         let span = self.real_time_data_spans.get(index).ok_or_else(|| {
-            Error::UnsafeEdit(format!(
-                "RealTimeData index {index} is outside the source collection"
-            ))
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit real-time data",
+                "RealTimeData index is outside the source collection",
+            )
         })?;
         let start = self.records[span.first_record].record_start;
         let end = self.records[span.end_record - 1].payload_end;

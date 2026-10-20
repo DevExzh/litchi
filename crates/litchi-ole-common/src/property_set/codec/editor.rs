@@ -14,13 +14,13 @@ use std::collections::HashMap;
 use std::io::Cursor;
 
 /// Transactional editor for standard OLE Property Set streams.
-pub struct Editor {
+pub struct Edit {
     original: Vec<u8>,
     streams: Vec<(Vec<String>, Vec<u8>)>,
     staged: HashMap<Vec<String>, Option<Vec<u8>>>,
 }
 
-impl Editor {
+impl Edit {
     /// Opens a compound file for transactional Property Set editing.
     ///
     /// # Errors

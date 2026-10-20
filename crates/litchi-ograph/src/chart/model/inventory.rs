@@ -2,13 +2,13 @@ use super::super::Stream;
 use std::ops::{Deref, DerefMut};
 
 /// Mutable slice guard that preserves pristine replay until mutation occurs.
-pub struct Edit<'a, T> {
+pub struct ItemsMut<'a, T> {
     pub(in crate::chart) values: &'a mut [T],
     pub(in crate::chart) dirty: &'a mut bool,
     pub(in crate::chart) parsed: bool,
 }
 
-impl<T> Deref for Edit<'_, T> {
+impl<T> Deref for ItemsMut<'_, T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
@@ -16,7 +16,7 @@ impl<T> Deref for Edit<'_, T> {
     }
 }
 
-impl<T> DerefMut for Edit<'_, T> {
+impl<T> DerefMut for ItemsMut<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         if self.parsed {
             *self.dirty = true;

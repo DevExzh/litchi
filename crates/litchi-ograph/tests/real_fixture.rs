@@ -6,7 +6,7 @@
 )]
 
 use litchi_cfb::OleFile;
-use litchi_ograph::chart::{Chart, Context, Kind, Refs};
+use litchi_ograph::chart::{Context, Kind, Model, Refs};
 use std::io::Cursor;
 use std::path::PathBuf;
 
@@ -41,7 +41,7 @@ fn discovers_and_replays_chart_substreams_from_real_excel_workbooks() {
 
         for chart in charts {
             assert_eq!(chart.kind(), Kind::Excel, "{name}");
-            let parsed = Chart::parse(chart, Context::excel())
+            let parsed = Model::parse(chart, Context::excel())
                 .unwrap_or_else(|error| panic!("{name} semantic chart parse failed: {error}"));
             let replayed = parsed
                 .encode()

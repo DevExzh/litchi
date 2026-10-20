@@ -14,7 +14,7 @@ mod validation;
 mod tests;
 
 pub use codec::{parse_bytes, parse_metadata, to_bytes, to_metadata_bytes};
-pub use editor::{Change, Commit, Editor, Patch};
+pub use editor::{Change, Commit, Diagnostics, Edit, Patch};
 pub use model::{
     ActiveX, EPRINT_STREAM, Entry, FieldCounts, Flags, Format, Metadata, OBJ_INFO_STREAM,
     OBJECT_POOL_STORAGE, OCX_DATA_STREAM, ObjectPool, OcxInfo, PRINT_STREAM, Persist1, Persist2,

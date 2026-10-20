@@ -84,13 +84,13 @@ impl EditOptions {
 
     /// Return the requested object-capture bounds.
     #[must_use]
-    pub const fn get_object_limits(&self) -> ObjectLimits {
+    pub const fn object_limits_value(&self) -> ObjectLimits {
         self.object_limits
     }
 
     /// Return the requested CFB admission bounds.
     #[must_use]
-    pub const fn get_cfb_limits(&self) -> OleFileLimits {
+    pub const fn cfb_limits_value(&self) -> OleFileLimits {
         self.cfb_limits
     }
 }
@@ -205,6 +205,16 @@ pub struct Diagnostics {
 }
 
 impl Diagnostics {
+    const fn applied(changed: bool, operation_count: usize) -> Self {
+        Self {
+            changed,
+            operation_count,
+            changed_cells: 0,
+            changed_number_fields: 0,
+            touched_streams: 0,
+        }
+    }
+
     fn from_leaf(value: cell_values::Diagnostics, operation_count: usize) -> Self {
         Self {
             changed: value.changed(),
@@ -399,7 +409,7 @@ impl Edit {
         super::ensure_publication_allowed(&package.inner).map_err(Error::Package)?;
         let source_guard = capture_source_guard(&package)?;
         let snapshot = package
-            .edit_snapshot_with_limits(options.object_limits, options.cfb_limits)
+            .edit_snapshot_with_options(options)
             .map_err(Error::Package)?;
         check_source_guard(source_guard.as_ref())?;
         let inner = snapshot.edit();
@@ -495,7 +505,7 @@ impl Edit {
     ) -> Result<Option<&mut Self>> {
         let guard = capture_source_guard(donor)?;
         let options = donor.retained_edit_options()?;
-        let donor = donor.edit_snapshot_with_limits(options.object_limits, options.cfb_limits)?;
+        let donor = donor.edit_snapshot_with_options(options)?;
         let mut candidate = self.inner.clone();
         let copied = candidate
             .copy_scalar_cells_from(
@@ -525,7 +535,7 @@ impl Edit {
     ) -> Result<Option<&mut Self>> {
         let guard = capture_source_guard(donor)?;
         let options = donor.retained_edit_options()?;
-        let donor = donor.edit_snapshot_with_limits(options.object_limits, options.cfb_limits)?;
+        let donor = donor.edit_snapshot_with_options(options)?;
         let mut candidate = self.inner.clone();
         let copied = candidate
             .copy_scalar_cell_from(
@@ -943,7 +953,7 @@ impl Package {
     }
 
     /// Apply a primary exact-source patch without mutating this package.
-    pub fn apply(&self, patch: &Patch) -> Result<Self> {
+    pub fn apply(&self, patch: &Patch) -> Result<Commit> {
         super::ensure_publication_allowed(&self.inner).map_err(Error::Package)?;
         let guard = capture_source_guard(self)?;
         let matches = if let Some(snapshot) = &self.inner.edit_snapshot {
@@ -957,17 +967,25 @@ impl Package {
         }
         if patch.is_noop() {
             check_source_guard(guard.as_ref())?;
-            return Ok(self.clone());
+            return Ok(Commit {
+                package: self.clone(),
+                patch: patch.clone(),
+                diagnostics: Diagnostics::applied(false, patch.operation_count()),
+            });
         }
         let options = self.retained_edit_options()?;
         let snapshot = self
-            .edit_snapshot_with_limits(options.object_limits, options.cfb_limits)
+            .edit_snapshot_with_options(options)
             .map_err(Error::Package)?;
         let target = patch.leaf().apply(&snapshot).map_err(Error::from)?;
         check_source_guard(guard.as_ref())?;
         let package = package_from_snapshot(self, target)?;
         check_source_guard(guard.as_ref())?;
-        Ok(package)
+        Ok(Commit {
+            package,
+            patch: patch.clone(),
+            diagnostics: Diagnostics::applied(true, patch.operation_count()),
+        })
     }
 }
 
@@ -1040,8 +1058,8 @@ fn package_from_snapshot(source: &Package, snapshot: cell_values::Snapshot) -> R
         let workbook = crate::SourceBackedWorkbook::from_shared_ole_file_with_options(
             cfb,
             crate::SourceBackedOptions::default()
-                .with_limits(limits)
-                .with_leniency(leniency),
+                .limits(limits)
+                .leniency(leniency),
         )
         .map_err(PackageError::Source)?;
         let mut package = Package::from_source(workbook)?;

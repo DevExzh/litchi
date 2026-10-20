@@ -11,14 +11,13 @@
 
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::Position;
+use litchi_doc::Package;
 use litchi_doc::body_text::{Error, Refusal, Snapshot, TransactionLimits};
 use litchi_doc::builder::Builder;
 use litchi_doc::parts::fib::FileInformationBlock;
-use litchi_doc::tracked_revision::{
-    Limits, RevisionEditor, RevisionKind, RevisionMetadata, Snapshot as RevisionSnapshot,
-};
+use litchi_doc::tracked_revision::{Limits, RevisionKind, RevisionMetadata};
 use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting};
-use litchi_ole_common::object::{Editor as PackageEditor, Targets};
+use litchi_ole_common::object::{Edit as PackageEditor, Targets};
 use litchi_ole_common::property_set::{
     CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Section, Stream, Value,
     document_summary::DIGITAL_SIGNATURE,
@@ -239,7 +238,7 @@ fn changed_frame_patch(source: &Snapshot, replacement_value: u32) -> litchi_doc:
         .expect("Dofr records");
     let mut replacement = records.get(1).expect("frame record").bytes().to_vec();
     replacement[20..24].copy_from_slice(&replacement_value.to_le_bytes());
-    let mut transaction = records.transaction();
+    let mut transaction = records.edit();
     transaction
         .replace_record_bytes(1, &replacement)
         .expect("record replacement");
@@ -262,7 +261,7 @@ fn signed_dofr_noop_is_allowed_but_changed_source_is_refused() {
             .expect("signed exact no-op")
     );
     assert_eq!(
-        no_op.commit().expect("no-op commit").snapshot().bytes(),
+        no_op.commit().expect("no-op commit").package().bytes(),
         source.bytes()
     );
 
@@ -273,7 +272,7 @@ fn signed_dofr_noop_is_allowed_but_changed_source_is_refused() {
         Err(Error::Refused(Refusal::SignedSource))
     ));
     assert_eq!(
-        changed.commit().expect("refused commit").snapshot().bytes(),
+        changed.commit().expect("refused commit").package().bytes(),
         source.bytes()
     );
 }
@@ -322,7 +321,7 @@ fn reopened_identical_source_with_different_limits_accepts_dofr_patch() {
     assert!(edit.apply_dofr_patch(&patch).expect("same-source patch"));
     let committed = edit.commit().expect("reopened commit");
     let records = committed
-        .snapshot()
+        .package()
         .dofr_records()
         .expect("Dofr read")
         .expect("Dofr records");
@@ -404,7 +403,7 @@ fn duplicate_unsigned_stw_user_names_are_conservatively_signed() {
             .expect("malformed exact no-op")
     );
     assert_eq!(
-        no_op.commit().expect("no-op commit").snapshot().bytes(),
+        no_op.commit().expect("no-op commit").package().bytes(),
         source.bytes()
     );
 
@@ -432,46 +431,26 @@ fn signed_source_refuses_changed_ordinary_body_publication() {
 fn signed_lower_editors_refuse_changed_publication_but_allow_exact_noops() {
     let source_bytes = doc_with_dofr(2, true);
 
-    let mut direct = RevisionEditor::open(source_bytes.clone(), Limits::default())
-        .expect("direct signed editor");
-    direct
-        .add_text(
-            0,
-            "x",
-            RevisionKind::Insertion,
-            RevisionMetadata::new("Alice"),
-        )
-        .expect("stage direct edit");
-    assert!(direct.finish().is_err());
+    let package = Package::from_bytes(&source_bytes).expect("signed package");
+    let mut edit = package
+        .edit_tracked_revisions()
+        .expect("tracked signed edit");
+    edit.add_text(
+        0,
+        "x",
+        RevisionKind::Insertion,
+        RevisionMetadata::new("Alice"),
+    )
+    .expect("stage tracked edit");
+    assert!(edit.commit().is_err());
 
-    let direct_noop =
-        RevisionEditor::open(source_bytes.clone(), Limits::default()).expect("direct signed no-op");
-    assert_eq!(
-        direct_noop.finish().expect("direct exact no-op"),
-        source_bytes
-    );
-
-    let tracked = RevisionSnapshot::open(source_bytes.clone(), Limits::default())
-        .expect("tracked signed snapshot");
-    let mut transaction = tracked.edit().expect("tracked edit");
-    transaction
-        .add_text(
-            0,
-            "x",
-            RevisionKind::Insertion,
-            RevisionMetadata::new("Alice"),
-        )
-        .expect("stage tracked edit");
-    assert!(transaction.commit().is_err());
-
-    let tracked_noop =
-        RevisionSnapshot::open(source_bytes, Limits::default()).expect("tracked signed no-op");
-    let noop_commit = tracked_noop
-        .edit()
+    let noop_commit = package
+        .edit_tracked_revisions()
         .expect("tracked no-op edit")
         .commit()
         .expect("tracked exact no-op");
-    assert_eq!(noop_commit.snapshot().bytes(), tracked_noop.bytes());
+    assert!(!noop_commit.diagnostics().changed());
+    assert_eq!(noop_commit.package().to_bytes().unwrap(), source_bytes);
 }
 
 #[test]
@@ -602,7 +581,7 @@ fn dofr_save_reopen_and_inverse_restore_exact_source() {
     let mut edit = source.edit().expect("edit");
     assert!(edit.apply_dofr_patch(&patch).expect("apply patch"));
     let commit = edit.commit().expect("commit");
-    let reopened = Snapshot::open(commit.snapshot().finish(), Limits::default()).expect("reopen");
+    let reopened = Snapshot::open(commit.package().finish(), Limits::default()).expect("reopen");
     let reopened_records = reopened
         .dofr_records()
         .expect("reopened Dofr")

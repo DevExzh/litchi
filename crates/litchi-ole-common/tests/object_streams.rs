@@ -8,7 +8,7 @@
 )]
 
 use litchi_cfb::OleWriter;
-use litchi_ole_common::object::{Editor, Limits, Target, Targets};
+use litchi_ole_common::object::{Edit, Limits, Target, Targets};
 use litchi_ole_common::ole_streams::{
     CF_DIB, ClipboardFormat, Limits as StreamLimits, OleNativeStream, OlePresentationStream,
 };
@@ -26,14 +26,14 @@ fn write_cfb(build: impl FnOnce(&mut OleWriter)) -> Vec<u8> {
 fn presentation(data: &[u8]) -> Vec<u8> {
     OlePresentationStream::new(ClipboardFormat::Standard(CF_DIB), data.to_vec())
         .expect("presentation should construct")
-        .to_bytes()
+        .to_bytes(StreamLimits::default())
         .expect("presentation should serialize")
 }
 
 fn native(data: &[u8]) -> Vec<u8> {
     OleNativeStream::new(data.to_vec())
         .expect("native stream should construct")
-        .to_bytes()
+        .to_bytes(StreamLimits::default())
         .expect("native stream should serialize")
 }
 
@@ -106,10 +106,12 @@ fn metadata(object: &litchi_ole_common::object::Object, name: &str) -> (u32, u64
 
 #[test]
 fn object_and_snapshot_expose_typed_ole2_streams_without_name_scans() {
-    let editor = Editor::open(package(), targets(), Limits::default()).expect("editor should open");
+    let editor = Edit::open(package(), targets(), Limits::default()).expect("editor should open");
     let object = editor.objects().get("object").expect("object should exist");
 
-    let presentations = object.presentations().expect("presentations should parse");
+    let presentations = object
+        .presentations(StreamLimits::default())
+        .expect("presentations should parse");
     assert_eq!(
         presentations
             .iter()
@@ -124,7 +126,7 @@ fn object_and_snapshot_expose_typed_ole2_streams_without_name_scans() {
         .find(|stream| stream.path().len() == 1 && stream.name() == Some("\u{0002}OlePres007"))
         .expect("presentation stream should be captured");
     let direct = captured
-        .presentation()
+        .presentation(StreamLimits::default())
         .expect("direct presentation should parse")
         .expect("direct presentation should exist");
     assert!(Arc::ptr_eq(
@@ -137,7 +139,7 @@ fn object_and_snapshot_expose_typed_ole2_streams_without_name_scans() {
     ));
     assert_eq!(
         object
-            .presentation(42)
+            .presentation(42, StreamLimits::default())
             .expect("indexed presentation should parse")
             .expect("indexed presentation should exist")
             .data(),
@@ -145,17 +147,27 @@ fn object_and_snapshot_expose_typed_ole2_streams_without_name_scans() {
     );
     assert_eq!(
         object
-            .native()
+            .native(StreamLimits::default())
             .expect("native stream should parse")
             .expect("native stream should exist")
             .data(),
         b"opaque native bytes"
     );
 
-    let snapshot = editor.snapshot();
-    assert_eq!(snapshot.presentations("object").unwrap().len(), 2);
+    let snapshot = editor.staged();
     assert_eq!(
-        snapshot.native("object").unwrap().unwrap().data(),
+        snapshot
+            .presentations("object", StreamLimits::default())
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        snapshot
+            .native("object", StreamLimits::default())
+            .unwrap()
+            .unwrap()
+            .data(),
         b"opaque native bytes"
     );
 }
@@ -163,11 +175,11 @@ fn object_and_snapshot_expose_typed_ole2_streams_without_name_scans() {
 #[test]
 fn typed_owner_edits_are_noop_source_checked_and_reversible() {
     let original = package();
-    let source_editor = Editor::open(original.clone(), targets(), Limits::default())
+    let source_editor = Edit::open(original.clone(), targets(), Limits::default())
         .expect("source editor should open");
     let source = source_editor
-        .snapshot()
-        .presentation("object", 7)
+        .staged()
+        .presentation("object", 7, StreamLimits::default())
         .expect("source presentation should parse")
         .expect("source presentation should exist");
     let mut typed_edit = source.edit();
@@ -182,28 +194,28 @@ fn typed_owner_edits_are_noop_source_checked_and_reversible() {
         typed_commit
             .patch()
             .inverse()
-            .apply(typed_commit.snapshot())
+            .apply(typed_commit.package())
             .expect("inverse should apply")
             .bytes(),
         source.bytes()
     );
 
-    let mut noop = Editor::open(original.clone(), targets(), Limits::default())
+    let mut noop = Edit::open(original.clone(), targets(), Limits::default())
         .expect("no-op editor should open");
-    noop.update_presentation("object", 7, |_transaction| Ok(()))
+    noop.update_presentation("object", 7, StreamLimits::default(), |_transaction| Ok(()))
         .expect("no-op presentation edit should commit");
-    assert!(!noop.is_changed());
+    assert!(!noop.clone().commit().unwrap().diagnostics().changed());
     assert_eq!(noop.finish().expect("no-op should finish"), original);
 
     let mut owner =
-        Editor::open(original.clone(), targets(), Limits::default()).expect("owner should open");
+        Edit::open(original.clone(), targets(), Limits::default()).expect("owner should open");
     owner
         .apply_presentation_patch("object", 7, typed_commit.patch())
         .expect("typed patch should publish");
     assert_eq!(
         owner
-            .snapshot()
-            .presentation("object", 7)
+            .staged()
+            .presentation("object", 7, StreamLimits::default())
             .unwrap()
             .unwrap()
             .width(),
@@ -214,23 +226,23 @@ fn typed_owner_edits_are_noop_source_checked_and_reversible() {
         .expect("inverse patch should publish through owner");
     assert_eq!(
         owner
-            .snapshot()
-            .presentation("object", 7)
+            .staged()
+            .presentation("object", 7, StreamLimits::default())
             .unwrap()
             .unwrap()
             .bytes(),
         source.bytes()
     );
 
-    let mut stale = Editor::open(original.clone(), targets(), Limits::default())
+    let mut stale = Edit::open(original.clone(), targets(), Limits::default())
         .expect("stale editor should open");
     stale
-        .update_presentation("object", 7, |transaction| {
+        .update_presentation("object", 7, StreamLimits::default(), |transaction| {
             transaction.set_height(480)?;
             Ok(())
         })
         .expect("intervening edit should publish");
-    let after_intervening = stale.snapshot().finish().expect("snapshot should finish");
+    let after_intervening = stale.staged().finish().expect("snapshot should finish");
     assert!(
         stale
             .apply_presentation_patch("object", 7, typed_commit.patch())
@@ -238,7 +250,7 @@ fn typed_owner_edits_are_noop_source_checked_and_reversible() {
     );
     assert_eq!(
         stale
-            .snapshot()
+            .staged()
             .finish()
             .expect("stale rejection should preserve owner"),
         after_intervening
@@ -249,7 +261,7 @@ fn typed_owner_edits_are_noop_source_checked_and_reversible() {
 fn native_owner_edit_and_explicit_limits_preserve_directory_metadata() {
     let original = package();
     let mut editor =
-        Editor::open(original, targets(), Limits::default()).expect("editor should open");
+        Edit::open(original, targets(), Limits::default()).expect("editor should open");
     let object = editor.objects().get("object").expect("object should exist");
     let storage_metadata = (
         object.storage().directory().state_bits(),
@@ -260,7 +272,7 @@ fn native_owner_edit_and_explicit_limits_preserve_directory_metadata() {
     let native_metadata = metadata(object, "\u{0001}Ole10Native");
     let opaque_metadata = metadata(object, "Opaque");
     let presentation = object
-        .presentation(7)
+        .presentation(7, StreamLimits::default())
         .unwrap()
         .expect("presentation should exist");
     let limits = StreamLimits {
@@ -270,22 +282,22 @@ fn native_owner_edit_and_explicit_limits_preserve_directory_metadata() {
     };
     assert_eq!(
         editor
-            .snapshot()
-            .presentation_with_limits("object", 7, limits)
+            .staged()
+            .presentation("object", 7, limits)
             .unwrap()
             .unwrap()
             .data(),
         b"first presentation"
     );
     editor
-        .update_presentation("object", 7, |transaction| {
+        .update_presentation("object", 7, StreamLimits::default(), |transaction| {
             transaction.set_width(640)?;
             Ok(())
         })
         .expect("presentation edit should publish");
     let native_source = editor
-        .snapshot()
-        .native("object")
+        .staged()
+        .native("object", StreamLimits::default())
         .unwrap()
         .expect("native source should exist");
     let mut native_transaction = native_source.edit();
@@ -302,13 +314,18 @@ fn native_owner_edit_and_explicit_limits_preserve_directory_metadata() {
         .apply_native_patch("object", &native_commit.patch().inverse())
         .expect("native inverse should publish");
     editor
-        .update_native("object", |transaction| {
+        .update_native("object", StreamLimits::default(), |transaction| {
             transaction.set_data(b"replacement native bytes".to_vec())?;
             Ok(())
         })
         .expect("native edit should publish");
     assert_eq!(
-        editor.snapshot().native("object").unwrap().unwrap().data(),
+        editor
+            .staged()
+            .native("object", StreamLimits::default())
+            .unwrap()
+            .unwrap()
+            .data(),
         b"replacement native bytes"
     );
 
@@ -346,7 +363,7 @@ fn presentation_count_limit_is_independent_of_toc_entry_limit() {
                 .expect("presentation stream should write");
         }
     });
-    let editor = Editor::open(package, targets(), Limits::default()).expect("editor should open");
+    let editor = Edit::open(package, targets(), Limits::default()).expect("editor should open");
     let object = editor.objects().get("object").expect("object should exist");
     let limits = StreamLimits {
         max_bytes: stream.len(),
@@ -354,11 +371,11 @@ fn presentation_count_limit_is_independent_of_toc_entry_limit() {
         max_toc_entries: 1,
     };
     let error = object
-        .presentations_with_limits(limits)
+        .presentations(limits)
         .expect_err("a storage cannot expose 1,000 presentation streams");
     assert!(format!("{error:?}").contains("more than 999"));
     assert!(
-        object.presentation(0).is_err(),
+        object.presentation(0, StreamLimits::default()).is_err(),
         "indexed access must enforce the storage count too"
     );
 }
@@ -373,8 +390,7 @@ fn absent_typed_streams_still_validate_explicit_limits() {
             .create_stream(&["ObjectPool", "_1", "Opaque"], b"opaque")
             .expect("opaque stream should write");
     });
-    let mut editor =
-        Editor::open(package, targets(), Limits::default()).expect("editor should open");
+    let mut editor = Edit::open(package, targets(), Limits::default()).expect("editor should open");
     let invalid = StreamLimits {
         max_bytes: 0,
         max_data_bytes: 1,
@@ -385,23 +401,23 @@ fn absent_typed_streams_still_validate_explicit_limits() {
         max_toc_entries: 1_000,
         ..StreamLimits::default()
     };
-    assert!(object.presentations_with_limits(larger_toc_limit).is_ok());
-    assert!(object.native_with_limits(larger_toc_limit).is_ok());
+    assert!(object.presentations(larger_toc_limit).is_ok());
+    assert!(object.native(larger_toc_limit).is_ok());
     let presentation_error = object
-        .presentation_with_limits(7, invalid)
+        .presentation(7, invalid)
         .expect_err("absent presentation should still validate limits");
     assert!(format!("{presentation_error:?}").contains("limits must be non-zero"));
     let native_error = object
-        .native_with_limits(invalid)
+        .native(invalid)
         .expect_err("absent native stream should still validate limits");
     assert!(format!("{native_error:?}").contains("limits must be non-zero"));
     let list_error = object
-        .presentations_with_limits(invalid)
+        .presentations(invalid)
         .expect_err("empty presentation listing should still validate limits");
     assert!(format!("{list_error:?}").contains("limits must be non-zero"));
     assert!(
         editor
-            .update_native_with_limits("object", invalid, |_transaction| Ok(()))
+            .update_native("object", invalid, |_transaction| Ok(()))
             .is_err()
     );
 }
@@ -416,15 +432,20 @@ fn malformed_known_stream_is_rejected_without_owner_publication() {
             .create_stream(&["ObjectPool", "_1", "\u{0002}OlePres007"], &[1, 2, 3])
             .expect("malformed presentation should write");
     });
-    let mut editor = Editor::open(malformed.clone(), targets(), Limits::default())
+    let mut editor = Edit::open(malformed.clone(), targets(), Limits::default())
         .expect("opaque malformed package should open");
-    assert!(editor.snapshot().presentation("object", 7).is_err());
     assert!(
         editor
-            .update_presentation("object", 7, |_transaction| Ok(()))
+            .staged()
+            .presentation("object", 7, StreamLimits::default())
             .is_err()
     );
-    assert!(!editor.is_changed());
+    assert!(
+        editor
+            .update_presentation("object", 7, StreamLimits::default(), |_transaction| Ok(()))
+            .is_err()
+    );
+    assert!(!editor.clone().commit().unwrap().diagnostics().changed());
     assert_eq!(
         editor.finish().expect("rejected edit should finish"),
         malformed

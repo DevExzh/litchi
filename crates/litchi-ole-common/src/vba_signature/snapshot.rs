@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use super::model::{Blob, Error, Info, Kind, Limits};
-use super::transaction::{Revision, Transaction};
+use super::transaction::{Edit, Revision};
 
 /// An immutable, cheaply clonable owner snapshot for one complete
 /// `[MS-OSHARED]` `DigSigBlob` or `WordSigBlob`.
@@ -36,15 +36,6 @@ impl Snapshot {
     /// supplied resource limits.
     pub fn parse_with(source: &[u8], kind: Kind, limits: Limits) -> Result<Self, Error> {
         Ok(Self::from_blob(Blob::parse_with(source, kind, limits)?))
-    }
-
-    /// Alias for [`Self::parse_with`] using explicit-limit terminology.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::parse_with`].
-    pub fn parse_with_limits(source: &[u8], kind: Kind, limits: Limits) -> Result<Self, Error> {
-        Self::parse_with(source, kind, limits)
     }
 
     /// Parses an already-shared source allocation without copying it.
@@ -140,14 +131,8 @@ impl Snapshot {
 
     /// Starts an isolated source-checked payload transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction::new(self.clone())
-    }
-
-    /// Alias for [`Self::edit`] for callers using transactional terminology.
-    #[must_use]
-    pub fn transaction(&self) -> Transaction {
-        self.edit()
+    pub fn edit(&self) -> Edit {
+        Edit::new(self.clone())
     }
 
     /// Consumes this snapshot back into its immutable [`Blob`] owner.

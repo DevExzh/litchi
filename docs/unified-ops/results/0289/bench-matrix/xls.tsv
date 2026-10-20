@@ -25,6 +25,7 @@ xls	add (row)	row insert, SimpleWithImages.xls (unified leg)		after/before (unif
 xls	add (row)	row insert, WithConditionalFormatting.xls (CF, CFEx)		unified/native		226.73	228.38	µs	1.008	1.006–1.008	1.10 (single-op write)	meets	0316	parsed:0316/r3-new1.jsonl (+1 more)	
 xls	add (row)	row insert, sheet without INDEX		unified/native		95.51	96.77	µs	1.015	1.012–1.015	1.10 (single-op write)	meets	0308	parsed:0308/r2-new1.jsonl (+1 more)	
 xls	add (row)	row insert, validation.xls (DV PtgRefN)		unified/native		176.72	178.22	µs	1.011	1.006–1.011	1.10 (single-op write)	meets	0316	parsed:0316/r3-new1.jsonl (+1 more)	
+xls	batch	File batch1k (xls, W5 head vs base)	1k ops	after/before		4458.0	4435.9	µs	0.995		1.05 (no regression above 5%, record 0359)	meets	0359	parsed:0359/probe-after-2.json (+3 more)	
 xls	batch	cell removals on distinct cells (eager owner; one File::batch vs one leaf edit, fixture of 1,000)	1000 ops	unified/leaf		3333.6	3402.5	µs	1.021	1.020–1.021	2.0 (batch vs one leaf edit)	meets	0337	parsed:0337/abba/batch-D-before-1-n1000.json (+2 more)	
 xls	batch	cell removals on distinct cells (eager owner; one File::batch vs one leaf edit, fixture of 1,000)	1000 ops	unified/leaf	after record 0337	3380.9	3444.2	µs	1.021	1.014–1.021	2.0 (batch vs one leaf edit)	meets	0337	parsed:0337/abba/batch-D-after-1-n1000.json (+2 more)	
 xls	batch	cell removals on distinct cells (eager owner; one File::batch vs one leaf edit, fixture of 10,000)	100 ops	unified/leaf		9647.8	9607.6	µs	1.003	0.986–1.003	scaling (no ratio budget)	no-budget	0337	parsed:0337/abba/batch-A-before-1.json (+2 more)	
@@ -146,6 +147,7 @@ xls	move	sheet_move (positional owner)	100 cells	unified/native		89.64	91.99	µs
 xls	move	sheet_move (positional owner)	100 cells	unified/native		87.34	89.25	µs	1.022		1.10 (single-op write)	meets	0310	parsed:0310/merged/xls_p0-1.json (+1 more)	
 xls	move	sheet_move (positional owner)	10000 cells	unified/native		4302.4	4303.6	µs	1.000		1.10 (single-op write)	meets	0259	parsed:0259-xls-unified-p0/write-p0.json	
 xls	move	sheet_move (positional owner)	10000 cells	unified/native		4260.0	4262.8	µs	1.001	1.000–1.001	1.10 (single-op write)	meets	0310	parsed:0310/merged/xls_p0-1.json (+1 more)	
+xls	open	File open get (xls, W5 head vs base)		after/before		155.54	151.29	µs	0.973		1.05 (no regression above 5%, record 0359)	meets	0359	parsed:0359/probe-after-2.json (+3 more)	
 xls	open	complete XLS reader open, 20k-cell workbook		after/before (leaf reader)		5874.5	5468.3	µs	0.934	0.928–0.934	1.05 (no regression above 5%, record 0293)	meets	0293	parsed:0293/producer-structure-bench-abba.jsonl	
 xls	open	complete XLS reader open, FormulaEvalTestData.xls		after/before (leaf reader)		1860.7	1797.6	µs	0.968	0.964–0.968	1.05 (no regression above 5%, record 0293)	meets	0293	parsed:0293/producer-structure-bench-abba.jsonl	
 xls	open	complete open, 20k cells		after/before		5791.2	5642.8	µs	0.974		1.05 (no regression above 5%, record 0308)	meets	0308	parsed:0308/r2-run1-before.jsonl (+5 more)	
@@ -244,6 +246,7 @@ xls	query (early stop)	xls_50000_file_cold_first_cell_value_gt	1 matches	unified
 xls	query (early stop)	xls_50000_file_cold_limit10_cell_value_gt	10 matches	unified/leaf		40.14	2108.4	µs	52.898	51.156–52.898	none	no-budget	0267	parsed:0267/query-2-after.jsonl (+1 more)	
 xls	query (early stop)	xls_50000_file_cold_limit10_cell_value_gt	10 matches	unified/leaf		37.12	2078.7	µs	56.238	55.360–56.238	none	no-budget	0280	parsed:0280/query-2-after.jsonl (+1 more)	
 xls	query (full)	xls_read_bench unified_query, new vs baseline build		after/before (unified leg)				µs	1.009	0.988–1.009	1.05 (no regression above 5%, record 0263)	meets	0263	curated:0263-registry-schema-export.md §6 'Medians of all samples': 'xls unified_query: 0.988–1.009'	
+xls	set	File set (xls, W5 head vs base)		after/before		98.04	99.60	µs	1.016		1.05 (no regression above 5%, record 0359)	meets	0359	parsed:0359/probe-after-2.json (+3 more)	
 xls	set	cell_format (eager owner)	100 cells	unified/native		127.30	130.44	µs	1.025		1.10 (single-op write)	meets	0259	parsed:0259-xls-unified-p0/write-p0.json	
 xls	set	cell_format (eager owner)	100 cells	unified/native		127.15	129.87	µs	1.024	1.019–1.024	1.10 (single-op write)	meets	0310	parsed:0310/merged/xls_p0-1.json (+1 more)	
 xls	set	cell_format (eager owner)	10000 cells	unified/native		8611.6	8629.1	µs	1.002		1.10 (single-op write)	meets	0259	parsed:0259-xls-unified-p0/write-p0.json	

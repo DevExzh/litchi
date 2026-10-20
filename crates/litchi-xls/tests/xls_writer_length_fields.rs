@@ -1313,7 +1313,10 @@ fn the_pivot_view_editor_writes_astral_names_that_read_back() {
     writer
         .add_pivot_table(sheet, pivot_config("Sales", "Values"))
         .unwrap();
-    let mut editor = litchi_xls::PivotViewEditor::new(written(&mut writer)).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&written(&mut writer))
+        .unwrap()
+        .edit_pivot_views()
+        .unwrap();
     editor
         .update_by_name(0, "Sales", |table| {
             table.view.name = "S😀".to_string();
@@ -1326,7 +1329,7 @@ fn the_pivot_view_editor_writes_astral_names_that_read_back() {
             table.query_tag.as_mut().unwrap().table_name = "S😀".to_string();
         })
         .unwrap();
-    let workbook = read(editor.finish().unwrap());
+    let workbook = read(editor.commit().unwrap().patch().after().to_vec());
     let table = &workbook.worksheet_pivot_tables(0).unwrap()[0];
     assert_eq!(table.view.name, "S😀");
     assert_eq!(table.view.data_field_name, "V😀");
@@ -1350,13 +1353,23 @@ fn the_pivot_view_editor_writes_astral_names_that_read_back() {
     writer
         .add_pivot_table(sheet, pivot_config("Sales", "Values"))
         .unwrap();
-    let mut editor = litchi_xls::PivotViewEditor::new(written(&mut writer)).unwrap();
+    let mut editor = litchi_xls::Package::from_bytes(&written(&mut writer))
+        .unwrap()
+        .edit_pivot_views()
+        .unwrap();
     editor
         .update_by_name(0, "Sales", |table| {
             table.view.name = straddling(255);
         })
         .unwrap();
-    assert_eq!(too_long(editor.finish()), ("PivotTable name", 256, 255));
+    assert_eq!(
+        too_long(
+            editor
+                .commit()
+                .map(|commit| commit.patch().after().to_vec())
+        ),
+        ("PivotTable name", 256, 255)
+    );
 }
 
 /// A formula's tokens are encoded once, when it is set, and the write reuses

@@ -7,9 +7,10 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{DocumentStyleListFilter, DocumentXslTransformUsage, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DocumentStyleListFilter, DocumentXslTransformUsage, RtfWriter};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -19,7 +20,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_specification_example_as_typed_passive_flags() {
-    let document = RtfDocument::parse(r"{\rtf1{\*\wgrffmtfilter 2002}Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1{\*\wgrffmtfilter 2002}Body}").unwrap();
     let filter = document.style_list_filter().unwrap();
     assert_eq!(filter.bits(), 0x2002);
     assert!(filter.contains(DocumentStyleListFilter::CUSTOM_STYLES));
@@ -30,7 +31,7 @@ fn parses_specification_example_as_typed_passive_flags() {
 
 #[test]
 fn typed_api_and_writer_canonicalize_uppercase_exact_width_hex() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Body}").unwrap();
     let filter = DocumentStyleListFilter::ALL_STYLES
         .union(DocumentStyleListFilter::TABLE_STYLES)
         .union(DocumentStyleListFilter::ALTERNATE_STYLE_NAMES);
@@ -38,7 +39,7 @@ fn typed_api_and_writer_canonicalize_uppercase_exact_width_hex() {
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains(r"{\*\wgrffmtfilter 8081}"));
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.style_list_filter(), Some(filter));
     assert_eq!(reparsed.text(), "Body");
     document.clear_style_list_filter();
@@ -47,7 +48,7 @@ fn typed_api_and_writer_canonicalize_uppercase_exact_width_hex() {
 
 #[test]
 fn explicit_zero_and_coexisting_transform_metadata_round_trip_independently() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1{\*\xform transform.xsl}\usexform"#,
         r#"{\*\wgrffmtfilter 0000}Body}"#,
     ))
@@ -61,7 +62,7 @@ fn explicit_zero_and_coexisting_transform_metadata_round_trip_independently() {
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.find("\\xform").unwrap() < serialized.find("\\usexform").unwrap());
     assert!(serialized.find("\\usexform").unwrap() < serialized.find("\\wgrffmtfilter").unwrap());
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.style_list_filter(), document.style_list_filter());
     assert_eq!(
         reparsed.xsl_transform_usage(),
@@ -82,10 +83,7 @@ fn rejects_reserved_bit_invalid_width_text_parameters_and_active_content() {
         r"{\rtf1{\*\wgrffmtfilter {0001}}Body}",
         r"{\rtf1{\*\wgrffmtfilter \bin4 0001}Body}",
     ] {
-        assert!(
-            RtfDocument::parse(source).is_err(),
-            "accepted malformed {source}"
-        );
+        assert!(Tree::parse(source).is_err(), "accepted malformed {source}");
     }
     assert!(DocumentStyleListFilter::from_bits(0x0010).is_err());
 }
@@ -93,7 +91,7 @@ fn rejects_reserved_bit_invalid_width_text_parameters_and_active_content() {
 #[test]
 fn preserves_undefined_reserved_bit_from_real_world_fixture_until_modified() {
     let source = include_str!("../../../test-data/rtf/watermark.rtf");
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     let filter = document.style_list_filter().unwrap();
     assert_ne!(filter.bits() & 0x0010, 0);
 
@@ -125,9 +123,6 @@ fn rejects_unstarred_direct_duplicate_nested_and_late_destinations() {
         r"{\rtf1{{\*\wgrffmtfilter 0001}}Body}",
         r"{\rtf1 Body{\*\wgrffmtfilter 0001}}",
     ] {
-        assert!(
-            RtfDocument::parse(source).is_err(),
-            "accepted malformed {source}"
-        );
+        assert!(Tree::parse(source).is_err(), "accepted malformed {source}");
     }
 }

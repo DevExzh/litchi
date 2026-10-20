@@ -90,7 +90,8 @@ fn text(file: &File, path: &str) -> String {
 }
 
 fn native_cell(bytes: &[u8], row: u32, column: u32) -> Option<(Storage, u16)> {
-    let snapshot = Snapshot::from_bytes(bytes.to_vec()).unwrap();
+    let snapshot =
+        Snapshot::from_bytes(bytes.to_vec(), litchi_ole_common::object::Limits::default()).unwrap();
     snapshot
         .worksheet(Selector::Position(Position::new(0)))
         .unwrap()

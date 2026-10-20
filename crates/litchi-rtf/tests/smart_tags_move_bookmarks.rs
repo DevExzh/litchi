@@ -337,8 +337,7 @@ fn changed_publication_refuses_unmatched_move_end() -> Result<(), Box<dyn std::e
 
 #[test]
 fn raw_canonical_writer_refuses_unmatched_move_source() -> Result<(), Box<dyn std::error::Error>> {
-    let source =
-        litchi_rtf::raw::Document::parse(r#"{\rtf1\ansi{\*\mvfmf orphan 0100EFCDAB00}x}"#)?;
+    let source = litchi_rtf::raw::Tree::parse(r#"{\rtf1\ansi{\*\mvfmf orphan 0100EFCDAB00}x}"#)?;
     let mut output = Vec::new();
     let error = litchi_rtf::write::Writer::new(&mut output).write_document(&source);
     assert!(matches!(error, Err(error) if error.kind() == std::io::ErrorKind::InvalidInput));

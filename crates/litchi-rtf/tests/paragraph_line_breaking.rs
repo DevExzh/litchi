@@ -9,9 +9,10 @@
 
 mod repair_support;
 
-use litchi_rtf::{ParagraphFontAlignment, ParagraphWrapping, RtfDocument, RtfWriter, StyleBlock};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{ParagraphFontAlignment, ParagraphWrapping, RtfWriter, StyleBlock};
 
-fn block<'a>(document: &'a RtfDocument<'a>, needle: &str) -> &'a StyleBlock<'a> {
+fn block<'a>(document: &'a Tree<'a>, needle: &str) -> &'a StyleBlock<'a> {
     document
         .blocks()
         .iter()
@@ -29,7 +30,7 @@ fn parses_group_inheritance_resets_destinations_and_all_selectors() {
         r#"\nooverflow\faroman Overflow\par "#,
         r#"\wrapdefault\favar Variable\par \fafixed Fixed\par }"#,
     );
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     let outer = block(&document, "Outer").paragraph.line_breaking;
     assert!(outer.automatic_hyphenation && outer.auto_space_alphabetic && outer.auto_space_numbers);
     assert!(outer.adjust_right_indent);
@@ -81,7 +82,7 @@ fn parses_group_inheritance_resets_destinations_and_all_selectors() {
 
 #[test]
 fn deterministic_writer_and_stylesheet_round_trip() {
-    let document = RtfDocument::parse(
+    let document = Tree::parse(
         r"{\rtf1{\stylesheet{\s7\hyphpar\aspalpha\aspnum\nooverflow\facenter\adjustright Body;}}\pard\hyphpar\aspalpha\aspnum\nooverflow\facenter\adjustright Body}",
     ).unwrap();
     let expected = document
@@ -98,7 +99,7 @@ fn deterministic_writer_and_stylesheet_round_trip() {
         .unwrap();
     let text = String::from_utf8(first.clone()).unwrap();
     assert!(text.contains(r"\hyphpar\nooverflow\aspalpha\aspnum\facenter\adjustright"));
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first).unwrap();
     assert_eq!(
         reparsed
             .stylesheet()
@@ -144,7 +145,7 @@ fn parses_real_libreoffice_fixture() {
     let mut isolated = br"{\rtf1\ansi".to_vec();
     isolated.extend_from_slice(&bytes[start..end.unwrap()]);
     isolated.push(b'}');
-    let document = RtfDocument::parse_bytes(&isolated).unwrap();
+    let document = Tree::parse_bytes(&isolated).unwrap();
     let heading = document
         .stylesheet()
         .get(3)
@@ -178,7 +179,7 @@ fn rejects_invalid_parameters() {
         r"{\rtf1\fafixed1 X}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
             "accepted {source}"
         );
     }

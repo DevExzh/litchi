@@ -107,7 +107,7 @@ fn reads_pms_from_a_mail_merge_document() {
 #[test]
 fn exposes_mail_merge_state_through_the_document_api() {
     let mut package =
-        litchi_doc::raw::Package::from_reader(File::open(fixture(MERGE_FIXTURE)).unwrap()).unwrap();
+        litchi_doc::raw::Reader::from_reader(File::open(fixture(MERGE_FIXTURE)).unwrap()).unwrap();
     let document = package.document().unwrap();
 
     let mail_merge = document.mail_merge().expect("mail-merge state present");
@@ -126,7 +126,7 @@ fn exposes_mail_merge_state_through_the_document_api() {
 #[test]
 fn documents_without_merge_state_report_none() {
     // Word 97 era file without mail-merge state.
-    let mut package = litchi_doc::raw::Package::from_reader(
+    let mut package = litchi_doc::raw::Reader::from_reader(
         File::open(fixture(
             "test-data/poi/test-data/document/saved-by-table.doc",
         ))

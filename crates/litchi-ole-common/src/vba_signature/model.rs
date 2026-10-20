@@ -181,14 +181,8 @@ impl Blob {
 
     /// Starts a source-checked edit over this exact source.
     #[must_use]
-    pub fn edit(&self) -> super::Transaction {
+    pub fn edit(&self) -> super::Edit {
         self.snapshot().edit()
-    }
-
-    /// Alias for [`Self::edit`] using transactional terminology.
-    #[must_use]
-    pub fn transaction(&self) -> super::Transaction {
-        self.edit()
     }
 
     pub(crate) fn layout(&self) -> &codec::Layout {

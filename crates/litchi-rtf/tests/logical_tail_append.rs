@@ -147,8 +147,7 @@ fn changed_publication_plan(
         EditOptions::new().semantic_limits(limits),
     );
     edit.append_text_paragraphs(&[text]).unwrap();
-    edit.publication_plan_with_limits(publication_limits)
-        .unwrap()
+    edit.publication_plan(publication_limits).unwrap()
 }
 
 fn replace_once(mut bytes: Vec<u8>, from: &[u8], to: &[u8]) -> Vec<u8> {
@@ -717,7 +716,7 @@ fn publication_plan_noop_preserves_source_identity_and_bytes() {
     let source = Package::from_bytes(br"{\rtf1\ansi A B}").unwrap();
     let plan = source
         .edit_tail_append(TailSelector::Body)
-        .publication_plan_with_limits(TailAppendPublicationLimits::new(4, 2))
+        .publication_plan(TailAppendPublicationLimits::new(4, 2))
         .unwrap();
     assert!(plan.is_noop());
     assert!(plan.source().same_snapshot(&source));
@@ -744,7 +743,7 @@ fn context_aware_publication_planning_reserves_before_encoding() {
     let mut edit = source.edit_tail_append(TailSelector::Body);
     edit.append_text_paragraphs(&["B"]).unwrap();
     let error = edit
-        .publication_plan_with_limits_and_context(publication_limits, &context)
+        .publication_plan_with_context(publication_limits, &context)
         .unwrap_err();
     assert!(matches!(
         error,
@@ -758,7 +757,7 @@ fn context_aware_publication_planning_reserves_before_encoding() {
     let mut edit = source.edit_tail_append(TailSelector::Body);
     edit.append_text_paragraphs(&["B"]).unwrap();
     let plan = edit
-        .publication_plan_with_limits_and_context(publication_limits, &context)
+        .publication_plan_with_context(publication_limits, &context)
         .unwrap();
     assert!(budget.used(Resource::Memory) >= plan.inserted_bytes() as u64);
     let mut sink = PublicationSink::accepting(2);
@@ -799,7 +798,7 @@ fn publication_plan_refuses_active_protected_and_compressed_sources_before_outpu
     let mut active_edit = active.edit_tail_append(TailSelector::Body);
     active_edit.append_text_paragraphs(&["x"]).unwrap();
     assert!(matches!(
-        active_edit.publication_plan_with_limits(TailAppendPublicationLimits::new(8, 4)),
+        active_edit.publication_plan(TailAppendPublicationLimits::new(8, 4)),
         Err(Error::UnsupportedSource(_))
     ));
 
@@ -807,7 +806,7 @@ fn publication_plan_refuses_active_protected_and_compressed_sources_before_outpu
     let mut protected_edit = protected.edit_tail_append(TailSelector::Body);
     protected_edit.append_text_paragraphs(&["x"]).unwrap();
     assert!(matches!(
-        protected_edit.publication_plan_with_limits(TailAppendPublicationLimits::new(8, 4)),
+        protected_edit.publication_plan(TailAppendPublicationLimits::new(8, 4)),
         Err(Error::ProtectedDocument(ProtectionType::ReadOnly))
     ));
 
@@ -816,7 +815,7 @@ fn publication_plan_refuses_active_protected_and_compressed_sources_before_outpu
     let mut compressed_edit = compressed.edit_tail_append(TailSelector::Body);
     compressed_edit.append_text_paragraphs(&["x"]).unwrap();
     assert!(matches!(
-        compressed_edit.publication_plan_with_limits(TailAppendPublicationLimits::new(8, 4)),
+        compressed_edit.publication_plan(TailAppendPublicationLimits::new(8, 4)),
         Err(Error::UnsupportedSource(_))
     ));
 }
@@ -1036,7 +1035,7 @@ fn publication_plan_enforces_exact_and_over_output_bounds() {
     );
     edit.append_text_paragraphs(&["B"]).unwrap();
     assert!(matches!(
-        edit.publication_plan_with_limits(TailAppendPublicationLimits::new(8, 4)),
+        edit.publication_plan(TailAppendPublicationLimits::new(8, 4)),
         Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             ..

@@ -240,16 +240,20 @@ fn source_backed_formula_access_reaches_the_native_ancillary_parser() {
 
 #[test]
 fn native_noop_is_byte_exact_and_source_backed_numeric_edit_keeps_formula_frames() {
-    let native = Snapshot::from_bytes(native_bytes()).expect("open native cell-value snapshot");
+    let native = Snapshot::from_bytes(native_bytes(), litchi_xls::ole_object::Limits::default())
+        .expect("open native cell-value snapshot");
     let no_op = native.edit().commit().expect("exact no-op commit");
-    assert_eq!(no_op.snapshot().bytes(), native.bytes());
+    assert_eq!(no_op.package().bytes(), native.bytes());
     assert!(std::ptr::eq(
-        no_op.snapshot().bytes().as_ptr(),
+        no_op.package().bytes().as_ptr(),
         native.bytes().as_ptr()
     ));
 
-    let source = Snapshot::from_bytes(ancillary_formula_package())
-        .expect("open isolated source-backed cell-value snapshot");
+    let source = Snapshot::from_bytes(
+        ancillary_formula_package(),
+        litchi_xls::ole_object::Limits::default(),
+    )
+    .expect("open isolated source-backed cell-value snapshot");
     let (sheet_position, number) = source
         .worksheets()
         .find_map(|worksheet| {
@@ -275,9 +279,9 @@ fn native_noop_is_byte_exact_and_source_backed_numeric_edit_keeps_formula_frames
         .commit_source_backed()
         .expect("publish source-backed numeric no-op");
     assert!(source_backed_noop.is_noop());
-    assert_eq!(source_backed_noop.snapshot().bytes(), source.bytes());
+    assert_eq!(source_backed_noop.package().bytes(), source.bytes());
     assert!(std::ptr::eq(
-        source_backed_noop.snapshot().bytes().as_ptr(),
+        source_backed_noop.package().bytes().as_ptr(),
         source.bytes().as_ptr()
     ));
 
@@ -297,7 +301,7 @@ fn native_noop_is_byte_exact_and_source_backed_numeric_edit_keeps_formula_frames
     let commit = edit
         .commit_source_backed()
         .expect("source-backed numeric publication");
-    let target = commit.snapshot();
+    let target = commit.package();
     assert_eq!(commit.diagnostics().changed_cells(), 1);
     assert_eq!(commit.diagnostics().touched_streams(), 1);
     assert_eq!(
@@ -329,8 +333,11 @@ fn native_noop_is_byte_exact_and_source_backed_numeric_edit_keeps_formula_frames
 
 #[test]
 fn formula_cache_and_style_edits_preserve_the_untouched_rgb_extra() {
-    let source = Snapshot::from_bytes(ancillary_formula_package())
-        .expect("open isolated ancillary snapshot");
+    let source = Snapshot::from_bytes(
+        ancillary_formula_package(),
+        litchi_xls::ole_object::Limits::default(),
+    )
+    .expect("open isolated ancillary snapshot");
     let reference = Reference::new(0, 0).expect("synthetic reference");
 
     let old_cache = source
@@ -357,14 +364,14 @@ fn formula_cache_and_style_edits_preserve_the_untouched_rgb_extra() {
     let cache_commit = cache_edit.commit().expect("commit Formula cache edit");
     assert_eq!(
         formula_tail_frames(source.workbook_stream()),
-        formula_tail_frames(cache_commit.snapshot().workbook_stream())
+        formula_tail_frames(cache_commit.package().workbook_stream())
     );
-    assert_single_formula_metadata(cache_commit.snapshot().bytes(), 0, 0);
+    assert_single_formula_metadata(cache_commit.package().bytes(), 0, 0);
     assert_eq!(
         cache_commit
             .patch()
             .inverse()
-            .apply(cache_commit.snapshot())
+            .apply(cache_commit.package())
             .expect("invert Formula cache edit")
             .bytes(),
         source.bytes()
@@ -392,9 +399,9 @@ fn formula_cache_and_style_edits_preserve_the_untouched_rgb_extra() {
     let style_commit = style_edit.commit().expect("commit Formula style edit");
     assert_eq!(
         formula_tail_bytes(source.workbook_stream()),
-        formula_tail_bytes(style_commit.snapshot().workbook_stream())
+        formula_tail_bytes(style_commit.package().workbook_stream())
     );
-    assert_single_formula_metadata(style_commit.snapshot().bytes(), 0, 0);
+    assert_single_formula_metadata(style_commit.package().bytes(), 0, 0);
 }
 
 fn assert_non_workbook_streams_equal(before: &[u8], after: &[u8]) {
@@ -475,19 +482,20 @@ fn ancillary_formula_package() -> Vec<u8> {
 #[test]
 fn row_and_column_shift_refuse_rgb_extra_atomically() {
     let bytes = ancillary_formula_package();
-    let source = Snapshot::from_bytes(bytes).expect("open isolated ancillary package");
+    let source = Snapshot::from_bytes(bytes, litchi_xls::ole_object::Limits::default())
+        .expect("open isolated ancillary package");
     let before = source.bytes().to_vec();
 
     let mut rows = source.edit();
     assert!(matches!(
         rows.insert_rows(Selector::Position(Position::new(0)), 0, 1),
-        Err(Error::UnsafeEdit(_))
+        Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
     ));
 
     let mut columns = source.edit();
     assert!(matches!(
         columns.insert_columns(Selector::Position(Position::new(0)), 0, 1),
-        Err(Error::UnsafeEdit(_))
+        Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
     ));
     assert_eq!(source.bytes(), before.as_slice());
 }

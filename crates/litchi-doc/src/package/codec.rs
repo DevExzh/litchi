@@ -1,5 +1,5 @@
 use super::model::{
-    Error, OpenOptions, Package, RawPackage, Result, SourceLimitKind, SourceLimits,
+    Error, OpenOptions, Package, Reader, Result, SourceLimitKind, SourceLimits,
     preflight_declared_streams,
 };
 use crate::document::Document;
@@ -14,7 +14,7 @@ use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::sync::Arc;
 
-impl RawPackage<File> {
+impl Reader<File> {
     /// Open a .doc package from a file path.
     ///
     /// # Arguments
@@ -24,9 +24,9 @@ impl RawPackage<File> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi_doc::raw::Package;
+    /// use litchi_doc::raw::Reader;
     ///
-    /// let pkg = Package::open("document.doc")?;
+    /// let pkg = Reader::open("document.doc")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
@@ -35,17 +35,17 @@ impl RawPackage<File> {
 
     /// Open a `.doc` package under the options' finite read limits.
     pub fn open_with_options<P: AsRef<Path>>(path: P, options: OpenOptions) -> Result<Self> {
-        let source_limits = options.get_source_limits();
+        let source_limits = options.source_limits_value();
         let path = path.as_ref();
         let file = File::open(path)?;
         let source_len = file.metadata()?.len();
         validate_package_size(source_len, source_limits)?;
-        RawPackage::from_reader_with_limits(file, source_limits)
+        Reader::from_reader_with_options(file, options)
     }
 }
 
-impl<R: Read + Seek> RawPackage<R> {
-    /// Create a Package from any reader that implements Read + Seek.
+impl<R: Read + Seek> Reader<R> {
+    /// Create a reader from any source that implements Read + Seek.
     ///
     /// # Arguments
     ///
@@ -55,20 +55,22 @@ impl<R: Read + Seek> RawPackage<R> {
     ///
     /// ```rust,no_run
     /// use std::fs::File;
-    /// use litchi_doc::raw::Package;
+    /// use litchi_doc::raw::Reader;
     ///
     /// let file = File::open("document.doc")?;
-    /// let pkg = Package::from_reader(file)?;
+    /// let pkg = Reader::from_reader(file)?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_reader(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(reader, SourceLimits::default())
+        Self::from_reader_with_options(reader, OpenOptions::default())
     }
 
-    /// Create a package whose document reads inherit explicit finite limits.
-    pub fn from_reader_with_limits(reader: R, source_limits: SourceLimits) -> Result<Self> {
+    /// Create a reader whose document reads inherit the options' finite
+    /// source limits.
+    pub fn from_reader_with_options(reader: R, options: OpenOptions) -> Result<Self> {
+        let source_limits = options.source_limits_value();
         let ole = Self::open_ole_file_with_limits(reader, source_limits)?;
-        Self::from_ole_file_with_limits(ole, source_limits)
+        Self::from_ole_file_with_options(ole, options)
     }
 
     /// Validate a source length before entering the public DOC-reader gate.
@@ -122,7 +124,7 @@ impl<R: Read + Seek> RawPackage<R> {
         Ok(())
     }
 
-    /// Create a Package from an already-parsed OLE file.
+    /// Create a reader from an already-parsed OLE file.
     ///
     /// This is used for single-pass parsing where the OLE file has already
     /// been parsed during format detection. It avoids double-parsing.
@@ -135,16 +137,16 @@ impl<R: Read + Seek> RawPackage<R> {
     ///
     /// ```rust,no_run
     /// use litchi_cfb::OleFile;
-    /// use litchi_doc::raw::Package;
+    /// use litchi_doc::raw::Reader;
     /// use std::io::Cursor;
     ///
     /// let bytes = std::fs::read("document.doc")?;
     /// let ole = OleFile::open(Cursor::new(bytes))?;
-    /// let pkg = Package::from_ole_file(ole)?;
+    /// let pkg = Reader::from_ole_file(ole)?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_ole_file(ole: OleFile<R>) -> Result<Self> {
-        Self::from_ole_file_with_limits(ole, SourceLimits::default())
+        Self::from_ole_file_with_options(ole, OpenOptions::default())
     }
 
     /// Wrap an already-parsed OLE file with explicit document-read limits.
@@ -152,7 +154,8 @@ impl<R: Read + Seek> RawPackage<R> {
     /// Input and declared-stream sizes are checked before DOC payload reads.
     /// The caller controls the CFB parser's earlier directory/FAT allocation
     /// limits; adoption cannot constrain allocations that already happened.
-    pub fn from_ole_file_with_limits(ole: OleFile<R>, source_limits: SourceLimits) -> Result<Self> {
+    pub fn from_ole_file_with_options(ole: OleFile<R>, options: OpenOptions) -> Result<Self> {
+        let source_limits = options.source_limits_value();
         Self::validate_package_ole_file(&ole, source_limits)?;
         preflight_declared_streams(&ole, source_limits)?;
         Ok(Self { ole, source_limits })
@@ -166,9 +169,9 @@ impl<R: Read + Seek> RawPackage<R> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi_doc::raw::Package;
+    /// use litchi_doc::raw::Reader;
     ///
-    /// let mut pkg = Package::open("document.doc")?;
+    /// let mut pkg = Reader::open("document.doc")?;
     /// let doc = pkg.document()?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -182,28 +185,7 @@ impl<R: Read + Seek> RawPackage<R> {
     /// Get the main document using explicit password-to-open options.
     pub fn document_with_options(&mut self, options: OpenOptions) -> Result<Document> {
         let source_limits = options
-            .get_source_limits()
-            .constrained_by(self.source_limits);
-        Document::from_ole_with_options(&mut self.ole, options.source_limits(source_limits))
-    }
-
-    /// Open the document with explicit limits and no password.
-    pub fn document_with_limits(&mut self, source_limits: SourceLimits) -> Result<Document> {
-        Document::from_ole_with_options(
-            &mut self.ole,
-            OpenOptions::default().source_limits(source_limits.constrained_by(self.source_limits)),
-        )
-    }
-
-    /// Open the document with password/leniency options and explicit limits.
-    pub fn document_with_options_and_limits(
-        &mut self,
-        options: OpenOptions,
-        source_limits: SourceLimits,
-    ) -> Result<Document> {
-        let source_limits = options
-            .get_source_limits()
-            .constrained_by(source_limits)
+            .source_limits_value()
             .constrained_by(self.source_limits);
         Document::from_ole_with_options(&mut self.ole, options.source_limits(source_limits))
     }
@@ -283,7 +265,7 @@ impl<R: Read + Seek> RawPackage<R> {
     ///
     /// All logical OLE streams and storages are copied, while only the patch's
     /// `DataSpaces` stream replacements are applied. The output must be a fresh
-    /// seekable destination; the generic `raw::Package<R>` reader remains
+    /// seekable destination; the generic `raw::Reader<R>` reader remains
     /// intact.
     pub fn write_data_spaces_patch<W: Write + Seek>(
         &mut self,
@@ -359,7 +341,10 @@ impl<R: Read + Seek> RawPackage<R> {
     pub fn custom_xml_data_store(
         &mut self,
     ) -> litchi_ole_common::custom_xml::Result<Option<litchi_ole_common::custom_xml::Store>> {
-        litchi_ole_common::custom_xml::inspect(&mut self.ole)
+        litchi_ole_common::custom_xml::inspect(
+            &mut self.ole,
+            litchi_ole_common::custom_xml::Limits::default(),
+        )
     }
 
     pub fn summary_information(&mut self) -> Result<Option<Stream>> {
@@ -432,23 +417,18 @@ impl<R: Read + Seek> RawPackage<R> {
             .and_then(|stream| stream.section(USER_DEFINED_PROPERTIES_FMTID).cloned()))
     }
 
-    /// Reads inert `_PID_HLINKS` metadata and discovers DOC field-begin candidates.
+    /// Reads inert `_PID_HLINKS` metadata under shared overlay limits
+    /// ([`crate::user_defined_hyperlinks::Limits::default`] is the default
+    /// profile) and discovers DOC field-begin candidates.
     ///
-    /// Stored targets and locations remain opaque strings. This method never
-    /// resolves, opens, normalizes, evaluates, or executes linked content.
-    /// Numeric `dwApp` matches are exposed only as
+    /// Limits apply after generic property-set parsing and bound only the
+    /// reserved metadata overlay. Stored targets and locations remain opaque
+    /// strings. This method never resolves, opens, normalizes, evaluates, or
+    /// executes linked content. Numeric `dwApp` matches are exposed only as
     /// [`crate::HyperlinkAssociation::FieldCandidates`]; callers must use
     /// [`crate::UserDefinedHyperlink::resolve_field`] to prove a `Field`
     /// association before it can be reordered for writing.
-    pub fn user_defined_hyperlinks(&mut self) -> Result<Option<crate::UserDefinedHyperlinks>> {
-        self.user_defined_hyperlinks_with_limits(crate::user_defined_hyperlinks::Limits::default())
-    }
-
-    /// Reads inert `_PID_HLINKS` metadata with explicit shared overlay limits.
-    ///
-    /// Limits apply after generic property-set parsing and bound only the
-    /// reserved metadata overlay. Targets and locations remain opaque strings.
-    pub fn user_defined_hyperlinks_with_limits(
+    pub fn user_defined_hyperlinks(
         &mut self,
         limits: crate::user_defined_hyperlinks::Limits,
     ) -> Result<Option<crate::UserDefinedHyperlinks>> {
@@ -456,7 +436,7 @@ impl<R: Read + Seek> RawPackage<R> {
             return Ok(None);
         };
         let document = self.document()?;
-        crate::user_defined_hyperlinks::from_user_defined_section_with_limits(
+        crate::user_defined_hyperlinks::from_user_defined_section(
             &section,
             document.fields_table(),
             limits,
@@ -464,9 +444,9 @@ impl<R: Read + Seek> RawPackage<R> {
     }
 }
 
-impl RawPackage<Cursor<Vec<u8>>> {
+impl Reader<Cursor<Vec<u8>>> {
     /// Parse a complete in-memory DOC artifact for exact no-op publication.
-    pub fn from_bytes(bytes: &[u8]) -> Result<RawPackage<Cursor<Vec<u8>>>> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Reader<Cursor<Vec<u8>>>> {
         let source_limits = SourceLimits::default();
         Self::from_owned_bytes(clone_bounded_source(bytes, source_limits)?, source_limits)
     }
@@ -474,10 +454,10 @@ impl RawPackage<Cursor<Vec<u8>>> {
     pub(crate) fn from_owned_bytes(
         bytes: Vec<u8>,
         source_limits: SourceLimits,
-    ) -> Result<RawPackage<Cursor<Vec<u8>>>> {
+    ) -> Result<Reader<Cursor<Vec<u8>>>> {
         Self::validate_source_len(bytes.len(), source_limits)?;
         let ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits(source_limits)?)?;
-        RawPackage::from_ole_file_with_limits(ole, source_limits)
+        Reader::from_ole_file_with_options(ole, OpenOptions::default().source_limits(source_limits))
     }
 }
 
@@ -500,9 +480,9 @@ pub fn open_package(
     mut ole: OleFile<Cursor<Vec<u8>>>,
     options: OpenOptions,
 ) -> Result<OpenOutcome> {
-    let source_limits = options.get_source_limits();
-    RawPackage::<Cursor<Vec<u8>>>::validate_package_ole_file(&ole, source_limits)?;
-    let leniency = options.get_leniency();
+    let source_limits = options.source_limits_value();
+    Reader::<Cursor<Vec<u8>>>::validate_package_ole_file(&ole, source_limits)?;
+    let leniency = options.leniency_value();
     match Document::from_ole_with_options(&mut ole, options) {
         Ok(document) => Package::from_validated_ole(ole, document, source_limits, leniency)
             .map(OpenOutcome::Opened),
@@ -534,7 +514,7 @@ impl Package {
 
     /// Read and validate an immutable DOC package under one options envelope.
     pub fn from_reader_with_options<R: Read>(mut reader: R, options: OpenOptions) -> Result<Self> {
-        let bytes = read_bounded_source(&mut reader, options.get_source_limits())?;
+        let bytes = read_bounded_source(&mut reader, options.source_limits_value())?;
         Self::from_owned_bytes(bytes, options)
     }
 
@@ -545,7 +525,7 @@ impl Package {
 
     /// Parse an immutable DOC package under one options envelope.
     pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> Result<Self> {
-        let owned = clone_bounded_source(bytes, options.get_source_limits())?;
+        let owned = clone_bounded_source(bytes, options.source_limits_value())?;
         Self::from_owned_bytes(owned, options)
     }
 
@@ -696,16 +676,19 @@ impl Package {
     }
 
     pub(crate) fn from_owned_bytes(bytes: Vec<u8>, options: OpenOptions) -> Result<Self> {
-        let source_limits = options.get_source_limits();
-        RawPackage::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), source_limits)?;
+        let source_limits = options.source_limits_value();
+        Reader::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), source_limits)?;
         let ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits(source_limits)?)?;
-        let raw = RawPackage::from_ole_file_with_limits(ole, source_limits)?;
+        let raw = Reader::from_ole_file_with_options(
+            ole,
+            OpenOptions::default().source_limits(source_limits),
+        )?;
         Self::from_raw(raw, options)
     }
 
-    fn from_raw(mut raw: RawPackage<Cursor<Vec<u8>>>, options: OpenOptions) -> Result<Self> {
-        let source_limits = options.get_source_limits();
-        let leniency = options.get_leniency();
+    fn from_raw(mut raw: Reader<Cursor<Vec<u8>>>, options: OpenOptions) -> Result<Self> {
+        let source_limits = options.source_limits_value();
+        let leniency = options.leniency_value();
         let document = Document::from_ole_with_options(&mut raw.ole, options)?;
         Self::from_validated_ole(raw.ole, document, source_limits, leniency)
     }
@@ -814,7 +797,7 @@ fn cfb_limits(source_limits: SourceLimits) -> Result<OleFileLimits> {
 }
 
 fn clone_bounded_source(bytes: &[u8], source_limits: SourceLimits) -> Result<Vec<u8>> {
-    RawPackage::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), source_limits)?;
+    Reader::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), source_limits)?;
     let mut owned = Vec::new();
     owned
         .try_reserve_exact(bytes.len())

@@ -7,12 +7,13 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
     MathElementRole, MathObject, MathPropertiesKind, MathPropertyName, MathStructureChild,
-    MathStructureKind, MathZoneKind, RtfDocument, RtfWriter,
+    MathStructureKind, MathZoneKind, RtfWriter,
 };
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -22,7 +23,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_inline_fraction_with_properties_and_round_trips() {
-    let document = RtfDocument::parse(
+    let document = Tree::parse(
         r"{\rtf1\ansi before{\mmath{\mf{\mfPr{\mtype bar}}{\mnum{\mr 1}}{\mden{\mr 2}}}} after}",
     )
     .unwrap();
@@ -57,7 +58,7 @@ fn parses_inline_fraction_with_properties_and_round_trips() {
     assert_eq!(run.text, "1");
     assert!(!run.normal_text);
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.math_zones(), zones);
 }
@@ -65,7 +66,7 @@ fn parses_inline_fraction_with_properties_and_round_trips() {
 #[test]
 fn parses_display_zone_with_paragraph_properties() {
     let document =
-        RtfDocument::parse(r"{\rtf1{\mmathPara{\mmathParaPr{\mjc centerGroup}}{\mr x}}}").unwrap();
+        Tree::parse(r"{\rtf1{\mmathPara{\mmathParaPr{\mjc centerGroup}}{\mr x}}}").unwrap();
     let zones = document.math_zones();
     assert_eq!(zones.len(), 1);
     assert_eq!(zones[0].kind, MathZoneKind::Display);
@@ -74,13 +75,13 @@ fn parses_display_zone_with_paragraph_properties() {
     assert_eq!(paragraph.properties[0].name, MathPropertyName::Justify);
     assert_eq!(paragraph.properties[0].value, "centerGroup");
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.math_zones(), zones);
 }
 
 #[test]
 fn parses_nested_structures_matrix_and_unicode() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1{\mmath"#,
         r#"{\mnary{\mnaryPr{\mchr \u8721?}{\msubHide 1}}{\msub }{\msup{\mr n}}{\me{\mr i}}}"#,
         r#"{\mrad{\mradPr{\mdegHide 1}}{\mdeg{\mr 3}}{\me{\mr x}}}"#,
@@ -127,13 +128,13 @@ fn parses_nested_structures_matrix_and_unicode() {
     assert!(accent_run.normal_text);
     assert_eq!(accent_run.text, "hat");
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.math_zones(), zones);
 }
 
 #[test]
 fn skips_mmath_pict_fallback_and_accepts_momath_aliases() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1{\moMath{\mr 1}{\*\mmathPict {\pict\pngblip 00}}}"#,
         r#"{\moMathPara{\moMathParaPr{\mjc center}}{\mr 2}}}"#,
     ))
@@ -145,22 +146,21 @@ fn skips_mmath_pict_fallback_and_accepts_momath_aliases() {
     let paragraph = zones[1].paragraph_properties.as_ref().unwrap();
     assert_eq!(paragraph.properties[0].name, MathPropertyName::Justify);
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.math_zones(), zones);
 }
 
 #[test]
 fn coexists_with_body_markup_positions() {
     let document =
-        RtfDocument::parse(r"{\rtf1 ab{\mmath{\mr 1}}cd{\*\bkmkstart bm}ef{\*\bkmkend bm}}")
-            .unwrap();
+        Tree::parse(r"{\rtf1 ab{\mmath{\mr 1}}cd{\*\bkmkstart bm}ef{\*\bkmkend bm}}").unwrap();
     assert_eq!(document.text(), "abcdef");
     assert_eq!(document.math_zones()[0].position, 2);
     let bookmark = &document.bookmarks().bookmarks()[0];
     assert_eq!(bookmark.position, 4);
     assert_eq!(bookmark.content, "ef");
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.math_zones(), document.math_zones());
     assert_eq!(reparsed.text(), document.text());
 }
@@ -226,13 +226,13 @@ fn rejects_misplaced_or_malformed_math() {
         r"{\rtf1{\mmath{\mf{\mnum{\mr 1}}",
     ];
     for rtf in cases {
-        assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
+        assert!(Tree::parse(rtf).is_err(), "accepted malformed {rtf}");
     }
 }
 
 #[test]
 fn parses_matrix_columns_and_argument_properties() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1{\mmath"#,
         r#"{\mm{\mmPr{\mcount 2}{\mmcs{\mmc{\mmcPr{\mcount 2}{\mmcJc center}}}{\mmc{\mmcPr{\mcount 1}}}}}"#,
         r#"{\mmr{\me{\mr a}}{\me{\mr b}}}}"#,
@@ -274,7 +274,7 @@ fn parses_matrix_columns_and_argument_properties() {
     assert_eq!(argument.properties[0].name, MathPropertyName::ArgumentSize);
     assert_eq!(argument.properties[0].value, "2");
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.math_zones(), zones);
 }
 
@@ -301,7 +301,7 @@ fn rejects_misplaced_matrix_columns_and_argument_properties() {
         r"{\rtf1{\mmath{\mmcs{\mmc}}}}",
     ];
     for rtf in cases {
-        assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
+        assert!(Tree::parse(rtf).is_err(), "accepted malformed {rtf}");
     }
 }
 
@@ -336,7 +336,7 @@ fn nested_math_obeys_the_global_group_safety_limit() {
         rtf.push_str("}}");
     }
     rtf.push_str("}}");
-    assert!(RtfDocument::parse(&rtf).is_err());
+    assert!(Tree::parse(&rtf).is_err());
 
     let mut valid = String::from(r"{\rtf1{\mmath");
     for _ in 0..14 {
@@ -347,6 +347,6 @@ fn nested_math_obeys_the_global_group_safety_limit() {
         valid.push_str("}}");
     }
     valid.push_str("}}");
-    let document = RtfDocument::parse(&valid).unwrap();
+    let document = Tree::parse(&valid).unwrap();
     assert_eq!(document.math_zones().len(), 1);
 }

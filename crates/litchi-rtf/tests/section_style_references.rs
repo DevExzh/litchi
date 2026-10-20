@@ -9,11 +9,12 @@
 
 mod repair_support;
 
-use litchi_rtf::{RtfDocument, RtfWriter, SectionProperties, StyleType};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{RtfWriter, SectionProperties, StyleType};
 
 #[test]
 fn retains_grouped_references_inherits_sections_and_sectd_resets() {
-    let inherited = RtfDocument::parse(concat!(
+    let inherited = Tree::parse(concat!(
         r#"{\rtf1{\stylesheet{\*\ds5 Declared Section;}}"#,
         r#"\sectd\ds5{\ds6}First\sect\lndscpsxn Second}"#,
     ))
@@ -29,7 +30,7 @@ fn retains_grouped_references_inherits_sections_and_sectd_resets() {
     assert_eq!(inherited.sections()[0].properties.section_style, Some(6));
     assert_eq!(inherited.sections()[1].properties.section_style, Some(6));
 
-    let reset = RtfDocument::parse(r"{\rtf1\sectd\ds6 First\sect\sectd Second}").unwrap();
+    let reset = Tree::parse(r"{\rtf1\sectd\ds6 First\sect\sectd Second}").unwrap();
     assert_eq!(reset.sections().len(), 2);
     assert_eq!(reset.sections()[0].properties.section_style, Some(6));
     assert_eq!(reset.sections()[1].properties.section_style, None);
@@ -38,8 +39,7 @@ fn retains_grouped_references_inherits_sections_and_sectd_resets() {
 #[test]
 fn preserves_zero_maximum_omission_and_public_mutation() {
     let document =
-        RtfDocument::parse(r"{\rtf1\sectd\ds0 First\sect\sectd\ds65535 Second\sect\sectd Third}")
-            .unwrap();
+        Tree::parse(r"{\rtf1\sectd\ds0 First\sect\sectd\ds65535 Second\sect\sectd Third}").unwrap();
     assert_eq!(document.sections()[0].properties.section_style, Some(0));
     assert_eq!(
         document.sections()[1].properties.section_style,
@@ -68,14 +68,13 @@ fn rejects_malformed_body_and_stylesheet_handles_and_duplicate_selectors() {
         r"{\rtf1{\stylesheet{\*\ds1\ds2 Duplicate;}}}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
             "accepted {source}"
         );
     }
 
     let inert =
-        RtfDocument::parse(r"{\rtf1{\field{\*\fldinst TEST \ds65536}{\fldrslt Result}}Body}")
-            .unwrap();
+        Tree::parse(r"{\rtf1{\field{\*\fldinst TEST \ds65536}{\fldrslt Result}}Body}").unwrap();
     assert!(
         inert
             .sections()
@@ -86,7 +85,7 @@ fn rejects_malformed_body_and_stylesheet_handles_and_duplicate_selectors() {
 
 #[test]
 fn writer_is_canonical_and_round_trip_is_stable_without_resolving_styles() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1{\stylesheet{\*\ds3 Declared Section;}}"#,
         r#"\sectd\ds3\lndscpsxn Body}"#,
     ))
@@ -100,7 +99,7 @@ fn writer_is_canonical_and_round_trip_is_stable_without_resolving_styles() {
     let serialized = String::from_utf8(first.clone()).unwrap();
     assert!(serialized.contains(r"\sectd\ds3"));
 
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first).unwrap();
     assert_eq!(reparsed.stylesheet(), document.stylesheet());
     assert_eq!(reparsed.sections()[0].properties, original);
     let mut second = Vec::new();
@@ -116,7 +115,7 @@ fn parses_libreoffice_section_fixture_without_materializing_a_reference() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf100507.rtf"
     ));
-    let document = RtfDocument::parse_bytes(source).unwrap();
+    let document = Tree::parse_bytes(source).unwrap();
     assert!(
         document
             .sections()

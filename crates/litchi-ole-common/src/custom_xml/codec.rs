@@ -30,25 +30,14 @@ struct PropertiesParseState {
     element_count: usize,
 }
 
-/// Inspect a complete Custom XML data store with default limits.
-///
-/// # Errors
-///
-/// Returns an error if the compound file or Custom XML store is malformed.
-pub fn inspect<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Option<Store>> {
-    inspect_with_limits(ole, Limits::default())
-}
-
-/// Inspect a complete Custom XML data store with caller-selected limits.
+/// Inspect a complete Custom XML data store under bounded resource limits
+/// ([`Limits::default`] is the default profile).
 ///
 /// # Errors
 ///
 /// Returns an error if the compound file or Custom XML store is malformed, or
 /// if it exceeds `limits`.
-pub fn inspect_with_limits<R: Read + Seek>(
-    ole: &mut OleFile<R>,
-    limits: Limits,
-) -> Result<Option<Store>> {
+pub fn inspect<R: Read + Seek>(ole: &mut OleFile<R>, limits: Limits) -> Result<Option<Store>> {
     validate_limits(&limits)?;
     let redundant = marker_exists(ole, REDUNDANT_PROMOTION_STORAGE)?;
     let modified = marker_exists(ole, MODIFIED_PROMOTION_STORAGE)?;

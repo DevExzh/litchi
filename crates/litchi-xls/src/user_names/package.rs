@@ -1,5 +1,6 @@
 //! Source spans and package-level mutation helpers for `User Names`.
 
+use litchi_core::edit::RefusalKind;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -67,7 +68,11 @@ impl Package {
             self.limits,
         )?;
         let payload_len = u16::try_from(payload.len()).map_err(|_error| {
-            Error::UnsafeEdit("UsrInfo payload length does not fit CbUsr".to_string())
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit user names",
+                "UsrInfo payload length does not fit CbUsr",
+            )
         })?;
         let mut sizes = self.model.user_record_sizes;
         sizes[index] = payload_len;
@@ -88,10 +93,11 @@ impl Package {
         user: &UserEntry,
     ) -> Result<Vec<u8>> {
         if index > self.model.users.len() {
-            return Err(Error::UnsafeEdit(format!(
-                "User Names insertion index {index} is outside {} users",
-                self.model.users.len()
-            )));
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit user names",
+                "the User Names insertion index is outside the collection",
+            ));
         }
         self.ensure_revision_guid(user)?;
         if self
@@ -100,20 +106,24 @@ impl Package {
             .iter()
             .any(|current| current.user_id() == user.user_id())
         {
-            return Err(Error::UnsafeEdit(format!(
-                "User Names already contains lUsrId {}",
-                user.user_id()
-            )));
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit user names",
+                "the User Names collection already contains this lUsrId",
+            ));
         }
         if self.model.users.len() >= self.limits.max_users || self.model.users.len() >= 255 {
-            return Err(Error::UnsafeEdit(
-                "User Names cannot contain another user under the configured CUsr bound"
-                    .to_string(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit user names",
+                "User Names cannot contain another user under the configured CUsr bound",
             ));
         }
         if self.model.user_record_sizes[255] != 0 {
-            return Err(Error::UnsafeEdit(
-                "adding a User Names entry would discard a nonzero reserved CbUsr slot".to_string(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit user names",
+                "adding a User Names entry would discard a nonzero reserved CbUsr slot",
             ));
         }
         let payload = user.to_payload()?;
@@ -132,7 +142,11 @@ impl Package {
             sizes[position + 1] = sizes[position];
         }
         sizes[index] = u16::try_from(payload.len()).map_err(|_error| {
-            Error::UnsafeEdit("UsrInfo payload length does not fit CbUsr".to_string())
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit user names",
+                "UsrInfo payload length does not fit CbUsr",
+            )
         })?;
         let count_payload = encode_cusr(self.model.users.len() + 1)?;
         let cbusr_payload = encode_cbusr(&sizes);
@@ -157,9 +171,11 @@ impl Package {
 
     pub(crate) fn remove_user(&self, source: &[u8], index: usize) -> Result<(Vec<u8>, UserEntry)> {
         let removed = self.model.users.get(index).cloned().ok_or_else(|| {
-            Error::UnsafeEdit(format!(
-                "User Names index {index} is outside the collection"
-            ))
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit user names",
+                "User Names index is outside the collection",
+            )
         })?;
         let span = self.user_span(index)?;
         let mut sizes = self.model.user_record_sizes;
@@ -204,21 +220,27 @@ impl Package {
 
     fn user_span(&self, index: usize) -> Result<RecordSpan> {
         self.records.get(index + 4).copied().ok_or_else(|| {
-            Error::UnsafeEdit(format!(
-                "User Names index {index} is outside the collection"
-            ))
+            Error::refused(
+                RefusalKind::InvalidValue,
+                "edit user names",
+                "User Names index is outside the collection",
+            )
         })
     }
 
     fn ensure_revision_guid(&self, user: &UserEntry) -> Result<()> {
         let Some(guids) = &self.revision_guids else {
-            return Err(Error::UnsafeEdit(
-                "adding a User Names entry requires a Revision Log GUID closure".to_string(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit user names",
+                "adding a User Names entry requires a Revision Log GUID closure",
             ));
         };
         if !user.guid_matches_any(guids) {
-            return Err(Error::UnsafeEdit(
-                "UsrInfo.guid does not identify a Revision Log header".to_string(),
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit user names",
+                "UsrInfo.guid does not identify a Revision Log header",
             ));
         }
         Ok(())
@@ -231,11 +253,11 @@ fn validate_revision_guids(
     limits: Limits,
 ) -> Result<()> {
     if revision_guids.len() > limits.max_revision_guids {
-        return Err(Error::UnsafeEdit(format!(
-            "Revision Log contains {} GUIDs; maximum is {}",
-            revision_guids.len(),
-            limits.max_revision_guids
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit user names",
+            "the Revision Log exceeds its GUID limit",
+        ));
     }
     let mut seen = HashSet::new();
     seen.try_reserve(revision_guids.len())
@@ -266,8 +288,10 @@ fn replace_range(
     limits: Limits,
 ) -> Result<Vec<u8>> {
     if start > end || end > source.len() {
-        return Err(Error::UnsafeEdit(
-            "User Names replacement range is outside the source stream".to_string(),
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit user names",
+            "User Names replacement range is outside the source stream",
         ));
     }
     let output_len = source
@@ -276,10 +300,11 @@ fn replace_range(
         .and_then(|size| size.checked_add(replacement.len()))
         .ok_or(Error::Allocation("sizing User Names replacement"))?;
     if output_len > limits.max_stream_bytes {
-        return Err(Error::UnsafeEdit(format!(
-            "edited User Names stream has {output_len} bytes; maximum is {}",
-            limits.max_stream_bytes
-        )));
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit user names",
+            "the edited User Names stream exceeds its byte limit",
+        ));
     }
     let mut candidate = Vec::new();
     candidate
@@ -297,13 +322,17 @@ fn insert_at_range(source: &[u8], at: usize, bytes: &[u8], limits: Limits) -> Re
 
 fn replace_in_place(source: &mut [u8], start: usize, end: usize, replacement: &[u8]) -> Result<()> {
     if start > end || end > source.len() {
-        return Err(Error::UnsafeEdit(
-            "User Names header replacement range is outside the candidate".to_string(),
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit user names",
+            "User Names header replacement range is outside the candidate",
         ));
     }
     if end - start != replacement.len() {
-        return Err(Error::UnsafeEdit(
-            "User Names header replacement changed a fixed record length".to_string(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit user names",
+            "User Names header replacement changed a fixed record length",
         ));
     }
     source[start..end].copy_from_slice(replacement);

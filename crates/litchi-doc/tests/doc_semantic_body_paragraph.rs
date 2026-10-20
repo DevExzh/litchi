@@ -2,7 +2,7 @@
 
 use litchi_core::Position;
 use litchi_doc::body_text::{Projection, Snapshot};
-use litchi_doc::raw::Package;
+use litchi_doc::raw::Reader;
 use litchi_doc::writer::{Builder, FootnoteEntry};
 use std::io::Cursor;
 
@@ -39,7 +39,7 @@ fn body_queries_match_native_source_projection_and_ignore_other_stories() {
         .paragraphs(Projection::All)
         .expect("native body paragraphs");
 
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("DOC package");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("DOC package");
     let document = package.document().expect("DOC document");
 
     assert_eq!(

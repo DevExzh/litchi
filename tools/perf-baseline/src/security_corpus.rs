@@ -38,7 +38,7 @@ use litchi_core::{
     OwnedSource, ReadAt, Resource,
 };
 use litchi_doc::{
-    Error as DocError, OpenOptions, SourceLimits as DocSourceLimits, raw::Package as DocPackage,
+    Error as DocError, OpenOptions, SourceLimits as DocSourceLimits, raw::Reader as DocReader,
 };
 use litchi_docx::source_backed::Package as DocxSourcePackage;
 use litchi_ole_common::object::Limits as ObjectLimits;
@@ -288,16 +288,16 @@ fn inert_macro_security() -> Result<(), Box<dyn Error>> {
             .iter()
             .any(|module| { module.source().text().contains("Sub ") })
     );
-    let source = XlsSnapshot::from_bytes_with_limits_and_cfb(
+    let source = XlsSnapshot::from_bytes_with_cfb(
         bytes.clone(),
         security_object_limits(),
         security_ole_limits()?,
     )?;
     let no_op = source.edit().commit()?;
-    assert_eq!(no_op.snapshot().bytes(), bytes.as_slice());
+    assert_eq!(no_op.package().bytes(), bytes.as_slice());
     assert_eq!(
         before_macro_digest,
-        macro_stream_digest(no_op.snapshot().bytes())?
+        macro_stream_digest(no_op.package().bytes())?
     );
     let mut edit = source.edit();
     edit.insert_rows("Sheet1".into(), 1, 1)?;
@@ -473,11 +473,11 @@ fn security_object_limits() -> ObjectLimits {
     }
 }
 
-fn open_doc_package(bytes: &[u8]) -> Result<DocPackage<Cursor<Vec<u8>>>, Box<dyn Error>> {
+fn open_doc_package(bytes: &[u8]) -> Result<DocReader<Cursor<Vec<u8>>>, Box<dyn Error>> {
     let ole = OleFile::open_with_limits(Cursor::new(bytes.to_vec()), security_ole_limits()?)?;
-    Ok(DocPackage::from_ole_file_with_limits(
+    Ok(DocReader::from_ole_file_with_options(
         ole,
-        security_doc_limits()?,
+        OpenOptions::default().source_limits(security_doc_limits()?),
     )?)
 }
 

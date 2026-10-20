@@ -7,7 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{RtfDocument, RtfWriter, ShapeHyperlink};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{RtfWriter, ShapeHyperlink};
 use std::borrow::Cow;
 
 const SHAPE_WITH_HYPERLINK: &str = concat!(
@@ -16,7 +17,7 @@ const SHAPE_WITH_HYPERLINK: &str = concat!(
     r#"{\shptxt x}}}B}"#,
 );
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -26,7 +27,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_shape_hyperlink_property_and_round_trips() {
-    let document = RtfDocument::parse(SHAPE_WITH_HYPERLINK).unwrap();
+    let document = Tree::parse(SHAPE_WITH_HYPERLINK).unwrap();
     assert_eq!(document.text(), "AB");
     let shape = &document.shapes()[0];
     let property = shape
@@ -45,7 +46,7 @@ fn parses_shape_hyperlink_property_and_round_trips() {
         serialized.contains("{\\hl{\\hlloc http://example.test/x}{\\hlsrc src}{\\hlfr Click me}}")
     );
 
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), document.text());
     let reparsed_property = reparsed.shapes()[0]
         .properties
@@ -57,7 +58,7 @@ fn parses_shape_hyperlink_property_and_round_trips() {
 
 #[test]
 fn accepts_partial_hyperlink_strings() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1 A{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}"#,
         r#"{\sp{\sn link}{\sv 0}{\hl {\hlfr only a name}}}{\shptxt x}}}B}"#,
     ))
@@ -72,7 +73,7 @@ fn accepts_partial_hyperlink_strings() {
     assert!(hyperlink.source.is_none());
     assert_eq!(hyperlink.friendly_name.as_deref(), Some("only a name"));
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(
         reparsed.shapes()[0].properties[1].hyperlink,
         property.hyperlink
@@ -114,6 +115,6 @@ fn rejects_malformed_shape_hyperlink_groups() {
         r"{\rtf1{\shp{\*\shpinst{\sp{\sn a}{\sv 1}{\hl {\hlloc x}}}}",
     ];
     for rtf in cases {
-        assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
+        assert!(Tree::parse(rtf).is_err(), "accepted malformed {rtf}");
     }
 }

@@ -7,12 +7,12 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    MAX_PARAGRAPH_DROP_CAP_LINES, ParagraphDropCap, ParagraphDropCapKind, RtfDocument, RtfWriter,
-    StyleBlock,
+    MAX_PARAGRAPH_DROP_CAP_LINES, ParagraphDropCap, ParagraphDropCapKind, RtfWriter, StyleBlock,
 };
 
-fn block<'a>(document: &'a RtfDocument<'a>, needle: &str) -> &'a StyleBlock<'a> {
+fn block<'a>(document: &'a Tree<'a>, needle: &str) -> &'a StyleBlock<'a> {
     document
         .blocks()
         .iter()
@@ -22,7 +22,7 @@ fn block<'a>(document: &'a RtfDocument<'a>, needle: &str) -> &'a StyleBlock<'a> 
 
 #[test]
 fn parses_group_inheritance_and_pard_reset() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\ansi\pard\dropcapli3\dropcapt1 Outer\par "#,
         r#"{\dropcapt2 Inner\par }Tail\par "#,
         r#"{\pard Reset\par }}"#,
@@ -40,7 +40,7 @@ fn parses_group_inheritance_and_pard_reset() {
 
 #[test]
 fn body_style_and_default_round_trip_canonically() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\ansi"#,
         r#"{\stylesheet{\s7\dropcapli2\dropcapt2 Drop;}}"#,
         r#"{\*\defpap\dropcapli4\dropcapt1}"#,
@@ -75,7 +75,7 @@ fn body_style_and_default_round_trip_canonically() {
     let text = String::from_utf8(first.clone()).unwrap();
     assert!(text.contains(r"\dropcapli2\dropcapt2"));
     assert!(text.contains(r"\dropcapli4\dropcapt1"));
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first).unwrap();
     assert_eq!(block(&reparsed, "Body").paragraph.drop_cap, Some(expected));
     let mut second = Vec::new();
     RtfWriter::new(&mut second)
@@ -99,7 +99,7 @@ fn rejects_missing_partial_invalid_and_oversized_values() {
         r"{\rtf1{\stylesheet{\s1\dropcapli2 Bad;}}X}",
         r"{\rtf1{\*\defpap\dropcapt1}X}",
     ] {
-        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+        assert!(Tree::parse(source).is_err(), "accepted {source}");
     }
     assert!(ParagraphDropCap::new(ParagraphDropCapKind::InText, 0).is_err());
     assert!(

@@ -21,13 +21,13 @@ mod xml;
 )]
 mod tests;
 
-pub use self::codec::{inspect, inspect_with_limits, parse_properties, write, write_properties};
+pub use self::codec::{inspect, parse_properties, write, write_properties};
 pub use self::model::{
     Error, Item, ItemId, ItemKind, Limits, Promotion, Properties, Result, RootName, Store,
 };
 pub use self::patch::{Change, Patch};
 pub use self::snapshot::{Revision, Snapshot};
-pub use self::transaction::{Commit, Transaction, update};
+pub use self::transaction::{Commit, Diagnostics, Edit, update};
 
 pub const STORE_STORAGE: &str = "MsoDataStore";
 pub const REDUNDANT_PROMOTION_STORAGE: &str = "IsRedundantDataStorePromotion";

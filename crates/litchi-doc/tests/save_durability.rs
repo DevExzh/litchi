@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use litchi_core::Durability;
 use litchi_doc::builder::Builder;
-use litchi_doc::raw::Package;
+use litchi_doc::raw::Reader;
 
 const LEVELS: [Durability; 3] = [Durability::Full, Durability::FileOnly, Durability::NoSync];
 
@@ -73,7 +73,7 @@ fn every_level_publishes_the_default_save_bytes() {
         );
     }
 
-    let mut reopened = Package::open(directory.join("no-sync.doc")).unwrap();
+    let mut reopened = Reader::open(directory.join("no-sync.doc")).unwrap();
     assert!(
         reopened
             .document()

@@ -15,10 +15,11 @@
 //! bytes such as a carriage return as line-ending noise, so they have to be
 //! written as hex escapes. These tests pin both behaviours.
 
-use litchi_rtf::{RtfDocument, RtfWriter};
+use litchi_rtf::RtfWriter;
+use litchi_rtf::raw::Tree;
 
 /// Serialize `doc` and return the emitted RTF.
-fn write(doc: &RtfDocument<'_>) -> String {
+fn write(doc: &Tree<'_>) -> String {
     let mut bytes = Vec::new();
     RtfWriter::new(&mut bytes)
         .write_document(doc)
@@ -28,10 +29,9 @@ fn write(doc: &RtfDocument<'_>) -> String {
 
 /// Parse `source`, write it back out, and re-parse the result.
 fn round_trip(source: &str) -> (String, String, String) {
-    let doc = RtfDocument::parse(source).expect("source failed to parse");
+    let doc = Tree::parse(source).expect("source failed to parse");
     let emitted = write(&doc);
-    let reparsed =
-        RtfDocument::from_bytes(emitted.as_bytes()).expect("emitted RTF failed to parse");
+    let reparsed = Tree::from_bytes(emitted.as_bytes()).expect("emitted RTF failed to parse");
     (doc.text(), emitted, reparsed.text())
 }
 
@@ -81,10 +81,10 @@ fn libreoffice_fixtures_round_trip_their_body_text() {
             .join(fixture);
         let bytes = std::fs::read(&path)
             .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
-        let doc = RtfDocument::from_bytes(&bytes)
+        let doc = Tree::from_bytes(&bytes)
             .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
         let emitted = write(&doc);
-        let reparsed = RtfDocument::from_bytes(emitted.as_bytes())
+        let reparsed = Tree::from_bytes(emitted.as_bytes())
             .unwrap_or_else(|error| panic!("failed to re-parse {fixture}: {error}"));
         assert_eq!(reparsed.text(), doc.text(), "{fixture} lost body text");
         assert!(

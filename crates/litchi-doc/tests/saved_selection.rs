@@ -11,8 +11,8 @@ use litchi_doc::body_text::{Error, Projection, Refusal, Snapshot};
 use litchi_doc::builder::Builder;
 use litchi_doc::parts::fib::FileInformationBlock;
 use litchi_doc::tracked_revision::Limits;
-use litchi_doc::{SavedSelection, SelectionGeometry, SelectionStyle, raw::Package};
-use litchi_ole_common::object::{Editor as PackageEditor, Targets};
+use litchi_doc::{SavedSelection, SelectionGeometry, SelectionStyle, raw::Reader};
+use litchi_ole_common::object::{Edit as PackageEditor, Targets};
 use litchi_ole_common::property_set::{
     CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Section, Stream, Value,
     document_summary::DIGITAL_SIGNATURE,
@@ -217,7 +217,7 @@ fn fib_range_requires_exact_size_and_deferred_errors_are_cached() {
 
     let bytes = document_with_selsf(&source[..35], 35);
 
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("package open");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package open");
     let document = package
         .document()
         .expect("document open despite optional error");
@@ -235,7 +235,7 @@ fn document_accessor_returns_selection_and_enforces_main_text_bound() {
     let mut valid = record(0);
     set_cps(&mut valid, 0, 1, 0);
     let bytes = document_with_selsf(&valid, 36);
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("package open");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package open");
     let document = package.document().expect("document open");
     let selection = document
         .saved_selection()
@@ -248,7 +248,7 @@ fn document_accessor_returns_selection_and_enforces_main_text_bound() {
     let mut outside = record(0);
     set_cps(&mut outside, i32::MAX, i32::MAX, i32::MAX);
     let bytes = document_with_selsf(&outside, 36);
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("package open");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package open");
     let document = package.document().expect("document open");
     let first = document
         .saved_selection()
@@ -262,7 +262,7 @@ fn document_accessor_returns_selection_and_enforces_main_text_bound() {
     let mut outside_lim = record(0);
     set_cps(&mut outside_lim, 0, i32::MAX, 0);
     let bytes = document_with_selsf(&outside_lim, 36);
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("package open");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package open");
     let document = package.document().expect("document open");
     let first = document
         .saved_selection()
@@ -286,30 +286,27 @@ fn body_saved_selection_edit_is_source_bound_reversible_and_atomic() {
         .expect("saved-selection record");
 
     let mut no_op = source.edit().expect("no-op edit");
-    let no_op_patch = selection
-        .transaction()
-        .commit()
-        .expect("no-op Selsf transaction");
+    let no_op_patch = selection.edit().commit().expect("no-op Selsf transaction");
     assert!(
         !no_op
             .apply_saved_selection_patch(no_op_patch.patch())
             .expect("exact no-op patch")
     );
     let no_op_commit = no_op.commit().expect("no-op commit");
-    assert!(!no_op_commit.changed());
+    assert!(!no_op_commit.diagnostics().changed());
     assert!(std::sync::Arc::ptr_eq(
         &source.bytes_shared(),
-        &no_op_commit.snapshot().bytes_shared()
+        &no_op_commit.package().bytes_shared()
     ));
 
-    let mut transaction = selection.transaction();
+    let mut transaction = selection.edit();
     transaction
         .set_range(0, 1)
         .expect("valid range")
         .set_cp_anchor(1)
         .expect("valid anchor");
     let selection_commit = transaction.commit().expect("selection commit");
-    assert!(selection_commit.changed());
+    assert!(selection_commit.diagnostics().changed());
     let patch = selection_commit.patch().clone();
 
     let mut edit = source.edit().expect("source edit");
@@ -318,15 +315,15 @@ fn body_saved_selection_edit_is_source_bound_reversible_and_atomic() {
             .expect("publish Selsf patch")
     );
     let commit = edit.commit().expect("publish commit");
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     let published_selection = commit
-        .snapshot()
+        .package()
         .saved_selection()
         .expect("published Selsf read")
         .expect("published Selsf");
     assert_eq!(published_selection.cp_anchor(), 1);
     let published_package = PackageEditor::open(
-        commit.snapshot().finish(),
+        commit.package().finish(),
         Targets::default(),
         Limits::default(),
     )
@@ -339,11 +336,11 @@ fn body_saved_selection_edit_is_source_bound_reversible_and_atomic() {
     );
 
     let applied = commit.patch().apply(&source).expect("forward body patch");
-    assert_eq!(applied.bytes(), commit.snapshot().bytes());
+    assert_eq!(applied.bytes(), commit.package().bytes());
     let reverted = commit
         .patch()
         .inverse()
-        .apply(commit.snapshot())
+        .apply(commit.package())
         .expect("inverse body patch");
     assert_eq!(reverted.bytes(), source.bytes());
     assert!(std::sync::Arc::ptr_eq(
@@ -370,7 +367,7 @@ fn body_saved_selection_edit_is_source_bound_reversible_and_atomic() {
         Err(Error::Conflict)
     ));
     let foreign_commit = foreign_edit.commit().expect("foreign rollback commit");
-    assert_eq!(foreign_commit.snapshot().bytes(), foreign.bytes());
+    assert_eq!(foreign_commit.package().bytes(), foreign.bytes());
 
     let mut malformed_record = source_record.clone();
     malformed_record[4..8].copy_from_slice(&2i32.to_le_bytes());
@@ -386,7 +383,7 @@ fn body_saved_selection_edit_is_source_bound_reversible_and_atomic() {
         Err(Error::Invalid(_))
     ));
     let malformed_commit = malformed_edit.commit().expect("malformed rollback commit");
-    assert_eq!(malformed_commit.snapshot().bytes(), malformed.bytes());
+    assert_eq!(malformed_commit.package().bytes(), malformed.bytes());
 }
 
 #[test]
@@ -410,7 +407,7 @@ fn body_saved_selection_bounds_and_length_changes_are_checked_before_publish() {
         .expect("valid saved-selection read")
         .expect("saved-selection record");
     let max_cp = i32::MAX as u32;
-    let mut invalid_replacement = selection.transaction();
+    let mut invalid_replacement = selection.edit();
     invalid_replacement
         .set_cp_anchor(max_cp)
         .expect("structurally valid replacement anchor")
@@ -423,14 +420,14 @@ fn body_saved_selection_bounds_and_length_changes_are_checked_before_publish() {
         Err(Error::Invalid(_))
     ));
     let invalid_commit = invalid_edit.commit().expect("invalid patch remains atomic");
-    assert_eq!(invalid_commit.snapshot().bytes(), before.as_slice());
+    assert_eq!(invalid_commit.package().bytes(), before.as_slice());
 
     let mut edit = source.edit().expect("body edit");
     edit.replace_paragraph(Position::new(0), "Longer body")
         .expect("boundary Selsf CPs remap with the paragraph");
     let commit = edit.commit().expect("remapped Selsf commit");
     let remapped = commit
-        .snapshot()
+        .package()
         .saved_selection()
         .expect("remapped saved-selection read")
         .expect("remapped saved-selection record");
@@ -441,7 +438,7 @@ fn body_saved_selection_bounds_and_length_changes_are_checked_before_publish() {
     let reverted = commit
         .patch()
         .inverse()
-        .apply(commit.snapshot())
+        .apply(commit.package())
         .expect("inverse remapped text patch");
     assert_eq!(reverted.bytes(), before.as_slice());
 
@@ -460,7 +457,7 @@ fn body_saved_selection_bounds_and_length_changes_are_checked_before_publish() {
     let replayed = source
         .apply_durable(&durable)
         .expect("durable text replay remaps Selsf");
-    assert_eq!(replayed.bytes(), commit.snapshot().bytes());
+    assert_eq!(replayed.bytes(), commit.package().bytes());
     let replayed_reverted = replayed
         .apply_durable(&durable.inverse())
         .expect("durable inverse remaps Selsf back");
@@ -495,7 +492,7 @@ fn body_saved_selection_bounds_and_length_changes_are_checked_before_publish() {
         .commit()
         .expect("ambiguous edit remains atomic");
     assert_eq!(
-        ambiguous_commit.snapshot().bytes(),
+        ambiguous_commit.package().bytes(),
         ambiguous_before.as_slice()
     );
 }
@@ -548,19 +545,16 @@ fn body_saved_selection_edit_refuses_signed_changed_source_but_allows_noop() {
         .expect("saved-selection record");
 
     let mut no_op = source.edit().expect("signed no-op edit");
-    let no_op_patch = selection
-        .transaction()
-        .commit()
-        .expect("no-op Selsf transaction");
+    let no_op_patch = selection.edit().commit().expect("no-op Selsf transaction");
     assert!(
         !no_op
             .apply_saved_selection_patch(no_op_patch.patch())
             .expect("signed exact no-op")
     );
     let no_op_commit = no_op.commit().expect("signed no-op commit");
-    assert_eq!(no_op_commit.snapshot().bytes(), source.bytes());
+    assert_eq!(no_op_commit.package().bytes(), source.bytes());
 
-    let mut transaction = selection.transaction();
+    let mut transaction = selection.edit();
     transaction.set_cp_anchor(1).expect("valid anchor");
     let patch = transaction
         .commit()
@@ -573,5 +567,5 @@ fn body_saved_selection_edit_refuses_signed_changed_source_but_allows_noop() {
         Err(Error::Refused(Refusal::SignedSource))
     ));
     let unchanged = changed.commit().expect("refused edit remains atomic");
-    assert_eq!(unchanged.snapshot().bytes(), source.bytes());
+    assert_eq!(unchanged.package().bytes(), source.bytes());
 }

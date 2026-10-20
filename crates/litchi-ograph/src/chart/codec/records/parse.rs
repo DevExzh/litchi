@@ -6,7 +6,7 @@ use super::super::super::format::{self, Format};
 use super::super::super::group;
 use super::super::super::layout;
 use super::super::super::model::{
-    Binding, Chart, Context, DataKind, Family, Group, GroupId, Label, Legend, Order, Origin, Owner,
+    Binding, Context, DataKind, Family, Group, GroupId, Label, Legend, Model, Order, Origin, Owner,
     Props, Raw, Rect, Role, RowCol, Series, Value, XlValue,
 };
 use super::super::super::{BOF, EOF, Kind as ChartKind, Ref};
@@ -30,12 +30,12 @@ use super::wire::{
 use crate::{Error, Limits, Result};
 use litchi_biff::RecordRef;
 
-pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<Chart> {
+pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<Model> {
     if input.kind() != context.kind() {
         return invalid_model("context", "producer kind does not match the chart BOF");
     }
 
-    let mut chart = Chart {
+    let mut chart = Model {
         context,
         rect: Rect::default(),
         props: Props {
@@ -1800,7 +1800,7 @@ fn parse_area(record: RecordRef<'_>) -> Result<format::Area> {
 }
 
 fn add_raw(
-    chart: &mut Chart,
+    chart: &mut Model,
     record: RecordRef<'_>,
     unknown_bytes: &mut usize,
     limits: Limits,

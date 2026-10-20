@@ -20,4 +20,4 @@ pub const RECORD_TYPE: u16 = 0x089B;
 
 pub use codec::{parse, write};
 pub use model::{Record, Settings, Snapshot, Unknown};
-pub use transaction::{Edit, Patch};
+pub use transaction::{Commit, Diagnostics, Edit, Patch};

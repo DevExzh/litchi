@@ -165,8 +165,11 @@ pub(super) fn validate(file: &File) -> Result<Validation> {
         #[cfg(feature = "xls")]
         FileFormat::Xls => {
             let bytes = file.to_bytes()?;
-            litchi_xls::validation::validate_source(Arc::new(litchi_core::OwnedSource::new(bytes)))
-                .map_err(Error::Xls)?
+            litchi_xls::validation::validate_source(
+                Arc::new(litchi_core::OwnedSource::new(bytes)),
+                litchi_xls::validation::XlsValidationLimits::default(),
+            )
+            .map_err(Error::Xls)?
         },
         #[cfg(feature = "ppt")]
         FileFormat::Ppt => {

@@ -3,7 +3,9 @@ use super::codec::{
     WKB_FLAGS_REQUIRED, WKB_FN, WKB_OUTLINE_LEVEL, parse_plcf_wkb, parse_sttb_fnm,
 };
 use super::model::Collection;
-use super::{Editor, FileNameMetadata, FileNameSelector, Kind, ReferenceSelector, Snapshot};
+use super::package::Editor;
+use super::record::Snapshot;
+use super::{FileNameMetadata, FileNameSelector, Kind, ReferenceSelector};
 use crate::package::Result;
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::mail_merge::Fnpi;
@@ -375,11 +377,11 @@ fn no_op_snapshot_round_trip_preserves_ignored_and_unused_bytes() {
     let commit = snapshot.edit().commit().unwrap();
     assert!(commit.patch().is_noop());
     assert_eq!(
-        commit.snapshot().referenced_files_bytes(),
+        commit.package().referenced_files_bytes(),
         Some(tables.fnm.as_slice())
     );
     assert_eq!(
-        commit.snapshot().subdocuments_bytes(),
+        commit.package().subdocuments_bytes(),
         Some(tables.wkb.as_slice())
     );
     assert_eq!(
@@ -422,12 +424,12 @@ fn candidate_adds_renumbers_updates_and_moves_subdocuments() {
         .unwrap();
     let commit = transaction.commit().unwrap();
 
-    let files = commit.snapshot().collection().referenced_files();
+    let files = commit.package().collection().referenced_files();
     assert_eq!(files.len(), 4);
     assert_eq!(files[3].key(), new_key);
     assert_eq!(files[3].path(), "C:\\docs\\renamed.doc");
     assert_eq!(files[3].relative_path(), Some("renamed.doc"));
-    let references = commit.snapshot().collection().subdocuments();
+    let references = commit.package().collection().subdocuments();
     assert_eq!(
         references
             .iter()
@@ -468,7 +470,7 @@ fn terminal_cp_and_independent_wire_lengths_follow_candidate_context() {
     assert_eq!(u32::from_le_bytes(wkb[8..12].try_into().unwrap()), 22);
     assert_eq!(
         commit
-            .snapshot()
+            .package()
             .encode_referenced_files()
             .unwrap()
             .unwrap()
@@ -481,7 +483,7 @@ fn terminal_cp_and_independent_wire_lengths_follow_candidate_context() {
             .len()
     );
     assert_eq!(
-        commit.snapshot().encode_subdocuments().unwrap().unwrap(),
+        commit.package().encode_subdocuments().unwrap().unwrap(),
         wkb
     );
 }
@@ -495,7 +497,7 @@ fn invalid_candidates_are_rejected_without_partial_publish() {
             .set_subdocument_start(ReferenceSelector::index(0), 10)
             .is_err()
     );
-    assert!(!transaction.is_changed());
+    assert_eq!(transaction.staged(), &snapshot);
     assert!(
         transaction
             .update_file_name(
@@ -508,7 +510,7 @@ fn invalid_candidates_are_rejected_without_partial_publish() {
             )
             .is_err()
     );
-    assert!(!transaction.is_changed());
+    assert_eq!(transaction.staged(), &snapshot);
     assert!(
         transaction
             .renumber_file_name(FileNameSelector::Index(0), 0x0FFF)

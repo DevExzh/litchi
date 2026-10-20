@@ -8,7 +8,7 @@ use litchi_core::Position;
 use litchi_rtf::{
     Package,
     edit::Error,
-    transport::{compress, decompress, is_compressed_rtf},
+    transport::{DecompressionLimits, compress, decompress, is_compressed_rtf},
 };
 
 const LZFU_RAW: &[u8] = b"{\\rtf1\\ansi\\ansicpg1252\\pard hello world}\r\n";
@@ -45,7 +45,10 @@ fn literal_byte1252_transport_is_exact_and_changed_write_is_atomic_on_refusal() 
 #[test]
 fn specification_lzfu_transport_is_exact_and_changed_write_fails_closed() {
     assert!(is_compressed_rtf(LZFU_SPEC));
-    assert_eq!(decompress(LZFU_SPEC).unwrap(), LZFU_RAW);
+    assert_eq!(
+        decompress(LZFU_SPEC, DecompressionLimits::default()).unwrap(),
+        LZFU_RAW
+    );
     assert_eq!(compress(LZFU_RAW, true).unwrap(), LZFU_SPEC);
 
     let document = Package::from_bytes(LZFU_SPEC).unwrap();

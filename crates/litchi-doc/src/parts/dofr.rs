@@ -709,10 +709,10 @@ impl DofrArray {
         })
     }
 
-    /// Start a source-bound, same-length record replacement transaction.
+    /// Start a source-bound, same-length record replacement edit.
     #[must_use]
-    pub fn transaction(&self) -> DofrTransaction {
-        DofrTransaction {
+    pub fn edit(&self) -> DofrEdit {
+        DofrEdit {
             source: self.clone(),
             draft: self.source.clone(),
         }
@@ -738,22 +738,23 @@ impl DofrArray {
     }
 }
 
-/// A checked transaction over complete `Dofrh` records.
+/// A checked, staged edit over complete `Dofrh` records. Dropping it
+/// discards it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DofrTransaction {
+pub struct DofrEdit {
     source: DofrArray,
     draft: Vec<u8>,
 }
 
-impl DofrTransaction {
-    /// Original parsed array that this transaction is based on.
+impl DofrEdit {
+    /// Original parsed array that this edit is based on.
     #[must_use]
     pub fn source(&self) -> &DofrArray {
         &self.source
     }
 
-    /// Current validated draft.
-    pub fn snapshot(&self) -> Result<DofrArray> {
+    /// The staged draft, validated, without committing it.
+    pub fn staged(&self) -> Result<DofrArray> {
         DofrArray::parse_bytes(&self.draft)
             .map(|array| array.with_optional_owner(self.source.owner.clone()))
     }
@@ -786,43 +787,17 @@ impl DofrTransaction {
             replacement: snapshot.source.clone(),
             owner,
         };
-        Ok(DofrCommit { snapshot, patch })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(DofrCommit::new(snapshot, patch, diagnostics))
     }
 }
 
-/// The result of committing a [`DofrTransaction`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DofrCommit {
-    snapshot: DofrArray,
-    patch: DofrPatch,
-}
+/// The result of committing a [`DofrEdit`]: the validated post-edit array,
+/// its source-checked reversible patch and diagnostics.
+pub type DofrCommit = litchi_core::edit::Commit<DofrArray, DofrPatch>;
 
-impl DofrCommit {
-    /// Validated post-edit array.
-    #[must_use]
-    pub fn snapshot(&self) -> &DofrArray {
-        &self.snapshot
-    }
-
-    /// Source-checked reversible patch.
-    #[must_use]
-    pub fn patch(&self) -> &DofrPatch {
-        &self.patch
-    }
-
-    /// Whether any serialized byte changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.patch.changed()
-    }
-
-    /// Consume the commit and return its post-edit array.
-    #[must_use]
-    pub fn into_snapshot(self) -> DofrArray {
-        self.snapshot
-    }
-}
-
+/// Content-free diagnostics of one DOFR commit.
+pub use litchi_core::edit::Diagnostics;
 /// A reversible, source-checked same-length byte patch for `RgDofr`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DofrPatch {
@@ -844,10 +819,10 @@ impl DofrPatch {
         &self.replacement
     }
 
-    /// Whether applying this patch changes any serialized `RgDofr` byte.
+    /// Whether applying this patch changes no serialized `RgDofr` byte.
     #[must_use]
-    pub fn changed(&self) -> bool {
-        self.source != self.replacement
+    pub fn is_noop(&self) -> bool {
+        self.source == self.replacement
     }
 
     /// Validate the FIB-selected range and its exact source bytes without
@@ -1445,24 +1420,24 @@ mod tests {
     fn replacement_is_atomic_source_checked_and_reversible() {
         let source_bytes = frame_set();
         let source = DofrArray::parse_bytes(&source_bytes).unwrap();
-        let mut transaction = source.transaction();
+        let mut transaction = source.edit();
         let replacement = record(1, &frame_payload(1));
         transaction.replace_record_bytes(1, &replacement).unwrap();
         let commit = transaction.commit().unwrap();
-        assert!(commit.changed());
-        assert_eq!(commit.patch().apply(&source).unwrap(), *commit.snapshot());
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.patch().apply(&source).unwrap(), *commit.package());
         assert_eq!(
-            commit.patch().revert(commit.snapshot()).unwrap().bytes(),
+            commit.patch().revert(commit.package()).unwrap().bytes(),
             source.bytes()
         );
 
-        let mut stale = source.transaction();
+        let mut stale = source.edit();
         assert!(
             stale
                 .replace_record_bytes(1, &record(1, &[0; DOFR_FSN_SIZE - 1]))
                 .is_err()
         );
-        assert_eq!(stale.snapshot().unwrap().bytes(), source.bytes());
+        assert_eq!(stale.staged().unwrap().bytes(), source.bytes());
         let mut changed_source = source_bytes.clone();
         let last = changed_source.len() - 1;
         changed_source[last] ^= 0xFF;
@@ -1478,7 +1453,7 @@ mod tests {
         replacement[frame_start + 4..frame_start + 8].copy_from_slice(&1u32.to_le_bytes());
         let source_array = DofrArray::parse_bytes(&source).unwrap();
         let replacement_array = DofrArray::parse_bytes(&replacement).unwrap();
-        let mut transaction = source_array.transaction();
+        let mut transaction = source_array.edit();
         transaction
             .replace_record_bytes(1, replacement_array.get(1).unwrap().bytes())
             .unwrap();

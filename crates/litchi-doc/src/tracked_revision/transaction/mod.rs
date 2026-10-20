@@ -5,15 +5,20 @@
 //! rewrites. Keeping these layers separate makes the public facade semantic:
 //! callers edit revision metadata and ranges, not CFB streams or FKP pages.
 
+#![allow(
+    dead_code,
+    reason = "the record-level revision API is driven by the package family and unit tests; each uses a subset"
+)]
+
 mod commit;
 mod edit;
 mod patch;
 mod snapshot;
 
-pub use commit::Commit;
-pub use edit::Transaction;
-pub use patch::Patch;
-pub use snapshot::Snapshot;
+pub(crate) use commit::Commit;
+pub(crate) use edit::Transaction;
+pub(crate) use patch::Patch;
+pub(crate) use snapshot::Snapshot;
 
 use crate::package::Error as PackageError;
 

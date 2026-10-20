@@ -32,7 +32,7 @@ use std::sync::Arc;
 
 use litchi_core::unit::emu_i32_to_ppt_master_i16_round;
 use litchi_ograph::chart::{
-    Ai, Binding, Cache, Chart as GraphChart, Count, DataKind, GraphFamily, Link, Owner, Role,
+    Ai, Binding, Cache, Count, DataKind, GraphFamily, Link, Model as GraphChart, Owner, Role,
     RowCol, Series, Source, Value,
 };
 use litchi_ograph::{Limits as GraphLimits, Package as GraphPackage};
@@ -315,7 +315,7 @@ impl Chart {
                 ))?;
             }
         }
-        Ok(GraphPackage::from_chart_with_limits(graph, limits)?
+        Ok(GraphPackage::from_chart(graph, limits)?
             .finish()
             .into_bytes())
     }

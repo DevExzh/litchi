@@ -9,7 +9,8 @@
 
 //! Round-trip tests for extended underline styles and `\ulcN` underline color.
 
-use litchi_rtf::{RtfDocument, RtfWriter};
+use litchi_rtf::RtfWriter;
+use litchi_rtf::raw::Tree;
 
 const STYLES: &[(&str, &str)] = &[
     (r"\ulhair", "Hairline"),
@@ -23,7 +24,7 @@ const STYLES: &[(&str, &str)] = &[
     (r"\ululdbwave", "DoubleWave"),
 ];
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -35,7 +36,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 fn extended_underline_styles_round_trip() {
     for (control, variant) in STYLES {
         let source = format!(r"{{\rtf1\ansi{control} Underlined\par}}");
-        let document = RtfDocument::parse(&source).unwrap();
+        let document = Tree::parse(&source).unwrap();
         let block = &document.blocks()[0];
         assert_eq!(
             format!("{:?}", block.formatting.underline),
@@ -50,7 +51,7 @@ fn extended_underline_styles_round_trip() {
             "missing {control} in {serialized}"
         );
 
-        let reparsed = RtfDocument::parse(&serialized).unwrap();
+        let reparsed = Tree::parse(&serialized).unwrap();
         assert_eq!(
             format!("{:?}", reparsed.blocks()[0].formatting.underline),
             *variant,
@@ -63,7 +64,7 @@ fn extended_underline_styles_round_trip() {
 fn underline_color_round_trips() {
     let source =
         r"{\rtf1\ansi{\colortbl;\red0\green0\blue255;\red255\green0\blue0;}\uldb\ulc2 Text\par}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     let block = &document.blocks()[0];
     assert_eq!(block.formatting.underline_color, Some(2));
 
@@ -71,12 +72,12 @@ fn underline_color_round_trips() {
     let serialized = String::from_utf8(output).unwrap();
     assert!(serialized.contains(r"\ulc2"), "missing ulc in {serialized}");
 
-    let reparsed = RtfDocument::parse(&serialized).unwrap();
+    let reparsed = Tree::parse(&serialized).unwrap();
     assert_eq!(reparsed.blocks()[0].formatting.underline_color, Some(2));
 }
 
 #[test]
 fn underline_color_defaults_to_text_color() {
-    let document = RtfDocument::parse(r"{\rtf1\ansi\ulwave Text\par}").unwrap();
+    let document = Tree::parse(r"{\rtf1\ansi\ulwave Text\par}").unwrap();
     assert_eq!(document.blocks()[0].formatting.underline_color, None);
 }

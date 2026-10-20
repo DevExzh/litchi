@@ -9,12 +9,12 @@
 
 mod repair_support;
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    DocumentReadOnlyRecommendation, DocumentSavePreferences, DocumentThumbnailPreference,
-    RtfDocument, RtfWriter,
+    DocumentReadOnlyRecommendation, DocumentSavePreferences, DocumentThumbnailPreference, RtfWriter,
 };
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -24,7 +24,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_both_parameterless_passive_flags() {
-    let document = RtfDocument::parse(r"{\rtf1\readonlyrecommended\saveprevpict Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1\readonlyrecommended\saveprevpict Body}").unwrap();
     assert_eq!(
         *document.save_preferences(),
         DocumentSavePreferences {
@@ -37,7 +37,7 @@ fn parses_both_parameterless_passive_flags() {
 
 #[test]
 fn omission_preserves_unspecified_semantics() {
-    let document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1 Body}").unwrap();
     assert!(document.save_preferences().is_empty());
     assert_eq!(
         document.save_preferences().thumbnail,
@@ -47,7 +47,7 @@ fn omission_preserves_unspecified_semantics() {
 
 #[test]
 fn typed_api_round_trips_in_stable_order_and_clears() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Body}").unwrap();
     document.set_save_preferences(DocumentSavePreferences {
         read_only: DocumentReadOnlyRecommendation::Recommended,
         thumbnail: DocumentThumbnailPreference::RequiredIfSupported,
@@ -58,7 +58,7 @@ fn typed_api_round_trips_in_stable_order_and_clears() {
         serialized.find("\\readonlyrecommended").unwrap()
             < serialized.find("\\saveprevpict").unwrap()
     );
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.save_preferences(), document.save_preferences());
     assert_eq!(reparsed.text(), "Body");
     document.clear_save_preferences();
@@ -67,7 +67,7 @@ fn typed_api_round_trips_in_stable_order_and_clears() {
 
 #[test]
 fn coexists_after_existing_passive_root_metadata_in_deterministic_order() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1{\*\xform transform.xsl}\usexform"#,
         r#"{\*\wgrffmtfilter 2002}\stylesortmethod4"#,
         r#"\saveprevpict\readonlyrecommended Body}"#,
@@ -102,7 +102,7 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
         r"{\rtf1 Body\saveprevpict}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
             "accepted malformed {source}"
         );
     }

@@ -33,7 +33,7 @@ use crate::writer::ChpxFkpBuilder;
 use litchi_cfb::{OleFile, directory_names_equal};
 #[cfg(feature = "performance-diagnostics")]
 use litchi_ole_common::object::CfbParseEvent;
-use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
+use litchi_ole_common::object::{Edit as ObjectEditor, Targets};
 use litchi_ole_common::property_set::{
     DOCUMENT_SUMMARY_INFORMATION_FMTID, Stream as PropertySetStream,
     document_summary::DIGITAL_SIGNATURE,
@@ -945,7 +945,7 @@ impl Clone for RetainedRender {
 }
 
 #[derive(Clone)]
-pub struct RevisionEditor {
+pub(crate) struct RevisionEditor {
     package: ObjectEditor,
     word_path: Vec<String>,
     table_path: Vec<String>,
@@ -974,7 +974,7 @@ pub struct RevisionEditor {
 }
 
 impl RevisionEditor {
-    pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+    pub(crate) fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         Self::open_with_ole_file(bytes, limits).map(|(editor, _ole)| editor)
     }
 
@@ -985,7 +985,7 @@ impl RevisionEditor {
     /// carried by [`ProtectionPolicy`]. The capability records caller
     /// metadata; it does not authenticate a user or provide cryptographic
     /// audit.
-    pub fn open_with_policy(
+    pub(crate) fn open_with_policy(
         bytes: Vec<u8>,
         limits: Limits,
         policy: ProtectionPolicy,
@@ -1178,11 +1178,6 @@ impl RevisionEditor {
         Ok(editor)
     }
 
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.changed
-    }
-
     /// Configures the finite owner-side ceiling for one already-rendered
     /// handoff. A zero ceiling releases any held render and disables
     /// retention. The ordinary tracked-revision API leaves this at zero.
@@ -1218,7 +1213,7 @@ impl RevisionEditor {
     }
 
     #[must_use]
-    pub fn authors(&self) -> &[String] {
+    pub(crate) fn authors(&self) -> &[String] {
         &self.authors
     }
 
@@ -1248,7 +1243,7 @@ impl RevisionEditor {
     pub(crate) fn preflight_dofr_patch(&self, patch: &DofrPatch) -> Result<bool> {
         let fib = FileInformationBlock::parse(&self.word)?;
         patch.preflight_table_stream(&fib, &self.table)?;
-        Ok(patch.changed())
+        Ok(!patch.is_noop())
     }
 
     /// Whether this source carries inert binary VBA signature metadata in
@@ -1269,7 +1264,7 @@ impl RevisionEditor {
         let fib = FileInformationBlock::parse(&self.word)?;
         patch.preflight_table_stream(&fib, &self.table)?;
         patch.validate_main_story_bound(self.main_ccp)?;
-        Ok(patch.changed())
+        Ok(!patch.is_noop())
     }
 
     /// Applies a source-checked, same-length saved-selection patch and
@@ -1281,7 +1276,7 @@ impl RevisionEditor {
         let fib = FileInformationBlock::parse(&self.word)?;
         patch.preflight_table_stream(&fib, &self.table)?;
         patch.validate_main_story_bound(self.main_ccp)?;
-        if !patch.changed() {
+        if patch.is_noop() {
             return Ok(false);
         }
         if self.signed {
@@ -1297,7 +1292,7 @@ impl RevisionEditor {
     pub(crate) fn apply_dofr_patch(&mut self, patch: &DofrPatch) -> Result<bool> {
         let fib = FileInformationBlock::parse(&self.word)?;
         patch.preflight_table_stream(&fib, &self.table)?;
-        if !patch.changed() {
+        if patch.is_noop() {
             return Ok(false);
         }
         if self.signed {
@@ -2764,7 +2759,7 @@ impl RevisionEditor {
 
     /// Lists character and PAPX property revisions, merging adjacent runs with
     /// identical metadata even when the range crosses piece boundaries.
-    pub fn revisions(&self) -> Result<Vec<Revision>> {
+    pub(crate) fn revisions(&self) -> Result<Vec<Revision>> {
         let mut output = Vec::new();
         for run in &self.chpx {
             let sprms = strict_sprms(&run.grpprl)?;
@@ -2872,7 +2867,7 @@ impl RevisionEditor {
     /// below `ccpText`: MS-DOC 2.3.1 requires the last character of the main
     /// document to be a paragraph mark, so text cannot follow it. To extend the
     /// last paragraph, insert at `ccpText - 1`, in front of its mark.
-    pub fn add_text(
+    pub(crate) fn add_text(
         &mut self,
         cp: u32,
         text: &str,
@@ -2945,7 +2940,7 @@ impl RevisionEditor {
     }
 
     /// Adds a revision mark to an existing main-story range.
-    pub fn add(
+    pub(crate) fn add(
         &mut self,
         start_cp: u32,
         end_cp: u32,
@@ -2964,7 +2959,7 @@ impl RevisionEditor {
     }
 
     /// Replaces revision metadata without touching unrelated formatting SPRMs.
-    pub fn update(&mut self, index: usize, metadata: RevisionMetadata) -> Result<Revision> {
+    pub(crate) fn update(&mut self, index: usize, metadata: RevisionMetadata) -> Result<Revision> {
         let revision = self
             .revisions()?
             .get(index)
@@ -2985,7 +2980,7 @@ impl RevisionEditor {
     }
 
     /// Removes a mark while retaining its text/current formatting.
-    pub fn remove(&mut self, index: usize) -> Result<Revision> {
+    pub(crate) fn remove(&mut self, index: usize) -> Result<Revision> {
         let revision = self
             .revisions()?
             .get(index)
@@ -2999,7 +2994,7 @@ impl RevisionEditor {
     }
 
     /// Accepts a revision using Word redline semantics.
-    pub fn accept(&mut self, index: usize) -> Result<Revision> {
+    pub(crate) fn accept(&mut self, index: usize) -> Result<Revision> {
         let revision = self
             .revisions()?
             .get(index)
@@ -3017,7 +3012,7 @@ impl RevisionEditor {
     }
 
     /// Rejects a revision using Word redline semantics.
-    pub fn reject(&mut self, index: usize) -> Result<Revision> {
+    pub(crate) fn reject(&mut self, index: usize) -> Result<Revision> {
         let revision = self
             .revisions()?
             .get(index)
@@ -3052,7 +3047,7 @@ impl RevisionEditor {
     /// revision save route; callers do not need to opt into the CFB policy.
     /// A changed edit is authorized under the editor's protection policy, and
     /// a signed source cannot publish changed bytes.
-    pub fn finish(self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(self) -> Result<Vec<u8>> {
         if self.changed {
             self.protection_policy.authorize(self.protection)?;
         }
@@ -4085,11 +4080,11 @@ mod picture_group_tests {
         edit.apply_picture_transfer(&plan).unwrap();
         let commit = edit.commit().unwrap();
         assert_eq!(
-            commit.snapshot().paragraphs(Projection::All).unwrap()[0].text(),
+            commit.package().paragraphs(Projection::All).unwrap()[0].text(),
             "\u{0008}"
         );
         assert_eq!(
-            commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+            commit.patch().inverse().apply(commit.package()).unwrap(),
             receiver
         );
     }

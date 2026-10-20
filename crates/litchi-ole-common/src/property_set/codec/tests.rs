@@ -3,7 +3,7 @@
 use super::super::binding::Binding;
 use super::super::model::{Guid, Section, Stream, Value};
 use super::binary::parse_typed_property;
-use super::{Editor, PropertySetReader};
+use super::{Edit, PropertySetReader};
 use litchi_cfb::consts::{VT_BLOB, VT_I4};
 use litchi_cfb::{OleFile, OleWriter};
 use std::io::Cursor;
@@ -55,7 +55,7 @@ fn editor_preserves_nested_streams_with_matching_leaf_names() {
     let mut source = Cursor::new(Vec::new());
     writer.write_to(&mut source).expect("CFB source");
 
-    let mut editor = Editor::new(source.into_inner()).expect("editor source");
+    let mut editor = Edit::new(source.into_inner()).expect("editor source");
     editor
         .update(Binding::SummaryInformation, |section| {
             section.add(2, Value::Lpstr("Title".into()))
@@ -104,7 +104,7 @@ fn a_user_defined_edit_creates_a_typed_document_summary_section() {
     let mut source = Cursor::new(Vec::new());
     writer.write_to(&mut source).expect("CFB source");
 
-    let mut editor = Editor::new(source.into_inner()).expect("editor source");
+    let mut editor = Edit::new(source.into_inner()).expect("editor source");
     editor
         .update(Binding::UserDefinedProperties, |section| {
             section.add_named(2, "Department".into(), Value::Lpstr("Research".into()))

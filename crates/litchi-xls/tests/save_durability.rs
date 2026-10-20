@@ -14,7 +14,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use litchi_core::Durability;
 use litchi_xls::cell_values::{Reference, Selector};
-use litchi_xls::comments::{Snapshot, Value};
+use litchi_xls::comments::Value;
 use litchi_xls::raw::Reader;
 use litchi_xls::writer::Builder;
 
@@ -94,7 +94,10 @@ fn every_writer_level_publishes_the_default_save_bytes() {
 fn every_source_backed_overlay_level_publishes_the_default_save_bytes() {
     let mut source = Cursor::new(Vec::new());
     builder().build().unwrap().write_to(&mut source).unwrap();
-    let mut edit = Snapshot::from_bytes(source.into_inner()).unwrap().edit();
+    let mut edit = litchi_xls::Package::from_bytes(&source.into_inner())
+        .unwrap()
+        .edit_comments()
+        .unwrap();
     edit.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),

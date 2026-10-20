@@ -40,7 +40,7 @@
 use litchi_doc::builder::Builder;
 use litchi_doc::image::PictureFields;
 use litchi_doc::writer::{FloatingPosition, Picture, PictureKind};
-use litchi_doc::{Run, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, raw::Package};
+use litchi_doc::{Run, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, raw::Reader};
 use litchi_odraw::image::Kind as BlipKind;
 use std::io::{Cursor, Write};
 use std::path::PathBuf;
@@ -163,7 +163,7 @@ fn png_and_jpeg_pictures_round_trip_through_doc_reader() {
     let mut cursor = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut cursor).unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
 
     // Surrounding text survives and the picture characters stay invisible to text().
@@ -236,7 +236,7 @@ fn native_officeart_picture_family_round_trips_without_reencoding() {
 
     let mut cursor = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut cursor).unwrap();
-    let mut package = Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
     let runs = picture_runs(&document);
     assert_eq!(runs.len(), expected.len());
@@ -275,7 +275,7 @@ fn document_without_pictures_keeps_empty_data_stream() {
     let mut cursor = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut cursor).unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
     assert_eq!(document.text().unwrap(), "plain text\r");
     assert!(picture_runs(&document).is_empty());
@@ -316,7 +316,7 @@ fn inline_and_floating_pictures_round_trip_through_doc_reader() {
     let (doc_bytes, floating_width, floating_height) =
         write_doc_with_inline_and_floating(&jpeg_bytes);
 
-    let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(&doc_bytes)).unwrap();
     let document = package.document().unwrap();
 
     let text = document.text().unwrap();

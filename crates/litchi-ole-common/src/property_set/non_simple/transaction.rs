@@ -34,14 +34,14 @@ impl Revision {
 }
 
 #[derive(Debug, Clone)]
-pub struct Editor {
+pub struct Edit {
     source: Snapshot,
     candidate: Option<Stream>,
     records: Option<Vec<EntryRecord>>,
     edits: Vec<PayloadEdit>,
 }
 
-impl Editor {
+impl Edit {
     pub(crate) fn new(source: Snapshot) -> Self {
         Self {
             source,
@@ -54,11 +54,6 @@ impl Editor {
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
         &self.source
-    }
-
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.candidate.is_some() || self.records.is_some() || !self.edits.is_empty()
     }
 
     pub fn contents(&self) -> Result<Stream, OleError> {
@@ -303,19 +298,11 @@ impl Editor {
         Ok(self)
     }
 
-    pub fn snapshot(&self) -> Result<Snapshot, OleError> {
-        self.materialize()
-    }
-
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     pub fn commit(self) -> Result<Commit, OleError> {
         let snapshot = self.materialize()?;
         let patch = Patch::new(&self.source, &snapshot);
-        Ok(Commit { snapshot, patch })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn ensure_contents(&self) -> Result<Stream, OleError> {
@@ -438,43 +425,12 @@ impl Editor {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Patch {
@@ -578,7 +534,7 @@ impl Patch {
 
 pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, OleError>
 where
-    F: FnOnce(&mut Editor) -> Result<(), OleError>,
+    F: FnOnce(&mut Edit) -> Result<(), OleError>,
 {
     let mut editor = snapshot.edit();
     edit(&mut editor)?;

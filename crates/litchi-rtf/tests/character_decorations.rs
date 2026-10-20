@@ -9,7 +9,8 @@
 
 mod repair_support;
 
-use litchi_rtf::{CharacterBorderStyle, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{CharacterBorderStyle, RtfWriter};
 
 #[test]
 fn parses_libreoffice_character_border_and_shading_fixtures() {
@@ -18,7 +19,7 @@ fn parses_libreoffice_character_border_and_shading_fixtures() {
             "../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/hidden-para-separator.rtf",
         ))
         .unwrap();
-    let border_document = RtfDocument::parse(&border_source).unwrap();
+    let border_document = Tree::parse(&border_source).unwrap();
     assert!(border_document.runs().iter().any(|run| {
         run.text().contains('C')
             && run.formatting.character_border.is_some_and(|border| {
@@ -31,7 +32,7 @@ fn parses_libreoffice_character_border_and_shading_fixtures() {
             .join("../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/165717.rtf"),
     )
     .unwrap();
-    let shading_document = RtfDocument::parse(&shading_source).unwrap();
+    let shading_document = Tree::parse(&shading_source).unwrap();
     assert!(shading_document.stylesheet().styles().iter().any(|style| {
         style
             .formatting
@@ -49,7 +50,7 @@ fn inherits_resets_writes_and_keeps_ignored_destinations_inert() {
         r#"Tail{\plain Plain}"#,
         r#"{\*\unknown\chbrdr\brdrs\brdrw75\chshdng10000 ignored}Visible}"#,
     );
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     let blocks = document.blocks();
     let outer = blocks
         .iter()
@@ -98,7 +99,7 @@ fn inherits_resets_writes_and_keeps_ignored_destinations_inert() {
     assert!(written.contains(
         r"\chbrdr\brdrs\brdrw10\brdrcf2\brsp3\brdrsh\brdrframe\chshdng2500\chcfpat3\chcbpat4"
     ));
-    let reparsed = RtfDocument::parse(&written).unwrap();
+    let reparsed = Tree::parse(&written).unwrap();
     assert!(reparsed.blocks().iter().any(|block| {
         block.text.contains("Inner")
             && block.formatting.character_border.is_some_and(|border| {
@@ -124,10 +125,10 @@ fn rejects_malformed_character_decorations() {
         r"{\rtf1\chcbpat-1 X}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
             "accepted {source}"
         );
     }
 
-    assert!(RtfDocument::parse(r"{\rtf1{\*\unknown\chbrdr1\chshdng10001 ignored}Visible}").is_ok());
+    assert!(Tree::parse(r"{\rtf1{\*\unknown\chbrdr1\chshdng10001 ignored}Visible}").is_ok());
 }

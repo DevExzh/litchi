@@ -4,7 +4,7 @@ use super::model::{OcxInfo, RgxOcxInfo};
 use super::validation::{self, MAX_INFO_COUNT};
 use crate::package::{Error as PackageError, Result};
 
-/// One reversible semantic change made by an [`Editor`].
+/// One reversible semantic change made by an [`Edit`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Change {
     /// A record was inserted at `index`.
@@ -34,46 +34,26 @@ impl Patch {
 
     /// Whether the edit made no semantic changes.
     #[must_use]
-    pub const fn is_empty(&self) -> bool {
+    pub const fn is_noop(&self) -> bool {
         self.changes.is_empty()
     }
 }
 
-/// A committed immutable OLE-control snapshot and its semantic patch.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: RgxOcxInfo,
-    patch: Patch,
-}
+/// A committed immutable OLE-control snapshot, its semantic patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<RgxOcxInfo, Patch>;
 
-impl Commit {
-    /// The edited immutable snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &RgxOcxInfo {
-        &self.snapshot
-    }
-
-    /// The compact patch from the source snapshot.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit and return its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (RgxOcxInfo, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
-
-/// A transactional editor over an immutable `RgxOcxInfo` snapshot.
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
+/// A staged edit over an immutable `RgxOcxInfo` snapshot. Dropping it
+/// discards it.
 #[derive(Debug, Clone)]
-pub struct Editor {
+pub struct Edit {
     infos: Vec<OcxInfo>,
     changes: Vec<Change>,
 }
 
-impl Editor {
+impl Edit {
     /// Begin an edit from an immutable snapshot.
     #[must_use]
     pub fn new(source: &RgxOcxInfo) -> Self {
@@ -141,12 +121,11 @@ impl Editor {
     /// Commit the working records as a validated immutable snapshot.
     pub fn commit(self) -> Result<Commit> {
         let snapshot = RgxOcxInfo::try_new(self.infos)?;
-        Ok(Commit {
-            snapshot,
-            patch: Patch {
-                changes: self.changes,
-            },
-        })
+        let patch = Patch {
+            changes: self.changes,
+        };
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn ensure_cookie_available(&self, cookie: u32, except: Option<usize>) -> Result<()> {
@@ -163,10 +142,10 @@ impl Editor {
 }
 
 impl RgxOcxInfo {
-    /// Begin a transactional edit from this immutable snapshot.
+    /// Begin a staged edit from this immutable snapshot.
     #[must_use]
-    pub fn edit(&self) -> Editor {
-        Editor::new(self)
+    pub fn edit(&self) -> Edit {
+        Edit::new(self)
     }
 }
 

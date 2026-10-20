@@ -42,7 +42,7 @@ use litchi_doc::builder::Builder;
 use litchi_doc::shape::{extract_drawing_shapes, extract_shape_text};
 use litchi_doc::writer::{FloatingPosition, Picture};
 use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
-use litchi_doc::{ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, raw::Package};
+use litchi_doc::{ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, raw::Reader};
 use litchi_odraw::{Record, shape::Kind};
 use std::io::{Cursor, Write};
 use std::path::PathBuf;
@@ -150,7 +150,7 @@ fn write_doc_with_text_boxes(jpeg_bytes: &[u8]) -> Vec<u8> {
 fn text_boxes_round_trip_text_and_shapes() {
     let doc_bytes = write_doc_with_text_boxes(&jpeg_fixture());
 
-    let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(&doc_bytes)).unwrap();
     let document = package.document().unwrap();
 
     // Main story text is intact; the textbox story text is reachable through
@@ -277,7 +277,7 @@ fn genuine_word_text_boxes_parse_via_crate_reader() {
     // story lives in compressed pieces.
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/document/saved-by-table.doc");
-    let mut package = Package::open(path).unwrap();
+    let mut package = Reader::open(path).unwrap();
     let document = package.document().unwrap();
 
     let boxes = document.text_boxes();
@@ -310,7 +310,7 @@ fn document_without_text_boxes_has_empty_story() {
     writer.build().unwrap().write_to(&mut cursor).unwrap();
     let doc_bytes = cursor.into_inner();
 
-    let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(&doc_bytes)).unwrap();
     let document = package.document().unwrap();
     assert!(document.text_boxes().is_empty());
     assert_eq!(document.shape_positions().len(), 1);

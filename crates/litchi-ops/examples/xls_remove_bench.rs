@@ -274,7 +274,9 @@ mod enabled {
 
     fn verify_native(fixture: &Fixture, package: &Package) -> NativeSample {
         let bytes = package.to_bytes().expect("serialize native output");
-        let snapshot = Snapshot::from_bytes(bytes.clone()).expect("parse native output");
+        let snapshot =
+            Snapshot::from_bytes(bytes.clone(), litchi_xls::ole_object::Limits::default())
+                .expect("parse native output");
         let sheet = snapshot
             .worksheet(Selector::Position(Position::new(0)))
             .expect("resolve native output worksheet")
