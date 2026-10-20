@@ -57,7 +57,7 @@ fn text_box_package(slides: usize, boxes: usize) -> Result<Package> {
             );
         }
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     Package::from_reader(std::io::Cursor::new(package.to_bytes()?))
 }
 
@@ -664,7 +664,7 @@ fn the_notes_owning_deck_reuses_proofs_and_keeps_its_notes_graph() -> Result<()>
         slide.set_title(&format!("notes slide {index}"));
         slide.set_notes(&format!("speaker notes {index}"));
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     let package = Package::from_reader(std::io::Cursor::new(package.to_bytes()?))?;
     let source = package.opened_presentation()?;
     let mut edit = source.edit();
@@ -1054,7 +1054,7 @@ fn published_bytes_patches_and_revisions_never_depend_on_memo_contents() -> Resu
             assert!(next.set_shape_text(4, 0, format!("second {index}"))?);
             let second = next.commit()?;
             let _first = commit.into_package();
-            let mut facade = second.clone().into_package();
+            let facade = second.clone().into_package();
             outcomes.push((
                 label,
                 patch,

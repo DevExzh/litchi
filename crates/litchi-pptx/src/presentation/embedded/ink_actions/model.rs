@@ -771,8 +771,8 @@ impl Snapshot {
 
     /// Begin a source-backed existing-target edit.
     #[must_use]
-    pub fn edit(&self) -> super::transaction::Edit {
-        super::transaction::Edit::new(self.clone())
+    pub(crate) fn edit(&self) -> super::transaction::Draft {
+        super::transaction::Draft::new(self.clone())
     }
 }
 

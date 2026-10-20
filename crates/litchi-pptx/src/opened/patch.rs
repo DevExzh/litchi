@@ -876,21 +876,12 @@ impl Patch {
         Ok(output)
     }
 
-    /// Parse a stable durable patch under conservative finite limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for malformed or unbounded input.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, Limits::default())
-    }
-
     /// Parse a stable durable patch under caller-selected finite limits.
     ///
     /// # Errors
     ///
     /// Returns an error for malformed or unbounded input.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
         if bytes.len() > limits.max_patch_bytes() {
             return Err(Error::EditLimit {
                 kind: crate::opened::LimitKind::PatchBytes,
@@ -1625,17 +1616,11 @@ fn validate_topology_dependencies(package: &OpcPackage, patch: &Patch) -> Result
         for relationship in graph.iter().filter(|r| !r.is_external()) {
             let target = folded(relationship.target_partname()?.as_str())?;
             if removed.contains(&target) {
-                return Err(Error::UnsafeEdit {
-                    operation: "apply",
-                    reason: "a surviving relationship references a removed part",
-                });
+                return Err(Error::PatchConflict);
             }
             if added.contains(&target) && !authorizes_added_target_edge(patch, owner, relationship)
             {
-                return Err(Error::UnsafeEdit {
-                    operation: "apply",
-                    reason: "an unrelated relationship would become live after adding a part",
-                });
+                return Err(Error::PatchConflict);
             }
         }
     }
@@ -1691,10 +1676,7 @@ fn authorizes_added_target_edge(
 }
 
 fn stale() -> Error {
-    Error::UnsafeEdit {
-        operation: "apply",
-        reason: "an opened-presentation patch resource is stale",
-    }
+    Error::PatchConflict
 }
 
 fn replace_relationships(

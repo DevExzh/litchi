@@ -32,7 +32,7 @@ pub const MIN_FONT_SIZE: u32 = 100;
 /// The largest accepted typeface name, in bytes.
 pub const MAX_TYPEFACE_BYTES: usize = 1_024;
 
-/// The text element a [`TextEdit`] changes.
+/// The text element a [`TextAssignment`] changes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum TextTarget {
@@ -183,7 +183,7 @@ pub enum ShapeFill {
     None,
 }
 
-/// Optional property assignments for one [`TextEdit`].
+/// Optional property assignments for one [`TextAssignment`].
 ///
 /// Each field is `None` to leave the property as it is, `Some(None)` to
 /// remove the local property, and `Some(Some(value))` to set it.
@@ -349,12 +349,12 @@ impl<'a> TextProperties<'a> {
 
 /// One formatting assignment for [`super::Edit::set_text_properties`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TextEdit<'a> {
+pub struct TextAssignment<'a> {
     target: TextTarget,
     properties: TextProperties<'a>,
 }
 
-impl<'a> TextEdit<'a> {
+impl<'a> TextAssignment<'a> {
     /// Assign `properties` to `target`.
     #[must_use]
     pub const fn new(target: TextTarget, properties: TextProperties<'a>) -> Self {
@@ -379,7 +379,7 @@ impl<'a> TextEdit<'a> {
 /// complete shape scene whose shape count and identities must match.
 pub(crate) fn stage_text_properties(
     xml: &[u8],
-    edits: &[TextEdit<'_>],
+    edits: &[TextAssignment<'_>],
     max_text_bytes: usize,
     max_output_bytes: usize,
 ) -> Result<(Option<Vec<u8>>, usize)> {
@@ -417,7 +417,7 @@ pub(crate) fn stage_text_properties(
 /// reports it.
 pub(crate) fn stage_text_property_chunks(
     xml: &[u8],
-    chunks: &[&[TextEdit<'_>]],
+    chunks: &[&[TextAssignment<'_>]],
     max_text_bytes: usize,
     max_output_bytes: usize,
     mut changes: Option<&mut Vec<bool>>,
@@ -481,7 +481,7 @@ pub(crate) fn stage_text_property_chunks(
 /// is appended in order (record 0348).
 fn stage_admitted_text_edits(
     xml: &[u8],
-    edits: &[TextEdit<'_>],
+    edits: &[TextAssignment<'_>],
     max_output_bytes: usize,
     mut changes: Option<&mut Vec<bool>>,
 ) -> Result<(Option<Vec<u8>>, usize)> {
@@ -504,10 +504,11 @@ fn stage_admitted_text_edits(
     };
     let original = crate::shape::Scene::read(xml)?;
     if original.is_rewritten() {
-        return Err(Error::UnsafeEdit {
-            operation: "set_text_properties",
-            reason: "text property edits do not support markup-compatibility branch selection",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "set_text_properties",
+            "text property edits do not support markup-compatibility branch selection",
+        ));
     }
     // Every target is a leaf element of the original scene (a text shape or
     // a table frame), so their spans are disjoint: each edit rewrites its
@@ -561,10 +562,11 @@ fn stage_admitted_text_edits(
         let replacement = match cell {
             Some((row, column)) => {
                 if !is_table {
-                    return Err(Error::UnsafeEdit {
-                        operation: "set_text_properties",
-                        reason: "a table cell edit requires a table graphic frame",
-                    });
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedTarget,
+                        "set_text_properties",
+                        "a table cell edit requires a table graphic frame",
+                    ));
                 }
                 if !tables.contains_key(&slot) {
                     let cells = TableCells::locate(element)?;
@@ -613,10 +615,11 @@ fn stage_admitted_text_edits(
             },
             None => {
                 if is_table || edit.properties.has_cell_properties() {
-                    return Err(Error::UnsafeEdit {
-                        operation: "set_text_properties",
-                        reason: "text formatting requires a shape text body; fill applies to table cells",
-                    });
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedTarget,
+                        "set_text_properties",
+                        "text formatting requires a shape text body; fill applies to table cells",
+                    ));
                 }
                 let local = match edit.target {
                     TextTarget::Paragraph { paragraph, .. } => Some((paragraph.get(), None, None)),
@@ -694,10 +697,11 @@ fn stage_admitted_text_edits(
         .windows(2)
         .any(|pair| pair[0].1.end > pair[1].1.start)
     {
-        return Err(Error::UnsafeEdit {
-            operation: "set_text_properties",
-            reason: "text property edits address nested shapes",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedTarget,
+            "set_text_properties",
+            "text property edits address nested shapes",
+        ));
     }
     let removed: usize = elements.iter().map(|(_, span, _)| span.len()).sum();
     let added: usize = elements.iter().map(|(_, _, bytes)| bytes.len()).sum();
@@ -754,7 +758,7 @@ const fn shape_position(target: TextTarget) -> Position {
     }
 }
 
-fn validate(edit: &TextEdit<'_>) -> Result<()> {
+fn validate(edit: &TextAssignment<'_>) -> Result<()> {
     let properties = &edit.properties;
     if properties.is_empty() {
         return Err(Error::Invalid(
@@ -1359,11 +1363,12 @@ fn check_replaceable(owner: &[u8], kids: &[Node], range: &Range<usize>) -> Resul
 }
 
 fn dropped_content() -> Error {
-    Error::UnsafeEdit {
-        operation: "set_text_properties",
-        reason: "the replaced text holds a field (a:fld) or other markup that is not a run \
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "set_text_properties",
+        "the replaced text holds a field (a:fld) or other markup that is not a run \
                  or a line break; set the text of its runs instead",
-    }
+    )
 }
 
 fn is_run(local: &[u8]) -> bool {
@@ -1381,10 +1386,11 @@ pub(super) fn rewrite_run(
     let prefix = node.prefix(run).to_vec();
     let field = node.local(run) == b"fld";
     if text.is_some() && node.local(run) != b"r" && !field {
-        return Err(Error::UnsafeEdit {
-            operation: "set_text_properties",
-            reason: "run text applies to a text run (a:r) or a field's cached result (a:fld)",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedTarget,
+            "set_text_properties",
+            "run text applies to a text run (a:r) or a field's cached result (a:fld)",
+        ));
     }
     let kids = children(run, &node)?;
     let mut splices = Splices::new();
@@ -1465,10 +1471,11 @@ pub(super) fn rewrite_run(
 fn split_run(run: &[u8], span: Range<usize>, properties: &TextProperties<'_>) -> Result<Vec<u8>> {
     let node = root(run)?;
     if node.local(run) != b"r" {
-        return Err(Error::UnsafeEdit {
-            operation: "set_text_properties",
-            reason: "a run span applies to a text run (a:r)",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedTarget,
+            "set_text_properties",
+            "a run span applies to a text run (a:r)",
+        ));
     }
     let kids = children(run, &node)?;
     let t = child(run, &kids, b"t").ok_or_else(|| invalid("a text run has no a:t element"))?;
@@ -1478,10 +1485,11 @@ fn split_run(run: &[u8], span: Range<usize>, properties: &TextProperties<'_>) ->
         let raw =
             std::str::from_utf8(&run[t.content()]).map_err(|_| invalid("run text is not UTF-8"))?;
         if raw.contains("<![CDATA[") {
-            return Err(Error::UnsafeEdit {
-                operation: "set_text_properties",
-                reason: "a run span cannot split character data sections",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "set_text_properties",
+                "a run span cannot split character data sections",
+            ));
         }
         quick_xml::escape::unescape(raw)
             .map_err(|_| invalid("run text holds an unknown entity"))?
@@ -1754,10 +1762,11 @@ fn drawing_prefix(shape: &[u8], kids: &[Node], sppr_kids: &[Node]) -> Result<Vec
             return Ok(first.prefix(shape).to_vec());
         }
     }
-    Err(Error::UnsafeEdit {
-        operation: "set_text_properties",
-        reason: "the shape has no DrawingML child naming the drawing prefix",
-    })
+    Err(Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedTarget,
+        "set_text_properties",
+        "the shape has no DrawingML child naming the drawing prefix",
+    ))
 }
 
 /// Rewrite a shape's `p:spPr` for fill and preset-geometry assignments.
@@ -1767,10 +1776,11 @@ fn rewrite_sppr(
     properties: &TextProperties<'_>,
     splices: &mut Splices,
 ) -> Result<()> {
-    let sppr = child(shape, kids, b"spPr").ok_or(Error::UnsafeEdit {
-        operation: "set_text_properties",
-        reason: "the shape has no shape properties",
-    })?;
+    let sppr = child(shape, kids, b"spPr").ok_or(Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedTarget,
+        "set_text_properties",
+        "the shape has no shape properties",
+    ))?;
     let sppr_kids = children(shape, sppr)?;
     let prefix = drawing_prefix(shape, kids, &sppr_kids)?;
     let mut changes = Vec::new();
@@ -1852,10 +1862,11 @@ fn rewrite_shape(
     if !properties.has_body_properties() {
         return splices.apply(shape);
     }
-    let body = child(shape, &kids, b"txBody").ok_or(Error::UnsafeEdit {
-        operation: "set_text_properties",
-        reason: "the shape has no text body",
-    })?;
+    let body = child(shape, &kids, b"txBody").ok_or(Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedTarget,
+        "set_text_properties",
+        "the shape has no text body",
+    ))?;
     let (paragraph, run, span) = match target {
         TextTarget::Shape { .. } => (None, None, None),
         TextTarget::Paragraph { paragraph, .. } => (Some(paragraph.get()), None, None),
@@ -1916,10 +1927,11 @@ impl ShapeParagraphs {
     fn locate(shape: &[u8]) -> Result<Self> {
         let node = root(shape)?;
         let kids = children(shape, &node)?;
-        let body = child(shape, &kids, b"txBody").ok_or(Error::UnsafeEdit {
-            operation: "set_text_properties",
-            reason: "the shape has no text body",
-        })?;
+        let body = child(shape, &kids, b"txBody").ok_or(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedTarget,
+            "set_text_properties",
+            "the shape has no text body",
+        ))?;
         let spans = children(shape, body)?
             .into_iter()
             .filter(|kid| kid.local(shape) == b"p")
@@ -2058,10 +2070,11 @@ fn rewrite_cell_run(
         return Err(invalid("an empty a:tc has no runs"));
     }
     let kids = children(cell, &node)?;
-    let body = child(cell, &kids, b"txBody").ok_or(Error::UnsafeEdit {
-        operation: "set_text_properties",
-        reason: "the table cell has no text body",
-    })?;
+    let body = child(cell, &kids, b"txBody").ok_or(Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedTarget,
+        "set_text_properties",
+        "the table cell has no text body",
+    ))?;
     let rewritten = rewrite_body(
         &cell[body.span.clone()],
         Some(paragraph),
@@ -2086,10 +2099,11 @@ fn rewrite_cell_paragraph(
         return Err(invalid("an empty a:tc has no paragraphs"));
     }
     let kids = children(cell, &node)?;
-    let body = child(cell, &kids, b"txBody").ok_or(Error::UnsafeEdit {
-        operation: "set_text_properties",
-        reason: "the table cell has no text body",
-    })?;
+    let body = child(cell, &kids, b"txBody").ok_or(Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedTarget,
+        "set_text_properties",
+        "the table cell has no text body",
+    ))?;
     let rewritten = rewrite_body(
         &cell[body.span.clone()],
         Some(paragraph),
@@ -2113,10 +2127,11 @@ fn rewrite_cell(cell: &[u8], properties: &TextProperties<'_>) -> Result<Vec<u8>>
     let body = child(cell, &kids, b"txBody");
     let formatting = properties.has_run_properties() || properties.align.is_some();
     if properties.text.is_some() || formatting {
-        let body = body.ok_or(Error::UnsafeEdit {
-            operation: "set_text_properties",
-            reason: "the table cell has no text body",
-        })?;
+        let body = body.ok_or(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedTarget,
+            "set_text_properties",
+            "the table cell has no text body",
+        ))?;
         let element = &cell[body.span.clone()];
         let rewritten = match properties.text {
             Some(text) => rewrite_body_text(element, &prefix, text, properties)?,

@@ -655,7 +655,7 @@ fn parse_presentation_extensions(n: &Node) -> Result<Vec<Extension>> {
                     return Err(invalid("duplicate readonlyRecommended extension"));
                 }
                 readonly_seen = true;
-                Extension::ReadonlyRecommended(parse_extension_bool(
+                Extension::ReadOnlyRecommended(parse_extension_bool(
                     ext,
                     P1710_NS,
                     "readonlyRecommended",
@@ -924,7 +924,7 @@ fn write_presentation_extensions(x: &mut String, v: &[Extension], strict: bool) 
                 crate::presentation_properties::math::write(x, value, strict)?;
                 x.push_str("</p:ext>");
             },
-            Extension::ReadonlyRecommended(value) => {
+            Extension::ReadOnlyRecommended(value) => {
                 write_bool_extension(
                     x,
                     READONLY_RECOMMENDED_URI,
@@ -1482,7 +1482,7 @@ mod tests {
     #[test]
     fn readonly_recommended_writer_uses_the_p1710_namespace() {
         let properties = Properties {
-            extensions: vec![Extension::ReadonlyRecommended(true)],
+            extensions: vec![Extension::ReadOnlyRecommended(true)],
             ..Properties::default()
         };
         let xml = properties.to_xml(false).unwrap();

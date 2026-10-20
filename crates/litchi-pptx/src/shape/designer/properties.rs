@@ -4,6 +4,11 @@
 //! direct `p:nvPr` extension list.  This module deliberately scans the whole
 //! slide, rather than a detached shape fragment, so inherited namespace
 //! prefixes are proven before the payload codec accepts them.
+//!
+//! [`crate::Package::shape_designer_properties`] reads a [`Snapshot`];
+//! [`crate::Package::edit_shape_designer_properties`] starts an [`Edit`]
+//! whose [`Edit::commit`] publishes a new package with the reversible
+//! [`Patch`] (record 0351 §2.3).
 
 use std::ops::Range;
 use std::sync::Arc;
@@ -16,8 +21,8 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::{DrawingProperties, Limits, P202_NAMESPACE, PROPERTIES_EXTENSION_URI};
+use crate::Result;
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
-use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const PML_TRANSITIONAL: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
@@ -29,7 +34,7 @@ const PML_STRICT: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
 /// intentionally not cloneable: a commit can only be published against the
 /// exact source from which it was read.
 #[derive(Debug)]
-pub struct PropertiesSnapshot {
+pub struct Snapshot {
     owner: PackURI,
     source: Arc<Vec<u8>>,
     shape: Range<usize>,
@@ -43,7 +48,7 @@ struct PropertySource {
     inner_extensions: Option<Vec<u8>>,
 }
 
-impl PropertiesSnapshot {
+impl Snapshot {
     /// Borrow the selected shape's optional typed properties.
     #[inline]
     #[must_use]
@@ -87,8 +92,8 @@ impl PropertiesSnapshot {
     /// Start a move-only edit tied to this exact slide source.
     #[inline]
     #[must_use]
-    pub fn edit(self) -> PropertiesEdit {
-        PropertiesEdit {
+    pub(crate) fn edit(self) -> Draft {
+        Draft {
             snapshot: self,
             state: EditState::Unchanged,
             changed: false,
@@ -105,17 +110,18 @@ enum EditState {
 
 /// A move-only edit of one shape's optional Designer properties.
 #[derive(Debug)]
-pub struct PropertiesEdit {
-    snapshot: PropertiesSnapshot,
+pub(crate) struct Draft {
+    snapshot: Snapshot,
     state: EditState,
     changed: bool,
 }
 
-impl PropertiesEdit {
+impl Draft {
     /// Borrow the currently projected optional properties.
     #[inline]
     #[must_use]
-    pub fn properties(&self) -> Option<&DrawingProperties> {
+    #[cfg(test)]
+    pub(crate) fn properties(&self) -> Option<&DrawingProperties> {
         match &self.state {
             EditState::Unchanged => self.snapshot.properties(),
             EditState::Set(value) => Some(value),
@@ -129,7 +135,7 @@ impl PropertiesEdit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set(&mut self, value: DrawingProperties) -> Result<()> {
+    pub(crate) fn set(&mut self, value: DrawingProperties) -> Result<()> {
         validate_properties(&value, self.snapshot.limits)?;
         self.changed =
             self.snapshot.occurrence_count() != 1 || self.snapshot.properties() != Some(&value);
@@ -138,19 +144,9 @@ impl PropertiesEdit {
     }
 
     /// Remove the `designPr` payload, leaving all unrelated extension markup.
-    pub fn remove(&mut self) {
+    pub(crate) fn remove(&mut self) {
         self.changed = self.snapshot.is_present();
         self.state = EditState::Remove;
-    }
-
-    fn is_changed(&self) -> bool {
-        self.changed
-    }
-
-    /// The outcome of this edit or commit.
-    #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
-        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Consume this edit into a move-only source-bound commit.
@@ -158,12 +154,13 @@ impl PropertiesEdit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<PropertiesCommit> {
+    pub(crate) fn commit(self) -> Result<Prepared> {
         if self.changed && self.snapshot.occurrence_count() > 1 {
-            return Err(Error::UnsafeEdit {
-                operation: "commit_shape_designer_properties",
-                reason: "the selected shape has multiple matching Designer properties extensions",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "commit_shape_designer_properties",
+                "the selected shape has multiple matching Designer properties extensions",
+            ));
         }
         if let EditState::Set(value) = &self.state {
             validate_properties(value, self.snapshot.limits)?;
@@ -172,7 +169,7 @@ impl PropertiesEdit {
             EditState::Unchanged | EditState::Remove => None,
             EditState::Set(value) => Some(value),
         };
-        Ok(PropertiesCommit {
+        Ok(Prepared {
             snapshot: self.snapshot,
             value,
             changed: self.changed,
@@ -182,17 +179,18 @@ impl PropertiesEdit {
 
 /// A move-only staged `designPr` publication.
 #[derive(Debug)]
-pub struct PropertiesCommit {
-    snapshot: PropertiesSnapshot,
+pub(crate) struct Prepared {
+    snapshot: Snapshot,
     value: Option<DrawingProperties>,
     changed: bool,
 }
 
-impl PropertiesCommit {
+impl Prepared {
     /// Return whether publishing this commit is a byte-preserving no-op.
     #[inline]
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn is_noop(&self) -> bool {
         !self.changed
     }
 }
@@ -202,7 +200,7 @@ pub(crate) fn load_properties<'k>(
     package: &OpcPackage,
     owner: &PackURI,
     key: impl Into<crate::shape::Key<'k>>,
-) -> Result<PropertiesSnapshot> {
+) -> Result<Snapshot> {
     load_properties_with_limits(package, owner, key, Limits::default())
 }
 
@@ -212,14 +210,14 @@ pub(crate) fn load_properties_with_limits<'k>(
     owner: &PackURI,
     key: impl Into<crate::shape::Key<'k>>,
     limits: Limits,
-) -> Result<PropertiesSnapshot> {
+) -> Result<Snapshot> {
     let part = package.get_part(owner)?;
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
     let source = copy_owner(part.blob(), limits)?;
     let shape = crate::tag::shape::selected_raw_span(&source, key.into())?;
     let located = locate(&source, shape.clone(), limits)?;
     let occurrences = parse_properties(&source, &located, limits)?;
-    Ok(PropertiesSnapshot {
+    Ok(Snapshot {
         owner: part.partname().clone(),
         source,
         shape,
@@ -229,11 +227,8 @@ pub(crate) fn load_properties_with_limits<'k>(
 }
 
 /// Apply a move-only commit atomically to its originating slide.
-pub(crate) fn apply_properties(
-    package: &mut OpcPackage,
-    commit: PropertiesCommit,
-) -> Result<PropertiesSnapshot> {
-    let PropertiesCommit {
+pub(crate) fn apply_properties(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
+    let Prepared {
         snapshot,
         value,
         changed,
@@ -283,10 +278,7 @@ pub(crate) fn apply_properties(
     let part = package.get_part(&snapshot.owner)?;
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
     if part.blob() != original {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_shape_designer_properties",
-            reason: "the selected slide changed during Designer properties staging",
-        });
+        return Err(Error::PatchConflict);
     }
     if staged == original {
         return Ok(snapshot);
@@ -297,7 +289,7 @@ pub(crate) fn apply_properties(
         .get_part_mut(&snapshot.owner)?
         .set_blob_shared(Arc::clone(&staged));
     settle_unsigned_change(package)?;
-    Ok(PropertiesSnapshot {
+    Ok(Snapshot {
         owner: snapshot.owner,
         source: staged,
         shape: staged_shape,
@@ -306,44 +298,33 @@ pub(crate) fn apply_properties(
     })
 }
 
-fn validate_current_source(package: &OpcPackage, snapshot: &PropertiesSnapshot) -> Result<()> {
+fn validate_current_source(package: &OpcPackage, snapshot: &Snapshot) -> Result<()> {
     let part = package.get_part(&snapshot.owner)?;
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
     if part.blob() != snapshot.source.as_slice() {
-        return Err(Error::UnsafeEdit {
-            operation: "apply_shape_designer_properties",
-            reason: "the selected slide changed after Designer properties were loaded",
-        });
+        return Err(Error::PatchConflict);
     }
     Ok(())
 }
 
 /// Directly replace or create selected shape Designer properties.
-#[allow(
-    dead_code,
-    reason = "kept as the crate-private direct publication wrapper"
-)]
 pub(crate) fn put_properties<'k>(
     package: &mut OpcPackage,
     owner: &PackURI,
     key: impl Into<crate::shape::Key<'k>>,
     value: DrawingProperties,
-) -> Result<PropertiesSnapshot> {
+) -> Result<Snapshot> {
     let mut edit = load_properties(package, owner, key)?.edit();
     edit.set(value)?;
     apply_properties(package, edit.commit()?)
 }
 
 /// Directly remove selected shape Designer properties.
-#[allow(
-    dead_code,
-    reason = "kept as the crate-private direct publication wrapper"
-)]
 pub(crate) fn remove_properties<'k>(
     package: &mut OpcPackage,
     owner: &PackURI,
     key: impl Into<crate::shape::Key<'k>>,
-) -> Result<PropertiesSnapshot> {
+) -> Result<Snapshot> {
     let mut edit = load_properties(package, owner, key)?.edit();
     edit.remove();
     apply_properties(package, edit.commit()?)
@@ -669,15 +650,16 @@ fn stage(
     source: &[u8],
     shape: &Range<usize>,
     value: Option<&DrawingProperties>,
-    snapshot: &PropertiesSnapshot,
+    snapshot: &Snapshot,
     limits: Limits,
 ) -> Result<Vec<u8>> {
     let located = locate(source, shape.clone(), limits)?;
     if located.property_exts.len() > 1 {
-        return Err(Error::UnsafeEdit {
-            operation: "stage_shape_designer_properties",
-            reason: "the selected shape has multiple matching Designer properties extensions",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "stage_shape_designer_properties",
+            "the selected shape has multiple matching Designer properties extensions",
+        ));
     }
     let occurrence = located.property_exts.first();
     let current = occurrence.and_then(|occurrence| occurrence.properties.as_ref());
@@ -693,10 +675,10 @@ fn stage(
         (None, Some(value)) => insert_properties(source, &located, value, inner_extensions, limits),
         (None, None) => fallible_copy_vec(source, "Designer no-op output"),
         (Some(current), None) => {
-            let occurrence = occurrence.ok_or(Error::UnsafeEdit {
-                operation: "stage_shape_designer_properties",
-                reason: "current Designer properties have no outer occurrence",
-            })?;
+            let occurrence = occurrence.ok_or(Error::internal(
+                "stage_shape_designer_properties",
+                "current Designer properties have no outer occurrence",
+            ))?;
             remove_properties_xml(source, &located, occurrence, current, limits)
         },
     }
@@ -1230,5 +1212,96 @@ mod tests {
         );
         assert!(text.contains("<!--outer-->"));
         assert!(!text.contains("p202:designPr"));
+    }
+}
+
+crate::part_edit::family!("shape Designer-properties");
+
+/// A staged shape Designer-properties edit of one [`crate::Package`].
+/// Dropping it discards it.
+#[derive(Debug)]
+pub struct Edit<'a> {
+    staged: crate::part_edit::Staged<'a>,
+}
+
+impl crate::Package {
+    /// Start a shape Designer-properties edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose typed
+    /// mutations are refused.
+    pub fn edit_shape_designer_properties(&self) -> Result<Edit<'_>> {
+        Ok(Edit {
+            staged: crate::part_edit::Staged::new(self, "edit_shape_designer_properties")?,
+        })
+    }
+
+    /// Apply a shape Designer-properties patch to a new package; this one is
+    /// unchanged. An empty patch returns an equal package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// before state, and the signature refusal for a changed patch of a
+    /// signed package.
+    pub fn apply_shape_designer_properties(&self, patch: &Patch) -> Result<Commit> {
+        Ok(commit_of((
+            patch.0.apply(self, "apply_shape_designer_properties")?,
+            patch.0.clone(),
+        )))
+    }
+}
+
+impl Edit<'_> {
+    /// Replace or create the Designer properties of the selected shape.
+    /// Returns the published snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing, ambiguous or out-of-range slide or
+    /// shape, invalid properties, several matching Designer extensions, or a
+    /// changed edit of a signed package.
+    pub fn set<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+        properties: DrawingProperties,
+    ) -> Result<Snapshot> {
+        let (slide, _) = crate::package::resolve_slide_identity(self.staged.opc(), slide.into())?;
+        let shape = shape.into();
+        self.staged
+            .update(|opc| put_properties(opc, &slide, shape, properties))
+    }
+
+    /// Remove the `designPr` payload of the selected shape, leaving all
+    /// unrelated extension markup. Returns the published snapshot.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set`].
+    pub fn remove<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<Snapshot> {
+        let (slide, _) = crate::package::resolve_slide_identity(self.staged.opc(), slide.into())?;
+        let shape = shape.into();
+        self.staged
+            .update(|opc| remove_properties(opc, &slide, shape))
+    }
+
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.staged.reset();
+    }
+
+    /// Publish the staged changes to a new package.
+    ///
+    /// # Errors
+    ///
+    /// Returns the part-count limit of the patch.
+    pub fn commit(self) -> Result<Commit> {
+        Ok(commit_of(self.staged.commit()?))
     }
 }

@@ -12,7 +12,6 @@ use super::Package;
 use crate::custom::{Host, Props};
 use crate::parts::PresentationPart;
 use crate::resources;
-use crate::writer::MutablePresentation;
 use crate::{Error, Result};
 
 const PRESENTATION_PART: &str = "/ppt/presentation.xml";
@@ -27,15 +26,7 @@ const NOTES_MASTER_RELATIONSHIP_ID: &str = "rIdNotesMaster";
 const CORE_PROPERTIES_PART: &str = "/docProps/core.xml";
 const EXTENDED_PROPERTIES_PART: &str = "/docProps/app.xml";
 
-pub(super) const STALE_PRESENTATION_GRAPH_REASON: &str = "the mutable presentation model has unflushed changes; finish the builder before reading the canonical package graph";
-
 impl Package {
-    pub(crate) fn finish_creation(mut self) -> Result<Self> {
-        self.flush_presentation()?;
-        self.mutable_pres = None;
-        Ok(self)
-    }
-
     /// Create a minimal valid canonical `PresentationML` package.
     ///
     /// Use [`crate::builder::Builder`] to configure a fresh presentation.
@@ -54,7 +45,7 @@ impl Package {
     ///
     /// Returns an error if the operation fails.
     pub fn new() -> Result<Self> {
-        Self::new_authoring()?.finish_creation()
+        Self::new_authoring()
     }
 
     pub(crate) fn new_authoring() -> Result<Self> {
@@ -183,14 +174,13 @@ impl Package {
 
         Ok(Self {
             opc: package,
-            mutable_pres: Some(MutablePresentation::new()),
             part_digests: std::sync::OnceLock::new(),
             physical_source_provenance: false,
             tolerance: crate::leniency::ToleranceReport::default(),
             #[cfg(feature = "encryption")]
             encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
-            #[cfg(feature = "automatic-fonts")]
-            font_embedding_dirty: false,
+            #[cfg(feature = "encryption")]
+            encryption_limits: litchi_crypto::ooxml::Limits::default(),
         })
     }
 
@@ -312,14 +302,13 @@ impl Package {
             crate::presentation_properties::load_from_package_with_tolerance(&opc, &mut tolerance);
         Ok(Self {
             opc,
-            mutable_pres: None,
             part_digests: std::sync::OnceLock::new(),
             physical_source_provenance,
             tolerance,
             #[cfg(feature = "encryption")]
             encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
-            #[cfg(feature = "automatic-fonts")]
-            font_embedding_dirty: false,
+            #[cfg(feature = "encryption")]
+            encryption_limits: litchi_crypto::ooxml::Limits::default(),
         })
     }
 
@@ -331,7 +320,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.
-    pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         self.save_with_durability(path, litchi_core::Durability::Full)
     }
 
@@ -351,7 +340,7 @@ impl Package {
     /// `Durability::Full` can report that the destination was replaced but
     /// its directory could not be synchronized.
     pub fn save_with_durability<P: AsRef<Path>>(
-        &mut self,
+        &self,
         path: P,
         durability: litchi_core::Durability,
     ) -> Result<()> {
@@ -362,7 +351,6 @@ impl Package {
                 operation: "save",
                 source,
             })?;
-        self.flush_presentation()?;
         PackageWriter::write_with_durability(path, &self.opc, durability)?;
         Ok(())
     }
@@ -372,7 +360,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn to_bytes(&mut self) -> Result<Vec<u8>> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
         #[cfg(feature = "encryption")]
         self.encryption
             .ordinary_output()
@@ -380,95 +368,39 @@ impl Package {
                 operation: "to_bytes",
                 source,
             })?;
-        self.flush_presentation()?;
         Ok(PackageWriter::to_bytes(&self.opc)?)
     }
 
-    pub(super) fn edit_typed<T>(
-        &mut self,
-        operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
-    ) -> Result<T> {
-        self.ensure_plain_mutation("typed package mutation")?;
-        self.edit_raw(operation)
-    }
-
-    pub(super) fn edit_raw<T>(
-        &mut self,
-        operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
-    ) -> Result<T> {
-        let before = self.opc.clone();
-        let presentation_before = self.mutable_pres.clone();
-        #[cfg(feature = "automatic-fonts")]
-        let font_embedding_dirty_before = self.font_embedding_dirty;
-
-        // A raw edit hands the complete graph to the operation, so no memo of
-        // the previous graph survives it, in either direction.
-        self.release_part_digests();
-        let result = (|| {
-            self.flush_presentation()?;
-            operation(&mut self.opc)
-        })();
-        match result {
-            Ok(value) => Ok(value),
-            Err(error) => {
-                self.opc = before;
-                self.mutable_pres = presentation_before;
-                #[cfg(feature = "automatic-fonts")]
-                {
-                    self.font_embedding_dirty = font_embedding_dirty_before;
-                }
-                Err(error)
-            },
-        }
-    }
-
-    pub(super) fn flush_presentation(&mut self) -> Result<()> {
-        let presentation_modified = self.is_modified();
+    /// Publish an authored presentation model into this freshly created
+    /// package: the slides when the model changed, and the automatic fonts
+    /// when `embed_fonts` asks for them. On error the package is dropped.
+    pub(crate) fn publish_authored(
+        mut self,
+        presentation: &crate::builder::Presentation,
+        embed_fonts: bool,
+    ) -> Result<Self> {
+        let _ = embed_fonts;
+        let presentation_modified = presentation.is_modified();
         #[cfg(feature = "automatic-fonts")]
         let fonts_requested = self.opc.save_options().fonts != litchi_opc::FontEmbedding::None
-            && (presentation_modified || self.font_embedding_dirty);
+            && (presentation_modified || embed_fonts);
         #[cfg(not(feature = "automatic-fonts"))]
         let fonts_requested = false;
         if !presentation_modified && !fonts_requested {
-            return Ok(());
+            return Ok(self);
         }
-        let Some(presentation) = self.mutable_pres.clone() else {
-            return Err(Error::UnsafeEdit {
-                operation: "save",
-                reason: "the lossless facade cannot publish an opened package's mutable graph",
-            });
-        };
-        // Materializing the mutable presentation rewrites parts of the graph,
-        // so the retained payload-digest memo is released first.
-        self.release_part_digests();
-        let before = self.opc.clone();
-        let result = (|| {
-            if presentation_modified {
-                self.materialize_presentation(&presentation)?;
-            }
-            #[cfg(feature = "automatic-fonts")]
-            self.embed_fonts_for_presentation(&presentation)?;
-            Ok(())
-        })();
-        match result {
-            Ok(()) => {
-                #[cfg(feature = "automatic-fonts")]
-                if fonts_requested {
-                    self.font_embedding_dirty = false;
-                }
-                if presentation_modified && let Some(presentation) = self.mutable_pres.as_mut() {
-                    presentation.mark_clean();
-                }
-                Ok(())
-            },
-            Err(error) => {
-                self.opc = before;
-                Err(error)
-            },
+        if presentation_modified {
+            self.materialize_presentation(presentation)?;
         }
+        #[cfg(feature = "automatic-fonts")]
+        self.embed_fonts_for_presentation(presentation)?;
+        Ok(self)
     }
 
-    fn materialize_presentation(&mut self, presentation: &MutablePresentation) -> Result<()> {
+    fn materialize_presentation(
+        &mut self,
+        presentation: &crate::builder::Presentation,
+    ) -> Result<()> {
         // Compile all fallible p202 payloads before changing any OPC state.
         let designer = presentation.preflight_designer()?;
         let presentation_name = pack_uri(PRESENTATION_PART)?;

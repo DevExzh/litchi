@@ -167,8 +167,8 @@ impl Snapshot {
     /// Start an isolated transaction over this snapshot.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Edit {
-        Edit {
+    pub(crate) fn edit(&self) -> Draft {
+        Draft {
             source: self.clone(),
             control: self.control.clone(),
             binary: self.binary.as_ref().map(|value| Arc::clone(&value.bytes)),
@@ -189,13 +189,13 @@ impl Snapshot {
 
 /// Failure-atomic editor over typed control and descriptor metadata.
 #[derive(Debug, Clone)]
-pub struct Edit {
+pub struct Draft {
     source: Snapshot,
     control: Control,
     binary: Option<Arc<Vec<u8>>>,
 }
 
-impl Edit {
+impl Draft {
     /// Borrow the immutable source snapshot used by this edit.
     #[inline]
     #[must_use]
@@ -332,7 +332,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Prepared> {
         validate_control(&self.control)?;
         let relationship_id = self
             .source
@@ -427,11 +427,11 @@ impl Edit {
             descriptor_relationships,
             binary,
         )?;
-        let patch = Patch {
+        let patch = Change {
             before: self.source,
             after: snapshot.clone(),
         };
-        Ok(Commit { snapshot, patch })
+        Ok(Prepared { snapshot, patch })
     }
 
     fn descriptor_mut(&mut self) -> Result<&mut Descriptor> {
@@ -444,68 +444,70 @@ impl Edit {
 
 /// Successful publication candidate and its reversible package patch.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Prepared {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: Snapshot,
-    patch: Patch,
+    patch: Change,
 }
 
-impl Commit {
+impl Prepared {
     /// Borrow the validated detached target snapshot.
     #[inline]
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    #[cfg(test)]
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the source-checked package patch.
     #[inline]
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    #[cfg(test)]
+    pub(crate) const fn patch(&self) -> &Change {
         &self.patch
     }
 
+    #[cfg(test)]
     fn is_changed(&self) -> bool {
         !self.patch.is_empty()
     }
 
     /// The outcome of this edit or commit.
     #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
         crate::diagnostics::Diagnostics::new(self.is_changed())
-    }
-
-    /// Consume this commit into its target snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
     }
 
     /// Consume this commit into its source-checked package patch.
     #[must_use]
-    pub fn into_patch(self) -> Patch {
+    pub(crate) fn into_patch(self) -> Change {
         self.patch
     }
 }
 
 /// A reversible, source-checked replacement of one slide-owned `ActiveX` graph.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub(crate) struct Change {
     before: Snapshot,
     after: Snapshot,
 }
 
-impl Patch {
+impl Change {
     /// Source snapshot required for forward application.
     #[inline]
     #[must_use]
-    pub const fn before(&self) -> &Snapshot {
+    pub(crate) const fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Target snapshot produced by forward application.
     #[inline]
     #[must_use]
-    pub const fn after(&self) -> &Snapshot {
+    pub(crate) const fn after(&self) -> &Snapshot {
         &self.after
     }
 
@@ -515,49 +517,15 @@ impl Patch {
         self.before.same_source(&self.after)
     }
 
-    fn is_changed(&self) -> bool {
-        !self.is_empty()
-    }
-
-    /// Whether this patch leaves its source unchanged.
-    #[must_use]
-    pub fn is_noop(&self) -> bool {
-        !self.is_changed()
-    }
-
     /// Build the exact inverse patch.
     #[inline]
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
         }
-    }
-
-    /// Publish this patch atomically to its owning OPC package.
-    ///
-    /// A change to a signed package is refused with
-    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-    /// (ADR 0006) before anything is mutated: remove the signature explicitly
-    /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
-    /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
-    /// no-op keeps the signature.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn apply(&self, package: &mut litchi_opc::OpcPackage) -> Result<Snapshot> {
-        super::package::apply_patch(package, self)
-    }
-
-    /// Alias for undoing a committed patch against its exact target graph.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn undo(&self, package: &mut litchi_opc::OpcPackage) -> Result<Snapshot> {
-        self.inverse().apply(package)
     }
 }
 

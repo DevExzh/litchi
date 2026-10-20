@@ -161,7 +161,7 @@ fn generate_protection_pptx(password: &str) -> Result<(), Box<dyn std::error::Er
             914400,
         );
     }
-    let mut pkg = builder.build()?;
+    let pkg = builder.build()?;
     pkg.save_plain("pptx_protection_clear.pptx")?;
     pkg.save_encrypted("pptx_protection_open_password.pptx", password, Mode::Agile)?;
 

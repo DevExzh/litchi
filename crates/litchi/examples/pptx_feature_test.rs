@@ -4,11 +4,11 @@
 //! PresentationML is built and round-tripped through its typed owner before it
 //! is summarized in the package, keeping the package facade focused on slides.
 
+use litchi_pptx::Package;
 use litchi_pptx::animations::{Effect, EffectInstance, Sequence, Trigger};
 use litchi_pptx::presentation_properties::metadata::custom_show::{List as ShowList, Show};
 use litchi_pptx::presentation_properties::metadata::handout::{Layout, Master};
 use litchi_pptx::presentation_properties::metadata::sections::{List as SectionList, Section};
-use litchi_pptx::{MutablePresentation, Package};
 use std::error::Error as StdError;
 
 const X: i64 = 914_400;
@@ -146,7 +146,7 @@ fn test_all_features() -> Result<(), Box<dyn StdError>> {
 }
 
 fn add_summary_slide(
-    presentation: &mut MutablePresentation,
+    presentation: &mut litchi_pptx::builder::Presentation,
     title: &str,
     body: &str,
 ) -> Result<(), Box<dyn StdError>> {
@@ -156,7 +156,7 @@ fn add_summary_slide(
     Ok(())
 }
 
-fn save_and_reopen(mut package: Package, path: &str) -> Result<(), Box<dyn StdError>> {
+fn save_and_reopen(package: Package, path: &str) -> Result<(), Box<dyn StdError>> {
     package.save(path)?;
     let reopened = Package::open(path)?;
     assert_eq!(reopened.presentation()?.slide_count()?, 1);

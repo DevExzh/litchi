@@ -50,13 +50,13 @@ fn master_theme_accessor_rejects_external_theme_relationships() {
 fn package_with_slide() -> Package {
     let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     builder.presentation().unwrap().add_slide().unwrap();
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     let package_bytes = package.to_bytes().unwrap();
     Package::from_bytes(&package_bytes).unwrap()
 }
 
 fn package_with_external_master_theme() -> Package {
-    let mut package = package_with_slide();
+    let package = package_with_slide();
     let package_bytes = package.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&package_bytes).unwrap();
     let master_name = PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap();

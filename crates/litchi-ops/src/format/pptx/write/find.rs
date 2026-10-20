@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use litchi_core::{FileFormat, Position};
 use litchi_drawingml::text::body::{Body, RunKind};
-use litchi_pptx::opened::{TextEdit, TextTarget};
+use litchi_pptx::opened::{TextAssignment, TextTarget};
 
 use super::text::{TextValues, admit};
 use super::{Commit, Pptx, allocation, error};
@@ -201,8 +201,8 @@ impl Pptx {
                 .reverse()
         });
         let properties = format.as_ref().map(TextValues::properties);
-        let mut slides: Vec<(usize, Vec<TextEdit<'_>>)> = Vec::new();
-        let mut notes: Vec<(usize, Vec<TextEdit<'_>>)> = Vec::new();
+        let mut slides: Vec<(usize, Vec<TextAssignment<'_>>)> = Vec::new();
+        let mut notes: Vec<(usize, Vec<TextAssignment<'_>>)> = Vec::new();
         for change in &changes {
             let groups = match change.locus.place {
                 Place::Slide => &mut slides,
@@ -220,7 +220,7 @@ impl Pptx {
             };
             if let Some(text) = &change.text {
                 edits.try_reserve(1).map_err(allocation)?;
-                edits.push(TextEdit::new(
+                edits.push(TextAssignment::new(
                     change.target(None),
                     litchi_pptx::opened::TextProperties::default().with_text(text),
                 ));
@@ -228,7 +228,7 @@ impl Pptx {
             if let Some(properties) = properties {
                 for mark in change.marks.iter().rev() {
                     edits.try_reserve(1).map_err(allocation)?;
-                    edits.push(TextEdit::new(change.target(Some(mark)), properties));
+                    edits.push(TextAssignment::new(change.target(Some(mark)), properties));
                 }
             }
         }

@@ -8,7 +8,7 @@ use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
 use super::super::Limits;
 use super::super::package::load_slide;
 use super::transaction::{
-    Commit, PartSource, Patch, RelationshipState, Snapshot, sorted_parts, sorted_relationships,
+    Change, PartSource, Prepared, RelationshipState, Snapshot, sorted_parts, sorted_relationships,
 };
 use super::validation::{MAX_RELATIONSHIPS, validate_source};
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
@@ -74,7 +74,7 @@ pub fn load(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     let current = load(
         package,
         patch.before().slide_index,
@@ -114,11 +114,11 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     apply_patch(package, &commit.into_patch())
 }
 
-fn install(package: &mut OpcPackage, patch: &Patch) -> Result<()> {
+fn install(package: &mut OpcPackage, patch: &Change) -> Result<()> {
     let before = patch.before();
     let after = patch.after();
     if before.slide_part_name != after.slide_part_name || before.slide_index != after.slide_index {

@@ -84,7 +84,11 @@ fn publish_and_reopen(xml: &str, expected: &Master) -> Result<(), Box<dyn std::e
     // Build the canonical package, then make one atomic OPC edit for the
     // handout part, relationship, and presentation-level handout ID list.
     let mut package = builder.build()?;
-    package.edit_opc(|opc| store_handout(opc, xml))?;
+    {
+        let mut opc_edit = package.edit_opc()?;
+        opc_edit.update(|opc| store_handout(opc, xml))?;
+        package = opc_edit.commit()?.into_package();
+    }
 
     let bytes = package.to_bytes()?;
     let reopened = Package::from_bytes(&bytes)?;

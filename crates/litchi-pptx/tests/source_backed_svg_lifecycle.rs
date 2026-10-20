@@ -1095,7 +1095,7 @@ fn malformed_shared_svg_detach_cannot_commit() {
     assert!(edit.detach().unwrap());
     assert!(matches!(
         edit.commit(),
-        Err(Error::Invalid(_)) | Err(Error::Relationship(_)) | Err(Error::UnsafeEdit { .. })
+        Err(Error::Invalid(_)) | Err(Error::Relationship(_)) | Err(Error::Refused(_))
     ));
 }
 
@@ -1128,7 +1128,7 @@ fn attach_rejects_existing_svg_owner_shared_id_and_unsafe_targets_before_publica
     let mce = mce_extension_package();
     assert!(matches!(
         open_editor(&mce).edit_svg_attachment(0, 0),
-        Err(Error::Invalid(_)) | Err(Error::Relationship(_)) | Err(Error::UnsafeEdit { .. })
+        Err(Error::Invalid(_)) | Err(Error::Relationship(_)) | Err(Error::Refused(_))
     ));
 
     let transition_mce = unrelated_transition_mce_package();
@@ -1254,9 +1254,9 @@ fn attachment_limits_are_checked_before_lifecycle_publication() {
         .unwrap()
         .build()
         .unwrap();
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits(
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(source.clone())),
-        limits,
+        litchi_pptx::OpenOptions::default().source_limits(limits),
     )
     .unwrap();
     let mut edit = editor.edit_svg_attachment(0, 0).unwrap();
@@ -1305,16 +1305,20 @@ fn inherited_namespace_context_respects_source_part_limit_and_is_reusable() {
         .unwrap();
 
     let source_for_presentation = Arc::new(VersionedSource::new(source.clone()));
-    let presentation =
-        SourceBackedPresentation::from_read_at_with_limits(source_for_presentation, source_limit)
-            .unwrap();
+    let presentation = SourceBackedPresentation::from_read_at_with_options(
+        source_for_presentation,
+        litchi_pptx::OpenOptions::default().source_limits(source_limit),
+    )
+    .unwrap();
     let slide = presentation.slide(0).unwrap();
     assert!(slide.images().is_ok());
 
     let source_for_editor = Arc::new(VersionedSource::new(source.clone()));
-    let editor =
-        SourceBackedPresentationEditor::from_read_at_with_limits(source_for_editor, source_limit)
-            .unwrap();
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
+        source_for_editor,
+        litchi_pptx::OpenOptions::default().source_limits(source_limit),
+    )
+    .unwrap();
     assert!(editor.edit_svg_attachment(0, 0).is_ok());
 
     let tight_limit = SourceLimits::builder()
@@ -1323,16 +1327,16 @@ fn inherited_namespace_context_respects_source_part_limit_and_is_reusable() {
         .build()
         .unwrap();
     assert!(matches!(
-        SourceBackedPresentation::from_read_at_with_limits(
+        SourceBackedPresentation::from_read_at_with_options(
             Arc::new(VersionedSource::new(source.clone())),
-            tight_limit,
+            litchi_pptx::OpenOptions::default().source_limits(tight_limit)
         ),
         Err(Error::Opc(OpcError::Limit { .. }))
     ));
     assert!(matches!(
-        SourceBackedPresentationEditor::from_read_at_with_limits(
+        SourceBackedPresentationEditor::from_read_at_with_options(
             Arc::new(VersionedSource::new(source.clone())),
-            tight_limit,
+            litchi_pptx::OpenOptions::default().source_limits(tight_limit)
         ),
         Err(Error::Opc(OpcError::Limit { .. }))
     ));
@@ -1350,9 +1354,9 @@ fn selfclosing_blip_limit_rejects_the_real_expanded_slide_size() {
         .unwrap()
         .build()
         .unwrap();
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits(
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(source.clone())),
-        limits,
+        litchi_pptx::OpenOptions::default().source_limits(limits),
     )
     .unwrap();
     let mut edit = editor.edit_svg_attachment(0, 0).unwrap();

@@ -4,13 +4,16 @@
     reason = "test fixture construction and assertions panic on failure by design"
 )]
 
+mod in_place;
+use in_place::InPlace as _;
+
 use std::sync::Arc;
 
 use litchi_opc::{
     FontEmbedding, OpcPackage, PackURI, PackageWriter, Part, Relationships, SaveOptions,
 };
 use litchi_pptx::opened::Limits;
-use litchi_pptx::{CrossSlideCopyPatch, Error, Package, SlideCopyRefusal};
+use litchi_pptx::{Error, Package, SlideCopyRefusal};
 
 type TestResult<T = ()> = litchi_pptx::Result<T>;
 
@@ -35,7 +38,7 @@ fn cross_copy_rejects_stale_semantic_and_physical_inputs_without_mutation() -> T
     let mut stale_metadata = Package::from_reader(std::io::Cursor::new(stale_metadata_bytes))?;
     let stale_metadata_before = serialized(&mut stale_metadata)?;
     let error = stale_metadata
-        .apply_cross_slide_copy_plan(&source, &plan)
+        .stage_cross_slide_copy_in_place(&source, &plan)
         .expect_err("a changed destination graph must reject the old plan");
     assert_unsafe_edit(error);
     assert_eq!(serialized(&mut stale_metadata)?, stale_metadata_before);
@@ -52,7 +55,7 @@ fn cross_copy_rejects_stale_semantic_and_physical_inputs_without_mutation() -> T
         Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     let stale_source_destination_before = serialized(&mut stale_source_destination)?;
     let error = stale_source_destination
-        .apply_cross_slide_copy_plan(&stale_source, &plan)
+        .stage_cross_slide_copy_in_place(&stale_source, &plan)
         .expect_err("a changed source archive must reject the old plan");
     assert_unsafe_edit(error);
     assert_eq!(
@@ -67,7 +70,7 @@ fn cross_copy_rejects_stale_semantic_and_physical_inputs_without_mutation() -> T
         Package::from_reader(std::io::Cursor::new(stale_destination_bytes))?;
     let stale_destination_before = serialized(&mut stale_destination)?;
     let error = stale_destination
-        .apply_cross_slide_copy_plan(&source, &plan)
+        .stage_cross_slide_copy_in_place(&source, &plan)
         .expect_err("a changed destination archive must reject the old plan");
     assert_unsafe_edit(error);
     assert_eq!(
@@ -95,20 +98,22 @@ fn cross_copy_rejects_tampered_durable_patch_and_limits_before_mutation() -> Tes
     // authorization.
     let source_physical_revision_offset = 8 + 32 * 3;
     tampered_bytes[source_physical_revision_offset] ^= 1;
-    let tampered = CrossSlideCopyPatch::from_bytes(&tampered_bytes)?;
+    let tampered =
+        litchi_pptx::cross_slide_copy::Patch::from_bytes(&tampered_bytes, Limits::default())?;
 
     let mut destination = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     let before = serialized(&mut destination)?;
     let error = destination
-        .apply_cross_slide_copy_patch(&source, &tampered)
+        .apply_cross_slide_copy_in_place(&source, &tampered)
         .expect_err("a tampered durable source revision must be rejected");
     assert_unsafe_edit(error);
     assert_eq!(serialized(&mut destination)?, before);
 
     let tiny_limits = Limits::new(4_096, 1, 1_024, 1, 1_024, 64 * 1024 * 1024)
         .ok_or_else(|| Error::Invalid("test limits are invalid".into()))?;
-    let error = CrossSlideCopyPatch::from_bytes_with_limits(&plan.patch().to_bytes()?, tiny_limits)
-        .expect_err("a restrictive durable-patch byte limit must be enforced");
+    let error =
+        litchi_pptx::cross_slide_copy::Patch::from_bytes(&plan.patch().to_bytes()?, tiny_limits)
+            .expect_err("a restrictive durable-patch byte limit must be enforced");
     assert!(matches!(error, Error::Limit { .. }));
     Ok(())
 }
@@ -127,16 +132,19 @@ fn cross_copy_plan_and_durable_patch_are_byte_equivalent_and_inverse_exact() -> 
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination_for_plan.opened_presentation()?;
     let plan = destination_snapshot.plan_cross_slide_copy(&source_snapshot, 0_usize, 0_usize, 1)?;
-    let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    let durable = litchi_pptx::cross_slide_copy::Patch::from_bytes(
+        &plan.patch().to_bytes()?,
+        Limits::default(),
+    )?;
 
     let mut plan_destination =
         Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
-    plan_destination.apply_cross_slide_copy_plan(&source, &plan)?;
+    plan_destination.stage_cross_slide_copy_in_place(&source, &plan)?;
     let plan_output = serialized(&mut plan_destination)?;
 
     let mut patch_destination =
         Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
-    patch_destination.apply_cross_slide_copy_patch(&source, &durable)?;
+    patch_destination.apply_cross_slide_copy_in_place(&source, &durable)?;
     let patch_output = serialized(&mut patch_destination)?;
     assert_eq!(plan_output, patch_output);
     assert_eq!(
@@ -144,8 +152,11 @@ fn cross_copy_plan_and_durable_patch_are_byte_equivalent_and_inverse_exact() -> 
         b"destination archive comment"
     );
 
-    let inverse = CrossSlideCopyPatch::from_bytes(&durable.inverse().to_bytes()?)?;
-    patch_destination.apply_cross_slide_copy_patch(&source, &inverse)?;
+    let inverse = litchi_pptx::cross_slide_copy::Patch::from_bytes(
+        &durable.inverse().to_bytes()?,
+        Limits::default(),
+    )?;
+    patch_destination.apply_cross_slide_copy_in_place(&source, &inverse)?;
     assert_eq!(serialized(&mut patch_destination)?, destination_bytes);
     assert_eq!(serialized(&mut source)?, source_bytes);
 
@@ -175,13 +186,13 @@ fn cross_copy_replans_after_dirty_destination_for_sequential_copies() -> TestRes
         0_usize,
         1,
     )?;
-    destination.apply_cross_slide_copy_plan(&source, &first_plan)?;
+    destination.stage_cross_slide_copy_in_place(&source, &first_plan)?;
     let after_first = serialized(&mut destination)?;
     assert_eq!(archive_comment(&after_first)?, b"dirty destination archive");
 
     let before_stale_retry = after_first.clone();
     let error = destination
-        .apply_cross_slide_copy_plan(&source, &first_plan)
+        .stage_cross_slide_copy_in_place(&source, &first_plan)
         .expect_err("the first plan must be stale after its successful publication");
     assert_unsafe_edit(error);
     assert_eq!(serialized(&mut destination)?, before_stale_retry);
@@ -192,7 +203,7 @@ fn cross_copy_replans_after_dirty_destination_for_sequential_copies() -> TestRes
         2_usize,
         3,
     )?;
-    destination.apply_cross_slide_copy_plan(&source, &second_plan)?;
+    destination.stage_cross_slide_copy_in_place(&source, &second_plan)?;
     let output = serialized(&mut destination)?;
     let reopened = Package::from_reader(std::io::Cursor::new(output.clone()))?;
     let reopened_snapshot = reopened.opened_presentation()?;
@@ -209,8 +220,8 @@ fn cross_copy_replans_after_dirty_destination_for_sequential_copies() -> TestRes
     assert_eq!(archive_comment(&output)?, b"dirty destination archive");
 
     let mut replay = Package::from_reader(std::io::Cursor::new(destination_bytes))?;
-    replay.apply_cross_slide_copy_plan(&source, &first_plan)?;
-    replay.apply_cross_slide_copy_plan(&source, &second_plan)?;
+    replay.stage_cross_slide_copy_in_place(&source, &first_plan)?;
+    replay.stage_cross_slide_copy_in_place(&source, &second_plan)?;
     assert_eq!(serialized(&mut replay)?, output);
     assert_eq!(serialized(&mut source)?, source_bytes);
     Ok(())
@@ -227,7 +238,7 @@ fn cross_copy_exact_archive_limit_accepts_and_one_short_rejects_before_publicati
     let plan = baseline_destination
         .opened_presentation()?
         .plan_cross_slide_copy(&source.opened_presentation()?, 0_usize, 0_usize, 1)?;
-    baseline_destination.apply_cross_slide_copy_plan(&source, &plan)?;
+    baseline_destination.stage_cross_slide_copy_in_place(&source, &plan)?;
     let expected = serialized(&mut baseline_destination)?;
     assert!(expected.len() > source_bytes.len());
     assert!(expected.len() > destination_bytes.len());
@@ -251,14 +262,18 @@ fn cross_copy_exact_archive_limit_accepts_and_one_short_rejects_before_publicati
     let exact_source_before = source_bytes.clone();
     let exact_destination_before = destination_bytes.clone();
     let exact_plan = exact_destination
-        .opened_presentation_with_limits(exact_limits)?
+        .opened_presentation_with_options(
+            litchi_pptx::opened::EditOptions::default().limits(exact_limits),
+        )?
         .plan_cross_slide_copy(
-            &exact_source.opened_presentation_with_limits(exact_limits)?,
+            &exact_source.opened_presentation_with_options(
+                litchi_pptx::opened::EditOptions::default().limits(exact_limits),
+            )?,
             0_usize,
             0_usize,
             1,
         )?;
-    exact_destination.apply_cross_slide_copy_plan(&exact_source, &exact_plan)?;
+    exact_destination.stage_cross_slide_copy_in_place(&exact_source, &exact_plan)?;
     assert_eq!(serialized(&mut exact_destination)?, expected);
     assert_eq!(serialized(&mut exact_source)?, exact_source_before);
     assert_ne!(
@@ -277,9 +292,13 @@ fn cross_copy_exact_archive_limit_accepts_and_one_short_rejects_before_publicati
     let short_source_before = source_bytes.clone();
     let short_destination_before = destination_bytes.clone();
     let error = short_destination
-        .opened_presentation_with_limits(short_limits)?
+        .opened_presentation_with_options(
+            litchi_pptx::opened::EditOptions::default().limits(short_limits),
+        )?
         .plan_cross_slide_copy(
-            &short_source.opened_presentation_with_limits(short_limits)?,
+            &short_source.opened_presentation_with_options(
+                litchi_pptx::opened::EditOptions::default().limits(short_limits),
+            )?,
             0_usize,
             0_usize,
             1,
@@ -336,23 +355,29 @@ fn cross_copy_preserves_custom_parts_and_save_options_through_forward_and_invers
     let plan = plan_destination
         .opened_presentation()?
         .plan_cross_slide_copy(&source.opened_presentation()?, 0_usize, 0_usize, 1)?;
-    let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
-    let inverse = CrossSlideCopyPatch::from_bytes(&durable.inverse().to_bytes()?)?;
+    let durable = litchi_pptx::cross_slide_copy::Patch::from_bytes(
+        &plan.patch().to_bytes()?,
+        Limits::default(),
+    )?;
+    let inverse = litchi_pptx::cross_slide_copy::Patch::from_bytes(
+        &durable.inverse().to_bytes()?,
+        Limits::default(),
+    )?;
 
-    plan_destination.apply_cross_slide_copy_plan(&source, &plan)?;
+    plan_destination.stage_cross_slide_copy_in_place(&source, &plan)?;
     assert_custom_destination_state(&plan_destination, &sentinel_name)?;
     let plan_output = serialized(&mut plan_destination)?;
 
-    plan_destination.apply_cross_slide_copy_patch(&source, &inverse)?;
+    plan_destination.apply_cross_slide_copy_in_place(&source, &inverse)?;
     assert_custom_destination_state(&plan_destination, &sentinel_name)?;
     assert_eq!(serialized(&mut plan_destination)?, before);
 
     let mut patch_destination = custom_destination(&sentinel_name)?;
     assert_eq!(serialized(&mut patch_destination)?, before);
-    patch_destination.apply_cross_slide_copy_patch(&source, &durable)?;
+    patch_destination.apply_cross_slide_copy_in_place(&source, &durable)?;
     assert_custom_destination_state(&patch_destination, &sentinel_name)?;
     assert_eq!(serialized(&mut patch_destination)?, plan_output);
-    patch_destination.apply_cross_slide_copy_patch(&source, &inverse)?;
+    patch_destination.apply_cross_slide_copy_in_place(&source, &inverse)?;
     assert_custom_destination_state(&patch_destination, &sentinel_name)?;
     assert_eq!(serialized(&mut patch_destination)?, before);
     Ok(())
@@ -368,7 +393,7 @@ fn authored_package(names: &[&str]) -> TestResult<Vec<u8>> {
             slide.add_text_box(&format!("body:{name}"), 10, 20, 300, 400);
         }
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     let bytes = package.to_bytes()?;
     let mut opc = OpcPackage::from_vec(bytes)?;
     for (index, name) in names.iter().enumerate() {
@@ -398,7 +423,7 @@ fn custom_destination(sentinel_name: &PackURI) -> TestResult<Package> {
         "Destination B",
     ])?))?;
     let sentinel_name = sentinel_name.clone();
-    package.edit_opc(|opc| {
+    package.edit_opc_in_place(|opc| {
         opc.try_add_part(Box::new(SentinelPart::new(sentinel_name)))?;
         opc.set_save_options(SaveOptions {
             fonts: FontEmbedding::Full,
@@ -426,7 +451,7 @@ fn serialized(package: &mut Package) -> TestResult<Vec<u8>> {
 }
 
 fn assert_unsafe_edit(error: Error) {
-    assert!(matches!(error, Error::UnsafeEdit { .. }));
+    assert!(matches!(error, Error::PatchConflict | Error::Refused(_)));
 }
 
 fn with_eocd_comment(mut bytes: Vec<u8>, comment: &[u8]) -> TestResult<Vec<u8>> {

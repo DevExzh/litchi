@@ -13,8 +13,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "expected source-path source-position destination-path destination-position".into(),
         );
     }
-    let source = SourceBackedPresentation::from_path(&args[0])?;
-    let editor = SourceBackedPresentationEditor::from_path(&args[2])?;
+    let source = SourceBackedPresentation::open(&args[0])?;
+    let editor = SourceBackedPresentationEditor::open(&args[2])?;
     let source_position: usize = args[1].parse()?;
     let destination_position: usize = args[3].parse()?;
     let insertion_position = destination_position.checked_add(1).ok_or_else(|| {

@@ -147,11 +147,11 @@ impl Pptx {
         // box is appended after all of them.
         let scene_index = Position::new(scene.len());
         let properties = format.properties();
-        let body = [litchi_pptx::opened::TextEdit::new(
+        let body = [litchi_pptx::opened::TextAssignment::new(
             litchi_pptx::opened::TextTarget::Shape { shape: scene_index },
             properties,
         )];
-        let body: &[litchi_pptx::opened::TextEdit<'_>] =
+        let body: &[litchi_pptx::opened::TextAssignment<'_>] =
             if format.is_empty() { &[] } else { &body };
         let link = click.for_add(self.slides_in_catalog()?)?;
         let (target, proof, after) = match &source {

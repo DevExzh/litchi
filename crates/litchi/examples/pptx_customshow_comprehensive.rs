@@ -4,10 +4,10 @@
 //! owner transactionally publishes custom shows and sections into the OPC
 //! presentation graph.
 
+use litchi_pptx::Package;
 use litchi_pptx::presentation_properties::metadata::custom_show::Show;
 use litchi_pptx::presentation_properties::metadata::sections::Section;
 use litchi_pptx::presentation_properties::metadata::structure;
-use litchi_pptx::{MutablePresentation, Package};
 use std::error::Error as StdError;
 
 const X: i64 = 914_400;
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
 }
 
 fn add_slides(
-    presentation: &mut MutablePresentation,
+    presentation: &mut litchi_pptx::builder::Presentation,
     titles: &[&str],
     content_prefix: &str,
     height: i64,
@@ -68,17 +68,15 @@ fn publish_structure(
         .collect::<Vec<_>>();
     assert_eq!(slide_ids.len(), slide_count);
 
-    package.edit_opc(|opc| {
+    {
+        let mut edit = package.edit_structure()?;
         for (id, plan) in shows.iter().enumerate() {
             let selected = plan
                 .positions
                 .iter()
                 .map(|&position| slide_ids[position])
                 .collect::<Vec<_>>();
-            structure::add_custom_show(
-                opc,
-                Show::new((id + 1) as u32, plan.name).with_slides(selected),
-            )?;
+            edit.add_custom_show(Show::new((id + 1) as u32, plan.name).with_slides(selected))?;
         }
 
         for plan in &sections {
@@ -87,10 +85,10 @@ fn publish_structure(
                 .iter()
                 .map(|&position| slide_ids[position])
                 .collect::<Vec<_>>();
-            structure::add_section(opc, Section::new(plan.name, plan.id).with_slides(selected))?;
+            edit.add_section(Section::new(plan.name, plan.id).with_slides(selected))?;
         }
-        Ok(())
-    })?;
+        package = edit.commit()?.into_package();
+    }
 
     let graph = package.with_opc(structure::load)?;
     assert_eq!(graph.slides.len(), slide_count);

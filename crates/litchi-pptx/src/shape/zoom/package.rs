@@ -29,10 +29,7 @@ pub(crate) fn store(
         let part = package.get_part(slide_name)?;
         let slide = SlidePart::from_part(part)?;
         if slide.part().blob() != value.base_xml() {
-            return Err(Error::UnsafeEdit {
-                operation: "put_zooms",
-                reason: "the zoom owner source changed after it was loaded",
-            });
+            return Err(Error::PatchConflict);
         }
 
         let mut previous = Owner::read(slide.part().blob())?;

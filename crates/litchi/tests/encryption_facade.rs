@@ -31,11 +31,11 @@ fn pptx_facade_exposes_managed_package_encryption() {
     use litchi::pptx::{Package, encryption::Mode};
     use std::io::Cursor;
 
-    let mut package = Package::new().expect("create presentation package");
+    let package = Package::new().expect("create presentation package");
     let encrypted = package
         .to_encrypted(PASSWORD, Mode::Standard)
         .expect("encrypt presentation package");
-    let mut reopened = Package::from_reader_with_password(Cursor::new(encrypted), PASSWORD)
+    let reopened = Package::from_reader_with_password(Cursor::new(encrypted), PASSWORD)
         .expect("open encrypted presentation package");
     assert_eq!(reopened.encryption(), Some(Mode::Standard));
 

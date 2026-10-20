@@ -8,7 +8,7 @@
 //!
 //! - `cell_format_batch/<owner>/<N>`: one atomic `File::batch` of N
 //!   `set /slide[1]/table[1]/tr[R]/tc[C] {bold, fill}` against one native
-//!   edit staging the same N `TextEdit`s in 256-edit chunks through one
+//!   edit staging the same N `TextAssignment`s in 256-edit chunks through one
 //!   `set_text_property_chunks` call and one commit (a table of up to 100
 //!   columns; the 1k-op batch budget: within 2×);
 //! - `cell_paragraph_batch/<owner>/<N>`: N `set …/tc[C]/paragraph[1]
@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     use litchi_core::Position;
     use litchi_ops::{BatchItem, BatchMode, NewNode, OpenOptions, Props, SourceMode, props};
     use litchi_pptx::opened::{
-        CellFill, ModernCommentChange, Rgb, TextEdit, TextProperties, TextTarget,
+        CellFill, ModernCommentChange, Rgb, TextAssignment, TextProperties, TextTarget,
     };
 
     const WARMUP: usize = 2;
@@ -217,7 +217,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .with_bold(Some(true))
                         .with_fill(Some(CellFill::Rgb(Rgb([0xFF, 0xEE, 0xCC]))))
                 };
-                let edits: Vec<TextEdit<'_>> = cells
+                let edits: Vec<TextAssignment<'_>> = cells
                     .iter()
                     .map(|&(row, column)| {
                         let (row, column) = (Position::new(row), Position::new(column));
@@ -235,7 +235,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 column,
                             }
                         };
-                        TextEdit::new(target, properties)
+                        TextAssignment::new(target, properties)
                     })
                     .collect();
                 let items: Vec<BatchItem<'static>> = cells
@@ -252,7 +252,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     })
                     .collect();
-                let chunks: Vec<&[TextEdit<'_>]> = edits.chunks(256).collect();
+                let chunks: Vec<&[TextAssignment<'_>]> = edits.chunks(256).collect();
                 let leaf_bytes = || -> Result<Vec<u8>, litchi_pptx::Error> {
                     if eager_owner {
                         let mut edit = eager_package.edit()?;
@@ -344,11 +344,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 litchi_core::OwnedSource::new(bytes.clone()),
             ))?;
             let texts: Vec<String> = (0..n).map(|index| format!("para-{index}")).collect();
-            let edits: Vec<TextEdit<'_>> = texts
+            let edits: Vec<TextAssignment<'_>> = texts
                 .iter()
                 .enumerate()
                 .map(|(index, text)| {
-                    TextEdit::new(
+                    TextAssignment::new(
                         TextTarget::Paragraph {
                             shape: Position::new(index),
                             paragraph: Position::new(0),
@@ -365,7 +365,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     )
                 })
                 .collect();
-            let chunks: Vec<&[TextEdit<'_>]> = edits.chunks(256).collect();
+            let chunks: Vec<&[TextAssignment<'_>]> = edits.chunks(256).collect();
             let leaf_bytes = || -> Result<Vec<u8>, litchi_pptx::Error> {
                 if eager_owner {
                     let mut edit = eager_package.edit()?;
@@ -450,9 +450,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 })
                 .ok_or("the notes page has a body")?
         };
-        let edits: Vec<TextEdit<'_>> = (0..n)
+        let edits: Vec<TextAssignment<'_>> = (0..n)
             .map(|index| {
-                TextEdit::new(
+                TextAssignment::new(
                     TextTarget::Paragraph {
                         shape: Position::new(notes_shape),
                         paragraph: Position::new(index),
@@ -472,7 +472,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .collect();
         let leaf_once = || -> Result<litchi_pptx::Package, litchi_pptx::Error> {
             // One notes-part pass for every chunk (record 0348).
-            let chunks: Vec<&[TextEdit<'_>]> = edits.chunks(256).collect();
+            let chunks: Vec<&[TextAssignment<'_>]> = edits.chunks(256).collect();
             let mut edit = package.edit()?;
             edit.set_notes_text_property_chunks(0_usize, &chunks)?;
             Ok(edit.commit()?.into_package())

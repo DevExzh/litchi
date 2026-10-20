@@ -59,7 +59,7 @@ const ROOT_PREFIX_BYTES: usize = XML_DECL.len() + ROOT_OPEN.len() + MAX_NAMESPAC
 const EMPTY_WIRE_BYTES: usize = ROOT_PREFIX_BYTES + ROOT_EMPTY_CLOSE.len();
 const NONEMPTY_WIRE_BYTES: usize = ROOT_PREFIX_BYTES + ROOT_CHILDREN_OPEN.len() + ROOT_CLOSE.len();
 
-use crate::{Error, Result};
+use crate::Result;
 
 mod codec;
 mod model;
@@ -74,6 +74,8 @@ pub mod shape;
 pub use codec::{parse, write};
 pub use model::{Conformance, Key, List, Source, Tag, is_relationship, raw};
 pub use package::{discover, load, put, remove};
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
 // Crate-internal seams shared with the shape-owned package layer. They retain
 // the old parent-private topology without expanding the external API.

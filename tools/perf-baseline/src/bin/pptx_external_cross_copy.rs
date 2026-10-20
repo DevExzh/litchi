@@ -250,14 +250,20 @@ fn iteration(
         maximum_request: 0,
     };
     let started = Instant::now();
-    let source =
-        SourceBackedPresentation::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source_adapter.clone(),
-            SourceLimits::default(),
-            cache,
-            source_context,
-        )?;
-    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(destination_adapter.clone(), SourceLimits::default(), cache, destination_context)?;
+    let source = SourceBackedPresentation::from_read_at_with_options(
+        source_adapter.clone(),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache)
+            .execution_context(source_context),
+    )?;
+    let editor = SourceBackedPresentationEditor::from_read_at_with_options(
+        destination_adapter.clone(),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache)
+            .execution_context(destination_context),
+    )?;
     let open_ns = u64::try_from(started.elapsed().as_nanos())?;
     let opened =
         json!({"source":source_adapter.snapshot()?,"destination":destination_adapter.snapshot()?});

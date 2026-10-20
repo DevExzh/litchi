@@ -158,12 +158,6 @@ impl Commit {
 
 impl Package {
     fn metadata_snapshot(&self) -> Result<Snapshot> {
-        if self.mutable_pres.is_some() {
-            return Err(Error::Invalid(
-                "metadata of a presentation with pending authoring state is read after it is built"
-                    .to_owned(),
-            ));
-        }
         Snapshot::read(&self.opc, Host::PowerPoint)
     }
 
@@ -208,23 +202,17 @@ impl Package {
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// package.
     pub fn apply_metadata(&self, patch: &Patch) -> Result<Self> {
-        if self.mutable_pres.is_some() {
-            return Err(Error::Invalid(
-                "metadata patches apply to a built presentation".to_owned(),
-            ));
-        }
         let mut opc = self.opc.clone();
         patch.apply(&mut opc)?;
         Ok(Self {
             opc,
-            mutable_pres: None,
             part_digests: std::sync::OnceLock::new(),
             physical_source_provenance: self.physical_source_provenance,
             tolerance: self.tolerance.clone(),
             #[cfg(feature = "encryption")]
             encryption: self.encryption,
-            #[cfg(feature = "automatic-fonts")]
-            font_embedding_dirty: self.font_embedding_dirty,
+            #[cfg(feature = "encryption")]
+            encryption_limits: self.encryption_limits,
         })
     }
 }

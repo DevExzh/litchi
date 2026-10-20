@@ -164,28 +164,31 @@ impl Edit {
         let xml = owner.blob();
         let scene = crate::shape::Scene::read(xml)?;
         if scene.is_rewritten() {
-            return Err(Error::UnsafeEdit {
-                operation: "set_picture_image",
-                reason: "picture edits do not select markup-compatibility branches",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "set_picture_image",
+                "picture edits do not select markup-compatibility branches",
+            ));
         }
         let picture = scene.shape(key)?;
         if !matches!(picture, crate::shape::Shape::Picture(_)) {
             return Err(invalid("the selected shape is not a picture"));
         }
         if crate::media_parts::summary(picture)?.is_some() {
-            return Err(Error::UnsafeEdit {
-                operation: "set_picture_image",
-                reason: "a media picture's poster is not replaced as a picture image",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                "set_picture_image",
+                "a media picture's poster is not replaced as a picture image",
+            ));
         }
         let span = picture.common().span()?.range(xml.len())?;
         let fragment = &xml[span.clone()];
         if fragment.windows(7).any(|window| window == b"svgBlip") {
-            return Err(Error::UnsafeEdit {
-                operation: "set_picture_image",
-                reason: "an SVG picture's image is not replaced",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                "set_picture_image",
+                "an SVG picture's image is not replaced",
+            ));
         }
         let tag = first_start_tag(fragment, b"blip")?
             .ok_or_else(|| invalid("the picture has no a:blip"))?;
@@ -290,10 +293,11 @@ impl Edit {
         let xml = owner.blob();
         let scene = crate::shape::Scene::read(xml)?;
         if scene.is_rewritten() {
-            return Err(Error::UnsafeEdit {
-                operation: "set_shape_description",
-                reason: "shape edits do not select markup-compatibility branches",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "set_shape_description",
+                "shape edits do not select markup-compatibility branches",
+            ));
         }
         let target = scene.shape(key)?;
         if target.description()?.as_deref() == description {
@@ -386,10 +390,11 @@ impl Edit {
         let xml = owner.blob();
         let scene = crate::shape::Scene::read(xml)?;
         if scene.is_rewritten() {
-            return Err(Error::UnsafeEdit {
-                operation: "set_shape_name",
-                reason: "shape edits do not select markup-compatibility branches",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "set_shape_name",
+                "shape edits do not select markup-compatibility branches",
+            ));
         }
         let target = scene.shape(key)?;
         let span = target.common().span()?.range(xml.len())?;

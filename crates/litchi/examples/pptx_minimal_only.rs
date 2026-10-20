@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     slide.set_title("Minimal Test");
 
     // Save
-    let mut pkg = builder.build()?;
+    let pkg = builder.build()?;
     pkg.save(Path::new("minimal_only.pptx"))?;
     println!("Saved: minimal_only.pptx");
 

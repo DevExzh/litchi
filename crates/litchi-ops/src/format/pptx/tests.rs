@@ -361,10 +361,11 @@ fn cancellation_is_typed() {
     let (cancellation_source, cancellation) = CancellationSource::pair();
     let limits = ExecutionLimits::new(NonZeroUsize::MIN, NonZeroUsize::MIN, NonZeroU64::MAX, 0)
         .expect("valid execution limits");
-    let presentation = pptx::SourceBackedPresentation::from_path_with_limits_and_execution_context(
+    let presentation = pptx::SourceBackedPresentation::open_with_options(
         fixture("backgrounds.pptx"),
-        pptx::SourceLimits::default(),
-        ExecutionContext::new(budget, cancellation, limits),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(pptx::SourceLimits::default())
+            .execution_context(ExecutionContext::new(budget, cancellation, limits)),
     )
     .expect("managed source-backed PPTX");
     let handle = Pptx::from_source(presentation, &options());
@@ -406,9 +407,10 @@ fn related_order_fixture() -> Vec<u8> {
             slide.add_text_box(name, 0, 0, 914_400, 914_400);
         }
     }
-    let mut package = builder.build().unwrap();
-    package
-        .edit_opc(|opc| {
+    let package = builder.build().unwrap();
+    let mut opc_edit = package.edit_opc().unwrap();
+    opc_edit
+        .update(|opc| {
             // The builder's title is shape text; authored slide facts are the
             // independent p:cSld@name values exposed by the unified node.
             for (index, (name, _, _, _)) in slides.iter().enumerate() {
@@ -486,6 +488,7 @@ fn related_order_fixture() -> Vec<u8> {
             Ok(())
         })
         .unwrap();
+    let package = opc_edit.commit().unwrap().into_package();
     package.to_bytes().unwrap()
 }
 
@@ -759,10 +762,11 @@ fn unsigned_managed_source_respects_native_materialization_policy() {
     let (_, cancellation) = CancellationSource::pair();
     let limits =
         ExecutionLimits::new(NonZeroUsize::MIN, NonZeroUsize::MIN, NonZeroU64::MAX, 0).unwrap();
-    let presentation = pptx::SourceBackedPresentation::from_path_with_limits_and_execution_context(
+    let presentation = pptx::SourceBackedPresentation::open_with_options(
         fixture("sample.pptx"),
-        pptx::SourceLimits::default(),
-        ExecutionContext::new(budget, cancellation, limits),
+        litchi_pptx::OpenOptions::default()
+            .source_limits(pptx::SourceLimits::default())
+            .execution_context(ExecutionContext::new(budget, cancellation, limits)),
     )
     .unwrap();
     let handle = Pptx::from_source(presentation, &options())
@@ -897,7 +901,8 @@ fn source_adoption_rejects_a_revision_from_an_independently_opened_owner() {
         Ok(_) => panic!("independently opened source owner was adopted"),
         Err(error) => error,
     };
-    assert_eq!(error.code(), Code::IoError);
+    // A revision of another base is the caller's input (record 0351).
+    assert_eq!(error.code(), Code::InvalidInput);
     assert!(matches!(
         error.leaf(),
         Source::Pptx(pptx::Error::PatchConflict)

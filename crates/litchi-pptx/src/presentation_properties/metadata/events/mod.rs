@@ -1,16 +1,17 @@
 //! Slide-show event values and bounded extension storage.
 
 mod codec;
+mod edit;
 mod model;
 mod package;
 mod transaction;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 mod validation;
 
 #[cfg(test)]
 mod tests;
 
-pub use crate::diagnostics::Diagnostics;
 pub use codec::EXTENSION_URI;
 pub use model::{Draft, Event, Kind, Trigger};
-pub use package::{apply_commit, apply_patch, load, load_snapshot, remove, store};
-pub use transaction::{Commit, Edit, Patch, Revision, Snapshot};
+pub use package::{load, load_snapshot};
+pub use transaction::{ListDraft, Revision, Snapshot};

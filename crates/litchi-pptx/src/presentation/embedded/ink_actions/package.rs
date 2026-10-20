@@ -18,7 +18,7 @@ use super::model::{
     ActionAnchor, AnchorFingerprint, Dialect, InboundReference, PackageRelationship, RawAnchor,
     Snapshot,
 };
-use super::transaction::{Commit, Patch};
+use super::transaction::{Change, Prepared};
 use crate::presentation::embedded::{invalid, limit};
 use crate::{Error, Result};
 
@@ -772,7 +772,7 @@ fn package_relationships<'a>(
 }
 
 /// Apply a source-checked existing-target patch atomically.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     let before = patch.before();
     let slide = package.get_part(&before.slide_part_name)?;
     let current = load_snapshot(package, before.slide_index, slide, &before.limits())?;
@@ -802,11 +802,11 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 
 /// Apply a committed existing-target transaction atomically.
 #[inline]
-pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     apply_patch(package, commit.patch())
 }
 
-fn install_patch(package: &mut OpcPackage, patch: &Patch) -> Result<()> {
+fn install_patch(package: &mut OpcPackage, patch: &Change) -> Result<()> {
     let before = patch.before();
     let after = patch.after();
     let owner_changed = package.get_part(&before.slide_part_name)?.blob() != after.source_xml();
@@ -858,7 +858,7 @@ fn install_patch(package: &mut OpcPackage, patch: &Patch) -> Result<()> {
     Ok(())
 }
 
-fn preflight_patch_limits(package: &OpcPackage, patch: &Patch) -> Result<()> {
+fn preflight_patch_limits(package: &OpcPackage, patch: &Change) -> Result<()> {
     let read_limits = package.read_limits();
     let part_count = package.part_count();
     if part_count > read_limits.max_parts() {

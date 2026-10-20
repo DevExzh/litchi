@@ -11,25 +11,25 @@ fn opened() -> Result<Package> {
             .add_slide()?
             .add_text_box(text, 0, 0, 914_400, 914_400);
     }
-    let mut authored = builder.build()?;
+    let authored = builder.build()?;
     Package::from_reader(std::io::Cursor::new(authored.to_bytes()?))
 }
 
 #[test]
 fn direct_commit_and_immutable_replay_preserve_their_sources() -> Result<()> {
-    let mut source = opened()?;
+    let source = opened()?;
     let original = source.to_bytes()?;
     let mut edit = source.edit()?;
     edit.set_shape_text(0_usize, 0_usize, "changed")?;
     let commit = edit.commit()?;
     assert!(commit.diagnostics().changed());
-    let (mut changed, patch) = commit.into_parts();
+    let (changed, patch) = commit.into_parts();
     assert_eq!(source.to_bytes()?, original);
     let output = changed.to_bytes()?;
-    let mut replayed = source.apply(&patch)?;
+    let replayed = source.apply(&patch)?;
     assert_eq!(replayed.to_bytes()?, output);
     assert_eq!(source.to_bytes()?, original);
-    let mut restored = changed.apply(&patch.inverse())?;
+    let restored = changed.apply(&patch.inverse())?;
     assert_eq!(restored.to_bytes()?, original);
     assert_eq!(changed.to_bytes()?, output);
     assert!(changed.apply(&patch).is_err());
@@ -49,8 +49,8 @@ fn cloned_commits_and_snapshot_derived_edits_keep_owner_evidence() -> Result<()>
     edit.set_shape_text(0_usize, 0_usize, "changed")?;
     let commit = edit.commit()?;
     assert_eq!(commit.package().tolerance_report(), &report);
-    let mut first = commit.clone().into_package();
-    let mut second = commit.into_package();
+    let first = commit.clone().into_package();
+    let second = commit.into_package();
     assert_eq!(first.tolerance_report(), &report);
     assert_eq!(second.tolerance_report(), &report);
     assert_eq!(
@@ -96,7 +96,7 @@ fn direct_publication_keeps_the_candidate_independent_of_source_drift() -> Resul
 
 #[test]
 fn no_op_package_and_commit_debug_do_not_disclose_document_content() -> Result<()> {
-    let mut source = opened()?;
+    let source = opened()?;
     let original = source.to_bytes()?;
     let edit = source.edit()?;
     let edit_debug = format!("{edit:?}");
@@ -108,8 +108,8 @@ fn no_op_package_and_commit_debug_do_not_disclose_document_content() -> Result<(
             assert!(!value.contains(secret), "debug leaked {secret}");
         }
     }
-    let mut cloned = commit.clone().into_package();
-    let mut moved = commit.into_package();
+    let cloned = commit.clone().into_package();
+    let moved = commit.into_package();
     assert_eq!(cloned.to_bytes()?, original);
     assert_eq!(moved.to_bytes()?, original);
     Ok(())
@@ -119,12 +119,12 @@ fn no_op_package_and_commit_debug_do_not_disclose_document_content() -> Result<(
 #[test]
 fn encryption_provenance_survives_commits_clones_replay_and_reencryption() -> Result<()> {
     use litchi_crypto::ooxml::Mode;
-    let mut source = opened()?;
+    let source = opened()?;
     let encrypted = source.to_encrypted("test password", Mode::Standard)?;
     let source =
         Package::from_reader_with_password(std::io::Cursor::new(encrypted), "test password")?;
     let noop = source.edit()?.commit()?;
-    let mut replayed_noop = source.apply(noop.patch())?;
+    let replayed_noop = source.apply(noop.patch())?;
     assert_eq!(replayed_noop.encryption(), Some(Mode::Standard));
     assert!(replayed_noop.to_bytes().is_err());
     let mut edit = source.opened_presentation()?.edit();
@@ -137,7 +137,7 @@ fn encryption_provenance_survives_commits_clones_replay_and_reencryption() -> Re
         assert_eq!(package.encryption(), Some(Mode::Standard));
         assert!(package.to_bytes().is_err());
     }
-    let mut replayed = source.apply(&patch)?;
+    let replayed = source.apply(&patch)?;
     assert_eq!(replayed.encryption(), Some(Mode::Standard));
     assert!(replayed.to_bytes().is_err());
     let bytes = changed.to_reencrypted("new password")?;
@@ -154,13 +154,13 @@ fn encryption_provenance_survives_commits_clones_replay_and_reencryption() -> Re
 #[test]
 fn signed_replay_refuses_changed_sources_and_signature_injection() -> Result<()> {
     let bytes = std::fs::read("../../test-data/poi/test-data/xmldsign/hello-world-signed.pptx")?;
-    let mut signed = Package::from_reader(std::io::Cursor::new(bytes.clone()))?;
+    let signed = Package::from_reader(std::io::Cursor::new(bytes.clone()))?;
     let noop = signed.edit()?.commit()?;
     assert!(!noop.diagnostics().changed());
     assert_eq!(noop.clone().into_package().to_bytes()?, bytes);
     assert_eq!(signed.apply(noop.patch())?.to_bytes()?, bytes);
     let mut unsigned = Package::from_reader(std::io::Cursor::new(bytes.clone()))?;
-    unsigned.unsign()?;
+    unsigned = unsigned.unsign()?;
     let mut edit = unsigned.edit()?;
     edit.add_text_box(0_usize, "changed", (0, 0, 914_400, 914_400))?;
     let commit = edit.commit()?;

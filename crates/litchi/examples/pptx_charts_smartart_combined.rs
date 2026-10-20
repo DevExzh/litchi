@@ -316,7 +316,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     let output_path = "charts_smartart_combined.pptx";
     package.save(output_path)?;
 

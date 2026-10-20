@@ -152,10 +152,11 @@ impl Grid {
                 .iter()
                 .any(|row| row.cells.len() != self.columns.len())
         {
-            return Err(Error::UnsafeEdit {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
                 operation,
-                reason: "a merged table's rows do not hold one cell per grid column",
-            });
+                "a merged table's rows do not hold one cell per grid column",
+            ));
         }
         Ok(())
     }
@@ -601,10 +602,11 @@ pub(crate) fn change(
                 .iter()
                 .any(|row| row.cells.get(position).is_some_and(|cell| cell.h_merge))
             {
-                return Err(Error::UnsafeEdit {
-                    operation: "insert_table_column",
-                    reason: "the position cuts through cells merged across columns",
-                });
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedTarget,
+                    "insert_table_column",
+                    "the position cuts through cells merged across columns",
+                ));
             }
             let width = match width {
                 Some(width) => width,
@@ -650,10 +652,11 @@ pub(crate) fn change(
                 return Err(invalid("the column position is past the last column"));
             };
             if grid.columns.len() == 1 {
-                return Err(Error::UnsafeEdit {
-                    operation: "remove_table_column",
-                    reason: "a table keeps at least one column",
-                });
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "remove_table_column",
+                    "a table keeps at least one column",
+                ));
             }
             edits.push((span.clone(), Vec::new()));
             for row in &grid.rows {
@@ -662,10 +665,11 @@ pub(crate) fn change(
                     .get(column)
                     .ok_or_else(|| invalid("a row has no cell at the column position"))?;
                 if cell.horizontal() && cell.vertical() {
-                    return Err(Error::UnsafeEdit {
-                        operation: "remove_table_column",
-                        reason: "the column takes part in a merge spanning rows and columns",
-                    });
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedTarget,
+                        "remove_table_column",
+                        "the column takes part in a merge spanning rows and columns",
+                    ));
                 }
                 if cell.h_merge {
                     // A covered cell: its merge's first cell spans one
@@ -677,10 +681,11 @@ pub(crate) fn change(
                         .find(|(_, cell)| !cell.h_merge)
                         .ok_or_else(|| invalid("a covered cell has no merge to its left"))?;
                     if first.vertical() {
-                        return Err(Error::UnsafeEdit {
-                            operation: "remove_table_column",
-                            reason: "the column takes part in a merge spanning rows and columns",
-                        });
+                        return Err(Error::refused(
+                            litchi_core::edit::RefusalKind::UnsupportedTarget,
+                            "remove_table_column",
+                            "the column takes part in a merge spanning rows and columns",
+                        ));
                     }
                     if first.grid_span as usize + anchor > column {
                         edits.push((
@@ -697,10 +702,11 @@ pub(crate) fn change(
                         .cells
                         .get(column + 1)
                         .filter(|next| next.h_merge && !next.vertical())
-                        .ok_or(Error::UnsafeEdit {
-                            operation: "remove_table_column",
-                            reason: "a merged cell's covered cells are not in its row",
-                        })?;
+                        .ok_or(Error::refused(
+                            litchi_core::edit::RefusalKind::UnsupportedTarget,
+                            "remove_table_column",
+                            "a merged cell's covered cells are not in its row",
+                        ))?;
                     edits.push((
                         next.tag.clone(),
                         set_attributes(
@@ -738,10 +744,11 @@ pub(crate) fn change(
                 .get(position)
                 .is_some_and(|row| row.cells.iter().any(|cell| cell.v_merge))
             {
-                return Err(Error::UnsafeEdit {
-                    operation: "insert_table_row",
-                    reason: "the position cuts through cells merged across rows",
-                });
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedTarget,
+                    "insert_table_row",
+                    "the position cuts through cells merged across rows",
+                ));
             }
             let mut heights = row_heights(xml, &grid)?;
             let height = match height {
@@ -802,10 +809,11 @@ pub(crate) fn change(
                 return Err(invalid("the row position is past the last row"));
             };
             if grid.rows.len() == 1 {
-                return Err(Error::UnsafeEdit {
-                    operation: "remove_table_row",
-                    reason: "a table keeps at least one row",
-                });
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "remove_table_row",
+                    "a table keeps at least one row",
+                ));
             }
             let mut heights = row_heights(xml, &grid)?;
             for (column, cell) in removed.cells.iter().enumerate() {
@@ -839,10 +847,11 @@ pub(crate) fn change(
                             .cells
                             .get(column + offset)
                             .filter(|next| next.v_merge)
-                            .ok_or(Error::UnsafeEdit {
-                                operation: "remove_table_row",
-                                reason: "a merged cell's covered cells are not below it",
-                            })?;
+                            .ok_or(Error::refused(
+                                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                                "remove_table_row",
+                                "a merged cell's covered cells are not below it",
+                            ))?;
                         let mut changes: Vec<(&[u8], Option<String>)> = vec![(b"vMerge", None)];
                         if offset == 0 {
                             changes.push((b"rowSpan", span_value(cell.row_span - 1)));
@@ -1056,7 +1065,7 @@ mod tests {
                     text: ""
                 }
             ),
-            Err(Error::UnsafeEdit { .. })
+            Err(Error::Refused(_))
         ));
         let inserted = apply(
             &xml,
@@ -1107,7 +1116,7 @@ mod tests {
                     texts: &[]
                 }
             ),
-            Err(Error::UnsafeEdit { .. })
+            Err(Error::Refused(_))
         ));
         // The covered row goes: the merge spans one row.
         let covered = apply(&xml, Change::RemoveRow { row: 1 }).unwrap();
@@ -1121,7 +1130,7 @@ mod tests {
         let one = FRAME.as_bytes();
         assert!(matches!(
             change(one, 0..one.len(), Change::RemoveRow { row: 0 }),
-            Err(Error::UnsafeEdit { .. })
+            Err(Error::Refused(_))
         ));
     }
 

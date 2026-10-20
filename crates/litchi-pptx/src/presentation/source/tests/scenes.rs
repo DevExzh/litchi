@@ -66,10 +66,11 @@ fn warm_and_cold_source_revision_changes_are_typed_refusals() {
 fn managed_scenes_hold_payload_charges_without_cache_retention() {
     let source = Arc::new(litchi_core::OwnedSource::new(with_slide(&shape_xml())));
     let (budget, cancel, context) = source_backed_context(16 * 1024 * 1024);
-    let presentation = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
+    let presentation = SourceBackedPresentation::from_read_at_with_options(
         source,
-        SourceLimits::default(),
-        context,
+        crate::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let slide = presentation.slide(0).unwrap();
@@ -104,9 +105,9 @@ fn physical_xml_limits_apply_before_mce_and_failures_are_not_cached() {
         .unwrap()
         .build()
         .unwrap();
-    let presentation = SourceBackedPresentation::from_read_at_with_limits(
+    let presentation = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(litchi_core::OwnedSource::new(with_slide(xml.as_bytes()))),
-        limits,
+        crate::OpenOptions::default().source_limits(limits),
     )
     .unwrap();
     let slide = presentation.slide(0).unwrap();

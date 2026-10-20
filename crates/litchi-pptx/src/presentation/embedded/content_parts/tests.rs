@@ -4,9 +4,10 @@
     reason = "test assertions panic on failure by design"
 )]
 
+use super::package::{apply_commit, apply_patch};
 use super::{
     Anchor, BlackWhiteMode, Limits, Payload, Relationship, Snapshot, Target, TargetMode,
-    apply_commit, apply_patch, load_slide, load_snapshot,
+    load_slide, load_snapshot,
 };
 use crate::Error;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};

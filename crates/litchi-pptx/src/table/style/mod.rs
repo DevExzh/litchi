@@ -9,8 +9,8 @@ mod tests;
 
 pub use model::{Conformance, Def, Id, Link, List, Parts};
 pub use validation::{conformance, link, load, present, put, remove};
-
-use crate::Error;
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
 const A: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const AS: &str = "http://purl.oclc.org/ooxml/drawingml/main";

@@ -7,6 +7,7 @@
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 
+use super::package::*;
 use super::*;
 use crate::presentation_properties::metadata::custom_show::Show;
 use crate::presentation_properties::metadata::sections::Section;

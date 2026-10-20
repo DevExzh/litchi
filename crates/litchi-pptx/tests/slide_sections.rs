@@ -29,7 +29,7 @@ fn deck() -> Vec<u8> {
     for _ in 0..3 {
         builder.presentation().unwrap().add_slide().unwrap();
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
     let ids: Vec<u32> = package
         .edit()
         .unwrap()

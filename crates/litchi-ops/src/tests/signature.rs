@@ -361,7 +361,7 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
                 .add_text_box(0_usize, MARKER, (0, 0, 914_400, 914_400))
                 .unwrap();
             let commit = transaction.commit().unwrap();
-            let mut package = commit.into_package();
+            let package = commit.into_package();
             (package.to_bytes().unwrap(), MARKER.to_owned())
         },
         #[cfg(feature = "xlsx")]

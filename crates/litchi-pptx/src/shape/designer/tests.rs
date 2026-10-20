@@ -118,22 +118,6 @@ fn creates_and_removes_extension_lists_without_touching_the_shape_tail() {
 }
 
 #[test]
-fn detached_edits_are_atomic_and_preserve_the_snapshot_contract() {
-    let snapshot = Snapshot::new(true);
-    let mut editor = snapshot.edit();
-    editor.set(false).expect("set");
-    assert!(editor.diagnostics().changed());
-    assert_eq!(editor.snapshot().value(), Some(false));
-    let committed = editor.commit().expect("commit");
-    assert_eq!(snapshot.value(), Some(true));
-    assert_eq!(committed.value(), Some(false));
-
-    let mut editor = committed.edit();
-    editor.clear();
-    assert_eq!(editor.commit().expect("clear").value(), None);
-}
-
-#[test]
 fn package_operations_are_selector_first_and_atomic() {
     let shape = shape_with_design("true");
     let (mut package, owner) = owner_package(slide_with_shape(

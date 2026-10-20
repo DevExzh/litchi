@@ -572,7 +572,7 @@ fn sink_ceiling(maximum: usize) -> Result<u64, Box<dyn Error>> {
 }
 
 fn validate_owned_plan(
-    plan: &litchi_pptx::opened::CrossSlideCopyPlan,
+    plan: &litchi_pptx::cross_slide_copy::Plan,
     corpus: &crate::PptxCrossCopyCorpus,
 ) -> Result<(), Box<dyn Error>> {
     if plan.source().name() != corpus.source_slide_name
@@ -631,8 +631,7 @@ fn run_owned_iteration(
     let inputs_and_sink_ready = capture_checkpoint()?;
 
     let source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_input))?;
-    let mut destination =
-        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_input))?;
+    let destination = litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_input))?;
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination.opened_presentation()?;
     let opened = capture_checkpoint()?;
@@ -646,12 +645,14 @@ fn run_owned_iteration(
     validate_owned_plan(&plan, corpus)?;
     let planned = capture_checkpoint()?;
 
-    let published = destination.apply_cross_slide_copy_plan(&source, &plan)?;
-    if published.slides().len() != corpus.destination_slide_count + 1 {
+    let mut publication = destination.edit()?;
+    publication.stage_cross_slide_copy(&source, &plan)?;
+    let published = publication.commit()?;
+    if published.package().presentation()?.slide_count()? != corpus.destination_slide_count + 1 {
         return Err("owned publication changed the wrong slide count".into());
     }
     {
-        let destination_opc = destination.opc()?;
+        let destination_opc = published.package().opc()?;
         destination_opc.write_to(&mut sink)?;
     }
     validate_sink(&sink, &corpus.expected_output)?;

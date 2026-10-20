@@ -138,8 +138,8 @@ impl Snapshot {
     /// Start an isolated semantic edit. The snapshot itself is never changed.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> super::Edit {
-        super::Edit::new(self.clone())
+    pub(crate) fn edit(&self) -> super::Draft {
+        super::Draft::new(self.clone())
     }
 
     pub(super) fn from_source(owner: PackURI, source: Vec<u8>) -> Result<Self> {

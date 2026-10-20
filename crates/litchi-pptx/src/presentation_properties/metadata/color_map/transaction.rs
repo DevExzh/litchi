@@ -114,8 +114,8 @@ impl Snapshot {
     /// Start an atomic detached edit over this typed color-map value.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Edit {
-        Edit {
+    pub(crate) fn edit(&self) -> Draft {
+        Draft {
             original: self.clone(),
             working: self.located.value,
         }
@@ -139,12 +139,12 @@ impl Snapshot {
 
 /// A bounded edit staged against one color-map source.
 #[derive(Debug, Clone)]
-pub struct Edit {
+pub struct Draft {
     original: Snapshot,
     working: Value,
 }
 
-impl Edit {
+impl Draft {
     /// Borrow the projected typed value.
     #[inline]
     #[must_use]
@@ -227,10 +227,10 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Prepared> {
         if !self.is_changed() {
-            let patch = Patch::new(self.original.clone(), self.original.clone());
-            return Ok(Commit {
+            let patch = Change::new(self.original.clone(), self.original.clone());
+            return Ok(Prepared {
                 snapshot: self.original,
                 patch,
                 changed: false,
@@ -248,8 +248,8 @@ impl Edit {
             return Err(invalid("color-map serialization changed the typed value"));
         }
         let snapshot = Snapshot::from_located(Arc::clone(&updated), located);
-        let patch = Patch::new(self.original, snapshot.clone());
-        Ok(Commit {
+        let patch = Change::new(self.original, snapshot.clone());
+        Ok(Prepared {
             snapshot,
             patch,
             changed: true,
@@ -268,92 +268,84 @@ impl Edit {
 
 /// A committed color-map snapshot and its reversible source patch.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Prepared {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     snapshot: Snapshot,
-    patch: Patch,
+    patch: Change,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "read by the module's source-level tests")
+    )]
     changed: bool,
 }
 
-impl Commit {
+impl Prepared {
+    #[cfg(test)]
     fn is_changed(&self) -> bool {
         self.changed
     }
 
     /// The outcome of this edit or commit.
     #[must_use]
-    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+    #[cfg(test)]
+    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
         crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Borrow the projected post-edit snapshot.
     #[inline]
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the reversible source-checked patch.
     #[inline]
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &Change {
         &self.patch
     }
 
     /// Consume the commit into its patch.
     #[inline]
     #[must_use]
-    pub fn into_patch(self) -> Patch {
+    #[cfg(test)]
+    pub(crate) fn into_patch(self) -> Change {
         self.patch
     }
 }
 
 /// A reversible, source-checked replacement of one color-map XML source.
 #[derive(Debug, Clone)]
-pub struct Patch {
+pub(crate) struct Change {
     before: Snapshot,
     after: Snapshot,
 }
 
-impl Patch {
+impl Change {
     fn new(before: Snapshot, after: Snapshot) -> Self {
         Self { before, after }
-    }
-
-    /// Borrow the exact source context required before publication.
-    #[inline]
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
-    }
-
-    /// Borrow the exact source context produced by publication.
-    #[inline]
-    #[must_use]
-    pub fn after(&self) -> &Snapshot {
-        &self.after
     }
 
     /// Return whether this patch is an exact no-op.
     #[inline]
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Return the exact inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    #[cfg(test)]
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
         }
-    }
-
-    /// Return the source fingerprint required for publication.
-    #[inline]
-    #[must_use]
-    pub const fn expected_revision(&self) -> Revision {
-        self.before.revision
     }
 
     /// Apply this patch atomically to an exact XML source buffer.
@@ -361,7 +353,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn apply(&self, target: &mut Vec<u8>) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, target: &mut Vec<u8>) -> Result<Snapshot> {
         if target.as_slice() != self.before.source_xml.as_slice() {
             return Err(invalid("color-map source is stale"));
         }
@@ -386,16 +378,6 @@ impl Patch {
         let replacement = self.after.source_xml.as_ref().clone();
         *target = replacement;
         Ok(result)
-    }
-
-    /// Alias for [`Self::apply`] emphasizing the detached source target.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    #[inline]
-    pub fn apply_to(&self, target: &mut Vec<u8>) -> Result<Snapshot> {
-        self.apply(target)
     }
 }
 

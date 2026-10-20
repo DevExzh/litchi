@@ -4,6 +4,9 @@
     reason = "test assertions panic on failure by design"
 )]
 
+mod in_place;
+use in_place::InPlace as _;
+
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::BlobPart;
 use litchi_opc::{PackURI, PackageWriter};
@@ -112,7 +115,7 @@ fn package_updates_and_removes_catalog_without_legacy_writer_state() {
     let medium = Id::parse("{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}").unwrap();
     let mut styles = package.styles().unwrap().unwrap();
     styles.rename(medium, "Renamed safely").unwrap();
-    assert!(package.put_styles(styles).unwrap());
+    assert!(package.put_styles_in_place(styles).unwrap());
 
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
     package.save(output.path()).unwrap();
@@ -128,13 +131,13 @@ fn package_updates_and_removes_catalog_without_legacy_writer_state() {
         "Renamed safely"
     );
 
-    let removed = reopened.remove_styles().unwrap().unwrap();
+    let removed = reopened.remove_styles_in_place().unwrap().unwrap();
     assert_eq!(
         removed.default().to_string(),
         "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"
     );
     assert!(reopened.styles().unwrap().is_none());
-    assert!(reopened.remove_styles().unwrap().is_none());
+    assert!(reopened.remove_styles_in_place().unwrap().is_none());
 }
 
 #[test]
@@ -146,7 +149,7 @@ fn style_edit_composes_with_a_new_deck_slide_edit() {
     let mut styles = package.styles().unwrap().unwrap();
     styles.add(Def::new(created, "Created").unwrap()).unwrap();
     styles.set_default(created);
-    assert!(package.put_styles(styles).unwrap());
+    assert!(package.put_styles_in_place(styles).unwrap());
 
     assert_eq!(package.styles().unwrap().unwrap().default(), created);
 
@@ -162,7 +165,7 @@ fn style_removal_composes_with_a_new_deck_slide_edit() {
     let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     builder.presentation().unwrap().add_slide().unwrap();
     let mut package = builder.build().unwrap();
-    assert!(package.remove_styles().unwrap().is_some());
+    assert!(package.remove_styles_in_place().unwrap().is_some());
     assert!(package.styles().unwrap().is_none());
 
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
@@ -175,9 +178,9 @@ fn style_removal_composes_with_a_new_deck_slide_edit() {
 #[test]
 fn noncanonical_style_target_survives_transactional_raw_save() {
     let mut package = Package::new().unwrap();
-    let styles = package.remove_styles().unwrap().unwrap();
+    let styles = package.remove_styles_in_place().unwrap().unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.add_part(Box::new(BlobPart::new(
                 PackURI::new("/ppt/tableStyles.xml").unwrap(),
                 "application/xml".into(),
@@ -186,7 +189,7 @@ fn noncanonical_style_target_survives_transactional_raw_save() {
             Ok(())
         })
         .unwrap();
-    assert!(package.put_styles(styles).unwrap());
+    assert!(package.put_styles_in_place(styles).unwrap());
 
     // Exercise a producer-selected style reference that occupies the
     // historical rId1 slide-master slot.
@@ -214,7 +217,7 @@ fn noncanonical_style_target_survives_transactional_raw_save() {
         )
     };
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let presentation = opc.get_part_mut(&presentation_name)?;
             assert!(presentation.rels_mut().remove(&master_id).is_some());
             assert!(presentation.rels_mut().remove(&style_id).is_some());
@@ -293,7 +296,7 @@ fn make_strict(package: &mut Package) {
         "http://purl.oclc.org/ooxml/officeDocument/relationships/tableStyles";
 
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             let (root_id, root_target) = opc
                 .rels()
                 .iter()
