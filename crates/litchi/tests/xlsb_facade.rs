@@ -235,14 +235,6 @@ fn open_eager(bytes: impl Into<Vec<u8>>) -> litchi::Result<File> {
     litchi::open_bytes_with(bytes, &OpenOptions::new().source_mode(SourceMode::Eager))
 }
 
-/// The `litchi::Error` a `litchi_core::sheet` trait method boxed.
-#[track_caller]
-fn unbox<'a>(error: &'a (dyn std::error::Error + Send + Sync + 'static)) -> &'a litchi::Error {
-    error
-        .downcast_ref::<litchi::Error>()
-        .unwrap_or_else(|| panic!("expected a boxed litchi::Error, got {error:?}"))
-}
-
 /// `error` reports that the source changed after open.
 #[track_caller]
 fn assert_source_changed(error: &litchi::Error) {
@@ -258,14 +250,15 @@ fn assert_source_changed(error: &litchi::Error) {
     assert!(changed, "expected a source change, got {error:?}");
 }
 
-/// The trait result failed with a source change.
+/// The trait result failed with a source change (the trait errors are
+/// typed `litchi::Error` values).
 #[track_caller]
-fn assert_boxed_source_changed<T>(result: litchi_core::sheet::Result<T>) {
+fn assert_boxed_source_changed<T>(result: Result<T, litchi::Error>) {
     let error = match result {
         Ok(_) => panic!("stale source operation unexpectedly succeeded"),
         Err(error) => error,
     };
-    assert_source_changed(unbox(error.as_ref()));
+    assert_source_changed(&error);
 }
 
 /// `error` is the XLSB package's `UnsupportedFeature` refusal, naming
@@ -285,12 +278,12 @@ fn assert_unsupported_feature(error: &litchi::Error, expected: &str) {
 
 /// The trait result failed with the XLSB `UnsupportedFeature` refusal.
 #[track_caller]
-fn assert_boxed_unsupported_feature<T>(result: litchi_core::sheet::Result<T>, expected: &str) {
+fn assert_boxed_unsupported_feature<T>(result: Result<T, litchi::Error>, expected: &str) {
     let error = match result {
         Ok(_) => panic!("unsupported XLSB operation unexpectedly succeeded"),
         Err(error) => error,
     };
-    assert_unsupported_feature(unbox(error.as_ref()), expected);
+    assert_unsupported_feature(&error, expected);
 }
 
 /// `error` is the OPC read-limit refusal of `resource`: `observed` against
@@ -761,10 +754,8 @@ fn eager_and_dynamic_facade_reject_active_chart_as_active_worksheet() {
         .expect_err("a chart tab cannot be returned as an active worksheet");
     assert!(
         matches!(
-            eager_error
-                .downcast_ref::<Box<xlsb::package::error::Error>>()
-                .map(Box::as_ref),
-            Some(xlsb::package::error::Error::UnsupportedFeature(message))
+            &eager_error,
+            xlsb::package::error::Error::UnsupportedFeature(message)
                 if message == "XLSB active sheet is not a worksheet"
         ),
         "active chart failure must retain the typed XLSB package error"
@@ -775,7 +766,6 @@ fn eager_and_dynamic_facade_reject_active_chart_as_active_worksheet() {
     assert_eq!(WorkbookTrait::active_sheet_index(&dynamic), 0);
     let dynamic_error = WorkbookTrait::active_worksheet(&dynamic)
         .expect_err("a chart tab cannot be returned as an active worksheet");
-    let dynamic_error = unbox(dynamic_error.as_ref());
     assert!(
         matches!(
             dynamic_error.leaf(),
@@ -866,7 +856,6 @@ fn path_facade_reports_typed_error_for_active_chart_and_source_change_takes_prec
     assert_eq!(WorkbookTrait::active_sheet_index(&workbook), 0);
     let error = WorkbookTrait::active_worksheet(&workbook)
         .expect_err("a chart tab cannot be returned as an active worksheet");
-    let error = unbox(error.as_ref());
     assert!(
         matches!(
             error.leaf(),

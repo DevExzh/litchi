@@ -176,7 +176,9 @@ fn assert_signed<T: std::fmt::Debug>(result: litchi_xlsx::Result<T>) {
 }
 
 #[track_caller]
-fn assert_boxed_signed<T: std::fmt::Debug>(result: litchi_core::sheet::Result<T>) {
+fn assert_boxed_signed<T: std::fmt::Debug>(
+    result: Result<T, Box<dyn std::error::Error + Send + Sync>>,
+) {
     let error = result.expect_err("a change to a signed package must be refused");
     assert!(
         matches!(error.downcast_ref::<Error>(), Some(Error::Signed)),

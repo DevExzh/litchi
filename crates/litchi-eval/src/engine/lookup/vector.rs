@@ -45,7 +45,7 @@ fn lookup_cmp(a: &CellValue, b: &CellValue) -> Ordering {
 /// The array form `LOOKUP(lookup_value, array)` is not implemented: it picks
 /// its result from the last row/column of a two-dimensional array, and this
 /// engine's `CellValue` has no array variant to pass such a value in.
-pub(crate) async fn eval_lookup(
+pub(crate) fn eval_lookup(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -57,18 +57,18 @@ pub(crate) async fn eval_lookup(
         ));
     }
 
-    let lookup_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let lookup_val = evaluate_expression(ctx, current_sheet, &args[0])?;
     if let CellValue::Error(_) = lookup_val {
         return Ok(lookup_val);
     }
 
-    let lookup_vector = flatten_range_expr(ctx, current_sheet, &args[1]).await?;
+    let lookup_vector = flatten_range_expr(ctx, current_sheet, &args[1])?;
     if !is_1d(&lookup_vector) {
         return Ok(CellValue::Error("#N/A".to_string()));
     }
 
     let result_values = if args.len() == 3 {
-        let result_vector = flatten_range_expr(ctx, current_sheet, &args[2]).await?;
+        let result_vector = flatten_range_expr(ctx, current_sheet, &args[2])?;
         if !is_1d(&result_vector) || result_vector.values.len() != lookup_vector.values.len() {
             return Ok(CellValue::Error("#N/A".to_string()));
         }
@@ -130,53 +130,53 @@ mod tests {
         values.iter().map(|v| CellValue::Int(*v)).collect()
     }
 
-    #[tokio::test]
-    async fn test_lookup_two_arg_form() {
+    #[test]
+    fn test_lookup_two_arg_form() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Ascending vector; LOOKUP(3) finds 3 itself.
         engine.add_range("Sheet1", 1, 1, 5, 1, ints(&[1, 2, 3, 4, 5]));
         let args = vec![num_expr(3.0), range_expr("Sheet1", 1, 1, 5, 1)];
-        let result = eval_lookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_lookup(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(3));
     }
 
-    #[tokio::test]
-    async fn test_lookup_approximate_match() {
+    #[test]
+    fn test_lookup_approximate_match() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // LOOKUP(4.5) returns the largest value <= 4.5, i.e. 4.
         engine.add_range("Sheet1", 1, 1, 5, 1, ints(&[1, 2, 3, 4, 5]));
         let args = vec![num_expr(4.5), range_expr("Sheet1", 1, 1, 5, 1)];
-        let result = eval_lookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_lookup(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(4));
     }
 
-    #[tokio::test]
-    async fn test_lookup_greater_than_all() {
+    #[test]
+    fn test_lookup_greater_than_all() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         engine.add_range("Sheet1", 1, 1, 3, 1, ints(&[10, 20, 30]));
         let args = vec![num_expr(999.0), range_expr("Sheet1", 1, 1, 3, 1)];
-        let result = eval_lookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_lookup(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(30));
     }
 
-    #[tokio::test]
-    async fn test_lookup_below_first_returns_na() {
+    #[test]
+    fn test_lookup_below_first_returns_na() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         engine.add_range("Sheet1", 1, 1, 3, 1, ints(&[10, 20, 30]));
         let args = vec![num_expr(5.0), range_expr("Sheet1", 1, 1, 3, 1)];
-        let result = eval_lookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_lookup(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert_eq!(e, "#N/A"),
             _ => panic!("Expected #N/A, got {:?}", result),
         }
     }
 
-    #[tokio::test]
-    async fn test_lookup_with_result_vector() {
+    #[test]
+    fn test_lookup_with_result_vector() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         engine.add_range("Sheet1", 1, 1, 3, 1, ints(&[1, 2, 3]));
@@ -198,12 +198,12 @@ mod tests {
             range_expr("Sheet1", 1, 1, 3, 1),
             range_expr("Sheet1", 1, 2, 3, 2),
         ];
-        let result = eval_lookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_lookup(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("two".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_lookup_result_vector_size_mismatch() {
+    #[test]
+    fn test_lookup_result_vector_size_mismatch() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         engine.add_range("Sheet1", 1, 1, 3, 1, ints(&[1, 2, 3]));
@@ -213,28 +213,28 @@ mod tests {
             range_expr("Sheet1", 1, 1, 3, 1),
             range_expr("Sheet1", 1, 2, 2, 2),
         ];
-        let result = eval_lookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_lookup(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert_eq!(e, "#N/A"),
             _ => panic!("Expected #N/A, got {:?}", result),
         }
     }
 
-    #[tokio::test]
-    async fn test_lookup_non_vector_range() {
+    #[test]
+    fn test_lookup_non_vector_range() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         engine.add_range("Sheet1", 1, 1, 2, 2, ints(&[1, 2, 3, 4]));
         let args = vec![num_expr(2.0), range_expr("Sheet1", 1, 1, 2, 2)];
-        let result = eval_lookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_lookup(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert_eq!(e, "#N/A"),
             _ => panic!("Expected #N/A, got {:?}", result),
         }
     }
 
-    #[tokio::test]
-    async fn test_lookup_text_values_case_insensitive() {
+    #[test]
+    fn test_lookup_text_values_case_insensitive() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         engine.add_range(
@@ -251,12 +251,12 @@ mod tests {
         );
         // Case-insensitive: "BANANA" matches "banana".
         let args = vec![str_expr("BANANA"), range_expr("Sheet1", 1, 1, 3, 1)];
-        let result = eval_lookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_lookup(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::String("banana".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_lookup_text_sorts_after_numbers() {
+    #[test]
+    fn test_lookup_text_sorts_after_numbers() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         // Mixed vector: numbers sort before text, so LOOKUP(99) skips the text.
@@ -274,22 +274,22 @@ mod tests {
             ],
         );
         let args = vec![num_expr(99.0), range_expr("Sheet1", 1, 1, 4, 1)];
-        let result = eval_lookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_lookup(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(3));
     }
 
-    #[tokio::test]
-    async fn test_lookup_horizontal_vector() {
+    #[test]
+    fn test_lookup_horizontal_vector() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         engine.add_range("Sheet1", 1, 1, 1, 3, ints(&[5, 10, 15]));
         let args = vec![num_expr(12.0), range_expr("Sheet1", 1, 1, 1, 3)];
-        let result = eval_lookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_lookup(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(10));
     }
 
-    #[tokio::test]
-    async fn test_lookup_error_lookup_value_propagates() {
+    #[test]
+    fn test_lookup_error_lookup_value_propagates() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         engine.add_range("Sheet1", 1, 1, 2, 1, ints(&[1, 2]));
@@ -297,19 +297,19 @@ mod tests {
             Expr::Literal(CellValue::Error("#DIV/0!".to_string())),
             range_expr("Sheet1", 1, 1, 2, 1),
         ];
-        let result = eval_lookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_lookup(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert_eq!(e, "#DIV/0!"),
             _ => panic!("Expected #DIV/0!, got {:?}", result),
         }
     }
 
-    #[tokio::test]
-    async fn test_lookup_wrong_arg_count() {
+    #[test]
+    fn test_lookup_wrong_arg_count() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(1.0)];
-        let result = eval_lookup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_lookup(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 2 or 3")),
             _ => panic!("Expected Error"),

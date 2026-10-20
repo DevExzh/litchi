@@ -2,7 +2,7 @@
 
 use super::invalid;
 use super::model::{CONTENT_TYPE, MAX_PART_BYTES, REL, STRICT_REL, XmlMapConformance, XmlMapInfo};
-use litchi_core::sheet::Result;
+use crate::BoxedResult as Result;
 use litchi_opc::{OpcPackage, PackURI};
 
 /// Discovers and parses the single Custom XML Maps part related to the workbook.

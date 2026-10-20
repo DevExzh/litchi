@@ -2072,6 +2072,10 @@ macro_rules! from_leaf {
     ($(#[$cfg:meta])* $leaf:ty => $variant:ident, $format:expr) => {
         $(#[$cfg])*
         impl From<$leaf> for Error {
+            // An error conversion is never the hot path: keep it out of the
+            // callers' bodies (record 0353a).
+            #[cold]
+            #[inline(never)]
             fn from(error: $leaf) -> Self {
                 Self::from_class(
                     error.classify(),
@@ -2122,6 +2126,8 @@ from_leaf!(#[cfg(feature = "xlsx")] litchi_xlsx::Error => Xlsx, Some(FileFormat:
 // typed cause, but expose only a content-free classification in diagnostics.
 #[cfg(feature = "xlsb")]
 impl From<litchi_xlsb::package::PackageError> for Error {
+    #[cold]
+    #[inline(never)]
     fn from(error: litchi_xlsb::package::PackageError) -> Self {
         let class = error.classify();
         let message = class.code.summary();
@@ -2131,6 +2137,8 @@ impl From<litchi_xlsb::package::PackageError> for Error {
 
 #[cfg(feature = "xlsb")]
 impl From<litchi_xlsb::Error> for Error {
+    #[cold]
+    #[inline(never)]
     fn from(error: litchi_xlsb::Error) -> Self {
         let class = error.classify();
         let message = class.code.summary();
@@ -2299,3 +2307,45 @@ impl Classify for litchi_core::atomic::Error {
     }
 }
 from_leaf!(litchi_core::atomic::Error => Publication, None);
+
+/// Classify a typed error for the format-neutral sheet error the formula
+/// engine reports: the code selects the variant, and the message is the
+/// code's static summary, so no authored content crosses.
+#[cfg(any(feature = "xlsx", feature = "xlsb", feature = "xls", feature = "ods"))]
+impl From<Error> for litchi_core::sheet::Error {
+    #[cold]
+    #[inline(never)]
+    fn from(error: Error) -> Self {
+        use litchi_core::edit::RefusalKind;
+        let code = error.code();
+        let refused = |kind| Self::refused(kind, "read", code.summary());
+        match code {
+            Code::NotFound
+            | Code::PathNotFound
+            | Code::ZeroMatches
+            | Code::RangeTargetNotFound
+            | Code::FileNotFound => refused(RefusalKind::NotFound),
+            Code::OutOfRange
+            | Code::InvalidValue
+            | Code::InvalidInput
+            | Code::InvalidArgument
+            | Code::InvalidPath
+            | Code::InvalidSelector
+            | Code::MissingArgument => refused(RefusalKind::InvalidValue),
+            Code::UnsupportedProperty => refused(RefusalKind::UnsupportedProperty),
+            Code::UnsupportedType | Code::UnsupportedElement | Code::UnsupportedPath => {
+                refused(RefusalKind::UnsupportedTarget)
+            },
+            Code::UnsupportedFormat | Code::UnsupportedCommand | Code::UnsupportedCapability => {
+                refused(RefusalKind::UnsupportedOperation)
+            },
+            Code::LimitExceeded | Code::OutputTooLarge | Code::MaxDepthExceeded => {
+                refused(RefusalKind::UnsupportedContent)
+            },
+            Code::DocumentProtected => refused(RefusalKind::Protected),
+            Code::IoError | Code::FileLocked => Self::Io,
+            Code::CorruptFile | Code::CorruptBatch => Self::Malformed(code.summary()),
+            _ => Self::Internal(code.summary()),
+        }
+    }
+}

@@ -2993,3 +2993,19 @@ Structured keywords (owner decision 0350, memo item 20):
 | `litchi_pages::metadata::Edit::set_keywords(&[String])`, `metadata::Error::InvalidKeyword`; `litchi_ods::metadata::Editor::set_keywords(Vec<String>)`; `litchi_odi` `set_keywords(Vec<String>)` and `MetadataFields::keywords() -> &[String]` | adopted (0354) |
 
 See [0354](unified-ops/0354-sheet-text-and-structured-keywords.md).
+
+## Sheet traits: typed errors and a synchronous engine (record 0353a)
+
+Owner decision 0350 and coordinator decision 0353a: no boxed error on the
+sheet traits and no boxed future in the formula engine.
+
+| Name | Status |
+|---|---|
+| `litchi_core::sheet::{Error, LimitKind}` (non-exhaustive; `Refused(edit::Refusal)`, `Limit { kind, observed, maximum }`, `SourceChanged`, `Io`, `Malformed(&'static str)`, `Internal(&'static str)`), `Error::{refused, refusal}` | adopted (0353a): the format-neutral, content-free sheet and evaluation error (0351 §2.4 shape) |
+| `litchi_core::sheet::Result<T, E = Error>` | adopted (0353a), replacing `Result<T, Box<dyn Error + Send + Sync>>` |
+| `litchi_core::sheet::Worksheet::Error`, `WorkbookTrait::Error` (associated types; `WorkbookTrait::Worksheet<'a>: Worksheet<Error = Self::Error>`) | adopted (0353a): each implementation reports its own typed error (`litchi_ops::Error`, `litchi_xls::Error`, `litchi_xlsb::package::PackageError`, `litchi_sheet_text::Error`, `sheet::Error`) |
+| `impl From<litchi_ops::Error \| litchi_xls::Error \| litchi_xlsb::package::PackageError \| litchi_sheet_text::Error> for litchi_core::sheet::Error` | adopted (0353a): classification with static reasons, which `FormulaEvaluator` requires (`sheet::Error: From<W::Error>`) |
+| `litchi_eval::DepthLimit` | deleted (0353a): a too-deep chain is `sheet::Error::Limit { kind: LimitKind::Depth, .. }` |
+| `litchi_eval::FormulaEvaluator::{evaluate_cell, evaluate_sheet}` | kept `async` (0353a); the engine core is synchronous and the futures only await the caller's `Fetch` for `WEBSERVICE` between passes |
+
+See [0353a](unified-ops/0353a-sheet-errors-and-sync-engine.md).

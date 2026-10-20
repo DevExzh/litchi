@@ -68,6 +68,10 @@
     reason = "schema variants stay explicit and keyed unit maps preserve the required lookup representation"
 )]
 
+/// The boxed-error result these modules' public reads still return (they
+/// predate the typed sheet error of record 0353a).
+pub(crate) type BoxedResult<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
 pub mod active_x;
 pub mod auto_filter;
 pub mod calculation_properties;

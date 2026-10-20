@@ -8,8 +8,8 @@ use super::codec::{
     parse_pivot_table_definition_with_cache, read_pivot_cache_definition,
     validate_pivot_cache_records,
 };
+use crate::BoxedResult as SheetResult;
 use crate::raw::parse_catalog;
-use litchi_core::sheet::Result as SheetResult;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI};
 

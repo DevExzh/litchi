@@ -12,7 +12,6 @@ use crate::package::shared_strings::SharedString;
 use crate::package::styles_table::{CellFormat, StylesTable};
 use crate::sheet::{Grid, Selector, Tab, Worksheet};
 use litchi_core::Position;
-use litchi_core::sheet::Result as SheetResult;
 use litchi_opc::OpcPackage;
 use std::sync::Arc;
 
@@ -485,6 +484,7 @@ impl Workbook {
 impl litchi_core::sheet::WorkbookTrait for Workbook {
     /// The worksheet snapshot the owner's cache retains, shared rather than
     /// copied.
+    type Error = crate::package::error::Error;
     type Worksheet<'a> = Arc<Worksheet>;
     type Worksheets<'a> = Worksheets<'a>;
 
@@ -492,11 +492,11 @@ impl litchi_core::sheet::WorkbookTrait for Workbook {
         self.active_worksheet_index().unwrap_or(0)
     }
 
-    fn active_worksheet(&self) -> SheetResult<Arc<Worksheet>> {
+    fn active_worksheet(&self) -> crate::package::error::Result<Arc<Worksheet>> {
         let index = self.active_worksheet_index().ok_or_else(|| {
-            Box::new(crate::package::error::Error::UnsupportedFeature(
+            crate::package::error::Error::UnsupportedFeature(
                 "XLSB active sheet is not a worksheet".to_string(),
-            ))
+            )
         })?;
         self.worksheet_by_index(index)
     }
@@ -510,18 +510,19 @@ impl litchi_core::sheet::WorkbookTrait for Workbook {
         &self.worksheet_names
     }
 
-    fn worksheet_by_index(&self, index: usize) -> SheetResult<Arc<Worksheet>> {
-        Ok(self.cached_worksheet(index)?)
+    fn worksheet_by_index(&self, index: usize) -> crate::package::error::Result<Arc<Worksheet>> {
+        self.cached_worksheet(index)
     }
 
-    fn worksheet_by_name(&self, name: &str) -> SheetResult<Arc<Worksheet>> {
+    fn worksheet_by_name(&self, name: &str) -> crate::package::error::Result<Arc<Worksheet>> {
         for (i, ws_name) in self.worksheet_names.iter().enumerate() {
             if ws_name == name {
                 return self.worksheet_by_index(i);
             }
         }
-        Err(Box::new(crate::package::error::Error::InvalidFormat(
-            format!("Worksheet '{}' not found", name),
+        Err(crate::package::error::Error::InvalidFormat(format!(
+            "Worksheet '{}' not found",
+            name
         )))
     }
 
@@ -547,18 +548,14 @@ pub struct Worksheets<'a> {
 }
 
 impl Iterator for Worksheets<'_> {
-    type Item = SheetResult<Arc<Worksheet>>;
+    type Item = crate::package::error::Result<Arc<Worksheet>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.workbook.worksheet_names.len() {
             let result = self.workbook.cached_worksheet(self.index);
             // Continue to the next worksheet even on error.
             self.index += 1;
-            Some(
-                result.map_err(|error| -> Box<dyn std::error::Error + Send + Sync> {
-                    Box::new(error)
-                }),
-            )
+            Some(result)
         } else {
             None
         }

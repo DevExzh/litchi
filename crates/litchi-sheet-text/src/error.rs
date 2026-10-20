@@ -151,6 +151,40 @@ impl From<TryReserveError> for Error {
     }
 }
 
+/// Classify a text-workbook error for the format-neutral sheet error the
+/// formula engine reports. The message is static: no source text, name or
+/// position crosses.
+impl From<Error> for litchi_core::sheet::Error {
+    #[cold]
+    #[inline(never)]
+    fn from(error: Error) -> Self {
+        use litchi_core::edit::RefusalKind;
+        let refused = |kind, reason| Self::refused(kind, "read", reason);
+        match error {
+            Error::Io(_) => Self::Io,
+            Error::MissingWorksheet => refused(
+                RefusalKind::NotFound,
+                "the text workbook has no such worksheet",
+            ),
+            Error::RowOutOfRange { .. } => {
+                refused(RefusalKind::NotFound, "the row is past the last row")
+            },
+            Error::InvalidCoordinate | Error::InvalidOption { .. } | Error::InvalidLimit { .. } => {
+                refused(RefusalKind::InvalidValue, "the request is not valid")
+            },
+            Error::Limit { .. } | Error::Allocation { .. } => refused(
+                RefusalKind::UnsupportedContent,
+                "the text source exceeds a configured limit",
+            ),
+            Error::Encoding { .. }
+            | Error::UnterminatedQuote { .. }
+            | Error::InvalidCharacter { .. }
+            | Error::Syntax { .. }
+            | Error::OutOfGrid { .. } => Self::Malformed("the text source is malformed"),
+        }
+    }
+}
+
 const fn option_name(option: OptionKind) -> &'static str {
     match option {
         OptionKind::Delimiter => "delimiter",
