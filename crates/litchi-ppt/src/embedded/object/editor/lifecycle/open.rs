@@ -71,13 +71,29 @@ pub(crate) fn inspect_live_mapping_at(
 }
 
 pub(crate) fn open(bytes: Arc<[u8]>, collection: Collection) -> Result<Editor> {
-    open_with_limit(bytes, collection, usize::MAX)
+    open_with_limit(bytes, collection, usize::MAX, false)
+}
+
+/// Open over a package that may be signed; the editor records the signature
+/// and `finish` refuses a changed publication.
+pub(crate) fn open_admitting_signature(bytes: Arc<[u8]>, collection: Collection) -> Result<Editor> {
+    open_with_limit(bytes, collection, usize::MAX, true)
+}
+
+/// The empty collection of a records-only editor.
+pub(crate) fn no_objects() -> Collection {
+    Collection {
+        id_seed: 1,
+        objects: Vec::new(),
+        unknown_records: Vec::new(),
+    }
 }
 
 fn open_with_limit(
     bytes: Arc<[u8]>,
     collection: Collection,
     max_output_bytes: usize,
+    admit_signature: bool,
 ) -> Result<Editor> {
     if bytes.len() > max_output_bytes {
         return Err(Error::ResourceLimit(format!(
@@ -86,7 +102,7 @@ fn open_with_limit(
         )));
     }
     let mut ole = OleFile::open(Cursor::new(bytes.clone()))?;
-    reject_unsupported_package(&ole)?;
+    let signed = reject_unsupported_package(&ole, admit_signature)?;
     let paths = ole.list_streams();
 
     let document_path = find_stream(&paths, "PowerPoint Document")?;
@@ -133,6 +149,7 @@ fn open_with_limit(
         rewrite_object_list: false,
         changed: false,
         layout: litchi_cfb::SectorLayoutPolicy::default(),
+        signed,
     })
 }
 
@@ -144,23 +161,24 @@ pub(crate) fn open_records_arc_with_limit(
     bytes: Arc<[u8]>,
     max_output_bytes: usize,
 ) -> Result<Editor> {
-    open_with_limit(
-        bytes,
-        Collection {
-            id_seed: 1,
-            objects: Vec::new(),
-            unknown_records: Vec::new(),
-        },
-        max_output_bytes,
-    )
+    open_with_limit(bytes, no_objects(), max_output_bytes, false)
 }
 
-fn reject_unsupported_package<R: Read + Seek>(ole: &OleFile<R>) -> Result<()> {
+/// Refuse a package with an encryption or rights-management component, and
+/// one with a signature component unless `admit_signature`. Returns whether
+/// a signature component was found.
+fn reject_unsupported_package<R: Read + Seek>(
+    ole: &OleFile<R>,
+    admit_signature: bool,
+) -> Result<bool> {
+    let mut signed = false;
     let mut pending = vec![Vec::<String>::new()];
     while let Some(directory) = pending.pop() {
         let directory_refs: Vec<_> = directory.iter().map(String::as_str).collect();
         for entry in ole.list_directory_entries(&directory_refs)? {
-            if is_protected_component(&entry.name) {
+            if admit_signature && is_signature_component(&entry.name) {
+                signed = true;
+            } else if is_protected_component(&entry.name) {
                 return Err(Error::Corrupted(
                     "signed or encrypted PPT is not eligible for OLE editing".into(),
                 ));
@@ -173,7 +191,21 @@ fn reject_unsupported_package<R: Read + Seek>(ole: &OleFile<R>) -> Result<()> {
             }
         }
     }
-    Ok(())
+    Ok(signed)
+}
+
+/// The digital-signature storages and streams: the subset of
+/// `is_protected_component` a signed, unencrypted deck carries (the same
+/// names `Package` reports as a signature).
+fn is_signature_component(name: &str) -> bool {
+    [
+        "_xmlsignatures",
+        "_signatures",
+        "DigitalSignature",
+        "\u{0005}DigitalSignature",
+    ]
+    .iter()
+    .any(|marker| name.eq_ignore_ascii_case(marker))
 }
 
 fn find_stream(paths: &[Vec<String>], name: &str) -> Result<Vec<String>> {

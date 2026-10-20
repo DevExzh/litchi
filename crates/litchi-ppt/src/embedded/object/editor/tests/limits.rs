@@ -39,6 +39,7 @@ fn rejects_a_projected_incremental_stream_above_the_publication_limit() {
         rewrite_object_list: false,
         changed: true,
         layout: litchi_cfb::SectorLayoutPolicy::default(),
+        signed: false,
     };
 
     let error = editor.finish().unwrap_err();

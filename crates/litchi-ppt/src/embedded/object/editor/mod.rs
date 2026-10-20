@@ -49,6 +49,10 @@ pub(crate) struct Editor {
     pub(super) rewrite_object_list: bool,
     pub(super) changed: bool,
     pub(super) layout: litchi_cfb::SectorLayoutPolicy,
+    /// Whether the source carries a digital-signature component. Such an
+    /// editor was opened for staging only: [`Self::finish`] refuses any
+    /// changed publication, which would invalidate the signature.
+    pub(super) signed: bool,
 }
 
 impl Editor {
@@ -91,6 +95,16 @@ impl Editor {
         lifecycle::inspect_live_mapping_at(document, head_offset, leniency, report)
     }
 
+    /// Opens the shared incremental persisted-record editor without requiring
+    /// an external-object collection. Used by non-OLE record editors.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub(crate) fn open_records(bytes: Vec<u8>) -> Result<Self> {
+        lifecycle::open_records(Arc::from(bytes))
+    }
+
     /// Opens a transactional editor over an OLE-backed `PowerPoint` package.
     ///
     /// # Errors
@@ -100,14 +114,17 @@ impl Editor {
         lifecycle::open(Arc::from(bytes), collection)
     }
 
-    /// Opens the shared incremental persisted-record editor without requiring
-    /// an external-object collection. Used by non-OLE record editors.
+    /// [`Self::open_records`] over a package that may carry a
+    /// digital-signature component, so a scoped family can stage and read
+    /// over a signed deck. [`Self::finish`] still refuses a changed
+    /// publication of a signed source; encryption and rights-management
+    /// components stay refused.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub(crate) fn open_records(bytes: Vec<u8>) -> Result<Self> {
-        lifecycle::open_records(Arc::from(bytes))
+    pub(crate) fn open_records_admitting_signature(bytes: Vec<u8>) -> Result<Self> {
+        lifecycle::open::open_admitting_signature(Arc::from(bytes), lifecycle::open::no_objects())
     }
 
     pub(crate) fn open_records_arc_with_limit(
@@ -160,6 +177,38 @@ impl Editor {
         record: Vec<u8>,
     ) -> Result<()> {
         mutation::replace_persisted_record(self, persist_id, record)
+    }
+
+    /// Whether a replacement of `persist_id` is staged.
+    pub(crate) fn is_record_staged(&self, persist_id: u32) -> bool {
+        self.staged_storage.contains_key(&persist_id)
+    }
+
+    /// Whether any record replacement or insertion is staged.
+    pub(crate) fn has_staged_records(&self) -> bool {
+        !self.staged_storage.is_empty()
+    }
+
+    /// The source bytes of the live record `persist_id`, ignoring any staged
+    /// replacement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `persist_id` has no live source record.
+    pub(crate) fn source_record(&self, persist_id: u32) -> Result<&[u8]> {
+        let offset = *self
+            .mappings
+            .get(&persist_id)
+            .ok_or_else(|| Error::Corrupted(format!("unknown persist ID {persist_id}")))?;
+        let offset = usize::try_from(offset)
+            .map_err(|_err| Error::Corrupted("persist offset exceeds usize".into()))?;
+        rewrite::slice(&self.document, offset)
+    }
+
+    /// Drops the staged replacement of `persist_id`, so the source record
+    /// stays live.
+    pub(crate) fn unstage_record(&mut self, persist_id: u32) {
+        self.staged_storage.remove(&persist_id);
     }
 
     /// Stages a complete record under a caller-allocated unused persist ID.

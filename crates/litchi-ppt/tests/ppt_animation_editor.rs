@@ -183,14 +183,124 @@ fn with_signature(source: &[u8]) -> Vec<u8> {
 }
 
 #[test]
-fn a_signed_package_refuses_animation_edits() {
-    let (source, _slide, _master) = built();
-    let signed = Package::from_bytes(&with_signature(&source.to_bytes().unwrap())).unwrap();
-    // Every staged animation change would invalidate the signature, and the
-    // record editor cannot stage over signature storages, so the edit is
-    // refused up front.
-    assert!(matches!(
-        signed.edit_animations(),
-        Err(animation::Error::Signed)
-    ));
+fn a_signed_package_admits_animation_edits_and_refuses_only_a_changed_commit() {
+    let (source, slide, _master) = built();
+    let signed_bytes = with_signature(&source.to_bytes().unwrap());
+    let signed = Package::from_bytes(&signed_bytes).unwrap();
+
+    // Staging and reading work; an exact no-op commit keeps the signature.
+    let edit = signed.edit_animations().unwrap();
+    assert_eq!(edit.find(slide).unwrap().scope, Scope::Slide);
+    let no_op = edit.commit().unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), signed_bytes);
+
+    // A change that is reverted before the commit is a no-op too.
+    let original = signed.edit_animations().unwrap().find(slide).unwrap();
+    let mut edit = signed.edit_animations().unwrap();
+    edit.add(slide, 0, node(TimeNodeKind::Parallel, 100))
+        .unwrap();
+    edit.replace(
+        slide,
+        original.extension.time_node,
+        original.extension.build_list,
+    )
+    .unwrap();
+    let reverted = edit.commit().unwrap();
+    assert!(!reverted.diagnostics().changed());
+    assert_eq!(reverted.package().to_bytes().unwrap(), signed_bytes);
+
+    // A changed commit would invalidate the signature.
+    let mut edit = signed.edit_animations().unwrap();
+    edit.add(slide, 0, node(TimeNodeKind::Parallel, 100))
+        .unwrap();
+    assert!(matches!(edit.commit(), Err(animation::Error::Signed)));
+    assert_eq!(signed.to_bytes().unwrap(), signed_bytes);
+}
+
+#[test]
+fn a_change_reverted_before_the_commit_is_an_exact_no_op() {
+    let (built, slide, master) = built();
+    // A source whose slide already carries a timeline with one child.
+    let mut edit = built.edit_animations().unwrap();
+    edit.add(slide, 0, node(TimeNodeKind::Parallel, 100))
+        .unwrap();
+    let source = edit.commit().unwrap().package().clone();
+    let source_bytes = source.to_bytes().unwrap();
+    let staged = |package: &Package, persist_id| {
+        package.edit_animations().unwrap().find(persist_id).unwrap()
+    };
+    let original = staged(&source, slide);
+    let original_master = staged(&source, master);
+    let assert_no_op = |edit: animation::Edit| {
+        let commit = edit.commit().unwrap();
+        assert!(!commit.diagnostics().changed());
+        assert!(commit.patch().is_noop());
+        assert_eq!(commit.patch().changed_bytes(), 0);
+        assert_eq!(commit.package().to_bytes().unwrap(), source_bytes);
+    };
+
+    // Update a node and update it back.
+    let mut edit = source.edit_animations().unwrap();
+    let first = original.extension.time_node.as_ref().unwrap().children[0].clone();
+    edit.update(slide, 0, node(TimeNodeKind::Sequential, 999))
+        .unwrap();
+    edit.update(slide, 0, first.clone()).unwrap();
+    assert_eq!(edit.find(slide).unwrap(), original);
+    assert_no_op(edit);
+
+    // Add, reorder and remove back to the source order.
+    let mut edit = source.edit_animations().unwrap();
+    edit.add(slide, 1, node(TimeNodeKind::Sequential, 200))
+        .unwrap();
+    edit.reorder(slide, &[1, 0]).unwrap();
+    edit.remove(slide, 0).unwrap();
+    assert_eq!(edit.find(slide).unwrap(), original);
+    assert_no_op(edit);
+
+    // Give the master a timeline, then restore its source timeline: the
+    // record is rewritten back to its source meaning and keeps its bytes.
+    let mut edit = source.edit_animations().unwrap();
+    edit.add(master, 0, node(TimeNodeKind::Sequential, 200))
+        .unwrap();
+    edit.replace(
+        master,
+        original_master.extension.time_node.clone(),
+        original_master.extension.build_list.clone(),
+    )
+    .unwrap();
+    assert_eq!(edit.find(master).unwrap(), original_master);
+    assert_no_op(edit);
+
+    // A partial revert publishes only the record that still changed: the
+    // master keeps its source timeline.
+    let mut edit = source.edit_animations().unwrap();
+    edit.add(slide, 1, node(TimeNodeKind::Sequential, 200))
+        .unwrap();
+    edit.add(master, 0, node(TimeNodeKind::Sequential, 200))
+        .unwrap();
+    edit.replace(
+        master,
+        original_master.extension.time_node.clone(),
+        original_master.extension.build_list.clone(),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(
+        root_children(&commit.package().edit_animations().unwrap(), slide),
+        2
+    );
+    assert_eq!(staged(commit.package(), master), original_master);
+    let replayed = source.apply_animations(commit.patch()).unwrap();
+    assert_eq!(
+        replayed.package().to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
+    let restored = commit
+        .package()
+        .apply_animations(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(restored.package().to_bytes().unwrap(), source_bytes);
 }

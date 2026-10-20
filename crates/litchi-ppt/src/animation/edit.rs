@@ -33,13 +33,10 @@ impl std::fmt::Debug for Edit {
 impl Edit {
     fn new(package: &Package) -> Result<Self> {
         let base = Base::capture(package)?;
-        let inner = match RecordEdit::open(base.bytes().to_vec(), EditorLimits::default()) {
-            Ok(inner) => inner,
-            // The record editor refuses signed packages before staging; any
-            // staged animation change would invalidate the signature.
-            Err(_) if base.is_signed()? => return Err(Error::Signed),
-            Err(error) => return Err(scoped::publication("edit_animations")(error).into()),
-        };
+        // A signed package opens for staging; only a changed commit is
+        // refused, since it would invalidate the signature.
+        let inner = RecordEdit::open(base.bytes().to_vec(), EditorLimits::default())
+            .map_err(scoped::publication("edit_animations"))?;
         Ok(Self { base, inner })
     }
 
@@ -255,8 +252,10 @@ impl Edit {
             .map_err(scoped::staging("animation.replace_shape_animation"))?)
     }
 
-    /// Publish the staged animations as a new package. An edit with no
-    /// staged change publishes the source package unchanged.
+    /// Publish the staged animations as a new package. An edit whose staged
+    /// records equal the source (nothing staged, or every change reverted)
+    /// publishes the source package unchanged; a record rewritten back to
+    /// its source animation model keeps its source bytes.
     ///
     /// # Errors
     ///
@@ -266,11 +265,11 @@ impl Edit {
     /// republished.
     pub fn commit(self) -> Result<Commit> {
         let Self { base, inner } = self;
-        if !inner.has_net_change() {
-            return Ok(super::published(base.unchanged()));
-        }
-        let after = match inner.into_bytes() {
-            Ok(bytes) => bytes,
+        let after = match inner.into_net_bytes() {
+            Ok(Some(bytes)) => bytes,
+            Ok(None) => return Ok(super::published(base.unchanged())),
+            // The record publisher refuses a changed write of a signed
+            // package; report the signature.
             Err(_) if base.is_signed()? => return Err(Error::Signed),
             Err(error) => return Err(scoped::publication("animation.commit")(error).into()),
         };
@@ -284,11 +283,10 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Signed`] for a signed package (the record editor
-    /// cannot stage over its signature storages), [`Error::Package`] for an
-    /// encrypted presentation or a package whose persisted records cannot be
-    /// read, and [`Error::Refused`] when a slide or master animation record
-    /// is not representable.
+    /// Returns [`Error::Package`] for an encrypted presentation or a package
+    /// whose persisted records cannot be read, and [`Error::Refused`] when a
+    /// slide or master animation record is not representable. A signed
+    /// package opens; its changed commit is [`Error::Signed`].
     pub fn edit_animations(&self) -> Result<Edit> {
         Edit::new(self)
     }

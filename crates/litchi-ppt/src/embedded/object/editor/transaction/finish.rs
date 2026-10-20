@@ -17,6 +17,11 @@ pub(crate) fn finish(mut editor: Editor) -> Result<Vec<u8>> {
         original.extend_from_slice(&editor.original);
         return Ok(original);
     }
+    if editor.signed {
+        return Err(Error::Corrupted(
+            "signed PPT is not eligible for a changed OLE publication".into(),
+        ));
+    }
 
     for id in &editor.removed_persist_ids {
         editor.mappings.remove(id);
