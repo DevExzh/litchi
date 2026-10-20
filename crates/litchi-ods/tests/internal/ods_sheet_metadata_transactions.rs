@@ -1207,39 +1207,48 @@ fn source_backed_metadata_commit_round_trips_inverse_and_untouched_members() {
         "sum"
     );
 
-    let mut edit = before.edit().expect("source metadata edit");
+    let mut edit = owner
+        .edit_sheet_metadata_with(metadata::Limits::default(), &context())
+        .expect("source metadata edit");
     edit.set_consolidation(Some(options("average")))
         .expect("stage source consolidation");
-    let commit = edit.commit(&context()).expect("source metadata commit");
-    assert!(commit.changed());
+    let commit = edit.commit().expect("source metadata commit");
+    assert!(commit.diagnostics().changed());
     assert_eq!(commit.patch().source_xml(), before.source_xml());
-    assert_eq!(commit.patch().target_xml(), commit.snapshot().source_xml());
+    assert_eq!(
+        commit.patch().target_xml(),
+        commit.package().content_xml().expect("committed content")
+    );
 
-    let applied = commit
-        .patch()
-        .apply(&before)
-        .expect("apply source-backed patch");
+    let applied = owner
+        .apply_sheet_metadata(commit.patch())
+        .expect("apply source-backed patch through the owner");
     assert_eq!(
-        applied.snapshot().source_xml(),
-        commit.snapshot().source_xml()
+        applied.package().content_xml().expect("applied content"),
+        commit.patch().target_xml()
     );
-    let applied_via_owner = owner
-        .apply_sheet_metadata_patch(commit.patch())
-        .expect("apply source-backed patch through facade");
-    assert_eq!(
-        applied_via_owner.snapshot().source_xml(),
-        commit.snapshot().source_xml()
-    );
-    let restored = commit
-        .patch()
-        .inverse()
-        .apply(applied.snapshot())
+    let restored = applied
+        .package()
+        .apply_sheet_metadata(&commit.patch().inverse())
         .expect("apply source-backed inverse");
-    assert_eq!(restored.snapshot().source_xml(), before.source_xml());
+    assert_eq!(
+        restored.package().content_xml().expect("restored content"),
+        before.source_xml()
+    );
+    let mut restored_bytes = Vec::new();
+    restored
+        .package()
+        .write_to(&mut restored_bytes)
+        .expect("restored publish");
+    assert_eq!(
+        restored_bytes, source,
+        "the inverse restores the exact archive"
+    );
 
     let mut output = Vec::new();
     let report = commit
-        .write_to(&mut output, SourceContentPublicationOptions::new())
+        .package()
+        .write_to_with_options(&mut output, SourceContentPublicationOptions::new())
         .expect("publish source-backed metadata commit");
     assert!(!report.is_no_op());
     assert_eq!(report.bytes(), output.len() as u64);
@@ -1270,16 +1279,19 @@ fn source_backed_noop_publication_retains_exact_xml_and_reports_noop() {
     let source = package(&content, false);
     let owner = SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(source.clone())))
         .expect("source-backed canonical fixture");
-    let before = owner.sheet_metadata().expect("source metadata snapshot");
-    let mut edit = before.edit().expect("source metadata edit");
-    let commit = edit.commit(&context()).expect("source no-op commit");
-    assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
-    assert_eq!(commit.snapshot().source_xml(), content);
+    let edit = owner.edit_sheet_metadata().expect("source metadata edit");
+    let commit = edit.commit().expect("source no-op commit");
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
+    assert_eq!(
+        commit.package().content_xml().expect("no-op content"),
+        content
+    );
 
     let mut output = Vec::new();
     let report = commit
-        .write_to(&mut output, SourceContentPublicationOptions::new())
+        .package()
+        .write_to_with_options(&mut output, SourceContentPublicationOptions::new())
         .expect("publish source no-op");
     assert!(report.is_no_op());
     assert_eq!(report.bytes(), output.len() as u64);
@@ -1295,10 +1307,11 @@ fn source_backed_publication_honors_limits_and_cancellation() {
     let mut edit = owner.edit_sheet_metadata().expect("source metadata edit");
     edit.set_consolidation(Some(options("average")))
         .expect("stage source consolidation");
-    let commit = edit.commit(&context()).expect("source metadata commit");
+    let commit = edit.commit().expect("source metadata commit");
 
     let error = commit
-        .write_to(
+        .package()
+        .write_to_with_options(
             Vec::new(),
             SourceContentPublicationOptions::new().with_max_output_bytes(1),
         )
@@ -1315,7 +1328,8 @@ fn source_backed_publication_honors_limits_and_cancellation() {
     let (cancellation, token) = CancellationSource::pair();
     cancellation.cancel();
     let error = commit
-        .write_to(
+        .package()
+        .write_to_with_options(
             Vec::new(),
             SourceContentPublicationOptions::new().with_cancellation(token),
         )
@@ -1343,17 +1357,18 @@ fn source_backed_metadata_detects_stale_source_before_publication() {
     let owner = SourceBackedSpreadsheet::from_read_at(source.clone())
         .expect("mutable source-backed fixture");
     let before = owner.sheet_metadata().expect("source metadata snapshot");
-    let mut edit = before.edit().expect("source metadata edit");
+    let mut edit = owner.edit_sheet_metadata().expect("source metadata edit");
     edit.set_consolidation(Some(options("average")))
         .expect("stage source consolidation");
-    let commit = edit.commit(&context()).expect("source metadata commit");
+    let commit = edit.commit().expect("source metadata commit");
 
     source.bump();
     assert!(before.consolidation().is_err());
-    assert!(commit.patch().apply(&before).is_err());
+    assert!(owner.apply_sheet_metadata(commit.patch()).is_err());
     let mut output = Vec::new();
     let error = commit
-        .write_to(&mut output, SourceContentPublicationOptions::new())
+        .package()
+        .write_to_with_options(&mut output, SourceContentPublicationOptions::new())
         .expect_err("stale source publication");
     assert!(matches!(
         error,
@@ -1366,7 +1381,7 @@ fn source_backed_metadata_detects_stale_source_before_publication() {
 }
 
 #[test]
-fn signed_source_refuses_changed_metadata_while_preserving_staged_edit() {
+fn signed_source_refuses_changed_metadata_at_commit() {
     let owner = SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(package(
         &canonical_content(),
         true,
@@ -1381,8 +1396,11 @@ fn signed_source_refuses_changed_metadata_while_preserving_staged_edit() {
         .expect("signed source metadata edit");
     edit.set_consolidation(Some(options("average")))
         .expect("stage signed source edit");
-    assert!(edit.commit(&context()).is_err());
-    assert!(edit.commit(&context()).is_err());
+    assert!(matches!(
+        edit.commit(),
+        Err(litchi_odf_common::Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::Protected
+    ));
     assert_eq!(
         owner.content_xml().expect("source remains unchanged"),
         before

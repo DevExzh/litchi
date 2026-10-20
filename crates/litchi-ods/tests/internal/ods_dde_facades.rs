@@ -85,12 +85,6 @@ fn bom_prefixed_content_keeps_exact_transaction_coordinates() {
         commit.snapshot().sheet_sources()[0].source().item(),
         "replacement-values"
     );
-    let restored = commit
-        .patch()
-        .inverse()
-        .apply(commit.snapshot())
-        .expect("exact inverse");
-    assert_eq!(restored.snapshot().source_xml(), content);
 }
 
 #[test]
@@ -272,32 +266,48 @@ fn source_backed_commit_reopens_preserves_members_and_inverts() {
     let owner = SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(original.clone())))
         .expect("source-backed fixture");
     let (_cancel, execution) = context();
-    let before = owner
-        .dde_with(dde::Limits::default(), &execution)
-        .expect("source snapshot");
-    let mut edit = before.edit().expect("source edit");
+    let mut edit = owner
+        .edit_dde_with(dde::Limits::default(), &execution)
+        .expect("source edit");
     edit.set_sheet_source("Data", replacement_source())
         .expect("stage source");
-    let commit = edit.commit(&execution).expect("source commit");
-    assert!(commit.changed());
-    let applied = commit.patch().apply(&before).expect("apply source patch");
-    let via_owner = owner
-        .apply_dde_patch(commit.patch())
-        .expect("owner patch forwarding");
+    let commit = edit.commit().expect("source commit");
+    assert!(commit.diagnostics().changed());
+    let applied = owner.apply_dde(commit.patch()).expect("apply source patch");
     assert_eq!(
-        via_owner.snapshot().source_xml(),
-        applied.snapshot().source_xml()
+        applied.package().content_xml().expect("applied content"),
+        commit.package().content_xml().expect("committed content")
     );
-    let restored = commit
-        .patch()
-        .inverse()
-        .apply(applied.snapshot())
+    assert_eq!(
+        commit
+            .package()
+            .dde()
+            .expect("committed inventory")
+            .sheet_sources()
+            .expect("committed sources")[0]
+            .source()
+            .item(),
+        "replacement-values"
+    );
+    let restored = applied
+        .package()
+        .apply_dde(&commit.patch().inverse())
         .expect("source inverse");
-    assert_eq!(restored.snapshot().source_xml(), CONTENT);
+    assert_eq!(restored.package().content_xml().expect("restored"), CONTENT);
+    let mut restored_bytes = Vec::new();
+    restored
+        .package()
+        .write_to(&mut restored_bytes)
+        .expect("restored publish");
+    assert_eq!(
+        restored_bytes, original,
+        "the inverse restores the exact archive"
+    );
 
     let mut output = Vec::new();
     commit
-        .write_to(&mut output, SourceContentPublicationOptions::new())
+        .package()
+        .write_to_with_options(&mut output, SourceContentPublicationOptions::new())
         .expect("sequential publish");
     let identical = raw_identical_members(&original, &output).expect("member comparison");
     assert!(identical.contains("Pictures/unrelated.bin"));
@@ -315,29 +325,34 @@ fn source_backed_commit_reopens_preserves_members_and_inverts() {
 }
 
 #[test]
-fn source_patch_rechecks_destination_output_limit_and_live_owner() {
+fn source_edit_checks_its_output_limit_and_patches_check_their_owner() {
     let owner = SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(package())))
         .expect("source owner");
     let (_cancel, execution) = context();
-    let before = owner
-        .dde_with(dde::Limits::default(), &execution)
-        .expect("source snapshot");
-    let mut edit = before.edit().expect("source edit");
-    edit.set_sheet_source("Data", replacement_source())
+    let mut limited = owner
+        .edit_dde_with(dde::Limits::default().with_output_bytes(1), &execution)
+        .expect("limited edit");
+    limited
+        .set_sheet_source("Data", replacement_source())
         .expect("stage source");
-    let commit = edit.commit(&execution).expect("source commit");
-    let limited = owner
-        .dde_with(dde::Limits::default().with_output_bytes(1), &execution)
-        .expect("limited destination");
     assert!(matches!(
-        commit.patch().apply(&limited),
-        Err(Error::ResourceLimit(_))
+        limited.commit(),
+        Err(litchi_odf_common::Error::Core(Error::ResourceLimit(_))
+            | litchi_odf_common::Error::Limit { .. })
     ));
 
+    let mut edit = owner
+        .edit_dde_with(dde::Limits::default(), &execution)
+        .expect("source edit");
+    edit.set_sheet_source("Data", replacement_source())
+        .expect("stage source");
+    let commit = edit.commit().expect("source commit");
     let second = SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(package())))
         .expect("second owner");
-    let second_snapshot = second.dde().expect("second snapshot");
-    assert!(commit.patch().apply(&second_snapshot).is_err());
+    assert!(matches!(
+        second.apply_dde(commit.patch()),
+        Err(litchi_odf_common::Error::PatchConflict { .. })
+    ));
 }
 
 struct MutableSource {
@@ -380,16 +395,19 @@ fn stale_source_refuses_reads_patch_application_and_publication() {
     let before = owner
         .dde_with(dde::Limits::default(), &execution)
         .expect("source snapshot");
-    let mut edit = before.edit().expect("source edit");
+    let mut edit = owner
+        .edit_dde_with(dde::Limits::default(), &execution)
+        .expect("source edit");
     edit.set_sheet_source("Data", replacement_source())
         .expect("stage source");
-    let commit = edit.commit(&execution).expect("source commit");
+    let commit = edit.commit().expect("source commit");
     source.revision.fetch_add(1, Ordering::Relaxed);
     assert!(before.sheet_sources().is_err());
-    assert!(commit.patch().apply(&before).is_err());
+    assert!(owner.apply_dde(commit.patch()).is_err());
     let mut output = Vec::new();
     let error = commit
-        .write_to(&mut output, SourceContentPublicationOptions::new())
+        .package()
+        .write_to(&mut output)
         .expect_err("stale publication");
     assert!(matches!(
         error,

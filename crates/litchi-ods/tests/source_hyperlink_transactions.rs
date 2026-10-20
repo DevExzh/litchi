@@ -62,10 +62,10 @@ fn source_hyperlink_batch_rewrites_direct_links_and_supports_exact_no_op() -> li
         Some(0)
     );
     let no_op_commit = no_op.commit()?;
-    assert!(!no_op_commit.changed());
-    assert_eq!(no_op_commit.snapshot().content_xml(), CONTENT);
+    assert!(!no_op_commit.diagnostics().changed());
+    assert_eq!(no_op_commit.package().content_xml().unwrap(), CONTENT);
     let mut no_op_output = Vec::new();
-    no_op_commit.write_to(&mut no_op_output).unwrap();
+    no_op_commit.package().write_to(&mut no_op_output).unwrap();
     assert_eq!(no_op_output, source);
 
     let mut edit = owner.edit_cells()?;
@@ -87,7 +87,7 @@ fn source_hyperlink_batch_rewrites_direct_links_and_supports_exact_no_op() -> li
     );
     let commit = edit.commit()?;
     let mut output = Vec::new();
-    commit.write_to(&mut output).unwrap();
+    commit.package().write_to(&mut output).unwrap();
     let reopened = Package::from_bytes(&output)?.workbook()?;
     let Some(litchi_ods::CellView::Stored(cell)) = reopened.cell("Data", 0, 0) else {
         return Err(litchi_core::Error::InvalidFormat(
@@ -110,7 +110,10 @@ fn source_hyperlink_batch_rewrites_direct_links_and_supports_exact_no_op() -> li
     );
     let chained_commit = chained.commit()?;
     let mut chained_output = Vec::new();
-    chained_commit.write_to(&mut chained_output).unwrap();
+    chained_commit
+        .package()
+        .write_to(&mut chained_output)
+        .unwrap();
     let chained_reopen = Package::from_bytes(&chained_output)?.workbook()?;
     let Some(litchi_ods::CellView::Stored(cell)) = chained_reopen.cell("Data", 0, 0) else {
         return Err(litchi_core::Error::InvalidFormat(
@@ -148,7 +151,7 @@ fn source_hyperlink_operations_are_ordered_and_failure_atomic() -> litchi_core::
     );
     let commit = edit.commit()?;
     let mut output = Vec::new();
-    commit.write_to(&mut output).unwrap();
+    commit.package().write_to(&mut output).unwrap();
     let reopened = Package::from_bytes(&output)?.workbook()?;
     let Some(litchi_ods::CellView::Stored(cell)) = reopened.cell("Data", 0, 0) else {
         return Err(litchi_core::Error::InvalidFormat(
@@ -178,7 +181,7 @@ fn source_hyperlink_operations_are_ordered_and_failure_atomic() -> litchi_core::
             .is_err()
     );
     assert_eq!(rejected.changed_cells(), 0);
-    assert!(rejected.is_no_op());
+    assert!(rejected.is_noop());
     Ok(())
 }
 
@@ -196,7 +199,7 @@ fn source_hyperlink_preserves_unchanged_legacy_unsafe_links() -> litchi_core::Re
     );
     let no_op_commit = no_op.commit()?;
     let mut no_op_output = Vec::new();
-    no_op_commit.write_to(&mut no_op_output).unwrap();
+    no_op_commit.package().write_to(&mut no_op_output).unwrap();
     assert_eq!(no_op_output, source);
 
     let mut edit = owner.edit_cells()?;
@@ -207,7 +210,7 @@ fn source_hyperlink_preserves_unchanged_legacy_unsafe_links() -> litchi_core::Re
     );
     let commit = edit.commit()?;
     let mut output = Vec::new();
-    commit.write_to(&mut output).unwrap();
+    commit.package().write_to(&mut output).unwrap();
     let reopened = Package::from_bytes(&output)?.workbook()?;
     let Some(litchi_ods::CellView::Stored(cell)) = reopened.cell("Data", 0, 0) else {
         return Err(litchi_core::Error::InvalidFormat(

@@ -21,10 +21,8 @@ use crate::model::names::{Definition, Expression, Range, Scope};
 pub use litchi_odf_common::rdf::{Graph, Object, Subject, Triple};
 pub use selective::{SheetCatalogEntry, SourceBackedSpreadsheetCatalog, SourceReadMetrics};
 pub use source::SourceBackedSpreadsheet;
-pub use source_edit::{
-    FormulaChange, HyperlinkChange, HyperlinkOperation, SourceCellCommit, SourceCellEdit,
-    SourceCellPatch, SourceCellPublicationReport, SourceCellSnapshot,
-};
+pub(crate) use source_edit::SourceCellEdit;
+pub use source_edit::{FormulaChange, HyperlinkChange, HyperlinkOperation};
 
 /// Maximum number of positional cell selectors accepted by one lookup batch.
 ///

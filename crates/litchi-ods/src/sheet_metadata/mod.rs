@@ -9,16 +9,11 @@
 pub mod detective;
 mod index;
 
-use std::{
-    collections::BTreeMap, fmt, io::Write, mem::size_of, ops::Range as ByteRange, sync::Arc,
-};
+use std::{collections::BTreeMap, fmt, mem::size_of, ops::Range as ByteRange, sync::Arc};
 
 use litchi_core::{
     Budget, CancellationSource, Error, ExecutionContext, ExecutionLimits, Position, Profile,
-    Reservation, Resource, Result, SourceVersion,
-};
-use litchi_odf_common::core::{
-    SourceContentPublicationError, SourceContentPublicationOptions, SourceContentPublicationReport,
+    Reservation, Resource, Result,
 };
 
 pub use crate::model::consolidation::{Options, UseLabels};
@@ -641,46 +636,14 @@ impl Snapshot {
         })
     }
 
-    /// Reopen a retained target under the destination snapshot's policy.
-    ///
-    /// A patch target may have been accepted under another profile or
-    /// cancellation token.  Reusing its retained snapshot would therefore
-    /// bypass destination admission.  The exact target bytes are checked and
-    /// parsed again under the destination context, with a destination-owned
-    /// output reservation retained by the returned snapshot.
-    fn reopen_for_destination(&self, destination: &Self) -> Result<Self> {
-        self.context.check().map_err(map_execution)?;
-        destination.context.check().map_err(map_execution)?;
-        let target_bytes = self.source.len();
-        if target_bytes > destination.limits.max_output_bytes() {
-            return Err(limit(
-                Resource::OutputBytes,
-                "output bytes",
-                target_bytes,
-                destination.limits.max_output_bytes(),
-            ));
-        }
-        let output = destination
-            .context
-            .reserve(
-                Resource::OutputBytes,
-                u64::try_from(target_bytes)
-                    .map_err(|_| invalid("ODS metadata target size overflows u64"))?,
-            )
-            .map_err(map_execution)?;
-        let mut target = Self::parse_arc_with_context(
-            Arc::clone(&self.source),
-            destination.limits,
-            &destination.context,
-            destination.enforce_context_lineage,
-        )?;
-        target._source_output = Some(Arc::new(output));
-        Ok(target)
-    }
-
     /// Exact content.xml source bytes retained by this snapshot.
     #[must_use]
     pub fn source_xml(&self) -> &str {
+        &self.source
+    }
+
+    /// The retained `content.xml`, shared.
+    pub(crate) fn source_arc(&self) -> &Arc<str> {
         &self.source
     }
     /// Alias for [`Self::source_xml`].
@@ -1602,411 +1565,31 @@ impl Commit {
     }
 }
 
-/// Source-backed immutable metadata snapshot.
-pub struct SourceMetadataSnapshot<'source> {
-    owner: &'source crate::facade::SourceBackedSpreadsheet,
-    inner: Snapshot,
-    source_version: SourceVersion,
-}
-
-impl fmt::Debug for SourceMetadataSnapshot<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("SourceMetadataSnapshot")
-            .field("source_version", &self.source_version)
-            .field("source_bytes", &self.inner.source.len())
-            .finish_non_exhaustive()
+/// Admit an exact target `content.xml` under a destination's limits and
+/// execution context, as a patch replay did before record 0358a: the output
+/// ceiling, an output reservation and a full parse under that policy.
+pub(crate) fn admit_target(
+    target: &Arc<str>,
+    limits: Limits,
+    context: &ExecutionContext,
+) -> Result<()> {
+    context.check().map_err(map_execution)?;
+    if target.len() > limits.max_output_bytes() {
+        return Err(limit(
+            Resource::OutputBytes,
+            "output bytes",
+            target.len(),
+            limits.max_output_bytes(),
+        ));
     }
-}
-
-impl<'source> Clone for SourceMetadataSnapshot<'source> {
-    fn clone(&self) -> Self {
-        Self {
-            owner: self.owner,
-            inner: self.inner.clone(),
-            source_version: self.source_version,
-        }
-    }
-}
-
-impl<'source> SourceMetadataSnapshot<'source> {
-    pub(crate) fn from_owner(
-        owner: &'source crate::facade::SourceBackedSpreadsheet,
-        limits: Limits,
-        context: &ExecutionContext,
-        enforce_context_lineage: bool,
-    ) -> Result<Self> {
-        owner.check_source()?;
-        let source_version = owner.source_version()?;
-        let source = owner.content_xml_arc()?;
-        let inner =
-            Snapshot::parse_arc_with_context(source, limits, context, enforce_context_lineage)?;
-        owner.check_source()?;
-        Ok(Self {
-            owner,
-            inner,
-            source_version,
-        })
-    }
-    /// Exact source version captured by this snapshot.
-    #[must_use]
-    pub const fn source_version(&self) -> SourceVersion {
-        self.source_version
-    }
-    /// Borrow exact content.xml bytes.
-    #[must_use]
-    pub fn source_xml(&self) -> &str {
-        self.inner.source_xml()
-    }
-    /// Read consolidation.
-    pub fn consolidation(&self) -> Result<Option<&Options>> {
-        self.check_source()?;
-        self.inner.consolidation()
-    }
-    /// Read labels.
-    pub fn label_ranges(&self) -> Result<LabelRangesView<'_>> {
-        self.check_source()?;
-        Ok(self.inner.label_ranges())
-    }
-    /// Read cell metadata.
-    pub fn cell_metadata(
-        &self,
-        selector: CellSelector<'_>,
-    ) -> Result<Option<CellMetadataView<'_>>> {
-        self.check_source()?;
-        self.inner.cell_metadata(selector)
-    }
-    /// Start source-backed edit.
-    pub fn edit(&self) -> Result<SourceMetadataEdit<'source>> {
-        self.check_source()?;
-        Ok(SourceMetadataEdit {
-            before: self.clone(),
-            inner: self.inner.edit(),
-        })
-    }
-    fn check_source(&self) -> Result<()> {
-        let observed = self.owner.source_version()?;
-        if observed == self.source_version {
-            Ok(())
-        } else {
-            Err(Error::SourceChanged {
-                expected: self.source_version,
-                observed,
-            })
-        }
-    }
-    fn is_signed(&self) -> Result<bool> {
-        self.owner.sheet_metadata_signed()
-    }
-}
-
-/// Source-backed semantic metadata edit. Its `commit` method borrows the edit
-/// so failed validation leaves the staged ledger and source snapshot intact.
-pub struct SourceMetadataEdit<'source> {
-    before: SourceMetadataSnapshot<'source>,
-    inner: Edit,
-}
-
-impl fmt::Debug for SourceMetadataEdit<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("SourceMetadataEdit")
-            .field("source_version", &self.before.source_version)
-            .finish_non_exhaustive()
-    }
-}
-
-impl<'source> SourceMetadataEdit<'source> {
-    /// Base source snapshot.
-    #[must_use]
-    pub const fn before(&self) -> &SourceMetadataSnapshot<'source> {
-        &self.before
-    }
-    /// Stage consolidation replacement/removal.
-    pub fn set_consolidation(&mut self, value: Option<Options>) -> Result<()> {
-        self.inner.set_consolidation(value)
-    }
-    /// Clear consolidation.
-    pub fn clear_consolidation(&mut self) -> Result<()> {
-        self.inner.clear_consolidation()
-    }
-    /// Stage label insertion.
-    pub fn add_label_range(&mut self, value: LabelRange) -> Result<()> {
-        self.inner.add_label_range(value)
-    }
-    /// Stage label insertion at a source-order index.
-    pub fn insert_label_range(&mut self, index: usize, value: LabelRange) -> Result<()> {
-        self.inner.insert_label_range(index, value)
-    }
-    /// Stage label replacement.
-    pub fn replace_label_range(&mut self, index: usize, value: LabelRange) -> Result<()> {
-        self.inner.replace_label_range(index, value)
-    }
-    /// Stage label removal.
-    pub fn remove_label_range(&mut self, index: usize) -> Result<LabelRange> {
-        self.inner.remove_label_range(index)
-    }
-    /// Clear labels and their container.
-    pub fn clear_label_ranges(&mut self) -> Result<()> {
-        self.inner.clear_label_ranges()
-    }
-    /// Ensure labels container presence.
-    pub fn ensure_label_ranges(&mut self) -> Result<()> {
-        self.inner.ensure_label_ranges()
-    }
-    /// Set an existing cell source owner.
-    pub fn set_cell_range_source(
-        &mut self,
-        selector: CellSelector<'_>,
-        value: CellRange,
-    ) -> Result<()> {
-        self.inner.set_cell_range_source(selector, value)
-    }
-    /// Clear an existing cell source owner.
-    pub fn clear_cell_range_source(&mut self, selector: CellSelector<'_>) -> Result<()> {
-        self.inner.clear_cell_range_source(selector)
-    }
-    /// Set an existing cell detective owner.
-    pub fn set_detective(&mut self, selector: CellSelector<'_>, value: Detective) -> Result<()> {
-        self.inner.set_detective(selector, value)
-    }
-    /// Clear an existing cell detective owner.
-    pub fn clear_detective(&mut self, selector: CellSelector<'_>) -> Result<()> {
-        self.inner.clear_detective(selector)
-    }
-    /// Edit an existing cell detective owner.
-    pub fn edit_detective<F>(&mut self, selector: CellSelector<'_>, update: F) -> Result<()>
-    where
-        F: FnOnce(&mut Detective) -> Result<()>,
-    {
-        self.inner.edit_detective(selector, update)
-    }
-    /// Commit against the retained source version without consuming this edit.
-    pub fn commit(&mut self, context: &ExecutionContext) -> Result<SourceMetadataCommit<'source>> {
-        self.before.check_source()?;
-        let commit = self.inner.commit(context)?;
-        if commit.changed() && self.before.is_signed()? {
-            return Err(Error::Refused(litchi_core::edit::Refusal::new(
-                litchi_core::edit::RefusalKind::Protected,
-                "ods.sheet_metadata",
-                "signed-source refusal: changed ODS sheet metadata requires explicit unsign/resign policy",
-            )));
-        }
-        self.before.check_source()?;
-        Ok(SourceMetadataCommit {
-            snapshot: SourceMetadataSnapshot {
-                owner: self.before.owner,
-                inner: commit.snapshot.clone(),
-                source_version: self.before.source_version,
-            },
-            patch: SourceMetadataPatch {
-                before: self.before.clone(),
-                target_inner: commit.snapshot.clone(),
-            },
-            changed: commit.changed(),
-        })
-    }
-}
-
-/// Source-backed exact content patch and accepted target snapshot.
-pub struct SourceMetadataCommit<'source> {
-    snapshot: SourceMetadataSnapshot<'source>,
-    patch: SourceMetadataPatch<'source>,
-    changed: bool,
-}
-
-impl fmt::Debug for SourceMetadataCommit<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("SourceMetadataCommit")
-            .field("changed", &self.changed)
-            .field("source_bytes", &self.snapshot.inner.source.len())
-            .finish_non_exhaustive()
-    }
-}
-
-impl<'source> SourceMetadataCommit<'source> {
-    /// Candidate source-backed metadata snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &SourceMetadataSnapshot<'source> {
-        &self.snapshot
-    }
-    /// Exact reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &SourceMetadataPatch<'source> {
-        &self.patch
-    }
-    /// Whether content.xml changed.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-    /// Publish the complete accepted ODS package to a sequential sink.
-    ///
-    /// Publication limits, cancellation, and optional execution-budget
-    /// accounting are governed by `options`. The metadata snapshot's retained
-    /// execution context is not implicitly reused for this package phase.
-    pub fn write_to<W: Write>(
-        &self,
-        writer: W,
-        options: SourceContentPublicationOptions,
-    ) -> std::result::Result<SourceContentPublicationReport, SourceContentPublicationError> {
-        if let Err(error) = self.snapshot.check_source() {
-            return Err(match error {
-                Error::SourceChanged { expected, observed } => {
-                    SourceContentPublicationError::SourceChanged {
-                        expected,
-                        observed,
-                        progress:
-                            litchi_odf_common::core::SourceContentPublicationProgress::Untouched,
-                    }
-                },
-                other => SourceContentPublicationError::Core(other),
-            });
-        }
-        if self.changed
-            && self
-                .snapshot
-                .is_signed()
-                .map_err(SourceContentPublicationError::Core)?
-        {
-            return Err(SourceContentPublicationError::Core(Error::Refused(
-                litchi_core::edit::Refusal::new(
-                    litchi_core::edit::RefusalKind::Protected,
-                    "ods.sheet_metadata",
-                    "signed-source refusal: changed ODS sheet metadata cannot be published",
-                ),
-            )));
-        }
-        self.snapshot.owner.write_sheet_metadata_content(
-            writer,
-            self.snapshot.source_xml().as_bytes(),
-            options,
+    let _output = context
+        .reserve(
+            Resource::OutputBytes,
+            u64::try_from(target.len())
+                .map_err(|_| invalid("ODS metadata target size overflows u64"))?,
         )
-    }
-    /// Publish with default finite source-content options.
-    pub fn write_to_default<W: Write>(
-        &self,
-        writer: W,
-    ) -> std::result::Result<SourceContentPublicationReport, SourceContentPublicationError> {
-        self.write_to(writer, SourceContentPublicationOptions::new())
-    }
-}
-
-/// Source-backed exact patch.
-pub struct SourceMetadataPatch<'source> {
-    before: SourceMetadataSnapshot<'source>,
-    target_inner: Snapshot,
-}
-
-impl fmt::Debug for SourceMetadataPatch<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("SourceMetadataPatch")
-            .field("changed", &self.changed())
-            .finish_non_exhaustive()
-    }
-}
-
-impl<'source> Clone for SourceMetadataPatch<'source> {
-    fn clone(&self) -> Self {
-        Self {
-            before: self.before.clone(),
-            target_inner: self.target_inner.clone(),
-        }
-    }
-}
-
-impl<'source> SourceMetadataPatch<'source> {
-    /// Exact source content.xml bytes authorized by this patch.
-    #[must_use]
-    pub fn source_xml(&self) -> &str {
-        self.before.source_xml()
-    }
-    /// Exact target content.xml bytes produced by this patch.
-    #[must_use]
-    pub fn target_xml(&self) -> &str {
-        self.target_inner.source_xml()
-    }
-    /// Whether target bytes differ.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.before.source_xml() != self.target_inner.source_xml()
-    }
-    /// Alias for changed.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        !self.changed()
-    }
-    /// Inverse source-authorized patch.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            before: SourceMetadataSnapshot {
-                owner: self.before.owner,
-                inner: self.target_inner.clone(),
-                source_version: self.before.source_version,
-            },
-            target_inner: self.before.inner.clone(),
-        }
-    }
-    /// Apply against the exact source-backed snapshot.
-    ///
-    /// The destination must come from the same live
-    /// [`crate::facade::SourceBackedSpreadsheet`] owner and source version,
-    /// and must retain identical `content.xml` bytes.  An independently
-    /// reopened package with equivalent bytes is a different source lineage
-    /// and is rejected.
-    pub fn apply(
-        &self,
-        snapshot: &SourceMetadataSnapshot<'source>,
-    ) -> Result<SourceMetadataCommit<'source>> {
-        snapshot.check_source()?;
-        snapshot.inner.context.check().map_err(map_execution)?;
-        if !std::ptr::eq(snapshot.owner, self.before.owner)
-            || snapshot.source_version != self.before.source_version
-            || snapshot.source_xml() != self.source_xml()
-        {
-            return Err(Error::InvalidFormat(
-                "ODS source metadata patch source snapshot does not match".to_string(),
-            ));
-        }
-        if self.changed() && snapshot.is_signed()? {
-            return Err(Error::Refused(litchi_core::edit::Refusal::new(
-                litchi_core::edit::RefusalKind::Protected,
-                "ods.sheet_metadata",
-                "signed-source refusal: changed ODS sheet metadata patch cannot be applied",
-            )));
-        }
-        if !self.changed() {
-            return Ok(SourceMetadataCommit {
-                snapshot: snapshot.clone(),
-                patch: self.clone(),
-                changed: false,
-            });
-        }
-        // The accepted target was fully reopened during the originating
-        // commit and is retained by this patch.  A source-backed owner may
-        // still expose multiple snapshots with different destination
-        // profiles, so revalidate the exact target under the destination
-        // context before handing it back.  This also keeps the returned
-        // reversible patch bound to that destination snapshot.
-        let inner = self.target_inner.reopen_for_destination(&snapshot.inner)?;
-        let patch_target = inner.clone();
-        snapshot.check_source()?;
-        Ok(SourceMetadataCommit {
-            snapshot: SourceMetadataSnapshot {
-                owner: snapshot.owner,
-                inner,
-                source_version: snapshot.source_version,
-            },
-            patch: SourceMetadataPatch {
-                before: snapshot.clone(),
-                target_inner: patch_target,
-            },
-            changed: self.changed(),
-        })
-    }
+        .map_err(map_execution)?;
+    Snapshot::parse_arc_with_context(Arc::clone(target), limits, context, true).map(drop)
 }
 
 pub(crate) fn detective_limits(limits: Limits) -> Result<detective::Limits> {
@@ -3992,30 +3575,4 @@ pub(crate) fn default_context() -> ExecutionContext {
         )
         .expect("finite execution profile"),
     )
-}
-
-impl crate::facade::SourceBackedSpreadsheet {
-    /// Capture a source-backed sheet metadata snapshot under finite defaults.
-    pub fn sheet_metadata(&self) -> Result<SourceMetadataSnapshot<'_>> {
-        SourceMetadataSnapshot::from_owner(self, Limits::default(), &default_context(), false)
-    }
-    /// Capture a source-backed sheet metadata snapshot under explicit limits and context.
-    pub fn sheet_metadata_with(
-        &self,
-        limits: Limits,
-        context: &ExecutionContext,
-    ) -> Result<SourceMetadataSnapshot<'_>> {
-        SourceMetadataSnapshot::from_owner(self, limits, context, true)
-    }
-    /// Begin a source-backed metadata edit.
-    pub fn edit_sheet_metadata(&self) -> Result<SourceMetadataEdit<'_>> {
-        self.sheet_metadata()?.edit()
-    }
-    /// Apply an exact source-backed metadata patch and return its accepted commit.
-    pub fn apply_sheet_metadata_patch<'a>(
-        &'a self,
-        patch: &SourceMetadataPatch<'a>,
-    ) -> Result<SourceMetadataCommit<'a>> {
-        patch.apply(&self.sheet_metadata()?)
-    }
 }

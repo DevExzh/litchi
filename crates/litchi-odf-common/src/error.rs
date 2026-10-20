@@ -149,6 +149,39 @@ impl From<litchi_core::atomic::Error> for Error {
     }
 }
 
+impl From<crate::core::SourceContentPublicationError> for Error {
+    /// A source-backed `content.xml` publication failure as an owner error:
+    /// a source change and an I/O, allocation or core failure keep their
+    /// typed core payload; every other publication failure keeps its message.
+    fn from(error: crate::core::SourceContentPublicationError) -> Self {
+        use crate::core::SourceContentPublicationError as Publication;
+        match error {
+            Publication::Core(error) => Self::from(error),
+            Publication::SourceChanged {
+                expected, observed, ..
+            } => Self::Core(litchi_core::Error::SourceChanged { expected, observed }),
+            Publication::Sink { source, .. } => Self::Core(litchi_core::Error::Io(source)),
+            Publication::Allocation { resource, source } => {
+                Self::Core(litchi_core::Error::Allocation { resource, source })
+            },
+            Publication::Source { source, .. } => Self::from(source),
+            other => Self::Core(litchi_core::Error::Other(other.to_string())),
+        }
+    }
+}
+
+impl From<crate::core::source_publication::SourceContentInsertionError> for Error {
+    /// A source-backed `content.xml` insertion failure as an owner error; a
+    /// publication failure keeps the mapping of its publication error.
+    fn from(error: crate::core::source_publication::SourceContentInsertionError) -> Self {
+        use crate::core::source_publication::SourceContentInsertionError as Insertion;
+        match error {
+            Insertion::Publication { source, .. } => Self::from(source),
+            other => Self::Core(litchi_core::Error::Other(other.to_string())),
+        }
+    }
+}
+
 impl From<Error> for litchi_core::Error {
     fn from(error: Error) -> Self {
         match error {
@@ -173,7 +206,11 @@ impl From<Error> for litchi_core::Error {
             invalid @ Error::InvalidLimit { .. } => Self::InvalidFormat(invalid.to_string()),
             Error::Refused(refusal) => Self::Refused(refusal),
             conflict @ Error::PatchConflict { .. } => Self::InvalidFormat(conflict.to_string()),
-            signed @ Error::Signed => Self::Unsupported(signed.to_string()),
+            Error::Signed => Self::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::Protected,
+                "odf.package",
+                "the package is signed: a changed write would invalidate its signatures",
+            )),
         }
     }
 }

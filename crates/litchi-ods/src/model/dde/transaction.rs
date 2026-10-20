@@ -1224,26 +1224,16 @@ impl Edit {
             ));
         }
         if self.is_noop() {
-            let source = Arc::new(self.before.clone());
             return Ok(Commit {
                 snapshot: self.before.clone(),
-                patch: Patch {
-                    source: Arc::clone(&source),
-                    target: source,
-                },
                 changed: false,
             });
         }
         let rendered = render_source(&self.before, self, context)?;
         if rendered.xml == self.before.content.as_ref() {
             drop(rendered);
-            let source = Arc::new(self.before.clone());
             return Ok(Commit {
                 snapshot: self.before.clone(),
-                patch: Patch {
-                    source: Arc::clone(&source),
-                    target: source,
-                },
                 changed: false,
             });
         }
@@ -1255,14 +1245,8 @@ impl Edit {
         // The candidate, parser projection, and readback renderer have all
         // finished using the transient source-splice allocations.
         drop(rendered);
-        let source = Arc::new(self.before.clone());
-        let target_source = Arc::new(target.clone());
         Ok(Commit {
             snapshot: target,
-            patch: Patch {
-                source,
-                target: target_source,
-            },
             changed: true,
         })
     }
@@ -1354,7 +1338,6 @@ impl Edit {
 #[derive(Clone, Debug)]
 pub(crate) struct Commit {
     snapshot: Snapshot,
-    patch: Patch,
     changed: bool,
 }
 
@@ -1369,112 +1352,6 @@ impl Commit {
     #[must_use]
     pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
-    }
-
-    /// Borrow the exact reversible patch.
-    #[must_use]
-    pub(crate) fn patch(&self) -> &Patch {
-        &self.patch
-    }
-}
-
-/// An exact-source, reversible `content.xml` DDE patch.
-#[derive(Clone, Debug)]
-pub(crate) struct Patch {
-    source: Arc<Snapshot>,
-    target: Arc<Snapshot>,
-}
-
-impl PartialEq for Patch {
-    fn eq(&self, other: &Self) -> bool {
-        self.source_xml() == other.source_xml() && self.target_xml() == other.target_xml()
-    }
-}
-
-impl Eq for Patch {}
-
-impl Patch {
-    /// Whether the patch preserves source bytes exactly.
-    #[must_use]
-    pub(crate) fn is_empty(&self) -> bool {
-        // Commits that preserve bytes intentionally retain one Arc for both
-        // endpoints.  Use that O(1) invariant instead of scanning the whole
-        // content XML from a non-fallible query.
-        Arc::ptr_eq(&self.source, &self.target)
-    }
-
-    /// Whether the patch changes source bytes.
-    #[must_use]
-    pub(crate) fn changed(&self) -> bool {
-        !self.is_empty()
-    }
-
-    /// Return the exact source XML this patch expects.
-    #[must_use]
-    pub(crate) fn source_xml(&self) -> &str {
-        self.source.source_xml()
-    }
-
-    /// Return the exact target XML this patch publishes.
-    #[must_use]
-    pub(crate) fn target_xml(&self) -> &str {
-        self.target.source_xml()
-    }
-
-    /// Return the exact inverse patch.
-    #[must_use]
-    pub(crate) fn inverse(&self) -> Self {
-        Self {
-            source: Arc::clone(&self.target),
-            target: Arc::clone(&self.source),
-        }
-    }
-
-    /// Apply the patch to an exact source snapshot under its destination
-    /// limits and retained context.
-    pub(crate) fn apply(&self, snapshot: &Snapshot) -> CoreResult<Commit> {
-        self.source.context().check().map_err(map_execution_core)?;
-        snapshot.context().check().map_err(map_execution_core)?;
-        if !compare_xml_bytes(
-            snapshot.context(),
-            snapshot.content.as_ref(),
-            self.source.content.as_ref(),
-        )? {
-            return Err(invalid_core("ODS DDE patch source snapshot does not match"));
-        }
-        if self.is_empty() {
-            return Ok(Commit {
-                snapshot: snapshot.clone(),
-                patch: self.clone(),
-                changed: false,
-            });
-        }
-        if self.target.content.len() > snapshot.limits().output_bytes() {
-            return Err(resource_core(
-                "output bytes",
-                self.target.content.len(),
-                snapshot.limits().output_bytes(),
-            ));
-        }
-        let output_reservation = snapshot
-            .context()
-            .reserve(Resource::OutputBytes, self.target.content.len() as u64)
-            .map_err(map_execution_core)
-            .map(Arc::new)?;
-        let mut target = Snapshot::parse_shared_with_context(
-            Arc::clone(&self.target.content),
-            snapshot.limits(),
-            snapshot.context(),
-            snapshot.enforce_context_lineage(),
-        )
-        .map_err(CoreError::from)?;
-        target.enforce_context_lineage = snapshot.enforce_context_lineage();
-        target._output_reservation = Some(output_reservation);
-        Ok(Commit {
-            snapshot: target,
-            patch: self.clone(),
-            changed: true,
-        })
     }
 }
 
@@ -3850,6 +3727,30 @@ fn map_execution_core(error: ExecutionError) -> CoreError {
         ExecutionError::ResourceLimit(limit) => CoreError::ResourceLimit(limit),
         _other => CoreError::Other("ODS DDE execution policy rejected operation".to_string()),
     }
+}
+
+/// Admit an exact target `content.xml` under a destination's limits and
+/// execution context, as a patch replay did before record 0358a: the output
+/// ceiling, an output reservation and a full parse under that policy.
+pub(crate) fn admit_target(
+    target: &Arc<str>,
+    limits: Limits,
+    context: &ExecutionContext,
+) -> CoreResult<()> {
+    context.check().map_err(map_execution_core)?;
+    if target.len() > limits.output_bytes() {
+        return Err(resource_core(
+            "output bytes",
+            target.len(),
+            limits.output_bytes(),
+        ));
+    }
+    let _output = context
+        .reserve(Resource::OutputBytes, target.len() as u64)
+        .map_err(map_execution_core)?;
+    Snapshot::parse_shared_with_context(Arc::clone(target), limits, context, true)
+        .map(drop)
+        .map_err(CoreError::from)
 }
 
 fn invalid_core(message: impl Into<String>) -> CoreError {

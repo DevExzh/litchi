@@ -22,11 +22,9 @@ use std::{
 };
 
 mod lexical;
-mod source_backed;
 mod transaction;
 
-pub use source_backed::{SourceCommit, SourceEdit, SourcePatch, SourceSnapshot};
-pub(crate) use transaction::Patch;
+pub(crate) use transaction::admit_target;
 pub use transaction::{
     CachedCell, CachedRow, CachedTable, CachedValue, Edit, LinkSpec, SheetSelector,
 };
@@ -1038,6 +1036,11 @@ impl Snapshot {
 
     #[must_use]
     pub fn source_xml(&self) -> &str {
+        &self.content
+    }
+
+    /// The retained `content.xml`, shared.
+    pub(crate) fn content_arc(&self) -> &Arc<str> {
         &self.content
     }
 
