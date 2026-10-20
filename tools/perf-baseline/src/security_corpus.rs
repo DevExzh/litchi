@@ -290,7 +290,7 @@ fn inert_macro_security() -> Result<(), Box<dyn Error>> {
             .iter()
             .any(|module| { module.source().text().contains("Sub ") })
     );
-    let source = XlsSnapshot::from_bytes_with_limits_and_cfb(
+    let source = XlsSnapshot::from_bytes_with_cfb(
         bytes.clone(),
         security_object_limits(),
         security_ole_limits()?,

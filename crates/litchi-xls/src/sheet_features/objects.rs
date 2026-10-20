@@ -775,7 +775,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Invalid`] for a cell outside the grid or an author
+    /// Returns [`Error::Refused`] for a cell outside the grid or an author
     /// longer than 54 characters.
     pub fn add_note(
         &mut self,
@@ -862,8 +862,8 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Missing`] when the cell has no note and
-    /// [`Error::Invalid`] when the target cell has one.
+    /// Returns [`Error::Refused`] when the cell has no note and
+    /// [`Error::Refused`] when the target cell has one.
     pub fn set_note(
         &mut self,
         sheet: usize,
@@ -968,7 +968,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Missing`] when the cell has no note.
+    /// Returns [`Error::Refused`] when the cell has no note.
     pub fn remove_note(&mut self, sheet: usize, row: u16, column: u16) -> Result<()> {
         self.step()?;
         let (layout, _, position, note_index) = self.note_object(sheet, row, column)?;
@@ -1006,7 +1006,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Invalid`] for an anchor outside the grid.
+    /// Returns [`Error::Refused`] for an anchor outside the grid.
     pub fn add_shape(&mut self, sheet: usize, spec: &ShapeSpec) -> Result<usize> {
         self.step()?;
         spec.anchor.check()?;
@@ -1082,7 +1082,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Invalid`] for an image that is not PNG or JPEG
+    /// Returns [`Error::Refused`] for an image that is not PNG or JPEG
     /// or an anchor outside the grid.
     pub fn add_picture(&mut self, sheet: usize, spec: &PictureSpec) -> Result<usize> {
         self.step()?;
@@ -1261,7 +1261,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Missing`] when there is no such drawing.
+    /// Returns [`Error::Refused`] when there is no such drawing.
     pub fn set_drawing(
         &mut self,
         sheet: usize,
@@ -1355,7 +1355,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Missing`] when there is no such drawing.
+    /// Returns [`Error::Refused`] when there is no such drawing.
     pub fn remove_drawing(&mut self, sheet: usize, picture: bool, index: usize) -> Result<()> {
         self.step()?;
         let position = *self

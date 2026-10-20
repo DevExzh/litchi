@@ -8,7 +8,7 @@
 use std::io::Cursor;
 use std::sync::Arc;
 
-use litchi_cfb::{OleFile, OleFileLimits};
+use litchi_cfb::OleFile;
 use litchi_core::sheet::WorkbookTrait;
 use litchi_core::{FileFormat, Metadata};
 use litchi_xls::{Package, SourceBackedWorkbook, cell_values};
@@ -394,9 +394,9 @@ impl Xls {
                 bytes,
             )?);
         }
-        Ok(self
-            .owner()
-            .edit_snapshot_with_limits(limits, OleFileLimits::default())?)
+        Ok(self.owner().edit_snapshot_with_options(
+            litchi_xls::package::edit::EditOptions::new().object_limits(limits),
+        )?)
     }
 
     fn trait_workbook(&self) -> Result<&EagerWorkbook> {
@@ -738,7 +738,7 @@ mod tests {
             if !xls.is_source_backed() {
                 continue;
             }
-            let owner = SourceBackedWorkbook::from_path(&path).unwrap();
+            let owner = SourceBackedWorkbook::open(&path).unwrap();
             assert_same(xls.text(), owner.text(), &name);
             assert_same(xls.worksheet_names(), owner.worksheet_names(), &name);
             assert_same(xls.worksheet_count(), owner.worksheet_count(), &name);
@@ -1122,7 +1122,11 @@ mod tests {
     #[test]
     fn editors_are_built_from_the_retained_source() {
         let bytes = fixture("Simple.xls");
-        let oracle = cell_values::Snapshot::from_bytes(bytes.clone()).unwrap();
+        let oracle = cell_values::Snapshot::from_bytes(
+            bytes.clone(),
+            litchi_doc::tracked_revision::Limits::default(),
+        )
+        .unwrap();
 
         let eager = open_bytes(bytes).unwrap();
         let editor = eager.cell_values_editor().unwrap();

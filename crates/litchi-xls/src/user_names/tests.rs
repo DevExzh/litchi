@@ -53,7 +53,7 @@ fn timestamp_edit_preserves_nul_in_inert_user_name() {
 #[test]
 fn parses_user_names_and_preserves_reserved_fields() {
     let (bytes, guid) = stream_with_user();
-    let snapshot = Snapshot::parse(&bytes).unwrap();
+    let snapshot = Snapshot::parse(&bytes, Limits::default()).unwrap();
     assert_eq!(snapshot.user_count(), 1);
     assert_eq!(snapshot.users()[0].user_id(), 7);
     assert_eq!(snapshot.users()[0].guid(), &guid);
@@ -151,7 +151,7 @@ fn collection_edit_updates_cusr_and_cbusr() {
 #[test]
 fn insertion_requires_revision_guid_closure() {
     let (bytes, guid) = stream_with_user();
-    let source = Snapshot::parse(&bytes).unwrap();
+    let source = Snapshot::parse(&bytes, Limits::default()).unwrap();
     let user = UserEntry::new(8, guid, opened_at(), "Bob").unwrap();
     assert!(source.edit().push(user).is_err());
 }
@@ -205,13 +205,13 @@ fn malformed_count_and_size_are_rejected() {
     let (mut bytes, _) = stream_with_user();
     // CUsr declares two users while only one UsrInfo follows.
     bytes[4..6].copy_from_slice(&2u16.to_le_bytes());
-    assert!(Snapshot::parse(&bytes).is_err());
+    assert!(Snapshot::parse(&bytes, Limits::default()).is_err());
 
     let (mut bytes, _) = stream_with_user();
     // CbUsr's first declared payload length no longer matches UsrInfo.
     let cbusr_payload_offset = 4 + 2 + 4 + 4 + 4;
     bytes[cbusr_payload_offset..cbusr_payload_offset + 2].copy_from_slice(&1u16.to_le_bytes());
-    assert!(Snapshot::parse(&bytes).is_err());
+    assert!(Snapshot::parse(&bytes, Limits::default()).is_err());
 
     let (mut bytes, _) = stream_with_user();
     // UsrChk.version is restricted to the BIFF2-BIFF8 values in MS-XLS
@@ -219,18 +219,18 @@ fn malformed_count_and_size_are_rejected() {
     let usr_chk_payload_offset = 4 + 2 + 4;
     bytes[usr_chk_payload_offset..usr_chk_payload_offset + 2]
         .copy_from_slice(&0x0700u16.to_le_bytes());
-    assert!(Snapshot::parse(&bytes).is_err());
+    assert!(Snapshot::parse(&bytes, Limits::default()).is_err());
 
     let (bytes, _) = stream_with_user();
     assert!(
-        Snapshot::parse_with_limits(
+        Snapshot::parse(
             &bytes,
             Limits::default().with_max_stream_bytes(bytes.len() - 1),
         )
         .is_err()
     );
     assert!(
-        Snapshot::parse_with_limits(
+        Snapshot::parse(
             &bytes,
             Limits::default().with_max_stream_bytes(Limits::MAX_STREAM_BYTES + 1),
         )

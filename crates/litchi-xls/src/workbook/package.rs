@@ -85,7 +85,7 @@ impl<R: Read + Seek> Reader<R> {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new_with_options(reader: R, options: OpenOptions<'_>) -> Result<Self> {
-        let source_limits = options.get_source_limits();
+        let source_limits = options.source_limits_value();
         let ole_file = Self::open_ole_file_with_limits(reader, source_limits)?;
         preflight_declared_streams(&ole_file, source_limits)?;
         Self::from_admitted_ole_file(ole_file, options)
@@ -114,7 +114,7 @@ impl<R: Read + Seek> Reader<R> {
         ole_file: OleFile<R>,
         options: OpenOptions<'_>,
     ) -> Result<Self> {
-        let source_limits = options.get_source_limits();
+        let source_limits = options.source_limits_value();
         Self::validate_ole_file(&ole_file, source_limits)?;
         Self::from_admitted_ole_file(ole_file, options)
     }
@@ -149,7 +149,7 @@ impl<R: Read + Seek> Reader<R> {
         ole_file: OleFile<R>,
         options: OpenOptions<'_>,
     ) -> Result<std::result::Result<Self, OleFile<R>>> {
-        let source_limits = options.get_source_limits();
+        let source_limits = options.source_limits_value();
         Self::validate_ole_file(&ole_file, source_limits)?;
         let mut workbook = Self::empty(ole_file);
 
@@ -202,9 +202,9 @@ impl<R: Read + Seek> Reader<R> {
             .open_stream(&["Workbook"])
             .or_else(|_| self.ole_file.open_stream(&["Book"]))?;
         let (workbook_data, encryption) =
-            prepare_workbook_stream_with_state(workbook_data, options.get_password())?;
+            prepare_workbook_stream_with_state(workbook_data, options.password_value())?;
         self.encryption = encryption;
-        let mut tolerance = ToleranceLog::new(options.get_leniency());
+        let mut tolerance = ToleranceLog::new(options.leniency_value());
         // Container repairs come first: the compound-file reader applied them
         // while the OLE file was opened, before any BIFF record was read.
         tolerance
@@ -278,7 +278,7 @@ impl<R: Read + Seek> Reader<R> {
                 sheet_index,
                 bound_sheet,
                 &encoding,
-                options.get_compatibility_profile(),
+                options.compatibility_profile_value(),
                 cells,
                 tolerance.report_mut(),
             ) {
@@ -532,25 +532,6 @@ impl<R: Read + Seek> Reader<R> {
         })
     }
 
-    /// Parse the shared-workbook `User Names` stream on demand.
-    ///
-    /// The required `Revision Log` stream is scanned first for its bounded
-    /// outer grammar and `RRDHead.guid` closure; every `UsrInfo.guid` is
-    /// checked against that set before the snapshot is returned. The snapshot
-    /// also retains the exact Revision Log source identity so a later User
-    /// Names patch cannot apply to a workbook whose revision log changed
-    /// underneath it. The operation is inert: it never acquires the locks
-    /// represented by either stream and never merges or replays revisions.
-    /// # Errors
-    ///
-    /// Returns an error when the stream occurs more than once, the required
-    /// Revision Log is absent or duplicated, its bounded framing/header scan
-    /// is malformed or exceeds the configured limits, or a user GUID has no
-    /// Revision Log owner.
-    pub fn user_names(&mut self) -> Result<Option<crate::user_names::Snapshot>> {
-        self.user_names_with_limits(crate::user_names::Limits::default())
-    }
-
     /// Parse the shared-workbook `User Names` stream with explicit resource
     /// bounds. The read remains lazy and inert, and the Revision Log source
     /// identity is retained for source-checked patch application.
@@ -558,7 +539,7 @@ impl<R: Read + Seek> Reader<R> {
     ///
     /// Returns an error when a bound, stream grammar, required Revision Log,
     /// or GUID dependency closure is invalid.
-    pub fn user_names_with_limits(
+    pub fn user_names(
         &mut self,
         limits: crate::user_names::Limits,
     ) -> Result<Option<crate::user_names::Snapshot>> {

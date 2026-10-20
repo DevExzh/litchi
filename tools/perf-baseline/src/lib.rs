@@ -30932,7 +30932,7 @@ fn verify_semantic_xls(
     let (sheet_count, rows, columns) = shape
         .xls_dimensions()
         .ok_or("payload-heavy XLS corpus is excluded from semantic verification")?;
-    let snapshot = Snapshot::from_bytes(bytes.to_vec())?;
+    let snapshot = Snapshot::from_bytes(bytes.to_vec(), litchi_ole_common::object::Limits::default())?;
     if snapshot.worksheet_count() != sheet_count {
         return Err("semantic XLS worksheet count differs from writer specification".into());
     }
@@ -30978,7 +30978,7 @@ fn run_semantic_xls(
     let reference = Reference::new(selected.1 as u32, selected.2 as u32)?;
     let replacement = xls_expected_value(shape, selected.0, selected.1, selected.2)? + 0.5;
     let expected_changed = if case == Case::XlsSemanticOneEditSave {
-        let source = Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = Snapshot::from_bytes(corpus.archive.clone(), litchi_ole_common::object::Limits::default())?;
         let mut edit = source.edit();
         edit.set_number(selected.0.into(), reference, replacement)?;
         edit.commit()?.snapshot().bytes().to_vec()
@@ -31083,7 +31083,7 @@ fn run_semantic_xls(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::XlsSemanticNoopEditSave | Case::XlsSemanticOneEditSave => {
-                let source = Snapshot::from_bytes(corpus.archive.clone())?;
+                let source = Snapshot::from_bytes(corpus.archive.clone(), litchi_ole_common::object::Limits::default())?;
                 let updated = case == Case::XlsSemanticOneEditSave;
                 let started = Instant::now();
                 let mut edit = source.edit();
@@ -34259,7 +34259,7 @@ fn run_xls_validation_report(
         corpus,
         warmup_iterations,
         samples,
-        |source| Ok(litchi_xls::validation::validate_source(source)?),
+        |source| Ok(litchi_xls::validation::validate_source(source, litchi_xls::validation::XlsValidationLimits::default())?),
     )
 }
 

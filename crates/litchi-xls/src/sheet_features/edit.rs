@@ -333,7 +333,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Invalid`] for more than 1,026 breaks.
+    /// Returns [`Error::Refused`] for more than 1,026 breaks.
     pub fn set_row_breaks(&mut self, sheet: usize, breaks: &[PageBreak]) -> Result<()> {
         self.set_breaks(sheet, HORIZONTAL_PAGE_BREAKS, breaks, LAST_COLUMN)
     }
@@ -343,7 +343,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Invalid`] for more than 1,026 breaks or a column
+    /// Returns [`Error::Refused`] for more than 1,026 breaks or a column
     /// outside the grid.
     pub fn set_column_breaks(&mut self, sheet: usize, breaks: &[PageBreak]) -> Result<()> {
         if breaks.iter().any(|item| item.index > 255) {
@@ -429,7 +429,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Invalid`] for a link without a target or a value
+    /// Returns [`Error::Refused`] for a link without a target or a value
     /// outside its BIFF8 bound.
     pub fn add_hyperlink(&mut self, sheet: usize, link: &HyperlinkSpec) -> Result<usize> {
         self.step()?;
@@ -446,7 +446,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Missing`] when there is no such hyperlink.
+    /// Returns [`Error::Refused`] when there is no such hyperlink.
     pub fn set_hyperlink(
         &mut self,
         sheet: usize,
@@ -468,7 +468,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Missing`] when there is no such hyperlink.
+    /// Returns [`Error::Refused`] when there is no such hyperlink.
     pub fn remove_hyperlink(&mut self, sheet: usize, index: usize) -> Result<()> {
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
@@ -513,7 +513,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Invalid`] for a validation outside its BIFF8 bounds.
+    /// Returns [`Error::Refused`] for a validation outside its BIFF8 bounds.
     pub fn add_validation(&mut self, sheet: usize, spec: &ValidationSpec) -> Result<usize> {
         self.step()?;
         let bytes = encode::validation(spec).map_err(|_| {
@@ -546,7 +546,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Missing`] when there is no such validation.
+    /// Returns [`Error::Refused`] when there is no such validation.
     pub fn set_validation(
         &mut self,
         sheet: usize,
@@ -574,7 +574,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Missing`] when there is no such validation.
+    /// Returns [`Error::Refused`] when there is no such validation.
     pub fn remove_validation(&mut self, sheet: usize, index: usize) -> Result<()> {
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
@@ -671,7 +671,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Invalid`] for a format outside its BIFF8 bounds.
+    /// Returns [`Error::Refused`] for a format outside its BIFF8 bounds.
     pub fn add_format(&mut self, sheet: usize, format: &Format) -> Result<usize> {
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
@@ -689,8 +689,8 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Missing`] when there is no such format and
-    /// [`Error::Unsupported`] when it holds more than one rule or a `CFEx`
+    /// Returns [`Error::Refused`] when there is no such format and
+    /// [`Error::Refused`] when it holds more than one rule or a `CFEx`
     /// extends it.
     pub fn set_format(&mut self, sheet: usize, index: usize, format: &Format) -> Result<()> {
         self.step()?;
@@ -727,7 +727,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Missing`] when there is no such format.
+    /// Returns [`Error::Refused`] when there is no such format.
     pub fn set_format_ranges(&mut self, sheet: usize, index: usize, ranges: &[Area]) -> Result<()> {
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
@@ -772,7 +772,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Missing`] when there is no such format.
+    /// Returns [`Error::Refused`] when there is no such format.
     pub fn remove_format(&mut self, sheet: usize, index: usize) -> Result<()> {
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
@@ -820,8 +820,8 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Invalid`] for a range outside the grid and
-    /// [`Error::Unsupported`] for source layouts the editor does not rewrite.
+    /// Returns [`Error::Refused`] for a range outside the grid and
+    /// [`Error::Refused`] for source layouts the editor does not rewrite.
     pub fn set_auto_filter(&mut self, sheet: usize, area: Option<Area>) -> Result<()> {
         self.step()?;
         if let Some(area) = area {
@@ -1089,7 +1089,7 @@ fn cf12_priority(payload: &[u8]) -> Option<u16> {
 ///
 /// # Errors
 ///
-/// Returns [`Error::Invalid`] for a formula the tokenizer cannot encode.
+/// Returns [`Error::Refused`] for a formula the tokenizer cannot encode.
 pub fn compile_formula(formula: &str) -> Result<Vec<u8>> {
     let tokens = crate::writer::FormulaTokenizer::extended()
         .tokenize(formula)
@@ -1108,15 +1108,29 @@ pub fn compile_formula(formula: &str) -> Result<Vec<u8>> {
 }
 
 /// Apply a patch to the exact package it was made from.
-pub(super) fn apply(package: &Package, patch: &Patch) -> Result<Package> {
+pub(super) fn apply(package: &Package, patch: &Patch) -> Result<Commit> {
     let bytes = package.to_bytes()?;
     if bytes.as_slice() != patch.before() {
         return Err(Error::PatchConflict);
     }
     if patch.is_noop() {
-        return Ok(package.clone());
+        return Ok(Commit {
+            package: package.clone(),
+            patch: patch.clone(),
+            diagnostics: Diagnostics {
+                changed: false,
+                operations: 0,
+            },
+        });
     }
-    Ok(crate::package::republish(package, patch.after().to_vec())?)
+    Ok(Commit {
+        package: crate::package::republish(package, patch.after().to_vec())?,
+        patch: patch.clone(),
+        diagnostics: Diagnostics {
+            changed: true,
+            operations: 0,
+        },
+    })
 }
 
 /// One conditional format with one rule.

@@ -189,7 +189,7 @@ fn try_open_both(
     .map_err(|error| error.to_string());
     let owner = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(OwnedSource::new(package.to_vec())),
-        SourceBackedOptions::new().with_leniency(leniency),
+        SourceBackedOptions::new().leniency(leniency),
     )
     .map(|owner| owner.tolerance_report())
     .map_err(|error| error.to_string());

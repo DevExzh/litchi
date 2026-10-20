@@ -23,7 +23,7 @@
 //! })?;
 //! let (edited, patch) = edit.commit()?.into_parts();
 //! assert_eq!(edited.metadata()?.title.as_deref(), Some("Budget"));
-//! let reverted = edited.apply_metadata(&patch.inverse())?;
+//! let reverted = edited.apply_metadata(&patch.inverse())?.into_package();
 //! assert_eq!(reverted.to_bytes()?, package.to_bytes()?);
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
@@ -240,7 +240,7 @@ impl Commit {
 /// A staged metadata transaction over one immutable [`Package`].
 pub struct Edit {
     base: Package,
-    transaction: property_set::Transaction,
+    transaction: property_set::Edit,
     initial: SummaryProperties,
     properties: SummaryProperties,
 }
@@ -259,10 +259,10 @@ impl Edit {
         if base.is_encrypted() {
             return Err(Error::Protected);
         }
-        let bytes = base.to_bytes()?;
-        let transaction = property_set::Snapshot::from_bytes(bytes)?
-            .transaction()
-            .map_err(protected)?;
+        let transaction = property_set::Edit::new(base).map_err(|error| match error {
+            crate::package::Error::Reader(error) => protected(error),
+            error => Error::from(error),
+        })?;
         let initial = SummaryProperties::from_editor(transaction.editor())?;
         Ok(Self {
             base: base.clone(),
@@ -315,7 +315,7 @@ impl Edit {
             return unchanged(base);
         }
         properties.stage_changes(&initial, transaction.editor_mut())?;
-        let patch = transaction.commit()?.into_patch();
+        let (patch, _) = transaction.finish()?;
         let before: Arc<[u8]> = Arc::from(patch.before());
         let after: Arc<[u8]> = Arc::from(patch.after());
         let package = if before == after {
@@ -350,15 +350,22 @@ impl Package {
     ///
     /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// source, and [`Error::Package`] when its result cannot be republished.
-    pub fn apply_metadata(&self, patch: &Patch) -> Result<Self> {
+    pub fn apply_metadata(&self, patch: &Patch) -> Result<Commit> {
         let bytes = self.to_bytes()?;
         if bytes.as_slice() != patch.before_bytes() {
             return Err(Error::PatchConflict);
         }
-        if patch.is_noop() {
-            return Ok(self.clone());
-        }
-        republish(self, patch.after_bytes().to_vec())
+        let changed = !patch.is_noop();
+        let package = if changed {
+            republish(self, patch.after_bytes().to_vec())?
+        } else {
+            self.clone()
+        };
+        Ok(Commit {
+            package,
+            diagnostics: Diagnostics { changed },
+            patch: patch.clone(),
+        })
     }
 }
 
@@ -413,8 +420,8 @@ fn republish(source: &Package, bytes: Vec<u8>) -> Result<Package> {
             let workbook = crate::SourceBackedWorkbook::from_shared_ole_file_with_options(
                 cfb,
                 crate::SourceBackedOptions::default()
-                    .with_limits(limits)
-                    .with_leniency(leniency),
+                    .limits(limits)
+                    .leniency(leniency),
             )
             .map_err(PackageError::Source)?;
             Ok(Package::from_source(workbook)?)

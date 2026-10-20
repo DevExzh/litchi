@@ -18,40 +18,23 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Parse a complete `User Names` stream with default resource bounds.
-    /// # Errors
-    ///
-    /// Returns an error when framing, the stream grammar, or a typed payload
-    /// violates its bounded MS-XLS contract.
-    pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
-        Self::parse_with_limits(bytes, Limits::default())
-    }
-
     /// Parse a complete stream with explicit resource bounds.
     /// # Errors
     ///
     /// Returns an error when a bound or the stream grammar is violated.
-    pub fn parse_with_limits(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
+    pub fn parse(bytes: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         let source = bytes.as_ref();
         ensure_source_bound(source, limits)?;
         let bytes = copy_bytes(source, "retaining User Names source")?;
-        Self::parse_shared_with_limits(bytes, limits)
-    }
-
-    /// Parse an already shared source allocation without copying it.
-    /// # Errors
-    ///
-    /// Returns an error when a bound or the stream grammar is violated.
-    pub fn parse_shared(bytes: Arc<[u8]>) -> Result<Self> {
-        Self::parse_shared_with_limits(bytes, Limits::default())
+        Self::parse_shared(bytes, limits)
     }
 
     /// Parse an already shared source allocation with explicit bounds.
     /// # Errors
     ///
     /// Returns an error when a bound or the stream grammar is violated.
-    pub fn parse_shared_with_limits(bytes: Arc<[u8]>, limits: Limits) -> Result<Self> {
+    pub fn parse_shared(bytes: Arc<[u8]>, limits: Limits) -> Result<Self> {
         let package = Arc::new(Package::parse(&bytes, limits)?);
         Ok(Self {
             fingerprint: fingerprint(&bytes),
@@ -546,7 +529,7 @@ impl Patch {
                 source.package.revision_log_source.clone(),
             )
         } else {
-            Snapshot::parse_shared_with_limits(Arc::clone(&self.after), source.package.limits)
+            Snapshot::parse_shared(Arc::clone(&self.after), source.package.limits)
         }
     }
 
@@ -575,7 +558,7 @@ impl Patch {
                 target.package.revision_log_source.clone(),
             )
         } else {
-            Snapshot::parse_shared_with_limits(Arc::clone(&self.before), target.package.limits)
+            Snapshot::parse_shared(Arc::clone(&self.before), target.package.limits)
         }
     }
 

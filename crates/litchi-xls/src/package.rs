@@ -269,11 +269,11 @@ impl Package {
 
     /// Open an XLS package from a copied byte slice under explicit policies.
     pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions<'_>) -> Result<Self> {
-        if bytes.len() > options.get_source_limits().max_input_bytes() {
+        if bytes.len() > options.source_limits_value().max_input_bytes() {
             return Err(Error::Reader(ReaderError::Limit {
                 kind: crate::SourceLimitKind::InputBytes,
                 observed: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
-                maximum: u64::try_from(options.get_source_limits().max_input_bytes())
+                maximum: u64::try_from(options.source_limits_value().max_input_bytes())
                     .unwrap_or(u64::MAX),
             }));
         }
@@ -298,7 +298,7 @@ impl Package {
         reader: &mut R,
         options: OpenOptions<'_>,
     ) -> Result<Self> {
-        let bytes = read_bounded(reader, options.get_source_limits())?;
+        let bytes = read_bounded(reader, options.source_limits_value())?;
         Self::from_owned_bytes(bytes, options)
     }
 
@@ -331,7 +331,7 @@ impl Package {
         mut ole_file: OleFile<Cursor<Vec<u8>>>,
         options: OpenOptions<'_>,
     ) -> Result<std::result::Result<Self, OleFile<Cursor<Vec<u8>>>>> {
-        crate::raw::preflight_ole_file(&ole_file, options.get_source_limits())?;
+        crate::raw::preflight_ole_file(&ole_file, options.source_limits_value())?;
         let metadata = eager_metadata(&mut ole_file);
         let reader = match RawReader::from_ole_file_or_password_required(ole_file, options) {
             Ok(Ok(reader)) => reader,
@@ -346,7 +346,7 @@ impl Package {
         mut ole_file: OleFile<Cursor<Vec<u8>>>,
         options: OpenOptions<'_>,
     ) -> Result<Self> {
-        crate::raw::preflight_ole_file(&ole_file, options.get_source_limits())?;
+        crate::raw::preflight_ole_file(&ole_file, options.source_limits_value())?;
         let metadata = eager_metadata(&mut ole_file);
         let reader = RawReader::from_ole_file_with_options(ole_file, options)?;
         Self::from_reader_parts(reader, options, metadata)
@@ -380,9 +380,9 @@ impl Package {
 
     pub(crate) fn from_owned_bytes(bytes: Vec<u8>, options: OpenOptions<'_>) -> Result<Self> {
         let cfb_limits =
-            litchi_cfb::OleFileLimits::new(options.get_source_limits().max_input_bytes() as u64)?;
+            litchi_cfb::OleFileLimits::new(options.source_limits_value().max_input_bytes() as u64)?;
         let mut ole_file = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits)?;
-        crate::raw::preflight_ole_file(&ole_file, options.get_source_limits())?;
+        crate::raw::preflight_ole_file(&ole_file, options.source_limits_value())?;
         let metadata = eager_metadata(&mut ole_file);
         let reader = RawReader::from_ole_file_with_options(ole_file, options)?;
         Self::from_reader_parts(reader, options, metadata)
@@ -403,9 +403,9 @@ impl Package {
                     encryption,
                 },
                 policy: RetainedPolicy::Eager {
-                    source_limits: options.get_source_limits(),
-                    leniency: options.get_leniency(),
-                    compatibility_profile: options.get_compatibility_profile(),
+                    source_limits: options.source_limits_value(),
+                    leniency: options.leniency_value(),
+                    compatibility_profile: options.compatibility_profile_value(),
                 },
                 metadata: metadata_cache,
                 edit_snapshot: None,
@@ -579,8 +579,8 @@ impl Package {
                 let workbook = SourceBackedWorkbook::from_shared_ole_file_with_options(
                     cfb,
                     crate::SourceBackedOptions::default()
-                        .with_limits(limits)
-                        .with_leniency(leniency),
+                        .limits(limits)
+                        .leniency(leniency),
                 )?;
                 Self::from_source(workbook)
             },
@@ -747,12 +747,12 @@ impl Package {
     /// No snapshot is constructed while a package is opened. Primary edits
     /// retain their validated snapshot for subsequent operations; this explicit
     /// low-level adapter also retains and intersects that selected profile.
-    pub fn edit_snapshot_with_limits(
+    pub fn edit_snapshot_with_options(
         &self,
-        limits: litchi_ole_common::object::Limits,
-        cfb_limits: litchi_cfb::OleFileLimits,
+        options: EditOptions,
     ) -> Result<crate::cell_values::Snapshot> {
-        let (limits, cfb_limits) = self.edit_profile(limits, cfb_limits)?;
+        let (limits, cfb_limits) =
+            self.edit_profile(options.object_limits_value(), options.cfb_limits_value())?;
         if let Some(cfb) = self.source() {
             cfb.source_version().map_err(SourceBackedError::from)?;
         }
@@ -820,10 +820,7 @@ impl Package {
 
     /// Begin the editable cell-values adapter with its default object limits.
     pub fn edit_snapshot(&self) -> Result<crate::cell_values::Snapshot> {
-        self.edit_snapshot_with_limits(
-            litchi_ole_common::object::Limits::default(),
-            litchi_cfb::OleFileLimits::default(),
-        )
+        self.edit_snapshot_with_options(EditOptions::default())
     }
 }
 

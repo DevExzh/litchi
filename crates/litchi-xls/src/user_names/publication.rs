@@ -31,21 +31,6 @@ struct Inner {
 }
 
 impl Snapshot {
-    /// Open an XLS package that contains one root `User Names` stream.
-    ///
-    /// The common CFB owner rejects signed, encrypted, and DRM containers.
-    /// BIFF `FILEPASS` records are rejected by the complete XLS open as well;
-    /// this owner never attempts to decrypt or re-encrypt a source.  All CFB
-    /// streams and directory metadata are captured before an edit is exposed.
-    ///
-    /// # Errors
-    ///
-    /// Returns a CFB, workbook, User Names grammar, Revision Log closure, or
-    /// protected-source error.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, UserNamesLimits::default())
-    }
-
     /// Open an XLS package with an explicit `User Names` resource bound.
     ///
     /// The byte bound is checked against the User Names and required Revision
@@ -57,7 +42,7 @@ impl Snapshot {
     ///
     /// Returns an error when the bound, package, workbook, User Names stream,
     /// or Revision Log dependency closure is invalid.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: UserNamesLimits) -> Result<Self> {
+    pub fn from_bytes(bytes: Vec<u8>, limits: UserNamesLimits) -> Result<Self> {
         validate_user_names_limits(limits)?;
         let expected_path = preflight_user_names(&bytes, limits)?;
         let (package, user_names_path) = open_package(bytes)?;
@@ -301,7 +286,7 @@ impl Edit {
         )?;
         let rendered =
             package.put_stream_shared_with_rendered(&source.inner.user_names_path, replacement)?;
-        let snapshot = Snapshot::from_bytes_with_limits(rendered, source.inner.user_names_limits)?;
+        let snapshot = Snapshot::from_bytes(rendered, source.inner.user_names_limits)?;
         let patch = Patch::new(source.bytes_shared(), snapshot.bytes_shared());
         Ok(Commit { snapshot, patch })
     }
@@ -413,7 +398,7 @@ impl Patch {
         if self.is_noop() {
             return Ok(source.clone());
         }
-        Snapshot::from_bytes_with_limits(self.after.to_vec(), source.inner.user_names_limits)
+        Snapshot::from_bytes(self.after.to_vec(), source.inner.user_names_limits)
     }
 
     /// Apply the inverse replacement to its exact committed target.
@@ -432,7 +417,7 @@ impl Patch {
         if self.is_noop() {
             return Ok(target.clone());
         }
-        Snapshot::from_bytes_with_limits(self.before.to_vec(), target.inner.user_names_limits)
+        Snapshot::from_bytes(self.before.to_vec(), target.inner.user_names_limits)
     }
 
     /// Return the exact inverse replacement.
@@ -521,6 +506,6 @@ fn find_revision_log_path<R: std::io::Read + std::io::Seek>(
 fn parse_user_names(bytes: &[u8], limits: UserNamesLimits) -> Result<UserNamesSnapshot> {
     let mut workbook = crate::raw::Reader::new(Cursor::new(bytes))?;
     workbook
-        .user_names_with_limits(limits)?
+        .user_names(limits)?
         .ok_or_else(|| Error::InvalidData("XLS package has no User Names stream".to_string()))
 }

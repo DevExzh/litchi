@@ -614,7 +614,11 @@ fn assert_exact_noop(input: &Input) {
         ),
         #[cfg(feature = "xls")]
         FileFormat::Xls => assert!(
-            litchi_xls::cell_values::Snapshot::from_bytes(bytes.clone()).is_err(),
+            litchi_xls::cell_values::Snapshot::from_bytes(
+                bytes.clone(),
+                litchi_doc::tracked_revision::Limits::default()
+            )
+            .is_err(),
             "{label}: the XLS editor admitted a signed container"
         ),
         #[cfg(feature = "ppt")]

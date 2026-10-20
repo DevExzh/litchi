@@ -703,26 +703,12 @@ pub struct Snapshot {
 pub type History = litchi_core::patch::History<Snapshot>;
 
 impl Snapshot {
-    /// Opens an unencrypted, unsigned XLS package and captures exact source bytes.
-    ///
-    /// The ordinary [`crate::raw::Reader`] reader validates the complete candidate. The
-    /// package transaction layer additionally refuses signed, encrypted, and
-    /// DRM CFB containers before exposing an edit.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed CFB, BIFF, encryption, allocation, or workbook
-    /// validation error before a snapshot is published.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, Limits::default())
-    }
-
     /// Opens an unencrypted XLS package under an explicit object capture
     /// profile before publishing the editable snapshot.
     ///
     /// The bounded corpus and other security-sensitive callers use this entry
     /// point instead of inheriting the broad convenience defaults.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+    pub fn from_bytes(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         let package = PackageEditor::open_with_cfb_limits(
             bytes,
             Targets::default(),
@@ -734,7 +720,7 @@ impl Snapshot {
 
     /// Opens an unencrypted XLS package under explicit object and CFB
     /// admission profiles before publishing the editable snapshot.
-    pub fn from_bytes_with_limits_and_cfb(
+    pub fn from_bytes_with_cfb(
         bytes: Vec<u8>,
         limits: Limits,
         cfb_limits: OleFileLimits,
@@ -759,7 +745,7 @@ impl Snapshot {
     ///
     /// Returns [`Error::Cfb`] when the source changed or exceeds
     /// `cfb_limits`, [`Error::Allocation`] when the copy cannot be reserved,
-    /// and otherwise the errors of [`Self::from_bytes_with_limits_and_cfb`].
+    /// and otherwise the errors of [`Self::from_bytes_with_cfb`].
     pub fn from_shared_ole_file(
         cfb: &litchi_cfb::SharedOleFile,
         limits: Limits,
@@ -802,7 +788,7 @@ impl Snapshot {
                 observed,
             }));
         }
-        Self::from_bytes_with_limits_and_cfb(bytes, limits, cfb_limits)
+        Self::from_bytes_with_cfb(bytes, limits, cfb_limits)
     }
 
     fn from_package_editor(package: PackageEditor) -> Result<Self> {
@@ -1016,7 +1002,7 @@ impl Snapshot {
             .try_reserve_exact(bytes.len())
             .map_err(|_| Error::Allocation("XLS primary edit source"))?;
         owned.extend_from_slice(bytes);
-        Self::from_bytes_with_limits_and_cfb(owned, limits, cfb_limits)
+        Self::from_bytes_with_cfb(owned, limits, cfb_limits)
     }
 
     /// Intersect selected profiles without reparsing the immutable image.
@@ -2786,7 +2772,7 @@ impl Edit {
     /// # builder.write_number(sheet, 0, 0, 2.0)?;
     /// # builder.write_number(sheet, 0, 1, 7.0)?;
     /// # let bytes = builder.build()?.to_bytes()?;
-    /// let source = Snapshot::from_bytes(bytes)?;
+    /// let source = Snapshot::from_bytes(bytes, litchi_xls::ole_object::Limits::default())?;
     /// let mut edit = source.edit();
     /// let b1 = Reference::new(0, 1)?;
     /// edit.set_formula(Selector::Name("Data"), b1, "A1*3")?;
@@ -3035,7 +3021,7 @@ impl Edit {
     /// # let sheet = builder.add_worksheet("Data")?;
     /// # builder.write_number(sheet, 0, 0, 1.0)?;
     /// # let bytes = builder.build()?.to_bytes()?;
-    /// let source = Snapshot::from_bytes(bytes)?;
+    /// let source = Snapshot::from_bytes(bytes, litchi_xls::ole_object::Limits::default())?;
     /// let mut edit = source.edit();
     /// let mut change = FormatChange::default();
     /// change.horizontal = Some(HorizontalAlignment::Right);
@@ -3610,7 +3596,7 @@ impl Edit {
     /// use litchi_core::Position;
     /// use litchi_xls::cell_values::{Selector, Snapshot};
     /// # let bytes = litchi_xls::Package::new()?.to_bytes()?;
-    /// let source = Snapshot::from_bytes(bytes)?;
+    /// let source = Snapshot::from_bytes(bytes, litchi_xls::ole_object::Limits::default())?;
     /// let mut edit = source.edit();
     /// edit.set_row_height(Selector::Position(Position::new(0)), 4, 600)?;
     /// edit.set_row_hidden(Selector::Position(Position::new(0)), 5, true)?;
@@ -3848,7 +3834,7 @@ impl Edit {
     /// # builder.add_worksheet("First")?;
     /// # builder.add_worksheet("Second")?;
     /// # let bytes = builder.build()?.to_bytes()?;
-    /// let source = Snapshot::from_bytes(bytes)?;
+    /// let source = Snapshot::from_bytes(bytes, litchi_xls::ole_object::Limits::default())?;
     /// let mut edit = source.edit();
     /// edit.reorder_sheets(&[Selector::Name("Second"), Selector::Name("first")])?;
     /// let target = edit.commit()?.into_parts().0;
@@ -3897,7 +3883,7 @@ impl Edit {
     /// use litchi_core::Position;
     /// use litchi_xls::cell_values::Snapshot;
     /// # let bytes = litchi_xls::Package::new()?.to_bytes()?;
-    /// let source = Snapshot::from_bytes(bytes)?;
+    /// let source = Snapshot::from_bytes(bytes, litchi_xls::ole_object::Limits::default())?;
     /// let mut edit = source.edit();
     /// edit.insert_sheet(Position::new(0), "Summary")?;
     /// let target = edit.commit()?.into_parts().0;
@@ -3952,7 +3938,7 @@ impl Edit {
     /// # builder.add_worksheet("Keep")?;
     /// # builder.add_worksheet("Drop")?;
     /// # let bytes = builder.build()?.to_bytes()?;
-    /// let source = Snapshot::from_bytes(bytes)?;
+    /// let source = Snapshot::from_bytes(bytes, litchi_xls::ole_object::Limits::default())?;
     /// let mut edit = source.edit();
     /// edit.remove_sheet(Selector::Name("Drop"))?;
     /// let target = edit.commit()?.into_parts().0;

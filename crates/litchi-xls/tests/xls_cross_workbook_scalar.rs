@@ -15,8 +15,11 @@ use litchi_xls::cell_values::{
 use std::io::Cursor;
 
 fn workbook_bytes(numbers: &[(u32, u16, f64)], blanks: &[(u32, u16)]) -> Vec<u8> {
-    let mut snapshot =
-        Snapshot::from_bytes(neutralize_refresh_all(raw_workbook_bytes(numbers, blanks))).unwrap();
+    let mut snapshot = Snapshot::from_bytes(
+        neutralize_refresh_all(raw_workbook_bytes(numbers, blanks)),
+        litchi_xls::ole_object::Limits::default(),
+    )
+    .unwrap();
     if !blanks.is_empty() {
         let style = snapshot
             .worksheets()
@@ -222,10 +225,10 @@ fn add_opaque_stream(bytes: Vec<u8>) -> Vec<u8> {
 }
 
 fn scalar_source() -> Snapshot {
-    Snapshot::from_bytes(add_opaque_stream(workbook_bytes(
-        &[(0, 0, 1.25), (2, 2, 9.5)],
-        &[(1, 1)],
-    )))
+    Snapshot::from_bytes(
+        add_opaque_stream(workbook_bytes(&[(0, 0, 1.25), (2, 2, 9.5)], &[(1, 1)])),
+        litchi_xls::ole_object::Limits::default(),
+    )
     .unwrap()
 }
 
@@ -233,8 +236,11 @@ fn scalar_source() -> Snapshot {
 fn copies_numbers_and_blanks_in_source_order_and_preserves_foreign_streams() {
     let donor = scalar_source();
     let donor_before = donor.bytes().to_vec();
-    let target =
-        Snapshot::from_bytes(add_opaque_stream(workbook_bytes(&[(10, 10, 42.0)], &[]))).unwrap();
+    let target = Snapshot::from_bytes(
+        add_opaque_stream(workbook_bytes(&[(10, 10, 42.0)], &[])),
+        litchi_xls::ole_object::Limits::default(),
+    )
+    .unwrap();
     let target_opaque = OleFile::open(Cursor::new(target.bytes()))
         .unwrap()
         .open_stream(&["Opaque"])
@@ -299,7 +305,11 @@ fn copies_numbers_and_blanks_in_source_order_and_preserves_foreign_streams() {
 #[test]
 fn same_width_existing_targets_are_supported_but_occupied_mismatches_are_atomic() {
     let donor = scalar_source();
-    let target = Snapshot::from_bytes(workbook_bytes(&[(5, 4, 77.0)], &[])).unwrap();
+    let target = Snapshot::from_bytes(
+        workbook_bytes(&[(5, 4, 77.0)], &[]),
+        litchi_xls::ole_object::Limits::default(),
+    )
+    .unwrap();
     let mut edit = target.edit();
     edit.copy_scalar_cell_from(
         &donor,
@@ -323,7 +333,11 @@ fn same_width_existing_targets_are_supported_but_occupied_mismatches_are_atomic(
         1.25
     );
 
-    let occupied = Snapshot::from_bytes(workbook_bytes(&[(5, 4, 77.0)], &[])).unwrap();
+    let occupied = Snapshot::from_bytes(
+        workbook_bytes(&[(5, 4, 77.0)], &[]),
+        litchi_xls::ole_object::Limits::default(),
+    )
+    .unwrap();
     let mut refused = occupied.edit();
     let error = refused
         .copy_scalar_cell_from(
@@ -355,8 +369,16 @@ fn strings_formulas_and_unrelated_owners_are_refused_before_staging() {
         .unwrap()
         .write_to(&mut string_output)
         .unwrap();
-    let string_donor = Snapshot::from_bytes(string_output.into_inner()).unwrap();
-    let target = Snapshot::from_bytes(workbook_bytes(&[], &[])).unwrap();
+    let string_donor = Snapshot::from_bytes(
+        string_output.into_inner(),
+        litchi_xls::ole_object::Limits::default(),
+    )
+    .unwrap();
+    let target = Snapshot::from_bytes(
+        workbook_bytes(&[], &[]),
+        litchi_xls::ole_object::Limits::default(),
+    )
+    .unwrap();
     let range =
         CellRange::new(Reference::new(0, 0).unwrap(), Reference::new(0, 1).unwrap()).unwrap();
 
@@ -384,7 +406,11 @@ fn strings_formulas_and_unrelated_owners_are_refused_before_staging() {
         .unwrap()
         .write_to(&mut formula_output)
         .unwrap();
-    let formula_donor = Snapshot::from_bytes(formula_output.into_inner()).unwrap();
+    let formula_donor = Snapshot::from_bytes(
+        formula_output.into_inner(),
+        litchi_xls::ole_object::Limits::default(),
+    )
+    .unwrap();
     let mut formula_edit = target.edit();
     assert!(
         formula_edit
@@ -417,34 +443,41 @@ fn assert_scalar_transfer_refused(target: &Snapshot, donor: &Snapshot) {
 
 #[test]
 fn hostile_duplicate_unknown_and_dependency_records_are_refused_atomically() {
-    let target = Snapshot::from_bytes(workbook_bytes(&[(100, 100, 42.0)], &[])).unwrap();
+    let target = Snapshot::from_bytes(
+        workbook_bytes(&[(100, 100, 42.0)], &[]),
+        litchi_xls::ole_object::Limits::default(),
+    )
+    .unwrap();
 
     let duplicate = rewrite_workbook_stream(
         neutralize_refresh_all(raw_workbook_bytes(&[(0, 0, 1.25), (2, 2, 9.5)], &[])),
         |workbook| duplicate_first_number_owner(workbook),
     );
-    let duplicate = Snapshot::from_bytes(duplicate).unwrap();
+    let duplicate =
+        Snapshot::from_bytes(duplicate, litchi_xls::ole_object::Limits::default()).unwrap();
     assert_scalar_transfer_refused(&target, &duplicate);
 
     let unknown_worksheet = rewrite_workbook_stream(
         neutralize_refresh_all(raw_workbook_bytes(&[(0, 0, 1.25)], &[])),
         |workbook| replace_first_record_kind(workbook, 0x0055, 0x7FFE),
     );
-    let unknown_worksheet = Snapshot::from_bytes(unknown_worksheet).unwrap();
+    let unknown_worksheet =
+        Snapshot::from_bytes(unknown_worksheet, litchi_xls::ole_object::Limits::default()).unwrap();
     assert_scalar_transfer_refused(&target, &unknown_worksheet);
 
     let unknown_global = rewrite_workbook_stream(
         neutralize_refresh_all(raw_workbook_bytes(&[(0, 0, 1.25)], &[])),
         |workbook| replace_first_record_kind(workbook, 0x008C, 0x7FFD),
     );
-    let unknown_global = Snapshot::from_bytes(unknown_global).unwrap();
+    let unknown_global =
+        Snapshot::from_bytes(unknown_global, litchi_xls::ole_object::Limits::default()).unwrap();
     assert_scalar_transfer_refused(&target, &unknown_global);
 
     let supbook = rewrite_workbook_stream(
         neutralize_refresh_all(raw_workbook_bytes(&[(0, 0, 1.25)], &[])),
         |workbook| replace_first_record(workbook, 0x008C, 0x01AE, &[1, 0, 1, 4]),
     );
-    let supbook = Snapshot::from_bytes(supbook).unwrap();
+    let supbook = Snapshot::from_bytes(supbook, litchi_xls::ole_object::Limits::default()).unwrap();
     assert_scalar_transfer_refused(&target, &supbook);
 
     let autofilter = rewrite_workbook_stream(
@@ -455,7 +488,8 @@ fn hostile_duplicate_unknown_and_dependency_records_are_refused_atomically() {
             append_worksheet_records(workbook, &[(0x009D, &info), (0x009E, &filter)]);
         },
     );
-    let autofilter = Snapshot::from_bytes(autofilter).unwrap();
+    let autofilter =
+        Snapshot::from_bytes(autofilter, litchi_xls::ole_object::Limits::default()).unwrap();
     assert_scalar_transfer_refused(&target, &autofilter);
 
     let dval = rewrite_workbook_stream(
@@ -466,7 +500,7 @@ fn hostile_duplicate_unknown_and_dependency_records_are_refused_atomically() {
             append_worksheet_records(workbook, &[(0x01B2, &payload)]);
         },
     );
-    let dval = Snapshot::from_bytes(dval).unwrap();
+    let dval = Snapshot::from_bytes(dval, litchi_xls::ole_object::Limits::default()).unwrap();
     assert_scalar_transfer_refused(&target, &dval);
 
     let custom_view = rewrite_workbook_stream(
@@ -478,7 +512,8 @@ fn hostile_duplicate_unknown_and_dependency_records_are_refused_atomically() {
             append_worksheet_records(workbook, &[(0x01AA, &begin), (0x01AB, &end)]);
         },
     );
-    let custom_view = Snapshot::from_bytes(custom_view).unwrap();
+    let custom_view =
+        Snapshot::from_bytes(custom_view, litchi_xls::ole_object::Limits::default()).unwrap();
     assert_scalar_transfer_refused(&target, &custom_view);
 
     let scenman = rewrite_workbook_stream(
@@ -488,14 +523,15 @@ fn hostile_duplicate_unknown_and_dependency_records_are_refused_atomically() {
             insert_worksheet_records_before(workbook, 0x0200, &[(0x00AE, &payload)]);
         },
     );
-    let scenman = Snapshot::from_bytes(scenman).unwrap();
+    let scenman = Snapshot::from_bytes(scenman, litchi_xls::ole_object::Limits::default()).unwrap();
     assert_scalar_transfer_refused(&target, &scenman);
 
     let duplicate_target = rewrite_workbook_stream(
         neutralize_refresh_all(raw_workbook_bytes(&[(4, 4, 77.0), (5, 5, 88.0)], &[])),
         |workbook| duplicate_first_number_owner(workbook),
     );
-    let duplicate_target = Snapshot::from_bytes(duplicate_target).unwrap();
+    let duplicate_target =
+        Snapshot::from_bytes(duplicate_target, litchi_xls::ole_object::Limits::default()).unwrap();
     let duplicate_target_before = duplicate_target.bytes().to_vec();
     let mut duplicate_target_edit = duplicate_target.edit();
     let range =
@@ -516,14 +552,22 @@ fn hostile_duplicate_unknown_and_dependency_records_are_refused_atomically() {
         duplicate_target_before.as_slice()
     );
 
-    let refresh_all = Snapshot::from_bytes(raw_workbook_bytes(&[(0, 0, 1.25)], &[])).unwrap();
+    let refresh_all = Snapshot::from_bytes(
+        raw_workbook_bytes(&[(0, 0, 1.25)], &[]),
+        litchi_xls::ole_object::Limits::default(),
+    )
+    .unwrap();
     assert_scalar_transfer_refused(&target, &refresh_all);
 }
 
 #[test]
 fn bounds_noop_and_stale_or_foreign_artifacts_are_checked() {
     let donor = scalar_source();
-    let target = Snapshot::from_bytes(workbook_bytes(&[(100, 100, 42.0)], &[])).unwrap();
+    let target = Snapshot::from_bytes(
+        workbook_bytes(&[(100, 100, 42.0)], &[]),
+        litchi_xls::ole_object::Limits::default(),
+    )
+    .unwrap();
     let too_large = CellRange::new(
         Reference::new(0, 0).unwrap(),
         Reference::new(63, 64).unwrap(),
@@ -589,5 +633,11 @@ fn signed_cfb_is_refused_before_cross_workbook_transfer() {
         .unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    assert!(Snapshot::from_bytes(output.into_inner()).is_err());
+    assert!(
+        Snapshot::from_bytes(
+            output.into_inner(),
+            litchi_xls::ole_object::Limits::default()
+        )
+        .is_err()
+    );
 }

@@ -938,7 +938,8 @@ pub(super) fn empty_worksheet_template() -> Result<Template> {
     };
     let package = builder.build().map_err(template_error)?;
     let bytes = package.to_bytes().map_err(template_error)?;
-    let snapshot = super::Snapshot::from_bytes(bytes)?;
+    let snapshot =
+        super::Snapshot::from_bytes(bytes, litchi_ole_common::object::Limits::default())?;
     let workbook = snapshot.workbook_stream();
     let (_, tabs) = parse(workbook)?;
     let tab = tabs

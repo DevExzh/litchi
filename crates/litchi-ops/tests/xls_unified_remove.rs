@@ -173,7 +173,8 @@ fn cell_property(file: &File, path: &str, key: &str) -> Option<String> {
 }
 
 fn native_cell_value(bytes: &[u8], sheet: usize, row: u32, column: u32) -> Option<XlsValue> {
-    let snapshot = Snapshot::from_bytes(bytes.to_vec()).expect("open native XLS snapshot");
+    let snapshot = Snapshot::from_bytes(bytes.to_vec(), litchi_xls::ole_object::Limits::default())
+        .expect("open native XLS snapshot");
     snapshot
         .worksheet(Selector::Position(Position::new(sheet)))
         .expect("resolve native worksheet")
@@ -186,7 +187,8 @@ fn native_cell_value(bytes: &[u8], sheet: usize, row: u32, column: u32) -> Optio
 }
 
 fn native_cell_style(bytes: &[u8], sheet: usize, row: u32, column: u32) -> Option<u16> {
-    let snapshot = Snapshot::from_bytes(bytes.to_vec()).expect("open native XLS snapshot");
+    let snapshot = Snapshot::from_bytes(bytes.to_vec(), litchi_xls::ole_object::Limits::default())
+        .expect("open native XLS snapshot");
     snapshot
         .worksheet(Selector::Position(Position::new(sheet)))
         .expect("resolve native worksheet")

@@ -7,9 +7,7 @@ use std::sync::{
 use litchi_cfb::{OleError, SharedOleFile, writer::OleWriter};
 use litchi_core::{CheckStatus, OwnedSource, ReadAt, SourceVersion};
 use litchi_xls::ClipboardFormat;
-use litchi_xls::validation::{
-    XlsValidationError, XlsValidationLimits, validate_source, validate_source_with_limits,
-};
+use litchi_xls::validation::{XlsValidationError, XlsValidationLimits, validate_source};
 use litchi_xls::writer::{
     AddInFunctionOptions, Builder, DdeOrOleItemOptions, DdeOrOleLinkOptions,
     ExternalDefinedNameOptions, ExternalSheetOptions, ExternalWorkbookOptions,
@@ -344,7 +342,11 @@ fn status<'a>(report: &'a litchi_core::ValidateReport, id: &str) -> &'a CheckSta
 
 #[test]
 fn clear_workbook_reports_only_provable_semantics() {
-    let report = validate_source(source(authored(false, false))).expect("validation");
+    let report = validate_source(
+        source(authored(false, false)),
+        XlsValidationLimits::default(),
+    )
+    .expect("validation");
 
     assert!(report.is_complete());
     assert!(!report.has_errors());
@@ -388,7 +390,8 @@ fn clear_workbook_reports_only_provable_semantics() {
 
 #[test]
 fn external_metadata_is_reported_without_resolving_targets() {
-    let report = validate_source(source(authored_external())).expect("validation");
+    let report = validate_source(source(authored_external()), XlsValidationLimits::default())
+        .expect("validation");
 
     assert!(report.is_complete());
     assert!(!report.has_errors());
@@ -414,8 +417,11 @@ fn all_space_external_path_remains_external_presence() {
         &[],
         &[],
     );
-    let report = validate_source(source(cfb_with_streams(&[("Workbook", stream)], &[])))
-        .expect("validation report");
+    let report = validate_source(
+        source(cfb_with_streams(&[("Workbook", stream)], &[])),
+        XlsValidationLimits::default(),
+    )
+    .expect("validation report");
 
     assert!(report.is_complete());
     assert!(!report.has_errors());
@@ -449,8 +455,11 @@ fn rejects_duplicate_external_cache_owners_and_cells() {
 
     for records in [&duplicate_xct[..], &overlapping_cells[..]] {
         let stream = minimal_workbook(records, &[], &bof_payload(0x0010, 16), &[], &[]);
-        let report = validate_source(source(cfb_with_streams(&[("Workbook", stream)], &[])))
-            .expect("validation report");
+        let report = validate_source(
+            source(cfb_with_streams(&[("Workbook", stream)], &[])),
+            XlsValidationLimits::default(),
+        )
+        .expect("validation report");
         assert!(report.has_errors(), "duplicate external cache was accepted");
         assert!(
             report
@@ -468,8 +477,11 @@ fn rejects_conflicting_dde_standard_document_flags() {
         frame(0x0023, &conflicting_dde_name_payload()),
     ];
     let stream = minimal_workbook(&records, &[], &bof_payload(0x0010, 16), &[], &[]);
-    let report = validate_source(source(cfb_with_streams(&[("Workbook", stream)], &[])))
-        .expect("validation report");
+    let report = validate_source(
+        source(cfb_with_streams(&[("Workbook", stream)], &[])),
+        XlsValidationLimits::default(),
+    )
+    .expect("validation report");
 
     assert!(report.has_errors());
     assert!(
@@ -482,7 +494,11 @@ fn rejects_conflicting_dde_standard_document_flags() {
 
 #[test]
 fn protection_is_reported_without_retaining_password_material() {
-    let report = validate_source(source(authored(true, false))).expect("validation");
+    let report = validate_source(
+        source(authored(true, false)),
+        XlsValidationLimits::default(),
+    )
+    .expect("validation");
 
     assert!(report.is_complete());
     assert!(!report.has_errors());
@@ -497,7 +513,11 @@ fn protection_is_reported_without_retaining_password_material() {
 
 #[test]
 fn encrypted_workbook_stops_clear_semantic_checks() {
-    let report = validate_source(source(authored(false, true))).expect("validation");
+    let report = validate_source(
+        source(authored(false, true)),
+        XlsValidationLimits::default(),
+    )
+    .expect("validation");
 
     assert!(!report.is_complete());
     assert!(!report.has_errors());
@@ -523,8 +543,11 @@ fn encrypted_workbook_stops_clear_semantic_checks() {
 
 #[test]
 fn writer_places_filepass_after_optional_writeprotect() {
-    let report =
-        validate_source(source(authored_encrypted_with_write_reservation())).expect("validation");
+    let report = validate_source(
+        source(authored_encrypted_with_write_reservation()),
+        XlsValidationLimits::default(),
+    )
+    .expect("validation");
 
     assert!(!report.has_errors());
     assert!(matches!(
@@ -544,8 +567,11 @@ fn unsupported_filepass_is_not_reported_as_malformed() {
     let mut stream = frame(0x0809, &bof_payload(0x0005, 16));
     stream.extend_from_slice(&frame(0x002F, &unsupported_cryptoapi_filepass()));
     stream.extend_from_slice(&[0xFF; 5]);
-    let report = validate_source(source(cfb_with_streams(&[("Workbook", stream)], &[])))
-        .expect("validation report");
+    let report = validate_source(
+        source(cfb_with_streams(&[("Workbook", stream)], &[])),
+        XlsValidationLimits::default(),
+    )
+    .expect("validation report");
 
     assert!(report.has_errors());
     assert!(matches!(
@@ -592,8 +618,11 @@ fn preserves_metadata_errors_before_filepass_stop() {
             "xls.external_reference.invalid",
         ),
     ] {
-        let report = validate_source(source(cfb_with_streams(&[("Workbook", stream)], &[])))
-            .expect("validation report");
+        let report = validate_source(
+            source(cfb_with_streams(&[("Workbook", stream)], &[])),
+            XlsValidationLimits::default(),
+        )
+        .expect("validation report");
 
         assert!(report.has_errors());
         assert!(matches!(
@@ -611,7 +640,8 @@ fn preserves_metadata_errors_before_filepass_stop() {
 
 #[test]
 fn malformed_cfb_is_structured_and_downstream_is_blocked() {
-    let report = validate_source(source(vec![0u8; 512])).expect("validation report");
+    let report = validate_source(source(vec![0u8; 512]), XlsValidationLimits::default())
+        .expect("validation report");
 
     assert!(!report.is_complete());
     assert!(report.has_errors());
@@ -644,7 +674,7 @@ fn cfb_directory_byte_ceiling_is_blocked_without_validation_errors() {
     let exact = XlsValidationLimits::default()
         .with_max_directory_bytes(1024)
         .expect("two directory sectors fit the exact ceiling");
-    let report = validate_source_with_limits(source(bytes.clone()), exact)
+    let report = validate_source(source(bytes.clone()), exact)
         .expect("exact directory ceiling should validate");
     assert!(report.is_complete());
     assert!(!report.has_errors());
@@ -652,7 +682,7 @@ fn cfb_directory_byte_ceiling_is_blocked_without_validation_errors() {
     let limited = XlsValidationLimits::default()
         .with_max_directory_bytes(512)
         .expect("one directory sector is a valid configured ceiling");
-    let report = validate_source_with_limits(source(bytes), limited)
+    let report = validate_source(source(bytes), limited)
         .expect("directory ceiling should be represented in the report");
     assert!(!report.is_complete());
     assert!(!report.has_errors());
@@ -698,8 +728,8 @@ fn workbook_byte_ceiling_blocks_before_materialization() {
         100_000,
         litchi_core::ValidationLimits::default(),
     );
-    let report = validate_source_with_limits(source(authored(false, false)), limits)
-        .expect("validation report");
+    let report =
+        validate_source(source(authored(false, false)), limits).expect("validation report");
 
     assert!(!report.is_complete());
     assert!(!report.has_errors());
@@ -738,7 +768,7 @@ fn streaming_record_limits_match_biff_boundaries() {
         )
     };
 
-    let preterminal = validate_source_with_limits(
+    let preterminal = validate_source(
         source(cfb_with_streams(&[("Workbook", stream.clone())], &[])),
         limits(1),
     )
@@ -754,7 +784,7 @@ fn streaming_record_limits_match_biff_boundaries() {
     ));
 
     for maximum in [6, 7] {
-        let report = validate_source_with_limits(
+        let report = validate_source(
             source(cfb_with_streams(&[("Workbook", stream.clone())], &[])),
             limits(maximum),
         )
@@ -763,7 +793,7 @@ fn streaming_record_limits_match_biff_boundaries() {
         assert!(!report.has_errors());
     }
 
-    let limited = validate_source_with_limits(
+    let limited = validate_source(
         source(cfb_with_streams(&[("Workbook", stream.clone())], &[])),
         limits(5),
     )
@@ -778,7 +808,7 @@ fn streaming_record_limits_match_biff_boundaries() {
         CheckStatus::StoppedBy { .. }
     ));
 
-    let zero = validate_source_with_limits(
+    let zero = validate_source(
         source(cfb_with_streams(&[("Workbook", stream)], &[])),
         limits(0),
     )
@@ -800,8 +830,11 @@ fn streaming_record_payload_and_truncation_boundaries_match_biff() {
         &[],
         &[],
     );
-    let report = validate_source(source(cfb_with_streams(&[("Workbook", accepted)], &[])))
-        .expect("validation report");
+    let report = validate_source(
+        source(cfb_with_streams(&[("Workbook", accepted)], &[])),
+        XlsValidationLimits::default(),
+    )
+    .expect("validation report");
     assert!(report.is_complete());
     assert!(!report.has_errors());
 
@@ -813,8 +846,11 @@ fn streaming_record_payload_and_truncation_boundaries_match_biff() {
         &[],
         &[],
     );
-    let report = validate_source(source(cfb_with_streams(&[("Workbook", oversized)], &[])))
-        .expect("validation report");
+    let report = validate_source(
+        source(cfb_with_streams(&[("Workbook", oversized)], &[])),
+        XlsValidationLimits::default(),
+    )
+    .expect("validation report");
     assert!(!report.has_errors());
     assert!(matches!(
         status(&report, "xls.biff.parse"),
@@ -832,10 +868,10 @@ fn streaming_record_payload_and_truncation_boundaries_match_biff() {
             .expect("oversized BIFF payload")
             .to_le_bytes(),
     );
-    let report = validate_source(source(cfb_with_streams(
-        &[("Workbook", oversized_filepass)],
-        &[],
-    )))
+    let report = validate_source(
+        source(cfb_with_streams(&[("Workbook", oversized_filepass)], &[])),
+        XlsValidationLimits::default(),
+    )
     .expect("validation report");
     assert!(report.has_errors());
     assert!(matches!(
@@ -853,10 +889,10 @@ fn streaming_record_payload_and_truncation_boundaries_match_biff() {
     truncated_filepass.extend_from_slice(&0x002Fu16.to_le_bytes());
     truncated_filepass.extend_from_slice(&6u16.to_le_bytes());
     truncated_filepass.extend_from_slice(&[0; 2]);
-    let report = validate_source(source(cfb_with_streams(
-        &[("Workbook", truncated_filepass)],
-        &[],
-    )))
+    let report = validate_source(
+        source(cfb_with_streams(&[("Workbook", truncated_filepass)], &[])),
+        XlsValidationLimits::default(),
+    )
     .expect("validation report");
     assert!(report.has_errors());
     assert!(matches!(
@@ -878,10 +914,13 @@ fn streaming_record_payload_and_truncation_boundaries_match_biff() {
             .expect("oversized BIFF payload")
             .to_le_bytes(),
     );
-    let report = validate_source(source(cfb_with_streams(
-        &[("Workbook", oversized_after_terminal)],
-        &[],
-    )))
+    let report = validate_source(
+        source(cfb_with_streams(
+            &[("Workbook", oversized_after_terminal)],
+            &[],
+        )),
+        XlsValidationLimits::default(),
+    )
     .expect("validation report");
     assert!(!report.has_errors());
     assert!(matches!(
@@ -896,8 +935,11 @@ fn streaming_record_payload_and_truncation_boundaries_match_biff() {
     for tail_len in 1..=3 {
         let mut stream = valid.clone();
         stream.extend(std::iter::repeat_n(0xAA, tail_len));
-        let report = validate_source(source(cfb_with_streams(&[("Workbook", stream)], &[])))
-            .expect("validation report");
+        let report = validate_source(
+            source(cfb_with_streams(&[("Workbook", stream)], &[])),
+            XlsValidationLimits::default(),
+        )
+        .expect("validation report");
         assert!(report.has_errors());
         assert!(
             report
@@ -919,8 +961,11 @@ fn streaming_record_payload_and_truncation_boundaries_match_biff() {
     truncated.extend_from_slice(&0x7777u16.to_le_bytes());
     truncated.extend_from_slice(&10u16.to_le_bytes());
     truncated.extend_from_slice(&[0xAA; 3]);
-    let report = validate_source(source(cfb_with_streams(&[("Workbook", truncated)], &[])))
-        .expect("validation report");
+    let report = validate_source(
+        source(cfb_with_streams(&[("Workbook", truncated)], &[])),
+        XlsValidationLimits::default(),
+    )
+    .expect("validation report");
     assert!(report.has_errors());
     assert!(
         report
@@ -935,10 +980,10 @@ fn streaming_record_payload_and_truncation_boundaries_match_biff() {
 
     let mut early_truncated = frame(0x0809, &bof_payload(0x0005, 16));
     early_truncated.extend_from_slice(&[0x77, 0x77, 0x0A]);
-    let report = validate_source(source(cfb_with_streams(
-        &[("Workbook", early_truncated)],
-        &[],
-    )))
+    let report = validate_source(
+        source(cfb_with_streams(&[("Workbook", early_truncated)], &[])),
+        XlsValidationLimits::default(),
+    )
     .expect("validation report");
     assert!(report.has_errors());
     assert!(matches!(
@@ -969,7 +1014,8 @@ fn streaming_validation_stops_before_large_ciphertext_tail() {
     let tail_range = (tail_start as u64, sentinel.len());
     let source = Arc::new(ReadWidthSource::new(cfb, 16 * 1024));
 
-    let report = validate_source(source.clone()).expect("validation report");
+    let report =
+        validate_source(source.clone(), XlsValidationLimits::default()).expect("validation report");
     assert!(!report.has_errors());
     assert!(source.maximum_observed() <= 16 * 1024);
     assert!(
@@ -999,7 +1045,8 @@ fn streaming_validation_frames_many_records_without_a_read_each() {
         64 * 1024,
     ));
 
-    let report = validate_source(source.clone()).expect("validation report");
+    let report =
+        validate_source(source.clone(), XlsValidationLimits::default()).expect("validation report");
     assert!(!report.has_errors());
     let ranges = source.ranges();
     assert!(
@@ -1031,7 +1078,8 @@ fn streaming_validation_opens_no_window_before_a_filepass() {
     let cfb = cfb_with_streams(&[("Workbook", stream)], &[]);
     let source = Arc::new(ReadWidthSource::new(cfb, 64 * 1024));
 
-    let report = validate_source(source.clone()).expect("validation report");
+    let report =
+        validate_source(source.clone(), XlsValidationLimits::default()).expect("validation report");
     assert!(matches!(
         status(&report, "xls.encryption.presence"),
         CheckStatus::Complete
@@ -1071,7 +1119,8 @@ fn streaming_validation_propagates_read_and_source_change_errors() {
 
     let source =
         Arc::new(ReadWidthSource::new(cfb.clone(), 16 * 1024).with_failure_range(marker_range));
-    let error = validate_source(source).expect_err("injected read failure");
+    let error =
+        validate_source(source, XlsValidationLimits::default()).expect_err("injected read failure");
     assert!(matches!(
         error,
         XlsValidationError::Ingress(OleError::Io(_))
@@ -1079,7 +1128,8 @@ fn streaming_validation_propagates_read_and_source_change_errors() {
 
     let source =
         Arc::new(ReadWidthSource::new(cfb.clone(), 16 * 1024).with_change_range(marker_range));
-    let error = validate_source(source).expect_err("injected source change");
+    let error = validate_source(source, XlsValidationLimits::default())
+        .expect_err("injected source change");
     assert!(matches!(
         error,
         XlsValidationError::Ingress(OleError::SourceChanged { .. })
@@ -1090,7 +1140,8 @@ fn streaming_validation_propagates_read_and_source_change_errors() {
             .with_failure_range(marker_range)
             .with_change_range(marker_range),
     );
-    let error = validate_source(source).expect_err("source change precedence");
+    let error = validate_source(source, XlsValidationLimits::default())
+        .expect_err("source change precedence");
     assert!(matches!(
         error,
         XlsValidationError::Ingress(OleError::SourceChanged { .. })
@@ -1113,7 +1164,7 @@ fn incomplete_streaming_scans_fail_closed_for_encryption() {
 
     let mut record_limited = frame(0x0809, &bof_payload(0x0005, 16));
     record_limited.extend_from_slice(&frame(0x7777, &[]));
-    let report = validate_source_with_limits(
+    let report = validate_source(
         source(cfb_with_streams(&[("Workbook", record_limited)], &[])),
         limits(128 * 1024 * 1024, 1),
     )
@@ -1130,7 +1181,7 @@ fn incomplete_streaming_scans_fail_closed_for_encryption() {
             .expect("oversized BIFF payload")
             .to_le_bytes(),
     );
-    let report = validate_source_with_limits(
+    let report = validate_source(
         source(cfb_with_streams(&[("Workbook", payload_limited)], &[])),
         limits(128 * 1024 * 1024, 1_000_000),
     )
@@ -1142,7 +1193,7 @@ fn incomplete_streaming_scans_fail_closed_for_encryption() {
 
     let mut header_truncated = frame(0x0809, &bof_payload(0x0005, 16));
     header_truncated.extend_from_slice(&[0x77, 0x77, 0x0A]);
-    let report = validate_source_with_limits(
+    let report = validate_source(
         source(cfb_with_streams(&[("Workbook", header_truncated)], &[])),
         limits(128 * 1024 * 1024, 1_000_000),
     )
@@ -1153,7 +1204,7 @@ fn incomplete_streaming_scans_fail_closed_for_encryption() {
     ));
 
     let stream = frame(0x0809, &bof_payload(0x0005, 16));
-    let report = validate_source_with_limits(
+    let report = validate_source(
         source(cfb_with_streams(&[("Workbook", stream)], &[])),
         limits(1, 1_000_000),
     )
@@ -1175,8 +1226,8 @@ fn finite_input_and_record_ceilings_stop_without_errors() {
         100_000,
         litchi_core::ValidationLimits::default(),
     );
-    let report = validate_source_with_limits(source(authored(false, false)), input_limits)
-        .expect("validation report");
+    let report =
+        validate_source(source(authored(false, false)), input_limits).expect("validation report");
     assert!(!report.is_complete());
     assert!(!report.has_errors());
     assert!(matches!(
@@ -1193,8 +1244,8 @@ fn finite_input_and_record_ceilings_stop_without_errors() {
         100_000,
         litchi_core::ValidationLimits::default(),
     );
-    let report = validate_source_with_limits(source(authored(false, false)), record_limits)
-        .expect("validation report");
+    let report =
+        validate_source(source(authored(false, false)), record_limits).expect("validation report");
     assert!(!report.is_complete());
     assert!(!report.has_errors());
     assert!(matches!(
@@ -1215,7 +1266,7 @@ fn finite_input_and_record_ceilings_stop_without_errors() {
         100_000,
         litchi_core::ValidationLimits::default(),
     );
-    let report = validate_source_with_limits(source(authored(false, false)), worksheet_limits)
+    let report = validate_source(source(authored(false, false)), worksheet_limits)
         .expect("validation report");
     assert!(!report.is_complete());
     assert!(!report.has_errors());
@@ -1234,7 +1285,8 @@ fn rejects_ambiguous_and_non_stream_workbook_entries() {
     let workbook = workbook_stream(authored(false, false));
 
     let book_fallback = cfb_with_streams(&[("Book", workbook.clone())], &[]);
-    let report = validate_source(source(book_fallback)).expect("validation report");
+    let report = validate_source(source(book_fallback), XlsValidationLimits::default())
+        .expect("validation report");
     assert!(report.is_complete());
     assert!(!report.has_errors());
     assert!(matches!(
@@ -1246,7 +1298,8 @@ fn rejects_ambiguous_and_non_stream_workbook_entries() {
         &[("Workbook", workbook.clone()), ("Book", workbook.clone())],
         &[],
     );
-    let report = validate_source(source(both_names)).expect("validation report");
+    let report = validate_source(source(both_names), XlsValidationLimits::default())
+        .expect("validation report");
     assert_eq!(report.issues()[0].code(), "xls.workbook.stream_ambiguous");
     assert!(matches!(
         status(&report, "xls.workbook.stream"),
@@ -1258,7 +1311,8 @@ fn rejects_ambiguous_and_non_stream_workbook_entries() {
     ));
 
     let non_stream = cfb_with_streams(&[("Book", workbook)], &["Workbook"]);
-    let report = validate_source(source(non_stream)).expect("validation report");
+    let report = validate_source(source(non_stream), XlsValidationLimits::default())
+        .expect("validation report");
     assert_eq!(report.issues()[0].code(), "xls.workbook.stream_ambiguous");
     assert!(report.has_errors());
 }
@@ -1365,8 +1419,11 @@ fn rejects_hostile_biff_ownership_and_global_ordering() {
     ];
 
     for (stream, expect_blocked) in cases {
-        let report = validate_source(source(cfb_with_streams(&[("Workbook", stream)], &[])))
-            .expect("validation report");
+        let report = validate_source(
+            source(cfb_with_streams(&[("Workbook", stream)], &[])),
+            XlsValidationLimits::default(),
+        )
+        .expect("validation report");
         assert!(report.has_errors(), "hostile BIFF was accepted");
         assert!(
             report
@@ -1395,8 +1452,11 @@ fn stops_before_ciphertext_after_bounded_filepass() {
     stream.extend_from_slice(&frame(0x002F, &[0, 0, 0, 0, 0, 0]));
     stream.extend_from_slice(&[0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 
-    let report = validate_source(source(cfb_with_streams(&[("Workbook", stream)], &[])))
-        .expect("validation report");
+    let report = validate_source(
+        source(cfb_with_streams(&[("Workbook", stream)], &[])),
+        XlsValidationLimits::default(),
+    )
+    .expect("validation report");
     assert!(!report.has_errors());
     assert!(matches!(
         status(&report, "xls.encryption.presence"),
@@ -1438,8 +1498,11 @@ fn reports_filepass_placement_errors_before_stopping_ciphertext() {
     inside_sheet.extend_from_slice(&[0xFF; 5]);
 
     for stream in [first, after_global_eof, inside_sheet] {
-        let report = validate_source(source(cfb_with_streams(&[("Workbook", stream)], &[])))
-            .expect("validation report");
+        let report = validate_source(
+            source(cfb_with_streams(&[("Workbook", stream)], &[])),
+            XlsValidationLimits::default(),
+        )
+        .expect("validation report");
         assert!(
             report.has_errors(),
             "invalid FILEPASS placement was accepted"
@@ -1468,8 +1531,11 @@ fn rejects_filepass_after_codepage_before_ciphertext() {
     stream.extend_from_slice(&frame(0x002F, &[0, 0, 0, 0, 0, 0]));
     stream.extend_from_slice(&[0xFF; 5]);
 
-    let report = validate_source(source(cfb_with_streams(&[("Workbook", stream)], &[])))
-        .expect("validation report");
+    let report = validate_source(
+        source(cfb_with_streams(&[("Workbook", stream)], &[])),
+        XlsValidationLimits::default(),
+    )
+    .expect("validation report");
 
     assert!(report.has_errors());
     assert!(matches!(
@@ -1494,8 +1560,11 @@ fn accepts_filepass_only_after_early_writeprotect() {
     valid.extend_from_slice(&frame(0x0086, &[]));
     valid.extend_from_slice(&frame(0x002F, &[0, 0, 0, 0, 0, 0]));
     valid.extend_from_slice(&[0xFF; 5]);
-    let report = validate_source(source(cfb_with_streams(&[("Workbook", valid)], &[])))
-        .expect("validation report");
+    let report = validate_source(
+        source(cfb_with_streams(&[("Workbook", valid)], &[])),
+        XlsValidationLimits::default(),
+    )
+    .expect("validation report");
     assert!(!report.has_errors());
     assert!(
         !report
@@ -1519,8 +1588,11 @@ fn rejects_filepass_after_other_global_records() {
         }
         stream.extend_from_slice(&frame(0x002F, &[0, 0, 0, 0, 0, 0]));
         stream.extend_from_slice(&[0xFF; 5]);
-        let report = validate_source(source(cfb_with_streams(&[("Workbook", stream)], &[])))
-            .expect("validation report");
+        let report = validate_source(
+            source(cfb_with_streams(&[("Workbook", stream)], &[])),
+            XlsValidationLimits::default(),
+        )
+        .expect("validation report");
         assert!(report.has_errors());
         assert!(
             report
@@ -1578,8 +1650,11 @@ fn preserves_incomplete_metadata_before_filepass_stop() {
             "xls.protection.invalid",
         ),
     ] {
-        let report = validate_source(source(cfb_with_streams(&[("Workbook", stream)], &[])))
-            .expect("validation report");
+        let report = validate_source(
+            source(cfb_with_streams(&[("Workbook", stream)], &[])),
+            XlsValidationLimits::default(),
+        )
+        .expect("validation report");
         assert!(report.has_errors());
         assert!(matches!(
             status(&report, check),

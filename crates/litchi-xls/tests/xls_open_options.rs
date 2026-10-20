@@ -4,30 +4,33 @@ use litchi_xls::{CompatibilityProfile, Leniency, OpenOptions};
 #[test]
 fn options_are_consuming_and_password_debug_is_redacted() {
     let defaults = OpenOptions::default();
-    assert_eq!(defaults.get_password(), None);
-    assert_eq!(defaults.get_leniency(), Leniency::Strict);
+    assert_eq!(defaults.password_value(), None);
+    assert_eq!(defaults.leniency_value(), Leniency::Strict);
     assert_eq!(
-        defaults.get_compatibility_profile(),
+        defaults.compatibility_profile_value(),
         CompatibilityProfile::Strict
     );
     let configured = defaults
         .password("private-workbook-password")
         .leniency(Leniency::TolerateFormattingDefects)
         .compatibility_profile(CompatibilityProfile::SharedFormulaFlagWithoutPtgExpV1);
-    assert_eq!(configured.get_password(), Some("private-workbook-password"));
     assert_eq!(
-        configured.get_leniency(),
+        configured.password_value(),
+        Some("private-workbook-password")
+    );
+    assert_eq!(
+        configured.leniency_value(),
         Leniency::TolerateFormattingDefects
     );
     assert_eq!(
-        configured.get_compatibility_profile(),
+        configured.compatibility_profile_value(),
         CompatibilityProfile::SharedFormulaFlagWithoutPtgExpV1
     );
-    assert_eq!(defaults.get_password(), None);
+    assert_eq!(defaults.password_value(), None);
     let debug = format!("{configured:?}");
     assert!(!debug.contains("private-workbook-password"));
     assert!(debug.contains("[REDACTED]"));
-    assert_eq!(configured.password(None).get_password(), None);
+    assert_eq!(configured.password(None).password_value(), None);
 }
 
 #[test]
@@ -45,8 +48,8 @@ fn selected_source_profile_survives_other_option_setters() {
         .source_limits(limits)
         .password("private-workbook-password")
         .leniency(Leniency::TolerateFormattingDefects);
-    assert_eq!(configured.get_source_limits(), limits);
-    assert_eq!(configured.password(None).get_source_limits(), limits);
+    assert_eq!(configured.source_limits_value(), limits);
+    assert_eq!(configured.password(None).source_limits_value(), limits);
 }
 
 #[test]

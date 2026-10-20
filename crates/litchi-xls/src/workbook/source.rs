@@ -270,26 +270,26 @@ impl SourceBackedOptions {
 
     /// Current finite scan limits.
     #[must_use]
-    pub const fn limits(&self) -> SourceBackedLimits {
+    pub const fn limits_value(&self) -> SourceBackedLimits {
         self.limits
     }
 
     /// Sets the finite scan limits.
     #[must_use]
-    pub const fn with_limits(mut self, limits: SourceBackedLimits) -> Self {
+    pub const fn limits(mut self, limits: SourceBackedLimits) -> Self {
         self.limits = limits;
         self
     }
 
     /// Current formatting-defect policy.
     #[must_use]
-    pub const fn leniency(&self) -> Leniency {
+    pub const fn leniency_value(&self) -> Leniency {
         self.leniency
     }
 
     /// Sets the formatting-defect policy.
     #[must_use]
-    pub const fn with_leniency(mut self, leniency: Leniency) -> Self {
+    pub const fn leniency(mut self, leniency: Leniency) -> Self {
         self.leniency = leniency;
         self
     }
@@ -924,20 +924,12 @@ impl SourceBackedWorkbook {
         Self::from_read_at_with_options(source, SourceBackedOptions::default())
     }
 
-    /// Opens a positional source with explicit finite limits.
-    pub fn from_read_at_with_limits(
-        source: Arc<dyn ReadAt>,
-        limits: SourceBackedLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_with_options(source, SourceBackedOptions::default().with_limits(limits))
-    }
-
     /// Opens a positional source with explicit options.
     pub fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
         options: SourceBackedOptions,
     ) -> Result<Self> {
-        let limits = options.limits();
+        let limits = options.limits_value();
         limits.validate()?;
         let cfb_limits =
             SharedOleFileLimits::new(limits.max_input_bytes).map_err(SourceBackedError::Cfb)?;
@@ -948,26 +940,14 @@ impl SourceBackedWorkbook {
 
     /// Opens a filesystem path through the positional `FileSource` adapter.
     #[cfg(any(unix, windows))]
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let source = Arc::new(FileSource::open(path).map_err(SourceBackedError::Io)?);
         Self::from_read_at(source)
     }
 
-    /// Opens a filesystem path with explicit finite limits.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(
-        path: impl AsRef<Path>,
-        limits: SourceBackedLimits,
-    ) -> Result<Self> {
-        Self::from_path_with_options(path, SourceBackedOptions::default().with_limits(limits))
-    }
-
     /// Opens a filesystem path with explicit options.
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_options(
-        path: impl AsRef<Path>,
-        options: SourceBackedOptions,
-    ) -> Result<Self> {
+    pub fn open_with_options(path: impl AsRef<Path>, options: SourceBackedOptions) -> Result<Self> {
         let source = Arc::new(FileSource::open(path).map_err(SourceBackedError::Io)?);
         Self::from_read_at_with_options(source, options)
     }
@@ -1234,7 +1214,7 @@ impl SourceBackedWorkbook {
         cfb: Arc<SharedOleFile>,
         options: SourceBackedOptions,
     ) -> Result<Self> {
-        let limits = options.limits();
+        let limits = options.limits_value();
         limits.validate()?;
         let source = cfb.source_arc();
         // `SharedOleFile::source_version` already observes the source this view
@@ -1260,7 +1240,7 @@ impl SourceBackedWorkbook {
             &workbook_path,
             workbook_stream_len,
             limits,
-            options.leniency(),
+            options.leniency_value(),
         )?;
         validate_sheet_offsets(workbook_stream_len, parsed.global_end, &mut parsed.sheets)?;
         let mut worksheet_names = Vec::new();
@@ -1295,7 +1275,7 @@ impl SourceBackedWorkbook {
             styles: parsed.styles.map(Arc::new),
             encoding: parsed.encoding,
             limits,
-            leniency: options.leniency(),
+            leniency: options.leniency_value(),
             query_cache: Arc::new(QueryIndexCache::new(
                 limits.max_query_index_bytes,
                 cache_sheet_count,

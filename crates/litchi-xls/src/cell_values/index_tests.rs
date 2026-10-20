@@ -158,7 +158,7 @@ fn structural_index_distinguishes_disjoint_cells_and_sheet_wide_axes() {
 
 #[test]
 fn joining_a_noop_then_staging_reuses_the_coordinate_slot() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let mut left = source.edit();
     left.set_number(
         Selector::Position(Position::new(0)),
@@ -195,7 +195,7 @@ fn joining_a_noop_then_staging_reuses_the_coordinate_slot() {
 
 #[test]
 fn joined_fixed_and_structural_cell_operations_conflict_in_both_orders() {
-    let source = Snapshot::from_bytes(package()).unwrap();
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
     let reference = Reference { row: 0, column: 0 };
     let style = StyleIndex::new(&source, 0).unwrap();
 
@@ -228,7 +228,7 @@ fn joined_fixed_and_structural_cell_operations_conflict_in_both_orders() {
 
 #[test]
 fn joined_cloned_edits_rebuild_indexes_across_sheets_and_invert_exactly() {
-    let source = Snapshot::from_bytes(multi_sheet_package()).unwrap();
+    let source = Snapshot::from_bytes(multi_sheet_package(), Limits::default()).unwrap();
     let expected_order = [reference(0, 0), reference(1, 1), reference(2, 2)];
     for worksheet in source.worksheets() {
         let actual: Vec<_> = worksheet.cells().map(Cell::reference).collect();

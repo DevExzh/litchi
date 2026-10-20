@@ -23,8 +23,11 @@ fn fixture(name: &str) -> PathBuf {
 fn real_excel_formula_references_shift_reopen_and_invert() {
     let path =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/xls/SimpleWithChoose.xls");
-    let source = Snapshot::from_bytes(std::fs::read(path).expect("read Microsoft Excel fixture"))
-        .expect("open Microsoft Excel formula fixture");
+    let source = Snapshot::from_bytes(
+        std::fs::read(path).expect("read Microsoft Excel fixture"),
+        litchi_xls::ole_object::Limits::default(),
+    )
+    .expect("open Microsoft Excel formula fixture");
     let mut transaction = source.edit();
     transaction
         .insert_rows(Selector::Position(Position::new(0)), 0, 1)
@@ -79,8 +82,11 @@ fn real_excel_formula_references_shift_reopen_and_invert() {
 fn real_mulrk_field_edit_remains_packed() {
     let path =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/xls/FormulaSheetRange.xls");
-    let source = Snapshot::from_bytes(std::fs::read(path).expect("read MulRk fixture"))
-        .expect("parse MulRk fixture");
+    let source = Snapshot::from_bytes(
+        std::fs::read(path).expect("read MulRk fixture"),
+        litchi_xls::ole_object::Limits::default(),
+    )
+    .expect("parse MulRk fixture");
     let (sheet_position, reference) = source
         .worksheets()
         .find_map(|sheet| {
@@ -123,8 +129,11 @@ fn real_mulrk_field_edit_remains_packed() {
 fn real_mulrk_edge_deletion_rebuilds_and_semantically_repacks() {
     let path =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/xls/FormulaSheetRange.xls");
-    let source = Snapshot::from_bytes(std::fs::read(path).expect("read MulRk fixture"))
-        .expect("parse MulRk fixture");
+    let source = Snapshot::from_bytes(
+        std::fs::read(path).expect("read MulRk fixture"),
+        litchi_xls::ole_object::Limits::default(),
+    )
+    .expect("parse MulRk fixture");
     let (sheet_position, reference) = source
         .worksheets()
         .find_map(|sheet| {
@@ -173,6 +182,7 @@ fn real_mulrk_edge_deletion_rebuilds_and_semantically_repacks() {
 fn real_fixture_number_commit_reopens_and_preserves_other_streams() {
     let source = Snapshot::from_bytes(
         std::fs::read(fixture("44010-TwoCharts.xls")).expect("read real XLS fixture"),
+        litchi_xls::ole_object::Limits::default(),
     )
     .expect("parse real XLS fixture");
     let (sheet_position, number) = source
@@ -264,8 +274,11 @@ fn multiple_real_fixtures_rename_and_fully_reopen() {
         ("44010-TwoCharts.xls", "Chart Data Renamed"),
         ("unicodeNameRecord.xls", "Unicode Renamed"),
     ] {
-        let source = Snapshot::from_bytes(std::fs::read(fixture(name)).expect("read real fixture"))
-            .expect("open real fixture transaction");
+        let source = Snapshot::from_bytes(
+            std::fs::read(fixture(name)).expect("read real fixture"),
+            litchi_xls::ole_object::Limits::default(),
+        )
+        .expect("open real fixture transaction");
         let position = source
             .worksheets()
             .next()
