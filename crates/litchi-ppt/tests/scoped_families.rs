@@ -15,7 +15,9 @@ use std::path::PathBuf;
 use litchi_core::Position;
 use litchi_core::edit::RefusalKind;
 use litchi_ppt::font::Scope;
-use litchi_ppt::{Package, broadcast, external_media, font};
+use litchi_ppt::master::Kind;
+use litchi_ppt::master::metadata as master_metadata;
+use litchi_ppt::{Package, broadcast, external_media, font, master_layout};
 
 fn fixture(path: &str) -> Vec<u8> {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -210,4 +212,221 @@ fn external_media_edits_publish_replay_and_invert_exactly() {
         commit.package().apply_external_media(commit.patch()),
         Err(external_media::Error::PatchConflict)
     ));
+}
+
+/// A deck with a main master and a handout master.
+fn mastered() -> Package {
+    Package::from_bytes(&fixture("poi/test-data/slideshow/headers_footers.ppt")).unwrap()
+}
+
+fn layout_record(package: &Package, kind: Kind) -> litchi_ppt::records::Record {
+    package
+        .edit_master_layout(kind, Position::new(0))
+        .unwrap()
+        .record()
+        .clone()
+}
+
+#[test]
+fn master_metadata_edits_publish_replay_and_invert_exactly() {
+    let source = mastered();
+    let source_bytes = source.to_bytes().unwrap();
+    let main = Position::new(0);
+
+    let no_op = source
+        .edit_master_metadata(Kind::Main, main)
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), source_bytes);
+
+    // Setting and clearing an absent name is an exact no-op.
+    let mut edit = source.edit_master_metadata(Kind::Main, main).unwrap();
+    assert!(edit.name().unwrap().is_none());
+    edit.set_name("Scoped master").unwrap();
+    assert!(edit.clear_name().unwrap());
+    let net_no_op = edit.commit().unwrap();
+    assert!(!net_no_op.diagnostics().changed());
+    assert_eq!(net_no_op.package().to_bytes().unwrap(), source_bytes);
+
+    let mut edit = source.edit_master_metadata(Kind::Main, main).unwrap();
+    edit.set_name("Scoped master").unwrap();
+    drop(edit);
+    assert_eq!(source.to_bytes().unwrap(), source_bytes);
+
+    let handout_before = layout_record(&source, Kind::Handout);
+    let mut edit = source.edit_master_metadata(Kind::Main, main).unwrap();
+    edit.set_name("Scoped master").unwrap();
+    edit.set_template_name("Scoped design").unwrap();
+    assert_eq!(edit.name().unwrap().unwrap().as_str(), "Scoped master");
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.patch().before_bytes(), source_bytes.as_slice());
+    let published = commit
+        .package()
+        .edit_master_metadata(Kind::Main, main)
+        .unwrap();
+    assert_eq!(published.name().unwrap().unwrap().as_str(), "Scoped master");
+    assert_eq!(
+        published.template_name().unwrap().unwrap().as_str(),
+        "Scoped design"
+    );
+    // The masters the edit does not name keep their records.
+    assert_eq!(
+        layout_record(commit.package(), Kind::Handout),
+        handout_before
+    );
+
+    let replayed = source.apply_master_metadata(commit.patch()).unwrap();
+    assert_eq!(
+        replayed.package().to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
+    let restored = commit
+        .package()
+        .apply_master_metadata(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(restored.package().to_bytes().unwrap(), source_bytes);
+    assert!(matches!(
+        commit.package().apply_master_metadata(commit.patch()),
+        Err(master_metadata::Error::PatchConflict)
+    ));
+
+    // Clearing the published name republishes the master without it.
+    let mut clear = commit
+        .package()
+        .edit_master_metadata(Kind::Main, main)
+        .unwrap();
+    assert!(clear.clear_name().unwrap());
+    let cleared = clear.commit().unwrap();
+    assert!(cleared.diagnostics().changed());
+    assert!(
+        cleared
+            .package()
+            .edit_master_metadata(Kind::Main, main)
+            .unwrap()
+            .name()
+            .unwrap()
+            .is_none()
+    );
+
+    // A design name belongs to a main master only.
+    let mut handout = source
+        .edit_master_metadata(Kind::Handout, Position::new(0))
+        .unwrap();
+    let Err(master_metadata::Error::Refused(_)) = handout.set_template_name("x") else {
+        panic!("a handout master cannot carry a design name");
+    };
+    assert!(handout.changes().is_empty());
+
+    for (kind, position) in [
+        (Kind::Main, Position::new(99)),
+        (Kind::Handout, Position::new(1)),
+        (Kind::Title, Position::new(0)),
+    ] {
+        let Err(master_metadata::Error::Refused(refusal)) =
+            source.edit_master_metadata(kind, position)
+        else {
+            panic!("a missing master must be refused");
+        };
+        assert_eq!(refusal.kind(), RefusalKind::NotFound);
+    }
+}
+
+#[test]
+fn master_layout_edits_publish_replay_and_invert_exactly() {
+    let source = mastered();
+    let source_bytes = source.to_bytes().unwrap();
+    let main = Position::new(0);
+
+    let no_op = source
+        .edit_master_layout(Kind::Main, main)
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_bytes().unwrap(), source_bytes);
+
+    let handout_before = layout_record(&source, Kind::Handout);
+    let mut edit = source.edit_master_layout(Kind::Main, main).unwrap();
+    let original = edit.record().clone();
+    let count = original.children.len();
+    let last = original.children[count - 1].clone();
+    edit.append(master_layout::Path::root(), last.clone())
+        .unwrap();
+    assert_eq!(edit.changes().len(), 1);
+    assert_eq!(edit.view().record().children.len(), count + 1);
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    let published = commit
+        .package()
+        .edit_master_layout(Kind::Main, main)
+        .unwrap();
+    assert_eq!(published.record().children.len(), count + 1);
+    assert_eq!(published.record().children[count], last);
+    assert_eq!(
+        layout_record(commit.package(), Kind::Handout),
+        handout_before
+    );
+
+    let replayed = source.apply_master_layout(commit.patch()).unwrap();
+    assert_eq!(
+        replayed.package().to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
+    let restored = commit
+        .package()
+        .apply_master_layout(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(restored.package().to_bytes().unwrap(), source_bytes);
+    assert!(matches!(
+        commit.package().apply_master_layout(commit.patch()),
+        Err(master_layout::Error::PatchConflict)
+    ));
+
+    // Removing the appended record again restores the master's tree.
+    let mut remove = commit
+        .package()
+        .edit_master_layout(Kind::Main, main)
+        .unwrap();
+    assert_eq!(
+        remove
+            .remove(master_layout::Path::root().child(count))
+            .unwrap(),
+        last
+    );
+    let removed = remove.commit().unwrap();
+    assert!(removed.diagnostics().changed());
+    assert_eq!(
+        removed
+            .package()
+            .edit_master_layout(Kind::Main, main)
+            .unwrap()
+            .record(),
+        &original
+    );
+
+    // An out-of-range path is a refused value.
+    let mut edit = source.edit_master_layout(Kind::Main, main).unwrap();
+    let Err(master_layout::Error::Refused(refusal)) =
+        edit.remove(master_layout::Path::root().child(count + 5))
+    else {
+        panic!("an out-of-range path must be refused");
+    };
+    assert_eq!(refusal.kind(), RefusalKind::InvalidValue);
+    assert!(edit.changes().is_empty());
+
+    for (kind, position) in [
+        (Kind::Title, Position::new(99)),
+        (Kind::Handout, Position::new(1)),
+    ] {
+        let Err(master_layout::Error::Refused(refusal)) = source.edit_master_layout(kind, position)
+        else {
+            panic!("a missing master must be refused");
+        };
+        assert_eq!(refusal.kind(), RefusalKind::NotFound);
+    }
 }

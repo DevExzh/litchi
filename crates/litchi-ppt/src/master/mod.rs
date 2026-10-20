@@ -6,6 +6,7 @@
 //! catalog, so it stays independent of a particular `Presentation` parser.
 
 mod codec;
+pub(crate) mod locate;
 pub mod metadata;
 mod model;
 mod validation;

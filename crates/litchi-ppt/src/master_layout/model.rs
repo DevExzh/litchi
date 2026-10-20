@@ -311,8 +311,8 @@ impl Snapshot {
 
     /// Start an isolated transactional edit from this immutable state.
     #[must_use]
-    pub fn edit(&self) -> transaction::Transaction {
-        transaction::Transaction::open(self.clone())
+    pub(crate) fn edit(&self) -> transaction::RecordEdit {
+        transaction::RecordEdit::open(self.clone())
     }
 
     /// Borrow this snapshot through the transaction's immutable view.

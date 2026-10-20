@@ -5053,6 +5053,47 @@ fn persisted_record_readonly(snapshot: &Snapshot, persist_id: u32) -> Result<Vec
         })
 }
 
+/// Reads one persisted record of any kind, such as a master, by persist ID.
+///
+/// An unsigned package reads through the append-only editor, as
+/// [`persisted_record`] does; a signed one slices the record from the
+/// PowerPoint Document stream at its retained persist offset.
+fn persisted_object_record(snapshot: &Snapshot, persist_id: u32) -> Result<Vec<u8>> {
+    if !snapshot.has_signature {
+        return persisted_record(snapshot, persist_id);
+    }
+    let mut package =
+        Reader::from_reader_with_options(Cursor::new(snapshot.bytes()), snapshot.open_options())?;
+    let presentation = package.presentation_with_options(snapshot.open_options())?;
+    let offset = presentation
+        .inner
+        .persist_mapping
+        .get_offset(persist_id)
+        .and_then(|offset| usize::try_from(offset).ok())
+        .ok_or_else(|| {
+            PackageError::Corrupted("PPT selected persist record has no directory entry".into())
+        })?;
+    let document = presentation.document_stream();
+    let tail = document.get(offset..).ok_or_else(|| {
+        PackageError::Corrupted(
+            "PPT selected persist record offset exceeds its document stream".into(),
+        )
+    })?;
+    let (_, consumed) = crate::Record::parse_with_limits(tail, 0, presentation.source_limits())?;
+    let end = offset.checked_add(consumed).ok_or_else(|| {
+        PackageError::Corrupted("PPT selected persist record length overflows".into())
+    })?;
+    document
+        .get(offset..end)
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| {
+            PackageError::Corrupted(
+                "PPT selected persist record exceeds its document stream".into(),
+            )
+            .into()
+        })
+}
+
 fn inspect_slide_hidden(snapshot: &Snapshot, position: Position) -> Result<bool> {
     let slide = snapshot
         .document

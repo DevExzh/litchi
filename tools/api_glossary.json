@@ -5856,6 +5856,96 @@
           "name": "snapshot",
           "scope": "litchi_ppt::client_data::Edit",
           "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "ChangeSet",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "use the family Patch (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "ChangeSet",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use the family Patch (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::master_layout",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::master_layout",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "ChangeSet",
+          "scope": "litchi_ppt::master_layout",
+          "replacement": "use the family Patch (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "use Package::edit_master_metadata(kind, position) -> master::metadata::Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use Package::edit_master_metadata(kind, position) -> master::metadata::Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::master_layout",
+          "replacement": "use Package::edit_master_layout(kind, position) -> master_layout::Edit (record 0357)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "use Package::edit_master_metadata(kind, position) -> master::metadata::Edit (record 0357)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use master::metadata::Edit::set_template_name / clear_template_name (record 0357)"
+        },
+        {
+          "name": "Commit",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use master::metadata::Commit (record 0357)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::master::metadata::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::master_layout::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "finish",
+          "scope": "litchi_ppt::master_layout::Edit",
+          "replacement": "use Edit::commit"
         }
       ],
       "families": [
@@ -5869,7 +5959,9 @@
         "litchi_ppt::external_media",
         "litchi_ppt::diagram",
         "litchi_ppt::slide_sync",
-        "litchi_ppt::client_data"
+        "litchi_ppt::client_data",
+        "litchi_ppt::master::metadata",
+        "litchi_ppt::master_layout"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",
@@ -6494,6 +6586,96 @@
           "name": "snapshot",
           "scope": "litchi_ppt::client_data::Edit",
           "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "ChangeSet",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "use the family Patch (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "ChangeSet",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use the family Patch (record 0357)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::master_layout",
+          "replacement": "drop the Edit (record 0351 §2.3)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::master_layout",
+          "replacement": "use commit.diagnostics().changed() / patch.is_noop()"
+        },
+        {
+          "name": "ChangeSet",
+          "scope": "litchi_ppt::master_layout",
+          "replacement": "use the family Patch (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "use Package::edit_master_metadata(kind, position) -> master::metadata::Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use Package::edit_master_metadata(kind, position) -> master::metadata::Edit (record 0357)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::master_layout",
+          "replacement": "use Package::edit_master_layout(kind, position) -> master_layout::Edit (record 0357)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::master::metadata",
+          "replacement": "use Package::edit_master_metadata(kind, position) -> master::metadata::Edit (record 0357)"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use master::metadata::Edit::set_template_name / clear_template_name (record 0357)"
+        },
+        {
+          "name": "Commit",
+          "scope": "litchi_ppt::master::metadata::template",
+          "replacement": "use master::metadata::Commit (record 0357)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::master::metadata::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::master_layout::Edit",
+          "replacement": "a commit publishes the Package"
+        },
+        {
+          "name": "finish",
+          "scope": "litchi_ppt::master_layout::Edit",
+          "replacement": "use Edit::commit"
         }
       ],
       "families": [
@@ -6507,7 +6689,9 @@
         "litchi_ppt::external_media",
         "litchi_ppt::diagram",
         "litchi_ppt::slide_sync",
-        "litchi_ppt::client_data"
+        "litchi_ppt::client_data",
+        "litchi_ppt::master::metadata",
+        "litchi_ppt::master_layout"
       ],
       "immutable_owners": [
         "litchi_ppt::Package",

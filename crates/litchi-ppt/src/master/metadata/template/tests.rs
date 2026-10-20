@@ -125,7 +125,7 @@ fn inserts_after_round_trip_and_preserves_unknown_and_slide_name_records() {
 }
 
 #[test]
-fn replacement_clear_rollback_undo_and_redo_are_transactional() {
+fn replacement_clear_undo_and_redo_are_transactional() {
     let template = name_record(2, "old-design");
     let source = Snapshot::from_record(master(vec![unknown(0x7abc, &[1]), template])).unwrap();
     let original = source.bytes().to_vec();
@@ -142,9 +142,6 @@ fn replacement_clear_rollback_undo_and_redo_are_transactional() {
     assert_eq!(undone.name().unwrap().unwrap().as_str(), "old-design");
     let redone = commit.redo(&undone).unwrap();
     assert_eq!(redone.bytes(), commit.snapshot().bytes());
-
-    let rollback = source.edit().rollback();
-    assert_eq!(rollback.bytes(), source.bytes());
 
     let mut clear = commit.snapshot().edit();
     assert!(clear.clear_name().unwrap());
@@ -193,7 +190,10 @@ fn failed_authoring_does_not_change_source() {
     let original = source.bytes().to_vec();
     let mut edit = source.edit();
     assert!(edit.set_name("x".repeat(MAX_NAME_BYTES / 2 + 1)).is_err());
-    assert!(!edit.is_changed());
-    assert_eq!(edit.snapshot().unwrap().bytes(), original.as_slice());
+    assert!(edit.changes().is_empty());
+    assert_eq!(
+        edit.commit().unwrap().snapshot().bytes(),
+        original.as_slice()
+    );
     assert_eq!(source.bytes(), original.as_slice());
 }

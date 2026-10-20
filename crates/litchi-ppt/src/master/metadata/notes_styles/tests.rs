@@ -150,9 +150,9 @@ fn clears_and_rejects_wrong_context_without_mutating_the_editor() {
                 .set_notes_styles(Styles::from_xml(XML).unwrap())
                 .is_err()
         );
-        assert!(!rejected_edit.is_changed());
+        assert!(rejected_edit.changes().is_empty());
         assert_eq!(
-            rejected_edit.snapshot().unwrap().bytes(),
+            rejected_edit.commit().unwrap().snapshot().bytes(),
             original.as_slice()
         );
     }
