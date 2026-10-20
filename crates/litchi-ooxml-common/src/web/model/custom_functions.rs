@@ -12,6 +12,7 @@ use super::super::{
 };
 use super::{Limits, MAX_WEB_EXTENSION_ITEMS};
 use crate::Error;
+use crate::web::LimitKind;
 use crate::xml::attributes::BytesStartExt as _;
 use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
@@ -140,7 +141,7 @@ impl CustomFunctionList {
     fn push_id_with_limit(&mut self, id: impl Into<String>, maximum: usize) -> Result<&mut Self> {
         if self.ids.len() >= maximum {
             return limit(
-                "custom function IDs",
+                LimitKind::CustomFunctionListIds,
                 maximum,
                 self.ids.len().saturating_add(1),
             );
@@ -231,28 +232,32 @@ pub(in crate::web) fn validate_custom_functions(
         validate_xml_string("background runtimeId", &background.runtime_id)?;
         string_bytes = string_bytes
             .checked_add(background.runtime_id.len())
-            .ok_or(Error::Limit {
-                resource: "web extension decoded string bytes",
-                max: limits.string_bytes,
-                actual: usize::MAX,
+            .ok_or(Error::WebLimit {
+                kind: LimitKind::DecodedStringBytes,
+                maximum: limits.string_bytes,
+                observed: usize::MAX,
             })?;
     }
     if let Some(list) = &value.custom_function_list {
         if list.ids.len() > limits.items {
-            return limit("custom function IDs", limits.items, list.ids.len());
+            return limit(
+                LimitKind::CustomFunctionListIds,
+                limits.items,
+                list.ids.len(),
+            );
         }
         for id in &list.ids {
             validate_xml_string("custom function ID", id)?;
-            string_bytes = string_bytes.checked_add(id.len()).ok_or(Error::Limit {
-                resource: "web extension decoded string bytes",
-                max: limits.string_bytes,
-                actual: usize::MAX,
+            string_bytes = string_bytes.checked_add(id.len()).ok_or(Error::WebLimit {
+                kind: LimitKind::DecodedStringBytes,
+                maximum: limits.string_bytes,
+                observed: usize::MAX,
             })?;
         }
     }
     if string_bytes > limits.string_bytes {
         return limit(
-            "web extension decoded string bytes",
+            LimitKind::DecodedStringBytes,
             limits.string_bytes,
             string_bytes,
         );
@@ -361,7 +366,7 @@ pub(in crate::web) fn parse_custom_functions_with_limits(
                         .ok_or_else(|| Error::Invalid("customFunctionIds has no list".into()))?;
                     if list.ids.len() >= limits.items {
                         return limit(
-                            "custom function IDs",
+                            LimitKind::CustomFunctionListIds,
                             limits.items,
                             list.ids.len().saturating_add(1),
                         );
@@ -582,27 +587,27 @@ fn append_custom_text(
         let next_len = active_id
             .len()
             .checked_add(text.len())
-            .ok_or(Error::Limit {
-                resource: "custom function ID bytes",
-                max: limits.string_bytes,
-                actual: usize::MAX,
+            .ok_or(Error::WebLimit {
+                kind: LimitKind::CustomFunctionIdBytes,
+                maximum: limits.string_bytes,
+                observed: usize::MAX,
             })?;
         if next_len > limits.string_bytes {
-            return limit("custom function ID bytes", limits.string_bytes, next_len);
+            return limit(
+                LimitKind::CustomFunctionIdBytes,
+                limits.string_bytes,
+                next_len,
+            );
         }
         let total = (*string_bytes)
             .checked_add(text.len())
-            .ok_or(Error::Limit {
-                resource: "web extension decoded string bytes",
-                max: limits.string_bytes,
-                actual: usize::MAX,
+            .ok_or(Error::WebLimit {
+                kind: LimitKind::DecodedStringBytes,
+                maximum: limits.string_bytes,
+                observed: usize::MAX,
             })?;
         if total > limits.string_bytes {
-            return limit(
-                "web extension decoded string bytes",
-                limits.string_bytes,
-                total,
-            );
+            return limit(LimitKind::DecodedStringBytes, limits.string_bytes, total);
         }
         active_id
             .try_reserve(text.len())
@@ -625,7 +630,7 @@ fn append_custom_text(
 fn push_custom_id(list: &mut CustomFunctionList, id: String, limits: &Limits) -> Result<()> {
     if list.ids.len() >= limits.items {
         return limit(
-            "custom function IDs",
+            LimitKind::CustomFunctionListIds,
             limits.items,
             list.ids.len().saturating_add(1),
         );
@@ -709,13 +714,14 @@ fn parse_background(
                     return invalid("duplicate backgroundAppData runtimeId attribute".into());
                 }
                 let value = value.into_owned();
-                *string_bytes = (*string_bytes)
-                    .checked_add(value.len())
-                    .ok_or(Error::Limit {
-                        resource: "web extension decoded string bytes",
-                        max: limits.string_bytes,
-                        actual: usize::MAX,
-                    })?;
+                *string_bytes =
+                    (*string_bytes)
+                        .checked_add(value.len())
+                        .ok_or(Error::WebLimit {
+                            kind: LimitKind::DecodedStringBytes,
+                            maximum: limits.string_bytes,
+                            observed: usize::MAX,
+                        })?;
                 runtime_id = Some(value);
             },
             _ => return invalid("backgroundAppData has an unexpected attribute".into()),
@@ -748,33 +754,25 @@ fn is_xml_space(character: char) -> bool {
 }
 
 fn preflight_attribute_bytes(raw: &[u8], string_bytes: usize, limits: &Limits) -> Result<()> {
-    let next = string_bytes.checked_add(raw.len()).ok_or(Error::Limit {
-        resource: "web extension decoded string bytes",
-        max: limits.string_bytes,
-        actual: usize::MAX,
+    let next = string_bytes.checked_add(raw.len()).ok_or(Error::WebLimit {
+        kind: LimitKind::DecodedStringBytes,
+        maximum: limits.string_bytes,
+        observed: usize::MAX,
     })?;
     if next > limits.string_bytes {
-        return limit(
-            "web extension decoded string bytes",
-            limits.string_bytes,
-            next,
-        );
+        return limit(LimitKind::DecodedStringBytes, limits.string_bytes, next);
     }
     Ok(())
 }
 
 fn preflight_text_bytes(raw: &[u8], string_bytes: usize, limits: &Limits) -> Result<()> {
-    let next = string_bytes.checked_add(raw.len()).ok_or(Error::Limit {
-        resource: "web extension decoded string bytes",
-        max: limits.string_bytes,
-        actual: usize::MAX,
+    let next = string_bytes.checked_add(raw.len()).ok_or(Error::WebLimit {
+        kind: LimitKind::DecodedStringBytes,
+        maximum: limits.string_bytes,
+        observed: usize::MAX,
     })?;
     if next > limits.string_bytes {
-        return limit(
-            "web extension decoded string bytes",
-            limits.string_bytes,
-            next,
-        );
+        return limit(LimitKind::DecodedStringBytes, limits.string_bytes, next);
     }
     Ok(())
 }
@@ -1024,17 +1022,17 @@ fn scan_xml_layout(xml: &[u8], limits: &Limits) -> Result<XmlLayout> {
                 local_name,
                 qname,
             } => {
-                nodes = nodes.checked_add(1).ok_or(Error::Limit {
-                    resource: "custom-function XML nodes",
-                    max: limits.nodes,
-                    actual: usize::MAX,
+                nodes = nodes.checked_add(1).ok_or(Error::WebLimit {
+                    kind: LimitKind::CustomFunctionXmlNodes,
+                    maximum: limits.nodes,
+                    observed: usize::MAX,
                 })?;
                 if nodes > limits.nodes {
-                    return limit("custom-function XML nodes", limits.nodes, nodes);
+                    return limit(LimitKind::CustomFunctionXmlNodes, limits.nodes, nodes);
                 }
                 if stack.len() >= limits.depth {
                     return limit(
-                        "custom-function XML depth",
+                        LimitKind::CustomFunctionXmlDepth,
                         limits.depth,
                         stack.len().saturating_add(1),
                     );
@@ -1054,7 +1052,7 @@ fn scan_xml_layout(xml: &[u8], limits: &Limits) -> Result<XmlLayout> {
                 {
                     if layout.extension_entries.len() >= limits.items {
                         return limit(
-                            "custom-function OfficeArt extensions",
+                            LimitKind::CustomFunctionOfficeArtExtensions,
                             limits.items,
                             layout.extension_entries.len().saturating_add(1),
                         );
@@ -1079,7 +1077,7 @@ fn scan_xml_layout(xml: &[u8], limits: &Limits) -> Result<XmlLayout> {
                     if web && let Some(kind) = PayloadKind::from_name(local_name.as_bytes()) {
                         if layout.payloads.len() >= limits.items {
                             return limit(
-                                "custom-function payloads",
+                                LimitKind::CustomFunctionPayloads,
                                 limits.items,
                                 layout.payloads.len().saturating_add(1),
                             );
@@ -1119,7 +1117,7 @@ fn scan_xml_layout(xml: &[u8], limits: &Limits) -> Result<XmlLayout> {
                     {
                         if layout.payloads[payload_index].ids.len() >= limits.items {
                             return limit(
-                                "custom-function IDs",
+                                LimitKind::CustomFunctionIds,
                                 limits.items,
                                 layout.payloads[payload_index].ids.len().saturating_add(1),
                             );
@@ -1165,13 +1163,13 @@ fn scan_xml_layout(xml: &[u8], limits: &Limits) -> Result<XmlLayout> {
                 local_name,
                 qname,
             } => {
-                nodes = nodes.checked_add(1).ok_or(Error::Limit {
-                    resource: "custom-function XML nodes",
-                    max: limits.nodes,
-                    actual: usize::MAX,
+                nodes = nodes.checked_add(1).ok_or(Error::WebLimit {
+                    kind: LimitKind::CustomFunctionXmlNodes,
+                    maximum: limits.nodes,
+                    observed: usize::MAX,
                 })?;
                 if nodes > limits.nodes {
-                    return limit("custom-function XML nodes", limits.nodes, nodes);
+                    return limit(LimitKind::CustomFunctionXmlNodes, limits.nodes, nodes);
                 }
                 if stack.is_empty() {
                     layout.root = Some(XmlRange {
@@ -1187,7 +1185,7 @@ fn scan_xml_layout(xml: &[u8], limits: &Limits) -> Result<XmlLayout> {
                 {
                     if layout.extension_entries.len() >= limits.items {
                         return limit(
-                            "custom-function OfficeArt extensions",
+                            LimitKind::CustomFunctionOfficeArtExtensions,
                             limits.items,
                             layout.extension_entries.len().saturating_add(1),
                         );
@@ -1210,7 +1208,7 @@ fn scan_xml_layout(xml: &[u8], limits: &Limits) -> Result<XmlLayout> {
                     if web && let Some(kind) = PayloadKind::from_name(local_name.as_bytes()) {
                         if layout.payloads.len() >= limits.items {
                             return limit(
-                                "custom-function payloads",
+                                LimitKind::CustomFunctionPayloads,
                                 limits.items,
                                 layout.payloads.len().saturating_add(1),
                             );
@@ -1246,7 +1244,7 @@ fn scan_xml_layout(xml: &[u8], limits: &Limits) -> Result<XmlLayout> {
                 {
                     if layout.payloads[payload_index].ids.len() >= limits.items {
                         return limit(
-                            "custom-function IDs",
+                            LimitKind::CustomFunctionIds,
                             limits.items,
                             layout.payloads[payload_index].ids.len().saturating_add(1),
                         );
@@ -1402,11 +1400,7 @@ pub(in crate::web) fn rewrite_custom_functions(
     limits: &Limits,
 ) -> Result<String> {
     if xml.len() > limits.xml_bytes {
-        return limit(
-            "web extension extLst XML bytes",
-            limits.xml_bytes,
-            xml.len(),
-        );
+        return limit(LimitKind::ExtLstXmlBytes, limits.xml_bytes, xml.len());
     }
     if let Some(value) = value {
         validate_custom_functions(value, limits)?;
@@ -1826,7 +1820,7 @@ fn add_attribute_edit(
 
 fn render_custom_functions(value: &CustomFunctions, limits: &Limits) -> Result<String> {
     let capacity = custom_functions_rendered_len(value)?;
-    let mut out = bounded_string(capacity, limits.xml_bytes, "custom-function XML")?;
+    let mut out = bounded_string(capacity, limits.xml_bytes, LimitKind::CustomFunctionXml)?;
     if let Some(contains) = &value.contains_custom_functions {
         render_contains(&mut out, contains);
     }
@@ -1837,7 +1831,11 @@ fn render_custom_functions(value: &CustomFunctions, limits: &Limits) -> Result<S
         render_list(&mut out, "we", list, limits)?;
     }
     if out.len() > limits.xml_bytes {
-        return limit("custom-function XML bytes", limits.xml_bytes, out.len());
+        return limit(
+            LimitKind::CustomFunctionXmlBytes,
+            limits.xml_bytes,
+            out.len(),
+        );
     }
     Ok(out)
 }
@@ -1856,12 +1854,12 @@ fn render_extension(value: CustomFunctions, limits: &Limits) -> Result<String> {
         .and_then(|length| length.checked_add("\">".len()))
         .and_then(|length| length.checked_add(payload.len()))
         .and_then(|length| length.checked_add("</a:ext>".len()))
-        .ok_or(Error::Limit {
-            resource: "custom-function XML bytes",
-            max: limits.xml_bytes,
-            actual: usize::MAX,
+        .ok_or(Error::WebLimit {
+            kind: LimitKind::CustomFunctionXmlBytes,
+            maximum: limits.xml_bytes,
+            observed: usize::MAX,
         })?;
-    let mut out = bounded_string(capacity, limits.xml_bytes, "custom-function XML")?;
+    let mut out = bounded_string(capacity, limits.xml_bytes, LimitKind::CustomFunctionXml)?;
     out.push_str("<a:ext xmlns:a=\"");
     escape_attr(&mut out, DRAWINGML_NAMESPACE);
     out.push_str("\" xmlns:we=\"");
@@ -1872,7 +1870,11 @@ fn render_extension(value: CustomFunctions, limits: &Limits) -> Result<String> {
     out.push_str(&payload);
     out.push_str("</a:ext>");
     if out.len() > limits.xml_bytes {
-        return limit("custom-function XML bytes", limits.xml_bytes, out.len());
+        return limit(
+            LimitKind::CustomFunctionXmlBytes,
+            limits.xml_bytes,
+            out.len(),
+        );
     }
     Ok(out)
 }
@@ -1928,13 +1930,13 @@ fn render_ids(prefix: &str, ids: &[String], limits: &Limits) -> Result<String> {
             .checked_add("<we:customFunctionIds>".len())
             .and_then(|length| length.checked_add(escaped_xml_bytes(id).ok()?))
             .and_then(|length| length.checked_add("</we:customFunctionIds>".len()))
-            .ok_or(Error::Limit {
-                resource: "custom-function XML bytes",
-                max: limits.xml_bytes,
-                actual: usize::MAX,
+            .ok_or(Error::WebLimit {
+                kind: LimitKind::CustomFunctionXmlBytes,
+                maximum: limits.xml_bytes,
+                observed: usize::MAX,
             })?;
     }
-    let mut out = bounded_string(capacity, limits.xml_bytes, "custom-function XML")?;
+    let mut out = bounded_string(capacity, limits.xml_bytes, LimitKind::CustomFunctionXml)?;
     for id in ids {
         out.push('<');
         out.push_str(prefix);
@@ -1945,7 +1947,11 @@ fn render_ids(prefix: &str, ids: &[String], limits: &Limits) -> Result<String> {
         out.push_str(":customFunctionIds>");
     }
     if out.len() > limits.xml_bytes {
-        return limit("custom-function XML bytes", limits.xml_bytes, out.len());
+        return limit(
+            LimitKind::CustomFunctionXmlBytes,
+            limits.xml_bytes,
+            out.len(),
+        );
     }
     Ok(out)
 }
@@ -1963,10 +1969,10 @@ fn custom_functions_rendered_len(value: &CustomFunctions) -> Result<usize> {
                     3
                 })
             })
-            .ok_or(Error::Limit {
-                resource: "custom-function XML bytes",
-                max: usize::MAX,
-                actual: usize::MAX,
+            .ok_or(Error::WebLimit {
+                kind: LimitKind::CustomFunctionXmlBytes,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
     }
     if let Some(background) = &value.background_app_data {
@@ -1979,10 +1985,10 @@ fn custom_functions_rendered_len(value: &CustomFunctions) -> Result<usize> {
             .and_then(|value| value.checked_add("\" runtimeId=\"".len()))
             .and_then(|value| value.checked_add(escaped_xml_bytes(&background.runtime_id).ok()?))
             .and_then(|value| value.checked_add(3))
-            .ok_or(Error::Limit {
-                resource: "custom-function XML bytes",
-                max: usize::MAX,
-                actual: usize::MAX,
+            .ok_or(Error::WebLimit {
+                kind: LimitKind::CustomFunctionXmlBytes,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
     }
     if let Some(list) = &value.custom_function_list {
@@ -2004,10 +2010,10 @@ fn custom_functions_rendered_len(value: &CustomFunctions) -> Result<usize> {
                         .and_then(|ids| value.checked_add(ids))
                 }
             })
-            .ok_or(Error::Limit {
-                resource: "custom-function XML bytes",
-                max: usize::MAX,
-                actual: usize::MAX,
+            .ok_or(Error::WebLimit {
+                kind: LimitKind::CustomFunctionXmlBytes,
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
     }
     Ok(length)
@@ -2022,22 +2028,25 @@ fn escaped_xml_bytes(value: &str) -> Result<usize> {
             '\t' | '\n' | '\r' => 5,
             _ => character.len_utf8(),
         };
-        length.checked_add(escaped).ok_or(Error::Limit {
-            resource: "custom-function XML bytes",
-            max: usize::MAX,
-            actual: usize::MAX,
+        length.checked_add(escaped).ok_or(Error::WebLimit {
+            kind: LimitKind::CustomFunctionXmlBytes,
+            maximum: usize::MAX,
+            observed: usize::MAX,
         })
     })
 }
 
-fn bounded_string(capacity: usize, maximum: usize, resource: &'static str) -> Result<String> {
+fn bounded_string(capacity: usize, maximum: usize, kind: LimitKind) -> Result<String> {
     if capacity > maximum {
-        return limit(resource, maximum, capacity);
+        return limit(kind, maximum, capacity);
     }
     let mut value = String::new();
     value
         .try_reserve(capacity)
-        .map_err(|source| Error::Allocation { resource, source })?;
+        .map_err(|source| Error::Allocation {
+            resource: kind.as_str(),
+            source,
+        })?;
     Ok(value)
 }
 
@@ -2079,15 +2088,15 @@ fn apply_edits(xml: &[u8], mut edits: Vec<Edit>, maximum: usize) -> Result<Strin
         output_len = output_len
             .checked_sub(edit.end - edit.start)
             .and_then(|value| value.checked_add(edit.replacement.len()))
-            .ok_or(Error::Limit {
-                resource: "custom-function XML bytes",
-                max: maximum,
-                actual: usize::MAX,
+            .ok_or(Error::WebLimit {
+                kind: LimitKind::CustomFunctionXmlBytes,
+                maximum,
+                observed: usize::MAX,
             })?;
         previous_end = edit.end;
     }
     if output_len > maximum {
-        return limit("custom-function XML bytes", maximum, output_len);
+        return limit(LimitKind::CustomFunctionXmlBytes, maximum, output_len);
     }
     if edits.is_empty() {
         return clone_source(xml);
@@ -2127,11 +2136,7 @@ pub(in crate::web) fn custom_source_compatible(
 
 fn custom_source_skeleton(xml: &[u8], limits: &Limits) -> Result<(Vec<u8>, bool)> {
     if xml.len() > limits.xml_bytes {
-        return limit(
-            "web extension extLst XML bytes",
-            limits.xml_bytes,
-            xml.len(),
-        );
+        return limit(LimitKind::ExtLstXmlBytes, limits.xml_bytes, xml.len());
     }
     let layout = scan_xml_layout(xml, limits)?;
     let opaque = layout.payloads.iter().any(|payload| {

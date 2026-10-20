@@ -1,6 +1,8 @@
 //! Shared, inert Office web-extension and persisted task-pane metadata.
 
 mod codec;
+pub mod custom_function;
+mod limit;
 mod model;
 mod package;
 mod semantic;
@@ -51,5 +53,6 @@ use raw::{
     ADD_IN_CONTENT_TYPE, ADD_IN_RELATIONSHIP, TASK_PANES_CONTENT_TYPE, TASK_PANES_RELATIONSHIP,
 };
 
+pub use limit::LimitKind;
 pub use model::*;
 pub use package::*;

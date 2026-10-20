@@ -1,6 +1,7 @@
 use super::super::codec::limit;
 use super::super::{Error, Result};
 use super::Limits;
+use crate::web::LimitKind;
 #[derive(Debug, Default)]
 pub(in crate::web) struct OperationBudget {
     pub(in crate::web) xml_bytes: usize,
@@ -9,14 +10,14 @@ pub(in crate::web) struct OperationBudget {
 
 impl OperationBudget {
     pub(in crate::web) fn charge_xml(&mut self, bytes: usize, limits: &Limits) -> Result<()> {
-        self.xml_bytes = self.xml_bytes.checked_add(bytes).ok_or(Error::Limit {
-            resource: "aggregate web extension XML bytes",
-            max: limits.total_xml_bytes,
-            actual: usize::MAX,
+        self.xml_bytes = self.xml_bytes.checked_add(bytes).ok_or(Error::WebLimit {
+            kind: LimitKind::AggregateXmlBytes,
+            maximum: limits.total_xml_bytes,
+            observed: usize::MAX,
         })?;
         if self.xml_bytes > limits.total_xml_bytes {
             return limit(
-                "aggregate web extension XML bytes",
+                LimitKind::AggregateXmlBytes,
                 limits.total_xml_bytes,
                 self.xml_bytes,
             );
@@ -25,14 +26,17 @@ impl OperationBudget {
     }
 
     pub(in crate::web) fn charge_strings(&mut self, bytes: usize, limits: &Limits) -> Result<()> {
-        self.string_bytes = self.string_bytes.checked_add(bytes).ok_or(Error::Limit {
-            resource: "retained web extension string bytes",
-            max: limits.total_string_bytes,
-            actual: usize::MAX,
-        })?;
+        self.string_bytes = self
+            .string_bytes
+            .checked_add(bytes)
+            .ok_or(Error::WebLimit {
+                kind: LimitKind::RetainedStringBytes,
+                maximum: limits.total_string_bytes,
+                observed: usize::MAX,
+            })?;
         if self.string_bytes > limits.total_string_bytes {
             return limit(
-                "retained web extension string bytes",
+                LimitKind::RetainedStringBytes,
                 limits.total_string_bytes,
                 self.string_bytes,
             );
@@ -51,10 +55,10 @@ impl OperationBudget {
         copies: usize,
         limits: &Limits,
     ) -> Result<()> {
-        let retained = bytes.checked_mul(copies).ok_or(Error::Limit {
-            resource: "indexed web extension package metadata bytes",
-            max: limits.total_string_bytes,
-            actual: usize::MAX,
+        let retained = bytes.checked_mul(copies).ok_or(Error::WebLimit {
+            kind: LimitKind::IndexedPackageMetadataBytes,
+            maximum: limits.total_string_bytes,
+            observed: usize::MAX,
         })?;
         self.charge_strings(retained, limits)
     }

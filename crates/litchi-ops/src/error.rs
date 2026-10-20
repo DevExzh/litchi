@@ -1151,9 +1151,13 @@ impl Classify for litchi_core::Error {
 
 /// Whether a shared OOXML error is a typed budget of a shared family
 /// (record 0360).
-#[cfg(feature = "docx")]
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 fn common_limit(error: &litchi_ooxml_common::Error) -> bool {
-    matches!(error, litchi_ooxml_common::Error::CustomXmlLimit { .. })
+    matches!(
+        error,
+        litchi_ooxml_common::Error::CustomXmlLimit { .. }
+            | litchi_ooxml_common::Error::WebLimit { .. }
+    )
 }
 
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
@@ -1332,6 +1336,7 @@ impl Classify for litchi_pptx::Error {
             // a source change or cancellation during the read, through the
             // shared OOXML error.
             Self::CustomProperties(litchi_ooxml_common::Error::Opc(error)) => error.classify(),
+            Self::CustomProperties(error) if common_limit(error) => Class::of(Code::LimitExceeded),
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
             Self::IndexOutOfBounds { .. }
             | Self::SlideIndexOutOfBounds { .. }
@@ -1380,6 +1385,7 @@ impl Classify for litchi_xlsx::Error {
                 _ => Class::of(Code::CorruptFile),
             },
             Self::Package(error) => error.classify(),
+            Self::Common(error) if common_limit(error) => Class::of(Code::LimitExceeded),
             #[cfg(feature = "encryption")]
             Self::Encryption(error) => error.classify(),
             #[cfg(feature = "encryption")]
@@ -1474,6 +1480,7 @@ impl Classify for litchi_xlsb::package::PackageError {
             },
             Self::Io(error) => error.classify(),
             Self::Opc(error) => error.classify(),
+            Self::Common(error) if common_limit(error) => Class::of(Code::LimitExceeded),
             Self::Wire(error) => error.classify(),
             Self::Execution(error) => error.classify(),
             Self::LimitExceeded { .. }

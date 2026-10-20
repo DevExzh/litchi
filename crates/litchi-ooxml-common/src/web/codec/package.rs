@@ -5,6 +5,7 @@ use super::super::package::{PackageGraphIndex, fold_part_name};
 use super::super::validation::validate_image_content_type;
 use super::super::{IMAGE_RELATIONSHIP_TYPE, STRICT_IMAGE_RELATIONSHIP_TYPE};
 use super::semantic::{invalid, limit};
+use crate::web::LimitKind;
 use crate::{Error, Result};
 use litchi_opc::{OpcPackage, PackURI, Part};
 use std::collections::{HashMap, HashSet};
@@ -79,7 +80,7 @@ pub(in crate::web) fn load_snapshot_resources(
         }
         if image.blob().len() > limits.image_bytes {
             return limit(
-                "web extension snapshot bytes",
+                LimitKind::SnapshotBytes,
                 limits.image_bytes,
                 image.blob().len(),
             );
@@ -91,7 +92,7 @@ pub(in crate::web) fn load_snapshot_resources(
                 .ok_or_else(|| Error::Invalid("aggregate snapshot byte count overflow".into()))?;
             if *total_snapshot_bytes > limits.total_image_bytes {
                 return limit(
-                    "aggregate web extension snapshot bytes",
+                    LimitKind::AggregateSnapshotBytes,
                     limits.total_image_bytes,
                     *total_snapshot_bytes,
                 );

@@ -8,6 +8,7 @@ use super::super::{
     TASK_PANES_CONTENT_TYPE, TASK_PANES_RELATIONSHIP,
 };
 use super::{PackageGraphIndex, fold_part_name};
+use crate::web::LimitKind;
 pub(in crate::web) fn has_task_panes_relationship(
     package: &OpcPackage,
     limits: &Limits,
@@ -15,7 +16,7 @@ pub(in crate::web) fn has_task_panes_relationship(
     let relationships = package.rels().len();
     if relationships > limits.package_relationships {
         return limit(
-            "package relationships",
+            LimitKind::PackageRelationships,
             limits.package_relationships,
             relationships,
         );

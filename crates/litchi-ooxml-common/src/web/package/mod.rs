@@ -9,10 +9,7 @@ mod transaction;
 mod validation;
 
 pub use discovery::*;
-pub use durable::{
-    CustomFunctionEdit, CustomFunctionOperation, GraphMode, OwnerSelector, WebIntent,
-    apply_durable, apply_durable_with_limits, plan_durable_with_limits,
-};
+pub use durable::{GraphMode, OwnerSelector, WebIntent, apply_durable, plan_durable};
 pub use planning::*;
 pub use transaction::Patch;
 

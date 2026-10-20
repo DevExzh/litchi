@@ -93,12 +93,12 @@ fn assert_invalid(result: Result<Vec<ClosureRecord>>) {
 fn assert_limit(result: Result<Vec<ClosureRecord>>, resource: &str, maximum: usize, actual: usize) {
     let error = result.expect_err("over-limit closure was accepted");
     match error {
-        Error::Limit {
-            resource: actual_resource,
-            max: actual_maximum,
-            actual: actual_value,
+        Error::WebLimit {
+            kind: actual_resource,
+            maximum: actual_maximum,
+            observed: actual_value,
         } => {
-            assert_eq!(actual_resource, resource);
+            assert_eq!(actual_resource.as_str(), resource);
             assert_eq!(actual_maximum, maximum);
             assert_eq!(actual_value, actual);
         },

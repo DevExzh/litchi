@@ -1492,7 +1492,7 @@ fn package_graph_limits_bound_index_allocation_relationships_and_deletion() {
     };
     assert!(matches!(
         load_with(&authored, &no_parts),
-        Err(Error::Limit { .. })
+        Err(Error::WebLimit { .. })
     ));
     let no_relationships = Limits {
         package_relationships: 0,
@@ -1500,7 +1500,7 @@ fn package_graph_limits_bound_index_allocation_relationships_and_deletion() {
     };
     assert!(matches!(
         load_with(&authored, &no_relationships),
-        Err(Error::Limit { .. })
+        Err(Error::WebLimit { .. })
     ));
     let no_deletions = Limits {
         part_deletions: 0,
@@ -1555,7 +1555,7 @@ fn part_name_allocation_probes_are_operation_wide() {
 
     assert!(matches!(
         put_with(&mut package, panes, Conformance::Transitional, &limits,),
-        Err(Error::Limit { .. })
+        Err(Error::WebLimit { .. })
     ));
     assert_eq!(package.part_count(), 1);
     assert_eq!(package.get_part(&occupied_name).unwrap().blob(), &[7]);
@@ -1584,7 +1584,7 @@ fn aggregate_xml_and_retained_string_budgets_bound_put_and_load() {
             Conformance::Transitional,
             &xml_tight,
         ),
-        Err(Error::Limit { .. })
+        Err(Error::WebLimit { .. })
     ));
     assert_eq!(rejected.part_count(), 0);
 
@@ -1599,7 +1599,7 @@ fn aggregate_xml_and_retained_string_budgets_bound_put_and_load() {
             Conformance::Transitional,
             &strings_tight,
         ),
-        Err(Error::Limit { .. })
+        Err(Error::WebLimit { .. })
     ));
     assert_eq!(rejected.part_count(), 0);
 
@@ -1607,11 +1607,11 @@ fn aggregate_xml_and_retained_string_budgets_bound_put_and_load() {
     put(&mut stored, panes, Conformance::Transitional).unwrap();
     assert!(matches!(
         load_with(&stored, &xml_tight),
-        Err(Error::Limit { .. })
+        Err(Error::WebLimit { .. })
     ));
     assert!(matches!(
         load_with(&stored, &strings_tight),
-        Err(Error::Limit { .. })
+        Err(Error::WebLimit { .. })
     ));
 }
 
@@ -1640,7 +1640,7 @@ fn inherited_namespace_expansion_is_charged_before_fragment_retention() {
 
     assert!(matches!(
         parse_add_in_with(xml.as_bytes(), &limits),
-        Err(Error::Limit { .. })
+        Err(Error::WebLimit { .. })
     ));
     assert_eq!(parse_add_in(xml.as_bytes()).unwrap().bindings().len(), 32);
 }
@@ -1660,7 +1660,7 @@ fn package_and_authored_relationship_metadata_share_the_string_budget() {
     };
     assert!(matches!(
         load_with(&stored, &tight),
-        Err(Error::Limit { .. })
+        Err(Error::WebLimit { .. })
     ));
 
     let add_in = AddIn::new(
@@ -1676,7 +1676,7 @@ fn package_and_authored_relationship_metadata_share_the_string_budget() {
     let mut package = OpcPackage::new();
     assert!(matches!(
         put_with(&mut package, panes, Conformance::Transitional, &tight,),
-        Err(Error::Limit { .. })
+        Err(Error::WebLimit { .. })
     ));
     assert_eq!(package.part_count(), 0);
 }

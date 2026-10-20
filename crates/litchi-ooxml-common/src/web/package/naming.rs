@@ -7,6 +7,7 @@ use super::{
     ExistingAddInGraph, PackageGraphIndex, PlannedPart, folded_name_conflicts,
     load_with_index_budget,
 };
+use crate::web::LimitKind;
 pub(in crate::web) fn fold_part_name(name: &PackURI) -> String {
     name.as_str().to_ascii_lowercase()
 }
@@ -132,7 +133,7 @@ pub(in crate::web) fn charge_allocation_probe(probes: &mut usize, limits: &Limit
     let actual = probes.saturating_add(1);
     if *probes >= limits.part_allocations {
         return limit(
-            "web extension part-name allocation probes",
+            LimitKind::PartNameAllocationProbes,
             limits.part_allocations,
             actual,
         );
@@ -145,10 +146,10 @@ pub(in crate::web) fn next_package_relationship_id(
     package: &OpcPackage,
     limits: &Limits,
 ) -> Result<String> {
-    let attempts = package.rels().len().checked_add(1).ok_or(Error::Limit {
-        resource: "web extension relationship IDs",
-        max: limits.part_allocations,
-        actual: usize::MAX,
+    let attempts = package.rels().len().checked_add(1).ok_or(Error::WebLimit {
+        kind: LimitKind::RelationshipIds,
+        maximum: limits.part_allocations,
+        observed: usize::MAX,
     })?;
     let attempts = attempts.min(limits.part_allocations);
     for index in 1..=attempts {

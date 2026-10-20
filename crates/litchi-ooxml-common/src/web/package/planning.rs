@@ -17,6 +17,7 @@ use super::{
     next_package_relationship_id, next_task_panes_part_name, next_web_extension_part_name,
     planned_deletions, preflight_planned_parts, validate_plan_counts,
 };
+use crate::web::LimitKind;
 /// Create or replace the package-level persisted task-pane graph.
 ///
 /// Add-in references, bindings, properties, and snapshot resources are stored
@@ -225,7 +226,7 @@ pub fn plan_put_with(
                             })?;
                         if total_snapshot_bytes > limits.total_image_bytes {
                             return limit(
-                                "aggregate web extension snapshot bytes",
+                                LimitKind::AggregateSnapshotBytes,
                                 limits.total_image_bytes,
                                 total_snapshot_bytes,
                             );
@@ -587,7 +588,7 @@ fn relationship_attributes_use_namespace(
     limits: &Limits,
 ) -> Result<bool> {
     if xml.len() > limits.xml_bytes {
-        return limit("web extension XML bytes", limits.xml_bytes, xml.len());
+        return limit(LimitKind::XmlBytes, limits.xml_bytes, xml.len());
     }
     // Resolve MCE only for this profile check. No source offsets are derived
     // from the effective tree; any actual edit still uses a raw source span

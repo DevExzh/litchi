@@ -8,12 +8,14 @@
 //!
 //! The public flow is `Patch::to_durable(PatchLimits)`, deterministic JSON
 //! serialization through the common core patch, bounded JSON decoding, and
-//! `apply_durable_with_limits` (or the DOCX facade's corresponding method).
+//! `apply_durable` (or the DOCX facade's corresponding method).
 //! The source guard covers the retained logical OPC graph, content types,
 //! relationship tokens, and affected XML provenance; compressed ZIP artifact
 //! identity and unrelated non-part archive entries are outside that logical
 //! guard and remain owned by the package source.
 
+use crate::web::LimitKind;
+use crate::web::custom_function;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::Write as _;
 use std::mem::size_of;
@@ -85,51 +87,6 @@ pub enum OwnerSelector {
     PaneIndex(usize),
 }
 
-/// One typed custom-function operation.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CustomFunctionOperation {
-    Set(Option<CustomFunctions>),
-    SetContains(Option<ContainsCustomFunctions>),
-    SetBackground(Option<BackgroundAppData>),
-    SetList(Option<CustomFunctionList>),
-    InsertId { index: usize, id: String },
-    ReplaceId { index: usize, id: String },
-    RemoveId { index: usize },
-}
-
-/// A bounded semantic custom-function edit. `additions` is only admitted for
-/// [`GraphMode::EnsureGraph`]. Complete graph replacement is represented by a
-/// [`WebIntent::Put`] so no panes or resources can be silently omitted.
-#[derive(Debug, Clone, PartialEq)]
-pub struct CustomFunctionEdit {
-    pub mode: GraphMode,
-    pub operations: Vec<(OwnerSelector, CustomFunctionOperation)>,
-    pub additions: Vec<Pane>,
-}
-
-impl CustomFunctionEdit {
-    #[must_use]
-    pub fn existing(operations: Vec<(OwnerSelector, CustomFunctionOperation)>) -> Self {
-        Self {
-            mode: GraphMode::ExistingOnly,
-            operations,
-            additions: Vec::new(),
-        }
-    }
-
-    #[must_use]
-    pub fn ensure(
-        additions: Vec<Pane>,
-        operations: Vec<(OwnerSelector, CustomFunctionOperation)>,
-    ) -> Self {
-        Self {
-            mode: GraphMode::EnsureGraph,
-            operations,
-            additions,
-        }
-    }
-}
-
 /// Typed intent retained by an ordinary Web Extensions [`Patch`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum WebIntent {
@@ -138,7 +95,7 @@ pub enum WebIntent {
         conformance: Conformance,
     },
     Remove,
-    CustomFunctions(CustomFunctionEdit),
+    CustomFunctions(custom_function::Edit),
 }
 
 /// Attach semantic intent to a planned package transaction.
@@ -157,7 +114,7 @@ pub(in crate::web::package) fn bind_intent(patch: Patch, intent: WebIntent) -> P
 pub(in crate::web::package) fn custom_edit_for_graph(
     existing: &Panes,
     incoming: &Panes,
-) -> Result<CustomFunctionEdit> {
+) -> Result<custom_function::Edit> {
     if existing.len() != incoming.len() {
         return invalid("custom-function graph intent changed pane count".into());
     }
@@ -175,14 +132,14 @@ pub(in crate::web::package) fn custom_edit_for_graph(
         if old.add_in.custom_functions() != new.add_in.custom_functions() {
             operations.push((
                 OwnerSelector::AddInId(new.add_in.id.clone()),
-                CustomFunctionOperation::Set(new.add_in.custom_functions().cloned()),
+                custom_function::Operation::Set(new.add_in.custom_functions().cloned()),
             ));
         }
     }
     if operations.is_empty() {
         return invalid("custom-function graph intent has no changed owner".into());
     }
-    Ok(CustomFunctionEdit::existing(operations))
+    Ok(custom_function::Edit::existing(operations))
 }
 
 impl Patch {
@@ -206,30 +163,22 @@ impl Patch {
     }
 }
 
-/// Apply one durable Web Extensions transaction with ordinary graph limits.
-/// The caller owns the package mutation; every failure leaves it unchanged.
+/// Apply one durable Web Extensions transaction under the caller's graph
+/// limits. The caller owns the package mutation; every failure leaves it
+/// unchanged.
 pub fn apply_durable<Mode>(
     package: &mut OpcPackage,
     patch: &CorePatch<Mode>,
     limits: &Limits,
 ) -> Result<bool> {
-    apply_durable_with_limits(package, patch, limits)
-}
-
-/// Apply one durable Web Extensions transaction under caller-provided bounds.
-pub fn apply_durable_with_limits<Mode>(
-    package: &mut OpcPackage,
-    patch: &CorePatch<Mode>,
-    limits: &Limits,
-) -> Result<bool> {
-    let planned = plan_durable_with_limits(package, patch, limits)?;
+    let planned = plan_durable(package, patch, limits)?;
     planned.apply(package)
 }
 
 /// Verify one durable operation and return the ordinary source-checked graph
 /// [`Patch`] that will publish it. This keeps signed-package and atomicity
 /// policy in the existing transaction owner.
-pub fn plan_durable_with_limits<Mode>(
+pub fn plan_durable<Mode>(
     package: &OpcPackage,
     patch: &CorePatch<Mode>,
     limits: &Limits,
@@ -692,36 +641,36 @@ fn encode_selector(
 
 fn encode_operation(
     encoder: &mut Encoder,
-    operation: &CustomFunctionOperation,
+    operation: &custom_function::Operation,
 ) -> std::result::Result<(), PatchError> {
     match operation {
-        CustomFunctionOperation::Set(value) => {
+        custom_function::Operation::Set(value) => {
             encoder.u8(0)?;
             encode_custom_functions(encoder, value.as_ref())?;
         },
-        CustomFunctionOperation::SetContains(value) => {
+        custom_function::Operation::SetContains(value) => {
             encoder.u8(1)?;
             encode_contains(encoder, value.as_ref())?;
         },
-        CustomFunctionOperation::SetBackground(value) => {
+        custom_function::Operation::SetBackground(value) => {
             encoder.u8(2)?;
             encode_background(encoder, value.as_ref())?;
         },
-        CustomFunctionOperation::SetList(value) => {
+        custom_function::Operation::SetList(value) => {
             encoder.u8(3)?;
             encode_list(encoder, value.as_ref())?;
         },
-        CustomFunctionOperation::InsertId { index, id } => {
+        custom_function::Operation::InsertId { index, id } => {
             encoder.u8(4)?;
             encoder.u64(*index)?;
             encoder.text(id)?;
         },
-        CustomFunctionOperation::ReplaceId { index, id } => {
+        custom_function::Operation::ReplaceId { index, id } => {
             encoder.u8(5)?;
             encoder.u64(*index)?;
             encoder.text(id)?;
         },
-        CustomFunctionOperation::RemoveId { index } => {
+        custom_function::Operation::RemoveId { index } => {
             encoder.u8(6)?;
             encoder.u64(*index)?;
         },
@@ -822,32 +771,32 @@ impl IntentDecodeBudget {
             .semantic
             .xml_bytes
             .checked_add(bytes)
-            .ok_or(Error::Limit {
-                resource: "aggregate web extension XML bytes",
-                max: limits.total_xml_bytes,
-                actual: usize::MAX,
+            .ok_or(Error::WebLimit {
+                kind: LimitKind::AggregateXmlBytes,
+                maximum: limits.total_xml_bytes,
+                observed: usize::MAX,
             })?;
         if total > limits.total_xml_bytes {
-            return Err(Error::Limit {
-                resource: "aggregate web extension XML bytes",
-                max: limits.total_xml_bytes,
-                actual: total,
+            return Err(Error::WebLimit {
+                kind: LimitKind::AggregateXmlBytes,
+                maximum: limits.total_xml_bytes,
+                observed: total,
             });
         }
         Ok(())
     }
 
     fn preflight_image(&self, bytes: usize, limits: &Limits) -> Result<()> {
-        let total = self.image_bytes.checked_add(bytes).ok_or(Error::Limit {
-            resource: "aggregate web extension image bytes",
-            max: limits.total_image_bytes,
-            actual: usize::MAX,
+        let total = self.image_bytes.checked_add(bytes).ok_or(Error::WebLimit {
+            kind: LimitKind::AggregateImageBytes,
+            maximum: limits.total_image_bytes,
+            observed: usize::MAX,
         })?;
         if total > limits.total_image_bytes {
-            return Err(Error::Limit {
-                resource: "aggregate web extension image bytes",
-                max: limits.total_image_bytes,
-                actual: total,
+            return Err(Error::WebLimit {
+                kind: LimitKind::AggregateImageBytes,
+                maximum: limits.total_image_bytes,
+                observed: total,
             });
         }
         Ok(())
@@ -900,7 +849,7 @@ impl<'a> Decoder<'a> {
         }
     }
 
-    fn u64(&mut self, field: &'static str, maximum: usize) -> Result<usize> {
+    fn u64(&mut self, field: LimitKind, maximum: usize) -> Result<usize> {
         let bytes: [u8; 8] = self
             .take(8)?
             .try_into()
@@ -909,10 +858,10 @@ impl<'a> Decoder<'a> {
             Error::Invalid("Web Extensions durable integer exceeds this platform".into())
         })?;
         if value > maximum {
-            return Err(Error::Limit {
-                resource: field,
-                max: maximum,
-                actual: value,
+            return Err(Error::WebLimit {
+                kind: field,
+                maximum,
+                observed: value,
             });
         }
         Ok(value)
@@ -940,7 +889,7 @@ impl<'a> Decoder<'a> {
         )))
     }
 
-    fn bytes_slice(&mut self, field: &'static str, maximum: usize) -> Result<&'a [u8]> {
+    fn bytes_slice(&mut self, field: LimitKind, maximum: usize) -> Result<&'a [u8]> {
         let length = self.u64(field, maximum)?;
         self.take(length)
     }
@@ -956,23 +905,23 @@ impl<'a> Decoder<'a> {
 
     fn bytes_with_total(
         &mut self,
-        field: &'static str,
+        field: LimitKind,
         maximum: usize,
         total: &mut usize,
         total_maximum: usize,
-        resource: &'static str,
+        resource: LimitKind,
     ) -> Result<Vec<u8>> {
         let source = self.bytes_slice(field, maximum)?;
-        let next = total.checked_add(source.len()).ok_or(Error::Limit {
-            resource,
-            max: total_maximum,
-            actual: usize::MAX,
+        let next = total.checked_add(source.len()).ok_or(Error::WebLimit {
+            kind: resource,
+            maximum: total_maximum,
+            observed: usize::MAX,
         })?;
         if next > total_maximum {
-            return Err(Error::Limit {
-                resource,
-                max: total_maximum,
-                actual: next,
+            return Err(Error::WebLimit {
+                kind: resource,
+                maximum: total_maximum,
+                observed: next,
             });
         }
         let output = Self::copy_source(source, "Web Extensions durable bytes")?;
@@ -991,16 +940,16 @@ impl<'a> Decoder<'a> {
             self.string_total = budget.string_bytes;
         }
         if budget.string_bytes > limits.total_string_bytes {
-            return Err(Error::Limit {
-                resource: "retained web extension string bytes",
-                max: limits.total_string_bytes,
-                actual: budget.string_bytes,
+            return Err(Error::WebLimit {
+                kind: LimitKind::RetainedStringBytes,
+                maximum: limits.total_string_bytes,
+                observed: budget.string_bytes,
             });
         }
         Ok(())
     }
 
-    fn text(&mut self, field: &'static str, maximum: usize) -> Result<String> {
+    fn text(&mut self, field: LimitKind, maximum: usize) -> Result<String> {
         let bytes = self.bytes_slice(field, maximum)?;
         let text = std::str::from_utf8(bytes)
             .map_err(|_| Error::Invalid("Web Extensions durable text is not UTF-8".into()))?;
@@ -1010,16 +959,16 @@ impl<'a> Decoder<'a> {
         let next = self
             .string_total
             .checked_add(text.len())
-            .ok_or(Error::Limit {
-                resource: "Web Extensions durable decoded strings",
-                max: self.string_maximum,
-                actual: usize::MAX,
+            .ok_or(Error::WebLimit {
+                kind: LimitKind::DurableDecodedStrings,
+                maximum: self.string_maximum,
+                observed: usize::MAX,
             })?;
         if next > self.string_maximum {
-            return Err(Error::Limit {
-                resource: "Web Extensions durable decoded strings",
-                max: self.string_maximum,
-                actual: next,
+            return Err(Error::WebLimit {
+                kind: LimitKind::DurableDecodedStrings,
+                maximum: self.string_maximum,
+                observed: next,
             });
         }
         let mut output = String::new();
@@ -1044,7 +993,7 @@ impl<'a> Decoder<'a> {
 
 fn intent_xml_for_parser(
     decoder: &mut Decoder<'_>,
-    field: &'static str,
+    field: LimitKind,
     limits: &Limits,
     budget: &mut IntentDecodeBudget,
 ) -> Result<(Vec<u8>, Limits)> {
@@ -1060,7 +1009,7 @@ fn intent_xml_for_parser(
 
 fn intent_extension_xml(
     decoder: &mut Decoder<'_>,
-    field: &'static str,
+    field: LimitKind,
     limits: &Limits,
     budget: &mut IntentDecodeBudget,
 ) -> Result<(Vec<u8>, Limits)> {
@@ -1083,24 +1032,24 @@ fn parser_limits_for_budget(
     let remaining = limits
         .total_string_bytes
         .checked_sub(budget.string_bytes)
-        .ok_or(Error::Limit {
-            resource: "retained web extension string bytes",
-            max: limits.total_string_bytes,
-            actual: budget.string_bytes,
+        .ok_or(Error::WebLimit {
+            kind: LimitKind::RetainedStringBytes,
+            maximum: limits.total_string_bytes,
+            observed: budget.string_bytes,
         })?;
     let next = budget
         .string_bytes
         .checked_add(source_len)
-        .ok_or(Error::Limit {
-            resource: "retained web extension string bytes",
-            max: limits.total_string_bytes,
-            actual: usize::MAX,
+        .ok_or(Error::WebLimit {
+            kind: LimitKind::RetainedStringBytes,
+            maximum: limits.total_string_bytes,
+            observed: usize::MAX,
         })?;
     if next > limits.total_string_bytes {
-        return Err(Error::Limit {
-            resource: "retained web extension string bytes",
-            max: limits.total_string_bytes,
-            actual: next,
+        return Err(Error::WebLimit {
+            kind: LimitKind::RetainedStringBytes,
+            maximum: limits.total_string_bytes,
+            observed: next,
         });
     }
     let mut parser_limits = *limits;
@@ -1116,7 +1065,7 @@ fn parser_limits_for_budget(
 
 fn intent_image_shared(
     decoder: &mut Decoder<'_>,
-    field: &'static str,
+    field: LimitKind,
     limits: &Limits,
     part_name: &PackURI,
     content_type: &str,
@@ -1141,10 +1090,10 @@ fn intent_image_shared(
         folded_name
             .len()
             .checked_add(content_type.len())
-            .ok_or(Error::Limit {
-                resource: "retained web extension string bytes",
-                max: limits.total_string_bytes,
-                actual: usize::MAX,
+            .ok_or(Error::WebLimit {
+                kind: LimitKind::RetainedStringBytes,
+                maximum: limits.total_string_bytes,
+                observed: usize::MAX,
             })?;
     budget.semantic.charge_strings(ledger_metadata, limits)?;
     decoder.synchronize_string_budget(&mut budget.semantic, limits)?;
@@ -1161,10 +1110,10 @@ fn intent_image_shared(
     budget.image_bytes = budget
         .image_bytes
         .checked_add(source.len())
-        .ok_or(Error::Limit {
-            resource: "aggregate web extension image bytes",
-            max: limits.total_image_bytes,
-            actual: usize::MAX,
+        .ok_or(Error::WebLimit {
+            kind: LimitKind::AggregateImageBytes,
+            maximum: limits.total_image_bytes,
+            observed: usize::MAX,
         })?;
     let data = Arc::new(output);
     budget.images.push(DecodedImage {
@@ -1180,10 +1129,10 @@ fn intent_image_shared(
 fn decode_intent(bytes: &[u8], limits: &Limits) -> Result<WebIntent> {
     let maximum = MAX_INTENT_BYTES;
     if bytes.len() > maximum {
-        return Err(Error::Limit {
-            resource: "Web Extensions durable intent bytes",
-            max: maximum,
-            actual: bytes.len(),
+        return Err(Error::WebLimit {
+            kind: LimitKind::DurableIntentBytes,
+            maximum,
+            observed: bytes.len(),
         });
     }
     let mut decoder = Decoder::new(bytes, INTENT_HEADER, limits.total_string_bytes)?;
@@ -1208,27 +1157,27 @@ fn decode_intent(bytes: &[u8], limits: &Limits) -> Result<WebIntent> {
                 2 => GraphMode::ReplaceManagedGraph,
                 _ => return invalid("unknown Web Extensions graph mode".into()),
             };
-            let addition_count = decoder.u64("Web Extensions durable pane count", limits.items)?;
+            let addition_count = decoder.u64(LimitKind::DurablePaneCount, limits.items)?;
             const MIN_PANE_WIRE_BYTES: usize = 47;
             if addition_count > decoder.remaining() / MIN_PANE_WIRE_BYTES {
                 return invalid("truncated Web Extensions durable panes".into());
             }
             let retained = addition_count
                 .checked_mul(size_of::<Pane>())
-                .ok_or_else(|| Error::Limit {
-                    resource: "Web Extensions durable authored panes",
-                    max: limits.total_xml_bytes.max(limits.total_image_bytes),
-                    actual: usize::MAX,
+                .ok_or_else(|| Error::WebLimit {
+                    kind: LimitKind::DurableAuthoredPanes,
+                    maximum: limits.total_xml_bytes.max(limits.total_image_bytes),
+                    observed: usize::MAX,
                 })?;
             let staging_maximum = limits
                 .total_xml_bytes
                 .max(limits.total_image_bytes)
                 .max(limits.total_string_bytes);
             if retained > staging_maximum {
-                return Err(Error::Limit {
-                    resource: "Web Extensions durable authored panes",
-                    max: staging_maximum,
-                    actual: retained,
+                return Err(Error::WebLimit {
+                    kind: LimitKind::DurableAuthoredPanes,
+                    maximum: staging_maximum,
+                    observed: retained,
                 });
             }
             let mut additions = Vec::new();
@@ -1241,13 +1190,12 @@ fn decode_intent(bytes: &[u8], limits: &Limits) -> Result<WebIntent> {
             for _ in 0..addition_count {
                 additions.push(decode_pane(&mut decoder, limits, &mut budget)?);
             }
-            let operation_count =
-                decoder.u64("Web Extensions durable operation count", limits.items)?;
+            let operation_count = decoder.u64(LimitKind::DurableOperationCount, limits.items)?;
             if operation_count > MAX_INTENT_OPERATIONS {
-                return Err(Error::Limit {
-                    resource: "Web Extensions durable operations",
-                    max: MAX_INTENT_OPERATIONS,
-                    actual: operation_count,
+                return Err(Error::WebLimit {
+                    kind: LimitKind::DurableOperations,
+                    maximum: MAX_INTENT_OPERATIONS,
+                    observed: operation_count,
                 });
             }
             const MIN_OPERATION_WIRE_BYTES: usize = 1 + 8 + 1 + 1;
@@ -1255,21 +1203,21 @@ fn decode_intent(bytes: &[u8], limits: &Limits) -> Result<WebIntent> {
                 return invalid("truncated Web Extensions durable operations".into());
             }
             let retained = operation_count
-                .checked_mul(size_of::<(OwnerSelector, CustomFunctionOperation)>())
-                .ok_or_else(|| Error::Limit {
-                    resource: "Web Extensions durable operations",
-                    max: limits.total_string_bytes.max(limits.total_xml_bytes),
-                    actual: usize::MAX,
+                .checked_mul(size_of::<(OwnerSelector, custom_function::Operation)>())
+                .ok_or_else(|| Error::WebLimit {
+                    kind: LimitKind::DurableOperations,
+                    maximum: limits.total_string_bytes.max(limits.total_xml_bytes),
+                    observed: usize::MAX,
                 })?;
             let staging_maximum = limits
                 .total_xml_bytes
                 .max(limits.total_image_bytes)
                 .max(limits.total_string_bytes);
             if retained > staging_maximum {
-                return Err(Error::Limit {
-                    resource: "Web Extensions durable operations",
-                    max: staging_maximum,
-                    actual: retained,
+                return Err(Error::WebLimit {
+                    kind: LimitKind::DurableOperations,
+                    maximum: staging_maximum,
+                    observed: retained,
                 });
             }
             let mut operations = Vec::new();
@@ -1285,7 +1233,7 @@ fn decode_intent(bytes: &[u8], limits: &Limits) -> Result<WebIntent> {
                     decode_operation(&mut decoder, limits)?,
                 ));
             }
-            WebIntent::CustomFunctions(CustomFunctionEdit {
+            WebIntent::CustomFunctions(custom_function::Edit {
                 mode,
                 operations,
                 additions,
@@ -1316,10 +1264,10 @@ fn decode_panes(
     budget: &mut IntentDecodeBudget,
 ) -> Result<Panes> {
     let (xml, parser_limits) =
-        intent_xml_for_parser(decoder, "Web Extensions task-pane XML", limits, budget)?;
+        intent_xml_for_parser(decoder, LimitKind::TaskPaneXml, limits, budget)?;
     let parsed = parse_panes_with_budget(&xml, &parser_limits, &mut budget.semantic)?;
     decoder.synchronize_string_budget(&mut budget.semantic, limits)?;
-    let count = decoder.u64("Web Extensions durable pane count", limits.items)?;
+    let count = decoder.u64(LimitKind::DurablePaneCount, limits.items)?;
     if count != parsed.len() {
         return invalid("Web Extensions durable pane count disagrees with XML".into());
     }
@@ -1329,20 +1277,20 @@ fn decode_panes(
     }
     let retained = count
         .checked_mul(size_of::<Pane>())
-        .ok_or_else(|| Error::Limit {
-            resource: "Web Extensions durable panes",
-            max: limits.total_xml_bytes.max(limits.total_image_bytes),
-            actual: usize::MAX,
+        .ok_or_else(|| Error::WebLimit {
+            kind: LimitKind::DurablePanes,
+            maximum: limits.total_xml_bytes.max(limits.total_image_bytes),
+            observed: usize::MAX,
         })?;
     let staging_maximum = limits
         .total_xml_bytes
         .max(limits.total_image_bytes)
         .max(limits.total_string_bytes);
     if retained > staging_maximum {
-        return Err(Error::Limit {
-            resource: "Web Extensions durable panes",
-            max: staging_maximum,
-            actual: retained,
+        return Err(Error::WebLimit {
+            kind: LimitKind::DurablePanes,
+            maximum: staging_maximum,
+            observed: retained,
         });
     }
     let mut panes = Vec::new();
@@ -1378,7 +1326,7 @@ fn decode_pane(
     limits: &Limits,
     budget: &mut IntentDecodeBudget,
 ) -> Result<Pane> {
-    let dock_state = Dock::parse(&decoder.text("Web Extensions dock state", limits.xml_bytes)?)?;
+    let dock_state = Dock::parse(&decoder.text(LimitKind::DockState, limits.xml_bytes)?)?;
     let visible = decoder.bool("Web Extensions pane visibility")?;
     let width = decoder.f64()?;
     if !width.is_finite() || width <= 0.0 {
@@ -1386,66 +1334,66 @@ fn decode_pane(
     }
     let row = decoder.u32("Web Extensions pane row")?;
     let locked = decoder.bool("Web Extensions pane locked state")?;
-    let relationship_id = decoder.text("Web Extensions pane relationship ID", limits.xml_bytes)?;
+    let relationship_id = decoder.text(LimitKind::PaneRelationshipId, limits.xml_bytes)?;
     let (add_in_xml, parser_limits) =
-        intent_xml_for_parser(decoder, "Web Extensions add-in XML", limits, budget)?;
+        intent_xml_for_parser(decoder, LimitKind::AddInXml, limits, budget)?;
     let add_in = parse_add_in_with_budget(&add_in_xml, &parser_limits, &mut budget.semantic)?;
     decoder.synchronize_string_budget(&mut budget.semantic, limits)?;
-    let resource_count = decoder.u64("Web Extensions snapshot resource count", limits.items)?;
+    let resource_count = decoder.u64(LimitKind::SnapshotResourceCount, limits.items)?;
     const MIN_RESOURCE_WIRE_BYTES: usize = 1 + 8;
     if resource_count > decoder.remaining() / MIN_RESOURCE_WIRE_BYTES {
         return invalid("truncated Web Extensions durable snapshot resources".into());
     }
     let retained = resource_count
         .checked_mul(size_of::<SnapshotResource>())
-        .ok_or(Error::Limit {
-            resource: "Web Extensions durable snapshot resources",
-            max: limits
+        .ok_or(Error::WebLimit {
+            kind: LimitKind::DurableSnapshotResources,
+            maximum: limits
                 .total_xml_bytes
                 .max(limits.total_image_bytes)
                 .max(limits.total_string_bytes),
-            actual: usize::MAX,
+            observed: usize::MAX,
         })?;
     let ledger_retained = resource_count
         .checked_mul(size_of::<DecodedImage>())
-        .ok_or(Error::Limit {
-            resource: "Web Extensions durable image ledger",
-            max: limits
+        .ok_or(Error::WebLimit {
+            kind: LimitKind::DurableImageLedger,
+            maximum: limits
                 .total_xml_bytes
                 .max(limits.total_image_bytes)
                 .max(limits.total_string_bytes),
-            actual: usize::MAX,
+            observed: usize::MAX,
         })?;
     let index_retained = resource_count
         .checked_mul(size_of::<(Vec<u8>, usize)>())
-        .ok_or(Error::Limit {
-            resource: "Web Extensions durable image index",
-            max: limits
+        .ok_or(Error::WebLimit {
+            kind: LimitKind::DurableImageIndex,
+            maximum: limits
                 .total_xml_bytes
                 .max(limits.total_image_bytes)
                 .max(limits.total_string_bytes),
-            actual: usize::MAX,
+            observed: usize::MAX,
         })?;
     let staging = retained
         .checked_add(ledger_retained)
         .and_then(|value| value.checked_add(index_retained))
-        .ok_or(Error::Limit {
-            resource: "Web Extensions durable snapshot staging",
-            max: limits
+        .ok_or(Error::WebLimit {
+            kind: LimitKind::DurableSnapshotStaging,
+            maximum: limits
                 .total_xml_bytes
                 .max(limits.total_image_bytes)
                 .max(limits.total_string_bytes),
-            actual: usize::MAX,
+            observed: usize::MAX,
         })?;
     let staging_maximum = limits
         .total_xml_bytes
         .max(limits.total_image_bytes)
         .max(limits.total_string_bytes);
     if staging > staging_maximum {
-        return Err(Error::Limit {
-            resource: "Web Extensions durable snapshot staging",
-            max: staging_maximum,
-            actual: staging,
+        return Err(Error::WebLimit {
+            kind: LimitKind::DurableSnapshotStaging,
+            maximum: staging_maximum,
+            observed: staging,
         });
     }
     let mut resources = Vec::new();
@@ -1473,12 +1421,8 @@ fn decode_pane(
         resources.push(decode_resource(decoder, limits, budget)?);
     }
     let extension_list = if decoder.bool("Web Extensions pane extension-list presence")? {
-        let (xml, parser_limits) = intent_extension_xml(
-            decoder,
-            "Web Extensions pane extension-list XML",
-            limits,
-            budget,
-        )?;
+        let (xml, parser_limits) =
+            intent_extension_xml(decoder, LimitKind::PaneExtensionListXml, limits, budget)?;
         let document = parse_xml_owned(xml, &parser_limits)?;
         let root = document.root()?;
         require_name(root, TASK_PANES_NAMESPACE, "extLst")?;
@@ -1508,17 +1452,15 @@ fn decode_resource(
     limits: &Limits,
     budget: &mut IntentDecodeBudget,
 ) -> Result<SnapshotResource> {
-    let relationship_id =
-        decoder.text("Web Extensions snapshot relationship ID", limits.xml_bytes)?;
+    let relationship_id = decoder.text(LimitKind::SnapshotRelationshipId, limits.xml_bytes)?;
     let target = match decoder.u8()? {
         0 => {
-            let name = decoder.text("Web Extensions snapshot part name", MAX_MEMBER_NAME)?;
-            let content_type =
-                decoder.text("Web Extensions snapshot content type", MAX_CONTENT_TYPE)?;
+            let name = decoder.text(LimitKind::SnapshotPartName, MAX_MEMBER_NAME)?;
+            let content_type = decoder.text(LimitKind::SnapshotContentType, MAX_CONTENT_TYPE)?;
             let part_name = PackURI::new(name).map_err(Error::Uri)?;
             let data = intent_image_shared(
                 decoder,
-                "Web Extensions snapshot bytes",
+                LimitKind::PackageSnapshotBytes,
                 limits,
                 &part_name,
                 &content_type,
@@ -1531,7 +1473,7 @@ fn decode_resource(
             }
         },
         1 => SnapshotTarget::External {
-            target: decoder.text("Web Extensions external snapshot target", limits.xml_bytes)?,
+            target: decoder.text(LimitKind::ExternalSnapshotTarget, limits.xml_bytes)?,
         },
         _ => return invalid("unknown Web Extensions snapshot target".into()),
     };
@@ -1544,31 +1486,34 @@ fn decode_resource(
 fn decode_selector(decoder: &mut Decoder<'_>, limits: &Limits) -> Result<OwnerSelector> {
     match decoder.u8()? {
         0 => Ok(OwnerSelector::AddInId(
-            decoder.text("Web Extensions owner ID", limits.xml_bytes)?,
+            decoder.text(LimitKind::OwnerId, limits.xml_bytes)?,
         )),
         1 => Ok(OwnerSelector::PaneIndex(
-            decoder.u64("Web Extensions pane index", limits.items)?,
+            decoder.u64(LimitKind::PaneIndex, limits.items)?,
         )),
         _ => invalid("unknown Web Extensions owner selector".into()),
     }
 }
 
-fn decode_operation(decoder: &mut Decoder<'_>, limits: &Limits) -> Result<CustomFunctionOperation> {
+fn decode_operation(
+    decoder: &mut Decoder<'_>,
+    limits: &Limits,
+) -> Result<custom_function::Operation> {
     Ok(match decoder.u8()? {
-        0 => CustomFunctionOperation::Set(decode_custom_functions(decoder, limits)?),
-        1 => CustomFunctionOperation::SetContains(decode_contains(decoder)?),
-        2 => CustomFunctionOperation::SetBackground(decode_background(decoder, limits)?),
-        3 => CustomFunctionOperation::SetList(decode_list(decoder, limits)?),
-        4 => CustomFunctionOperation::InsertId {
-            index: decoder.u64("Web Extensions custom-function index", limits.items)?,
-            id: decoder.text("Web Extensions custom-function ID", limits.xml_bytes)?,
+        0 => custom_function::Operation::Set(decode_custom_functions(decoder, limits)?),
+        1 => custom_function::Operation::SetContains(decode_contains(decoder)?),
+        2 => custom_function::Operation::SetBackground(decode_background(decoder, limits)?),
+        3 => custom_function::Operation::SetList(decode_list(decoder, limits)?),
+        4 => custom_function::Operation::InsertId {
+            index: decoder.u64(LimitKind::CustomFunctionIndex, limits.items)?,
+            id: decoder.text(LimitKind::PackageCustomFunctionId, limits.xml_bytes)?,
         },
-        5 => CustomFunctionOperation::ReplaceId {
-            index: decoder.u64("Web Extensions custom-function index", limits.items)?,
-            id: decoder.text("Web Extensions custom-function ID", limits.xml_bytes)?,
+        5 => custom_function::Operation::ReplaceId {
+            index: decoder.u64(LimitKind::CustomFunctionIndex, limits.items)?,
+            id: decoder.text(LimitKind::PackageCustomFunctionId, limits.xml_bytes)?,
         },
-        6 => CustomFunctionOperation::RemoveId {
-            index: decoder.u64("Web Extensions custom-function index", limits.items)?,
+        6 => custom_function::Operation::RemoveId {
+            index: decoder.u64(LimitKind::CustomFunctionIndex, limits.items)?,
         },
         _ => return invalid("unknown Web Extensions custom-function operation".into()),
     })
@@ -1609,7 +1554,7 @@ fn decode_background(
     }
     Ok(Some(BackgroundAppData::new(
         decoder.i32()?,
-        decoder.text("background runtime ID", limits.xml_bytes)?,
+        decoder.text(LimitKind::BackgroundRuntimeId, limits.xml_bytes)?,
     )?))
 }
 
@@ -1617,29 +1562,31 @@ fn decode_list(decoder: &mut Decoder<'_>, limits: &Limits) -> Result<Option<Cust
     if !decoder.bool("custom-function-list presence")? {
         return Ok(None);
     }
-    let count = decoder.u64("custom-function ID count", limits.items)?;
+    let count = decoder.u64(LimitKind::CustomFunctionIdCount, limits.items)?;
     if count > decoder.remaining() / size_of::<u64>() {
         return invalid("truncated Web Extensions custom-function IDs".into());
     }
-    let retained = count.checked_mul(size_of::<String>()).ok_or(Error::Limit {
-        resource: "Web Extensions custom-function IDs",
-        max: limits.total_string_bytes,
-        actual: usize::MAX,
-    })?;
+    let retained = count
+        .checked_mul(size_of::<String>())
+        .ok_or(Error::WebLimit {
+            kind: LimitKind::PackageCustomFunctionIds,
+            maximum: limits.total_string_bytes,
+            observed: usize::MAX,
+        })?;
     let staging_maximum = limits
         .total_xml_bytes
         .max(limits.total_image_bytes)
         .max(limits.total_string_bytes);
     if retained > staging_maximum {
-        return Err(Error::Limit {
-            resource: "Web Extensions custom-function IDs",
-            max: staging_maximum,
-            actual: retained,
+        return Err(Error::WebLimit {
+            kind: LimitKind::PackageCustomFunctionIds,
+            maximum: staging_maximum,
+            observed: retained,
         });
     }
     let mut list = CustomFunctionList::new();
     for _ in 0..count {
-        list.push_id(decoder.text("custom-function ID", limits.xml_bytes)?)?;
+        list.push_id(decoder.text(LimitKind::CustomFunctionId, limits.xml_bytes)?)?;
     }
     Ok(Some(list))
 }
@@ -1656,7 +1603,7 @@ fn replay_intent(package: &OpcPackage, intent: &WebIntent, limits: &Limits) -> R
 
 fn replay_custom_functions(
     package: &OpcPackage,
-    edit: &CustomFunctionEdit,
+    edit: &custom_function::Edit,
     limits: &Limits,
 ) -> Result<Patch> {
     if edit.mode == GraphMode::ReplaceManagedGraph {
@@ -1708,29 +1655,29 @@ fn infer_conformance(package: &OpcPackage, limits: &Limits) -> Result<Conformanc
 
 fn apply_operation(
     add_in: &mut AddIn,
-    operation: &CustomFunctionOperation,
+    operation: &custom_function::Operation,
     limits: &Limits,
 ) -> Result<()> {
     match operation {
-        CustomFunctionOperation::Set(value) => {
+        custom_function::Operation::Set(value) => {
             add_in.set_custom_functions_with_limits(value.clone(), limits)?;
         },
-        CustomFunctionOperation::SetContains(value) => {
+        custom_function::Operation::SetContains(value) => {
             let mut current = add_in.custom_functions().cloned().unwrap_or_default();
             current.set_contains_custom_functions(value.clone());
             add_in.set_custom_functions_with_limits(Some(current), limits)?;
         },
-        CustomFunctionOperation::SetBackground(value) => {
+        custom_function::Operation::SetBackground(value) => {
             let mut current = add_in.custom_functions().cloned().unwrap_or_default();
             current.set_background_app_data(value.clone());
             add_in.set_custom_functions_with_limits(Some(current), limits)?;
         },
-        CustomFunctionOperation::SetList(value) => {
+        custom_function::Operation::SetList(value) => {
             let mut current = add_in.custom_functions().cloned().unwrap_or_default();
             current.set_custom_function_list(value.clone());
             add_in.set_custom_functions_with_limits(Some(current), limits)?;
         },
-        CustomFunctionOperation::InsertId { index, id } => {
+        custom_function::Operation::InsertId { index, id } => {
             let mut current = add_in.custom_functions().cloned().unwrap_or_default();
             let mut ids = current
                 .custom_function_list()
@@ -1744,7 +1691,7 @@ fn apply_operation(
             current.set_custom_function_list(Some(make_function_list(ids, limits)?));
             add_in.set_custom_functions_with_limits(Some(current), limits)?;
         },
-        CustomFunctionOperation::ReplaceId { index, id } => {
+        custom_function::Operation::ReplaceId { index, id } => {
             let mut current = add_in.custom_functions().cloned().unwrap_or_default();
             let mut ids = current
                 .custom_function_list()
@@ -1758,7 +1705,7 @@ fn apply_operation(
             current.set_custom_function_list(Some(make_function_list(ids, limits)?));
             add_in.set_custom_functions_with_limits(Some(current), limits)?;
         },
-        CustomFunctionOperation::RemoveId { index } => {
+        custom_function::Operation::RemoveId { index } => {
             let mut current = add_in.custom_functions().cloned().unwrap_or_default();
             let mut ids = current
                 .custom_function_list()
@@ -1778,10 +1725,10 @@ fn apply_operation(
 
 fn make_function_list(ids: Vec<String>, limits: &Limits) -> Result<CustomFunctionList> {
     if ids.len() > limits.items {
-        return Err(Error::Limit {
-            resource: "custom function IDs",
-            max: limits.items,
-            actual: ids.len(),
+        return Err(Error::WebLimit {
+            kind: LimitKind::CustomFunctionListIds,
+            maximum: limits.items,
+            observed: ids.len(),
         });
     }
     let mut list = CustomFunctionList::new();
@@ -2150,15 +2097,15 @@ fn encode_member(
 fn decode_restore<'a>(bytes: &'a [u8], limits: &Limits) -> Result<(&'a [u8], &'a [u8])> {
     let maximum = MAX_CLOSURE_BYTES;
     if bytes.len() > maximum {
-        return Err(Error::Limit {
-            resource: "Web Extensions durable restore bytes",
-            max: maximum,
-            actual: bytes.len(),
+        return Err(Error::WebLimit {
+            kind: LimitKind::DurableRestoreBytes,
+            maximum,
+            observed: bytes.len(),
         });
     }
     let mut decoder = Decoder::new(bytes, RESTORE_HEADER, limits.total_string_bytes)?;
-    let intent = decoder.bytes_slice("Web Extensions durable intent", maximum)?;
-    let closure = decoder.bytes_slice("Web Extensions durable closure", maximum)?;
+    let intent = decoder.bytes_slice(LimitKind::DurableIntent, maximum)?;
+    let closure = decoder.bytes_slice(LimitKind::DurableClosure, maximum)?;
     if !decoder.finished() {
         return invalid("trailing Web Extensions durable restore bytes".into());
     }
@@ -2168,15 +2115,15 @@ fn decode_restore<'a>(bytes: &'a [u8], limits: &Limits) -> Result<(&'a [u8], &'a
 fn decode_closure(bytes: &[u8], limits: &Limits) -> Result<Vec<ClosureRecord>> {
     let maximum = MAX_CLOSURE_BYTES;
     if bytes.len() > maximum {
-        return Err(Error::Limit {
-            resource: "Web Extensions durable closure bytes",
-            max: maximum,
-            actual: bytes.len(),
+        return Err(Error::WebLimit {
+            kind: LimitKind::DurableClosureBytes,
+            maximum,
+            observed: bytes.len(),
         });
     }
     let mut decoder = Decoder::new(bytes, CLOSURE_HEADER, limits.total_string_bytes)?;
     let count = decoder.u64(
-        "Web Extensions durable closure records",
+        LimitKind::DurableClosureRecords,
         MAX_CLOSURE_RECORDS.min(limits.package_parts.saturating_mul(4).max(1)),
     )?;
     // Each record has a kind byte, a length-prefixed name, and two member
@@ -2192,10 +2139,10 @@ fn decode_closure(bytes: &[u8], limits: &Limits) -> Result<Vec<ClosureRecord>> {
             Error::Invalid("Web Extensions durable closure allocation overflow".into())
         })?;
     if retained > maximum {
-        return Err(Error::Limit {
-            resource: "Web Extensions durable closure records",
-            max: maximum,
-            actual: retained,
+        return Err(Error::WebLimit {
+            kind: LimitKind::DurableClosureRecords,
+            maximum,
+            observed: retained,
         });
     }
     let mut records = Vec::new();
@@ -2213,10 +2160,7 @@ fn decode_closure(bytes: &[u8], limits: &Limits) -> Result<Vec<ClosureRecord>> {
         if kind > 2 {
             return invalid("unknown Web Extensions durable closure member kind".into());
         }
-        let name = decoder.text(
-            "Web Extensions durable closure member name",
-            MAX_MEMBER_NAME,
-        )?;
+        let name = decoder.text(LimitKind::DurableClosureMemberName, MAX_MEMBER_NAME)?;
         if kind == 0 && name != "[Content_Types].xml" {
             return invalid("invalid Web Extensions content-types closure member".into());
         }
@@ -2282,7 +2226,7 @@ fn decode_member(
         return Ok(None);
     }
     let content_type = if kind == 2 {
-        Some(decoder.text("Web Extensions durable content type", MAX_CONTENT_TYPE)?)
+        Some(decoder.text(LimitKind::DurableContentType, MAX_CONTENT_TYPE)?)
     } else {
         None
     };
@@ -2295,7 +2239,7 @@ fn decode_member(
     }
     .min(MAX_CLOSURE_BYTES);
     let payload = decoder.bytes_with_total(
-        "Web Extensions durable closure payload",
+        LimitKind::DurableClosurePayload,
         payload_maximum,
         if payload_is_xml {
             total_xml_bytes
@@ -2308,19 +2252,19 @@ fn decode_member(
             limits.total_image_bytes
         },
         if payload_is_xml {
-            "Web Extensions durable XML payload bytes"
+            LimitKind::DurableXmlPayloadBytes
         } else {
-            "Web Extensions durable image payload bytes"
+            LimitKind::DurableImagePayloadBytes
         },
     )?;
     let relationships = if kind == 1 {
         let present = decoder.bool("Web Extensions durable relationship presence")?;
         let bytes = decoder.bytes_with_total(
-            "Web Extensions durable relationship XML",
+            LimitKind::DurableRelationshipXml,
             MAX_RELATIONSHIP_BYTES.min(limits.xml_bytes),
             total_xml_bytes,
             limits.total_xml_bytes,
-            "Web Extensions durable XML payload bytes",
+            LimitKind::DurableXmlPayloadBytes,
         )?;
         if payload != bytes {
             return invalid(
@@ -2331,11 +2275,11 @@ fn decode_member(
     } else if kind == 2 {
         let present = decoder.bool("Web Extensions durable relationship presence")?;
         let bytes = decoder.bytes_with_total(
-            "Web Extensions durable relationship XML",
+            LimitKind::DurableRelationshipXml,
             MAX_RELATIONSHIP_BYTES.min(limits.xml_bytes),
             total_xml_bytes,
             limits.total_xml_bytes,
-            "Web Extensions durable XML payload bytes",
+            LimitKind::DurableXmlPayloadBytes,
         )?;
         Some((present, bytes))
     } else {
@@ -2672,10 +2616,10 @@ fn exact_proof_package(
         }
     }
     if names.len() > limits.package_parts {
-        return Err(Error::Limit {
-            resource: "Web Extensions durable proof parts",
-            max: limits.package_parts,
-            actual: names.len(),
+        return Err(Error::WebLimit {
+            kind: LimitKind::DurableProofParts,
+            maximum: limits.package_parts,
+            observed: names.len(),
         });
     }
     let root_name = PackURI::new("/").map_err(Error::Uri)?;
@@ -2690,16 +2634,16 @@ fn exact_proof_package(
             .and_then(|value| value.checked_add(part.relationships.1.len()))
             .and_then(|value| value.checked_add(name.len()))
             .and_then(|value| value.checked_add(PROOF_ENTRY_OVERHEAD))
-            .ok_or(Error::Limit {
-                resource: "Web Extensions durable proof bytes",
-                max: maximum,
-                actual: usize::MAX,
+            .ok_or(Error::WebLimit {
+                kind: LimitKind::DurableProofBytes,
+                maximum,
+                observed: usize::MAX,
             })?;
         if total > maximum {
-            return Err(Error::Limit {
-                resource: "Web Extensions durable proof bytes",
-                max: maximum,
-                actual: total,
+            return Err(Error::WebLimit {
+                kind: LimitKind::DurableProofBytes,
+                maximum,
+                observed: total,
             });
         }
     }
