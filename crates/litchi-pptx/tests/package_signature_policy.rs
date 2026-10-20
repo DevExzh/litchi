@@ -627,15 +627,15 @@ fn families() -> Vec<Family> {
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    package.edit_opc_in_place(|opc| {
-                        events::store(opc, &slide(), &[Draft::play(Offset::ms(1), 2)])
+                    package.edit_show_events_in_place(|edit| {
+                        edit.set(&slide(), &[Draft::play(Offset::ms(1), 2)])
                     })
                 },
                 shows: |package| package.with_opc(|opc| Ok(events::load(opc, &slide())?.is_some())),
             }),
             no_op: Some(|package| {
-                package.edit_opc_in_place(|opc| {
-                    assert!(events::remove(opc, &slide())?.is_none());
+                package.edit_show_events_in_place(|edit| {
+                    assert!(edit.remove(&slide())?.is_none());
                     Ok(())
                 })
             }),

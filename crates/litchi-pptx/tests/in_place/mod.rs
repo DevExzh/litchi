@@ -180,6 +180,12 @@ pub(crate) trait InPlace {
             &mut litchi_pptx::presentation_properties::metadata::changes::Edit<'_>,
         ) -> Result<T>,
     ) -> Result<T>;
+    fn edit_show_events_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(
+            &mut litchi_pptx::presentation_properties::metadata::events::Edit<'_>,
+        ) -> Result<T>,
+    ) -> Result<T>;
 }
 
 impl InPlace for Package {
@@ -517,5 +523,15 @@ impl InPlace for Package {
     ) -> Result<T> {
         let package = self;
         in_place!(package, edit_changes_info, |edit| operation(&mut edit))
+    }
+
+    fn edit_show_events_in_place<T>(
+        &mut self,
+        operation: impl FnOnce(
+            &mut litchi_pptx::presentation_properties::metadata::events::Edit<'_>,
+        ) -> Result<T>,
+    ) -> Result<T> {
+        let package = self;
+        in_place!(package, edit_show_events, |edit| operation(&mut edit))
     }
 }

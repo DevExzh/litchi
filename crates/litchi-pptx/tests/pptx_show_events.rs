@@ -5,11 +5,9 @@
 )]
 
 use litchi_opc::{OpcPackage, PackURI};
-use litchi_pptx::Error;
-use litchi_pptx::presentation_properties::metadata::events::{
-    Draft, EXTENSION_URI, Kind, Trigger, store,
-};
+use litchi_pptx::presentation_properties::metadata::events::{Draft, EXTENSION_URI, Kind, Trigger};
 use litchi_pptx::time::Offset;
+use litchi_pptx::{Error, Package, Result};
 
 const LOCAL_SHOW_EVENTS: &[u8] =
     include_bytes!("../../../test-data/ooxml/pptx/show-events/basic_show_events.xml");
@@ -63,6 +61,15 @@ fn event_owner_ignores_events_under_other_extensions() {
     let xml = std::str::from_utf8(package.get_part(&slide_name).unwrap().blob()).unwrap();
     assert!(xml.contains("urn:litchi:not-show-events"));
     assert!(xml.contains(EXTENSION_URI));
+}
+
+/// Store `events` on one slide of a raw graph through the package family.
+fn store(opc: &mut OpcPackage, slide: &PackURI, events: &[Draft]) -> Result<()> {
+    let package = Package::from_opc_package(opc.clone())?;
+    let mut edit = package.edit_show_events()?;
+    edit.set(slide, events)?;
+    *opc = edit.commit()?.into_package().opc()?.clone();
+    Ok(())
 }
 
 fn event_drafts() -> Vec<Draft> {

@@ -3,10 +3,11 @@
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{OpcPackage, PackURI, Part};
 
-pub use super::codec::{load, store};
+pub use super::codec::load;
+pub(crate) use super::codec::store;
 use super::model::{Caption, CaptionTarget, MediaKey, MediaMetadata, TracksInfo};
 use super::tracks_info::{self, Found};
-use super::transaction::{Commit, Patch, Snapshot};
+use super::transaction::{Change, Prepared, Snapshot};
 use super::validation::{parse_boolean, validate_relationship_id};
 use crate::{Error, Result};
 
@@ -42,7 +43,7 @@ pub fn load_media(package: &OpcPackage, key: &MediaKey) -> Result<Option<Snapsho
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_media_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_media_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
     let source_name = PackURI::new(&patch.source_part_name).map_err(Error::Uri)?;
     let source = package.get_part(&source_name)?;
     if fingerprint(source.blob()) != patch.expected_revision
@@ -71,7 +72,7 @@ pub fn apply_media_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snap
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub fn apply_media_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+pub(crate) fn apply_media_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
     apply_media_patch(package, &commit.into_patch())
 }
 

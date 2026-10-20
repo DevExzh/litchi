@@ -142,7 +142,7 @@ pub fn load(package: &OpcPackage) -> Result<Vec<Track>> {
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn store(package: &mut OpcPackage, value: &Track) -> Result<()> {
+pub(crate) fn store(package: &mut OpcPackage, value: &Track) -> Result<()> {
     load(package)?;
     valid_rel_id(&value.relationship_id)?;
     let source_name = PackURI::new(&value.source_part_name).map_err(Error::Uri)?;
