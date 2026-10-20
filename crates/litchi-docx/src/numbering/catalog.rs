@@ -1,7 +1,7 @@
 //! A source-located catalog of the numbering part (record 0319,
 //! L-DOCX-R6).
 //!
-//! [`Catalog`](crate::numbering::catalog::Catalog) reads a `numbering.xml` payload once and keeps every
+//! [`Catalog`] reads a `numbering.xml` payload once and keeps every
 //! abstract definition (`w:abstractNum`) with its levels (`w:lvl`) and every
 //! numbering instance (`w:num`), each with the byte range of its element.
 //! Values are kept as the part spells them, as OfficeCLI reports them; a

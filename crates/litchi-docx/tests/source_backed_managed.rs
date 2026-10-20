@@ -510,7 +510,11 @@ fn managed_main_document_edits_retain_source_and_candidate_reservations() {
 
     let mut output = Vec::new();
     package
-        .publish_document_commit_to_stream(&mut output, &commit)
+        .apply(commit.patch())
+        .and_then(|committed| {
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        })
         .unwrap();
     assert!(!output.is_empty());
     drop(commit);

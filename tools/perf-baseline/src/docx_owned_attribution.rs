@@ -423,7 +423,8 @@ fn prepare_oracle(corpus: &super::Corpus) -> Result<Oracle, Box<dyn Error>> {
         return Err("DOCX owned attribution oracle commit is not changed".into());
     }
     let mut output = Vec::new();
-    let publication = package.apply_section_layout(commit.patch()).and_then(|committed| committed.package().write_to(&mut output))?;
+    let publication = package.apply_section_layout(&commit.patch().clone().into())?;
+    publication.package().write_to(&mut output)?;
     super::verify_docx_section_layout_output(corpus, &output, [3, 2, 2])?;
     super::verify_docx_section_layout_controls(corpus, &commit, &publication)?;
     let output_sha256 = super::sha256_hex(&output);
@@ -857,7 +858,8 @@ fn run_workload(
         let before_publication_after_commit = package.cache_diagnostics();
         let publication_started = Instant::now();
         let layout_publication =
-            package.apply_section_layout(layout_commit.patch()).and_then(|committed| committed.package().write_to(&mut sink))?;
+            package.apply_section_layout(&layout_commit.patch().clone().into())?;
+        layout_publication.package().write_to(&mut sink)?;
         black_box(&layout_publication);
         let publication_ns = super::elapsed_ns(publication_started.elapsed())?;
         let operation_ns = preparation_ns
@@ -891,8 +893,8 @@ fn run_workload(
             return Err("DOCX owned attribution patch oracle failed".into());
         }
         let publication_inverse_applicable_verified = layout_publication
-            .inverse_patch()
-            .apply(layout_publication.snapshot())
+            .package()
+            .apply_section_layout(&layout_publication.patch().inverse())
             .is_ok();
         if !publication_inverse_applicable_verified {
             return Err("DOCX owned attribution publication inverse is not applicable".into());
@@ -907,7 +909,10 @@ fn run_workload(
             OwnedSource::new(sink.bytes.clone()),
         ))?;
         let mut restored = Vec::new();
-        reopened.publish_section_layout_inverse_to_stream(&mut restored, &layout_publication)?;
+        reopened
+            .apply_section_layout(&layout_publication.patch().inverse())?
+            .package()
+            .write_to(&mut restored)?;
         let inverse_verified = restored == corpus.archive;
         if !inverse_verified {
             return Err("DOCX owned attribution inverse did not restore source".into());

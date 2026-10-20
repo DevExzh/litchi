@@ -17,7 +17,7 @@ use sha2::{Digest as _, Sha256};
 use std::fmt;
 use std::io::{self, BufRead, Read, Write};
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use thiserror::Error;
 
 mod encoder;
@@ -1630,10 +1630,24 @@ impl<'package> ParagraphStreamPlan<'package> {
     }
 
     pub(super) fn into_prepared(self) -> PreparedStream {
+        let durable = DurableParts {
+            limits: patch::PatchLimits::from_stream_limits(&self.limits),
+            main_part: self.main_part.clone(),
+            source: self.source,
+            authored: self.authored,
+            candidate: self.candidate,
+            source_archive: patch::ArtifactProof::new(
+                self.source_artifact_length,
+                self.source_artifact_fingerprint.into_sha256(),
+            ),
+            replay_reference: self.replay.durable_reference(),
+        };
         PreparedStream {
             base: self.package.clone(),
             splice: self.splice.into_owned(),
             expected_candidate_archive: self.expected_candidate_archive,
+            durable,
+            written: OnceLock::new(),
         }
     }
 
@@ -1642,11 +1656,26 @@ impl<'package> ParagraphStreamPlan<'package> {
     }
 }
 
+/// What a durable forward patch of a prepared append records, apart from
+/// the candidate archive (record 0355a).
+struct DurableParts {
+    limits: patch::PatchLimits,
+    main_part: String,
+    source: tail_append::SourceProof,
+    authored: AuthoredStreamProof,
+    candidate: tail_append::CandidateProof,
+    source_archive: patch::ArtifactProof,
+    replay_reference: Option<AuthoredReplayReference>,
+}
+
 /// A prepared stream splice that outlives its preparation borrow.
 pub(crate) struct PreparedStream {
     pub(super) base: Package,
     splice: litchi_opc::source_backed::SourcePartSplicePlan<'static>,
     expected_candidate_archive: Option<patch::ArtifactProof>,
+    durable: DurableParts,
+    /// The candidate archive identity measured by the first write.
+    written: OnceLock<patch::ArtifactProof>,
 }
 
 impl PreparedStream {
@@ -1656,7 +1685,7 @@ impl PreparedStream {
 
     pub(super) fn write(&self, writer: &mut dyn Write) -> Result<()> {
         let splice = self.splice.duplicate();
-        match self.expected_candidate_archive {
+        let publication = match self.expected_candidate_archive {
             Some(expected) => splice
                 .write_to_with_expected_artifact(
                     writer,
@@ -1666,7 +1695,35 @@ impl PreparedStream {
                 .map_err(Error::Opc)?,
             None => splice.write_to(writer).map_err(Error::Opc)?,
         };
+        let _ = self.written.set(patch::ArtifactProof::new(
+            publication.candidate_artifact_len(),
+            publication.candidate_artifact_fingerprint().into_sha256(),
+        ));
         Ok(())
+    }
+
+    /// The durable forward patch of this append, whose candidate archive is
+    /// `candidate` (or the identity measured by a write).
+    pub(super) fn durable_patch(
+        &self,
+        candidate: impl FnOnce() -> Result<patch::ArtifactProof>,
+    ) -> Result<patch::ParagraphStreamPatch> {
+        let candidate_archive = match self.written.get() {
+            Some(written) => *written,
+            None => candidate()?,
+        };
+        let parts = &self.durable;
+        patch::ParagraphStreamPatch::from_tail_append_proofs(
+            parts.limits,
+            parts.main_part.clone(),
+            parts.source,
+            parts.authored,
+            parts.candidate,
+            parts.source_archive,
+            candidate_archive,
+            parts.replay_reference.clone(),
+        )
+        .map_err(Error::Patch)
     }
 }
 
@@ -2408,7 +2465,11 @@ mod authenticated_reader_tests {
 
 impl From<crate::Error> for Error {
     fn from(error: crate::Error) -> Self {
-        Self::TailAppend(tail_append::Error::Document(error))
+        match error {
+            crate::Error::ParagraphStream(error) => *error,
+            crate::Error::Opc(error) => Self::Opc(error),
+            error => Self::TailAppend(tail_append::Error::Document(error)),
+        }
     }
 }
 

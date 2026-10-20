@@ -236,7 +236,10 @@ fn source_backed_edits_publish_what_the_eager_owner_publishes() {
         first_edit(&mut edit);
         let commit = edit.commit().unwrap();
         let mut published = Vec::new();
-        let source_result = package.publish_document_commit_to_stream(&mut published, &commit);
+        let source_result = package.apply(commit.patch()).and_then(|committed| {
+            committed.write_to(&mut published)?;
+            committed.document_snapshot()
+        });
 
         let owner = eager(&original);
         let mut edit = owner
@@ -313,7 +316,11 @@ fn exact_no_ops_republish_every_fixture_byte_for_byte() {
         assert!(commit.patch().is_noop());
         let mut published = Vec::new();
         package
-            .publish_document_commit_to_stream(&mut published, &commit)
+            .apply(commit.patch())
+            .and_then(|committed| {
+                committed.write_to(&mut published)?;
+                committed.document_snapshot()
+            })
             .unwrap_or_else(|error| panic!("{name}: {error}"));
         assert_eq!(published, original, "{name}");
 

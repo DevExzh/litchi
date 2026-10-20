@@ -431,21 +431,25 @@ impl Patch {
         self.before.as_slice() == self.after.as_slice()
     }
 
-    /// Apply only to the byte-exact source artifact and main story.
-    /// Apply to a snapshot with the patch's exact before bytes, from any
-    /// source (record 0355a: a package replay reads the snapshot it applies
-    /// to).
-    pub(crate) fn apply_content(&self, source: &Snapshot) -> Result<Snapshot> {
-        if source.xml.as_slice() != self.before.as_slice() {
-            return Err(Error::PatchConflict);
-        }
-        source.with_xml(checked_clone(self.after.as_slice(), "patch application")?)
+    /// This patch bound to the complete artifact whose SHA-256 is
+    /// `fingerprint`, at any source version (record 0355a: the durable form
+    /// of a committed package's patch).
+    pub(crate) fn rebound(mut self, fingerprint: [u8; 32]) -> Self {
+        self.expected_fingerprint = fingerprint;
+        self.source_version = None;
+        self
     }
 
     pub(crate) const fn limits(&self) -> Limits {
         self.limits
     }
 
+    /// Apply only to the byte-exact source artifact and main story.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] for another artifact, version or
+    /// main story.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.artifact_fingerprint != self.expected_fingerprint
             || source.xml.as_slice() != self.before.as_slice()
@@ -461,9 +465,10 @@ impl Patch {
     /// Return the exact patch that restores the input bytes.
     ///
     /// This form is authorized for the projected in-memory [`Snapshot`],
-    /// which deliberately retains the original artifact identity. After ZIP
-    /// publication, use [`Publication::inverse_patch`] to obtain an inverse
-    /// authorized for the exact emitted artifact.
+    /// which deliberately retains the original artifact identity. For a
+    /// committed package, the family patch's
+    /// [`durable`](crate::source_backed::plain_paragraph_copy::Patch::durable)
+    /// inverse is authorized for the exact written artifact.
     #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
@@ -744,21 +749,25 @@ impl RemovalPatch {
         self.before.as_slice() == self.after.as_slice()
     }
 
-    /// Apply only to the byte-exact source artifact and main story.
-    /// Apply to a snapshot with the patch's exact before bytes, from any
-    /// source (record 0355a: a package replay reads the snapshot it applies
-    /// to).
-    pub(crate) fn apply_content(&self, source: &Snapshot) -> Result<Snapshot> {
-        if source.xml.as_slice() != self.before.as_slice() {
-            return Err(Error::PatchConflict);
-        }
-        source.with_xml(checked_clone(self.after.as_slice(), "patch application")?)
+    /// This patch bound to the complete artifact whose SHA-256 is
+    /// `fingerprint`, at any source version (record 0355a: the durable form
+    /// of a committed package's patch).
+    pub(crate) fn rebound(mut self, fingerprint: [u8; 32]) -> Self {
+        self.expected_fingerprint = fingerprint;
+        self.source_version = None;
+        self
     }
 
     pub(crate) const fn limits(&self) -> Limits {
         self.limits
     }
 
+    /// Apply only to the byte-exact source artifact and main story.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] for another artifact, version or
+    /// main story.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.artifact_fingerprint != self.expected_fingerprint
             || source.xml.as_slice() != self.before.as_slice()
@@ -776,8 +785,9 @@ impl RemovalPatch {
 
     /// Return the exact patch that restores the input bytes.
     ///
-    /// After ZIP publication, use [`RemovalPublication::inverse_patch`] for an
-    /// inverse authorized against the exact emitted artifact fingerprint.
+    /// For a committed package, the family patch's
+    /// [`durable`](crate::source_backed::plain_paragraph_removal::Patch::durable)
+    /// inverse is authorized against the exact written artifact fingerprint.
     #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
@@ -1013,7 +1023,7 @@ impl Package {
     ) -> Result<(PackURI, Arc<Vec<u8>>)> {
         self.trim_clean_paragraph_index_for_operation();
         let current = self.plain_paragraph_copy_snapshot_bounded(patch.limits())?;
-        let target = patch.apply_content(&current)?;
+        let target = patch.apply(&current)?;
         Ok((self.plain_paragraph_main()?, Arc::clone(&target.xml)))
     }
 
@@ -1025,7 +1035,7 @@ impl Package {
     ) -> Result<(PackURI, Arc<Vec<u8>>)> {
         self.trim_clean_paragraph_index_for_operation();
         let current = self.plain_paragraph_removal_snapshot_bounded(patch.limits())?;
-        let target = patch.apply_content(&current)?;
+        let target = patch.apply(&current)?;
         Ok((self.plain_paragraph_main()?, Arc::clone(&target.xml)))
     }
 

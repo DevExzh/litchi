@@ -123,6 +123,18 @@ impl Package {
     /// source provenance, transfers, source changes and resource failures.
     pub fn apply(&self, patch: &crate::document::Patch) -> TransactionResult<Self> {
         self.check_source()?;
+        // A package writing exactly the commit's before artifact (a share of
+        // it, or a reopened copy of its bytes) gets the commit's exact after
+        // package, so the inverse of a commit restores the source archive.
+        if let Some((before, after)) = patch.restore()
+            && self
+                .same_artifact(before)
+                .map_err(crate::document::Error::from)?
+        {
+            return self
+                .restored(before, after)
+                .map_err(crate::document::Error::from);
+        }
         let result = (|| {
             let (name, current) = self.main_document_snapshot_with_before(
                 "apply",
@@ -179,6 +191,28 @@ impl Package {
         })();
         self.check_source()?;
         result
+    }
+
+    /// Apply a main-document patch and return the commit: the new package,
+    /// the patch carrying this exact package pair, and diagnostics. The
+    /// commit's inverse patch, applied to its package or to a reopened copy
+    /// of its output, restores this package's exact artifact.
+    ///
+    /// # Errors
+    /// Returns the failures of [`Self::apply`].
+    pub fn apply_document(
+        &self,
+        patch: &crate::document::Patch,
+    ) -> TransactionResult<crate::document::Commit<Self>> {
+        let package = self.apply(patch)?;
+        let diagnostics =
+            crate::document::Diagnostics::new(patch.operations().len(), !patch.is_noop());
+        let patch = patch.clone().with_restore(self.clone(), package.clone());
+        Ok(crate::document::Commit::from_parts(
+            package,
+            patch,
+            diagnostics,
+        ))
     }
 
     pub(super) fn effective_document_snapshot(

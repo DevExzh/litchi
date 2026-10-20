@@ -962,19 +962,10 @@ fn validate_zip(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
             let source = SourceBackedPackage::from_vec_with_limits(bytes.to_vec(), opc_limits()?)?;
             let docx = DocxSourcePackage::from_source_backed_package(source)?;
             let mut edit = docx.edit_document_variables()?;
-            edit.set_variable("security_matrix", "must-refuse")?;
-            let commit = edit.commit()?;
-            if !commit.changed() {
-                return Err(
-                    format!("{} protected edit was unexpectedly unchanged", fixture.id).into(),
-                );
-            }
-            let mut output = Vec::new();
-            if !matches!(
-                docx.apply_document_variables(commit.patch()).and_then(|committed| committed.package().write_to(&mut output)),
-                Err(litchi_docx::Error::Refused(_))
-            ) || !output.is_empty()
-            {
+            edit.set("security_matrix", "must-refuse")?;
+            // Record 0355a: the changed commit of a protected document is
+            // refused at commit, before any package or output exists.
+            if !matches!(edit.commit(), Err(litchi_docx::Error::Refused(_))) {
                 return Err(format!(
                     "{} protected edit was not refused before output",
                     fixture.id

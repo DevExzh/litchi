@@ -850,7 +850,7 @@ pub struct SvgAttachmentCommitDiagnostics {
 }
 
 impl SvgAttachmentCommitDiagnostics {
-    const fn new(operations: usize, selected_pictures: usize, changed: bool) -> Self {
+    pub(crate) const fn new(operations: usize, selected_pictures: usize, changed: bool) -> Self {
         Self {
             operations,
             selected_pictures,
@@ -1552,6 +1552,16 @@ impl SourceBackedSvgAttachmentBatchPatch {
         same_batch_state(&self.before, &self.after)
     }
 
+    /// The number of selected pictures whose state the patch changes.
+    pub(crate) fn changed_pictures(&self) -> usize {
+        self.before
+            .states
+            .iter()
+            .zip(self.after.states.iter())
+            .filter(|(left, right)| !same_state_core(left, right))
+            .count()
+    }
+
     /// Return the exact in-memory inverse.
     #[must_use]
     pub fn inverse(&self) -> Self {
@@ -1670,10 +1680,12 @@ impl super::Package {
         Ok(views)
     }
 
-    /// Begin one atomic source-backed edit spanning selected direct
+    /// Begin one atomic record-level edit spanning selected direct
     /// main-story pictures. The source drawing and relationship inventory are
-    /// captured once, even when many selectors are supplied.
-    pub(crate) fn edit_svg_attachments<I, S>(
+    /// captured once, even when many selectors are supplied. Its commit is a
+    /// detached batch snapshot and patch; [`Self::edit_svg`] commits to a
+    /// new package, and [`Self::apply_svg`] replays a batch patch.
+    pub fn edit_svg_attachments<I, S>(
         &self,
         selectors: I,
     ) -> Result<SourceBackedSvgAttachmentBatchEdit<'_>>

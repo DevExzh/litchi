@@ -12,6 +12,7 @@
 //! are useful attribution evidence without being mistaken for the total
 //! operation high-water mark.
 
+use crate::docx_family_publication::CopyPublish as _;
 use std::{
     ffi::OsString,
     fmt::Write as FmtWrite,
@@ -27,7 +28,7 @@ use std::{
 
 use litchi_core::{OwnedSource, Position, ReadAt, SourceVersion};
 use litchi_docx::source_backed::paragraph_copy::{
-    Commit, Edit, Error as CopyError, Limits, Patch, Publication, Snapshot,
+    Commit, Edit, Error as CopyError, Limits, Patch, Snapshot,
 };
 use litchi_docx::{Package as OwnedDocxPackage, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -744,8 +745,10 @@ fn build_candidate(
     let candidate_source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(candidate_archive.clone()));
     let candidate_package = source_backed::Package::from_read_at(candidate_source)?;
     let mut restored = Vec::new();
-    candidate_package
-        .publish_plain_paragraph_copy_patch_to_stream(&mut restored, publication.inverse_patch())?;
+    candidate_package.publish_plain_paragraph_copy_patch_to_stream(
+        &mut restored,
+        &publication.inverse_patch()?,
+    )?;
     let publication_inverse_verified = restored == source_archive_bytes;
     if !replay_verified
         || !inverse_verified
@@ -954,7 +957,7 @@ struct PhaseState {
     snapshot: Option<Snapshot>,
     edit: Option<Edit>,
     commit: Option<Commit>,
-    publication: Option<Publication>,
+    publication: Option<crate::docx_family_publication::CopyPublication>,
     sink: Option<SinkObservation>,
     reads: ReadObservation,
 }
@@ -1368,7 +1371,7 @@ mod tests {
         assert!(matches!(
             edit.copy_plain_paragraph(Position::new(1), Position::new(2)),
             Err(CopyError::Limit {
-                resource: "operations",
+                kind: litchi_docx::source_backed::paragraph_copy::LimitKind::Operations,
                 max: 1,
                 actual: 2
             })

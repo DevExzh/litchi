@@ -149,7 +149,8 @@ fn copies_exact_fragment_at_first_middle_and_last_source_order_slots() {
 
         let mut output = Vec::new();
         package
-            .publish_plain_paragraph_copy_to_stream(&mut output, &commit)
+            .apply_plain_paragraph_copy(&commit.patch().clone().into())
+            .and_then(|committed| Ok(committed.package().write_to(&mut output)?))
             .unwrap();
         assert_eq!(reopened_texts(output), expected);
     }
@@ -160,13 +161,17 @@ fn publication_raw_copies_unselected_members_and_inverse_restores_exact_artifact
     let source = bytes(&fixture(MAIN, document(&["one", "two"])));
     let unused = payload_range(&source, UNUSED);
     let package = open(source.clone());
-    let mut edit = package.edit_plain_paragraph_copy().unwrap();
+    let mut edit = package.plain_paragraph_copy_snapshot().unwrap().edit();
     edit.copy_plain_paragraph(Position::new(0), Position::new(2))
         .unwrap();
     let commit = edit.commit();
     let mut output = Vec::new();
     let publication = package
-        .publish_plain_paragraph_copy_to_stream(&mut output, &commit)
+        .apply_plain_paragraph_copy(&commit.patch().clone().into())
+        .and_then(|committed| {
+            committed.package().write_to(&mut output)?;
+            Ok(committed)
+        })
         .unwrap();
     assert_eq!(
         &output[payload_range(&output, UNUSED)],
@@ -174,18 +179,26 @@ fn publication_raw_copies_unselected_members_and_inverse_restores_exact_artifact
         "unselected physical payload must be raw-identical"
     );
 
-    let inverse_wire = publication.inverse_patch().to_bytes().unwrap();
+    let inverse_wire = publication
+        .patch()
+        .inverse()
+        .durable()
+        .unwrap()
+        .to_bytes()
+        .unwrap();
     let durable_inverse = Patch::from_bytes(&inverse_wire).unwrap();
     let mut durable_restored = Vec::new();
     open(output.clone())
-        .publish_plain_paragraph_copy_patch_to_stream(&mut durable_restored, &durable_inverse)
+        .apply_plain_paragraph_copy(&durable_inverse.clone().into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut durable_restored)?))
         .unwrap();
     assert_eq!(durable_restored, source);
 
     let published = open(output);
     let mut restored = Vec::new();
     published
-        .publish_plain_paragraph_copy_inverse_to_stream(&mut restored, &publication)
+        .apply_plain_paragraph_copy(&publication.patch().inverse())
+        .and_then(|committed| Ok(committed.package().write_to(&mut restored)?))
         .unwrap();
     assert_eq!(restored, source);
 }
@@ -209,7 +222,8 @@ fn durable_forward_inverse_are_canonical_and_reject_whole_artifact_staleness() {
     assert_eq!(applied.xml_bytes(), commit.projected().xml_bytes());
     let mut published = Vec::new();
     open(source.clone())
-        .publish_plain_paragraph_copy_patch_to_stream(&mut published, &durable)
+        .apply_plain_paragraph_copy(&durable.clone().into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut published)?))
         .unwrap();
     assert_eq!(reopened_texts(published), ["a", "c", "b", "c"]);
     let inverse_wire = durable.inverse().to_bytes().unwrap();
@@ -239,19 +253,32 @@ fn durable_forward_inverse_are_canonical_and_reject_whole_artifact_staleness() {
 fn empty_edit_is_an_exact_noop_and_stale_inverse_writes_nothing() {
     let source = bytes(&fixture(MAIN, document(&["only"])));
     let package = open(source.clone());
-    let commit = package.edit_plain_paragraph_copy().unwrap().commit();
+    let commit = package
+        .plain_paragraph_copy_snapshot()
+        .unwrap()
+        .edit()
+        .commit();
     assert!(commit.patch().is_noop());
     assert!(commit.effect_report().is_noop());
     let mut output = Vec::new();
     let publication = package
-        .publish_plain_paragraph_copy_to_stream(&mut output, &commit)
+        .apply_plain_paragraph_copy(&commit.patch().clone().into())
+        .and_then(|committed| {
+            committed.package().write_to(&mut output)?;
+            Ok(committed)
+        })
         .unwrap();
     assert_eq!(output, source);
 
     let foreign = open(bytes(&fixture(MAIN, document(&["foreign"]))));
     let mut inverse_output = Vec::new();
     assert!(matches!(
-        foreign.publish_plain_paragraph_copy_inverse_to_stream(&mut inverse_output, &publication),
+        foreign
+            .apply_plain_paragraph_copy(&publication.patch().inverse())
+            .and_then(|committed| {
+                committed.package().write_to(&mut inverse_output)?;
+                Ok(committed)
+            }),
         Err(Error::PatchConflict)
     ));
     assert!(inverse_output.is_empty());
@@ -282,7 +309,7 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
     assert!(matches!(
         edit.copy_plain_paragraph(Position::new(0), Position::new(1)),
         Err(Error::Limit {
-            resource: "operations",
+            kind: source_backed::paragraph_copy::LimitKind::Operations,
             ..
         })
     ));
@@ -296,7 +323,7 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
             )
             .plain_paragraph_copy_snapshot(),
         Err(Error::Limit {
-            resource: "paragraphs",
+            kind: source_backed::paragraph_copy::LimitKind::Paragraphs,
             ..
         })
     ));
@@ -309,7 +336,7 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
     assert!(matches!(
         edit.copy_plain_paragraph(Position::new(0), Position::new(0)),
         Err(Error::Limit {
-            resource: "output bytes",
+            kind: source_backed::paragraph_copy::LimitKind::OutputBytes,
             ..
         })
     ));
@@ -328,7 +355,7 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
     assert!(matches!(
         edit.commit().patch().to_bytes(),
         Err(Error::Limit {
-            resource: "durable patch bytes",
+            kind: source_backed::paragraph_copy::LimitKind::DurablePatchBytes,
             ..
         })
     ));
@@ -492,13 +519,14 @@ fn strict_and_ordinary_producer_namespace_declarations_are_supported() {
         strict_document,
         rt::STRICT_OFFICE_DOCUMENT,
     )));
-    let mut edit = package.edit_plain_paragraph_copy().unwrap();
+    let mut edit = package.plain_paragraph_copy_snapshot().unwrap().edit();
     edit.copy_plain_paragraph(Position::new(0), Position::new(1))
         .unwrap();
     let commit = edit.commit();
     let mut output = Vec::new();
     package
-        .publish_plain_paragraph_copy_to_stream(&mut output, &commit)
+        .apply_plain_paragraph_copy(&commit.patch().clone().into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut output)?))
         .unwrap();
     assert_eq!(reopened_texts(output), ["strict", "strict"]);
 
@@ -543,7 +571,7 @@ fn empty_body_and_empty_or_sole_paragraph_slots_are_unambiguous() {
         let xml = format!(r#"<w:document xmlns:w="{W}"><w:body><w:p/></w:body></w:document>"#)
             .into_bytes();
         let package = open(bytes(&fixture(MAIN, xml)));
-        let mut edit = package.edit_plain_paragraph_copy().unwrap();
+        let mut edit = package.plain_paragraph_copy_snapshot().unwrap().edit();
         edit.copy_plain_paragraph(Position::new(0), Position::new(before))
             .unwrap();
         let commit = edit.commit();
@@ -614,7 +642,7 @@ fn changed_source_version_is_rejected_before_publication_output() {
     });
     let read_at: Arc<dyn ReadAt> = source.clone();
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.edit_plain_paragraph_copy().unwrap();
+    let mut edit = package.plain_paragraph_copy_snapshot().unwrap().edit();
     edit.copy_plain_paragraph(Position::new(0), Position::new(1))
         .unwrap();
     let commit = edit.commit();
@@ -622,7 +650,11 @@ fn changed_source_version_is_rejected_before_publication_output() {
     let mut output = Vec::new();
     assert!(
         package
-            .publish_plain_paragraph_copy_to_stream(&mut output, &commit)
+            .apply_plain_paragraph_copy(&commit.patch().clone().into())
+            .and_then(|committed| {
+                committed.package().write_to(&mut output)?;
+                Ok(committed)
+            })
             .is_err()
     );
     assert!(output.is_empty());
@@ -681,7 +713,7 @@ impl io::Write for FailingSink {
 fn partial_sinks_complete_and_write_zero_fails_without_false_progress() {
     let source = bytes(&fixture(MAIN, document(&["a", "b"])));
     let package = open(source.clone());
-    let mut edit = package.edit_plain_paragraph_copy().unwrap();
+    let mut edit = package.plain_paragraph_copy_snapshot().unwrap().edit();
     edit.copy_plain_paragraph(Position::new(0), Position::new(2))
         .unwrap();
     let commit = edit.commit();
@@ -690,16 +722,23 @@ fn partial_sinks_complete_and_write_zero_fails_without_false_progress() {
         chunk: 7,
     };
     package
-        .publish_plain_paragraph_copy_to_stream(&mut partial, &commit)
+        .apply_plain_paragraph_copy(&commit.patch().clone().into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut partial)?))
         .unwrap();
     assert_eq!(reopened_texts(partial.bytes), ["a", "b", "a"]);
 
     let package = open(source);
-    let mut edit = package.edit_plain_paragraph_copy().unwrap();
+    let mut edit = package.plain_paragraph_copy_snapshot().unwrap().edit();
     edit.copy_plain_paragraph(Position::new(0), Position::new(2))
         .unwrap();
     let commit = edit.commit();
-    let Err(error) = package.publish_plain_paragraph_copy_to_stream(ZeroSink, &commit) else {
+    let Err(error) = package
+        .apply_plain_paragraph_copy(&commit.patch().clone().into())
+        .and_then(|committed| {
+            committed.package().write_to(ZeroSink)?;
+            Ok(committed)
+        })
+    else {
         panic!("write-zero sink must fail");
     };
     assert!(
@@ -712,7 +751,7 @@ fn partial_sinks_complete_and_write_zero_fails_without_false_progress() {
 
     let source = bytes(&fixture(MAIN, document(&["a", "b"])));
     let package = open(source);
-    let mut edit = package.edit_plain_paragraph_copy().unwrap();
+    let mut edit = package.plain_paragraph_copy_snapshot().unwrap().edit();
     edit.copy_plain_paragraph(Position::new(0), Position::new(2))
         .unwrap();
     let commit = edit.commit();
@@ -721,7 +760,12 @@ fn partial_sinks_complete_and_write_zero_fails_without_false_progress() {
         limit: 128,
     };
     assert!(matches!(
-        package.publish_plain_paragraph_copy_to_stream(&mut failing, &commit),
+        package
+            .apply_plain_paragraph_copy(&commit.patch().clone().into())
+            .and_then(|committed| {
+                committed.package().write_to(&mut failing)?;
+                Ok(committed)
+            }),
         Err(Error::Document(litchi_docx::Error::Opc(
             litchi_opc::OpcError::IncompleteOutput { written: 128, .. }
         )))

@@ -6488,6 +6488,7 @@ impl Edit {
             inverse_operations,
             inverse_admission,
             inverse_string_admission,
+            restore: None,
         };
         Ok(Commit {
             snapshot: projected,
@@ -6711,9 +6712,31 @@ pub struct Patch {
     inverse_operations: OperationList,
     inverse_admission: Option<Arc<OperationAdmission>>,
     inverse_string_admission: Option<Arc<StringAdmission>>,
+    /// The exact package pair of a source-backed commit (record 0355a):
+    /// applied to a package writing the first artifact, the patch returns
+    /// the second, so an inverse restores the original archive bytes.
+    restore: Option<Arc<(crate::source_backed::Package, crate::source_backed::Package)>>,
 }
 
 impl Patch {
+    /// This patch carrying the exact source-backed `before` and `after`
+    /// packages of a commit.
+    pub(crate) fn with_restore(
+        mut self,
+        before: crate::source_backed::Package,
+        after: crate::source_backed::Package,
+    ) -> Self {
+        self.restore = Some(Arc::new((before, after)));
+        self
+    }
+
+    /// The exact source-backed package pair of a commit, if any.
+    pub(crate) fn restore(
+        &self,
+    ) -> Option<&(crate::source_backed::Package, crate::source_backed::Package)> {
+        self.restore.as_deref()
+    }
+
     /// The operation-free patch that moves `before` to `after`: a recorded
     /// history transition replayed as one main-document replacement.
     pub(crate) fn transition(before: Snapshot, after: Snapshot) -> Self {
@@ -6726,6 +6749,7 @@ impl Patch {
             inverse_operations: OperationList::Empty,
             inverse_admission: None,
             inverse_string_admission: None,
+            restore: None,
         }
     }
 
@@ -6772,6 +6796,10 @@ impl Patch {
             inverse_operations: self.operations.clone(),
             inverse_admission: self.operation_admission.clone(),
             inverse_string_admission: self.operation_string_admission.clone(),
+            restore: self
+                .restore
+                .as_ref()
+                .map(|pair| Arc::new((pair.1.clone(), pair.0.clone()))),
         }
     }
 

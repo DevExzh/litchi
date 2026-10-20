@@ -2189,16 +2189,14 @@ mod tests {
         let package = source_backed_test_package();
         reset_capture_test_counts();
         let commit = package
-            .plan_story_hyperlink_redaction(&["https://capture.invalid/"], Mode::Strict)
+            .edit_story_hyperlink_redaction(&["https://capture.invalid/"], Mode::Strict)
             .unwrap()
-            .apply()
+            .commit()
             .unwrap();
         assert_eq!(capture_test_counts(), (1, 1));
 
         let mut output = Vec::new();
-        package
-            .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
-            .unwrap();
+        commit.package().write_to(&mut output).unwrap();
         assert!(!output.is_empty());
         assert_eq!(capture_test_counts(), (1, 1));
     }

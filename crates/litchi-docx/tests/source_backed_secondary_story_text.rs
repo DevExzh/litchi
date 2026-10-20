@@ -596,7 +596,11 @@ fn exercise_change(
 
     let mut published = Vec::new();
     let publication = package
-        .publish_story_text_commit_to_stream(&mut published, &commit)
+        .apply_story_text(&commit.patch().clone().into())
+        .and_then(|committed| {
+            committed.package().write_to(&mut published)?;
+            Ok(committed)
+        })
         .unwrap();
     let reopened = open(&published);
     assert_eq!(
@@ -616,7 +620,12 @@ fn exercise_change(
         part_bytes(&published, "/word/document.xml"),
         part_bytes(&source, "/word/document.xml")
     );
-    assert_eq!(publication.snapshot().selector(), selector);
+    let committed = publication
+        .package()
+        .story_text_snapshot(selector.clone())
+        .unwrap();
+    assert_eq!(committed.selector(), selector);
+    assert_eq!(committed.extract_text().unwrap(), after);
 }
 
 #[test]
@@ -659,7 +668,8 @@ fn secondary_entry_preserves_whitespace_comments_and_opaque_markup() {
     let commit = edit.commit().unwrap();
     let mut published = Vec::new();
     package
-        .publish_story_text_commit_to_stream(&mut published, &commit)
+        .apply_story_text(&commit.patch().clone().into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut published)?))
         .unwrap();
 
     let before_part = part_bytes(&source, "/word/footnotes.xml");
@@ -704,7 +714,8 @@ fn secondary_noop_is_exact_and_inverse_restores_the_source() {
     let noop_commit = noop.commit().unwrap();
     let mut exact = Vec::new();
     noop_package
-        .publish_story_text_commit_to_stream(&mut exact, &noop_commit)
+        .apply_story_text(&noop_commit.patch().clone().into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut exact)?))
         .unwrap();
     assert_eq!(exact, source);
 
@@ -718,16 +729,26 @@ fn secondary_noop_is_exact_and_inverse_restores_the_source() {
     let commit = edit.commit().unwrap();
     let mut published = Vec::new();
     let publication = changed_package
-        .publish_story_text_commit_to_stream(&mut published, &commit)
+        .apply_story_text(&commit.patch().clone().into())
+        .and_then(|committed| {
+            committed.package().write_to(&mut published)?;
+            Ok(committed)
+        })
         .unwrap();
     let mut restored = Vec::new();
     open(&published)
-        .publish_story_text_inverse_to_stream(&mut restored, &publication)
+        .apply_story_text(&publication.patch().inverse())
+        .and_then(|committed| Ok(committed.package().write_to(&mut restored)?))
         .unwrap();
     assert_eq!(restored, source);
     assert!(matches!(
-        open(&source).publish_story_text_inverse_to_stream(Vec::new(), &publication),
-        Err(source_backed::StoryTextError::ArtifactConflict)
+        open(&source)
+            .apply_story_text(&publication.patch().inverse())
+            .and_then(|committed| {
+                committed.package().write_to(Vec::new())?;
+                Ok(committed)
+            }),
+        Err(source_backed::StoryTextError::PatchConflict)
     ));
 }
 
@@ -745,7 +766,8 @@ fn signed_secondary_change_is_refused_but_signed_noop_is_exact() {
     let noop_commit = noop.commit().unwrap();
     let mut exact = Vec::new();
     noop_package
-        .publish_story_text_commit_to_stream(&mut exact, &noop_commit)
+        .apply_story_text(&noop_commit.patch().clone().into())
+        .and_then(|committed| Ok(committed.package().write_to(&mut exact)?))
         .unwrap();
     assert_eq!(exact, source);
 
@@ -759,7 +781,11 @@ fn signed_secondary_change_is_refused_but_signed_noop_is_exact() {
     let commit = edit.commit().unwrap();
     assert!(
         changed_package
-            .publish_story_text_commit_to_stream(Vec::new(), &commit)
+            .apply_story_text(&commit.patch().clone().into())
+            .and_then(|committed| {
+                committed.package().write_to(Vec::new())?;
+                Ok(committed)
+            })
             .is_err()
     );
 }
@@ -1006,7 +1032,12 @@ fn secondary_publication_rejects_a_source_revision_change() {
     let commit = edit.commit().unwrap();
     versioned.revision.fetch_add(1, Ordering::SeqCst);
     assert!(matches!(
-        package.publish_story_text_commit_to_stream(Vec::new(), &commit),
+        package
+            .apply_story_text(&commit.patch().clone().into())
+            .and_then(|committed| {
+                committed.package().write_to(Vec::new())?;
+                Ok(committed)
+            }),
         Err(source_backed::StoryTextError::Document(Error::Opc(
             litchi_opc::OpcError::SourceChanged { .. }
         )))
@@ -1031,7 +1062,7 @@ fn secondary_limits_bound_xml_paragraphs_and_output() {
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(paragraph_limit))
         .story_text_snapshot(StorySelector::footnote(41)),
         Err(source_backed::StoryTextError::Limit {
-            resource: "paragraphs",
+            kind: source_backed::story_text::LimitKind::Paragraphs,
             ..
         })
     ));
@@ -1042,7 +1073,7 @@ fn secondary_limits_bound_xml_paragraphs_and_output() {
             .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(xml_limit))
             .story_text_snapshot(StorySelector::footnote(41)),
         Err(source_backed::StoryTextError::Limit {
-            resource: "XML bytes",
+            kind: source_backed::story_text::LimitKind::XmlBytes,
             ..
         })
     ));
@@ -1093,7 +1124,7 @@ fn long_namespace_prefix_and_value_hit_namespace_byte_and_count_limits() {
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(namespace_limits))
         .story_text_snapshot(StorySelector::footnote(41)),
         Err(source_backed::StoryTextError::Limit {
-            resource: "namespace bytes",
+            kind: source_backed::story_text::LimitKind::NamespaceBytes,
             ..
         })
     ));
@@ -1359,12 +1390,14 @@ fn secondary_publication_rejects_a_partial_sink_without_panicking() {
         .unwrap();
     let commit = edit.commit().unwrap();
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        package.publish_story_text_commit_to_stream(
-            PartialWriter {
-                wrote_prefix: false,
-            },
-            &commit,
-        )
+        package
+            .apply_story_text(&commit.patch().clone().into())
+            .and_then(|committed| {
+                committed.package().write_to(PartialWriter {
+                    wrote_prefix: false,
+                })?;
+                Ok(committed)
+            })
     }));
     assert!(result.is_ok());
     assert!(result.unwrap().is_err());

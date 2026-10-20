@@ -24,7 +24,7 @@ pub(crate) enum StreamChange {
     Forward {
         input: Arc<dyn AuthoredInput>,
         limits: ParagraphStreamLimits,
-        expected: Option<PatchExpectations>,
+        expected: Option<Box<PatchExpectations>>,
         noop: bool,
         prepared: Option<Arc<PreparedStream>>,
     },
@@ -66,7 +66,7 @@ impl Change for StreamChange {
                     Some(prepared) if prepared.base.same_owner(package) => Arc::clone(prepared),
                     _ => Arc::new(
                         package
-                            .stream_edit(Arc::clone(input), *limits, expected.clone())
+                            .stream_edit(Arc::clone(input), *limits, expected.as_deref().cloned())
                             .prepare()?
                             .into_prepared(),
                     ),
@@ -80,7 +80,7 @@ impl Change for StreamChange {
                             crate::source_backed::tail_append::Error::Document(error),
                         ) => error,
                         stream::Error::Opc(error) => crate::Error::Opc(error),
-                        other => crate::Error::Other(other.to_string()),
+                        other => crate::Error::ParagraphStream(Box::new(other)),
                     })
                 })?)
             },
@@ -94,6 +94,37 @@ impl Change for StreamChange {
 
 source_family!("paragraph-stream append", StreamChange, stream::Error);
 
+impl Patch {
+    /// The durable forward patch of this commit: the source and candidate
+    /// archive identities and the semantic and authored proofs, replayed
+    /// with [`Package::apply_tail_append_stream_patch`] through an authored
+    /// replay resolver. The candidate identity is the one measured when the
+    /// committed package was written, or is measured now by hashing its
+    /// output once.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] for an inverse or a replayed patch (only a
+    /// commit's own forward patch is durable), or a source or patch error.
+    pub fn durable(&self) -> Result<stream::patch::ParagraphStreamPatch, Error> {
+        match (&self.change, &self.restore) {
+            (
+                StreamChange::Forward {
+                    prepared: Some(prepared),
+                    ..
+                },
+                Some((before, after)),
+            ) if prepared.base.same_owner(before) => prepared.durable_patch(|| {
+                let (len, sha256) = after.output_artifact()?;
+                Ok(stream::patch::ArtifactProof::new(len, sha256))
+            }),
+            _ => Err(Error::Invalid(
+                "only a paragraph-stream commit's own forward patch is durable",
+            )),
+        }
+    }
+}
+
 /// The budgets of this family, reported by [`Error::Limit`].
 pub use crate::source_backed::tail_append_stream::LimitKind;
 
@@ -105,7 +136,7 @@ pub(crate) fn commit_plan(plan: ParagraphStreamPlan<'_>) -> Result<Commit, Error
     let change = StreamChange::Forward {
         input,
         limits,
-        expected,
+        expected: expected.map(Box::new),
         noop: prepared.is_noop(),
         prepared: Some(prepared),
     };

@@ -16,9 +16,17 @@ use crate::source_backed::{
     SvgInput,
 };
 
-/// The batch record patch the family publishes.
+/// The batch record patch the family publishes, with its staged operation
+/// count.
 #[derive(Clone)]
-pub(crate) struct SvgChange(RecordPatch);
+pub(crate) struct SvgChange(RecordPatch, usize);
+
+impl SvgChange {
+    /// The commit's content-free facts.
+    fn diagnostics(&self) -> Diagnostics {
+        Diagnostics::new(self.1, self.0.source().len(), !self.0.is_noop())
+    }
+}
 
 impl Change for SvgChange {
     type Error = crate::Error;
@@ -28,7 +36,7 @@ impl Change for SvgChange {
     }
 
     fn inverse(&self) -> Self {
-        Self(self.0.inverse())
+        Self(self.0.inverse(), self.1)
     }
 
     fn publish(&self, package: &Package) -> Result<Package> {
@@ -41,7 +49,23 @@ impl Change for SvgChange {
     }
 }
 
-source_family!("SVG attachment", SvgChange);
+/// Content-free facts about an SVG commit: staged operations, selected
+/// pictures and whether it changed anything.
+pub use crate::source_backed::SvgAttachmentCommitDiagnostics as Diagnostics;
+
+source_family!("SVG attachment", SvgChange, crate::Error, diagnostics Diagnostics);
+
+impl From<RecordPatch> for Patch {
+    /// Replay a batch record patch onto a package holding its before state.
+    /// Its diagnostics count one operation per changed picture.
+    fn from(patch: RecordPatch) -> Self {
+        let operations = patch.changed_pictures();
+        Self {
+            change: SvgChange(patch, operations),
+            restore: None,
+        }
+    }
+}
 
 /// The budgets of this family: the package's open source limits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -130,7 +154,8 @@ impl<'a> Edit<'a> {
     /// output.
     pub fn commit(self) -> Result<Commit> {
         let commit = self.inner.commit()?;
-        commit_change(self.package, SvgChange(commit.patch().clone()))
+        let operations = commit.diagnostics().operations();
+        commit_change(self.package, SvgChange(commit.patch().clone(), operations))
     }
 }
 

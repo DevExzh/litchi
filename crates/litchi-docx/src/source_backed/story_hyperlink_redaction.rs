@@ -63,6 +63,16 @@ impl Change for StoryRedactionChange {
 
 source_family!("story-hyperlink redaction", StoryRedactionChange);
 
+impl From<record::Commit> for Patch {
+    /// Replay a sealed record commit onto the exact source it was planned on.
+    fn from(commit: record::Commit) -> Self {
+        Self {
+            change: StoryRedactionChange::Forward(Arc::new(commit)),
+            restore: None,
+        }
+    }
+}
+
 /// The budgets of this family, reported by
 /// [`crate::Error::ExternalHyperlinkRedactionLimit`].
 pub use crate::redact::LimitKind;

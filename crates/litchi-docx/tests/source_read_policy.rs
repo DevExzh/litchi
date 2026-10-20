@@ -232,11 +232,13 @@ fn managed_read_ahead_supports_semantic_read_then_releases_before_docx_publicati
     );
     assert_eq!(prepared.retained_window_bytes, 0);
     let mut output = Vec::new();
-    let publication = plan
+    let commit = plan.commit().expect("DOCX commit must succeed");
+    assert!(!commit.patch().is_noop());
+    commit
+        .package()
         .write_to(&mut output)
         .expect("DOCX publication must succeed");
-    assert!(!publication.is_noop());
-    drop(publication);
+    drop(commit);
 
     let after = package
         .source_read_diagnostics()

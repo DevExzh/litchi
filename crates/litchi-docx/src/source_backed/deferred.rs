@@ -26,6 +26,8 @@ pub(crate) struct Deferred {
     publish: Box<Publish>,
     limits: SourceLimits,
     materialized: OnceLock<SourceBackedPackage>,
+    /// The length and SHA-256 of the written artifact.
+    fingerprint: OnceLock<(u64, [u8; 32])>,
 }
 
 impl Deferred {
@@ -35,6 +37,9 @@ impl Deferred {
         if let Some(package) = self.materialized.get() {
             return Ok(package);
         }
+        // A publication releases the base's clean paragraph indexes first,
+        // as the stream publishers did, so their memory is free for it.
+        self.base.trim_clean_paragraph_index_for_operation();
         let mut bytes = Vec::new();
         (self.publish)(&mut bytes).map_err(|error| match error {
             Error::Opc(error) => error,
@@ -53,7 +58,10 @@ impl Deferred {
             Some(package) => Ok(package
                 .clone()
                 .write_topology_to_stream(writer, litchi_opc::SourceTopologyPlan::new())?),
-            None => (self.publish)(writer),
+            None => {
+                self.base.trim_clean_paragraph_index_for_operation();
+                (self.publish)(writer)
+            },
         }
     }
 }
@@ -86,12 +94,113 @@ impl Package {
             publish: Box::new(publish),
             limits,
             materialized: OnceLock::new(),
+            fingerprint: OnceLock::new(),
         }));
         Ok(next)
     }
 }
 
+/// A sink that hashes and counts what it is given.
+struct Hashing(sha2::Sha256, u64);
+
+impl Write for Hashing {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        sha2::Digest::update(&mut self.0, bytes);
+        self.1 += bytes.len() as u64;
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 impl Package {
+    /// The SHA-256 of the complete artifact this package writes (record
+    /// 0355a): the source archive for an opened package, the output for a
+    /// committed or edited one.
+    pub(crate) fn output_fingerprint(&self) -> Result<[u8; 32]> {
+        Ok(self.output_artifact()?.1)
+    }
+
+    /// The length and SHA-256 of the complete artifact this package writes.
+    /// A committed package hashes its output once (streaming, without
+    /// keeping it) and remembers it.
+    pub(crate) fn output_artifact(&self) -> Result<(u64, [u8; 32])> {
+        if self.effective.is_none() {
+            if let Some(deferred) = &self.deferred {
+                if let Some(artifact) = deferred.fingerprint.get() {
+                    return Ok(*artifact);
+                }
+            } else {
+                let artifact = self.physical_source()?.source_artifact();
+                return Ok((artifact.len(), artifact.fingerprint()?.into_sha256()));
+            }
+        }
+        let mut sink = Hashing(<sha2::Sha256 as sha2::Digest>::new(), 0);
+        self.write_to(&mut sink)?;
+        let artifact = (sink.1, sha2::Digest::finalize(sink.0).into());
+        if let (None, Some(deferred)) = (&self.effective, &self.deferred) {
+            let _ = deferred.fingerprint.set(artifact);
+        }
+        Ok(artifact)
+    }
+
+    /// Whether `self` writes exactly the artifact `other` writes: a share of
+    /// it, or a reopened copy of its bytes.
+    pub(crate) fn same_artifact(&self, other: &Self) -> Result<bool> {
+        if self.same_owner(other) {
+            return Ok(true);
+        }
+        Ok(self.output_artifact()? == other.output_artifact()?)
+    }
+
+    /// The package that restores `after` over `self`, a package writing
+    /// exactly `before`'s artifact (record 0355a).
+    ///
+    /// A share of `before` gets `after` itself. A reopened copy of an
+    /// opened archive restoring an opened archive streams the original
+    /// artifact through `self`'s execution context: output is charged to
+    /// it, and both artifacts are authenticated again as they are written
+    /// (`SourceArtifactMismatch` before any byte otherwise).
+    pub(crate) fn restored(&self, before: &Self, after: &Self) -> Result<Self> {
+        if self.same_owner(before) || !self.is_opened() || !after.is_opened() {
+            return Ok(after.clone());
+        }
+        let current = self.physical_source()?.clone();
+        let original = after.physical_source()?.source_artifact();
+        let current_artifact = current.source_artifact();
+        let proof = litchi_opc::SourceArtifactRestoreProof {
+            current_len: current_artifact.len(),
+            current_sha256: current_artifact.fingerprint()?,
+            original_len: original.len(),
+            original_sha256: original.fingerprint()?,
+        };
+        let max_output_bytes = proof.original_len.max(1);
+        let mut next = Self::with_execution(current.clone(), self.execution.clone())?
+            .with_semantic_limits(after.semantic_limits().clone());
+        next.deferred = Some(Arc::new(Deferred {
+            base: self.clone(),
+            publish: Box::new(move |writer| {
+                Ok(current.restore_source_artifact_to_stream(
+                    &original,
+                    proof,
+                    max_output_bytes,
+                    writer,
+                )?)
+            }),
+            limits: after.physical_source()?.read_limits(),
+            materialized: OnceLock::new(),
+            fingerprint: OnceLock::from((proof.original_len, proof.original_sha256.into_sha256())),
+        }));
+        Ok(next)
+    }
+
+    /// Whether the package writes its opened source archive unchanged.
+    fn is_opened(&self) -> bool {
+        self.effective.is_none() && self.deferred.is_none()
+    }
+
     /// Whether `self` and `other` are shares of one package (the same
     /// source, caches and pending output).
     pub(crate) fn same_owner(&self, other: &Self) -> bool {
@@ -124,13 +233,37 @@ macro_rules! source_family {
         #[doc = concat!("The error of the ", $what, " family.")]
         pub type Error = $error;
 
-        crate::source_backed::deferred::source_family!(@core $what, $change, $error);
+        pub use litchi_core::edit::Diagnostics;
+
+        crate::source_backed::deferred::source_family!(
+            @core $what, $change, $error, litchi_core::edit::Diagnostics,
+            |change: &$change| litchi_core::edit::Diagnostics::new(
+                !crate::source_backed::deferred::Change::is_noop(change)
+            )
+        );
     };
     // A family module that defines its own `Error`.
     ($what:literal, $change:ty, own_error $error:ty) => {
-        crate::source_backed::deferred::source_family!(@core $what, $change, $error);
+        pub use litchi_core::edit::Diagnostics;
+
+        crate::source_backed::deferred::source_family!(
+            @core $what, $change, $error, litchi_core::edit::Diagnostics,
+            |change: &$change| litchi_core::edit::Diagnostics::new(
+                !crate::source_backed::deferred::Change::is_noop(change)
+            )
+        );
     };
-    (@core $what:literal, $change:ty, $error:ty) => {
+    // A family with its own diagnostics type, reported by the change's
+    // `diagnostics()`; the module declares `Diagnostics`.
+    ($what:literal, $change:ty, $error:ty, diagnostics $diag:ty) => {
+        #[doc = concat!("The error of the ", $what, " family.")]
+        pub type Error = $error;
+
+        crate::source_backed::deferred::source_family!(
+            @core $what, $change, $error, $diag, |change: &$change| change.diagnostics()
+        );
+    };
+    (@core $what:literal, $change:ty, $error:ty, $diag:ty, $report:expr) => {
         #[doc = concat!(
                     "A replayable ", $what, " change of a source-backed package: the ",
                     "exact before and after state of what it changed. Replay it with the ",
@@ -177,39 +310,35 @@ macro_rules! source_family {
                     "A committed ", $what, " change: the new source-backed package, its ",
                     "patch and diagnostics."
                 )]
-        pub type Commit = litchi_core::edit::Commit<crate::source_backed::Package, Patch>;
-
-        pub use litchi_core::edit::Diagnostics;
+        pub type Commit = litchi_core::edit::Commit<crate::source_backed::Package, Patch, $diag>;
 
         fn commit_change(
             package: &crate::source_backed::Package,
             change: $change,
         ) -> std::result::Result<Commit, $error> {
-            let changed = !crate::source_backed::deferred::Change::is_noop(&change);
+            let diagnostics = ($report)(&change);
             let next = crate::source_backed::deferred::Change::publish(&change, package)?;
             let patch = Patch {
                 change,
                 restore: Some((package.clone(), next.clone())),
             };
-            Ok(Commit::new(
-                next,
-                patch,
-                litchi_core::edit::Diagnostics::new(changed),
-            ))
+            Ok(Commit::new(next, patch, diagnostics))
         }
 
         fn apply_change(
             package: &crate::source_backed::Package,
             patch: &Patch,
         ) -> std::result::Result<Commit, $error> {
+            // The package that writes exactly the patch's before artifact (a
+            // share of it, or a reopened copy of its bytes) gets the exact
+            // after package: an inverse restores the original artifact.
             if let Some((before, after)) = &patch.restore
-                && package.same_owner(before)
+                && package.same_artifact(before)?
             {
-                let changed = !patch.is_noop();
                 return Ok(Commit::new(
-                    after.clone(),
+                    package.restored(before, after)?,
                     patch.clone(),
-                    litchi_core::edit::Diagnostics::new(changed),
+                    ($report)(&patch.change),
                 ));
             }
             commit_change(package, patch.change.clone())

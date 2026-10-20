@@ -121,7 +121,7 @@ fn inventory_reuse_keeps_reference_preflight_before_section_and_footnote_errors(
             maximum,
             actual,
         }) => {
-            assert_eq!(kind, crate::section::LimitKind::HeaderFooterReferenceBytes);
+            assert_eq!(kind, LimitKind::HeaderFooterReferenceBytes);
             assert_eq!(maximum, relationship_id.len() - 1);
             assert_eq!(actual, relationship_id.len());
         },

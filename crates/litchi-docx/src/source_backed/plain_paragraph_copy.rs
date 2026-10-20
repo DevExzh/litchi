@@ -38,6 +38,24 @@ impl Change for CopyChange {
 
 source_family!("plain-paragraph copy", CopyChange, record::Error);
 
+impl Patch {
+    /// The durable record patch of this change, bound to the complete
+    /// artifact it applies to: for a commit's patch, the artifact of the
+    /// package it was committed on; for its inverse, the committed
+    /// package's output. Serialize it with `to_bytes` and replay it with
+    /// `Patch::from` (record 0355a).
+    ///
+    /// # Errors
+    ///
+    /// Returns a source or resource error while fingerprinting the artifact.
+    pub fn durable(&self) -> Result<record::Patch, Error> {
+        Ok(match &self.restore {
+            Some((before, _)) => self.change.0.clone().rebound(before.output_fingerprint()?),
+            None => self.change.0.clone(),
+        })
+    }
+}
+
 impl From<record::Patch> for Patch {
     /// Replay a record patch onto a package whose main document holds its
     /// before bytes.

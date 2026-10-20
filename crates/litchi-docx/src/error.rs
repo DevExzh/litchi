@@ -117,6 +117,11 @@ pub enum Error {
     #[error("{0}")]
     Other(String),
 
+    /// Writing a committed paragraph-stream package failed (record 0355a):
+    /// the typed stream error, carried through the package writer.
+    #[error(transparent)]
+    ParagraphStream(Box<crate::source_backed::tail_append_stream::Error>),
+
     /// A semantic selector matched more than one producer object.
     #[error("{object} selector '{key}' is ambiguous")]
     Ambiguous {

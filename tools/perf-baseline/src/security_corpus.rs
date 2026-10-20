@@ -189,24 +189,22 @@ fn protected_docx_security() -> Result<(), Box<dyn Error>> {
         SourceBackedPackage::from_vec_with_limits(bytes.clone(), security_read_limits()?)?;
     let docx = DocxSourcePackage::from_source_backed_package(package)?;
     let no_op = docx.edit_document_variables()?.commit()?;
-    assert!(!no_op.changed());
+    assert!(!no_op.diagnostics().changed());
     let mut no_op_output = Vec::new();
-    docx.apply_document_variables(no_op.patch()).and_then(|committed| committed.package().write_to(&mut no_op_output))?;
+    no_op.package().write_to(&mut no_op_output)?;
     assert_eq!(no_op_output, bytes);
 
+    // Record 0355a: a changed commit of a protected document is refused at
+    // commit, before any package or output exists.
     let package = SourceBackedPackage::from_vec_with_limits(bytes, security_read_limits()?)?;
     let docx = DocxSourcePackage::from_source_backed_package(package)?;
     let mut edit = docx.edit_document_variables()?;
-    edit.set_variable("security_matrix", "must-refuse")?;
-    let commit = edit.commit()?;
-    assert!(commit.changed());
-    let mut output = Vec::new();
-    let error = match docx.apply_document_variables(commit.patch()).and_then(|committed| committed.package().write_to(&mut output)) {
-        Ok(_) => return Err("protected DOCX publication unexpectedly succeeded".into()),
+    edit.set("security_matrix", "must-refuse")?;
+    let error = match edit.commit() {
+        Ok(_) => return Err("protected DOCX commit unexpectedly succeeded".into()),
         Err(error) => error,
     };
     assert!(matches!(error, litchi_docx::Error::Refused(_)));
-    assert!(output.is_empty());
     Ok(())
 }
 

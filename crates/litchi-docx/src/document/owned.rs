@@ -1218,6 +1218,7 @@ impl Edit<crate::source_backed::Package> {
         let diagnostics = committed.diagnostics();
         let (_, patch) = committed.into_parts();
         let package = self.package.apply(&patch)?;
+        let patch = patch.with_restore(self.package, package.clone());
         Ok(Commit {
             package,
             patch,

@@ -426,6 +426,24 @@
           "name": "into_workbook",
           "scope": "litchi_docx",
           "replacement": "(record 0351)"
+        },
+        {
+          "name": "_to_stream",
+          "scope": "litchi_docx",
+          "replacement": "commit the family edit to a source-backed Package and call write_to (record 0355a)",
+          "match": "suffix"
+        },
+        {
+          "name": "publish_",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "commit the family edit to a Package; Package::write_to is the only output (record 0355a)",
+          "match": "prefix"
+        },
+        {
+          "name": "Publication",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "a family Commit holds the new Package, its Patch and Diagnostics (record 0355a)",
+          "match": "suffix"
         }
       ],
       "families": [
@@ -451,7 +469,20 @@
         "litchi_docx::task_panes",
         "litchi_docx::web",
         "litchi_docx::package::story",
-        "litchi_docx::alt"
+        "litchi_docx::alt",
+        "litchi_docx::source_backed::alt_chunk_payload",
+        "litchi_docx::source_backed::document_variables",
+        "litchi_docx::source_backed::glossary_text",
+        "litchi_docx::source_backed::hyperlink_detachment",
+        "litchi_docx::source_backed::hyperlink_redaction",
+        "litchi_docx::source_backed::paragraph_stream",
+        "litchi_docx::source_backed::plain_paragraph_copy",
+        "litchi_docx::source_backed::plain_paragraph_removal",
+        "litchi_docx::source_backed::section_layout",
+        "litchi_docx::source_backed::story_hyperlink_redaction",
+        "litchi_docx::source_backed::story_text_edit",
+        "litchi_docx::source_backed::svg",
+        "litchi_docx::source_backed::tail_append"
       ],
       "immutable_owners": [
         "litchi_docx::Document",
@@ -783,6 +814,24 @@
           "name": "into_workbook",
           "scope": "litchi_docx",
           "replacement": "(record 0351)"
+        },
+        {
+          "name": "_to_stream",
+          "scope": "litchi_docx",
+          "replacement": "commit the family edit to a source-backed Package and call write_to (record 0355a)",
+          "match": "suffix"
+        },
+        {
+          "name": "publish_",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "commit the family edit to a Package; Package::write_to is the only output (record 0355a)",
+          "match": "prefix"
+        },
+        {
+          "name": "Publication",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "a family Commit holds the new Package, its Patch and Diagnostics (record 0355a)",
+          "match": "suffix"
         }
       ],
       "families": [
@@ -809,7 +858,20 @@
         "litchi_docx::vba",
         "litchi_docx::web",
         "litchi_docx::package::story",
-        "litchi_docx::alt"
+        "litchi_docx::alt",
+        "litchi_docx::source_backed::alt_chunk_payload",
+        "litchi_docx::source_backed::document_variables",
+        "litchi_docx::source_backed::glossary_text",
+        "litchi_docx::source_backed::hyperlink_detachment",
+        "litchi_docx::source_backed::hyperlink_redaction",
+        "litchi_docx::source_backed::paragraph_stream",
+        "litchi_docx::source_backed::plain_paragraph_copy",
+        "litchi_docx::source_backed::plain_paragraph_removal",
+        "litchi_docx::source_backed::section_layout",
+        "litchi_docx::source_backed::story_hyperlink_redaction",
+        "litchi_docx::source_backed::story_text_edit",
+        "litchi_docx::source_backed::svg",
+        "litchi_docx::source_backed::tail_append"
       ],
       "immutable_owners": [
         "litchi_docx::Document",
