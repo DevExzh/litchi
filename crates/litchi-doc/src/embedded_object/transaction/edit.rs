@@ -81,6 +81,16 @@ impl Transaction {
         self.editor.add(options).map_err(TransactionError::Invalid)
     }
 
+    /// Appends a native Equation.3 EMBED field with a real PICF preview.
+    pub(crate) fn add_mtef_equation(
+        &mut self,
+        options: crate::equation::MtefEquationWriteOptions,
+    ) -> Result<Reference, TransactionError> {
+        self.editor
+            .add_mtef_equation(options)
+            .map_err(TransactionError::Invalid)
+    }
+
     /// Removes one managed field and its owning `ObjectPool` storage.
     ///
     /// # Errors

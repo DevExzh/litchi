@@ -11,7 +11,7 @@ mod reference;
 mod unknown;
 
 pub use comp_obj::{Clipboard, CompObj};
-pub use editor::Editor;
+pub(crate) use editor::Editor;
 pub(in crate::embedded_object) use editor::{FieldMarker, RawPiece};
 pub use info::Info;
 pub use inventory::{Entry, Inventory};

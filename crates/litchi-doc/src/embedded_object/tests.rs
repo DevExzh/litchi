@@ -1,10 +1,11 @@
 //! Regression tests for the DOC embedded-object model and codec.
 
 use super::Limits;
+use super::Snapshot;
 use super::codec::{discover_targets, validate_existing_fields};
 use super::model::{FieldMarker, Info, Kind};
 use super::storage::{OBJECT_POOL, is_object_storage_name};
-use super::{Snapshot, TransactionError};
+use super::transaction::TransactionError;
 use crate::builder::Builder;
 use litchi_cfb::OleWriter;
 use litchi_ole_common::object::{Edit as ObjectEditor, Target, Targets};

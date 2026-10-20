@@ -201,7 +201,7 @@ pub use document::{
     BodyParagraphs, Document, HeaderFooterSlot, StoryBlock, StoryBlockKind, StoryBlocks,
     StoryIndexDiagnostics,
 };
-pub use embedded_object::{Editor, WriteOptions};
+pub use embedded_object::WriteOptions;
 pub use encryption::EncryptionProfile;
 pub use equation::{EQUATION_3_CLSID, MtefEquation, MtefEquationWriteOptions};
 pub use footnote::{Endnote, Footnote};

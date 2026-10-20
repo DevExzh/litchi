@@ -209,8 +209,10 @@ fn genuine_embedded_object_transfer_closes_cfb_field_preview_and_storage() {
     let mut preview = 12u32.to_le_bytes().to_vec();
     preview.extend_from_slice(&7_701u32.to_le_bytes());
     preview.extend_from_slice(&[0; 4]);
-    let mut donor_owner =
-        litchi_doc::Editor::open(donor_base, Limits::default()).expect("real donor embedded owner");
+    let mut donor_owner = litchi_doc::Package::from_bytes(&donor_base)
+        .expect("real donor package")
+        .edit_embedded_objects()
+        .expect("real donor embedded owner");
     donor_owner
         .add(litchi_doc::WriteOptions::new(
             7_701,
@@ -218,7 +220,13 @@ fn genuine_embedded_object_transfer_closes_cfb_field_preview_and_storage() {
             preview,
         ))
         .expect("seed inert resource on genuine donor");
-    let donor = authorized_fixture(&donor_owner.finish().expect("genuine donor publication"));
+    let donor = authorized_fixture(
+        donor_owner
+            .commit()
+            .expect("genuine donor publication")
+            .patch()
+            .after_bytes(),
+    );
 
     let receiver = authorized_fixture(
         &std::fs::read(fixture("test-data/ole/doc/documentProperties.doc"))

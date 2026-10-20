@@ -13,6 +13,6 @@ mod patch;
 mod snapshot;
 mod storage;
 
-pub use edit::{Transaction, TransactionError};
-pub use patch::{Commit, Patch};
+pub(crate) use edit::{Transaction, TransactionError};
+pub(crate) use patch::{Commit, Patch};
 pub use snapshot::Snapshot;

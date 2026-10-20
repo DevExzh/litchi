@@ -95,7 +95,7 @@ fn missing_stream() -> PackageError {
 
 impl Editor {
     /// Returns one managed object's OLEDS presentation under explicit limits.
-    pub fn presentation(
+    pub(crate) fn presentation(
         &self,
         storage_id: u32,
         index: usize,
@@ -106,7 +106,7 @@ impl Editor {
     }
 
     /// Returns one DOC-reference-selected presentation under explicit limits.
-    pub fn presentation_for(
+    pub(crate) fn presentation_for(
         &self,
         reference: &Reference,
         index: usize,
@@ -118,7 +118,7 @@ impl Editor {
     }
 
     /// Returns all managed presentations under explicit limits.
-    pub fn presentations(
+    pub(crate) fn presentations(
         &self,
         storage_id: u32,
         limits: ole_streams::Limits,
@@ -128,7 +128,7 @@ impl Editor {
     }
 
     /// Returns all DOC-reference-selected presentations under explicit limits.
-    pub fn presentations_for(
+    pub(crate) fn presentations_for(
         &self,
         reference: &Reference,
         limits: ole_streams::Limits,
@@ -139,7 +139,7 @@ impl Editor {
     }
 
     /// Returns one managed object's native-data stream under explicit limits.
-    pub fn native(
+    pub(crate) fn native(
         &self,
         storage_id: u32,
         limits: ole_streams::Limits,
@@ -149,7 +149,7 @@ impl Editor {
     }
 
     /// Returns DOC-reference-selected native data under explicit limits.
-    pub fn native_for(
+    pub(crate) fn native_for(
         &self,
         reference: &Reference,
         limits: ole_streams::Limits,
@@ -171,7 +171,11 @@ impl Editor {
     ///
     /// Returns an error when the storage ID is not referenced, the replacement
     /// is malformed/oversized, or the candidate package cannot be validated.
-    pub fn replace_storage(&mut self, storage_id: u32, compound_file: Vec<u8>) -> Result<()> {
+    pub(crate) fn replace_storage(
+        &mut self,
+        storage_id: u32,
+        compound_file: Vec<u8>,
+    ) -> Result<()> {
         let reference = reference_for_storage_id(self, storage_id)?;
         let object = object_for_reference_checked(self, &reference)?;
         let key = object.key().to_owned();
@@ -194,7 +198,7 @@ impl Editor {
     }
 
     /// Atomically edits a presentation under explicit OLEDS limits.
-    pub fn update_presentation<F>(
+    pub(crate) fn update_presentation<F>(
         &mut self,
         storage_id: u32,
         index: usize,
@@ -209,7 +213,7 @@ impl Editor {
     }
 
     /// Atomically edits a DOC-reference-selected presentation under limits.
-    pub fn update_presentation_for<F>(
+    pub(crate) fn update_presentation_for<F>(
         &mut self,
         reference: &Reference,
         index: usize,
@@ -243,7 +247,7 @@ impl Editor {
     }
 
     /// Applies a source-checked OLEDS presentation patch atomically.
-    pub fn apply_presentation_patch(
+    pub(crate) fn apply_presentation_patch(
         &mut self,
         storage_id: u32,
         index: usize,
@@ -254,7 +258,7 @@ impl Editor {
     }
 
     /// Applies a presentation patch selected by a DOC object reference.
-    pub fn apply_presentation_patch_for(
+    pub(crate) fn apply_presentation_patch_for(
         &mut self,
         reference: &Reference,
         index: usize,
@@ -282,7 +286,7 @@ impl Editor {
     }
 
     /// Atomically edits native data under explicit OLEDS limits.
-    pub fn update_native<F>(
+    pub(crate) fn update_native<F>(
         &mut self,
         storage_id: u32,
         limits: ole_streams::Limits,
@@ -296,7 +300,7 @@ impl Editor {
     }
 
     /// Atomically edits DOC-reference-selected native data under limits.
-    pub fn update_native_for<F>(
+    pub(crate) fn update_native_for<F>(
         &mut self,
         reference: &Reference,
         limits: ole_streams::Limits,
@@ -329,13 +333,17 @@ impl Editor {
     }
 
     /// Applies a source-checked OLEDS native-data patch atomically.
-    pub fn apply_native_patch(&mut self, storage_id: u32, patch: &native::Patch) -> Result<()> {
+    pub(crate) fn apply_native_patch(
+        &mut self,
+        storage_id: u32,
+        patch: &native::Patch,
+    ) -> Result<()> {
         let reference = reference_for_storage_id(self, storage_id)?;
         self.apply_native_patch_for(&reference, patch)
     }
 
     /// Applies a native-data patch selected by a DOC object reference.
-    pub fn apply_native_patch_for(
+    pub(crate) fn apply_native_patch_for(
         &mut self,
         reference: &Reference,
         patch: &native::Patch,

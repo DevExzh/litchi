@@ -34,9 +34,9 @@
 
 use litchi_cfb::OleFile;
 use litchi_doc::builder::Builder;
-use litchi_doc::embedded_object::{Info, Limits};
+use litchi_doc::embedded_object::Info;
 use litchi_doc::writer::Picture;
-use litchi_doc::{EQUATION_3_CLSID, Editor, MtefEquation, MtefEquationWriteOptions, raw::Reader};
+use litchi_doc::{EQUATION_3_CLSID, MtefEquation, MtefEquationWriteOptions, Package, raw::Reader};
 use litchi_ole_common::object::{Edit as ObjectEditor, Limits as ObjectLimits, Target, Targets};
 use std::io::Cursor;
 
@@ -80,7 +80,8 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
     let equation = MtefEquation::from_mtef_payload(payload.clone()).unwrap();
     assert_eq!(equation.mtef_payload(), payload);
     let preview = Picture::new(preview_png()).unwrap();
-    let mut editor = Editor::open(base_doc(), Limits::default()).unwrap();
+    let source = Package::from_bytes(&base_doc()).unwrap();
+    let mut editor = source.edit_embedded_objects().unwrap();
     let reference = editor
         .add_mtef_equation(MtefEquationWriteOptions::new(314_159, equation, preview))
         .unwrap();
@@ -94,7 +95,7 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
             .collect::<Vec<_>>(),
         vec![reference.storage_id]
     );
-    let bytes = editor.finish().unwrap();
+    let bytes = editor.commit().unwrap().patch().after_bytes().to_vec();
 
     let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
     let storage = ole
@@ -135,7 +136,10 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
             .equation_native()
     );
 
-    let reopened = Editor::open(bytes.clone(), Limits::default()).unwrap();
+    let reopened = Package::from_bytes(&bytes)
+        .unwrap()
+        .embedded_objects()
+        .unwrap();
     assert_eq!(
         reopened
             .objects()
