@@ -926,7 +926,7 @@ fn joined_edits_are_deterministic_disjoint_and_conflict_aware() {
     assert_eq!(
         joined
             .sub_edits()
-            .map(edit::PreparedEdit::id)
+            .map(edit::SubEdit::id)
             .collect::<Vec<_>>(),
         ["a-name", "z-text"]
     );

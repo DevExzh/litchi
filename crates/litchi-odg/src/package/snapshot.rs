@@ -19,7 +19,7 @@ use crate::transition::Transition;
 use litchi_core::{
     BlobBundle, BlobLimits, CompositionLimits, DiagnosticFingerprint, Error,
     History as CoreHistory, HistoryLimits, JoinedSubEdits, Metadata, Patch as CorePatch,
-    PatchLimits, PatchOperation, Result, Reversible, ReversibleOperation, SubEdit,
+    PatchLimits, PatchOperation, Result, Reversible, ReversibleOperation,
 };
 use litchi_odf_common::{
     Error as OdfError, OpenOptions, compact_xml,
@@ -155,6 +155,20 @@ pub enum SecurityLifecycleOperation {
 pub enum SecurityLifecycleRefusal {
     ExistingPackageReencryptionUnavailable,
     ExistingPackageResigningUnavailable,
+}
+
+impl SecurityLifecycleRefusal {
+    /// The refusal class litchi-ops reports for this reason (record 0351
+    /// §2.4): the route does not implement the operation.
+    #[must_use]
+    pub const fn kind(self) -> litchi_core::edit::RefusalKind {
+        match self {
+            Self::ExistingPackageReencryptionUnavailable
+            | Self::ExistingPackageResigningUnavailable => {
+                litchi_core::edit::RefusalKind::UnsupportedOperation
+            },
+        }
+    }
 }
 
 /// Supported, exact-preservation-only, or finally unsupported lifecycle disposition.
@@ -4896,7 +4910,7 @@ impl Patch {
         &self,
         identifier: impl Into<String>,
         limits: CompositionLimits,
-    ) -> Result<PreparedEdit> {
+    ) -> Result<SubEdit> {
         let durable = self.durable()?;
         let writes = if durable
             .operations()
@@ -4938,7 +4952,7 @@ impl Lineage {
 }
 
 /// One independently prepared ODG semantic patch.
-pub type PreparedEdit = SubEdit<Lineage, DurablePatch>;
+pub type SubEdit = litchi_core::SubEdit<Lineage, DurablePatch>;
 
 /// Deterministically ordered, provably disjoint ODG sub-edits.
 pub type JoinedEdits = JoinedSubEdits<Lineage, DurablePatch>;

@@ -1,10 +1,27 @@
-//! Source-checked master-document title transactions.
+//! Source-checked master-document title edits: the `title` family.
+//!
+//! [`Package::edit_title`](crate::Package::edit_title) stages an [`Edit`];
+//! [`Edit::commit`] publishes a new [`Package`](crate::Package) with its
+//! [`Patch`] and [`Diagnostics`];
+//! [`Package::apply_title`](crate::Package::apply_title) replays a patch onto
+//! its exact source.
 
-use litchi_core::{Error, Metadata, Result};
+use litchi_core::{Error as CoreError, Metadata, Result};
 use litchi_odf_common::core::{MetaXmlPatch, metadata::Metadata as OdfMetadata, patch_meta_xml};
 use std::sync::Arc;
 
 use crate::Package;
+
+/// Whether a commit changed the package bytes.
+pub use litchi_core::edit::Diagnostics;
+/// The family error: typed limits, refusals and patch conflicts plus the
+/// common-core payload.
+pub use litchi_odf_common::Error;
+/// The dimension named by [`Error::Limit`] and [`Error::InvalidLimit`].
+pub use litchi_odf_common::LimitKind;
+
+/// A committed title edit: the published package, its patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
 const MAX_TITLE_BYTES: usize = 16 * 1024;
 
@@ -60,10 +77,14 @@ impl<'source> Edit<'source> {
     ///
     /// Returns an error when the source metadata cannot be patched, the
     /// candidate package cannot be validated, or title readback differs.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(self) -> std::result::Result<Commit, Error> {
+        Ok(self.commit_core()?)
+    }
+
+    fn commit_core(self) -> Result<Commit> {
         if self.before == self.after {
             let snapshot = self.source.clone();
-            return Ok(Commit::new(self.source, snapshot));
+            return Ok(commit(self.source, snapshot));
         }
         let source_meta_xml = self
             .source_meta_xml
@@ -84,50 +105,17 @@ impl<'source> Edit<'source> {
                 "ODM title transaction readback differs from the staged title",
             ));
         }
-        Ok(Commit::new(self.source, snapshot))
+        Ok(commit(self.source, snapshot))
     }
 }
 
-/// A validated publication result containing a new master snapshot and patch.
-pub struct Commit {
-    snapshot: Package,
-    patch: Patch,
-}
-
-impl Commit {
-    fn new(before: &Package, snapshot: Package) -> Self {
-        Self {
-            patch: Patch {
-                before: before.shared_bytes(),
-                after: snapshot.shared_bytes(),
-            },
-            snapshot,
-        }
-    }
-
-    /// Returns the committed immutable package.
-    #[must_use]
-    pub const fn package(&self) -> &Package {
-        &self.snapshot
-    }
-
-    /// Returns the exact-source-checked reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consumes this result and returns the committed immutable package.
-    #[must_use]
-    pub fn into_package(self) -> Package {
-        self.snapshot
-    }
-
-    /// Consumes the commit into its published package and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Package, Patch) {
-        (self.snapshot, self.patch)
-    }
+fn commit(before: &Package, snapshot: Package) -> Commit {
+    let patch = Patch {
+        before: before.shared_bytes(),
+        after: snapshot.shared_bytes(),
+    };
+    let diagnostics = Diagnostics::new(!patch.is_noop());
+    Commit::new(snapshot, patch, diagnostics)
 }
 
 /// An exact-source-checked reversible master-document title patch.
@@ -150,13 +138,19 @@ impl Patch {
     ///
     /// Returns an error when `source` is not byte-for-byte identical to the
     /// source snapshot accepted by this patch.
-    pub(crate) fn apply(&self, source: &Package) -> Result<Package> {
+    pub(crate) fn apply(&self, source: &Package) -> std::result::Result<Commit, Error> {
         if !self.is_applicable_to(source) {
-            return Err(invalid(
-                "ODM title patch source does not match its expected snapshot",
+            return Err(Error::patch_conflict(
+                "title.apply",
+                "the package is not the patch source",
             ));
         }
-        Package::from_shared_bytes(Arc::clone(&self.after))
+        let package = Package::from_shared_bytes(Arc::clone(&self.after))?;
+        Ok(Commit::new(
+            package,
+            self.clone(),
+            Diagnostics::new(!self.is_noop()),
+        ))
     }
 
     /// Returns the patch that restores the exact source package bytes.
@@ -190,6 +184,6 @@ pub(crate) fn validate_title(title: &str) -> Result<()> {
     Ok(())
 }
 
-fn invalid(message: &str) -> Error {
-    Error::InvalidFormat(message.to_owned())
+fn invalid(message: &str) -> CoreError {
+    CoreError::InvalidFormat(message.to_owned())
 }

@@ -344,7 +344,10 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error when this package does not match the patch's source.
-    pub fn apply_title(&self, patch: &crate::title::Patch) -> Result<Self> {
+    pub fn apply_title(
+        &self,
+        patch: &crate::title::Patch,
+    ) -> std::result::Result<crate::title::Commit, PackageError> {
         patch.apply(self)
     }
 
@@ -370,7 +373,10 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error when this package does not match the patch's source.
-    pub fn apply_link(&self, patch: &crate::link::Patch) -> Result<Self> {
+    pub fn apply_link(
+        &self,
+        patch: &crate::link::Patch,
+    ) -> std::result::Result<crate::link::Commit, PackageError> {
         patch.apply(self)
     }
 

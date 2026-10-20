@@ -44,6 +44,19 @@ pub enum ComponentTransferRefusal {
     FormattedXmlRequiresSourceProvenance,
 }
 
+impl ComponentTransferRefusal {
+    /// The refusal class litchi-ops reports for this reason (record 0351
+    /// §2.4): the payload is content the writer cannot keep.
+    #[must_use]
+    pub const fn kind(self) -> litchi_core::edit::RefusalKind {
+        match self {
+            Self::FormattedXmlRequiresSourceProvenance => {
+                litchi_core::edit::RefusalKind::UnsupportedContent
+            },
+        }
+    }
+}
+
 /// Whether the inventoried payload can pass the current audited writer.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum ComponentTransferSupport {

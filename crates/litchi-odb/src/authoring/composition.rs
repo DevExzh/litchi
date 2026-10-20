@@ -18,7 +18,7 @@ pub use litchi_core::{CompositionLimits, MergeChoice};
 pub struct Lineage(Arc<[u8]>);
 
 /// One independently prepared ODB patch with canonical semantic effects.
-pub type PreparedEdit = litchi_core::SubEdit<Lineage, Patch>;
+pub type SubEdit = litchi_core::SubEdit<Lineage, Patch>;
 
 /// Deterministically ordered, provably disjoint ODB sub-edits.
 pub type JoinedEdits = litchi_core::JoinedSubEdits<Lineage, Patch>;
@@ -43,7 +43,7 @@ impl Patch {
         &self,
         identifier: impl Into<String>,
         limits: CompositionLimits,
-    ) -> std::result::Result<PreparedEdit, litchi_core::CompositionError> {
+    ) -> std::result::Result<SubEdit, litchi_core::CompositionError> {
         let writes = effect_keys(&self.changes);
         litchi_core::SubEdit::new(
             lineage(&self.source),
