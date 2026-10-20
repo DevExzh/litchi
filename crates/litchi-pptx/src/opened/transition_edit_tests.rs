@@ -125,7 +125,7 @@ fn shape_edits_work_after_an_extension_transition() -> Result<()> {
     edit.add_text_box(0_usize, "beta", (0, 0, 914_400, 914_400))?;
     edit.set_text_properties(
         0_usize,
-        &[super::TextEdit::new(
+        &[super::TextAssignment::new(
             super::TextTarget::Shape {
                 shape: Position::new(0),
             },

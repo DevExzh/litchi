@@ -15,7 +15,7 @@ use litchi_opc::constants::relationship_type as rt;
 
 use super::Edit;
 use crate::master_layout::PlaceholderKind;
-use crate::opened::{TextEdit, TextProperties, TextTarget};
+use crate::opened::{TextAssignment, TextProperties, TextTarget};
 use crate::{Error, Result};
 
 const fn is_title(kind: PlaceholderKind) -> bool {
@@ -270,7 +270,7 @@ impl Edit {
         position: Position,
         text: &str,
     ) -> Result<()> {
-        let edits = [TextEdit::new(
+        let edits = [TextAssignment::new(
             TextTarget::Shape { shape: position },
             TextProperties::default().with_text(text),
         )];

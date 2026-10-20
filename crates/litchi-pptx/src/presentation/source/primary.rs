@@ -1584,7 +1584,7 @@ impl Edit {
     pub fn set_text_properties(
         &mut self,
         slide: impl Into<Position>,
-        edits: &[crate::opened::TextEdit<'_>],
+        edits: &[crate::opened::TextAssignment<'_>],
     ) -> Result<usize> {
         self.stage_slide_edit(
             slide.into(),
@@ -1707,7 +1707,7 @@ impl Edit {
     pub fn set_text_property_chunks(
         &mut self,
         slide: impl Into<Position>,
-        chunks: &[&[crate::opened::TextEdit<'_>]],
+        chunks: &[&[crate::opened::TextAssignment<'_>]],
     ) -> Result<usize> {
         self.stage_slide_edit(
             slide.into(),
@@ -1722,7 +1722,7 @@ impl Edit {
     pub fn set_text_property_chunks_per_edit(
         &mut self,
         slide: impl Into<Position>,
-        chunks: &[&[crate::opened::TextEdit<'_>]],
+        chunks: &[&[crate::opened::TextAssignment<'_>]],
     ) -> Result<Vec<bool>> {
         let mut changes = Vec::new();
         self.stage_slide_edit(

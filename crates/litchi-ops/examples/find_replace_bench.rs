@@ -194,7 +194,7 @@ fn docx_paragraph(paragraphs: usize) -> Outcome<serde_json::Value> {
 fn pptx(slides: usize, matches: usize) -> Outcome<serde_json::Value> {
     use litchi_core::Position;
     use litchi_ops::{File, OpenOptions, SourceMode, props};
-    use litchi_pptx::opened::{TextEdit, TextProperties, TextTarget};
+    use litchi_pptx::opened::{TextAssignment, TextProperties, TextTarget};
 
     let bytes = pptx_fixture(slides, matches)?;
     let package = litchi_pptx::Package::from_bytes(&bytes)?;
@@ -221,10 +221,10 @@ fn pptx(slides: usize, matches: usize) -> Outcome<serde_json::Value> {
                     texts.push((index, text.replace("needle", "pin")));
                 }
             }
-            let edits: Vec<TextEdit<'_>> = texts
+            let edits: Vec<TextAssignment<'_>> = texts
                 .iter()
                 .map(|(index, text)| {
-                    TextEdit::new(
+                    TextAssignment::new(
                         TextTarget::Run {
                             shape: Position::new(*index),
                             paragraph: Position::new(0),

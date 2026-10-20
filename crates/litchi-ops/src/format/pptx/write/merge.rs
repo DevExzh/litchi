@@ -7,7 +7,7 @@
 use std::ops::Range;
 
 use litchi_drawingml::text::body::RunKind;
-use litchi_pptx::opened::{TextEdit, TextProperties};
+use litchi_pptx::opened::{TextAssignment, TextProperties};
 
 use super::find::{Place, RunChange};
 use super::{Commit, Pptx};
@@ -107,8 +107,8 @@ pub(crate) fn merge(
     if changes.is_empty() {
         return Ok((None, summary));
     }
-    let mut slides: Vec<(usize, Vec<TextEdit<'_>>)> = Vec::new();
-    let mut notes: Vec<(usize, Vec<TextEdit<'_>>)> = Vec::new();
+    let mut slides: Vec<(usize, Vec<TextAssignment<'_>>)> = Vec::new();
+    let mut notes: Vec<(usize, Vec<TextAssignment<'_>>)> = Vec::new();
     for change in &changes {
         let groups = match change.locus.place {
             Place::Slide => &mut slides,
@@ -121,7 +121,7 @@ pub(crate) fn merge(
             groups.push((change.locus.slide, Vec::new()));
         }
         if let (Some((_, edits)), Some(text)) = (groups.last_mut(), &change.text) {
-            edits.push(TextEdit::new(
+            edits.push(TextAssignment::new(
                 change.target(None),
                 TextProperties::default().with_text(text),
             ));

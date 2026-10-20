@@ -806,7 +806,7 @@ impl Edit {
     pub fn set_text_properties<'s>(
         &mut self,
         slide: impl Into<crate::slide::Selector<'s>>,
-        edits: &[super::TextEdit<'_>],
+        edits: &[super::TextAssignment<'_>],
     ) -> Result<usize> {
         let selected_slide = self.resolve_slide(slide.into())?;
         let owner = self.working.get_part(&selected_slide.part_name)?;
@@ -839,7 +839,7 @@ impl Edit {
     pub fn set_text_property_chunks<'s>(
         &mut self,
         slide: impl Into<crate::slide::Selector<'s>>,
-        chunks: &[&[super::TextEdit<'_>]],
+        chunks: &[&[super::TextAssignment<'_>]],
     ) -> Result<usize> {
         self.text_property_chunks(slide.into(), chunks, None)
     }
@@ -856,7 +856,7 @@ impl Edit {
     pub fn set_text_property_chunks_per_edit<'s>(
         &mut self,
         slide: impl Into<crate::slide::Selector<'s>>,
-        chunks: &[&[super::TextEdit<'_>]],
+        chunks: &[&[super::TextAssignment<'_>]],
     ) -> Result<Vec<bool>> {
         let mut changes = Vec::new();
         self.text_property_chunks(slide.into(), chunks, Some(&mut changes))?;
@@ -866,7 +866,7 @@ impl Edit {
     fn text_property_chunks(
         &mut self,
         slide: crate::slide::Selector<'_>,
-        chunks: &[&[super::TextEdit<'_>]],
+        chunks: &[&[super::TextAssignment<'_>]],
         changes: Option<&mut Vec<bool>>,
     ) -> Result<usize> {
         let selected_slide = self.resolve_slide(slide)?;
@@ -1297,7 +1297,7 @@ impl Edit {
     pub fn set_notes_text_properties<'s>(
         &mut self,
         slide: impl Into<crate::slide::Selector<'s>>,
-        edits: &[super::TextEdit<'_>],
+        edits: &[super::TextAssignment<'_>],
     ) -> Result<usize> {
         let selected_slide = self.resolve_slide(slide.into())?;
         let source = crate::notes::load_snapshot(&self.working, &self.source.presentation_name)?;
@@ -1342,7 +1342,7 @@ impl Edit {
     pub fn set_notes_text_property_chunks<'s>(
         &mut self,
         slide: impl Into<crate::slide::Selector<'s>>,
-        chunks: &[&[super::TextEdit<'_>]],
+        chunks: &[&[super::TextAssignment<'_>]],
     ) -> Result<usize> {
         self.notes_text_property_chunks(slide.into(), chunks, None)
     }
@@ -1357,7 +1357,7 @@ impl Edit {
     pub fn set_notes_text_property_chunks_per_edit<'s>(
         &mut self,
         slide: impl Into<crate::slide::Selector<'s>>,
-        chunks: &[&[super::TextEdit<'_>]],
+        chunks: &[&[super::TextAssignment<'_>]],
     ) -> Result<Vec<bool>> {
         let mut changes = Vec::new();
         self.notes_text_property_chunks(slide.into(), chunks, Some(&mut changes))?;
@@ -1367,7 +1367,7 @@ impl Edit {
     fn notes_text_property_chunks(
         &mut self,
         slide: crate::slide::Selector<'_>,
-        chunks: &[&[super::TextEdit<'_>]],
+        chunks: &[&[super::TextAssignment<'_>]],
         changes: Option<&mut Vec<bool>>,
     ) -> Result<usize> {
         let selected_slide = self.resolve_slide(slide)?;

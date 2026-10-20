@@ -32,7 +32,7 @@ pub const MIN_FONT_SIZE: u32 = 100;
 /// The largest accepted typeface name, in bytes.
 pub const MAX_TYPEFACE_BYTES: usize = 1_024;
 
-/// The text element a [`TextEdit`] changes.
+/// The text element a [`TextAssignment`] changes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum TextTarget {
@@ -183,7 +183,7 @@ pub enum ShapeFill {
     None,
 }
 
-/// Optional property assignments for one [`TextEdit`].
+/// Optional property assignments for one [`TextAssignment`].
 ///
 /// Each field is `None` to leave the property as it is, `Some(None)` to
 /// remove the local property, and `Some(Some(value))` to set it.
@@ -349,12 +349,12 @@ impl<'a> TextProperties<'a> {
 
 /// One formatting assignment for [`super::Edit::set_text_properties`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TextEdit<'a> {
+pub struct TextAssignment<'a> {
     target: TextTarget,
     properties: TextProperties<'a>,
 }
 
-impl<'a> TextEdit<'a> {
+impl<'a> TextAssignment<'a> {
     /// Assign `properties` to `target`.
     #[must_use]
     pub const fn new(target: TextTarget, properties: TextProperties<'a>) -> Self {
@@ -379,7 +379,7 @@ impl<'a> TextEdit<'a> {
 /// complete shape scene whose shape count and identities must match.
 pub(crate) fn stage_text_properties(
     xml: &[u8],
-    edits: &[TextEdit<'_>],
+    edits: &[TextAssignment<'_>],
     max_text_bytes: usize,
     max_output_bytes: usize,
 ) -> Result<(Option<Vec<u8>>, usize)> {
@@ -417,7 +417,7 @@ pub(crate) fn stage_text_properties(
 /// reports it.
 pub(crate) fn stage_text_property_chunks(
     xml: &[u8],
-    chunks: &[&[TextEdit<'_>]],
+    chunks: &[&[TextAssignment<'_>]],
     max_text_bytes: usize,
     max_output_bytes: usize,
     mut changes: Option<&mut Vec<bool>>,
@@ -481,7 +481,7 @@ pub(crate) fn stage_text_property_chunks(
 /// is appended in order (record 0348).
 fn stage_admitted_text_edits(
     xml: &[u8],
-    edits: &[TextEdit<'_>],
+    edits: &[TextAssignment<'_>],
     max_output_bytes: usize,
     mut changes: Option<&mut Vec<bool>>,
 ) -> Result<(Option<Vec<u8>>, usize)> {
@@ -758,7 +758,7 @@ const fn shape_position(target: TextTarget) -> Position {
     }
 }
 
-fn validate(edit: &TextEdit<'_>) -> Result<()> {
+fn validate(edit: &TextAssignment<'_>) -> Result<()> {
     let properties = &edit.properties;
     if properties.is_empty() {
         return Err(Error::Invalid(

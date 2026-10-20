@@ -127,7 +127,7 @@ fn validate(change: &Change<'_>, max_text_bytes: usize) -> Result<()> {
         ..*properties
     };
     if !check.is_empty() {
-        super::validate(&super::TextEdit::new(
+        super::validate(&super::TextAssignment::new(
             super::TextTarget::Shape {
                 shape: Position::new(0),
             },

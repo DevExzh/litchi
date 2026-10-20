@@ -81,7 +81,7 @@ fn eager_insertion_instantiates_layout_placeholders() {
     // it; the text-body verb fills it.
     let mut edit = package.edit().unwrap();
     assert!(edit.set_shape_text(1usize, 0usize, "Agenda").is_err());
-    let title = litchi_pptx::opened::TextEdit::new(
+    let title = litchi_pptx::opened::TextAssignment::new(
         litchi_pptx::opened::TextTarget::Shape {
             shape: Position::new(0),
         },

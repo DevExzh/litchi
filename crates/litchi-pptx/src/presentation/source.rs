@@ -2954,7 +2954,10 @@ impl SourceBackedSlideEdit {
     ///
     /// See [`crate::opened::Edit::set_text_properties`]. Only the selected
     /// slide payload changes, so the source-backed proof path still applies.
-    pub fn set_text_properties(&mut self, edits: &[crate::opened::TextEdit<'_>]) -> Result<usize> {
+    pub fn set_text_properties(
+        &mut self,
+        edits: &[crate::opened::TextAssignment<'_>],
+    ) -> Result<usize> {
         self.check_execution()?;
         self.refuse_enclosed("set_text_properties")?;
         if edits.is_empty() {
@@ -3025,7 +3028,7 @@ impl SourceBackedSlideEdit {
     /// [`crate::opened::Edit::set_text_property_chunks`].
     pub fn set_text_property_chunks(
         &mut self,
-        chunks: &[&[crate::opened::TextEdit<'_>]],
+        chunks: &[&[crate::opened::TextAssignment<'_>]],
     ) -> Result<usize> {
         self.text_property_chunks(chunks, None)
     }
@@ -3035,7 +3038,7 @@ impl SourceBackedSlideEdit {
     /// [`crate::opened::Edit::set_text_property_chunks_per_edit`].
     pub fn set_text_property_chunks_per_edit(
         &mut self,
-        chunks: &[&[crate::opened::TextEdit<'_>]],
+        chunks: &[&[crate::opened::TextAssignment<'_>]],
     ) -> Result<Vec<bool>> {
         let mut changes = Vec::new();
         self.text_property_chunks(chunks, Some(&mut changes))?;
@@ -3044,7 +3047,7 @@ impl SourceBackedSlideEdit {
 
     pub(crate) fn text_property_chunks(
         &mut self,
-        chunks: &[&[crate::opened::TextEdit<'_>]],
+        chunks: &[&[crate::opened::TextAssignment<'_>]],
         mut changes: Option<&mut Vec<bool>>,
     ) -> Result<usize> {
         self.check_execution()?;

@@ -28,7 +28,7 @@ mod enabled {
     use litchi_drawingml::geom::Preset;
     use litchi_ops::batch::{Options, Unsupported};
     use litchi_ops::{BatchItem, File, NewNode, OpenOptions, Props, SourceMode, props};
-    use litchi_pptx::opened::{Rgb, ShapeFill, TextEdit, TextProperties, TextTarget};
+    use litchi_pptx::opened::{Rgb, ShapeFill, TextAssignment, TextProperties, TextTarget};
     use litchi_pptx::transition::{Kind, Side, Transition};
 
     const DECKS: &[usize] = &[1, 100, 1_000];
@@ -114,7 +114,7 @@ mod enabled {
             let shape = Position::new(shapes);
             edit.set_text_properties(
                 0_usize,
-                &[TextEdit::new(TextTarget::Shape { shape }, format())],
+                &[TextAssignment::new(TextTarget::Shape { shape }, format())],
             )
             .expect("format");
             edit.commit().expect("commit").into_package()
@@ -188,7 +188,7 @@ mod enabled {
             let mut edit = native.edit().expect("edit");
             edit.set_text_properties(
                 0_usize,
-                &[TextEdit::new(
+                &[TextAssignment::new(
                     TextTarget::Shape {
                         shape: Position::new(0),
                     },
